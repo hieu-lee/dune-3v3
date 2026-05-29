@@ -7,10 +7,11 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "tsc -b && vite build",
-    "preview": "vite preview --host 0.0.0.0"
+    "preview": "vite preview --host 0.0.0.0",
+    "sync:cards": "node scripts/sync-dune-catalog.mjs",
+    "sync:card-images": "node scripts/sync-dune-catalog.mjs --download-images"
   },
   "dependencies": {
-    "@vitejs/plugin-react": "5.2.0",
     "lucide-react": "0.554.0",
     "react": "19.2.6",
     "react-dom": "19.2.6",

@@ -29,6 +29,9 @@ These notes are implementation scaffolding, not a replacement for the rulebook. 
 - Six-player icon mapping adds Great Houses and Fringe Worlds while retaining the normal icon vocabulary.
 - Team actions include troop reinforcement and trade of one trade-good type between teammates.
 - Swordmaster is single-use in six-player mode and then grants reveal strength each round.
+- Spy icons require an owned spy on a connected observation post; the current board model tracks spy posts by nearby board space until scanned board coordinates are available.
+- Dune Cards Hub's generic `Spy` attribute appears in reveal text, acquire bonuses, and conditions. Do not treat it as a play-time spy placement unless grouped/detail text confirms that timing.
+- Variable printed reveal effects must pause buying/end-turn flow until the table applies the printed persuasion or strength adjustment.
 - CHOAM module is mandatory in 6p; contracts and marked cards need first-class data support.
 - Conflict deck uses 5 Conflict II cards over 4 Conflict III cards; no Conflict I cards.
 
@@ -60,6 +63,7 @@ The UI should stay usable without these files and automatically upgrade when fil
 
 - Dune Cards Hub API: `https://dunecardshub.com/api/cards`
 - Dune Cards Hub attributes: `https://dunecardshub.com/api/cards/attributes`
+- Dune Cards Hub leaders: `https://dunecardshub.com/api/cards/leaders`
 - Dune Cards Hub search: `https://dunecardshub.com/api/cards/search?q=Arrakis%20Revolt`
 - DuneBlend structured card data: `https://github.com/anttttti/DuneBlend`
 - Dune Imperium Assets visual lookup: `https://www.duneimperiumassets.com/`
@@ -69,3 +73,12 @@ The UI should stay usable without these files and automatically upgrade when fil
 - Fan 3v3 FAQ: `https://tesera.ru/images/items/2513457/Dune%20Uprising%203v3%20FAQ.pdf`
 
 Keep official PDFs as the rules authority. Fan JSON, images, and repos are extraction aids for private playgroup asset/data entry.
+
+## Asset Leads
+
+- Dune Cards Hub image paths should come from the API fields, not generated slugs. Some filenames intentionally contain typos.
+- Example Dune Cards Hub card image: `https://dunecardshub.com/images/uprising-imperium-guild-envoy.webp`
+- Example Dune Cards Hub leader image: `https://dunecardshub.com/images/uprising-leader-muad-dib.webp`
+- TechnoTone board image lead: `https://raw.githubusercontent.com/TechnoTone/dune-imperium-uprising/master/static/img/board.jpg`
+- Chatanga/DuneImmorality board URL references: `https://raw.githubusercontent.com/Chatanga/DuneImmorality/main/scripts/modules/en/Board.lua`
+- No stable public source has been found yet for the Uprising six-player full board or commander personal-board images.

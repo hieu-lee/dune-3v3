@@ -1,7 +1,8 @@
-import { imperiumDeck, reserveMarket, starterCards } from "./data";
+import { conflictCards, imperiumDeck, reserveMarket, starterCards } from "./data";
 import type {
   BoardSpace,
   Card,
+  ConflictCard,
   FactionId,
   GameState,
   Influence,
@@ -27,12 +28,26 @@ export function cloneCards(cards: Card[]) {
 }
 
 function shuffleCards(cards: Card[]) {
-  const shuffled = [...cards];
+  return shuffleItems(cards);
+}
+
+function shuffleItems<T>(items: T[]) {
+  const shuffled = [...items];
   for (let index = shuffled.length - 1; index > 0; index -= 1) {
     const swapIndex = Math.floor(Math.random() * (index + 1));
     [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
   }
   return shuffled;
+}
+
+function cloneConflicts(conflicts: ConflictCard[]) {
+  return conflicts.map((conflict) => ({ ...conflict, rewards: [...conflict.rewards] }));
+}
+
+function buildSixPlayerConflictDeck() {
+  const levelTwo = shuffleItems(conflictCards.filter((conflict) => conflict.level === 2)).slice(0, 5);
+  const levelThree = shuffleItems(conflictCards.filter((conflict) => conflict.level === 3));
+  return cloneConflicts([...levelTwo, ...levelThree]);
 }
 
 function buildStarterDeck(team: TeamId) {
@@ -97,6 +112,9 @@ function makePlayer(
 
 export function initialGame(): GameState {
   const market = shuffleCards(cloneCards(imperiumDeck));
+  const [conflict, ...conflictDeck] = buildSixPlayerConflictDeck();
+  if (!conflict) throw new Error("Missing Uprising conflict cards for six-player setup.");
+
   const players = [
     makePlayer("p1", "Seat 1", "Muad'Dib", "muaddib", "Commander", "#45c4b0"),
     makePlayer("p2", "Seat 2", "Feyd-Rautha", "shaddam", "Ally", "#d26b48"),
@@ -116,14 +134,13 @@ export function initialGame(): GameState {
     imperiumRow: market.slice(0, 5),
     marketDeck: market.slice(5),
     reserveMarket: cloneCards(reserveMarket),
+    conflict,
+    conflictDeck,
+    conflictDiscard: [],
+    shieldWall: true,
     swordmasterClaimed: false,
     pendingQueue: [],
-    conflict: {
-      name: "Battle for Arrakeen",
-      stakes: "VP pressure, control, and doubled worm rewards later.",
-      shieldWall: true,
-    },
-    log: ["Round 1 begins. Muad'Dib has first action."],
+    log: [`Round 1 begins. ${conflict.name} is revealed. Muad'Dib has first action.`],
   };
 }
 
@@ -304,6 +321,8 @@ export function allPlayersDone(players: Player[]) {
 
 export function startNextRound(state: GameState): GameState {
   const firstSeat = (state.firstSeat + 1) % state.players.length;
+  const [nextConflict, ...conflictDeck] = state.conflictDeck;
+  const conflictDiscard = state.conflict ? [...state.conflictDiscard, state.conflict] : state.conflictDiscard;
   const players = state.players.map((player) =>
     drawCards(
       {
@@ -328,6 +347,14 @@ export function startNextRound(state: GameState): GameState {
     spaces: {},
     pendingAction: undefined,
     pendingQueue: [],
-    log: [`Round ${state.round + 1} begins. ${players[firstSeat].leader} has first action.`, ...state.log],
+    conflict: nextConflict ?? null,
+    conflictDeck,
+    conflictDiscard,
+    log: [
+      nextConflict
+        ? `Round ${state.round + 1} begins. ${nextConflict.name} is revealed. ${players[firstSeat].leader} has first action.`
+        : `Round ${state.round + 1} begins with no conflict cards remaining. ${players[firstSeat].leader} has first action.`,
+      ...state.log,
+    ],
   };
 }

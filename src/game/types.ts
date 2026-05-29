@@ -41,6 +41,18 @@ export type Card = {
   traits?: string[];
 };
 
+export type ConflictCard = {
+  id: string;
+  name: string;
+  level: 1 | 2 | 3;
+  rewards: string[];
+  stakes: string;
+  imagePath?: string;
+  thumbnailPath?: string;
+  sourceId?: number;
+  sourceSlug?: string;
+};
+
 export type BoardSpace = {
   id: string;
   name: string;
@@ -131,13 +143,12 @@ export type GameState = {
   imperiumRow: Card[];
   marketDeck: Card[];
   reserveMarket: Card[];
+  conflict: ConflictCard | null;
+  conflictDeck: ConflictCard[];
+  conflictDiscard: ConflictCard[];
+  shieldWall: boolean;
   swordmasterClaimed: boolean;
   pendingAction?: PendingAction;
   pendingQueue: PendingAction[];
-  conflict: {
-    name: string;
-    stakes: string;
-    shieldWall: boolean;
-  };
   log: string[];
 };

@@ -34,6 +34,7 @@ These notes are implementation scaffolding, not a replacement for the rulebook. 
 - Variable printed reveal effects must pause buying/end-turn flow until the table applies the printed persuasion or strength adjustment.
 - CHOAM module is mandatory in 6p; contracts and marked cards need first-class data support.
 - Conflict deck uses 5 Conflict II cards over 4 Conflict III cards; no Conflict I cards.
+- Current implementation builds that nine-card six-player conflict deck from the imported Uprising catalog and advances it at round setup.
 
 ## Data Gaps To Fill
 

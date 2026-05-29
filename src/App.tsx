@@ -471,16 +471,38 @@ export default function App() {
             </article>
           ))}
           <article className="conflict-card">
-            <div className="team-heading">
-              <Swords size={18} />
-              <div>
-                <h2>{game.conflict.name}</h2>
-                <p>{game.conflict.stakes}</p>
+            {game.conflict ? (
+              <>
+                {game.conflict.thumbnailPath && <img className="conflict-art" src={game.conflict.thumbnailPath} alt="" />}
+                <div className="team-heading">
+                  <Swords size={18} />
+                  <div>
+                    <span className="conflict-level">
+                      Conflict {game.conflict.level} - {game.conflictDeck.length} queued
+                    </span>
+                    <h2>{game.conflict.name}</h2>
+                    <p>{game.conflict.stakes}</p>
+                  </div>
+                </div>
+                <div className="conflict-rewards">
+                  {game.conflict.rewards.slice(0, 6).map((reward, index) => (
+                    <span key={`${reward}-${index}`}>{reward}</span>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="team-heading">
+                <Swords size={18} />
+                <div>
+                  <span className="conflict-level">Conflict deck exhausted</span>
+                  <h2>No Conflict Remaining</h2>
+                  <p>The nine-card six-player conflict stack has been resolved.</p>
+                </div>
               </div>
-            </div>
+            )}
             <div className="shield-state">
               <Shield size={16} />
-              Shield Wall {game.conflict.shieldWall ? "standing" : "removed"}
+              Shield Wall {game.shieldWall ? "standing" : "removed"}
             </div>
           </article>
         </aside>

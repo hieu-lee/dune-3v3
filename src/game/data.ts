@@ -1,5 +1,5 @@
 import catalogJson from "./uprising-catalog.generated.json";
-import type { BoardSpace, Card, IconId, TeamId } from "./types";
+import type { BoardSpace, Card, ConflictCard, IconId, TeamId } from "./types";
 
 type HubAttribute = [string, number | string | null];
 type HubCard = {
@@ -28,6 +28,7 @@ const iconAttributeMap: Record<string, IconId> = {
 };
 
 const summaryIgnore = new Set(["Persuasion cost", "Persuasion on reveal", "Swords"]);
+const conflictLevelAttributes = new Set(["conflict-1", "conflict-2", "conflict-3"]);
 
 export const iconLabels: Record<IconId, string> = {
   emperor: "Emperor",
@@ -158,6 +159,33 @@ function toImperiumCard(card: HubCard): Card {
 export const imperiumDeck: Card[] = catalog.cards
   .filter((card) => card.type === "imperium")
   .map(toImperiumCard);
+
+function conflictLevel(card: HubCard): ConflictCard["level"] {
+  if (card.attributes.some(([name]) => name === "conflict-3")) return 3;
+  if (card.attributes.some(([name]) => name === "conflict-2")) return 2;
+  return 1;
+}
+
+function toConflictCard(card: HubCard): ConflictCard {
+  const rewards = card.attributes
+    .filter(([name]) => !conflictLevelAttributes.has(name))
+    .map(([name, value]) => (typeof value === "number" ? `${name} ${value}` : name));
+  return {
+    id: `conflict-${card.id}`,
+    name: card.name,
+    level: conflictLevel(card),
+    rewards,
+    stakes: rewards.length ? rewards.join(", ") : "Resolve printed conflict rewards.",
+    imagePath: card.localImagePath ?? card.fullImageUrl ?? undefined,
+    thumbnailPath: card.localThumbnailPath ?? card.thumbnailImageUrl ?? undefined,
+    sourceId: card.id,
+    sourceSlug: card.slug,
+  };
+}
+
+export const conflictCards: ConflictCard[] = catalog.cards
+  .filter((card) => card.type === "conflict")
+  .map(toConflictCard);
 
 export const boardSpaces: BoardSpace[] = [
   {

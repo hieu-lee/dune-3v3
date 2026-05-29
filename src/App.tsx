@@ -17,6 +17,7 @@ import {
 import { type CSSProperties, useMemo, useState } from "react";
 import { boardSpaces, iconLabels, teams } from "./game/data";
 import {
+  advancePendingAction,
   advanceSeat,
   allPlayersDone,
   applyBoardEffect,
@@ -25,10 +26,13 @@ import {
   effectiveCost,
   iconCanReach,
   initialGame,
+  pendingActionForCard,
+  pendingActionsFor,
   pendingActionForSpace,
+  queuePendingActions,
   startNextRound,
 } from "./game/state";
-import type { Card, GameState, ResourceId, Resources, TeamId } from "./game/types";
+import type { BoardSpace, Card, GameState, Player, ResourceId, Resources, TeamId } from "./game/types";
 
 const resources: Array<{ id: ResourceId; label: string; Icon: LucideIcon }> = [
   { id: "solari", label: "Solari", Icon: CircleDollarSign },
@@ -56,11 +60,11 @@ export default function App() {
     return new Set(
       boardSpaces
         .filter((space) => !game.spaces[space.id])
-        .filter((space) => iconCanReach(selectedCard, space, activePlayer, game.swordmasterClaimed))
+        .filter((space) => iconCanReach(selectedCard, space, activePlayer, game.swordmasterClaimed, game.spyPosts))
         .filter((space) => canPay(activePlayer, effectiveCost(space, game.players)))
         .map((space) => space.id),
     );
-  }, [activePlayer, game.pendingAction, game.players, game.spaces, selectedCard]);
+  }, [activePlayer, game.pendingAction, game.players, game.spaces, game.spyPosts, game.swordmasterClaimed, selectedCard]);
 
   const canPlayAgent = Boolean(selectedCard && selectedSpace && legalSpaces.has(selectedSpace.id) && !game.pendingAction);
 
@@ -91,14 +95,23 @@ export default function App() {
         if (candidate.id === effectedTarget.id) return effectedTarget;
         return candidate;
       });
+      const spacePending = pendingActionForSpace(
+        selectedSpace,
+        source,
+        player.role === "Commander" ? effectedTarget : source,
+        players,
+      );
+      const cardPending = pendingActionForCard(selectedCard, source);
+      const pending = queuePendingActions(
+        current,
+        pendingActionsFor(spacePending, cardPending, source.spies),
+      );
       const nextState: GameState = {
         ...current,
         players,
         spaces: { ...current.spaces, [selectedSpace.id]: target.id },
         swordmasterClaimed: current.swordmasterClaimed || selectedSpace.id === "swordmaster",
-        pendingAction:
-          current.pendingAction ??
-          pendingActionForSpace(selectedSpace, source, player.role === "Commander" ? effectedTarget : source, players),
+        ...pending,
         log: [
           player.role === "Commander"
             ? `${player.leader} activates ${target.leader} at ${selectedSpace.name} with ${selectedCard.name}.`
@@ -118,6 +131,9 @@ export default function App() {
     if (activePlayer.revealed) return;
     const persuasion = activePlayer.hand.reduce((sum, card) => sum + card.persuasion, 0);
     const swords = activePlayer.hand.reduce((sum, card) => sum + card.swords, 0) + (activePlayer.swordmasterBonus ? 2 : 0);
+    const printedRevealCards = activePlayer.hand
+      .filter((card) => card.conditionalPersuasion || card.conditionalSwords)
+      .map((card) => card.name);
     setGame((current) => {
       const player = current.players[current.activeSeat];
       const targetId =
@@ -145,7 +161,24 @@ export default function App() {
       return {
         ...current,
         players,
+        pendingAction:
+          printedRevealCards.length > 0
+            ? {
+                kind: "reveal-adjust",
+                ownerId: player.id,
+                combatRecipientId: player.role === "Commander" ? targetId : player.id,
+                cards: printedRevealCards,
+                persuasionAdjustment: 0,
+                strengthAdjustment: 0,
+                source: "Printed reveal",
+              }
+            : current.pendingAction,
         log: [
+          ...(
+            printedRevealCards.length > 0
+              ? [`Resolve printed reveal text for ${printedRevealCards.join(", ")} before finalizing rewards.`]
+              : []
+          ),
           player.role === "Commander"
             ? `${player.leader} reveals for ${persuasion} persuasion and gives ${swords} strength to ${target?.leader ?? "an Ally"}.`
             : `${player.leader} reveals for ${persuasion} persuasion and ${swords} strength.`,
@@ -159,17 +192,15 @@ export default function App() {
     if (game.pendingAction) return;
     if (!activePlayer.revealed || activePlayer.persuasion < (card.cost ?? 0)) return;
     setGame((current) => {
-      const [replacement, ...marketDeck] = current.marketDeck;
-      const imperiumRow = current.imperiumRow
-        .filter((candidate) => candidate.id !== card.id)
-        .concat(replacement ? [replacement] : []);
+      const fromReserve = current.reserveMarket.some((candidate) => candidate.id === card.id);
+      const [replacement, ...marketDeckAfterDraw] = current.marketDeck;
+      const marketDeck = fromReserve ? current.marketDeck : marketDeckAfterDraw;
+      const imperiumRow = fromReserve
+        ? current.imperiumRow
+        : current.imperiumRow.filter((candidate) => candidate.id !== card.id).concat(replacement ? [replacement] : []);
       const players = current.players.map((player, index) =>
         index === current.activeSeat
-          ? {
-              ...player,
-              persuasion: player.persuasion - (card.cost ?? 0),
-              discard: [...player.discard, card],
-            }
+          ? acquireCard(player, card, fromReserve)
           : player,
       );
       return {
@@ -177,7 +208,10 @@ export default function App() {
         players,
         imperiumRow,
         marketDeck,
-        log: [`${activePlayer.leader} acquires ${card.name}.`, ...current.log],
+        log: [
+          `${activePlayer.leader} acquires ${card.name}${card.acquired ? ` for ${card.acquired} VP` : ""}.`,
+          ...current.log,
+        ],
       };
     });
   }
@@ -194,7 +228,78 @@ export default function App() {
   }
 
   function clearPendingAction() {
-    setGame((current) => ({ ...current, pendingAction: undefined }));
+    setGame((current) => ({ ...current, ...advancePendingAction(current) }));
+  }
+
+  function placeSpy(spaceId: string) {
+    if (game.pendingAction?.kind !== "spy") return;
+    setGame((current) => {
+      const pending = current.pendingAction;
+      if (!pending || pending.kind !== "spy" || pending.remaining <= 0) return current;
+      const owner = current.players.find((player) => player.id === pending.ownerId);
+      const space = boardSpaces.find((candidate) => candidate.id === spaceId);
+      if (!owner || !space || owner.spies <= 0 || !canPlaceSpyPost(space, owner, current)) return current;
+      const nextSpies = owner.spies - 1;
+      const players = current.players.map((player) =>
+        player.id === owner.id ? { ...player, spies: nextSpies } : player,
+      );
+      const remaining = Math.min(pending.remaining - 1, nextSpies);
+      return {
+        ...current,
+        players,
+        spyPosts: { ...current.spyPosts, [space.id]: owner.id },
+        ...(remaining > 0 ? { pendingAction: { ...pending, remaining } } : advancePendingAction(current)),
+        log: [`${owner.leader} places a spy near ${space.name} from ${pending.source}.`, ...current.log],
+      };
+    });
+  }
+
+  function adjustRevealReward(persuasionDelta: number, strengthDelta: number) {
+    if (game.pendingAction?.kind !== "reveal-adjust") return;
+    setGame((current) => {
+      const pending = current.pendingAction;
+      if (!pending || pending.kind !== "reveal-adjust") return current;
+      const owner = current.players.find((player) => player.id === pending.ownerId);
+      const recipient = current.players.find((player) => player.id === pending.combatRecipientId);
+      const appliedPersuasion = owner
+        ? Math.max(-pending.persuasionAdjustment, persuasionDelta)
+        : 0;
+      const appliedStrength = recipient
+        ? Math.max(-pending.strengthAdjustment, strengthDelta)
+        : 0;
+      if (appliedPersuasion === 0 && appliedStrength === 0) return current;
+      const players = current.players.map((player) => {
+        let next = player;
+        if (player.id === pending.ownerId) next = { ...next, persuasion: next.persuasion + appliedPersuasion };
+        if (player.id === pending.combatRecipientId) next = { ...next, conflict: next.conflict + appliedStrength };
+        return next;
+      });
+      return {
+        ...current,
+        players,
+        pendingAction: {
+          ...pending,
+          persuasionAdjustment: pending.persuasionAdjustment + appliedPersuasion,
+          strengthAdjustment: pending.strengthAdjustment + appliedStrength,
+        },
+      };
+    });
+  }
+
+  function finishRevealAdjustment() {
+    if (game.pendingAction?.kind !== "reveal-adjust") return;
+    setGame((current) => {
+      const pending = current.pendingAction;
+      if (!pending || pending.kind !== "reveal-adjust") return current;
+      return {
+        ...current,
+        ...advancePendingAction(current),
+        log: [
+          `Printed reveal adjustment resolved: ${signed(pending.persuasionAdjustment)} persuasion, ${signed(pending.strengthAdjustment)} strength.`,
+          ...current.log,
+        ],
+      };
+    });
   }
 
   function deployOne() {
@@ -213,7 +318,7 @@ export default function App() {
       return {
         ...current,
         players,
-        pendingAction: remaining > 0 ? { ...pending, remaining } : undefined,
+        ...(remaining > 0 ? { pendingAction: { ...pending, remaining } } : advancePendingAction(current)),
         log: [`${owner.leader} deploys 1 troop from ${pending.source}.`, ...current.log],
       };
     });
@@ -239,7 +344,7 @@ export default function App() {
       return {
         ...current,
         players,
-        pendingAction: remaining > 0 ? { ...pending, remaining } : undefined,
+        ...(remaining > 0 ? { pendingAction: { ...pending, remaining } } : advancePendingAction(current)),
         log: [`${recipient.leader} receives Military Support into ${destination}.`, ...current.log],
       };
     });
@@ -312,6 +417,13 @@ export default function App() {
   const pendingOwner = pendingAction?.kind === "deploy" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingActor = pendingAction?.kind === "trade" ? game.players.find((player) => player.id === pendingAction.actorId) : undefined;
   const pendingPartner = pendingAction?.kind === "trade" ? game.players.find((player) => player.id === pendingAction.partnerId) : undefined;
+  const pendingSpyOwner = pendingAction?.kind === "spy" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
+  const revealAdjustOwner =
+    pendingAction?.kind === "reveal-adjust" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
+  const revealAdjustRecipient =
+    pendingAction?.kind === "reveal-adjust"
+      ? game.players.find((player) => player.id === pendingAction.combatRecipientId)
+      : undefined;
   const tradePartners =
     pendingActor && pendingAction?.kind === "trade"
       ? game.players.filter((player) => player.team === pendingActor.team && player.id !== pendingActor.id)
@@ -320,6 +432,9 @@ export default function App() {
     pendingAction?.kind === "reinforce"
       ? game.players.filter((player) => player.team === pendingAction.team && player.role === "Ally")
       : [];
+  const spyPlacementSpaces = pendingSpyOwner
+    ? boardSpaces.filter((space) => canPlaceSpyPost(space, pendingSpyOwner, game))
+    : [];
 
   return (
     <main className="app-shell">
@@ -386,6 +501,7 @@ export default function App() {
           <div className="space-grid">
             {boardSpaces.map((space) => {
               const occupant = game.players.find((player) => player.id === game.spaces[space.id]);
+              const spyOwner = game.players.find((player) => player.id === game.spyPosts[space.id]);
               const unavailable = space.id === "swordmaster" && game.swordmasterClaimed;
               const legal = legalSpaces.has(space.id);
               const selected = selectedSpaceId === space.id;
@@ -401,6 +517,7 @@ export default function App() {
                   <strong>{space.name}</strong>
                   <small>{iconLabels[space.icon]}</small>
                   <span className="space-detail">{space.detail}</span>
+                  {spyOwner && <span className="spy-marker">{spyOwner.leader} spy</span>}
                   <span className="space-footer">
                     {space.combat && <Swords size={14} />}
                     {space.team && <Users size={14} />}
@@ -436,6 +553,7 @@ export default function App() {
                 <span>{player.agentsReady}/{player.agentsTotal} {player.role === "Commander" ? "activations" : "agents"}</span>
                 <span>{player.garrison} garrison</span>
                 <span>{player.conflict} strength</span>
+                <span>{player.spies} spies</span>
               </div>
             </article>
           ))}
@@ -451,6 +569,8 @@ export default function App() {
                 {pendingAction.kind === "deploy" && `${pendingOwner?.leader ?? "Player"} deployment`}
                 {pendingAction.kind === "reinforce" && `Military Support - ${pendingAction.remaining} troops`}
                 {pendingAction.kind === "trade" && `Trade from ${pendingAction.source}`}
+                {pendingAction.kind === "spy" && `Spy placement - ${pendingAction.remaining}`}
+                {pendingAction.kind === "reveal-adjust" && "Printed reveal adjustment"}
               </h2>
             </div>
 
@@ -462,6 +582,43 @@ export default function App() {
                   Deploy 1
                 </button>
                 <button type="button" onClick={clearPendingAction}>Done</button>
+              </div>
+            )}
+
+            {pendingAction.kind === "spy" && pendingSpyOwner && (
+              <div className="pending-controls spy-grid">
+                <span>{pendingSpyOwner.leader}: {pendingSpyOwner.spies} spies ready</span>
+                {spyPlacementSpaces.map((space) => (
+                  <button type="button" key={space.id} onClick={() => placeSpy(space.id)}>
+                    {space.name}
+                  </button>
+                ))}
+                <button type="button" onClick={clearPendingAction}>Done</button>
+              </div>
+            )}
+
+            {pendingAction.kind === "reveal-adjust" && revealAdjustOwner && revealAdjustRecipient && (
+              <div className="pending-controls reveal-adjust">
+                <span>{pendingAction.cards.join(", ")}</span>
+                <span>{revealAdjustOwner.persuasion} persuasion</span>
+                <button
+                  type="button"
+                  onClick={() => adjustRevealReward(-1, 0)}
+                  disabled={pendingAction.persuasionAdjustment <= 0}
+                >
+                  -1
+                </button>
+                <button type="button" onClick={() => adjustRevealReward(1, 0)}>+1</button>
+                <span>{revealAdjustRecipient.conflict} strength</span>
+                <button
+                  type="button"
+                  onClick={() => adjustRevealReward(0, -1)}
+                  disabled={pendingAction.strengthAdjustment <= 0}
+                >
+                  -1
+                </button>
+                <button type="button" onClick={() => adjustRevealReward(0, 1)}>+1</button>
+                <button type="button" onClick={finishRevealAdjustment}>Done</button>
               </div>
             )}
 
@@ -566,12 +723,14 @@ export default function App() {
                 key={card.id}
                 onClick={() => setSelectedCardId(card.id)}
               >
+                {card.thumbnailPath && <img className="card-art" src={card.thumbnailPath} alt="" loading="lazy" />}
                 <span>{card.icons.map((icon) => iconLabels[icon]).join(" / ") || "Reveal"}</span>
                 <strong>{card.name}</strong>
                 <p>{card.play}</p>
                 <footer>
                   <span><BookOpen size={13} /> {card.persuasion}</span>
                   <span><Swords size={13} /> {card.swords}</span>
+                  {(card.conditionalPersuasion || card.conditionalSwords) && <span>Printed</span>}
                 </footer>
               </button>
             ))}
@@ -587,7 +746,7 @@ export default function App() {
             <strong className="persuasion">{activePlayer.persuasion} persuasion</strong>
           </div>
           <div className="market-row">
-            {game.imperiumRow.map((card) => (
+            {[...game.imperiumRow, ...game.reserveMarket].map((card) => (
               <button
                 type="button"
                 className="market-card"
@@ -595,9 +754,14 @@ export default function App() {
                 onClick={() => buyCard(card)}
                 disabled={Boolean(game.pendingAction) || !activePlayer.revealed || activePlayer.persuasion < (card.cost ?? 0)}
               >
-                <span>{card.cost} persuasion</span>
+                {card.thumbnailPath && <img className="card-art" src={card.thumbnailPath} alt="" loading="lazy" />}
+                <span>
+                  {card.cost} persuasion
+                  {card.acquired ? ` - ${card.acquired} VP` : ""}
+                  {(card.conditionalPersuasion || card.conditionalSwords) ? " - printed reveal" : ""}
+                </span>
                 <strong>{card.name}</strong>
-                <p>{card.reveal}</p>
+                <p>{card.conditionalPersuasion || card.conditionalSwords ? "Resolve the printed reveal text on the card." : card.reveal}</p>
               </button>
             ))}
           </div>
@@ -626,4 +790,29 @@ function costLabel(cost?: Partial<Resources>) {
   return Object.entries(cost)
     .map(([key, value]) => `${value} ${key}`)
     .join(", ");
+}
+
+function acquireCard(player: Player, card: Card, fromReserve: boolean): Player {
+  const purchaseSequence = player.purchaseSequence + 1;
+  const acquiredCard = fromReserve
+    ? { ...card, id: `${card.id}-${player.id}-${purchaseSequence}` }
+    : card;
+  return {
+    ...player,
+    vp: player.vp + (card.acquired ?? 0),
+    persuasion: player.persuasion - (card.cost ?? 0),
+    purchaseSequence,
+    discard: [...player.discard, acquiredCard],
+  };
+}
+
+function canPlaceSpyPost(space: BoardSpace, owner: Player, game: GameState) {
+  if (game.spyPosts[space.id]) return false;
+  if (space.id === "swordmaster" && game.swordmasterClaimed) return false;
+  if (!space.personal) return true;
+  return owner.role === "Commander" && owner.team === space.personal;
+}
+
+function signed(value: number) {
+  return value >= 0 ? `+${value}` : `${value}`;
 }

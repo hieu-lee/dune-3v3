@@ -1,4 +1,33 @@
+import catalogJson from "./uprising-catalog.generated.json";
 import type { BoardSpace, Card, IconId, TeamId } from "./types";
+
+type HubAttribute = [string, number | string | null];
+type HubCard = {
+  id: number;
+  name: string;
+  type: string;
+  displayType: string | null;
+  slug: string;
+  fullImageUrl: string | null;
+  thumbnailImageUrl: string | null;
+  localImagePath: string | null;
+  localThumbnailPath: string | null;
+  attributes: HubAttribute[];
+};
+
+const catalog = catalogJson as unknown as { counts: Record<string, number>; cards: HubCard[] };
+const iconAttributeMap: Record<string, IconId> = {
+  "Agent icon: Emperor": "emperor",
+  "Agent icon: Spacing Guild": "spacing",
+  "Agent icon: Bene Gesserit": "bene",
+  "Agent icon: Fremen": "fremen",
+  "Agent icon: Landsraad": "landsraad",
+  "Agent icon: City": "city",
+  "Agent icon: Spice Trade": "spice",
+  "Agent icon: Spy": "spy",
+};
+
+const summaryIgnore = new Set(["Persuasion cost", "Persuasion on reveal", "Swords"]);
 
 export const iconLabels: Record<IconId, string> = {
   emperor: "Emperor",
@@ -8,7 +37,10 @@ export const iconLabels: Record<IconId, string> = {
   landsraad: "Landsraad",
   city: "City",
   spice: "Spice Trade",
+  spy: "Spy",
 };
+
+export const catalogStats = catalog.counts;
 
 export const teams: Record<TeamId, { name: string; accent: string; commander: string; motto: string }> = {
   muaddib: {
@@ -73,108 +105,59 @@ export const starterCards: Card[] = [
   },
 ];
 
-export const imperiumDeck: Card[] = [
-  {
-    id: "row-fedaykin",
-    name: "Fedaykin Strike Team",
-    icons: ["fremen", "city"],
-    persuasion: 2,
-    swords: 2,
-    play: "Recruit and threaten a combat space.",
-    reveal: "+2 persuasion and +2 strength.",
-    cost: 5,
-  },
-  {
-    id: "row-navigator",
-    name: "Guild Navigator",
-    icons: ["spacing", "spice"],
-    persuasion: 3,
-    swords: 0,
-    play: "Convert spice into mobility.",
-    reveal: "+3 persuasion.",
-    cost: 6,
-  },
-  {
-    id: "row-truthsayer",
-    name: "Truthsayer",
-    icons: ["bene", "landsraad"],
-    persuasion: 2,
-    swords: 0,
-    play: "Filter intrigue and hand quality.",
-    reveal: "+2 persuasion.",
-    cost: 4,
-  },
-  {
-    id: "row-smuggler",
-    name: "Smuggler Contact",
-    icons: ["spice", "city"],
-    persuasion: 1,
-    swords: 1,
-    play: "Gain trade goods and board reach.",
-    reveal: "+1 persuasion and +1 strength.",
-    cost: 3,
-  },
-  {
-    id: "row-sardaukar",
-    name: "Sardaukar Legion",
-    icons: ["emperor", "city"],
-    persuasion: 1,
-    swords: 3,
-    play: "Recruit heavily for the conflict.",
-    reveal: "+3 strength.",
-    cost: 5,
-  },
-  {
-    id: "row-choam",
-    name: "CHOAM Delegate",
-    icons: ["emperor", "landsraad"],
-    persuasion: 2,
-    swords: 0,
-    play: "Improve contract and Solari tempo.",
-    reveal: "+2 persuasion.",
-    cost: 4,
-  },
-  {
-    id: "row-spy",
-    name: "Spy Network",
-    icons: ["bene", "city"],
-    persuasion: 1,
-    swords: 1,
-    play: "Place or recall spies around contested spaces.",
-    reveal: "+1 persuasion and +1 strength.",
-    cost: 4,
-  },
-  {
-    id: "row-carryall",
-    name: "Carryall Logistics",
-    icons: ["spice", "spacing"],
-    persuasion: 2,
-    swords: 0,
-    play: "Move resources into a stronger board turn.",
-    reveal: "+2 persuasion.",
-    cost: 3,
-  },
-  {
-    id: "row-water",
-    name: "Water Seller",
-    icons: ["fremen", "spice"],
-    persuasion: 1,
-    swords: 0,
-    play: "Convert Solari pressure into desert access.",
-    reveal: "+1 persuasion.",
-    cost: 2,
-  },
-  {
-    id: "row-war-council",
-    name: "War Council",
-    icons: ["landsraad", "city"],
-    persuasion: 2,
-    swords: 2,
-    play: "Turn political position into deployment.",
-    reveal: "+2 persuasion and +2 strength.",
-    cost: 6,
-  },
-];
+function attributeNumber(card: HubCard, name: string, fallback = 0) {
+  const value = card.attributes.find(([attributeName]) => attributeName === name)?.[1];
+  if (typeof value === "number") return value;
+  return fallback;
+}
+
+function hasConditionalAttribute(card: HubCard, name: string) {
+  return card.attributes.some(([attributeName, value]) => attributeName === name && value === null);
+}
+
+function summarizeAttributes(card: HubCard) {
+  const traits = card.attributes
+    .filter(([name]) => !summaryIgnore.has(name) && !name.startsWith("Agent icon:") && !name.includes("Commander deck"))
+    .slice(0, 5)
+    .map(([name, value]) => (typeof value === "number" ? `${name} ${value}` : name));
+  return traits.length ? traits.join(", ") : "Use printed card text from the imported image.";
+}
+
+function revealText(persuasion: number, swords: number) {
+  const parts = [`+${persuasion} persuasion`];
+  if (swords > 0) parts.push(`+${swords} strength`);
+  return `${parts.join(" and ")}.`;
+}
+
+function toImperiumCard(card: HubCard): Card {
+  const persuasion = attributeNumber(card, "Persuasion on reveal");
+  const swords = attributeNumber(card, "Swords");
+  const conditionalPersuasion = !card.attributes.some(([name]) => name === "Persuasion on reveal");
+  const conditionalSwords = hasConditionalAttribute(card, "Swords");
+  return {
+    id: `hub-${card.id}`,
+    name: card.name,
+    icons: card.attributes.flatMap(([name]) => iconAttributeMap[name] ?? []),
+    acquired: hasConditionalAttribute(card, "Victory Point") ? 1 : undefined,
+    persuasion,
+    swords,
+    conditionalPersuasion,
+    conditionalSwords,
+    play: summarizeAttributes(card),
+    reveal: conditionalPersuasion || conditionalSwords ? "Resolve printed reveal text." : revealText(persuasion, swords),
+    cost: attributeNumber(card, "Persuasion cost"),
+    imagePath: card.localImagePath ?? card.fullImageUrl ?? undefined,
+    thumbnailPath: card.localThumbnailPath ?? card.thumbnailImageUrl ?? undefined,
+    sourceId: card.id,
+    sourceSlug: card.slug,
+    sourceType: card.type,
+    traits: card.attributes.map(([name]) => name),
+  };
+}
+
+export const imperiumDeck: Card[] = catalog.cards
+  .filter((card) => card.type === "imperium")
+  .map(toImperiumCard);
 
 export const boardSpaces: BoardSpace[] = [
   {
@@ -346,7 +329,8 @@ export const boardSpaces: BoardSpace[] = [
     influence: "bene",
     draw: 1,
     gain: { intrigue: 1 },
-    detail: "Influence, draw, and place-spy placeholder.",
+    spy: 1,
+    detail: "Influence, draw, and place a spy.",
   },
   {
     id: "deliver-supplies",
@@ -430,3 +414,6 @@ export const boardSpaces: BoardSpace[] = [
   },
 ];
 
+export const reserveMarket: Card[] = catalog.cards
+  .filter((card) => card.name === "The Spice Must Flow")
+  .map(toImperiumCard);

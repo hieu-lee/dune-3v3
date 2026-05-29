@@ -7,7 +7,8 @@ export type IconId =
   | "fremen"
   | "landsraad"
   | "city"
-  | "spice";
+  | "spice"
+  | "spy";
 export type FactionId =
   | "emperor"
   | "spacing"
@@ -26,9 +27,18 @@ export type Card = {
   icons: IconId[];
   persuasion: number;
   swords: number;
+  acquired?: number;
+  conditionalPersuasion?: boolean;
+  conditionalSwords?: boolean;
   play: string;
   reveal: string;
   cost?: number;
+  imagePath?: string;
+  thumbnailPath?: string;
+  sourceId?: number;
+  sourceSlug?: string;
+  sourceType?: string;
+  traits?: string[];
 };
 
 export type BoardSpace = {
@@ -45,6 +55,7 @@ export type BoardSpace = {
   team?: "trade" | "reinforce" | "commander";
   personal?: TeamId;
   detail: string;
+  spy?: number;
 };
 
 export type Player = {
@@ -68,6 +79,7 @@ export type Player = {
   spies: number;
   revealed: boolean;
   persuasion: number;
+  purchaseSequence: number;
   swordmasterBonus: boolean;
 };
 
@@ -92,6 +104,21 @@ export type PendingAction =
       actorGiven: number;
       partnerGiven: number;
       source: string;
+    }
+  | {
+      kind: "spy";
+      ownerId: string;
+      remaining: number;
+      source: string;
+    }
+  | {
+      kind: "reveal-adjust";
+      ownerId: string;
+      combatRecipientId: string;
+      cards: string[];
+      persuasionAdjustment: number;
+      strengthAdjustment: number;
+      source: string;
     };
 
 export type GameState = {
@@ -100,10 +127,13 @@ export type GameState = {
   firstSeat: number;
   players: Player[];
   spaces: Record<string, string>;
+  spyPosts: Record<string, string>;
   imperiumRow: Card[];
   marketDeck: Card[];
+  reserveMarket: Card[];
   swordmasterClaimed: boolean;
   pendingAction?: PendingAction;
+  pendingQueue: PendingAction[];
   conflict: {
     name: string;
     stakes: string;

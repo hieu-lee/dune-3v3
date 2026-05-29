@@ -1,4 +1,4 @@
-import { imperiumDeck, starterCards } from "./data";
+import { imperiumDeck, reserveMarket, starterCards } from "./data";
 import type {
   BoardSpace,
   Card,
@@ -89,6 +89,7 @@ function makePlayer(
     spies: 3,
     revealed: false,
     persuasion: 0,
+    purchaseSequence: 0,
     swordmasterBonus: false,
   };
   return drawCards(player, 5);
@@ -111,9 +112,12 @@ export function initialGame(): GameState {
     firstSeat: 0,
     players,
     spaces: {},
+    spyPosts: {},
     imperiumRow: market.slice(0, 5),
     marketDeck: market.slice(5),
+    reserveMarket: cloneCards(reserveMarket),
     swordmasterClaimed: false,
+    pendingQueue: [],
     conflict: {
       name: "Battle for Arrakeen",
       stakes: "VP pressure, control, and doubled worm rewards later.",
@@ -137,9 +141,16 @@ function canEnterSpace(space: BoardSpace, player: Player, swordmasterClaimed = f
   return player.role === "Commander" && player.team === space.personal;
 }
 
-export function iconCanReach(card: Card, space: BoardSpace, player: Player, swordmasterClaimed = false) {
+export function iconCanReach(
+  card: Card,
+  space: BoardSpace,
+  player: Player,
+  swordmasterClaimed = false,
+  spyPosts: Record<string, string> = {},
+) {
   if (!canEnterSpace(space, player, swordmasterClaimed)) return false;
   if (card.icons.includes(space.icon)) return true;
+  if (card.icons.includes("spy") && spyPosts[space.id] === player.id) return true;
   if (player.role === "Commander" && player.team === "muaddib" && space.icon === "fremen") {
     return card.icons.includes("fremen");
   }
@@ -172,6 +183,10 @@ export function pendingActionForSpace(
   target: Player,
   players: Player[],
 ): PendingAction | undefined {
+  if (space.spy && source.spies > 0) {
+    return { kind: "spy", ownerId: source.id, remaining: Math.min(space.spy, source.spies), source: space.name };
+  }
+
   if (space.team === "reinforce") {
     return { kind: "reinforce", team: source.team, remaining: space.troops ?? 0, source: space.name };
   }
@@ -196,6 +211,40 @@ export function pendingActionForSpace(
   }
 
   return undefined;
+}
+
+export function pendingActionForCard(card: Card, source: Player): PendingAction | undefined {
+  return undefined;
+}
+
+export function pendingActionsFor(
+  spacePending: PendingAction | undefined,
+  cardPending: PendingAction | undefined,
+  spySupply: number,
+): PendingAction[] {
+  if (spacePending?.kind === "spy" && cardPending?.kind === "spy" && spacePending.ownerId === cardPending.ownerId) {
+    return [{
+      ...spacePending,
+      remaining: Math.min(spySupply, spacePending.remaining + cardPending.remaining),
+      source: `${spacePending.source} / ${cardPending.source}`,
+    }];
+  }
+  return [spacePending, cardPending].filter((action): action is PendingAction => Boolean(action));
+}
+
+export function queuePendingActions(state: GameState, actions: PendingAction[]) {
+  if (actions.length === 0) {
+    return { pendingAction: state.pendingAction, pendingQueue: state.pendingQueue };
+  }
+  if (state.pendingAction) {
+    return { pendingAction: state.pendingAction, pendingQueue: [...state.pendingQueue, ...actions] };
+  }
+  return { pendingAction: actions[0], pendingQueue: [...state.pendingQueue, ...actions.slice(1)] };
+}
+
+export function advancePendingAction(state: GameState) {
+  const [pendingAction, ...pendingQueue] = state.pendingQueue;
+  return { pendingAction, pendingQueue };
 }
 
 export function applyBoardEffect(
@@ -277,6 +326,8 @@ export function startNextRound(state: GameState): GameState {
     activeSeat: firstSeat,
     players,
     spaces: {},
+    pendingAction: undefined,
+    pendingQueue: [],
     log: [`Round ${state.round + 1} begins. ${players[firstSeat].leader} has first action.`, ...state.log],
   };
 }

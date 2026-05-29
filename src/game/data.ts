@@ -1,5 +1,5 @@
 import catalogJson from "./uprising-catalog.generated.json";
-import type { BoardSpace, Card, ConflictCard, IconId, TeamId } from "./types";
+import type { BoardSpace, Card, ConflictCard, ContractCard, IconId, TeamId } from "./types";
 
 type HubAttribute = [string, number | string | null];
 type HubCard = {
@@ -29,6 +29,16 @@ const iconAttributeMap: Record<string, IconId> = {
 
 const summaryIgnore = new Set(["Persuasion cost", "Persuasion on reveal", "Swords"]);
 const conflictLevelAttributes = new Set(["conflict-1", "conflict-2", "conflict-3"]);
+const riseOfIxContractNames = new Set([
+  "Dreadnought",
+  "Harvest 3+ (contract)",
+  "Harvest 4+ (contract)",
+  "Heighliner III",
+  "High Council III",
+  "Interstellar Shipping",
+  "Smuggling",
+  "Tech Negotiation",
+]);
 
 export const iconLabels: Record<IconId, string> = {
   emperor: "Emperor",
@@ -187,7 +197,32 @@ export const conflictCards: ConflictCard[] = catalog.cards
   .filter((card) => card.type === "conflict")
   .map(toConflictCard);
 
+function toContractCard(card: HubCard): ContractCard {
+  return {
+    id: `contract-${card.id}`,
+    name: card.name,
+    imagePath: card.localImagePath ?? card.fullImageUrl ?? undefined,
+    thumbnailPath: card.localThumbnailPath ?? card.thumbnailImageUrl ?? undefined,
+    sourceId: card.id,
+    sourceSlug: card.slug,
+  };
+}
+
+export const standardContracts: ContractCard[] = catalog.cards
+  .filter((card) => card.type === "contract")
+  .filter((card) => !riseOfIxContractNames.has(card.name))
+  .map(toContractCard);
+
 export const boardSpaces: BoardSpace[] = [
+  {
+    id: "dutiful-service",
+    name: "Dutiful Service",
+    zone: "Faction",
+    icon: "emperor",
+    influence: "emperor",
+    contract: true,
+    detail: "Emperor influence and a face-up CHOAM contract.",
+  },
   {
     id: "economic-support",
     name: "Economic Support",
@@ -368,6 +403,15 @@ export const boardSpaces: BoardSpace[] = [
     influence: "spacing",
     gain: { water: 1 },
     detail: "Spacing Guild influence and water.",
+  },
+  {
+    id: "accept-contract",
+    name: "Accept Contract",
+    zone: "Spice Trade",
+    icon: "spice",
+    draw: 1,
+    contract: true,
+    detail: "Draw a card and take a face-up CHOAM contract.",
   },
   {
     id: "shipping",

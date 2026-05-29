@@ -11,6 +11,7 @@ Private web-table implementation for a six-player `Dune: Imperium - Uprising` te
 - Resource, influence, conflict, hand, and Imperium row UI foundations.
 - Imported Uprising Imperium cards with local WebP card art.
 - Catalog-backed six-player Conflict deck display.
+- CHOAM contract bank with two face-up offers and contract-space pickup flow.
 - Printed reveal adjustments and spy-post targeting for cards whose text is not reducible to a fixed number.
 - Asset pipeline conventions for owned scans or public reference images.
 

@@ -1,8 +1,9 @@
-import { conflictCards, imperiumDeck, reserveMarket, starterCards } from "./data";
+import { conflictCards, imperiumDeck, reserveMarket, standardContracts, starterCards } from "./data";
 import type {
   BoardSpace,
   Card,
   ConflictCard,
+  ContractCard,
   FactionId,
   GameState,
   Influence,
@@ -44,10 +45,21 @@ function cloneConflicts(conflicts: ConflictCard[]) {
   return conflicts.map((conflict) => ({ ...conflict, rewards: [...conflict.rewards] }));
 }
 
+function cloneContracts(contracts: ContractCard[]) {
+  return contracts.map((contract) => ({ ...contract }));
+}
+
 function buildSixPlayerConflictDeck() {
   const levelTwo = shuffleItems(conflictCards.filter((conflict) => conflict.level === 2)).slice(0, 5);
   const levelThree = shuffleItems(conflictCards.filter((conflict) => conflict.level === 3));
   return cloneConflicts([...levelTwo, ...levelThree]);
+}
+
+function buildChoamContractDeck() {
+  if (standardContracts.length !== 20) {
+    throw new Error(`Expected 20 standard CHOAM contracts, found ${standardContracts.length}.`);
+  }
+  return cloneContracts(shuffleItems(standardContracts));
 }
 
 function buildStarterDeck(team: TeamId) {
@@ -106,6 +118,7 @@ function makePlayer(
     persuasion: 0,
     purchaseSequence: 0,
     swordmasterBonus: false,
+    contracts: [],
   };
   return drawCards(player, 5);
 }
@@ -114,6 +127,7 @@ export function initialGame(): GameState {
   const market = shuffleCards(cloneCards(imperiumDeck));
   const [conflict, ...conflictDeck] = buildSixPlayerConflictDeck();
   if (!conflict) throw new Error("Missing Uprising conflict cards for six-player setup.");
+  const contracts = buildChoamContractDeck();
 
   const players = [
     makePlayer("p1", "Seat 1", "Muad'Dib", "muaddib", "Commander", "#45c4b0"),
@@ -134,6 +148,8 @@ export function initialGame(): GameState {
     imperiumRow: market.slice(0, 5),
     marketDeck: market.slice(5),
     reserveMarket: cloneCards(reserveMarket),
+    contractOffer: contracts.slice(0, 2),
+    contractDeck: contracts.slice(2),
     conflict,
     conflictDeck,
     conflictDiscard: [],
@@ -220,6 +236,10 @@ export function pendingActionForSpace(
     };
   }
 
+  if (space.contract) {
+    return { kind: "contract", ownerId: source.id, source: space.name, spaceId: space.id };
+  }
+
   if (space.combat) {
     const deployable = Math.min(target.garrison, (space.troops ?? 0) + 2);
     if (deployable > 0) {
@@ -262,6 +282,61 @@ export function queuePendingActions(state: GameState, actions: PendingAction[]) 
 export function advancePendingAction(state: GameState) {
   const [pendingAction, ...pendingQueue] = state.pendingQueue;
   return { pendingAction, pendingQueue };
+}
+
+type ContractPendingAction = Extract<PendingAction, { kind: "contract" }>;
+
+export function takeChoamContract(state: GameState, pending: ContractPendingAction, contractId: string): GameState {
+  const offerIndex = state.contractOffer.findIndex((contract) => contract.id === contractId);
+  const contract = state.contractOffer[offerIndex];
+  const owner = state.players.find((player) => player.id === pending.ownerId);
+  if (!contract || !owner) return state;
+  const [replacement, ...contractDeck] = state.contractDeck;
+  const contractOffer = state.contractOffer.flatMap((candidate, index) => {
+    if (index !== offerIndex) return [candidate];
+    return replacement ? [replacement] : [];
+  });
+  const players = state.players.map((player) =>
+    player.id === owner.id
+      ? {
+          ...player,
+          contracts: [
+            ...player.contracts,
+            {
+              card: contract,
+              completed: false,
+              takenRound: state.round,
+              takenAtSpaceId: pending.spaceId,
+            },
+          ],
+        }
+      : player,
+  );
+  return {
+    ...state,
+    players,
+    contractOffer,
+    contractDeck,
+    ...advancePendingAction(state),
+    log: [`${owner.leader} takes the ${contract.name} CHOAM contract from ${pending.source}.`, ...state.log],
+  };
+}
+
+export function collectChoamContractFallback(state: GameState, pending: ContractPendingAction): GameState {
+  if (state.contractOffer.length > 0) return state;
+  const owner = state.players.find((player) => player.id === pending.ownerId);
+  if (!owner) return state;
+  const players = state.players.map((player) =>
+    player.id === owner.id
+      ? { ...player, resources: { ...player.resources, solari: player.resources.solari + 2 } }
+      : player,
+  );
+  return {
+    ...state,
+    players,
+    ...advancePendingAction(state),
+    log: [`${owner.leader} gains 2 Solari from ${pending.source}; no CHOAM contracts remain.`, ...state.log],
+  };
 }
 
 export function applyBoardEffect(

@@ -4,6 +4,7 @@ import {
   Crown,
   Droplets,
   Eye,
+  FileText,
   HandCoins,
   Hexagon,
   RotateCcw,
@@ -22,6 +23,7 @@ import {
   allPlayersDone,
   applyBoardEffect,
   canPay,
+  collectChoamContractFallback,
   defaultActivatedAllyId,
   effectiveCost,
   iconCanReach,
@@ -31,6 +33,7 @@ import {
   pendingActionForSpace,
   queuePendingActions,
   startNextRound,
+  takeChoamContract,
 } from "./game/state";
 import type { BoardSpace, Card, GameState, Player, ResourceId, Resources, TeamId } from "./game/types";
 
@@ -399,6 +402,24 @@ export default function App() {
     });
   }
 
+  function takeContract(contractId: string) {
+    if (game.pendingAction?.kind !== "contract") return;
+    setGame((current) => {
+      const pending = current.pendingAction;
+      if (!pending || pending.kind !== "contract") return current;
+      return takeChoamContract(current, pending, contractId);
+    });
+  }
+
+  function collectContractFallback() {
+    if (game.pendingAction?.kind !== "contract") return;
+    setGame((current) => {
+      const pending = current.pendingAction;
+      if (!pending || pending.kind !== "contract") return current;
+      return collectChoamContractFallback(current, pending);
+    });
+  }
+
   function resetGame() {
     setGame(initialGame());
     setSelectedCardId(null);
@@ -418,6 +439,8 @@ export default function App() {
   const pendingActor = pendingAction?.kind === "trade" ? game.players.find((player) => player.id === pendingAction.actorId) : undefined;
   const pendingPartner = pendingAction?.kind === "trade" ? game.players.find((player) => player.id === pendingAction.partnerId) : undefined;
   const pendingSpyOwner = pendingAction?.kind === "spy" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
+  const pendingContractOwner =
+    pendingAction?.kind === "contract" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const revealAdjustOwner =
     pendingAction?.kind === "reveal-adjust" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const revealAdjustRecipient =
@@ -505,6 +528,25 @@ export default function App() {
               Shield Wall {game.shieldWall ? "standing" : "removed"}
             </div>
           </article>
+          <article className="choam-card">
+            <div className="team-heading">
+              <FileText size={18} />
+              <div>
+                <span className="conflict-level">{game.contractDeck.length} contracts in bank</span>
+                <h2>CHOAM Contracts</h2>
+                <p>Take a face-up contract from contract spaces.</p>
+              </div>
+            </div>
+            <div className="contract-offer">
+              {game.contractOffer.map((contract) => (
+                <div className="contract-preview" key={contract.id}>
+                  {contract.thumbnailPath && <img src={contract.thumbnailPath} alt="" />}
+                  <strong>{contract.name}</strong>
+                </div>
+              ))}
+              {game.contractOffer.length === 0 && <p>Contract spaces pay 2 Solari.</p>}
+            </div>
+          </article>
         </aside>
 
         <section className="board-panel" aria-label="Six-player board spaces">
@@ -543,6 +585,7 @@ export default function App() {
                   <span className="space-footer">
                     {space.combat && <Swords size={14} />}
                     {space.team && <Users size={14} />}
+                    {space.contract && <FileText size={14} />}
                     {occupant ? occupant.leader : unavailable ? "Claimed" : costLabel(effectiveCost(space, game.players))}
                   </span>
                 </button>
@@ -576,6 +619,7 @@ export default function App() {
                 <span>{player.garrison} garrison</span>
                 <span>{player.conflict} strength</span>
                 <span>{player.spies} spies</span>
+                <span>{player.contracts.length} contracts</span>
               </div>
             </article>
           ))}
@@ -593,6 +637,7 @@ export default function App() {
                 {pendingAction.kind === "trade" && `Trade from ${pendingAction.source}`}
                 {pendingAction.kind === "spy" && `Spy placement - ${pendingAction.remaining}`}
                 {pendingAction.kind === "reveal-adjust" && "Printed reveal adjustment"}
+                {pendingAction.kind === "contract" && `${pendingContractOwner?.leader ?? "Player"} CHOAM contract`}
               </h2>
             </div>
 
@@ -691,6 +736,23 @@ export default function App() {
                   {pendingPartner.leader} gives 1 ({pendingAction.partnerGiven})
                 </button>
                 <button type="button" onClick={clearPendingAction}>Done</button>
+              </div>
+            )}
+
+            {pendingAction.kind === "contract" && pendingContractOwner && (
+              <div className="pending-controls contract-choice">
+                {game.contractOffer.map((contract) => (
+                  <button type="button" key={contract.id} onClick={() => takeContract(contract.id)}>
+                    {contract.thumbnailPath && <img src={contract.thumbnailPath} alt="" />}
+                    <span>{contract.name}</span>
+                  </button>
+                ))}
+                {game.contractOffer.length === 0 && (
+                  <button type="button" onClick={collectContractFallback}>
+                    <CircleDollarSign size={15} />
+                    Collect 2 Solari
+                  </button>
+                )}
               </div>
             )}
           </div>

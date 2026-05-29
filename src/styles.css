@@ -101,6 +101,7 @@ h2 {
 .icon-button,
 .team-card,
 .conflict-card,
+.choam-card,
 .board-panel,
 .player-card,
 .hand-panel,
@@ -161,12 +162,14 @@ h2 {
 
 .team-card,
 .conflict-card,
+.choam-card,
 .player-card {
   border-radius: 8px;
   padding: 14px;
 }
 
-.conflict-card {
+.conflict-card,
+.choam-card {
   overflow: hidden;
 }
 
@@ -204,6 +207,34 @@ h2 {
   font-size: 0.72rem;
   font-weight: 900;
   padding: 5px 7px;
+}
+
+.contract-offer {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.contract-preview {
+  min-width: 0;
+}
+
+.contract-preview img,
+.contract-choice img {
+  width: 100%;
+  aspect-ratio: 63 / 88;
+  object-fit: contain;
+  border-radius: 6px;
+  background: rgba(8, 7, 6, 0.64);
+}
+
+.contract-preview strong {
+  display: block;
+  margin-top: 6px;
+  color: #fff6e6;
+  font-size: 0.76rem;
+  overflow-wrap: anywhere;
 }
 
 .team-card {
@@ -498,6 +529,19 @@ h2 {
   color: #fff3df;
   cursor: pointer;
   padding: 0 10px;
+}
+
+.contract-choice button {
+  width: 112px;
+  min-height: 0;
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  text-align: center;
+}
+
+.contract-choice button span {
+  overflow-wrap: anywhere;
 }
 
 .resource-picker button.selected {

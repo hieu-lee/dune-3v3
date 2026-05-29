@@ -33,6 +33,7 @@ These notes are implementation scaffolding, not a replacement for the rulebook. 
 - Dune Cards Hub's generic `Spy` attribute appears in reveal text, acquire bonuses, and conditions. Do not treat it as a play-time spy placement unless grouped/detail text confirms that timing.
 - Variable printed reveal effects must pause buying/end-turn flow until the table applies the printed persuasion or strength adjustment.
 - CHOAM module is mandatory in 6p; contracts and marked cards need first-class data support.
+- Current CHOAM implementation uses the 20 standard Uprising contracts, exposes two face-up offers, and gives contract spaces a pending take-contract choice.
 - Conflict deck uses 5 Conflict II cards over 4 Conflict III cards; no Conflict I cards.
 - Current implementation builds that nine-card six-player conflict deck from the imported Uprising catalog and advances it at round setup.
 

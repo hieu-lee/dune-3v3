@@ -53,6 +53,15 @@ export type ConflictCard = {
   sourceSlug?: string;
 };
 
+export type ContractCard = {
+  id: string;
+  name: string;
+  imagePath?: string;
+  thumbnailPath?: string;
+  sourceId?: number;
+  sourceSlug?: string;
+};
+
 export type BoardSpace = {
   id: string;
   name: string;
@@ -68,6 +77,14 @@ export type BoardSpace = {
   personal?: TeamId;
   detail: string;
   spy?: number;
+  contract?: boolean;
+};
+
+export type PlayerContract = {
+  card: ContractCard;
+  completed: boolean;
+  takenRound: number;
+  takenAtSpaceId?: string;
 };
 
 export type Player = {
@@ -93,6 +110,7 @@ export type Player = {
   persuasion: number;
   purchaseSequence: number;
   swordmasterBonus: boolean;
+  contracts: PlayerContract[];
 };
 
 export type PendingAction =
@@ -131,6 +149,12 @@ export type PendingAction =
       persuasionAdjustment: number;
       strengthAdjustment: number;
       source: string;
+    }
+  | {
+      kind: "contract";
+      ownerId: string;
+      source: string;
+      spaceId?: string;
     };
 
 export type GameState = {
@@ -143,6 +167,8 @@ export type GameState = {
   imperiumRow: Card[];
   marketDeck: Card[];
   reserveMarket: Card[];
+  contractOffer: ContractCard[];
+  contractDeck: ContractCard[];
   conflict: ConflictCard | null;
   conflictDeck: ConflictCard[];
   conflictDiscard: ConflictCard[];

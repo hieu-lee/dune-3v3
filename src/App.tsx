@@ -44,7 +44,7 @@ import {
   moveImperiumCardToThroneRow,
   resolveConflictTie,
   scoreEndgameBattleIconIntrigue,
-  scorePlotBattleIconIntrigue,
+  playPlotBattleIconIntrigue,
   startNextRound,
   takeChoamContract,
   transferTradeGood,
@@ -460,7 +460,7 @@ export default function App() {
   }
 
   function scorePlotIntrigue(intrigueId: string) {
-    setGame((current) => scorePlotBattleIconIntrigue(current, current.players[current.activeSeat].id, intrigueId));
+    setGame((current) => playPlotBattleIconIntrigue(current, current.players[current.activeSeat].id, intrigueId));
   }
 
   function finalizeEndgame() {
@@ -1110,8 +1110,8 @@ export default function App() {
                         onClick={() => scorePlotIntrigue(card.id)}
                         disabled={!playingPhase || Boolean(game.pendingAction)}
                       >
-                        <Crown size={14} />
-                        Score Plot VP
+                        <Sparkles size={14} />
+                        Gain Plot Spice
                       </button>
                     )}
                   </article>

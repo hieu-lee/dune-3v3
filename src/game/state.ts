@@ -856,7 +856,7 @@ export function scoreEndgameBattleIconIntrigue(
   };
 }
 
-export function scorePlotBattleIconIntrigue(
+export function playPlotBattleIconIntrigue(
   state: GameState,
   playerId: string,
   intrigueId: string,
@@ -871,7 +871,7 @@ export function scorePlotBattleIconIntrigue(
     candidate.id === player.id
       ? {
           ...candidate,
-          vp: candidate.vp + 1,
+          resources: { ...candidate.resources, spice: candidate.resources.spice + 1 },
           intrigues: candidate.intrigues.filter((card) => card.id !== intrigue.id),
         }
       : candidate,
@@ -880,7 +880,7 @@ export function scorePlotBattleIconIntrigue(
     ...state,
     players,
     intrigueDiscard: [...state.intrigueDiscard, intrigue],
-    log: [`${player.leader} scores ${intrigue.name} as a Plot Intrigue for 1 VP.`, ...state.log],
+    log: [`${player.leader} plays ${intrigue.name} as a Plot Intrigue for 1 spice.`, ...state.log],
   };
 }
 

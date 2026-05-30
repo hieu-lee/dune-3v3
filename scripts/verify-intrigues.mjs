@@ -89,28 +89,29 @@ try {
         : { ...candidate, intrigues: [] },
     ),
   };
-  const scoredPlot = state.scorePlotBattleIconIntrigue(plotFixture, "p2", crysknife.id);
-  assert.equal(playerById(scoredPlot, "p2").vp, playerById(plotFixture, "p2").vp + 1, "Plot battle-icon Intrigues should score 1 VP");
-  assert.deepEqual(playerById(scoredPlot, "p2").intrigues.map((card) => card.id), [mercenaries.id]);
-  assert.equal(scoredPlot.intrigueDiscard.at(-1).id, crysknife.id, "Scored Plot Intrigue should go to discard");
-  assert.match(scoredPlot.log[0], /scores Crysknife as a Plot Intrigue/);
+  const playedPlot = state.playPlotBattleIconIntrigue(plotFixture, "p2", crysknife.id);
+  assert.equal(playerById(playedPlot, "p2").vp, playerById(plotFixture, "p2").vp, "Plot battle-icon Intrigues should not score VP");
+  assert.equal(playerById(playedPlot, "p2").resources.spice, playerById(plotFixture, "p2").resources.spice + 1, "Plot battle-icon Intrigues should gain 1 spice");
+  assert.deepEqual(playerById(playedPlot, "p2").intrigues.map((card) => card.id), [mercenaries.id]);
+  assert.equal(playedPlot.intrigueDiscard.at(-1).id, crysknife.id, "Played Plot Intrigue should go to discard");
+  assert.match(playedPlot.log[0], /plays Crysknife as a Plot Intrigue for 1 spice/);
 
   const pendingPlot = {
     ...plotFixture,
     pendingAction: { kind: "spy", ownerId: "p2", remaining: 1, source: "Test" },
   };
   assert.equal(
-    state.scorePlotBattleIconIntrigue(pendingPlot, "p2", crysknife.id),
+    state.playPlotBattleIconIntrigue(pendingPlot, "p2", crysknife.id),
     pendingPlot,
     "Plot Intrigues should wait for pending actions to resolve",
   );
   assert.equal(
-    state.scorePlotBattleIconIntrigue(plotFixture, "p3", crysknife.id),
+    state.playPlotBattleIconIntrigue(plotFixture, "p3", crysknife.id),
     plotFixture,
     "Only the active player should play Plot Intrigues",
   );
   assert.equal(
-    state.scorePlotBattleIconIntrigue(plotFixture, "p2", mercenaries.id),
+    state.playPlotBattleIconIntrigue(plotFixture, "p2", mercenaries.id),
     plotFixture,
     "Non-battle-icon Intrigues should not use the Plot battle-icon scorer",
   );

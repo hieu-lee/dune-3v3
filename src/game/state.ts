@@ -46,6 +46,7 @@ const emptyInfluence = (): Influence => ({
 const secureSpiceTradeSourceId = 161;
 const choamProfitsSourceId = 450;
 const detonationSourceId = 131;
+const unexpectedAlliesSourceId = 137;
 const spiceMustFlowSourceId = 538;
 const shadowAllianceSourceId = 160;
 const shadowAllianceFactions: FactionId[] = [
@@ -105,6 +106,10 @@ function isStandardBattleIcon(icon: ConflictCard["battleIcon"]): icon is BattleI
 
 export function isDetonationIntrigue(intrigue: IntrigueCard) {
   return intrigue.sourceId === detonationSourceId;
+}
+
+export function isUnexpectedAlliesIntrigue(intrigue: IntrigueCard) {
+  return intrigue.sourceId === unexpectedAlliesSourceId;
 }
 
 function buildSixPlayerConflictDeck() {
@@ -1190,7 +1195,7 @@ export function playPlotBattleIconIntrigue(
   playerId: string,
   intrigueId: string,
 ): GameState {
-  if (state.phase !== "playing" || state.pendingAction) return state;
+  if (state.phase !== "playing" || state.pendingAction || state.pendingQueue.length > 0) return state;
   const player = state.players[state.activeSeat];
   if (!player || player.id !== playerId) return state;
   const intrigue = player.intrigues.find((card) => card.id === intrigueId);
@@ -1268,6 +1273,66 @@ export function playDetonationIntrigue(
       deployable > 0
         ? `${player.leader} plays Detonation${deployLabel} and may deploy up to ${deployable} troops.`
         : `${player.leader} plays Detonation${deployLabel} and deploys no troops.`,
+      ...state.log,
+    ],
+  };
+}
+
+export function playUnexpectedAlliesIntrigue(
+  state: GameState,
+  playerId: string,
+  intrigueId: string,
+  removeShieldWall: boolean,
+  sandwormOwnerId?: string,
+): GameState {
+  if (state.phase !== "playing" || state.pendingAction || state.pendingQueue.length > 0) return state;
+  const player = state.players[state.activeSeat];
+  if (!player || player.id !== playerId) return state;
+  const intrigue = player.intrigues.find((card) => card.id === intrigueId);
+  if (!intrigue || !isUnexpectedAlliesIntrigue(intrigue)) return state;
+  if (!state.conflict || player.resources.water < 2) return state;
+  if (state.shieldWall && conflictProtectedByShieldWall(state.conflict) && !removeShieldWall) return state;
+
+  const resolvedOwnerId = player.role === "Commander"
+    ? sandwormOwnerId ?? defaultActivatedAllyId(player, state.players)
+    : player.id;
+  const sandwormOwner = state.players.find((candidate) =>
+    candidate.id === resolvedOwnerId &&
+    candidate.team === player.team &&
+    candidate.role === "Ally"
+  );
+  if (!sandwormOwner) return state;
+
+  const removedShieldWall = removeShieldWall && state.shieldWall;
+  const ownerLabel = sandwormOwner.id !== player.id ? ` for ${sandwormOwner.leader}` : "";
+  const shieldLabel = removedShieldWall ? " removes the Shield Wall," : "";
+
+  const players = state.players.map((candidate) => {
+    let next = candidate;
+    if (candidate.id === player.id) {
+      next = {
+        ...next,
+        resources: { ...next.resources, water: next.resources.water - 2 },
+        intrigues: next.intrigues.filter((card) => card.id !== intrigue.id),
+      };
+    }
+    if (candidate.id === sandwormOwner.id) {
+      next = {
+        ...next,
+        conflict: next.conflict + 3,
+        deployedSandworms: next.deployedSandworms + 1,
+      };
+    }
+    return next;
+  });
+
+  return {
+    ...state,
+    shieldWall: removedShieldWall ? false : state.shieldWall,
+    players,
+    intrigueDiscard: [...state.intrigueDiscard, intrigue],
+    log: [
+      `${player.leader} plays Unexpected Allies${ownerLabel}, spends 2 water,${shieldLabel} and summons 1 sandworm.`,
       ...state.log,
     ],
   };

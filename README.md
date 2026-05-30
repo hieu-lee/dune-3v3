@@ -33,6 +33,7 @@ Private web-table implementation for a six-player `Dune: Imperium - Uprising` te
 - Reaching or dropping below 2 Influence automatically adds or removes the faction-track VP.
 - Active players can play the Plot side of battle-icon Intrigues for 1 spice during normal play.
 - Detonation can be played as a Plot Intrigue to remove the Shield Wall or deploy up to four troops.
+- Unexpected Allies can be played as a Plot Intrigue to spend 2 water, optionally remove the Shield Wall, and summon a sandworm for the active Ally or activated Ally.
 - Catalog-backed board-space art on matching placement tiles.
 - Printed reveal adjustments and spy-post targeting for cards whose text is not reducible to a fixed number.
 - Printed Combat Intrigue costs, choices, and strength effects remain manual until each card is fully modeled.

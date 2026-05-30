@@ -27,6 +27,12 @@ function playerById(game, playerId) {
   return player;
 }
 
+function conflictByName(data, name) {
+  const conflict = data.conflictCards.find((candidate) => candidate.name === name);
+  assert.ok(conflict, `Expected conflict ${name}`);
+  return conflict;
+}
+
 const server = await createServer({
   appType: "custom",
   logLevel: "silent",
@@ -76,14 +82,21 @@ try {
 
   const crysknife = data.intrigueCards.find((card) => card.sourceId === 159);
   const detonation = data.intrigueCards.find((card) => card.sourceId === 131);
+  const unexpectedAllies = data.intrigueCards.find((card) => card.sourceId === 137);
   const mercenaries = data.intrigueCards.find((card) => card.sourceId === 128);
   assert.ok(crysknife, "Crysknife Intrigue should be available");
   assert.ok(detonation, "Detonation Intrigue should be available");
+  assert.ok(unexpectedAllies, "Unexpected Allies Intrigue should be available");
   assert.ok(mercenaries, "Mercenaries Intrigue should be available");
   assert.equal(
     detonation.summary,
     "Remove the Shield Wall OR deploy up to four troops from your garrison to the Conflict.",
     "Detonation should expose its printed Plot choice instead of a generic imported-image summary",
+  );
+  assert.equal(
+    unexpectedAllies.summary,
+    "Pay 2 water to deploy a sandworm to the Conflict; may remove the Shield Wall.",
+    "Unexpected Allies should expose its water, detonation, and sandworm effect",
   );
   const plotFixture = {
     ...game,
@@ -111,6 +124,15 @@ try {
     state.playPlotBattleIconIntrigue(pendingPlot, "p2", crysknife.id),
     pendingPlot,
     "Plot Intrigues should wait for pending actions to resolve",
+  );
+  const queuedPlot = {
+    ...plotFixture,
+    pendingQueue: [{ kind: "spy", ownerId: "p2", remaining: 1, source: "Test" }],
+  };
+  assert.equal(
+    state.playPlotBattleIconIntrigue(queuedPlot, "p2", crysknife.id),
+    queuedPlot,
+    "Plot Intrigues should wait for queued pending actions to resolve",
   );
   assert.equal(
     state.playPlotBattleIconIntrigue(plotFixture, "p3", crysknife.id),
@@ -209,6 +231,135 @@ try {
     state.playDetonationIntrigue(pendingDetonation, "p2", detonation.id, "deploy"),
     pendingDetonation,
     "Detonation should wait for pending actions to resolve",
+  );
+  const queuedDetonation = {
+    ...detonationFixture,
+    pendingQueue: [{ kind: "spy", ownerId: "p2", remaining: 1, source: "Test" }],
+  };
+  assert.equal(
+    state.playDetonationIntrigue(queuedDetonation, "p2", detonation.id, "deploy"),
+    queuedDetonation,
+    "Detonation should wait for queued pending actions to resolve",
+  );
+
+  const nonProtectedConflict = conflictByName(data, "CHOAM Security");
+  const protectedConflict = conflictByName(data, "Battle For Arrakeen");
+  const unexpectedAlliesFixture = {
+    ...game,
+    activeSeat: game.players.findIndex((candidate) => candidate.id === "p3"),
+    conflict: nonProtectedConflict,
+    shieldWall: true,
+    intrigueDiscard: [],
+    pendingAction: undefined,
+    pendingQueue: [],
+    players: game.players.map((candidate) =>
+      candidate.id === "p3"
+        ? {
+            ...candidate,
+            makerHooks: false,
+            resources: { ...candidate.resources, water: 2 },
+            conflict: 0,
+            deployedSandworms: 0,
+            intrigues: [unexpectedAllies],
+          }
+        : { ...candidate, intrigues: [] },
+    ),
+  };
+  assert.equal(
+    state.isUnexpectedAlliesIntrigue(unexpectedAllies),
+    true,
+    "Unexpected Allies should be recognized as a structured Plot Intrigue",
+  );
+  const wormSummoned = state.playUnexpectedAlliesIntrigue(
+    unexpectedAlliesFixture,
+    "p3",
+    unexpectedAllies.id,
+    false,
+  );
+  assert.equal(playerById(wormSummoned, "p3").resources.water, 0, "Unexpected Allies should cost 2 water");
+  assert.equal(
+    playerById(wormSummoned, "p3").makerHooks,
+    false,
+    "Unexpected Allies should not require Maker Hooks",
+  );
+  assert.equal(playerById(wormSummoned, "p3").deployedSandworms, 1, "Unexpected Allies should deploy a sandworm");
+  assert.equal(playerById(wormSummoned, "p3").conflict, 3, "Unexpected Allies sandworms should add 3 strength");
+  assert.equal(wormSummoned.shieldWall, true, "Unexpected Allies should not force optional Shield Wall removal");
+  assert.deepEqual(playerById(wormSummoned, "p3").intrigues, []);
+  assert.equal(wormSummoned.intrigueDiscard.at(-1).id, unexpectedAllies.id);
+  assert.match(wormSummoned.log[0], /plays Unexpected Allies, spends 2 water, and summons 1 sandworm/);
+
+  const protectedUnexpectedAllies = { ...unexpectedAlliesFixture, conflict: protectedConflict };
+  assert.equal(
+    state.playUnexpectedAlliesIntrigue(protectedUnexpectedAllies, "p3", unexpectedAllies.id, false),
+    protectedUnexpectedAllies,
+    "Unexpected Allies should not summon through a standing Shield Wall on a protected Conflict",
+  );
+  const protectedWallRemoved = state.playUnexpectedAlliesIntrigue(
+    protectedUnexpectedAllies,
+    "p3",
+    unexpectedAllies.id,
+    true,
+  );
+  assert.equal(protectedWallRemoved.shieldWall, false, "Unexpected Allies should remove the Shield Wall when chosen");
+  assert.equal(playerById(protectedWallRemoved, "p3").deployedSandworms, 1);
+  assert.match(protectedWallRemoved.log[0], /spends 2 water, removes the Shield Wall, and summons 1 sandworm/);
+
+  const commanderUnexpectedAllies = {
+    ...unexpectedAlliesFixture,
+    activeSeat: game.players.findIndex((candidate) => candidate.id === "p4"),
+    players: game.players.map((candidate) =>
+      candidate.id === "p4"
+        ? { ...candidate, resources: { ...candidate.resources, water: 2 }, intrigues: [unexpectedAllies] }
+        : candidate.id === "p6"
+          ? { ...candidate, conflict: 0, deployedSandworms: 0, intrigues: [] }
+          : { ...candidate, intrigues: [] },
+    ),
+  };
+  const commanderSummoned = state.playUnexpectedAlliesIntrigue(
+    commanderUnexpectedAllies,
+    "p4",
+    unexpectedAllies.id,
+    false,
+    "p6",
+  );
+  assert.equal(playerById(commanderSummoned, "p4").resources.water, 0, "Commander should pay for Unexpected Allies");
+  assert.equal(playerById(commanderSummoned, "p4").deployedSandworms, 0, "Commander should not receive the sandworm");
+  assert.equal(playerById(commanderSummoned, "p6").deployedSandworms, 1, "Selected activated Ally should receive the sandworm");
+  assert.equal(playerById(commanderSummoned, "p6").conflict, 3);
+  assert.match(commanderSummoned.log[0], /Shaddam Corrino IV plays Unexpected Allies for Princess Irulan/);
+
+  const dryUnexpectedAllies = {
+    ...unexpectedAlliesFixture,
+    players: unexpectedAlliesFixture.players.map((candidate) =>
+      candidate.id === "p3"
+        ? { ...candidate, resources: { ...candidate.resources, water: 1 } }
+        : candidate,
+    ),
+  };
+  assert.equal(
+    state.playUnexpectedAlliesIntrigue(dryUnexpectedAllies, "p3", unexpectedAllies.id, false),
+    dryUnexpectedAllies,
+    "Unexpected Allies should require 2 water",
+  );
+
+  const pendingUnexpectedAllies = {
+    ...unexpectedAlliesFixture,
+    pendingAction: { kind: "spy", ownerId: "p3", remaining: 1, source: "Test" },
+  };
+  assert.equal(
+    state.playUnexpectedAlliesIntrigue(pendingUnexpectedAllies, "p3", unexpectedAllies.id, false),
+    pendingUnexpectedAllies,
+    "Unexpected Allies should wait for pending actions to resolve",
+  );
+  const queuedUnexpectedAllies = {
+    ...unexpectedAlliesFixture,
+    pendingQueue: [{ kind: "spy", ownerId: "p3", remaining: 1, source: "Test" }],
+  };
+  assert.equal(
+    state.playUnexpectedAlliesIntrigue(queuedUnexpectedAllies, "p3", unexpectedAllies.id, false),
+    queuedUnexpectedAllies,
+    "Unexpected Allies should wait for queued pending actions to resolve",
   );
 
   for (const space of data.boardSpaces.filter((candidate) => candidate.gain?.intrigue)) {

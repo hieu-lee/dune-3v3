@@ -56,7 +56,7 @@ const shaddamReservedContractNames = new Set(["Sardaukar I", "Sardaukar II"]);
 const automatedCombatSwordValues: Partial<Record<number, number>> = {};
 const intrigueSummariesByCatalogId: Partial<Record<number, string>> = {
   131: "Remove the Shield Wall OR deploy up to four troops from your garrison to the Conflict.",
-  137: "Pay 2 water to remove the Shield Wall and deploy a sandworm to the Conflict.",
+  137: "Pay 2 water to deploy a sandworm to the Conflict; may remove the Shield Wall.",
 };
 
 export const iconLabels: Record<IconId, string> = {

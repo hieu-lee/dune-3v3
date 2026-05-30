@@ -29,6 +29,7 @@ import {
   collectChoamContractFallback,
   collectMakerSpice,
   combatIntrigueTargets,
+  conflictProtectedByShieldWall,
   defaultActivatedAllyId,
   deployTroopToConflict,
   drawIntrigueCards,
@@ -40,6 +41,7 @@ import {
   iconCanReach,
   initialGame,
   isDetonationIntrigue,
+  isUnexpectedAlliesIntrigue,
   maybeStartCombatPhase,
   passCombatIntrigue,
   pendingActionForCard,
@@ -63,6 +65,7 @@ import {
   setChoamContractCompleted,
   playDetonationIntrigue,
   playPlotBattleIconIntrigue,
+  playUnexpectedAlliesIntrigue,
   resolveMakerChoice,
   resolveSietchTabrChoice,
   startCombatPhase,
@@ -561,6 +564,16 @@ export default function App() {
     });
   }
 
+  function playUnexpectedAllies(intrigueId: string, removeShieldWall: boolean) {
+    setGame((current) => {
+      const player = current.players[current.activeSeat];
+      const sandwormOwnerId = player.role === "Commander"
+        ? commanderTargets[player.id] ?? defaultActivatedAllyId(player, current.players)
+        : undefined;
+      return playUnexpectedAlliesIntrigue(current, player.id, intrigueId, removeShieldWall, sandwormOwnerId);
+    });
+  }
+
   function finalizeEndgame() {
     setGame((current) => finishEndgame(current));
   }
@@ -652,6 +665,12 @@ export default function App() {
   const playingPhase = game.phase === "playing";
   const plotIntrigueLocked = !playingPhase || Boolean(game.pendingAction) || game.pendingQueue.length > 0;
   const detonationDeployOwner = activePlayer.role === "Commander" ? activatedAlly : activePlayer;
+  const unexpectedAlliesOwner = activePlayer.role === "Commander" ? activatedAlly : activePlayer;
+  const currentConflictProtected = conflictProtectedByShieldWall(game.conflict);
+  const unexpectedAlliesCanPay = activePlayer.resources.water >= 2;
+  const unexpectedAlliesBlockedByShieldWall = Boolean(game.conflict && game.shieldWall && currentConflictProtected);
+  const unexpectedAlliesCanSummonWithoutWall = Boolean(game.conflict && (!game.shieldWall || !currentConflictProtected));
+  const unexpectedAlliesDisabled = plotIntrigueLocked || !game.conflict || !unexpectedAlliesCanPay;
   const spyPlacementSpaces = pendingSpyOwner
     ? boardSpaces.filter((space) => canPlaceSpyPost(space, pendingSpyOwner, game))
     : [];
@@ -1451,6 +1470,30 @@ export default function App() {
                           <Swords size={14} />
                           Deploy up to {Math.min(detonationDeployOwner.garrison, 4)}
                         </button>
+                      </div>
+                    )}
+                    {isUnexpectedAlliesIntrigue(card) && (
+                      <div className="intrigue-actions">
+                        {unexpectedAlliesCanSummonWithoutWall && (
+                          <button
+                            type="button"
+                            onClick={() => playUnexpectedAllies(card.id, false)}
+                            disabled={unexpectedAlliesDisabled}
+                          >
+                            <Sparkles size={14} />
+                            Worm{unexpectedAlliesOwner.id !== activePlayer.id ? `: ${unexpectedAlliesOwner.leader}` : ""}
+                          </button>
+                        )}
+                        {game.shieldWall && (
+                          <button
+                            type="button"
+                            onClick={() => playUnexpectedAllies(card.id, true)}
+                            disabled={unexpectedAlliesDisabled}
+                          >
+                            <Shield size={14} />
+                            {unexpectedAlliesBlockedByShieldWall ? "Wall + worm" : "Remove wall + worm"}
+                          </button>
+                        )}
                       </div>
                     )}
                   </article>

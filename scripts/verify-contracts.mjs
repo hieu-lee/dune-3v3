@@ -104,6 +104,26 @@ try {
   assert.equal(nextShaddam.contracts.at(-1)?.card.name, "Sardaukar I");
   assert.equal(nextShaddam.contracts.at(-1)?.takenAtSpaceId, "accept-contract");
 
+  const completed = state.setChoamContractCompleted(next, shaddam.id, sardaukar.id, true);
+  assert.equal(
+    completed.players.find((player) => player.id === shaddam.id)?.contracts.at(-1)?.completed,
+    true,
+    "Contract completion should be tracked on the player contract",
+  );
+  assert.match(completed.log[0], /completes the Sardaukar I CHOAM contract/);
+  assert.equal(
+    state.setChoamContractCompleted(completed, shaddam.id, sardaukar.id, true),
+    completed,
+    "Completing an already complete contract should be a no-op",
+  );
+
+  const reopened = state.setChoamContractCompleted(completed, shaddam.id, sardaukar.id, false);
+  assert.equal(
+    reopened.players.find((player) => player.id === shaddam.id)?.contracts.at(-1)?.completed,
+    false,
+    "Contract completion should be reversible for table corrections",
+  );
+
   const illegal = state.takeChoamContract(
     game,
     { kind: "contract", ownerId: ally.id, source: "Test Contract Space", spaceId: "accept-contract" },

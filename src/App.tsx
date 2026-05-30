@@ -32,6 +32,7 @@ import {
   deployTroopToConflict,
   drawIntrigueCards,
   endgameBattleIconChoices,
+  endgameConditionalIntrigueChoices,
   effectiveCost,
   finishEndgame,
   iconCanReach,
@@ -44,6 +45,8 @@ import {
   moveImperiumCardToThroneRow,
   resolveConflictTie,
   scoreEndgameBattleIconIntrigue,
+  scoreEndgameConditionalIntrigue,
+  setChoamContractCompleted,
   playPlotBattleIconIntrigue,
   startNextRound,
   takeChoamContract,
@@ -446,6 +449,10 @@ export default function App() {
     });
   }
 
+  function updateContractCompleted(playerId: string, contractId: string, completed: boolean) {
+    setGame((current) => setChoamContractCompleted(current, playerId, contractId, completed));
+  }
+
   function chooseConflictTieWinner(winnerId?: string) {
     if (game.pendingAction?.kind !== "conflict-tie") return;
     setGame((current) => {
@@ -457,6 +464,10 @@ export default function App() {
 
   function scoreEndgameIntrigue(playerId: string, intrigueId: string, conflictId: string) {
     setGame((current) => scoreEndgameBattleIconIntrigue(current, playerId, intrigueId, conflictId));
+  }
+
+  function scoreConditionalEndgameIntrigue(playerId: string, intrigueId: string) {
+    setGame((current) => scoreEndgameConditionalIntrigue(current, playerId, intrigueId));
   }
 
   function scorePlotIntrigue(intrigueId: string) {
@@ -513,6 +524,8 @@ export default function App() {
       ? game.players.filter((player) => pendingAction.tiedPlayerIds.includes(player.id))
       : [];
   const endgameChoices = endgameBattleIconChoices(game);
+  const conditionalEndgameChoices = endgameConditionalIntrigueChoices(game);
+  const hasEndgameChoices = endgameChoices.length + conditionalEndgameChoices.length > 0;
   const playingPhase = game.phase === "playing";
   const spyPlacementSpaces = pendingSpyOwner
     ? boardSpaces.filter((space) => canPlaceSpyPost(space, pendingSpyOwner, game))
@@ -756,6 +769,22 @@ export default function App() {
                   ))}
                 </div>
               )}
+              {player.contracts.length > 0 && (
+                <div className="contract-status-row">
+                  {player.contracts.map((contract) => (
+                    <label className={contract.completed ? "completed" : ""} key={contract.card.id} title={contract.card.name}>
+                      <input
+                        type="checkbox"
+                        checked={contract.completed}
+                        onChange={(event) =>
+                          updateContractCompleted(player.id, contract.card.id, event.currentTarget.checked)
+                        }
+                      />
+                      <span>{contract.card.name}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
             </article>
           ))}
         </aside>
@@ -824,7 +853,22 @@ export default function App() {
                     </div>
                   );
                 })}
-                {endgameChoices.length === 0 && <span>No battle-icon Endgame Intrigues are scoreable.</span>}
+                {conditionalEndgameChoices.map((choice) => {
+                  const owner = game.players.find((player) => player.id === choice.playerId);
+                  const intrigue = owner?.intrigues.find((card) => card.id === choice.intrigueId);
+                  if (!owner || !intrigue) return null;
+                  const rewardText = `${choice.vp} VP${choice.spice ? ` / ${choice.spice} spice` : ""}`;
+                  return (
+                    <div className="support-target" key={`${choice.playerId}-${choice.intrigueId}`}>
+                      <strong>{owner.leader}</strong>
+                      <span>{intrigue.name}</span>
+                      <button type="button" onClick={() => scoreConditionalEndgameIntrigue(owner.id, intrigue.id)}>
+                        Score {rewardText}
+                      </button>
+                    </div>
+                  );
+                })}
+                {!hasEndgameChoices && <span>No Endgame Intrigues are scoreable.</span>}
                 <button type="button" onClick={finalizeEndgame}>Finalize Scores</button>
               </div>
             )}

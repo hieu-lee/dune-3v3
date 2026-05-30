@@ -60,6 +60,12 @@ try {
 
   const crysknifeIntrigue = intrigueBySourceId(data, 159);
   const desertMouseIntrigue = intrigueBySourceId(data, 157);
+  const secureSpiceTrade = intrigueBySourceId(data, 161);
+  const choamProfits = intrigueBySourceId(data, 450);
+  const spiceMustFlow = data.reserveMarket.find((card) => card.sourceId === 538);
+  assert.ok(spiceMustFlow, "The Spice Must Flow reserve card should be available");
+  const contracts = data.standardContracts.slice(0, 4);
+  assert.equal(contracts.length, 4, "Expected enough contracts for CHOAM Profits fixture");
   const crysknifeConflict = { ...conflictBySourceId(data, 454), scored: false };
   const desertMouseConflict = { ...conflictBySourceId(data, 460), scored: false };
   const propaganda = { ...conflictBySourceId(data, 463), scored: false };
@@ -155,6 +161,93 @@ try {
     commanderCannotScore,
     "Commanders cannot score battle-icon Endgame Intrigues",
   );
+
+  const secureSpiceTradeEligible = endgameFixture(state, (players) =>
+    players.map((player) =>
+      player.id === "p4"
+        ? {
+            ...player,
+            deck: [{ ...spiceMustFlow, id: "tsmf-deck" }],
+            discard: [{ ...spiceMustFlow, id: "tsmf-discard" }],
+            intrigues: [secureSpiceTrade],
+          }
+        : player,
+    ),
+  );
+  assert.deepEqual(state.endgameConditionalIntrigueChoices(secureSpiceTradeEligible), [{
+    playerId: "p4",
+    intrigueId: secureSpiceTrade.id,
+    vp: 1,
+    spice: 2,
+  }]);
+  const secureSpiceTradeScored = state.scoreEndgameConditionalIntrigue(
+    secureSpiceTradeEligible,
+    "p4",
+    secureSpiceTrade.id,
+  );
+  assert.equal(playerById(secureSpiceTradeScored, "p4").vp, playerById(secureSpiceTradeEligible, "p4").vp + 1);
+  assert.equal(
+    playerById(secureSpiceTradeScored, "p4").resources.spice,
+    playerById(secureSpiceTradeEligible, "p4").resources.spice + 2,
+  );
+  assert.equal(playerById(secureSpiceTradeScored, "p4").intrigues.length, 0);
+  assert.equal(secureSpiceTradeScored.intrigueDiscard.at(-1).id, secureSpiceTrade.id);
+
+  const secureSpiceTradeIneligible = endgameFixture(state, (players) =>
+    players.map((player) =>
+      player.id === "p4"
+        ? { ...player, discard: [{ ...spiceMustFlow, id: "single-tsmf" }], intrigues: [secureSpiceTrade] }
+        : player,
+    ),
+  );
+  assert.deepEqual(state.endgameConditionalIntrigueChoices(secureSpiceTradeIneligible), []);
+  assert.equal(
+    state.scoreEndgameConditionalIntrigue(secureSpiceTradeIneligible, "p4", secureSpiceTrade.id),
+    secureSpiceTradeIneligible,
+  );
+
+  const choamProfitsEligible = endgameFixture(state, (players) =>
+    players.map((player) =>
+      player.id === "p2"
+        ? {
+            ...player,
+            intrigues: [choamProfits],
+            contracts: contracts.map((contract, index) => ({
+              card: contract,
+              completed: true,
+              takenRound: index + 1,
+            })),
+          }
+        : player,
+    ),
+  );
+  assert.deepEqual(state.endgameConditionalIntrigueChoices(choamProfitsEligible), [{
+    playerId: "p2",
+    intrigueId: choamProfits.id,
+    vp: 1,
+  }]);
+  const choamProfitsScored = state.scoreEndgameConditionalIntrigue(choamProfitsEligible, "p2", choamProfits.id);
+  assert.equal(playerById(choamProfitsScored, "p2").vp, playerById(choamProfitsEligible, "p2").vp + 1);
+  assert.equal(playerById(choamProfitsScored, "p2").resources.spice, playerById(choamProfitsEligible, "p2").resources.spice);
+  assert.equal(playerById(choamProfitsScored, "p2").intrigues.length, 0);
+  assert.equal(choamProfitsScored.intrigueDiscard.at(-1).id, choamProfits.id);
+
+  const choamProfitsIneligible = endgameFixture(state, (players) =>
+    players.map((player) =>
+      player.id === "p2"
+        ? {
+            ...player,
+            intrigues: [choamProfits],
+            contracts: contracts.map((contract, index) => ({
+              card: contract,
+              completed: index < 3,
+              takenRound: index + 1,
+            })),
+          }
+        : player,
+    ),
+  );
+  assert.deepEqual(state.endgameConditionalIntrigueChoices(choamProfitsIneligible), []);
 
   const vpTrigger = {
     ...state.initialGame(),

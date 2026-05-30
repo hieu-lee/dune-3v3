@@ -45,6 +45,8 @@ These notes are implementation scaffolding, not a replacement for the rulebook. 
 - Current Objective setup deals the four Objectives valid for six players only to Allies, applies the 4/6P Desert Mouse cross-team trade, and uses the first-player Desert Mouse Objective for the first seat.
 - Current Conflict-card implementation awards the won card to the unique winning Ally, pauses for same-team first-place tie concessions, and scores immediate non-wild battle-icon pairs against that Ally's face-up Objectives or won Conflicts.
 - Current Endgame implementation triggers during Recall when a player reaches 10 VP or the Conflict deck is empty, then lets Allies score Crysknife, Desert Mouse, and Ornithopter Endgame Intrigues against matching or wild face-up Conflict cards before finalizing team scores.
+- Current conditional Endgame Intrigue implementation scores Secure Spice Trade for 1 VP and 2 spice when a player has at least two The Spice Must Flow cards, and CHOAM Profits for 1 VP when a player has at least four completed contracts.
+- Current CHOAM contract implementation lets table players manually mark taken contracts complete for printed contract requirements.
 - Current Plot Intrigue implementation lets the active player gain 1 spice from the Plot side of Crysknife, Desert Mouse, and Ornithopter during Agent or Reveal turns.
 - Full leader card images are available from the player seats as table references while icon-heavy leader powers await structured automation.
 - Board-space tiles render local location-card art where the catalog has exact name matches; six-player-only and commander personal-board spaces stay text-only until scanned board art is available.
@@ -57,7 +59,7 @@ These notes are implementation scaffolding, not a replacement for the rulebook. 
 - Final board-space coordinates over scanned board art.
 - Remaining component images and card fronts/backs from owned scans or approved source assets.
 - Maker Hooks, worm deployment, and Shaddam's no-hooks replacement behavior.
-- Printed Conflict rewards, non-battle-icon Endgame Intrigues, and Combat Intrigue timing.
+- Printed Conflict rewards, Shadow Alliance Endgame scoring, and Combat Intrigue timing.
 
 ## Asset Conventions
 

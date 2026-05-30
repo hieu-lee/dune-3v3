@@ -42,6 +42,10 @@ const emptyInfluence = (): Influence => ({
   fringeWorlds: 0,
 });
 
+const secureSpiceTradeSourceId = 161;
+const choamProfitsSourceId = 450;
+const spiceMustFlowSourceId = 538;
+
 export function cloneCards(cards: Card[]) {
   return cards.map((card) => ({
     ...card,
@@ -653,6 +657,36 @@ export function collectChoamContractFallback(state: GameState, pending: Contract
   };
 }
 
+export function setChoamContractCompleted(
+  state: GameState,
+  playerId: string,
+  contractId: string,
+  completed: boolean,
+): GameState {
+  const owner = state.players.find((player) => player.id === playerId);
+  const contract = owner?.contracts.find((candidate) => candidate.card.id === contractId);
+  if (!owner || !contract || contract.completed === completed) return state;
+
+  const players = state.players.map((player) =>
+    player.id === owner.id
+      ? {
+          ...player,
+          contracts: player.contracts.map((candidate) =>
+            candidate.card.id === contractId ? { ...candidate, completed } : candidate,
+          ),
+        }
+      : player,
+  );
+  return {
+    ...state,
+    players,
+    log: [
+      `${owner.leader} ${completed ? "completes" : "marks incomplete"} the ${contract.card.name} CHOAM contract.`,
+      ...state.log,
+    ],
+  };
+}
+
 export function transferTradeGood(
   state: GameState,
   pending: TradePendingAction,
@@ -851,6 +885,69 @@ export function scoreEndgameBattleIconIntrigue(
     intrigueDiscard: [...state.intrigueDiscard, intrigue],
     log: [
       `${player.leader} scores ${intrigue.name} by flipping ${conflict.name} for 1 VP.`,
+      ...state.log,
+    ],
+  };
+}
+
+function countPlayerCardsBySourceId(player: Player, sourceId: number) {
+  return [...player.deck, ...player.hand, ...player.discard, ...player.playArea]
+    .filter((card) => card.sourceId === sourceId)
+    .length;
+}
+
+function scoreableConditionalEndgameReward(player: Player, intrigue: IntrigueCard) {
+  if (intrigue.sourceId === secureSpiceTradeSourceId) {
+    return countPlayerCardsBySourceId(player, spiceMustFlowSourceId) >= 2 ? { vp: 1, spice: 2 } : undefined;
+  }
+  if (intrigue.sourceId === choamProfitsSourceId) {
+    return player.contracts.filter((contract) => contract.completed).length >= 4 ? { vp: 1 } : undefined;
+  }
+  return undefined;
+}
+
+export function endgameConditionalIntrigueChoices(state: GameState) {
+  if (state.phase !== "endgame") return [];
+  return state.players.flatMap((player) =>
+    player.intrigues.flatMap((intrigue) => {
+      const reward = scoreableConditionalEndgameReward(player, intrigue);
+      return reward ? [{ playerId: player.id, intrigueId: intrigue.id, ...reward }] : [];
+    }),
+  );
+}
+
+export function scoreEndgameConditionalIntrigue(
+  state: GameState,
+  playerId: string,
+  intrigueId: string,
+): GameState {
+  if (state.phase !== "endgame") return state;
+  const player = state.players.find((candidate) => candidate.id === playerId);
+  if (!player) return state;
+  const intrigue = player.intrigues.find((card) => card.id === intrigueId);
+  if (!intrigue) return state;
+  const reward = scoreableConditionalEndgameReward(player, intrigue);
+  if (!reward) return state;
+
+  const players = state.players.map((candidate) =>
+    candidate.id === player.id
+      ? {
+          ...candidate,
+          vp: candidate.vp + reward.vp,
+          resources: {
+            ...candidate.resources,
+            spice: candidate.resources.spice + (reward.spice ?? 0),
+          },
+          intrigues: candidate.intrigues.filter((card) => card.id !== intrigue.id),
+        }
+      : candidate,
+  );
+  return {
+    ...state,
+    players,
+    intrigueDiscard: [...state.intrigueDiscard, intrigue],
+    log: [
+      `${player.leader} scores ${intrigue.name} for ${reward.vp} VP${reward.spice ? ` and ${reward.spice} spice` : ""}.`,
       ...state.log,
     ],
   };

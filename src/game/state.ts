@@ -72,6 +72,7 @@ const spiceMustFlowSourceId = 538;
 const shadowAllianceSourceId = 160;
 const usulSourceId = 552;
 const criticalShipmentsSourceId = 557;
+const demandResultsSourceId = 558;
 const devastatingAssaultSourceId = 559;
 const shadowAllianceFactions: FactionId[] = [
   "emperor",
@@ -716,8 +717,18 @@ export function isCriticalShipmentsCommanderCard(card: Card) {
   return card.sourceId === criticalShipmentsSourceId || card.name === "Critical Shipments";
 }
 
+export function isDemandResultsCommanderCard(card: Card) {
+  return card.sourceId === demandResultsSourceId || card.name === "Demand Results";
+}
+
 export function isDevastatingAssaultCommanderCard(card: Card) {
   return card.sourceId === devastatingAssaultSourceId || card.name === "Devastating Assault";
+}
+
+function shaddamAllyIds(state: GameState, source: Player): [string, string] | undefined {
+  const allies = state.players.filter((player) => player.team === source.team && player.role === "Ally");
+  if (allies.length < 2) return undefined;
+  return [allies[0].id, allies[1].id];
 }
 
 export function pendingActionForShaddamPersonalBoard(state: GameState): PendingAction | undefined {
@@ -777,6 +788,25 @@ export function pendingActionForCard(
       { commanderResource: "solari", commanderAmount: 2, allyResource: "water", allyAmount: 1 },
     ]);
   }
+  if (
+    isDemandResultsCommanderCard(card) &&
+    source.team === "shaddam" &&
+    source.role === "Commander" &&
+    source.resources.solari >= 2 &&
+    state &&
+    state.contractOffer.length >= 2
+  ) {
+    const allyIds = shaddamAllyIds(state, source);
+    if (!allyIds) return undefined;
+    return {
+      kind: "demand-results",
+      commanderId: source.id,
+      allyIds,
+      contractIds: [state.contractOffer[0].id, state.contractOffer[1].id],
+      cardId: card.id,
+      source: card.name,
+    };
+  }
   return undefined;
 }
 
@@ -827,6 +857,7 @@ type RecallSpyPendingAction = Extract<PendingAction, { kind: "recall-spy" }>;
 type LoseInfluencePendingAction = Extract<PendingAction, { kind: "lose-influence" }>;
 type RevealAdjustPendingAction = Extract<PendingAction, { kind: "reveal-adjust" }>;
 type CommanderResourceSplitPendingAction = Extract<PendingAction, { kind: "commander-resource-split" }>;
+type DemandResultsPendingAction = Extract<PendingAction, { kind: "demand-results" }>;
 
 function addPurchasedCard(player: Player, card: Card, fromReserve: boolean): Player {
   const purchaseSequence = player.purchaseSequence + 1;
@@ -2641,6 +2672,104 @@ export function resolveCommanderResourceSplitChoice(
       `${commander.leader} resolves ${pending.source}: gains ${resourceGainLog(option.commanderAmount, option.commanderResource)}; ${ally.leader} gains ${resourceGainLog(option.allyAmount, option.allyResource)}.`,
       ...state.log,
     ],
+  };
+}
+
+export function resolveDemandResultsChoice(
+  state: GameState,
+  pending: DemandResultsPendingAction,
+  optionIndex: number,
+): GameState {
+  const commander = state.players.find((player) => player.id === pending.commanderId);
+  const allyA = state.players.find((player) => player.id === pending.allyIds[0]);
+  const allyB = state.players.find((player) => player.id === pending.allyIds[1]);
+  const contractA = state.contractOffer.find((contract) => contract.id === pending.contractIds[0]);
+  const contractB = state.contractOffer.find((contract) => contract.id === pending.contractIds[1]);
+  const choices = optionIndex === 0
+    ? [
+        { ally: allyA, contract: contractA },
+        { ally: allyB, contract: contractB },
+      ]
+    : optionIndex === 1
+      ? [
+          { ally: allyA, contract: contractB },
+          { ally: allyB, contract: contractA },
+        ]
+      : undefined;
+
+  if (
+    !commander ||
+    commander.team !== "shaddam" ||
+    commander.role !== "Commander" ||
+    commander.resources.solari < 2 ||
+    !commander.playArea.some((card) => card.id === pending.cardId && isDemandResultsCommanderCard(card)) ||
+    !allyA ||
+    allyA.team !== commander.team ||
+    allyA.role !== "Ally" ||
+    !allyB ||
+    allyB.team !== commander.team ||
+    allyB.role !== "Ally" ||
+    allyA.id === allyB.id ||
+    !contractA ||
+    !contractB ||
+    contractA.id === contractB.id ||
+    !choices
+  ) {
+    return state;
+  }
+
+  const assigned = choices as Array<{ ally: Player; contract: ContractCard }>;
+  const assignedText = assigned
+    .map(({ ally, contract }) => `${ally.leader} takes ${contract.name}`)
+    .join("; ");
+  const replacementIds = new Set(pending.contractIds);
+  const contractDeck = [...state.contractDeck];
+  const contractOffer = state.contractOffer.flatMap((contract) => {
+    if (!replacementIds.has(contract.id)) return [contract];
+    const replacement = contractDeck.shift();
+    return replacement ? [replacement] : [];
+  });
+  const players = state.players.map((player) => {
+    if (player.id === commander.id) {
+      return {
+        ...player,
+        resources: { ...player.resources, solari: player.resources.solari - 2 },
+        playArea: player.playArea.filter((card) => card.id !== pending.cardId),
+      };
+    }
+    const assignment = assigned.find(({ ally }) => ally.id === player.id);
+    if (assignment) {
+      return {
+        ...player,
+        contracts: [
+          ...player.contracts,
+          {
+            card: assignment.contract,
+            completed: false,
+            takenRound: state.round,
+          },
+        ],
+      };
+    }
+    return player;
+  });
+
+  return {
+    ...state,
+    players,
+    contractOffer,
+    contractDeck,
+    ...advancePendingAction(state),
+    log: [`${commander.leader} spends 2 Solari for ${pending.source}; ${assignedText}.`, ...state.log],
+  };
+}
+
+export function skipDemandResults(state: GameState, pending: DemandResultsPendingAction): GameState {
+  const commander = state.players.find((player) => player.id === pending.commanderId);
+  return {
+    ...state,
+    ...advancePendingAction(state),
+    log: [`${commander?.leader ?? "Shaddam"} declines to pay 2 Solari for ${pending.source}.`, ...state.log],
   };
 }
 

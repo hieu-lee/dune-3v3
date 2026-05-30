@@ -284,6 +284,14 @@ export type PendingAction =
       options: CommanderResourceSplitOption[];
     }
   | {
+      kind: "demand-results";
+      commanderId: string;
+      allyIds: [string, string];
+      contractIds: [string, string];
+      cardId: string;
+      source: string;
+    }
+  | {
       kind: "conflict-tie";
       team: TeamId;
       tiedPlayerIds: string[];

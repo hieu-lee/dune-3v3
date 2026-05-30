@@ -107,8 +107,10 @@ import {
   playStrategicStockpilingPlotIntrigue,
   playUnexpectedAlliesIntrigue,
   resolveCommanderResourceSplitChoice,
+  resolveDemandResultsChoice,
   resolveMakerChoice,
   resolveSietchTabrChoice,
+  skipDemandResults,
   skipLoseInfluence,
   skipRecallSpy,
   skipTrashCard,
@@ -573,6 +575,24 @@ export default function App() {
     });
   }
 
+  function chooseDemandResults(optionIndex: number) {
+    if (game.pendingAction?.kind !== "demand-results") return;
+    setGame((current) => {
+      const pending = current.pendingAction;
+      if (!pending || pending.kind !== "demand-results") return current;
+      return maybeStartCombatPhase(resolveDemandResultsChoice(current, pending, optionIndex));
+    });
+  }
+
+  function skipDemandResultsChoice() {
+    if (game.pendingAction?.kind !== "demand-results") return;
+    setGame((current) => {
+      const pending = current.pendingAction;
+      if (!pending || pending.kind !== "demand-results") return current;
+      return maybeStartCombatPhase(skipDemandResults(current, pending));
+    });
+  }
+
   function deployOne() {
     if (game.pendingAction?.kind !== "deploy") return;
     setGame((current) => {
@@ -815,6 +835,18 @@ export default function App() {
     pendingAction?.kind === "commander-resource-split"
       ? game.players.find((player) => player.id === pendingAction.allyId)
       : undefined;
+  const pendingDemandResultsCommander =
+    pendingAction?.kind === "demand-results"
+      ? game.players.find((player) => player.id === pendingAction.commanderId)
+      : undefined;
+  const pendingDemandResultsAllies =
+    pendingAction?.kind === "demand-results"
+      ? pendingAction.allyIds.map((allyId) => game.players.find((player) => player.id === allyId))
+      : [];
+  const pendingDemandResultsContracts =
+    pendingAction?.kind === "demand-results"
+      ? pendingAction.contractIds.map((contractId) => game.contractOffer.find((contract) => contract.id === contractId))
+      : [];
   const pendingThroneOwner =
     pendingAction?.kind === "throne-row" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingTrashOwner =
@@ -1538,6 +1570,7 @@ export default function App() {
                 {pendingAction.kind === "maker-choice" && `${pendingMakerLabel ?? "Player"} Maker space`}
                 {pendingAction.kind === "sietch-tabr" && `${pendingSietchLabel ?? "Player"} Sietch Tabr`}
                 {pendingAction.kind === "commander-resource-split" && `${pendingResourceSplitCommander?.leader ?? "Commander"} ${pendingAction.source}`}
+                {pendingAction.kind === "demand-results" && `${pendingDemandResultsCommander?.leader ?? "Shaddam"} Demand Results`}
                 {pendingAction.kind === "throne-row" && `${pendingThroneOwner?.leader ?? "Shaddam"} Throne Row`}
                 {pendingAction.kind === "trash-card" && `${pendingTrashOwner?.leader ?? "Player"} optional trash`}
                 {pendingAction.kind === "recall-spy" && `${pendingRecallSpyOwner?.leader ?? "Player"} recall spy`}
@@ -1707,6 +1740,27 @@ export default function App() {
                     </button>
                   );
                 })}
+              </div>
+            )}
+
+            {pendingAction.kind === "demand-results" && (
+              <div className="pending-controls contract-choice">
+                {pendingDemandResultsAllies[0] && pendingDemandResultsAllies[1] && pendingDemandResultsContracts[0] && pendingDemandResultsContracts[1] ? (
+                  <>
+                    <span>Spend 2 Solari, assign both contracts, then trash Demand Results.</span>
+                    <button type="button" onClick={() => chooseDemandResults(0)}>
+                      <span>{pendingDemandResultsContracts[0].name} to {pendingDemandResultsAllies[0].leader}</span>
+                      <span>{pendingDemandResultsContracts[1].name} to {pendingDemandResultsAllies[1].leader}</span>
+                    </button>
+                    <button type="button" onClick={() => chooseDemandResults(1)}>
+                      <span>{pendingDemandResultsContracts[1].name} to {pendingDemandResultsAllies[0].leader}</span>
+                      <span>{pendingDemandResultsContracts[0].name} to {pendingDemandResultsAllies[1].leader}</span>
+                    </button>
+                  </>
+                ) : (
+                  <span>Demand Results can no longer resolve with the current table state.</span>
+                )}
+                <button type="button" onClick={skipDemandResultsChoice}>Skip</button>
               </div>
             )}
 

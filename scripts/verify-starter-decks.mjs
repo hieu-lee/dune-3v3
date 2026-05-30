@@ -387,6 +387,241 @@ try {
     "Wrong-team Critical Shipments should not pay Ally",
   );
 
+  const demandResults = data.emperorCommanderCards.find((card) => card.name === "Demand Results");
+  assert.ok(demandResults, "Emperor Commander deck should include Demand Results");
+  assert.equal(
+    state.isDemandResultsCommanderCard(demandResults),
+    true,
+    "Demand Results should be recognized as its Commander starter card",
+  );
+  const demandResultsPending = state.pendingActionForCard(demandResults, emperor, game, shaddamAlly);
+  assert.deepEqual(demandResultsPending, {
+    kind: "demand-results",
+    commanderId: emperor.id,
+    allyIds: [shaddamAlly.id, shaddamAllyB.id],
+    contractIds: [game.contractOffer[0].id, game.contractOffer[1].id],
+    cardId: demandResults.id,
+    source: "Demand Results",
+  });
+  assert.equal(
+    state.pendingActionForCard(
+      demandResults,
+      { ...emperor, resources: { ...emperor.resources, solari: 1 } },
+      game,
+      shaddamAlly,
+    ),
+    undefined,
+    "Demand Results should not queue when Shaddam cannot pay 2 Solari",
+  );
+  assert.equal(
+    state.pendingActionForCard(
+      demandResults,
+      emperor,
+      { ...game, contractOffer: [game.contractOffer[0]] },
+      shaddamAlly,
+    ),
+    undefined,
+    "Demand Results should need both face-up public contracts",
+  );
+  assert.equal(
+    state.pendingActionForCard(
+      demandResults,
+      emperor,
+      { ...game, players: game.players.filter((player) => player.id !== shaddamAllyB.id) },
+      shaddamAlly,
+    ),
+    undefined,
+    "Demand Results should need both Shaddam Allies",
+  );
+  assert.equal(
+    state.pendingActionForCard(demandResults, shaddamAlly, game, shaddamAllyB),
+    undefined,
+    "Demand Results should not trigger from an Ally starter deck owner",
+  );
+  assert.equal(
+    state.pendingActionForCard(demandResults, muadDib, game, muadDibAllyA),
+    undefined,
+    "Demand Results should not trigger for Muad'Dib's Commander",
+  );
+  const gatherSupport = data.boardSpaces.find((space) => space.id === "gather-support");
+  assert.ok(gatherSupport, "Gather Support should exist for Demand Results post-cost regression");
+  const poorDemandResultsSource = state.applyBoardEffect(
+    { ...emperor, resources: { solari: 2, spice: 0, water: 0 } },
+    shaddamAlly,
+    gatherSupport,
+    gatherSupport.cost,
+  ).source;
+  assert.equal(
+    state.pendingActionForCard(demandResults, poorDemandResultsSource, game, shaddamAlly),
+    undefined,
+    "Demand Results should not queue if the Landsraad space cost leaves Shaddam without 2 Solari",
+  );
+  const richDemandResultsSource = state.applyBoardEffect(
+    { ...emperor, resources: { solari: 4, spice: 0, water: 0 } },
+    shaddamAlly,
+    gatherSupport,
+    gatherSupport.cost,
+  ).source;
+  assert.equal(
+    state.pendingActionForCard(demandResults, richDemandResultsSource, game, shaddamAlly)?.kind,
+    "demand-results",
+    "Demand Results should queue from post-space resources when Shaddam can still pay 2 Solari",
+  );
+
+  const [contractA, contractB] = game.contractOffer;
+  const [replacementA, replacementB, ...remainingContractDeck] = game.contractDeck;
+  const baseDemandResultsResolution = {
+    ...game,
+    pendingAction: demandResultsPending,
+    pendingQueue: [],
+    players: game.players.map((player) => {
+      if (player.id === emperor.id) {
+        return {
+          ...player,
+          resources: { solari: 2, spice: 0, water: 0 },
+          playArea: [demandResults],
+          contracts: [],
+        };
+      }
+      if (player.id === shaddamAlly.id || player.id === shaddamAllyB.id) {
+        return { ...player, contracts: [] };
+      }
+      return player;
+    }),
+    log: [],
+  };
+  const resolvedDemandResults = state.resolveDemandResultsChoice(
+    baseDemandResultsResolution,
+    demandResultsPending,
+    0,
+  );
+  assert.equal(
+    playerById(resolvedDemandResults, emperor.id).resources.solari,
+    0,
+    "Demand Results resolution spends 2 Shaddam Solari",
+  );
+  assert.deepEqual(
+    playerById(resolvedDemandResults, emperor.id).playArea,
+    [],
+    "Demand Results resolution trashes Demand Results from play",
+  );
+  assert.deepEqual(
+    playerById(resolvedDemandResults, shaddamAlly.id).contracts.map((contract) => contract.card.id),
+    [contractA.id],
+    "Demand Results first option gives the first contract to the first Shaddam Ally",
+  );
+  assert.deepEqual(
+    playerById(resolvedDemandResults, shaddamAllyB.id).contracts.map((contract) => contract.card.id),
+    [contractB.id],
+    "Demand Results first option gives the second contract to the second Shaddam Ally",
+  );
+  assert.equal(
+    playerById(resolvedDemandResults, shaddamAlly.id).contracts[0].takenRound,
+    game.round,
+    "Demand Results should record the round contracts were taken",
+  );
+  assert.deepEqual(
+    resolvedDemandResults.contractOffer.map((contract) => contract.id),
+    [replacementA.id, replacementB.id],
+    "Demand Results should replace both public contracts from the contract deck",
+  );
+  assert.deepEqual(
+    resolvedDemandResults.contractDeck.map((contract) => contract.id),
+    remainingContractDeck.map((contract) => contract.id),
+    "Demand Results should consume exactly two public contract replacements",
+  );
+  assert.equal(resolvedDemandResults.pendingAction, undefined, "Demand Results resolution should advance pending action");
+  assert.match(resolvedDemandResults.log[0], /spends 2 Solari for Demand Results/, "Demand Results should log resolution");
+
+  const oneReplacementDemandResults = state.resolveDemandResultsChoice(
+    { ...baseDemandResultsResolution, contractDeck: [replacementA] },
+    demandResultsPending,
+    0,
+  );
+  assert.deepEqual(
+    oneReplacementDemandResults.contractOffer.map((contract) => contract.id),
+    [replacementA.id],
+    "Demand Results should refill only as many public contracts as remain in the deck",
+  );
+
+  const swappedDemandResults = state.resolveDemandResultsChoice(
+    baseDemandResultsResolution,
+    demandResultsPending,
+    1,
+  );
+  assert.deepEqual(
+    playerById(swappedDemandResults, shaddamAlly.id).contracts.map((contract) => contract.card.id),
+    [contractB.id],
+    "Demand Results second option gives the second contract to the first Shaddam Ally",
+  );
+  assert.deepEqual(
+    playerById(swappedDemandResults, shaddamAllyB.id).contracts.map((contract) => contract.card.id),
+    [contractA.id],
+    "Demand Results second option gives the first contract to the second Shaddam Ally",
+  );
+
+  const skippedDemandResults = state.skipDemandResults(baseDemandResultsResolution, demandResultsPending);
+  assert.equal(
+    playerById(skippedDemandResults, emperor.id).resources.solari,
+    2,
+    "Skipping Demand Results should not spend Shaddam Solari",
+  );
+  assert.deepEqual(
+    playerById(skippedDemandResults, emperor.id).playArea,
+    [demandResults],
+    "Skipping Demand Results should keep Demand Results in play",
+  );
+  assert.deepEqual(
+    skippedDemandResults.contractOffer.map((contract) => contract.id),
+    game.contractOffer.map((contract) => contract.id),
+    "Skipping Demand Results should not replace contracts",
+  );
+  assert.deepEqual(
+    playerById(skippedDemandResults, shaddamAlly.id).contracts,
+    [],
+    "Skipping Demand Results should not assign contracts",
+  );
+  assert.equal(skippedDemandResults.pendingAction, undefined, "Skipping Demand Results should advance pending action");
+
+  const staleDemandResultsState = { ...baseDemandResultsResolution, contractOffer: [replacementA, replacementB] };
+  const staleDemandResults = state.resolveDemandResultsChoice(
+    staleDemandResultsState,
+    demandResultsPending,
+    0,
+  );
+  assert.equal(staleDemandResults, staleDemandResultsState, "Stale Demand Results should return the original state");
+  assert.equal(staleDemandResults.players, baseDemandResultsResolution.players, "Stale Demand Results should not mutate players");
+  assert.deepEqual(
+    staleDemandResults.contractOffer.map((contract) => contract.id),
+    [replacementA.id, replacementB.id],
+    "Stale Demand Results should not mutate public offers",
+  );
+  const noCardDemandResultsState = {
+    ...baseDemandResultsResolution,
+    players: baseDemandResultsResolution.players.map((player) =>
+      player.id === emperor.id ? { ...player, playArea: [] } : player,
+    ),
+  };
+  assert.equal(
+    state.resolveDemandResultsChoice(noCardDemandResultsState, demandResultsPending, 0),
+    noCardDemandResultsState,
+    "Demand Results should not resolve if the card is no longer in play",
+  );
+  const duplicateAllyDemandResultsPending = {
+    ...demandResultsPending,
+    allyIds: [shaddamAlly.id, shaddamAlly.id],
+  };
+  assert.equal(
+    state.resolveDemandResultsChoice(baseDemandResultsResolution, duplicateAllyDemandResultsPending, 0),
+    baseDemandResultsResolution,
+    "Demand Results should not resolve a malformed pending action with duplicate Ally IDs",
+  );
+  assert.equal(
+    state.resolveDemandResultsChoice(baseDemandResultsResolution, demandResultsPending, 2),
+    baseDemandResultsResolution,
+    "Demand Results should ignore invalid assignment choices",
+  );
+
   const devastatingAssault = data.emperorCommanderCards.find((card) => card.name === "Devastating Assault");
   assert.ok(devastatingAssault, "Emperor Commander deck should include Devastating Assault");
   assert.equal(devastatingAssault.sourceId, 559, "Devastating Assault should use the catalog source id");

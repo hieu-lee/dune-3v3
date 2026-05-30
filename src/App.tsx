@@ -41,6 +41,7 @@ import {
   finishRevealAdjustment as resolveRevealAdjustment,
   iconCanReach,
   initialGame,
+  isBackedByChoamIntrigue,
   isContingencyPlanIntrigue,
   isDetonationIntrigue,
   isUnexpectedAlliesIntrigue,
@@ -1078,7 +1079,9 @@ export default function App() {
                     <strong>{card.name}</strong>
                     <span>
                       <Swords size={14} />
-                      +{automatedStrength ?? card.combatSwords} strength
+                      {isBackedByChoamIntrigue(card) && !automatedStrength
+                        ? "2+ completed contracts"
+                        : `+${automatedStrength ?? card.combatSwords} strength`}
                     </span>
                     {automatedStrength
                       ? combatTargets.map((target) => (
@@ -1091,7 +1094,7 @@ export default function App() {
                             {combatActor.role === "Commander" ? target.leader : "Play"}
                           </button>
                         ))
-                      : <span>Resolve printed card text.</span>}
+                      : <span>{isBackedByChoamIntrigue(card) ? "Requires 2 completed contracts." : "Resolve printed card text."}</span>}
                   </div>
                 );
               })}
@@ -1449,6 +1452,8 @@ export default function App() {
                       <span>
                         {isContingencyPlanIntrigue(card)
                           ? "Plot / Combat / +3 strength"
+                          : isBackedByChoamIntrigue(card)
+                            ? activeCombatStrength ? `Plot / Combat / +${activeCombatStrength} strength` : "Plot / Combat / 2+ completed contracts"
                           : isWeirdingCombatIntrigue(card) && activeCombatStrength
                             ? `Combat / +${activeCombatStrength} strength`
                             : card.battleIcon

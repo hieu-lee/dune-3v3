@@ -84,11 +84,13 @@ try {
   const detonation = data.intrigueCards.find((card) => card.sourceId === 131);
   const unexpectedAllies = data.intrigueCards.find((card) => card.sourceId === 137);
   const contingencyPlan = data.intrigueCards.find((card) => card.sourceId === 147);
+  const backedByChoam = data.intrigueCards.find((card) => card.sourceId === 448);
   const mercenaries = data.intrigueCards.find((card) => card.sourceId === 128);
   assert.ok(crysknife, "Crysknife Intrigue should be available");
   assert.ok(detonation, "Detonation Intrigue should be available");
   assert.ok(unexpectedAllies, "Unexpected Allies Intrigue should be available");
   assert.ok(contingencyPlan, "Contingency Plan Intrigue should be available");
+  assert.ok(backedByChoam, "Backed by CHOAM Intrigue should be available");
   assert.ok(mercenaries, "Mercenaries Intrigue should be available");
   assert.equal(
     detonation.summary,
@@ -104,6 +106,11 @@ try {
     contingencyPlan.summary,
     "Gain 2 Solari as a Plot Intrigue OR add 3 strength as a Combat Intrigue.",
     "Contingency Plan should expose both printed timing branches",
+  );
+  assert.equal(
+    backedByChoam.summary,
+    "Lose 1 Influence to gain 4 Solari as a Plot Intrigue OR add 4 strength in Combat if you have completed at least two contracts.",
+    "Backed by CHOAM should expose its Plot branch and completed-contract Combat threshold",
   );
   const plotFixture = {
     ...game,

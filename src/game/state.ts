@@ -49,6 +49,7 @@ const detonationSourceId = 131;
 const unexpectedAlliesSourceId = 137;
 const contingencyPlanSourceId = 147;
 const weirdingCombatSourceId = 154;
+const backedByChoamSourceId = 448;
 const spiceMustFlowSourceId = 538;
 const shadowAllianceSourceId = 160;
 const shadowAllianceFactions: FactionId[] = [
@@ -120,6 +121,10 @@ export function isContingencyPlanIntrigue(intrigue: IntrigueCard) {
 
 export function isWeirdingCombatIntrigue(intrigue: IntrigueCard) {
   return intrigue.sourceId === weirdingCombatSourceId;
+}
+
+export function isBackedByChoamIntrigue(intrigue: IntrigueCard) {
+  return intrigue.sourceId === backedByChoamSourceId;
 }
 
 function buildSixPlayerConflictDeck() {
@@ -1402,6 +1407,9 @@ export function combatIntrigueStrength(state: GameState, actor: Player, intrigue
   if (isWeirdingCombatIntrigue(intrigue)) {
     return effectiveRequirementInfluence(actor, "bene", state.players) >= 3 ? 5 : 3;
   }
+  if (isBackedByChoamIntrigue(intrigue)) {
+    return actor.contracts.filter((contract) => contract.completed).length >= 2 ? 4 : undefined;
+  }
   return undefined;
 }
 
@@ -1487,6 +1495,7 @@ export function playCombatIntrigue(
   const combatSwords = combatIntrigueStrength(state, actor, intrigue);
   if (!combatSwords) return state;
   const targets = combatIntrigueTargets(state, actor.id);
+  if (actor.role === "Commander" && !targetId) return state;
   const resolvedTargetId = targetId ?? targets[0];
   if (!resolvedTargetId || !targets.includes(resolvedTargetId)) return state;
   const target = state.players.find((player) => player.id === resolvedTargetId);

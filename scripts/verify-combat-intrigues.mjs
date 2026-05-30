@@ -25,6 +25,14 @@ function intrigueBySourceId(data, sourceId) {
   return { ...intrigue, traits: intrigue.traits ? [...intrigue.traits] : undefined };
 }
 
+function completedContract(data, index) {
+  return { card: data.standardContracts[index], completed: true, takenRound: 1 };
+}
+
+function incompleteContract(data, index) {
+  return { card: data.standardContracts[index], completed: false, takenRound: 1 };
+}
+
 function combatFixture(state, data, setupPlayers, firstSeat = 1) {
   const game = state.initialGame();
   return {
@@ -68,6 +76,7 @@ try {
   const impress = intrigueBySourceId(data, 152);
   const weirdingCombat = intrigueBySourceId(data, 154);
   const contingencyPlan = intrigueBySourceId(data, 147);
+  const backedByChoam = intrigueBySourceId(data, 448);
   const mercenaries = intrigueBySourceId(data, 128);
   assert.equal(impress.combatSwords, 2, "Impress should expose its structured Combat strength");
   assert.equal(weirdingCombat.combatSwords, 5, "Weirding Combat should expose its structured Combat strength");
@@ -78,8 +87,10 @@ try {
   );
   assert.equal(contingencyPlan.combatSwords, 3, "Contingency Plan should expose its printed Combat strength");
   assert.equal(contingencyPlan.automatedCombatSwords, 3, "Contingency Plan's full Combat branch should auto-resolve");
+  assert.equal(backedByChoam.combatSwords, 4, "Backed by CHOAM should expose its structured Combat strength");
   assert.equal(impress.automatedCombatSwords, undefined, "Impress has extra printed text and should not auto-resolve");
   assert.equal(weirdingCombat.automatedCombatSwords, undefined, "Weirding Combat should resolve from state-aware Influence");
+  assert.equal(backedByChoam.automatedCombatSwords, undefined, "Backed by CHOAM should resolve from completed contract state");
   assert.equal(mercenaries.combatSwords, undefined, "Non-Combat Intrigues should not expose Combat strength");
   assert.deepEqual(
     data.intrigueCards
@@ -172,6 +183,8 @@ try {
     }),
   );
   const allyCombat = state.startCombatPhase(allyPlayFixture);
+  const allyExplicitTargetPlayed = state.playCombatIntrigue(allyCombat, "p2", verifierCombat.id, "p2");
+  assert.equal(playerById(allyExplicitTargetPlayed, "p2").conflict, 4, "Ally Combat Intrigues should allow explicit self-targeting");
   const allyPlayed = state.playCombatIntrigue(allyCombat, "p2", verifierCombat.id);
   assert.equal(playerById(allyPlayed, "p2").conflict, 4, "Ally Combat Intrigues should add strength to that Ally");
   assert.deepEqual(playerById(allyPlayed, "p2").intrigues, [], "Played Combat Intrigue should leave the player's hand");
@@ -254,6 +267,71 @@ try {
   assert.equal(playerById(weirdingHighPlayed, "p2").conflict, 7);
   assert.match(weirdingHighPlayed.log[0], /adding 5 strength/);
 
+  const backedIncompleteFixture = combatFixture(state, data, (players) =>
+    players.map((player) =>
+      player.id === "p2"
+        ? { ...player, conflict: 2, deployedTroops: 1, contracts: [completedContract(data, 0)], intrigues: [backedByChoam] }
+        : player,
+    ),
+  );
+  const backedIncomplete = state.startCombatPhase(backedIncompleteFixture);
+  assert.equal(
+    state.combatIntrigueStrength(backedIncomplete, playerById(backedIncomplete, "p2"), backedByChoam),
+    undefined,
+    "Backed by CHOAM should require two completed contracts for its Combat branch",
+  );
+  assert.equal(
+    state.playCombatIntrigue(backedIncomplete, "p2", backedByChoam.id),
+    backedIncomplete,
+    "Backed by CHOAM should not auto-resolve before the completed-contract threshold",
+  );
+
+  const backedUncompletedFixture = combatFixture(state, data, (players) =>
+    players.map((player) =>
+      player.id === "p2"
+        ? {
+            ...player,
+            conflict: 2,
+            deployedTroops: 1,
+            contracts: [incompleteContract(data, 0), incompleteContract(data, 1)],
+            intrigues: [backedByChoam],
+          }
+        : player,
+    ),
+  );
+  const backedUncompleted = state.startCombatPhase(backedUncompletedFixture);
+  assert.equal(
+    state.combatIntrigueStrength(backedUncompleted, playerById(backedUncompleted, "p2"), backedByChoam),
+    undefined,
+    "Backed by CHOAM should count completed contracts, not merely held contracts",
+  );
+
+  const backedCompleteFixture = combatFixture(state, data, (players) =>
+    players.map((player) =>
+      player.id === "p2"
+        ? {
+            ...player,
+            conflict: 2,
+            deployedTroops: 1,
+            contracts: [completedContract(data, 0), completedContract(data, 1)],
+            intrigues: [backedByChoam],
+          }
+        : player.id === "p3"
+          ? { ...player, conflict: 4, deployedTroops: 1 }
+          : player,
+    ),
+  );
+  const backedComplete = state.startCombatPhase(backedCompleteFixture);
+  assert.equal(
+    state.combatIntrigueStrength(backedComplete, playerById(backedComplete, "p2"), backedByChoam),
+    4,
+    "Backed by CHOAM should add 4 strength with two completed contracts",
+  );
+  const backedCompletePlayed = state.playCombatIntrigue(backedComplete, "p2", backedByChoam.id);
+  assert.equal(playerById(backedCompletePlayed, "p2").conflict, 6);
+  assert.equal(backedCompletePlayed.intrigueDiscard.at(-1).id, backedByChoam.id);
+  assert.match(backedCompletePlayed.log[0], /plays Backed by CHOAM for Feyd-Rautha Harkonnen, adding 4 strength/);
+
   const resetPassFixture = combatFixture(state, data, (players) =>
     players.map((player) => {
       if (player.id === "p2") return { ...player, conflict: 2, deployedTroops: 1 };
@@ -285,6 +363,11 @@ try {
     ["p2", "p6"],
     "Commanders should target only same-team Allies with units in the Conflict",
   );
+  assert.equal(
+    state.playCombatIntrigue(commanderCombat, "p4", verifierCombat.id),
+    commanderCombat,
+    "Commander Combat Intrigues should require an explicit Ally target",
+  );
   const commanderPlayed = state.playCombatIntrigue(commanderCombat, "p4", verifierCombat.id, "p6");
   assert.equal(playerById(commanderPlayed, "p6").conflict, 3, "Commander Combat Intrigue should add strength to the chosen Ally");
   assert.deepEqual(playerById(commanderPlayed, "p4").intrigues, []);
@@ -314,6 +397,66 @@ try {
   assert.equal(playerById(commanderWeirdingPlayed, "p6").conflict, 6);
   assert.equal(playerById(commanderWeirdingPlayed, "p2").conflict, 5);
   assert.match(commanderWeirdingPlayed.log[0], /Shaddam Corrino IV plays Weirding Combat for Princess Irulan, adding 5 strength/);
+
+  const commanderBackedFixture = combatFixture(
+    state,
+    data,
+    (players) =>
+      players.map((player) => {
+        if (player.id === "p2") return { ...player, conflict: 5, deployedTroops: 1 };
+        if (player.id === "p4") {
+          return {
+            ...player,
+            contracts: [completedContract(data, 0), completedContract(data, 1)],
+            intrigues: [backedByChoam],
+          };
+        }
+        if (player.id === "p6") return { ...player, conflict: 1, deployedTroops: 1 };
+        return player;
+      }),
+    3,
+  );
+  const commanderBacked = state.startCombatPhase(commanderBackedFixture);
+  assert.equal(
+    state.combatIntrigueStrength(commanderBacked, playerById(commanderBacked, "p4"), backedByChoam),
+    4,
+    "Commander Backed by CHOAM should use the Commander's completed contracts",
+  );
+  const commanderBackedPlayed = state.playCombatIntrigue(commanderBacked, "p4", backedByChoam.id, "p6");
+  assert.equal(playerById(commanderBackedPlayed, "p6").conflict, 5);
+  assert.equal(playerById(commanderBackedPlayed, "p2").conflict, 5);
+  assert.match(commanderBackedPlayed.log[0], /Shaddam Corrino IV plays Backed by CHOAM for Princess Irulan, adding 4 strength/);
+
+  const commanderBackedTargetContractsFixture = combatFixture(
+    state,
+    data,
+    (players) =>
+      players.map((player) => {
+        if (player.id === "p2") {
+          return {
+            ...player,
+            conflict: 5,
+            deployedTroops: 1,
+            contracts: [completedContract(data, 0), completedContract(data, 1)],
+          };
+        }
+        if (player.id === "p4") return { ...player, intrigues: [backedByChoam] };
+        if (player.id === "p6") return { ...player, conflict: 1, deployedTroops: 1 };
+        return player;
+      }),
+    3,
+  );
+  const commanderBackedTargetContracts = state.startCombatPhase(commanderBackedTargetContractsFixture);
+  assert.equal(
+    state.combatIntrigueStrength(commanderBackedTargetContracts, playerById(commanderBackedTargetContracts, "p4"), backedByChoam),
+    undefined,
+    "Commander Backed by CHOAM should not use the target Ally's completed contracts",
+  );
+  assert.equal(
+    state.playCombatIntrigue(commanderBackedTargetContracts, "p4", backedByChoam.id, "p2"),
+    commanderBackedTargetContracts,
+    "Commander Backed by CHOAM should stay blocked when only the Ally target has completed contracts",
+  );
 
   const nonCombatFixture = combatFixture(state, data, (players) =>
     players.map((player) =>

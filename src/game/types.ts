@@ -123,6 +123,7 @@ export type Player = {
   purchaseSequence: number;
   swordmasterBonus: boolean;
   contracts: PlayerContract[];
+  reservedContracts: ContractCard[];
 };
 
 export type PendingAction =

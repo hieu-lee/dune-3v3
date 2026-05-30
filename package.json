@@ -10,6 +10,7 @@
     "preview": "vite preview --host 0.0.0.0",
     "sync:cards": "node scripts/sync-dune-catalog.mjs",
     "sync:card-images": "node scripts/sync-dune-catalog.mjs --download-images",
+    "verify:contracts": "node scripts/verify-contracts.mjs",
     "verify:leaders": "node scripts/verify-leaders.mjs",
     "verify:starter-decks": "node scripts/verify-starter-decks.mjs"
   },

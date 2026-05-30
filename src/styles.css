@@ -237,6 +237,22 @@ h2 {
   overflow-wrap: anywhere;
 }
 
+.contract-reserve {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 246, 230, 0.11);
+}
+
+.contract-reserve > span,
+.choice-divider {
+  display: block;
+  color: #b8ab98;
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
 .team-card {
   border-color: color-mix(in srgb, var(--accent), transparent 58%);
 }
@@ -560,6 +576,13 @@ h2 {
   gap: 6px;
   padding: 8px;
   text-align: center;
+}
+
+.contract-choice .choice-divider {
+  width: 100%;
+  padding: 0;
+  background: transparent;
+  color: #b8ab98;
 }
 
 .contract-choice button span {

@@ -452,6 +452,8 @@ export default function App() {
   const pendingSpyOwner = pendingAction?.kind === "spy" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingContractOwner =
     pendingAction?.kind === "contract" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
+  const shaddamCommander = game.players.find((player) => player.team === "shaddam" && player.role === "Commander");
+  const reservedContractChoices = pendingContractOwner?.reservedContracts ?? [];
   const revealAdjustOwner =
     pendingAction?.kind === "reveal-adjust" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const revealAdjustRecipient =
@@ -543,7 +545,7 @@ export default function App() {
             <div className="team-heading">
               <FileText size={18} />
               <div>
-                <span className="conflict-level">{game.contractDeck.length} contracts in bank</span>
+                <span className="conflict-level">{game.contractOffer.length + game.contractDeck.length} public contracts</span>
                 <h2>CHOAM Contracts</h2>
                 <p>Take a face-up contract from contract spaces.</p>
               </div>
@@ -557,6 +559,19 @@ export default function App() {
               ))}
               {game.contractOffer.length === 0 && <p>Contract spaces pay 2 Solari.</p>}
             </div>
+            {shaddamCommander && shaddamCommander.reservedContracts.length > 0 && (
+              <div className="contract-reserve">
+                <span>Sardaukar reserve</span>
+                <div className="contract-offer">
+                  {shaddamCommander.reservedContracts.map((contract) => (
+                    <div className="contract-preview" key={contract.id}>
+                      {contract.thumbnailPath && <img src={contract.thumbnailPath} alt="" />}
+                      <strong>{contract.name}</strong>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </article>
         </aside>
 
@@ -636,6 +651,7 @@ export default function App() {
                 <span>{player.conflict} strength</span>
                 <span>{player.spies} spies</span>
                 <span>{player.contracts.length} contracts</span>
+                {player.reservedContracts.length > 0 && <span>{player.reservedContracts.length} reserved</span>}
               </div>
             </article>
           ))}
@@ -757,13 +773,21 @@ export default function App() {
 
             {pendingAction.kind === "contract" && pendingContractOwner && (
               <div className="pending-controls contract-choice">
+                {game.contractOffer.length > 0 && <span className="choice-divider">Public</span>}
                 {game.contractOffer.map((contract) => (
                   <button type="button" key={contract.id} onClick={() => takeContract(contract.id)}>
                     {contract.thumbnailPath && <img src={contract.thumbnailPath} alt="" />}
                     <span>{contract.name}</span>
                   </button>
                 ))}
-                {game.contractOffer.length === 0 && (
+                {reservedContractChoices.length > 0 && <span className="choice-divider">Reserved</span>}
+                {reservedContractChoices.map((contract) => (
+                  <button type="button" key={contract.id} onClick={() => takeContract(contract.id)}>
+                    {contract.thumbnailPath && <img src={contract.thumbnailPath} alt="" />}
+                    <span>{contract.name}</span>
+                  </button>
+                ))}
+                {game.contractOffer.length === 0 && reservedContractChoices.length === 0 && (
                   <button type="button" onClick={collectContractFallback}>
                     <CircleDollarSign size={15} />
                     Collect 2 Solari

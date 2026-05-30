@@ -39,6 +39,7 @@ const riseOfIxContractNames = new Set([
   "Smuggling",
   "Tech Negotiation",
 ]);
+const shaddamReservedContractNames = new Set(["Sardaukar I", "Sardaukar II"]);
 
 export const iconLabels: Record<IconId, string> = {
   emperor: "Emperor",
@@ -555,6 +556,12 @@ function toContractCard(card: HubCard): ContractCard {
 export const standardContracts: ContractCard[] = catalog.cards
   .filter((card) => card.type === "contract")
   .filter((card) => !riseOfIxContractNames.has(card.name))
+  .filter((card) => !shaddamReservedContractNames.has(card.name))
+  .map(toContractCard);
+
+export const shaddamReservedContracts: ContractCard[] = catalog.cards
+  .filter((card) => card.type === "contract")
+  .filter((card) => shaddamReservedContractNames.has(card.name))
   .map(toContractCard);
 
 export const boardSpaces: BoardSpace[] = [

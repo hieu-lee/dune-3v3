@@ -5,6 +5,7 @@ import {
   imperiumDeck,
   leaderCardByName,
   reserveMarket,
+  shaddamReservedContracts,
   standardContracts,
 } from "./data";
 import type {
@@ -69,10 +70,17 @@ function buildSixPlayerConflictDeck() {
 }
 
 function buildChoamContractDeck() {
-  if (standardContracts.length !== 20) {
-    throw new Error(`Expected 20 standard CHOAM contracts, found ${standardContracts.length}.`);
+  if (standardContracts.length !== 18) {
+    throw new Error(`Expected 18 public CHOAM contracts, found ${standardContracts.length}.`);
   }
   return cloneContracts(shuffleItems(standardContracts));
+}
+
+function buildShaddamContractReserve() {
+  if (shaddamReservedContracts.length !== 2) {
+    throw new Error(`Expected 2 Shaddam reserved contracts, found ${shaddamReservedContracts.length}.`);
+  }
+  return cloneContracts(shaddamReservedContracts);
 }
 
 function buildStarterDeck(playerId: string, team: TeamId, role: Role) {
@@ -134,6 +142,7 @@ function makePlayer(
     purchaseSequence: 0,
     swordmasterBonus: false,
     contracts: [],
+    reservedContracts: team === "shaddam" && role === "Commander" ? buildShaddamContractReserve() : [],
   };
   return drawCards(player, 5);
 }
@@ -305,7 +314,37 @@ export function takeChoamContract(state: GameState, pending: ContractPendingActi
   const offerIndex = state.contractOffer.findIndex((contract) => contract.id === contractId);
   const contract = state.contractOffer[offerIndex];
   const owner = state.players.find((player) => player.id === pending.ownerId);
-  if (!contract || !owner) return state;
+  if (!owner) return state;
+  const reservedIndex = owner.reservedContracts.findIndex((reserved) => reserved.id === contractId);
+
+  if (!contract) {
+    const reservedContract = owner.reservedContracts[reservedIndex];
+    if (!reservedContract) return state;
+    const players = state.players.map((player) =>
+      player.id === owner.id
+        ? {
+            ...player,
+            reservedContracts: player.reservedContracts.filter((reserved) => reserved.id !== contractId),
+            contracts: [
+              ...player.contracts,
+              {
+                card: reservedContract,
+                completed: false,
+                takenRound: state.round,
+                takenAtSpaceId: pending.spaceId,
+              },
+            ],
+          }
+        : player,
+    );
+    return {
+      ...state,
+      players,
+      ...advancePendingAction(state),
+      log: [`${owner.leader} takes the reserved ${reservedContract.name} CHOAM contract from ${pending.source}.`, ...state.log],
+    };
+  }
+
   const [replacement, ...contractDeck] = state.contractDeck;
   const contractOffer = state.contractOffer.flatMap((candidate, index) => {
     if (index !== offerIndex) return [candidate];
@@ -340,7 +379,7 @@ export function takeChoamContract(state: GameState, pending: ContractPendingActi
 export function collectChoamContractFallback(state: GameState, pending: ContractPendingAction): GameState {
   if (state.contractOffer.length > 0) return state;
   const owner = state.players.find((player) => player.id === pending.ownerId);
-  if (!owner) return state;
+  if (!owner || owner.reservedContracts.length > 0) return state;
   const players = state.players.map((player) =>
     player.id === owner.id
       ? { ...player, resources: { ...player.resources, solari: player.resources.solari + 2 } }

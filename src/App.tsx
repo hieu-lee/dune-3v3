@@ -42,6 +42,7 @@ import {
   finishRevealAdjustment as resolveRevealAdjustment,
   iconCanReach,
   initialGame,
+  influenceLossChoices,
   influenceLossOptions,
   isBackedByChoamIntrigue,
   isContingencyPlanIntrigue,
@@ -81,6 +82,7 @@ import {
   setShieldWall,
   setAllianceOwner,
   setChoamContractCompleted,
+  playBackedByChoamPlotIntrigue,
   playContingencyPlanPlotIntrigue,
   playDetonationIntrigue,
   playPlotBattleIconIntrigue,
@@ -622,6 +624,10 @@ export default function App() {
 
   function playContingencyPlanPlot(intrigueId: string) {
     setGame((current) => playContingencyPlanPlotIntrigue(current, current.players[current.activeSeat].id, intrigueId));
+  }
+
+  function playBackedByChoamPlot(intrigueId: string, faction: FactionId) {
+    setGame((current) => playBackedByChoamPlotIntrigue(current, current.players[current.activeSeat].id, intrigueId, faction));
   }
 
   function playDetonation(intrigueId: string, choice: "shield-wall" | "deploy") {
@@ -1775,6 +1781,7 @@ export default function App() {
               <div className="intrigue-row">
                 {activePlayer.intrigues.map((card) => {
                   const activeCombatStrength = combatIntrigueStrength(game, activePlayer, card);
+                  const backedByChoamPlotChoices = isBackedByChoamIntrigue(card) ? influenceLossChoices(activePlayer) : [];
                   return (
                     <article className="intrigue-card" key={card.id}>
                       {card.thumbnailPath && <img className="card-art" src={card.thumbnailPath} alt="" loading="lazy" />}
@@ -1800,7 +1807,7 @@ export default function App() {
                               ? `Combat / +${activeCombatStrength} strength${activePlayer.deployedSandworms > 0 ? " / optional trash" : ""}`
                               : "Combat / +2 or +4 with worm"
                           : isBackedByChoamIntrigue(card)
-                            ? activeCombatStrength ? `Plot / Combat / +${activeCombatStrength} strength` : "Plot / Combat / 2+ completed contracts"
+                            ? activeCombatStrength ? `Plot / lose Inf. for +4 Solari / Combat +${activeCombatStrength}` : "Plot / lose Inf. for +4 Solari / Combat needs 2 contracts"
                           : isWeirdingCombatIntrigue(card) && activeCombatStrength
                             ? `Combat / +${activeCombatStrength} strength`
                             : card.battleIcon
@@ -1830,6 +1837,27 @@ export default function App() {
                           <CircleDollarSign size={14} />
                           Gain 2 Solari
                         </button>
+                      )}
+                      {isBackedByChoamIntrigue(card) && (
+                        <div className="intrigue-actions">
+                          {backedByChoamPlotChoices.map((faction) => (
+                            <button
+                              type="button"
+                              key={faction}
+                              onClick={() => playBackedByChoamPlot(card.id, faction)}
+                              disabled={plotIntrigueLocked}
+                              title={`Lose 1 ${factionLabels[faction]} Influence to gain 4 Solari`}
+                            >
+                              <CircleDollarSign size={14} />
+                              Lose {factionShortLabels[faction]} -&gt; 4 Solari
+                            </button>
+                          ))}
+                          {backedByChoamPlotChoices.length === 0 && (
+                            <button type="button" disabled title="Requires at least 1 Influence">
+                              Need Influence
+                            </button>
+                          )}
+                        </div>
                       )}
                       {isDetonationIntrigue(card) && (
                         <div className="intrigue-actions">

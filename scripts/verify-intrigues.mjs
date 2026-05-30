@@ -244,6 +244,121 @@ try {
     "Only the active player should play Contingency Plan as a Plot Intrigue",
   );
 
+  const backedPlotFixture = {
+    ...game,
+    activeSeat: game.players.findIndex((candidate) => candidate.id === "p2"),
+    pendingAction: undefined,
+    pendingQueue: [],
+    intrigueDiscard: [],
+    players: game.players.map((candidate) =>
+      candidate.id === "p2"
+        ? {
+            ...candidate,
+            resources: { ...candidate.resources, solari: 1 },
+            influence: { ...candidate.influence, bene: 2, spacing: 1 },
+            vp: candidate.vp + 1,
+            intrigues: [backedByChoam],
+          }
+        : { ...candidate, intrigues: [] },
+    ),
+  };
+  assert.equal(
+    state.isBackedByChoamIntrigue(backedByChoam),
+    true,
+    "Backed by CHOAM should be recognized as a structured Plot Intrigue",
+  );
+  assert.deepEqual(
+    state.influenceLossChoices(playerById(backedPlotFixture, "p2")),
+    ["spacing", "bene"],
+    "Backed by CHOAM Plot should offer the active player's positive Influence tracks",
+  );
+  const backedPlotted = state.playBackedByChoamPlotIntrigue(backedPlotFixture, "p2", backedByChoam.id, "bene");
+  assert.equal(playerById(backedPlotted, "p2").resources.solari, 5, "Backed by CHOAM Plot should gain 4 Solari");
+  assert.equal(playerById(backedPlotted, "p2").influence.bene, 1, "Backed by CHOAM Plot should lose the chosen Influence");
+  assert.equal(playerById(backedPlotted, "p2").influence.spacing, 1, "Backed by CHOAM Plot should not lose other Influence tracks");
+  assert.equal(playerById(backedPlotted, "p2").vp, playerById(backedPlotFixture, "p2").vp - 1, "Dropping below 2 Influence should remove the threshold VP");
+  assert.deepEqual(playerById(backedPlotted, "p2").intrigues, []);
+  assert.equal(backedPlotted.intrigueDiscard.at(-1).id, backedByChoam.id);
+  assert.match(backedPlotted.log[0], /plays Backed by CHOAM as a Plot Intrigue, loses 1 Bene Gesserit Influence, and gains 4 Solari/);
+  assert.equal(
+    state.playBackedByChoamPlotIntrigue(backedPlotFixture, "p2", backedByChoam.id, "emperor"),
+    backedPlotFixture,
+    "Backed by CHOAM Plot should reject Influence tracks the player cannot lose",
+  );
+  const backedWrongIntrigueFixture = {
+    ...backedPlotFixture,
+    players: backedPlotFixture.players.map((candidate) =>
+      candidate.id === "p2" ? { ...candidate, intrigues: [mercenaries] } : candidate,
+    ),
+  };
+  assert.equal(
+    state.playBackedByChoamPlotIntrigue(backedWrongIntrigueFixture, "p2", mercenaries.id, "bene"),
+    backedWrongIntrigueFixture,
+    "Backed by CHOAM Plot should reject other Intrigue cards even when they are in hand",
+  );
+  const p2BaseInfluence = playerById(game, "p2").influence;
+  const p2BaseVp = playerById(game, "p2").vp;
+  const backedNoInfluence = {
+    ...backedPlotFixture,
+    players: backedPlotFixture.players.map((candidate) =>
+      candidate.id === "p2"
+        ? { ...candidate, influence: { ...p2BaseInfluence }, vp: p2BaseVp }
+        : candidate,
+    ),
+  };
+  assert.equal(
+    state.playBackedByChoamPlotIntrigue(backedNoInfluence, "p2", backedByChoam.id, "bene"),
+    backedNoInfluence,
+    "Backed by CHOAM Plot should require at least one positive Influence track",
+  );
+  const commanderBackedPlot = {
+    ...backedPlotFixture,
+    activeSeat: game.players.findIndex((candidate) => candidate.id === "p4"),
+    players: game.players.map((candidate) =>
+      candidate.id === "p4"
+        ? {
+            ...candidate,
+            resources: { ...candidate.resources, solari: 0 },
+            influence: { ...candidate.influence, emperor: 2 },
+            vp: candidate.vp + 1,
+            intrigues: [backedByChoam],
+          }
+        : { ...candidate, intrigues: [] },
+    ),
+  };
+  const commanderBackedPlotted = state.playBackedByChoamPlotIntrigue(
+    commanderBackedPlot,
+    "p4",
+    backedByChoam.id,
+    "emperor",
+  );
+  assert.equal(playerById(commanderBackedPlotted, "p4").resources.solari, 4, "Commander Backed by CHOAM Plot should gain Solari for the Commander");
+  assert.equal(playerById(commanderBackedPlotted, "p4").influence.emperor, 1, "Commander Backed by CHOAM Plot should spend the Commander's own Influence");
+  assert.equal(playerById(commanderBackedPlotted, "p4").vp, playerById(commanderBackedPlot, "p4").vp - 1);
+  const pendingBackedPlot = {
+    ...backedPlotFixture,
+    pendingAction: { kind: "spy", ownerId: "p2", remaining: 1, source: "Test" },
+  };
+  assert.equal(
+    state.playBackedByChoamPlotIntrigue(pendingBackedPlot, "p2", backedByChoam.id, "bene"),
+    pendingBackedPlot,
+    "Backed by CHOAM Plot should wait for pending actions to resolve",
+  );
+  const queuedBackedPlot = {
+    ...backedPlotFixture,
+    pendingQueue: [{ kind: "spy", ownerId: "p2", remaining: 1, source: "Test" }],
+  };
+  assert.equal(
+    state.playBackedByChoamPlotIntrigue(queuedBackedPlot, "p2", backedByChoam.id, "bene"),
+    queuedBackedPlot,
+    "Backed by CHOAM Plot should wait for queued pending actions to resolve",
+  );
+  assert.equal(
+    state.playBackedByChoamPlotIntrigue(backedPlotFixture, "p3", backedByChoam.id, "bene"),
+    backedPlotFixture,
+    "Only the active player should play Backed by CHOAM as a Plot Intrigue",
+  );
+
   const detonationFixture = {
     ...game,
     activeSeat: game.players.findIndex((candidate) => candidate.id === "p2"),

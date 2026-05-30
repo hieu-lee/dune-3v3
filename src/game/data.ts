@@ -834,7 +834,8 @@ const boardSpaceSpecs: BoardSpace[] = [
     icon: "spice",
     gain: { spice: 1 },
     combat: true,
-    detail: "Maker space with bonus spice hook.",
+    maker: true,
+    detail: "Maker space with bonus spice.",
   },
   {
     id: "habbanya-erg",
@@ -845,7 +846,8 @@ const boardSpaceSpecs: BoardSpace[] = [
     gain: { spice: 2 },
     draw: 1,
     combat: true,
-    detail: "Six-player desert space with draw.",
+    maker: true,
+    detail: "Six-player Maker space with draw.",
   },
   {
     id: "hagga-basin",
@@ -855,6 +857,7 @@ const boardSpaceSpecs: BoardSpace[] = [
     cost: { water: 1 },
     gain: { spice: 2 },
     combat: true,
+    maker: true,
     detail: "Maker space; worm option when hooks are owned.",
   },
   {
@@ -865,6 +868,7 @@ const boardSpaceSpecs: BoardSpace[] = [
     cost: { water: 3 },
     gain: { spice: 4 },
     combat: true,
+    maker: true,
     detail: "Deep maker space; two-worm payoff later.",
   },
 ];

@@ -27,6 +27,7 @@ import {
   canMoveCardToThroneRow,
   canPay,
   collectChoamContractFallback,
+  collectMakerSpice,
   defaultActivatedAllyId,
   drawIntrigueCards,
   effectiveCost,
@@ -146,6 +147,7 @@ export default function App() {
       const hand = player.hand.filter((card) => card.id !== selectedCard.id);
       const playArea = selectedCard.trashOnPlay ? player.playArea : [...player.playArea, selectedCard];
       const cost = effectiveCost(selectedSpace, current.players);
+      const makerBonus = selectedSpace.maker ? current.makerSpice[selectedSpace.id] ?? 0 : 0;
       const { source, target: effectedTarget } = applyBoardEffect(
         {
           ...player,
@@ -156,6 +158,7 @@ export default function App() {
         target,
         selectedSpace,
         cost,
+        makerBonus,
       );
       const players = current.players.map((candidate, index) => {
         if (index === current.activeSeat) return source;
@@ -177,11 +180,15 @@ export default function App() {
         ...current,
         players,
         spaces: { ...current.spaces, [selectedSpace.id]: target.id },
+        makerSpice: collectMakerSpice(current, selectedSpace),
         swordmasterClaimed: current.swordmasterClaimed || selectedSpace.id === "swordmaster",
         ...pending,
         log: [
           selectedCard.trashOnPlay
             ? `${player.leader} trashes ${selectedCard.name}.`
+            : undefined,
+          makerBonus > 0
+            ? `${player.leader} collects ${makerBonus} bonus spice from ${selectedSpace.name}.`
             : undefined,
           player.role === "Commander"
             ? `${player.leader} activates ${target.leader} at ${selectedSpace.name} with ${selectedCard.name}.`
@@ -653,6 +660,12 @@ export default function App() {
                   <small>{iconLabels[space.icon]}</small>
                   <span className="space-detail">{space.detail}</span>
                   {spyOwner && <span className="spy-marker">{spyOwner.leader} spy</span>}
+                  {space.maker && (
+                    <span className="maker-marker">
+                      <Sparkles size={12} />
+                      {game.makerSpice[space.id] ?? 0} bonus
+                    </span>
+                  )}
                   <span className="space-footer">
                     {space.combat && <Swords size={14} />}
                     {space.team && <Users size={14} />}

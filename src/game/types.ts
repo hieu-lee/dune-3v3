@@ -97,6 +97,7 @@ export type BoardSpace = {
   troops?: number;
   draw?: number;
   combat?: boolean;
+  maker?: boolean;
   team?: "trade" | "reinforce" | "commander";
   personal?: TeamId;
   detail: string;
@@ -200,6 +201,7 @@ export type GameState = {
   players: Player[];
   spaces: Record<string, string>;
   spyPosts: Record<string, string>;
+  makerSpice: Record<string, number>;
   imperiumRow: Card[];
   marketDeck: Card[];
   reserveMarket: Card[];

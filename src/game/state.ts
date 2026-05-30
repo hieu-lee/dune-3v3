@@ -1,5 +1,6 @@
 import {
   allyStarterCards,
+  boardSpaces,
   commanderStarterDecks,
   conflictCards,
   imperiumDeck,
@@ -101,6 +102,11 @@ function buildIntrigueDeck() {
 }
 
 const shaddamPersonalBoardThroneSource = "Emperor personal board";
+export const makerSpaceIds = boardSpaces.filter((space) => space.maker).map((space) => space.id);
+
+function emptyMakerSpice(): Record<string, number> {
+  return Object.fromEntries(makerSpaceIds.map((spaceId) => [spaceId, 0]));
+}
 
 function buildStarterDeck(playerId: string, team: TeamId, role: Role) {
   const starterDeck = role === "Commander" ? commanderStarterDecks[team] : allyStarterCards;
@@ -190,6 +196,7 @@ export function initialGame(): GameState {
     players,
     spaces: {},
     spyPosts: {},
+    makerSpice: emptyMakerSpice(),
     imperiumRow: market.slice(0, 5),
     marketDeck: market.slice(5),
     reserveMarket: cloneCards(reserveMarket),
@@ -629,6 +636,7 @@ export function applyBoardEffect(
   targetPlayer: Player,
   space: BoardSpace,
   cost: Partial<Resources> = {},
+  bonusSpice = 0,
 ): { source: Player; target: Player } {
   const resourcesNext = { ...sourcePlayer.resources };
   Object.entries(cost).forEach(([key, amount]) => {
@@ -638,6 +646,7 @@ export function applyBoardEffect(
     if (key === "intrigue") return;
     resourcesNext[key as ResourceId] += amount ?? 0;
   });
+  resourcesNext.spice += bonusSpice;
 
   let source: Player = { ...sourcePlayer, resources: resourcesNext };
   let target: Player = targetPlayer;
@@ -713,6 +722,19 @@ export function allPlayersDone(players: Player[]) {
   return players.every((player) => player.revealed && player.agentsReady === 0);
 }
 
+export function advanceMakerSpice(state: GameState): Record<string, number> {
+  const makerSpice = { ...emptyMakerSpice(), ...state.makerSpice };
+  makerSpaceIds.forEach((spaceId) => {
+    if (!state.spaces[spaceId]) makerSpice[spaceId] += 1;
+  });
+  return makerSpice;
+}
+
+export function collectMakerSpice(state: GameState, space: BoardSpace): Record<string, number> {
+  if (!space.maker) return state.makerSpice;
+  return { ...emptyMakerSpice(), ...state.makerSpice, [space.id]: 0 };
+}
+
 export function startNextRound(state: GameState): GameState {
   const firstSeat = (state.firstSeat + 1) % state.players.length;
   const [nextConflict, ...conflictDeck] = state.conflictDeck;
@@ -739,6 +761,7 @@ export function startNextRound(state: GameState): GameState {
     activeSeat: firstSeat,
     players,
     spaces: {},
+    makerSpice: advanceMakerSpice(state),
     pendingAction: undefined,
     pendingQueue: [],
     conflict: nextConflict ?? null,

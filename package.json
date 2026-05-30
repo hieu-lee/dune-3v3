@@ -14,6 +14,7 @@
     "verify:contracts": "node scripts/verify-contracts.mjs",
     "verify:intrigues": "node scripts/verify-intrigues.mjs",
     "verify:leaders": "node scripts/verify-leaders.mjs",
+    "verify:maker-spice": "node scripts/verify-maker-spice.mjs",
     "verify:starter-decks": "node scripts/verify-starter-decks.mjs",
     "verify:team-trade": "node scripts/verify-team-trade.mjs",
     "verify:throne-row": "node scripts/verify-throne-row.mjs"

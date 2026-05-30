@@ -18,6 +18,7 @@ Private web-table implementation for a six-player `Dune: Imperium - Uprising` te
 - Catalog-backed Intrigue deck with physical card draws and active-player references.
 - Team trade flow supports spice, water, Solari, and chosen Intrigue-card transfers.
 - Shaddam Throne Row support for Emperor-board setup, Imperial Tent movement, and Shaddam-team acquisition.
+- Maker-space bonus spice tracks and pays out on the four six-player Maker desert spaces.
 - Catalog-backed board-space art on matching placement tiles.
 - Printed reveal adjustments and spy-post targeting for cards whose text is not reducible to a fixed number.
 - Asset pipeline conventions for owned scans or public reference images.

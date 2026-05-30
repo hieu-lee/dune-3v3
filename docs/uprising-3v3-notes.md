@@ -41,6 +41,7 @@ These notes are implementation scaffolding, not a replacement for the rulebook. 
 - Current Intrigue implementation builds the 39-card Uprising Intrigue deck from the imported catalog, draws cards into player hands, and keeps Intrigue out of tradeable resource counters.
 - Current team-trade implementation transfers normal resource counters or a chosen Intrigue card between teammates.
 - Current Throne Row implementation lets Shaddam's Emperor personal board setup and Imperial Tent move non-Fremen Imperium Row cards into Shaddam's team-only market with immediate row refill.
+- Current Maker-space implementation tracks bonus spice on Imperial Basin, Habbanya Erg, Hagga Basin, and Deep Desert, then pays and clears that bonus when an Agent visits the space.
 - Full leader card images are available from the player seats as table references while icon-heavy leader powers await structured automation.
 - Board-space tiles render local location-card art where the catalog has exact name matches; six-player-only and commander personal-board spaces stay text-only until scanned board art is available.
 
@@ -51,7 +52,7 @@ These notes are implementation scaffolding, not a replacement for the rulebook. 
 - Full automation for Imperium, Intrigue, Conflict, contract, and reserve printed effects.
 - Final board-space coordinates over scanned board art.
 - Remaining component images and card fronts/backs from owned scans or approved source assets.
-- Maker Hooks and Shaddam's no-hooks replacement behavior.
+- Maker Hooks, worm deployment, and Shaddam's no-hooks replacement behavior.
 - Objective-card distribution and team-balanced Desert Mouse/Crysknife setup.
 
 ## Asset Conventions

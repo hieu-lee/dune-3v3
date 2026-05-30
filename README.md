@@ -20,6 +20,7 @@ Private web-table implementation for a six-player `Dune: Imperium - Uprising` te
 - Shaddam Throne Row support for Emperor-board setup, Imperial Tent movement, and Shaddam-team acquisition.
 - Usul queues Muad'Dib's Commander/activated-Ally water-or-spice split when played.
 - Critical Shipments queues Shaddam's Commander/activated-Ally water-or-2-Solari split when played.
+- Devastating Assault gives Shaddam 1 Solari and recruits 1 troop for the activated Ally before deployment choices.
 - Maker-space bonus spice tracks and pays out on the four six-player Maker desert spaces.
 - Shipping enforces its 2 Spacing Guild Influence requirement, including Commander shared team influence.
 - Hagga Basin and Deep Desert support Maker Hooks sandworm choices, shield-wall checks, and worm combat strength.

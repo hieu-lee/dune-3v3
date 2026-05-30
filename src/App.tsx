@@ -23,6 +23,7 @@ import {
   acquireMarketCard,
   allPlayersDone,
   applyBoardEffect,
+  applyCardAgentEffect,
   boardSpaceRewardApplies,
   canPlaceSpyPost,
   canMoveCardToThroneRow,
@@ -250,7 +251,7 @@ export default function App() {
       const makerChoiceOwner = player.role === "Commander" ? target : player;
       const makerChoicePending = pendingActionForMakerChoice(current, selectedSpace, makerChoiceOwner, player);
       const sietchTabrPending = pendingActionForSietchTabr(current, selectedSpace, makerChoiceOwner, player);
-      const { source, target: effectedTarget } = applyBoardEffect(
+      let { source, target: effectedTarget } = applyBoardEffect(
         {
           ...player,
           hand,
@@ -263,6 +264,13 @@ export default function App() {
         makerBonus,
         Boolean(makerChoicePending),
       );
+      const cardAgentEffect = applyCardAgentEffect(
+        selectedCard,
+        source,
+        player.role === "Commander" ? effectedTarget : source,
+      );
+      source = cardAgentEffect.source;
+      effectedTarget = cardAgentEffect.target;
       const players = current.players.map((candidate, index) => {
         if (index === current.activeSeat) return source;
         if (candidate.id === effectedTarget.id) return effectedTarget;
@@ -275,6 +283,7 @@ export default function App() {
           source,
           player.role === "Commander" ? effectedTarget : source,
           players,
+          cardAgentEffect.recruitedTroops,
         );
       const cardPending = pendingActionForCard(
         selectedCard,
@@ -303,6 +312,7 @@ export default function App() {
           makerBonus > 0
             ? `${player.leader} collects ${makerBonus} bonus spice from ${selectedSpace.name}.`
             : undefined,
+          cardAgentEffect.log,
           player.role === "Commander"
             ? `${player.leader} activates ${target.leader} at ${selectedSpace.name} with ${selectedCard.name}.`
             : `${player.leader} sends an Agent to ${selectedSpace.name} with ${selectedCard.name}.`,

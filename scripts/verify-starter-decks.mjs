@@ -387,6 +387,160 @@ try {
     "Wrong-team Critical Shipments should not pay Ally",
   );
 
+  const devastatingAssault = data.emperorCommanderCards.find((card) => card.name === "Devastating Assault");
+  assert.ok(devastatingAssault, "Emperor Commander deck should include Devastating Assault");
+  assert.equal(devastatingAssault.sourceId, 559, "Devastating Assault should use the catalog source id");
+  assert.deepEqual(devastatingAssault.icons, ["spice"], "Devastating Assault should send Agents to spice spaces");
+  assert.equal(devastatingAssault.persuasion, 1, "Devastating Assault should keep its printed reveal persuasion");
+  assert.equal(devastatingAssault.swords, 0, "Devastating Assault should not have unconditional reveal swords");
+  assert.equal(
+    devastatingAssault.conditionalSwords,
+    true,
+    "Devastating Assault should keep its Swordmaster bonus reveal flag",
+  );
+  assert.equal(
+    state.isDevastatingAssaultCommanderCard(devastatingAssault),
+    true,
+    "Devastating Assault should be recognized as its Commander starter card",
+  );
+  const baseAssaultSource = {
+    ...emperor,
+    resources: { solari: 0, spice: 0, water: 0 },
+  };
+  const baseAssaultTarget = {
+    ...shaddamAlly,
+    garrison: 0,
+  };
+  const assaultEffect = state.applyCardAgentEffect(devastatingAssault, baseAssaultSource, baseAssaultTarget);
+  assert.equal(
+    assaultEffect.source.resources.solari,
+    1,
+    "Devastating Assault should give Shaddam's Commander 1 Solari",
+  );
+  assert.equal(
+    assaultEffect.target.garrison,
+    1,
+    "Devastating Assault should recruit 1 troop for the activated Ally",
+  );
+  assert.equal(
+    assaultEffect.source.garrison,
+    baseAssaultSource.garrison,
+    "Devastating Assault should not recruit for Shaddam's Commander",
+  );
+  assert.match(assaultEffect.log, /Devastating Assault/, "Devastating Assault should log its Agent reward");
+  assert.equal(assaultEffect.recruitedTroops, 1, "Devastating Assault should report 1 current-turn recruit");
+
+  const opposingTeamAssault = state.applyCardAgentEffect(devastatingAssault, baseAssaultSource, muadDibAllyA);
+  assert.equal(
+    opposingTeamAssault.source.resources.solari,
+    0,
+    "Devastating Assault should not reward an opposing Ally activation",
+  );
+  assert.equal(opposingTeamAssault.log, undefined, "Invalid Devastating Assault activations should not log");
+  const allyOwnedAssault = state.applyCardAgentEffect(devastatingAssault, shaddamAlly, shaddamAllyB);
+  assert.equal(
+    allyOwnedAssault.target.garrison,
+    shaddamAllyB.garrison,
+    "Devastating Assault should not trigger from an Ally starter deck owner",
+  );
+  assert.equal(allyOwnedAssault.log, undefined, "Ally-owned Devastating Assault should not log");
+  const missingTargetAssault = state.applyCardAgentEffect(devastatingAssault, baseAssaultSource, baseAssaultSource);
+  assert.equal(
+    missingTargetAssault.source.resources.solari,
+    0,
+    "Devastating Assault should not trigger without an activated Ally target",
+  );
+  assert.equal(missingTargetAssault.log, undefined, "Missing-target Devastating Assault should not log");
+
+  const imperialBasin = data.boardSpaces.find((space) => space.id === "imperial-basin");
+  assert.ok(imperialBasin, "Imperial Basin should exist for Devastating Assault deploy-order regression");
+  const basinBoardEffect = state.applyBoardEffect(baseAssaultSource, baseAssaultTarget, imperialBasin);
+  const basinAssaultEffect = state.applyCardAgentEffect(
+    devastatingAssault,
+    basinBoardEffect.source,
+    basinBoardEffect.target,
+  );
+  const basinPlayers = game.players.map((player) => {
+    if (player.id === emperor.id) return basinAssaultEffect.source;
+    if (player.id === shaddamAlly.id) return basinAssaultEffect.target;
+    return player;
+  });
+  assert.equal(
+    basinAssaultEffect.source.resources.spice,
+    1,
+    "Imperial Basin should still pay its printed spice before Devastating Assault is applied",
+  );
+  assert.equal(
+    basinAssaultEffect.source.resources.solari,
+    1,
+    "Devastating Assault should preserve board-space rewards while adding Solari",
+  );
+  assert.deepEqual(
+    state.pendingActionForSpace(
+      imperialBasin,
+      basinAssaultEffect.source,
+      basinAssaultEffect.target,
+      basinPlayers,
+      basinAssaultEffect.recruitedTroops,
+    ),
+    {
+      kind: "deploy",
+      ownerId: shaddamAlly.id,
+      remaining: 1,
+      source: "Imperial Basin",
+    },
+    "Devastating Assault's recruited troop should be deployable from the same combat space",
+  );
+  const twoGarrisonAssaultTarget = { ...baseAssaultTarget, garrison: 2 };
+  const twoGarrisonBoardEffect = state.applyBoardEffect(baseAssaultSource, twoGarrisonAssaultTarget, imperialBasin);
+  const twoGarrisonAssaultEffect = state.applyCardAgentEffect(
+    devastatingAssault,
+    twoGarrisonBoardEffect.source,
+    twoGarrisonBoardEffect.target,
+  );
+  const twoGarrisonPlayers = game.players.map((player) => {
+    if (player.id === emperor.id) return twoGarrisonAssaultEffect.source;
+    if (player.id === shaddamAlly.id) return twoGarrisonAssaultEffect.target;
+    return player;
+  });
+  assert.deepEqual(
+    state.pendingActionForSpace(
+      imperialBasin,
+      twoGarrisonAssaultEffect.source,
+      twoGarrisonAssaultEffect.target,
+      twoGarrisonPlayers,
+      twoGarrisonAssaultEffect.recruitedTroops,
+    ),
+    {
+      kind: "deploy",
+      ownerId: shaddamAlly.id,
+      remaining: 3,
+      source: "Imperial Basin",
+    },
+    "Devastating Assault's card-recruited troop should increase the same-turn deploy cap",
+  );
+  const acceptContractAssaultEffect = state.applyCardAgentEffect(
+    devastatingAssault,
+    baseAssaultSource,
+    baseAssaultTarget,
+  );
+  assert.deepEqual(
+    state.pendingActionForSpace(
+      acceptContract,
+      acceptContractAssaultEffect.source,
+      acceptContractAssaultEffect.target,
+      game.players,
+      acceptContractAssaultEffect.recruitedTroops,
+    ),
+    {
+      kind: "contract",
+      ownerId: emperor.id,
+      source: "Accept Contract",
+      spaceId: "accept-contract",
+    },
+    "Devastating Assault should not create deployment from a non-combat spice space",
+  );
+
   console.log("starter deck verification passed");
 } finally {
   await server.close();

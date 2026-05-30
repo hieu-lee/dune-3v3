@@ -72,6 +72,7 @@ const spiceMustFlowSourceId = 538;
 const shadowAllianceSourceId = 160;
 const usulSourceId = 552;
 const criticalShipmentsSourceId = 557;
+const devastatingAssaultSourceId = 559;
 const shadowAllianceFactions: FactionId[] = [
   "emperor",
   "spacing",
@@ -624,6 +625,7 @@ export function pendingActionForSpace(
   source: Player,
   target: Player,
   players: Player[],
+  extraRecruitedTroops = 0,
 ): PendingAction | undefined {
   if (space.spy && source.spies > 0) {
     return { kind: "spy", ownerId: source.id, remaining: Math.min(space.spy, source.spies), source: space.name };
@@ -650,7 +652,7 @@ export function pendingActionForSpace(
   }
 
   if (space.combat) {
-    const deployable = Math.min(target.garrison, (space.troops ?? 0) + 2);
+    const deployable = Math.min(target.garrison, (space.troops ?? 0) + Math.max(0, extraRecruitedTroops) + 2);
     if (deployable > 0) {
       return { kind: "deploy", ownerId: target.id, remaining: deployable, source: space.name };
     }
@@ -712,6 +714,10 @@ export function isUsulCommanderCard(card: Card) {
 
 export function isCriticalShipmentsCommanderCard(card: Card) {
   return card.sourceId === criticalShipmentsSourceId || card.name === "Critical Shipments";
+}
+
+export function isDevastatingAssaultCommanderCard(card: Card) {
+  return card.sourceId === devastatingAssaultSourceId || card.name === "Devastating Assault";
 }
 
 export function pendingActionForShaddamPersonalBoard(state: GameState): PendingAction | undefined {
@@ -1235,6 +1241,38 @@ export function applyBoardEffect(
   }
 
   return { source, target };
+}
+
+export function applyCardAgentEffect(
+  card: Card,
+  sourcePlayer: Player,
+  targetPlayer: Player,
+): { source: Player; target: Player; log?: string; recruitedTroops?: number } {
+  if (
+    isDevastatingAssaultCommanderCard(card) &&
+    sourcePlayer.team === "shaddam" &&
+    sourcePlayer.role === "Commander" &&
+    targetPlayer.team === sourcePlayer.team &&
+    targetPlayer.role === "Ally"
+  ) {
+    return {
+      source: {
+        ...sourcePlayer,
+        resources: {
+          ...sourcePlayer.resources,
+          solari: sourcePlayer.resources.solari + 1,
+        },
+      },
+      target: {
+        ...targetPlayer,
+        garrison: targetPlayer.garrison + 1,
+      },
+      log: `${sourcePlayer.leader} resolves ${card.name}: gains 1 Solari; ${targetPlayer.leader} recruits 1 troop.`,
+      recruitedTroops: 1,
+    };
+  }
+
+  return { source: sourcePlayer, target: targetPlayer };
 }
 
 export function drawIntrigueCards(state: GameState, ownerId: string, count: number, source: string): GameState {

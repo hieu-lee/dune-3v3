@@ -118,7 +118,7 @@ try {
   assert.equal(questionableMethods.combatSwords, 5, "Questionable Methods should expose its maximum structured Combat strength");
   assert.equal(
     questionableMethods.summary,
-    "Add 1 strength; the recipient may lose 1 Influence to add 4 more strength.",
+    "Add 1 strength; the recipient may lose 1 Influence, or a Commander may lose personal Influence, to add 4 more strength.",
     "Questionable Methods should expose its base strength and optional Influence loss",
   );
   assert.equal(weirdingCombat.combatSwords, 5, "Weirding Combat should expose its structured Combat strength");
@@ -529,6 +529,11 @@ try {
     ["bene"],
     "Questionable Methods should list only positive Influence tracks",
   );
+  assert.deepEqual(
+    state.influenceLossOptions(questionableInfluencePlayed, questionableInfluencePlayed.pendingAction),
+    [{ ownerId: "p2", faction: "bene" }],
+    "Questionable Methods should expose Influence-loss owner choices",
+  );
   assert.equal(
     state.passCombatIntrigue(questionableInfluencePlayed, questionableInfluencePlayed.players[questionableInfluencePlayed.activeSeat].id),
     questionableInfluencePlayed,
@@ -540,9 +545,38 @@ try {
     "Additional Combat Intrigues should wait for Questionable Methods Influence loss to resolve",
   );
   assert.equal(
-    state.loseInfluenceForPending(questionableInfluencePlayed, questionableInfluencePlayed.pendingAction, "emperor"),
+    state.loseInfluenceForPending(questionableInfluencePlayed, questionableInfluencePlayed.pendingAction, "p2", "emperor"),
     questionableInfluencePlayed,
     "Questionable Methods should reject Influence tracks the recipient cannot lose",
+  );
+  assert.equal(
+    state.loseInfluenceForPending(questionableInfluencePlayed, questionableInfluencePlayed.pendingAction, "missing", "bene"),
+    questionableInfluencePlayed,
+    "Questionable Methods should reject missing Influence-loss owners without advancing pending actions",
+  );
+  assert.equal(
+    state.loseInfluenceForPending(
+      questionableInfluencePlayed,
+      { ...questionableInfluencePlayed.pendingAction, combatRecipientId: "missing" },
+      "p2",
+      "bene",
+    ),
+    questionableInfluencePlayed,
+    "Questionable Methods should reject stale or forged pending actions",
+  );
+  const questionableMissingRecipientState = {
+    ...questionableInfluencePlayed,
+    pendingAction: { ...questionableInfluencePlayed.pendingAction, combatRecipientId: "missing" },
+  };
+  assert.equal(
+    state.loseInfluenceForPending(
+      questionableMissingRecipientState,
+      questionableMissingRecipientState.pendingAction,
+      "p2",
+      "bene",
+    ),
+    questionableMissingRecipientState,
+    "Questionable Methods should reject missing combat recipients without advancing pending actions",
   );
   const questionableActiveSeatAfterPlay = questionableInfluencePlayed.activeSeat;
   const questionableSkipped = state.skipLoseInfluence(questionableInfluencePlayed, questionableInfluencePlayed.pendingAction);
@@ -550,10 +584,11 @@ try {
   assert.equal(questionableSkipped.activeSeat, questionableActiveSeatAfterPlay, "Skipping Questionable Methods should not advance Combat again");
   assert.equal(playerById(questionableSkipped, "p2").influence.bene, 2, "Skipping Questionable Methods should keep Influence");
   assert.equal(playerById(questionableSkipped, "p2").conflict, 3, "Skipping Questionable Methods should keep only the base strength");
-  assert.match(questionableSkipped.log[0], /declines to lose Influence for Questionable Methods/);
+  assert.match(questionableSkipped.log[0], /No Influence is lost for Questionable Methods/);
   const questionableLostInfluence = state.loseInfluenceForPending(
     questionableInfluencePlayed,
     questionableInfluencePlayed.pendingAction,
+    "p2",
     "bene",
   );
   assert.equal(questionableLostInfluence.pendingAction, undefined, "Resolving Questionable Methods should clear the pending action");
@@ -913,6 +948,7 @@ try {
   const commanderQuestionableMethodsLostInfluence = state.loseInfluenceForPending(
     commanderQuestionableMethodsPlayed,
     commanderQuestionableMethodsPlayed.pendingAction,
+    "p6",
     "fringeWorlds",
   );
   assert.equal(
@@ -953,13 +989,191 @@ try {
     questionableMethods.id,
     "p6",
   );
-  assert.equal(
+  assert.deepEqual(
     commanderQuestionableMethodsActorInfluencePlayed.pendingAction,
-    undefined,
-    "Commander Questionable Methods should not use actor Influence when the target Ally has none",
+    {
+      kind: "lose-influence",
+      ownerId: "p6",
+      alternateOwnerIds: ["p4"],
+      combatRecipientId: "p6",
+      strength: 4,
+      source: "Questionable Methods",
+      optional: true,
+    },
+    "Commander Questionable Methods should allow the Commander to spend their personal Influence",
+  );
+  assert.deepEqual(
+    state.influenceLossOptions(
+      commanderQuestionableMethodsActorInfluencePlayed,
+      commanderQuestionableMethodsActorInfluencePlayed.pendingAction,
+    ),
+    [{ ownerId: "p4", faction: "emperor" }],
+    "Commander Questionable Methods should expose only the Commander's personal Influence when the target Ally has none",
   );
   assert.equal(playerById(commanderQuestionableMethodsActorInfluencePlayed, "p6").conflict, 2);
   assert.equal(playerById(commanderQuestionableMethodsActorInfluencePlayed, "p4").influence.emperor, 2);
+  const commanderQuestionableMethodsActorInfluenceLost = state.loseInfluenceForPending(
+    commanderQuestionableMethodsActorInfluencePlayed,
+    commanderQuestionableMethodsActorInfluencePlayed.pendingAction,
+    "p4",
+    "emperor",
+  );
+  assert.equal(playerById(commanderQuestionableMethodsActorInfluenceLost, "p4").influence.emperor, 1);
+  assert.equal(playerById(commanderQuestionableMethodsActorInfluenceLost, "p4").vp, 0);
+  assert.equal(playerById(commanderQuestionableMethodsActorInfluenceLost, "p6").conflict, 6);
+
+  assert.equal(
+    state.loseInfluenceForPending(
+      commanderQuestionableMethodsActorInfluencePlayed,
+      commanderQuestionableMethodsActorInfluencePlayed.pendingAction,
+      "p4",
+      "bene",
+    ),
+    commanderQuestionableMethodsActorInfluencePlayed,
+    "Commander Questionable Methods should reject non-personal Commander Influence tracks",
+  );
+
+  const muadDibQuestionableMethodsActorInfluenceFixture = combatFixture(
+    state,
+    data,
+    (players) =>
+      players.map((player) => {
+        if (player.id === "p1") {
+          return { ...player, intrigues: [questionableMethods], influence: { ...player.influence, fremen: 2 }, vp: 1 };
+        }
+        if (player.id === "p3") return { ...player, conflict: 1, deployedTroops: 1 };
+        if (player.id === "p5") return { ...player, conflict: 5, deployedTroops: 1 };
+        return player;
+      }),
+    0,
+  );
+  const muadDibQuestionableMethodsActorInfluence = state.startCombatPhase(
+    muadDibQuestionableMethodsActorInfluenceFixture,
+  );
+  const muadDibQuestionableMethodsActorInfluencePlayed = state.playCombatIntrigue(
+    muadDibQuestionableMethodsActorInfluence,
+    "p1",
+    questionableMethods.id,
+    "p3",
+  );
+  assert.deepEqual(
+    state.influenceLossOptions(
+      muadDibQuestionableMethodsActorInfluencePlayed,
+      muadDibQuestionableMethodsActorInfluencePlayed.pendingAction,
+    ),
+    [{ ownerId: "p1", faction: "fremen" }],
+    "Muad'Dib Questionable Methods should expose the Commander's personal Fremen Influence",
+  );
+  const muadDibQuestionableMethodsActorInfluenceLost = state.loseInfluenceForPending(
+    muadDibQuestionableMethodsActorInfluencePlayed,
+    muadDibQuestionableMethodsActorInfluencePlayed.pendingAction,
+    "p1",
+    "fremen",
+  );
+  assert.equal(playerById(muadDibQuestionableMethodsActorInfluenceLost, "p1").influence.fremen, 1);
+  assert.equal(playerById(muadDibQuestionableMethodsActorInfluenceLost, "p1").vp, 0);
+  assert.equal(playerById(muadDibQuestionableMethodsActorInfluenceLost, "p3").conflict, 6);
+
+  const commanderQuestionableMethodsMixedInfluenceFixture = combatFixture(
+    state,
+    data,
+    (players) =>
+      players.map((player) => {
+        if (player.id === "p2") return { ...player, conflict: 5, deployedTroops: 1 };
+        if (player.id === "p4") {
+          return { ...player, intrigues: [questionableMethods], influence: { ...player.influence, emperor: 2 }, vp: 1 };
+        }
+        if (player.id === "p6") {
+          return {
+            ...player,
+            conflict: 1,
+            deployedTroops: 1,
+            influence: { ...player.influence, fringeWorlds: 2 },
+            vp: 1,
+          };
+        }
+        return player;
+      }),
+    3,
+  );
+  const commanderQuestionableMethodsMixedInfluence = state.startCombatPhase(commanderQuestionableMethodsMixedInfluenceFixture);
+  const commanderQuestionableMethodsMixedInfluencePlayed = state.playCombatIntrigue(
+    commanderQuestionableMethodsMixedInfluence,
+    "p4",
+    questionableMethods.id,
+    "p6",
+  );
+  assert.deepEqual(
+    state.influenceLossOptions(
+      commanderQuestionableMethodsMixedInfluencePlayed,
+      commanderQuestionableMethodsMixedInfluencePlayed.pendingAction,
+    ),
+    [
+      { ownerId: "p6", faction: "fringeWorlds" },
+      { ownerId: "p4", faction: "emperor" },
+    ],
+    "Commander Questionable Methods should expose both target Ally and Commander personal Influence choices",
+  );
+  const commanderQuestionableMethodsMixedActiveSeat = commanderQuestionableMethodsMixedInfluencePlayed.activeSeat;
+  const commanderQuestionableMethodsMixedTargetLost = state.loseInfluenceForPending(
+    commanderQuestionableMethodsMixedInfluencePlayed,
+    commanderQuestionableMethodsMixedInfluencePlayed.pendingAction,
+    "p6",
+    "fringeWorlds",
+  );
+  assert.equal(
+    commanderQuestionableMethodsMixedTargetLost.activeSeat,
+    commanderQuestionableMethodsMixedActiveSeat,
+    "Mixed Questionable Methods target resolution should not advance Combat again",
+  );
+  assert.equal(playerById(commanderQuestionableMethodsMixedTargetLost, "p6").influence.fringeWorlds, 1);
+  assert.equal(playerById(commanderQuestionableMethodsMixedTargetLost, "p4").influence.emperor, 2);
+  assert.equal(playerById(commanderQuestionableMethodsMixedTargetLost, "p6").conflict, 6);
+  const commanderQuestionableMethodsMixedCommanderLost = state.loseInfluenceForPending(
+    commanderQuestionableMethodsMixedInfluencePlayed,
+    commanderQuestionableMethodsMixedInfluencePlayed.pendingAction,
+    "p4",
+    "emperor",
+  );
+  assert.equal(
+    commanderQuestionableMethodsMixedCommanderLost.activeSeat,
+    commanderQuestionableMethodsMixedActiveSeat,
+    "Mixed Questionable Methods Commander resolution should not advance Combat again",
+  );
+  assert.equal(playerById(commanderQuestionableMethodsMixedCommanderLost, "p6").influence.fringeWorlds, 2);
+  assert.equal(playerById(commanderQuestionableMethodsMixedCommanderLost, "p4").influence.emperor, 1);
+  assert.equal(playerById(commanderQuestionableMethodsMixedCommanderLost, "p6").conflict, 6);
+
+  const commanderQuestionableMethodsUnrelatedInfluenceFixture = combatFixture(
+    state,
+    data,
+    (players) =>
+      players.map((player) => {
+        if (player.id === "p2") {
+          return { ...player, conflict: 5, deployedTroops: 1, influence: { ...player.influence, bene: 2 }, vp: 1 };
+        }
+        if (player.id === "p4") return { ...player, intrigues: [questionableMethods] };
+        if (player.id === "p6") return { ...player, conflict: 1, deployedTroops: 1 };
+        return player;
+      }),
+    3,
+  );
+  const commanderQuestionableMethodsUnrelatedInfluence = state.startCombatPhase(
+    commanderQuestionableMethodsUnrelatedInfluenceFixture,
+  );
+  const commanderQuestionableMethodsUnrelatedInfluencePlayed = state.playCombatIntrigue(
+    commanderQuestionableMethodsUnrelatedInfluence,
+    "p4",
+    questionableMethods.id,
+    "p6",
+  );
+  assert.equal(
+    commanderQuestionableMethodsUnrelatedInfluencePlayed.pendingAction,
+    undefined,
+    "Commander Questionable Methods should not spend an unrelated Ally's Influence",
+  );
+  assert.equal(playerById(commanderQuestionableMethodsUnrelatedInfluencePlayed, "p6").conflict, 2);
+  assert.equal(playerById(commanderQuestionableMethodsUnrelatedInfluencePlayed, "p2").influence.bene, 2);
 
   const commanderSpringFixture = {
     ...combatFixture(

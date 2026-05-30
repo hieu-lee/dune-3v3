@@ -1187,15 +1187,40 @@ export function influenceLossChoices(player: Player) {
   return factionIds.filter((faction) => player.influence[faction] > 0);
 }
 
+function allowedInfluenceLossChoices(player: Player) {
+  const personalFaction = commanderPersonalFaction(player);
+  if (personalFaction) {
+    return player.influence[personalFaction] > 0 ? [personalFaction] : [];
+  }
+  return influenceLossChoices(player);
+}
+
+export function influenceLossOptions(state: GameState, pending: LoseInfluencePendingAction) {
+  const ownerIds = [pending.ownerId, ...(pending.alternateOwnerIds ?? [])].filter(
+    (ownerId, index, allOwnerIds) => allOwnerIds.indexOf(ownerId) === index,
+  );
+  return ownerIds.flatMap((ownerId) => {
+    const owner = state.players.find((player) => player.id === ownerId);
+    if (!owner) return [];
+    return allowedInfluenceLossChoices(owner).map((faction) => ({ ownerId: owner.id, faction }));
+  });
+}
+
 export function loseInfluenceForPending(
   state: GameState,
   pending: LoseInfluencePendingAction,
+  ownerId: string,
   faction: FactionId,
 ): GameState {
-  const owner = state.players.find((player) => player.id === pending.ownerId);
+  if (state.pendingAction !== pending) return state;
   const recipient = state.players.find((player) => player.id === pending.combatRecipientId);
-  if (!owner || !recipient) return { ...state, ...advancePendingAction(state) };
-  if (!influenceLossChoices(owner).includes(faction)) return state;
+  if (!recipient) return state;
+  const validOption = influenceLossOptions(state, pending).some(
+    (option) => option.ownerId === ownerId && option.faction === faction,
+  );
+  if (!validOption) return state;
+  const owner = state.players.find((player) => player.id === ownerId);
+  if (!owner) return state;
 
   const players = state.players.map((player) => {
     let next = player;
@@ -1216,12 +1241,12 @@ export function loseInfluenceForPending(
 }
 
 export function skipLoseInfluence(state: GameState, pending: LoseInfluencePendingAction): GameState {
+  if (state.pendingAction !== pending) return state;
   if (!pending.optional) return state;
-  const owner = state.players.find((player) => player.id === pending.ownerId);
   return {
     ...state,
     ...advancePendingAction(state),
-    log: [`${owner?.leader ?? "Player"} declines to lose Influence for ${pending.source}.`, ...state.log],
+    log: [`No Influence is lost for ${pending.source}.`, ...state.log],
   };
 }
 
@@ -1715,12 +1740,16 @@ export function playCombatIntrigue(
         optional: false,
       }
     : undefined;
+  const alternateInfluenceLossOwnerIds =
+    actor.role === "Commander" && allowedInfluenceLossChoices(actor).length > 0 ? [actor.id] : undefined;
   const canLoseInfluenceForQuestionableMethods =
-    isQuestionableMethodsIntrigue(intrigue) && influenceLossChoices(target).length > 0;
+    isQuestionableMethodsIntrigue(intrigue)
+    && (allowedInfluenceLossChoices(target).length > 0 || Boolean(alternateInfluenceLossOwnerIds));
   const influenceLossPending: PendingAction | undefined = canLoseInfluenceForQuestionableMethods
     ? {
         kind: "lose-influence",
         ownerId: target.id,
+        ...(alternateInfluenceLossOwnerIds ? { alternateOwnerIds: alternateInfluenceLossOwnerIds } : {}),
         combatRecipientId: target.id,
         strength: 4,
         source: "Questionable Methods",

@@ -122,7 +122,7 @@ try {
   );
   assert.equal(
     questionableMethods.summary,
-    "Add 1 strength; the recipient may lose 1 Influence to add 4 more strength.",
+    "Add 1 strength; the recipient may lose 1 Influence, or a Commander may lose personal Influence, to add 4 more strength.",
     "Questionable Methods should expose its base strength and optional Influence loss",
   );
   assert.equal(

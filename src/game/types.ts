@@ -215,6 +215,7 @@ export type PendingAction =
   | {
       kind: "lose-influence";
       ownerId: string;
+      alternateOwnerIds?: string[];
       combatRecipientId: string;
       strength: number;
       source: string;

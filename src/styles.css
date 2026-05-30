@@ -333,6 +333,24 @@ h2 {
   margin-top: 14px;
 }
 
+.shield-state label {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.shield-state label.disabled {
+  cursor: not-allowed;
+  opacity: 0.54;
+}
+
+.shield-state input {
+  flex: 0 0 auto;
+  accent-color: #f2b84b;
+}
+
 .board-panel {
   min-height: 690px;
   border-radius: 8px;
@@ -577,6 +595,11 @@ h2 {
   border-color: rgba(242, 184, 75, 0.5);
   background: rgba(242, 184, 75, 0.18);
   color: #ffe4a7;
+}
+
+.alliance-status-row label.disabled {
+  cursor: not-allowed;
+  opacity: 0.54;
 }
 
 .contract-status-row label {
@@ -878,6 +901,13 @@ h2 {
 }
 
 .turn-actions button:disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.8);
+  opacity: 0.44;
+}
+
+.pending-controls button:disabled,
+.resource-picker button:disabled {
   cursor: not-allowed;
   filter: grayscale(0.8);
   opacity: 0.44;

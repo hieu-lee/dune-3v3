@@ -42,6 +42,7 @@ import {
   maybeStartCombatPhase,
   passCombatIntrigue,
   pendingActionForCard,
+  pendingActionForMakerChoice,
   pendingActionsFor,
   pendingActionForSpace,
   playCombatIntrigue,
@@ -51,9 +52,14 @@ import {
   resolveConflictTie,
   scoreEndgameBattleIconIntrigue,
   scoreEndgameConditionalIntrigue,
+  canHaveMakerHooks,
+  playerHasConflictUnits,
+  setMakerHooks,
+  setShieldWall,
   setAllianceOwner,
   setChoamContractCompleted,
   playPlotBattleIconIntrigue,
+  resolveMakerChoice,
   startCombatPhase,
   startNextRound,
   takeChoamContract,
@@ -174,6 +180,8 @@ export default function App() {
       const playArea = selectedCard.trashOnPlay ? player.playArea : [...player.playArea, selectedCard];
       const cost = effectiveCost(selectedSpace, current.players);
       const makerBonus = selectedSpace.maker ? current.makerSpice[selectedSpace.id] ?? 0 : 0;
+      const makerChoiceOwner = player.role === "Commander" ? target : player;
+      const makerChoicePending = pendingActionForMakerChoice(current, selectedSpace, makerChoiceOwner, player);
       const { source, target: effectedTarget } = applyBoardEffect(
         {
           ...player,
@@ -185,6 +193,7 @@ export default function App() {
         selectedSpace,
         cost,
         makerBonus,
+        Boolean(makerChoicePending),
       );
       const players = current.players.map((candidate, index) => {
         if (index === current.activeSeat) return source;
@@ -198,9 +207,11 @@ export default function App() {
         players,
       );
       const cardPending = pendingActionForCard(selectedCard, source, current);
+      const pendingActions = pendingActionsFor(spacePending, cardPending, source.spies);
+      if (makerChoicePending) pendingActions.unshift(makerChoicePending);
       const pending = queuePendingActions(
         current,
-        pendingActionsFor(spacePending, cardPending, source.spies),
+        pendingActions,
       );
       const nextState: GameState = {
         ...current,
@@ -256,7 +267,7 @@ export default function App() {
           : player.id;
       const target = current.players.find((candidate) => candidate.id === targetId);
       const combatRecipient = player.role === "Commander" ? target : player;
-      const combatSwords = combatRecipient && combatRecipient.deployedTroops > 0 ? swords : 0;
+      const combatSwords = combatRecipient && playerHasConflictUnits(combatRecipient) ? swords : 0;
       const players = current.players.map((candidate, index) => {
         if (index === current.activeSeat) {
           return {
@@ -375,7 +386,7 @@ export default function App() {
         ? Math.max(-pending.persuasionAdjustment, persuasionDelta)
         : 0;
       const appliedStrength = recipient
-        ? Math.max(-pending.strengthAdjustment, recipient.deployedTroops > 0 ? strengthDelta : Math.min(0, strengthDelta))
+        ? Math.max(-pending.strengthAdjustment, playerHasConflictUnits(recipient) ? strengthDelta : Math.min(0, strengthDelta))
         : 0;
       if (appliedPersuasion === 0 && appliedStrength === 0) return current;
       const players = current.players.map((player) => {
@@ -402,6 +413,16 @@ export default function App() {
       const pending = current.pendingAction;
       if (!pending || pending.kind !== "reveal-adjust") return current;
       return resolveRevealAdjustment(current, pending);
+    });
+  }
+
+  function chooseMakerReward(choice: "spice" | "sandworms") {
+    if (game.pendingAction?.kind !== "maker-choice") return;
+    setGame((current) => {
+      const pending = current.pendingAction;
+      if (!pending || pending.kind !== "maker-choice") return current;
+      if (choice === "sandworms" && !pending.canSummonSandworms) return current;
+      return maybeStartCombatPhase(resolveMakerChoice(current, pending, choice));
     });
   }
 
@@ -467,6 +488,20 @@ export default function App() {
     setGame((current) => setAllianceOwner(current, faction, ownsAlliance ? playerId : undefined));
   }
 
+  function updateMakerHooks(playerId: string, hasHooks: boolean) {
+    setGame((current) => {
+      if (current.pendingAction?.kind === "maker-choice") return current;
+      return setMakerHooks(current, playerId, hasHooks);
+    });
+  }
+
+  function updateShieldWall(standing: boolean) {
+    setGame((current) => {
+      if (current.pendingAction?.kind === "maker-choice") return current;
+      return setShieldWall(current, standing);
+    });
+  }
+
   function chooseConflictTieWinner(winnerId?: string) {
     if (game.pendingAction?.kind !== "conflict-tie") return;
     setGame((current) => {
@@ -524,6 +559,20 @@ export default function App() {
   const pendingSpyOwner = pendingAction?.kind === "spy" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingContractOwner =
     pendingAction?.kind === "contract" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
+  const pendingMakerOwner =
+    pendingAction?.kind === "maker-choice" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
+  const pendingMakerSpiceOwner =
+    pendingAction?.kind === "maker-choice" ? game.players.find((player) => player.id === pendingAction.spiceOwnerId) : undefined;
+  const pendingMakerCanSummon =
+    pendingAction?.kind === "maker-choice" ? pendingAction.canSummonSandworms : false;
+  const pendingMakerSplit =
+    pendingAction?.kind === "maker-choice" &&
+    pendingMakerOwner &&
+    pendingMakerSpiceOwner &&
+    pendingMakerOwner.id !== pendingMakerSpiceOwner.id;
+  const pendingMakerLabel = pendingMakerSplit
+    ? `${pendingMakerSpiceOwner.leader} spice / ${pendingMakerOwner.leader} worms`
+    : pendingMakerOwner?.leader;
   const pendingThroneOwner =
     pendingAction?.kind === "throne-row" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const shaddamCommander = game.players.find((player) => player.team === "shaddam" && player.role === "Commander");
@@ -645,7 +694,20 @@ export default function App() {
             )}
             <div className="shield-state">
               <Shield size={16} />
-              Shield Wall {game.shieldWall ? "standing" : "removed"}
+              <label
+                className={[game.shieldWall ? "selected" : "", pendingAction?.kind === "maker-choice" ? "disabled" : ""]
+                  .filter(Boolean)
+                  .join(" ")}
+              >
+                <input
+                  type="checkbox"
+                  checked={game.shieldWall}
+                  disabled={pendingAction?.kind === "maker-choice"}
+                  aria-label="Shield Wall standing"
+                  onChange={(event) => updateShieldWall(event.currentTarget.checked)}
+                />
+                <span>Shield Wall {game.shieldWall ? "standing" : "removed"}</span>
+              </label>
             </div>
           </article>
           <article className="choam-card">
@@ -786,7 +848,9 @@ export default function App() {
                 <span>{player.agentsReady}/{player.agentsTotal} {player.role === "Commander" ? "activations" : "agents"}</span>
                 <span>{player.garrison} garrison</span>
                 {player.deployedTroops > 0 && <span>{player.deployedTroops} deployed</span>}
+                {player.deployedSandworms > 0 && <span>{player.deployedSandworms} worms</span>}
                 <span>{player.conflict} strength</span>
+                {player.makerHooks && <span>Maker Hooks</span>}
                 <span>{player.spies} spies</span>
                 <span>{player.intrigues.length} intrigue</span>
                 <span>{player.contracts.length} contracts</span>
@@ -828,6 +892,25 @@ export default function App() {
                   );
                 })}
               </div>
+              {canHaveMakerHooks(player) && (
+                <div className="alliance-status-row" aria-label={`${player.leader} Maker Hooks`}>
+                  <label
+                    className={[player.makerHooks ? "selected" : "", pendingAction?.kind === "maker-choice" ? "disabled" : ""]
+                      .filter(Boolean)
+                      .join(" ")}
+                    title="Maker Hooks"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={player.makerHooks}
+                      disabled={pendingAction?.kind === "maker-choice"}
+                      aria-label="Maker Hooks"
+                      onChange={(event) => updateMakerHooks(player.id, event.currentTarget.checked)}
+                    />
+                    <span>Hooks</span>
+                  </label>
+                </div>
+              )}
               {player.contracts.length > 0 && (
                 <div className="contract-status-row">
                   {player.contracts.map((contract) => (
@@ -981,6 +1064,7 @@ export default function App() {
                 {pendingAction.kind === "spy" && `Spy placement - ${pendingAction.remaining}`}
                 {pendingAction.kind === "reveal-adjust" && "Printed reveal adjustment"}
                 {pendingAction.kind === "contract" && `${pendingContractOwner?.leader ?? "Player"} CHOAM contract`}
+                {pendingAction.kind === "maker-choice" && `${pendingMakerLabel ?? "Player"} Maker space`}
                 {pendingAction.kind === "throne-row" && `${pendingThroneOwner?.leader ?? "Shaddam"} Throne Row`}
                 {pendingAction.kind === "conflict-tie" && `${teams[pendingAction.team].name} conflict tie`}
               </h2>
@@ -1031,6 +1115,18 @@ export default function App() {
                 </button>
                 <button type="button" onClick={() => adjustRevealReward(0, 1)}>+1</button>
                 <button type="button" onClick={finishRevealAdjust}>Done</button>
+              </div>
+            )}
+
+            {pendingAction.kind === "maker-choice" && pendingMakerOwner && (
+              <div className="pending-controls">
+                <span>{pendingMakerLabel}</span>
+                <button type="button" onClick={() => chooseMakerReward("spice")}>
+                  +{pendingAction.spice} spice{pendingMakerSplit ? `: ${pendingMakerSpiceOwner.leader}` : ""}
+                </button>
+                <button type="button" onClick={() => chooseMakerReward("sandworms")} disabled={!pendingMakerCanSummon}>
+                  Summon {pendingAction.sandworms}{pendingMakerSplit ? `: ${pendingMakerOwner.leader}` : ""}
+                </button>
               </div>
             )}
 

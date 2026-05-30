@@ -956,7 +956,8 @@ const boardSpaceSpecs: BoardSpace[] = [
     gain: { spice: 2 },
     combat: true,
     maker: true,
-    detail: "Maker space; worm option when hooks are owned.",
+    makerWorms: 1,
+    detail: "Maker space; choose 2 spice or a sandworm with Maker Hooks.",
   },
   {
     id: "deep-desert",
@@ -967,7 +968,8 @@ const boardSpaceSpecs: BoardSpace[] = [
     gain: { spice: 4 },
     combat: true,
     maker: true,
-    detail: "Deep maker space; two-worm payoff later.",
+    makerWorms: 2,
+    detail: "Deep maker space; choose 4 spice or two sandworms with Maker Hooks.",
   },
 ];
 

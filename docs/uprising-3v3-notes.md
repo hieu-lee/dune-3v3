@@ -41,7 +41,7 @@ These notes are implementation scaffolding, not a replacement for the rulebook. 
 - Current Intrigue implementation builds the 39-card Uprising Intrigue deck from the imported catalog, draws cards into player hands, and keeps Intrigue out of tradeable resource counters.
 - Current team-trade implementation transfers normal resource counters or a chosen Intrigue card between teammates.
 - Current Throne Row implementation lets Shaddam's Emperor personal board setup and Imperial Tent move non-Fremen Imperium Row cards into Shaddam's team-only market with immediate row refill.
-- Current Maker-space implementation tracks bonus spice on Imperial Basin, Habbanya Erg, Hagga Basin, and Deep Desert, then pays and clears that bonus when an Agent visits the space.
+- Current Maker-space implementation tracks bonus spice on Imperial Basin, Habbanya Erg, Hagga Basin, and Deep Desert, then pays and clears that bonus when an Agent visits the space. Hagga Basin and Deep Desert defer their base spice into a spice-or-sandworm choice when a Muad'Dib Ally has Maker Hooks and the Shield Wall allows worms.
 - Current Objective setup deals the four Objectives valid for six players only to Allies, applies the 4/6P Desert Mouse cross-team trade, and uses the first-player Desert Mouse Objective for the first seat.
 - Current Conflict-card implementation awards the won card to the unique winning Ally, pauses for same-team first-place tie concessions, and scores immediate non-wild battle-icon pairs against that Ally's face-up Objectives or won Conflicts.
 - Current Endgame implementation triggers during Recall when a player reaches 10 VP or the Conflict deck is empty, then lets Allies score Crysknife, Desert Mouse, and Ornithopter Endgame Intrigues against matching or wild face-up Conflict cards before finalizing team scores.
@@ -59,7 +59,7 @@ These notes are implementation scaffolding, not a replacement for the rulebook. 
 - Full automation for Imperium, Intrigue, Conflict, contract, and reserve printed effects.
 - Final board-space coordinates over scanned board art.
 - Remaining component images and card fronts/backs from owned scans or approved source assets.
-- Maker Hooks, worm deployment, and Shaddam's no-hooks replacement behavior.
+- Automatic Maker Hooks acquisition from the printed Muad'Dib personal board flow, sandworm reward doubling, and Shaddam's no-hooks replacement behavior.
 - Printed Conflict rewards and Combat Intrigue timing.
 
 ## Asset Conventions

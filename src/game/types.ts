@@ -121,6 +121,7 @@ export type BoardSpace = {
   draw?: number;
   combat?: boolean;
   maker?: boolean;
+  makerWorms?: number;
   team?: "trade" | "reinforce" | "commander";
   personal?: TeamId;
   detail: string;
@@ -160,6 +161,8 @@ export type Player = {
   garrison: number;
   conflict: number;
   deployedTroops: number;
+  deployedSandworms: number;
+  makerHooks: boolean;
   spies: number;
   revealed: boolean;
   persuasion: number;
@@ -213,6 +216,16 @@ export type PendingAction =
       ownerId: string;
       source: string;
       spaceId?: string;
+    }
+  | {
+      kind: "maker-choice";
+      ownerId: string;
+      spiceOwnerId: string;
+      spice: number;
+      sandworms: number;
+      canSummonSandworms: boolean;
+      source: string;
+      spaceId: string;
     }
   | {
       kind: "throne-row";

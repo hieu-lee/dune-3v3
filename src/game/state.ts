@@ -253,6 +253,8 @@ function makePlayer(
     garrison: role === "Commander" ? 0 : 3,
     conflict: 0,
     deployedTroops: 0,
+    deployedSandworms: 0,
+    makerHooks: false,
     spies: 3,
     revealed: false,
     persuasion: 0,
@@ -355,6 +357,55 @@ export function canMeetInfluenceRequirement(space: BoardSpace, player: Player, p
   return effectiveRequirementInfluence(player, space.requirement.faction, players) >= space.requirement.amount;
 }
 
+export function conflictProtectedByShieldWall(conflict: ConflictCard | null) {
+  if (!conflict) return false;
+  return ["Arrakeen", "Spice Refinery", "Imperial Basin"].some((location) =>
+    conflict.name.includes(location),
+  );
+}
+
+export function playerHasConflictUnits(player: Player) {
+  return player.deployedTroops + player.deployedSandworms > 0;
+}
+
+export function canHaveMakerHooks(player: Player) {
+  return player.team === "muaddib" && player.role === "Ally";
+}
+
+export function canSummonSandworms(state: GameState, owner: Player, count: number) {
+  if (!canHaveMakerHooks(owner) || !owner.makerHooks || count <= 0 || !state.conflict) return false;
+  return !state.shieldWall || !conflictProtectedByShieldWall(state.conflict);
+}
+
+export function setShieldWall(state: GameState, standing: boolean) {
+  if (state.shieldWall === standing) return state;
+  return {
+    ...state,
+    shieldWall: standing,
+    log: [
+      standing ? "The Shield Wall is standing." : "The Shield Wall has been removed.",
+      ...state.log,
+    ],
+  };
+}
+
+export function setMakerHooks(state: GameState, playerId: string, hasHooks: boolean) {
+  const owner = state.players.find((player) => player.id === playerId);
+  if (!owner || !canHaveMakerHooks(owner) || owner.makerHooks === hasHooks) return state;
+  return {
+    ...state,
+    players: state.players.map((player) =>
+      canHaveMakerHooks(player) ? { ...player, makerHooks: hasHooks } : player,
+    ),
+    log: [
+      hasHooks
+        ? `${teams.muaddib.name} Allies gain Maker Hooks.`
+        : `${teams.muaddib.name} Allies return Maker Hooks.`,
+      ...state.log,
+    ],
+  };
+}
+
 export function adjustInfluence(player: Player, faction: FactionId, amount: number): Player {
   const previous = player.influence[faction];
   const next = Math.max(0, previous + amount);
@@ -449,6 +500,27 @@ export function pendingActionForSpace(
   return undefined;
 }
 
+export function pendingActionForMakerChoice(
+  state: GameState,
+  space: BoardSpace,
+  owner: Player,
+  spiceOwner: Player = owner,
+): PendingAction | undefined {
+  const spice = space.gain?.spice ?? 0;
+  const canSummon = canSummonSandworms(state, owner, space.makerWorms ?? 0);
+  if (!space.makerWorms || spice <= 0 || !canSummon) return undefined;
+  return {
+    kind: "maker-choice",
+    ownerId: owner.id,
+    spiceOwnerId: spiceOwner.id,
+    spice,
+    sandworms: space.makerWorms,
+    canSummonSandworms: canSummon,
+    source: space.name,
+    spaceId: space.id,
+  };
+}
+
 export function isFremenCard(card: Card) {
   return card.traits?.includes("Faction: Fremen") ?? false;
 }
@@ -507,6 +579,7 @@ export function advancePendingAction(state: GameState) {
 
 type ContractPendingAction = Extract<PendingAction, { kind: "contract" }>;
 type DeployPendingAction = Extract<PendingAction, { kind: "deploy" }>;
+type MakerChoicePendingAction = Extract<PendingAction, { kind: "maker-choice" }>;
 type ReinforcePendingAction = Extract<PendingAction, { kind: "reinforce" }>;
 type TradePendingAction = Extract<PendingAction, { kind: "trade" }>;
 type ThroneRowPendingAction = Extract<PendingAction, { kind: "throne-row" }>;
@@ -841,12 +914,14 @@ export function applyBoardEffect(
   space: BoardSpace,
   cost: Partial<Resources> = {},
   bonusSpice = 0,
+  deferMakerChoice = false,
 ): { source: Player; target: Player } {
   const resourcesNext = { ...sourcePlayer.resources };
   Object.entries(cost).forEach(([key, amount]) => {
     resourcesNext[key as ResourceId] -= amount ?? 0;
   });
-  Object.entries(space.gain ?? {}).forEach(([key, amount]) => {
+  const gain = deferMakerChoice && space.makerWorms && space.gain ? { ...space.gain, spice: 0 } : space.gain;
+  Object.entries(gain ?? {}).forEach(([key, amount]) => {
     if (key === "intrigue") return;
     resourcesNext[key as ResourceId] += amount ?? 0;
   });
@@ -1095,7 +1170,7 @@ export function playPlotBattleIconIntrigue(
 }
 
 function allyHasUnitsInConflict(player: Player) {
-  return player.role === "Ally" && player.deployedTroops > 0;
+  return player.role === "Ally" && playerHasConflictUnits(player);
 }
 
 function commanderHasCombatAlly(state: GameState, commander: Player) {
@@ -1238,6 +1313,46 @@ export function finishRevealAdjustment(state: GameState, pending: RevealAdjustPe
   };
 }
 
+export function resolveMakerChoice(
+  state: GameState,
+  pending: MakerChoicePendingAction,
+  choice: "spice" | "sandworms",
+): GameState {
+  const owner = state.players.find((player) => player.id === pending.ownerId);
+  const spiceOwner = state.players.find((player) => player.id === pending.spiceOwnerId);
+  if (!owner) return { ...state, ...advancePendingAction(state) };
+  const spiceRecipient = spiceOwner ?? owner;
+
+  const summon = choice === "sandworms" && pending.canSummonSandworms;
+  const players = state.players.map((player) => {
+    if (!summon && player.id !== spiceRecipient.id) return player;
+    if (summon && player.id !== owner.id) return player;
+    if (summon) {
+      return {
+        ...player,
+        conflict: player.conflict + pending.sandworms * 3,
+        deployedSandworms: player.deployedSandworms + pending.sandworms,
+      };
+    }
+    return {
+      ...player,
+      resources: { ...player.resources, spice: player.resources.spice + pending.spice },
+    };
+  });
+
+  return {
+    ...state,
+    players,
+    ...advancePendingAction(state),
+    log: [
+      summon
+        ? `${owner.leader} summons ${pending.sandworms} sandworm${pending.sandworms === 1 ? "" : "s"} from ${pending.source}.`
+        : `${spiceRecipient.leader} gains ${pending.spice} spice from ${pending.source}.`,
+      ...state.log,
+    ],
+  };
+}
+
 export function deployTroopToConflict(state: GameState, pending: DeployPendingAction): GameState {
   const owner = state.players.find((player) => player.id === pending.ownerId);
   if (!owner || owner.garrison <= 0 || pending.remaining <= 0) return { ...state, ...advancePendingAction(state) };
@@ -1365,7 +1480,7 @@ export function resolveCurrentConflict(state: GameState): GameState {
   if (!state.conflict) return state;
 
   const contenders = state.players.filter(
-    (player) => player.role === "Ally" && player.deployedTroops > 0 && player.conflict > 0,
+    (player) => player.role === "Ally" && playerHasConflictUnits(player) && player.conflict > 0,
   );
   const bestStrength = Math.max(0, ...contenders.map((player) => player.conflict));
   const winners = contenders.filter((player) => player.conflict === bestStrength);
@@ -1529,6 +1644,7 @@ export function startNextRound(state: GameState): GameState {
         persuasion: 0,
         conflict: 0,
         deployedTroops: 0,
+        deployedSandworms: 0,
         hand: [],
         discard: [...player.discard, ...player.playArea, ...player.hand],
         playArea: [],

@@ -54,6 +54,7 @@ export type ConflictCard = {
   battleIcon: ConflictBattleIconId;
   rewards: string[];
   stakes: string;
+  scored?: boolean;
   imagePath?: string;
   thumbnailPath?: string;
   sourceId?: number;
@@ -95,6 +96,7 @@ export type ObjectiveCard = {
   battleIcon: BattleIconId;
   playerCount: "All" | "4/6P";
   firstPlayer?: boolean;
+  scored?: boolean;
 };
 
 export type BoardSpace = {
@@ -147,6 +149,7 @@ export type Player = {
   agentsTotal: number;
   garrison: number;
   conflict: number;
+  deployedTroops: number;
   spies: number;
   revealed: boolean;
   persuasion: number;
@@ -155,6 +158,7 @@ export type Player = {
   contracts: PlayerContract[];
   reservedContracts: ContractCard[];
   objectives: ObjectiveCard[];
+  wonConflicts: ConflictCard[];
 };
 
 export type PendingAction =
@@ -203,6 +207,13 @@ export type PendingAction =
   | {
       kind: "throne-row";
       ownerId: string;
+      source: string;
+    }
+  | {
+      kind: "conflict-tie";
+      team: TeamId;
+      tiedPlayerIds: string[];
+      strength: number;
       source: string;
     };
 

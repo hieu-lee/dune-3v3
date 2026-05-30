@@ -545,6 +545,17 @@ h2 {
   color: #f4d08b;
 }
 
+.conflict-supply-row span {
+  border-color: rgba(91, 192, 190, 0.32);
+  background: rgba(91, 192, 190, 0.12);
+  color: #b9ece9;
+}
+
+.objective-row span.scored {
+  border-style: dashed;
+  opacity: 0.58;
+}
+
 .resource-row span {
   display: inline-flex;
   gap: 4px;

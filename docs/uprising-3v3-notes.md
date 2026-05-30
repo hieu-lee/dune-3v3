@@ -43,6 +43,7 @@ These notes are implementation scaffolding, not a replacement for the rulebook. 
 - Current Throne Row implementation lets Shaddam's Emperor personal board setup and Imperial Tent move non-Fremen Imperium Row cards into Shaddam's team-only market with immediate row refill.
 - Current Maker-space implementation tracks bonus spice on Imperial Basin, Habbanya Erg, Hagga Basin, and Deep Desert, then pays and clears that bonus when an Agent visits the space.
 - Current Objective setup deals the four Objectives valid for six players only to Allies, applies the 4/6P Desert Mouse cross-team trade, and uses the first-player Desert Mouse Objective for the first seat.
+- Current Conflict-card implementation awards the won card to the unique winning Ally, pauses for same-team first-place tie concessions, and scores immediate non-wild battle-icon pairs against that Ally's face-up Objectives or won Conflicts.
 - Full leader card images are available from the player seats as table references while icon-heavy leader powers await structured automation.
 - Board-space tiles render local location-card art where the catalog has exact name matches; six-player-only and commander personal-board spaces stay text-only until scanned board art is available.
 
@@ -54,7 +55,7 @@ These notes are implementation scaffolding, not a replacement for the rulebook. 
 - Final board-space coordinates over scanned board art.
 - Remaining component images and card fronts/backs from owned scans or approved source assets.
 - Maker Hooks, worm deployment, and Shaddam's no-hooks replacement behavior.
-- Battle-icon pairing and VP scoring from Conflict, Objective, and Intrigue cards.
+- Printed Conflict rewards, Combat Intrigue timing, endgame wild battle-icon matching, and Intrigue-card battle-icon scoring.
 
 ## Asset Conventions
 

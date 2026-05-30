@@ -1,5 +1,6 @@
 import {
   allyStarterCards,
+  battleIconLabels,
   boardSpaces,
   commanderStarterDecks,
   conflictCards,
@@ -10,6 +11,7 @@ import {
   shaddamReservedContracts,
   sixPlayerObjectiveCards,
   standardContracts,
+  teams,
 } from "./data";
 import type {
   BoardSpace,
@@ -23,6 +25,7 @@ import type {
   ObjectiveCard,
   PendingAction,
   Player,
+  BattleIconId,
   ResourceId,
   Resources,
   Role,
@@ -78,6 +81,10 @@ function cloneIntrigues(intrigues: IntrigueCard[]) {
 
 function cloneObjectives(objectives: ObjectiveCard[]) {
   return objectives.map((objective) => ({ ...objective }));
+}
+
+function isStandardBattleIcon(icon: ConflictCard["battleIcon"]): icon is BattleIconId {
+  return icon !== "wild";
 }
 
 function buildSixPlayerConflictDeck() {
@@ -230,6 +237,7 @@ function makePlayer(
     agentsTotal: 2,
     garrison: role === "Commander" ? 0 : 3,
     conflict: 0,
+    deployedTroops: 0,
     spies: 3,
     revealed: false,
     persuasion: 0,
@@ -238,6 +246,7 @@ function makePlayer(
     contracts: [],
     reservedContracts: team === "shaddam" && role === "Commander" ? buildShaddamContractReserve() : [],
     objectives: [],
+    wonConflicts: [],
   };
   return drawCards(player, 5);
 }
@@ -446,6 +455,8 @@ export function advancePendingAction(state: GameState) {
 }
 
 type ContractPendingAction = Extract<PendingAction, { kind: "contract" }>;
+type DeployPendingAction = Extract<PendingAction, { kind: "deploy" }>;
+type ReinforcePendingAction = Extract<PendingAction, { kind: "reinforce" }>;
 type TradePendingAction = Extract<PendingAction, { kind: "trade" }>;
 type ThroneRowPendingAction = Extract<PendingAction, { kind: "throne-row" }>;
 
@@ -782,6 +793,209 @@ export function drawIntrigueCards(state: GameState, ownerId: string, count: numb
   };
 }
 
+export function deployTroopToConflict(state: GameState, pending: DeployPendingAction): GameState {
+  const owner = state.players.find((player) => player.id === pending.ownerId);
+  if (!owner || owner.garrison <= 0 || pending.remaining <= 0) return { ...state, ...advancePendingAction(state) };
+
+  const players = state.players.map((player) =>
+    player.id === pending.ownerId
+      ? {
+          ...player,
+          garrison: player.garrison - 1,
+          conflict: player.conflict + 2,
+          deployedTroops: player.deployedTroops + 1,
+        }
+      : player,
+  );
+  const remaining = pending.remaining - 1;
+  return {
+    ...state,
+    players,
+    ...(remaining > 0 ? { pendingAction: { ...pending, remaining } } : advancePendingAction(state)),
+    log: [`${owner.leader} deploys 1 troop from ${pending.source}.`, ...state.log],
+  };
+}
+
+export function reinforceTroop(
+  state: GameState,
+  pending: ReinforcePendingAction,
+  playerId: string,
+  destination: "garrison" | "conflict",
+): GameState {
+  if (pending.remaining <= 0) return state;
+  const recipient = state.players.find((player) => player.id === playerId);
+  if (!recipient || recipient.team !== pending.team || recipient.role !== "Ally") return state;
+
+  const players = state.players.map((player) =>
+    player.id === playerId
+      ? {
+          ...player,
+          garrison: destination === "garrison" ? player.garrison + 1 : player.garrison,
+          conflict: destination === "conflict" ? player.conflict + 2 : player.conflict,
+          deployedTroops: destination === "conflict" ? player.deployedTroops + 1 : player.deployedTroops,
+        }
+      : player,
+  );
+  const remaining = pending.remaining - 1;
+  return {
+    ...state,
+    players,
+    ...(remaining > 0 ? { pendingAction: { ...pending, remaining } } : advancePendingAction(state)),
+    log: [`${recipient.leader} receives Military Support into ${destination}.`, ...state.log],
+  };
+}
+
+function scoreBattleIconMatch(player: Player, conflict: ConflictCard) {
+  const wonConflict: ConflictCard = { ...conflict, rewards: [...conflict.rewards], scored: false };
+  if (!isStandardBattleIcon(conflict.battleIcon)) {
+    return {
+      player: { ...player, wonConflicts: [...player.wonConflicts, wonConflict] },
+      matched: false,
+      icon: conflict.battleIcon,
+    };
+  }
+
+  const objectiveIndex = player.objectives.findIndex(
+    (objective) => !objective.scored && objective.battleIcon === conflict.battleIcon,
+  );
+  if (objectiveIndex >= 0) {
+    const objectives = player.objectives.map((objective, index) =>
+      index === objectiveIndex ? { ...objective, scored: true } : objective,
+    );
+    return {
+      player: {
+        ...player,
+        vp: player.vp + 1,
+        objectives,
+        wonConflicts: [...player.wonConflicts, { ...wonConflict, scored: true }],
+      },
+      matched: true,
+      icon: conflict.battleIcon,
+    };
+  }
+
+  const conflictIndex = player.wonConflicts.findIndex(
+    (candidate) => !candidate.scored && candidate.battleIcon === conflict.battleIcon,
+  );
+  if (conflictIndex >= 0) {
+    const wonConflicts = player.wonConflicts.map((candidate, index) =>
+      index === conflictIndex ? { ...candidate, scored: true } : candidate,
+    );
+    return {
+      player: {
+        ...player,
+        vp: player.vp + 1,
+        wonConflicts: [...wonConflicts, { ...wonConflict, scored: true }],
+      },
+      matched: true,
+      icon: conflict.battleIcon,
+    };
+  }
+
+  return {
+    player: { ...player, wonConflicts: [...player.wonConflicts, wonConflict] },
+    matched: false,
+    icon: conflict.battleIcon,
+  };
+}
+
+function awardConflictToWinner(state: GameState, winner: Player, conflict: ConflictCard): GameState {
+  const scored = scoreBattleIconMatch(winner, conflict);
+  const players = state.players.map((player) => (player.id === winner.id ? scored.player : player));
+  return {
+    ...state,
+    players,
+    conflict: null,
+    log: [
+      scored.matched && isStandardBattleIcon(scored.icon)
+        ? `${winner.leader} matches ${battleIconLabels[scored.icon]} battle icons and gains 1 VP.`
+        : undefined,
+      `${winner.leader} wins ${conflict.name} and takes the Conflict card.`,
+      ...state.log,
+    ].filter((entry): entry is string => Boolean(entry)),
+  };
+}
+
+export function resolveCurrentConflict(state: GameState): GameState {
+  if (!state.conflict) return state;
+
+  const contenders = state.players.filter(
+    (player) => player.role === "Ally" && player.deployedTroops > 0 && player.conflict > 0,
+  );
+  const bestStrength = Math.max(0, ...contenders.map((player) => player.conflict));
+  const winners = contenders.filter((player) => player.conflict === bestStrength);
+
+  if (winners.length !== 1) {
+    const tiedTeam = winners[0]?.team;
+    const sameTeamTie = winners.length > 1 && tiedTeam && winners.every((winner) => winner.team === tiedTeam);
+    if (sameTeamTie) {
+      return {
+        ...state,
+        pendingAction: {
+          kind: "conflict-tie",
+          team: tiedTeam,
+          tiedPlayerIds: winners.map((winner) => winner.id),
+          strength: bestStrength,
+          source: state.conflict.name,
+        },
+        log: [
+          `${teams[tiedTeam].name} Allies tie for ${state.conflict.name}; choose whether one Ally concedes first place.`,
+          ...state.log,
+        ],
+      };
+    }
+
+    const reason = bestStrength === 0
+      ? `${state.conflict.name} resolves with no winner.`
+      : `${state.conflict.name} ends tied at ${bestStrength} strength; no one takes the Conflict card.`;
+    return {
+      ...state,
+      conflict: null,
+      conflictDiscard: [...state.conflictDiscard, state.conflict],
+      log: [reason, ...state.log],
+    };
+  }
+
+  return awardConflictToWinner(state, winners[0], state.conflict);
+}
+
+type ConflictTiePendingAction = Extract<PendingAction, { kind: "conflict-tie" }>;
+
+export function resolveConflictTie(
+  state: GameState,
+  pending: ConflictTiePendingAction,
+  winnerId?: string,
+): GameState {
+  if (!state.conflict) return state;
+
+  if (!winnerId) {
+    return {
+      ...state,
+      conflict: null,
+      conflictDiscard: [...state.conflictDiscard, state.conflict],
+      ...advancePendingAction(state),
+      log: [`No Ally concedes ${state.conflict.name}; no one takes the Conflict card.`, ...state.log],
+    };
+  }
+
+  const winner = state.players.find((player) =>
+    player.id === winnerId &&
+    player.team === pending.team &&
+    pending.tiedPlayerIds.includes(player.id) &&
+    player.role === "Ally"
+  );
+  if (!winner) return state;
+  const awarded = awardConflictToWinner(state, winner, state.conflict);
+  return {
+    ...awarded,
+    ...advancePendingAction(state),
+    log: [
+      `${winner.leader} takes first place after a same-team tie concession.`,
+      ...awarded.log,
+    ],
+  };
+}
+
 export function advanceSeat(state: GameState): number {
   for (let offset = 1; offset <= state.players.length; offset += 1) {
     const nextSeat = (state.activeSeat + offset) % state.players.length;
@@ -809,10 +1023,12 @@ export function collectMakerSpice(state: GameState, space: BoardSpace): Record<s
 }
 
 export function startNextRound(state: GameState): GameState {
-  const firstSeat = (state.firstSeat + 1) % state.players.length;
-  const [nextConflict, ...conflictDeck] = state.conflictDeck;
-  const conflictDiscard = state.conflict ? [...state.conflictDiscard, state.conflict] : state.conflictDiscard;
-  const players = state.players.map((player) =>
+  const resolvedState = resolveCurrentConflict(state);
+  if (resolvedState.pendingAction?.kind === "conflict-tie") return resolvedState;
+
+  const firstSeat = (resolvedState.firstSeat + 1) % resolvedState.players.length;
+  const [nextConflict, ...conflictDeck] = resolvedState.conflictDeck;
+  const players = resolvedState.players.map((player) =>
     drawCards(
       {
         ...player,
@@ -820,6 +1036,7 @@ export function startNextRound(state: GameState): GameState {
         revealed: false,
         persuasion: 0,
         conflict: 0,
+        deployedTroops: 0,
         hand: [],
         discard: [...player.discard, ...player.playArea, ...player.hand],
         playArea: [],
@@ -828,23 +1045,22 @@ export function startNextRound(state: GameState): GameState {
     ),
   );
   return {
-    ...state,
-    round: state.round + 1,
+    ...resolvedState,
+    round: resolvedState.round + 1,
     firstSeat,
     activeSeat: firstSeat,
     players,
     spaces: {},
-    makerSpice: advanceMakerSpice(state),
+    makerSpice: advanceMakerSpice(resolvedState),
     pendingAction: undefined,
     pendingQueue: [],
     conflict: nextConflict ?? null,
     conflictDeck,
-    conflictDiscard,
     log: [
       nextConflict
-        ? `Round ${state.round + 1} begins. ${nextConflict.name} is revealed. ${players[firstSeat].leader} has first action.`
-        : `Round ${state.round + 1} begins with no conflict cards remaining. ${players[firstSeat].leader} has first action.`,
-      ...state.log,
+        ? `Round ${resolvedState.round + 1} begins. ${nextConflict.name} is revealed. ${players[firstSeat].leader} has first action.`
+        : `Round ${resolvedState.round + 1} begins with no conflict cards remaining. ${players[firstSeat].leader} has first action.`,
+      ...resolvedState.log,
     ],
   };
 }

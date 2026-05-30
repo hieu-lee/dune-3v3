@@ -29,6 +29,7 @@ import {
   collectChoamContractFallback,
   collectMakerSpice,
   defaultActivatedAllyId,
+  deployTroopToConflict,
   drawIntrigueCards,
   effectiveCost,
   iconCanReach,
@@ -37,7 +38,9 @@ import {
   pendingActionsFor,
   pendingActionForSpace,
   queuePendingActions,
+  reinforceTroop,
   moveImperiumCardToThroneRow,
+  resolveConflictTie,
   startNextRound,
   takeChoamContract,
   transferTradeGood,
@@ -227,6 +230,9 @@ export default function App() {
         player.role === "Commander"
           ? commanderTargets[player.id] ?? defaultActivatedAllyId(player, current.players)
           : player.id;
+      const target = current.players.find((candidate) => candidate.id === targetId);
+      const combatRecipient = player.role === "Commander" ? target : player;
+      const combatSwords = combatRecipient && combatRecipient.deployedTroops > 0 ? swords : 0;
       const players = current.players.map((candidate, index) => {
         if (index === current.activeSeat) {
           return {
@@ -235,17 +241,16 @@ export default function App() {
             agentsReady: 0,
             resources: addResources(candidate.resources, revealGain),
             persuasion,
-            conflict: candidate.role === "Commander" ? candidate.conflict : candidate.conflict + swords,
+            conflict: candidate.role === "Commander" ? candidate.conflict : candidate.conflict + combatSwords,
             playArea: [...candidate.playArea, ...candidate.hand],
             hand: [],
           };
         }
         if (candidate.id === targetId && player.role === "Commander") {
-          return { ...candidate, conflict: candidate.conflict + swords };
+          return { ...candidate, conflict: candidate.conflict + combatSwords };
         }
         return candidate;
       });
-      const target = current.players.find((candidate) => candidate.id === targetId);
       return {
         ...current,
         players,
@@ -268,8 +273,8 @@ export default function App() {
               : []
           ),
           player.role === "Commander"
-            ? `${player.leader} reveals for ${persuasion} persuasion${revealGainLabel(revealGain)} and gives ${swords} strength to ${target?.leader ?? "an Ally"}.`
-            : `${player.leader} reveals for ${persuasion} persuasion, ${swords} strength${revealGainLabel(revealGain)}.`,
+            ? `${player.leader} reveals for ${persuasion} persuasion${revealGainLabel(revealGain)} and gives ${combatSwords} strength to ${target?.leader ?? "an Ally"}.`
+            : `${player.leader} reveals for ${persuasion} persuasion, ${combatSwords} strength${revealGainLabel(revealGain)}.`,
           ...current.log,
         ],
       };
@@ -343,7 +348,7 @@ export default function App() {
         ? Math.max(-pending.persuasionAdjustment, persuasionDelta)
         : 0;
       const appliedStrength = recipient
-        ? Math.max(-pending.strengthAdjustment, strengthDelta)
+        ? Math.max(-pending.strengthAdjustment, recipient.deployedTroops > 0 ? strengthDelta : Math.min(0, strengthDelta))
         : 0;
       if (appliedPersuasion === 0 && appliedStrength === 0) return current;
       const players = current.players.map((player) => {
@@ -385,20 +390,7 @@ export default function App() {
     setGame((current) => {
       const pending = current.pendingAction;
       if (!pending || pending.kind !== "deploy") return current;
-      const owner = current.players.find((player) => player.id === pending.ownerId);
-      if (!owner || owner.garrison <= 0 || pending.remaining <= 0) return { ...current, pendingAction: undefined };
-      const players = current.players.map((player) =>
-        player.id === pending.ownerId
-          ? { ...player, garrison: player.garrison - 1, conflict: player.conflict + 2 }
-          : player,
-      );
-      const remaining = pending.remaining - 1;
-      return {
-        ...current,
-        players,
-        ...(remaining > 0 ? { pendingAction: { ...pending, remaining } } : advancePendingAction(current)),
-        log: [`${owner.leader} deploys 1 troop from ${pending.source}.`, ...current.log],
-      };
+      return deployTroopToConflict(current, pending);
     });
   }
 
@@ -406,25 +398,8 @@ export default function App() {
     if (game.pendingAction?.kind !== "reinforce") return;
     setGame((current) => {
       const pending = current.pendingAction;
-      if (!pending || pending.kind !== "reinforce" || pending.remaining <= 0) return current;
-      const recipient = current.players.find((player) => player.id === playerId);
-      if (!recipient || recipient.team !== pending.team || recipient.role !== "Ally") return current;
-      const players = current.players.map((player) =>
-        player.id === playerId
-          ? {
-              ...player,
-              garrison: destination === "garrison" ? player.garrison + 1 : player.garrison,
-              conflict: destination === "conflict" ? player.conflict + 2 : player.conflict,
-            }
-          : player,
-      );
-      const remaining = pending.remaining - 1;
-      return {
-        ...current,
-        players,
-        ...(remaining > 0 ? { pendingAction: { ...pending, remaining } } : advancePendingAction(current)),
-        log: [`${recipient.leader} receives Military Support into ${destination}.`, ...current.log],
-      };
+      if (!pending || pending.kind !== "reinforce") return current;
+      return reinforceTroop(current, pending, playerId, destination);
     });
   }
 
@@ -461,6 +436,15 @@ export default function App() {
       const pending = current.pendingAction;
       if (!pending || pending.kind !== "contract") return current;
       return collectChoamContractFallback(current, pending);
+    });
+  }
+
+  function chooseConflictTieWinner(winnerId?: string) {
+    if (game.pendingAction?.kind !== "conflict-tie") return;
+    setGame((current) => {
+      const pending = current.pendingAction;
+      if (!pending || pending.kind !== "conflict-tie") return current;
+      return startNextRound(resolveConflictTie(current, pending, winnerId));
     });
   }
 
@@ -504,6 +488,10 @@ export default function App() {
   const reinforceAllies =
     pendingAction?.kind === "reinforce"
       ? game.players.filter((player) => player.team === pendingAction.team && player.role === "Ally")
+      : [];
+  const conflictTieAllies =
+    pendingAction?.kind === "conflict-tie"
+      ? game.players.filter((player) => pendingAction.tiedPlayerIds.includes(player.id))
       : [];
   const spyPlacementSpaces = pendingSpyOwner
     ? boardSpaces.filter((space) => canPlaceSpyPost(space, pendingSpyOwner, game))
@@ -719,18 +707,29 @@ export default function App() {
               <div className="mini-stats">
                 <span>{player.agentsReady}/{player.agentsTotal} {player.role === "Commander" ? "activations" : "agents"}</span>
                 <span>{player.garrison} garrison</span>
+                {player.deployedTroops > 0 && <span>{player.deployedTroops} deployed</span>}
                 <span>{player.conflict} strength</span>
                 <span>{player.spies} spies</span>
                 <span>{player.intrigues.length} intrigue</span>
                 <span>{player.contracts.length} contracts</span>
+                {player.wonConflicts.length > 0 && <span>{player.wonConflicts.length} conflicts</span>}
                 {player.reservedContracts.length > 0 && <span>{player.reservedContracts.length} reserved</span>}
               </div>
               {player.objectives.length > 0 && (
                 <div className="objective-row">
                   {player.objectives.map((objective) => (
-                    <span key={objective.id} title={objective.name}>
+                    <span className={objective.scored ? "scored" : ""} key={objective.id} title={objective.name}>
                       {battleIconLabels[objective.battleIcon]}
                       {objective.firstPlayer ? " - first" : ""}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {player.wonConflicts.length > 0 && (
+                <div className="objective-row conflict-supply-row">
+                  {player.wonConflicts.map((conflict) => (
+                    <span className={conflict.scored ? "scored" : ""} key={conflict.id} title={conflict.name}>
+                      {battleIconLabels[conflict.battleIcon]}
                     </span>
                   ))}
                 </div>
@@ -792,6 +791,7 @@ export default function App() {
                 {pendingAction.kind === "reveal-adjust" && "Printed reveal adjustment"}
                 {pendingAction.kind === "contract" && `${pendingContractOwner?.leader ?? "Player"} CHOAM contract`}
                 {pendingAction.kind === "throne-row" && `${pendingThroneOwner?.leader ?? "Shaddam"} Throne Row`}
+                {pendingAction.kind === "conflict-tie" && `${teams[pendingAction.team].name} conflict tie`}
               </h2>
             </div>
 
@@ -958,6 +958,19 @@ export default function App() {
                 {game.imperiumRow.every((card) => !canMoveCardToThroneRow(card)) && (
                   <button type="button" onClick={clearPendingAction}>No eligible card</button>
                 )}
+              </div>
+            )}
+
+            {pendingAction.kind === "conflict-tie" && (
+              <div className="pending-controls support-grid">
+                {conflictTieAllies.map((ally) => (
+                  <div className="support-target" key={ally.id}>
+                    <strong>{ally.leader}</strong>
+                    <span>{ally.conflict} strength</span>
+                    <button type="button" onClick={() => chooseConflictTieWinner(ally.id)}>Takes first</button>
+                  </div>
+                ))}
+                <button type="button" onClick={() => chooseConflictTieWinner()}>No concession</button>
               </div>
             )}
           </div>

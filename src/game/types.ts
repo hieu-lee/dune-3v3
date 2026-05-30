@@ -30,6 +30,8 @@ export type Card = {
   acquired?: number;
   conditionalPersuasion?: boolean;
   conditionalSwords?: boolean;
+  revealGain?: Partial<Resources>;
+  trashOnPlay?: boolean;
   play: string;
   reveal: string;
   cost?: number;

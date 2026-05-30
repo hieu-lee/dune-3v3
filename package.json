@@ -9,7 +9,8 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 0.0.0.0",
     "sync:cards": "node scripts/sync-dune-catalog.mjs",
-    "sync:card-images": "node scripts/sync-dune-catalog.mjs --download-images"
+    "sync:card-images": "node scripts/sync-dune-catalog.mjs --download-images",
+    "verify:starter-decks": "node scripts/verify-starter-decks.mjs"
   },
   "dependencies": {
     "lucide-react": "0.554.0",

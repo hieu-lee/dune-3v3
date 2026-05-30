@@ -15,9 +15,11 @@ These notes are implementation scaffolding, not a replacement for the rulebook. 
 
 - Six players sit as two teams of three.
 - Each team has one Commander and two Allies.
+- Allies use the standard 10-card starting deck.
 - Commander team identities:
   - Muad'Dib commands the Fremen-aligned team.
   - Shaddam Corrino IV commands the Emperor-aligned team.
+- Commanders use their dedicated 10-card Commander starting decks instead of the standard starting deck.
 - Use alternating seating. Clockwise from Muad'Dib: Muad'Dib, Shaddam Ally, Muad'Dib Ally, Shaddam, Muad'Dib Ally, Shaddam Ally.
 - Commanders start at 4 VP. Allies start at 1 VP.
 - Endgame is team-scored: sum all three players on each team.
@@ -39,7 +41,7 @@ These notes are implementation scaffolding, not a replacement for the rulebook. 
 
 ## Data Gaps To Fill
 
-- Full starting deck card list and exact card text for Muad'Dib and Shaddam.
+- Full automation for printed Commander starting-card effects.
 - Exact leader roster, signet powers, and commander board values.
 - Full Imperium deck, Intrigue deck, Conflict deck, and reserve card data.
 - Final board-space coordinates over scanned board art.

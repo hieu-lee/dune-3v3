@@ -81,12 +81,13 @@ export default function App() {
           : player.id;
       const target = current.players.find((candidate) => candidate.id === targetId) ?? player;
       const hand = player.hand.filter((card) => card.id !== selectedCard.id);
+      const playArea = selectedCard.trashOnPlay ? player.playArea : [...player.playArea, selectedCard];
       const cost = effectiveCost(selectedSpace, current.players);
       const { source, target: effectedTarget } = applyBoardEffect(
         {
           ...player,
           hand,
-          playArea: [...player.playArea, selectedCard],
+          playArea,
           agentsReady: player.agentsReady - 1,
         },
         target,
@@ -116,11 +117,14 @@ export default function App() {
         swordmasterClaimed: current.swordmasterClaimed || selectedSpace.id === "swordmaster",
         ...pending,
         log: [
+          selectedCard.trashOnPlay
+            ? `${player.leader} trashes ${selectedCard.name}.`
+            : undefined,
           player.role === "Commander"
             ? `${player.leader} activates ${target.leader} at ${selectedSpace.name} with ${selectedCard.name}.`
             : `${player.leader} sends an Agent to ${selectedSpace.name} with ${selectedCard.name}.`,
           ...current.log,
-        ],
+        ].filter((entry): entry is string => Boolean(entry)),
       };
       if (allPlayersDone(players)) return startNextRound(nextState);
       return { ...nextState, activeSeat: advanceSeat(nextState) };
@@ -134,6 +138,12 @@ export default function App() {
     if (activePlayer.revealed) return;
     const persuasion = activePlayer.hand.reduce((sum, card) => sum + card.persuasion, 0);
     const swords = activePlayer.hand.reduce((sum, card) => sum + card.swords, 0) + (activePlayer.swordmasterBonus ? 2 : 0);
+    const revealGain = activePlayer.hand.reduce<Partial<Resources>>((gain, card) => {
+      Object.entries(card.revealGain ?? {}).forEach(([resource, amount]) => {
+        gain[resource as ResourceId] = (gain[resource as ResourceId] ?? 0) + (amount ?? 0);
+      });
+      return gain;
+    }, {});
     const printedRevealCards = activePlayer.hand
       .filter((card) => card.conditionalPersuasion || card.conditionalSwords)
       .map((card) => card.name);
@@ -149,6 +159,7 @@ export default function App() {
             ...candidate,
             revealed: true,
             agentsReady: 0,
+            resources: addResources(candidate.resources, revealGain),
             persuasion,
             conflict: candidate.role === "Commander" ? candidate.conflict : candidate.conflict + swords,
             playArea: [...candidate.playArea, ...candidate.hand],
@@ -183,8 +194,8 @@ export default function App() {
               : []
           ),
           player.role === "Commander"
-            ? `${player.leader} reveals for ${persuasion} persuasion and gives ${swords} strength to ${target?.leader ?? "an Ally"}.`
-            : `${player.leader} reveals for ${persuasion} persuasion and ${swords} strength.`,
+            ? `${player.leader} reveals for ${persuasion} persuasion${revealGainLabel(revealGain)} and gives ${swords} strength to ${target?.leader ?? "an Ally"}.`
+            : `${player.leader} reveals for ${persuasion} persuasion, ${swords} strength${revealGainLabel(revealGain)}.`,
           ...current.log,
         ],
       };
@@ -874,6 +885,20 @@ function costLabel(cost?: Partial<Resources>) {
   return Object.entries(cost)
     .map(([key, value]) => `${value} ${key}`)
     .join(", ");
+}
+
+function addResources(resources: Resources, gain: Partial<Resources>) {
+  const next = { ...resources };
+  Object.entries(gain).forEach(([key, value]) => {
+    next[key as ResourceId] += value ?? 0;
+  });
+  return next;
+}
+
+function revealGainLabel(gain: Partial<Resources>) {
+  const entries = Object.entries(gain).filter(([, value]) => (value ?? 0) > 0);
+  if (entries.length === 0) return "";
+  return ` and gains ${entries.map(([key, value]) => `${value} ${key}`).join(", ")}`;
 }
 
 function acquireCard(player: Player, card: Card, fromReserve: boolean): Player {

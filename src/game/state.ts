@@ -1,4 +1,11 @@
-import { conflictCards, imperiumDeck, reserveMarket, standardContracts, starterCards } from "./data";
+import {
+  allyStarterCards,
+  commanderStarterDecks,
+  conflictCards,
+  imperiumDeck,
+  reserveMarket,
+  standardContracts,
+} from "./data";
 import type {
   BoardSpace,
   Card,
@@ -25,7 +32,12 @@ const emptyInfluence = (): Influence => ({
 });
 
 export function cloneCards(cards: Card[]) {
-  return cards.map((card) => ({ ...card }));
+  return cards.map((card) => ({
+    ...card,
+    icons: [...card.icons],
+    revealGain: card.revealGain ? { ...card.revealGain } : undefined,
+    traits: card.traits ? [...card.traits] : undefined,
+  }));
 }
 
 function shuffleCards(cards: Card[]) {
@@ -62,13 +74,14 @@ function buildChoamContractDeck() {
   return cloneContracts(shuffleItems(standardContracts));
 }
 
-function buildStarterDeck(team: TeamId) {
-  const core = cloneCards(starterCards);
-  const duplicates = [core[0], core[1], core[3], core[3], core[4]].map((card, index) => ({
-    ...card,
-    id: `${card.id}-${team}-${index}`,
-  }));
-  return shuffleCards([...cloneCards(starterCards), ...duplicates]);
+function buildStarterDeck(playerId: string, team: TeamId, role: Role) {
+  const starterDeck = role === "Commander" ? commanderStarterDecks[team] : allyStarterCards;
+  if (starterDeck.length !== 10) {
+    throw new Error(`${team} ${role} starter deck must contain 10 cards, found ${starterDeck.length}.`);
+  }
+  return shuffleCards(
+    cloneCards(starterDeck).map((card, index) => ({ ...card, id: `${playerId}-${card.id}-${index + 1}` })),
+  );
 }
 
 export function drawCards(player: Player, count: number): Player {
@@ -105,7 +118,7 @@ function makePlayer(
     vp: role === "Commander" ? 4 : 1,
     resources: { solari: 2, spice: 0, water: 1, intrigue: 0 },
     influence: emptyInfluence(),
-    deck: buildStarterDeck(team),
+    deck: buildStarterDeck(id, team, role),
     hand: [],
     discard: [],
     playArea: [],

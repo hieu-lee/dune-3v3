@@ -41,14 +41,17 @@ import {
   finishRevealAdjustment as resolveRevealAdjustment,
   iconCanReach,
   initialGame,
+  influenceLossChoices,
   isBackedByChoamIntrigue,
   isContingencyPlanIntrigue,
   isDevourIntrigue,
   isDetonationIntrigue,
   isFindWeaknessIntrigue,
+  isQuestionableMethodsIntrigue,
   isSpringTheTrapIntrigue,
   isUnexpectedAlliesIntrigue,
   isWeirdingCombatIntrigue,
+  loseInfluenceForPending,
   maybeStartCombatPhase,
   passCombatIntrigue,
   pendingActionForCard,
@@ -78,6 +81,7 @@ import {
   playUnexpectedAlliesIntrigue,
   resolveMakerChoice,
   resolveSietchTabrChoice,
+  skipLoseInfluence,
   skipRecallSpy,
   skipTrashCard,
   startCombatPhase,
@@ -413,6 +417,24 @@ export default function App() {
     });
   }
 
+  function loseInfluence(faction: FactionId) {
+    if (game.pendingAction?.kind !== "lose-influence") return;
+    setGame((current) => {
+      const pending = current.pendingAction;
+      if (!pending || pending.kind !== "lose-influence") return current;
+      return maybeStartCombatPhase(loseInfluenceForPending(current, pending, faction));
+    });
+  }
+
+  function skipInfluenceLoss() {
+    if (game.pendingAction?.kind !== "lose-influence") return;
+    setGame((current) => {
+      const pending = current.pendingAction;
+      if (!pending || pending.kind !== "lose-influence") return current;
+      return maybeStartCombatPhase(skipLoseInfluence(current, pending));
+    });
+  }
+
   function placeSpy(spaceId: string) {
     if (game.pendingAction?.kind !== "spy") return;
     setGame((current) => {
@@ -695,6 +717,13 @@ export default function App() {
       ? game.players.find((player) => player.id === pendingAction.combatRecipientId)
       : undefined;
   const pendingRecallSpyChoices = pendingAction?.kind === "recall-spy" ? recallableSpySpaces(game, pendingAction) : [];
+  const pendingInfluenceOwner =
+    pendingAction?.kind === "lose-influence" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
+  const pendingInfluenceRecipient =
+    pendingAction?.kind === "lose-influence"
+      ? game.players.find((player) => player.id === pendingAction.combatRecipientId)
+      : undefined;
+  const pendingInfluenceChoices = pendingInfluenceOwner ? influenceLossChoices(pendingInfluenceOwner) : [];
   const shaddamCommander = game.players.find((player) => player.team === "shaddam" && player.role === "Commander");
   const reservedContractChoices = pendingContractOwner?.reservedContracts ?? [];
   const revealAdjustOwner =
@@ -1133,6 +1162,7 @@ export default function App() {
               {combatCards.map((card) => {
                 const devourCard = isDevourIntrigue(card);
                 const findWeaknessCard = isFindWeaknessIntrigue(card);
+                const questionableMethodsCard = isQuestionableMethodsIntrigue(card);
                 const springTheTrapCard = isSpringTheTrapIntrigue(card);
                 const automatedStrength = combatIntrigueStrength(game, combatActor, card);
                 const canAutoResolve = Boolean(automatedStrength || devourCard || findWeaknessCard);
@@ -1143,6 +1173,8 @@ export default function App() {
                       <Swords size={14} />
                       {findWeaknessCard
                         ? "+2 / recall spy for +3"
+                        : questionableMethodsCard
+                          ? "+1 / lose Influence for +4"
                         : springTheTrapCard
                           ? "Recall 2 spies for +7"
                         : devourCard && !automatedStrength
@@ -1163,7 +1195,7 @@ export default function App() {
                               title={`Play ${card.name} for ${target.leader}`}
                             >
                               {combatActor.role === "Commander"
-                                ? `${target.leader}${devourCard || findWeaknessCard || springTheTrapCard ? ` (+${targetStrength})` : ""}`
+                                ? `${target.leader}${devourCard || findWeaknessCard || questionableMethodsCard || springTheTrapCard ? ` (+${targetStrength})` : ""}`
                                 : "Play"}
                             </button>
                           );
@@ -1247,6 +1279,7 @@ export default function App() {
                 {pendingAction.kind === "throne-row" && `${pendingThroneOwner?.leader ?? "Shaddam"} Throne Row`}
                 {pendingAction.kind === "trash-card" && `${pendingTrashOwner?.leader ?? "Player"} optional trash`}
                 {pendingAction.kind === "recall-spy" && `${pendingRecallSpyOwner?.leader ?? "Player"} recall spy`}
+                {pendingAction.kind === "lose-influence" && `${pendingInfluenceOwner?.leader ?? "Player"} influence choice`}
                 {pendingAction.kind === "conflict-tie" && `${teams[pendingAction.team].name} conflict tie`}
               </h2>
             </div>
@@ -1314,6 +1347,28 @@ export default function App() {
                 ))}
                 {pendingRecallSpyChoices.length === 0 && <span>No spy posts</span>}
                 {pendingAction.optional && <button type="button" onClick={skipRecall}>Skip</button>}
+              </div>
+            )}
+
+            {pendingAction.kind === "lose-influence" && pendingInfluenceOwner && (
+              <div className="pending-controls support-grid">
+                <span>
+                  {pendingInfluenceOwner.leader}: lose 1 Influence for +{pendingAction.strength} strength
+                  {pendingInfluenceRecipient ? ` to ${pendingInfluenceRecipient.leader}` : ""}
+                </span>
+                {pendingInfluenceChoices.map((faction) => (
+                  <button
+                    type="button"
+                    key={faction}
+                    onClick={() => loseInfluence(faction)}
+                    title={`Lose 1 ${factionLabels[faction]} Influence`}
+                  >
+                    <span>{factionShortLabels[faction]}</span>
+                    {factionLabels[faction]}
+                  </button>
+                ))}
+                {pendingInfluenceChoices.length === 0 && <span>No Influence to lose</span>}
+                {pendingAction.optional && <button type="button" onClick={skipInfluenceLoss}>Skip</button>}
               </div>
             )}
 
@@ -1579,6 +1634,8 @@ export default function App() {
                           ? "Plot / Combat / +3 strength"
                           : isFindWeaknessIntrigue(card)
                             ? "Combat / +2 / recall spy for +3"
+                          : isQuestionableMethodsIntrigue(card)
+                            ? "Combat / +1 / lose Influence for +4"
                           : isSpringTheTrapIntrigue(card)
                             ? "Combat / recall 2 spies for +7"
                           : isDevourIntrigue(card)

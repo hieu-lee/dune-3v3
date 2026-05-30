@@ -4,6 +4,7 @@ import {
   boardSpaces,
   commanderStarterDecks,
   conflictCards,
+  factionIds,
   factionLabels,
   imperiumDeck,
   intrigueCards,
@@ -53,6 +54,7 @@ const findWeaknessSourceId = 149;
 const devourSourceId = 151;
 const springTheTrapSourceId = 153;
 const weirdingCombatSourceId = 154;
+const questionableMethodsSourceId = 156;
 const backedByChoamSourceId = 448;
 const spiceMustFlowSourceId = 538;
 const shadowAllianceSourceId = 160;
@@ -137,6 +139,10 @@ export function isSpringTheTrapIntrigue(intrigue: IntrigueCard) {
 
 export function isWeirdingCombatIntrigue(intrigue: IntrigueCard) {
   return intrigue.sourceId === weirdingCombatSourceId;
+}
+
+export function isQuestionableMethodsIntrigue(intrigue: IntrigueCard) {
+  return intrigue.sourceId === questionableMethodsSourceId;
 }
 
 export function isBackedByChoamIntrigue(intrigue: IntrigueCard) {
@@ -665,6 +671,7 @@ type TradePendingAction = Extract<PendingAction, { kind: "trade" }>;
 type ThroneRowPendingAction = Extract<PendingAction, { kind: "throne-row" }>;
 type TrashCardPendingAction = Extract<PendingAction, { kind: "trash-card" }>;
 type RecallSpyPendingAction = Extract<PendingAction, { kind: "recall-spy" }>;
+type LoseInfluencePendingAction = Extract<PendingAction, { kind: "lose-influence" }>;
 type RevealAdjustPendingAction = Extract<PendingAction, { kind: "reveal-adjust" }>;
 
 function addPurchasedCard(player: Player, card: Card, fromReserve: boolean): Player {
@@ -1176,6 +1183,48 @@ export function skipRecallSpy(state: GameState, pending: RecallSpyPendingAction)
   };
 }
 
+export function influenceLossChoices(player: Player) {
+  return factionIds.filter((faction) => player.influence[faction] > 0);
+}
+
+export function loseInfluenceForPending(
+  state: GameState,
+  pending: LoseInfluencePendingAction,
+  faction: FactionId,
+): GameState {
+  const owner = state.players.find((player) => player.id === pending.ownerId);
+  const recipient = state.players.find((player) => player.id === pending.combatRecipientId);
+  if (!owner || !recipient) return { ...state, ...advancePendingAction(state) };
+  if (!influenceLossChoices(owner).includes(faction)) return state;
+
+  const players = state.players.map((player) => {
+    let next = player;
+    if (player.id === owner.id) next = adjustInfluence(next, faction, -1);
+    if (player.id === recipient.id) next = { ...next, conflict: next.conflict + pending.strength };
+    return next;
+  });
+
+  return {
+    ...state,
+    players,
+    ...advancePendingAction(state),
+    log: [
+      `${owner.leader} loses 1 ${factionLabels[faction]} Influence for ${pending.source}, adding ${pending.strength} strength to ${recipient.leader}.`,
+      ...state.log,
+    ],
+  };
+}
+
+export function skipLoseInfluence(state: GameState, pending: LoseInfluencePendingAction): GameState {
+  if (!pending.optional) return state;
+  const owner = state.players.find((player) => player.id === pending.ownerId);
+  return {
+    ...state,
+    ...advancePendingAction(state),
+    log: [`${owner?.leader ?? "Player"} declines to lose Influence for ${pending.source}.`, ...state.log],
+  };
+}
+
 function faceUpBattleIconConflicts(player: Player, battleIcon: BattleIconId) {
   return player.wonConflicts.filter(
     (conflict) => !conflict.scored && (conflict.battleIcon === battleIcon || conflict.battleIcon === "wild"),
@@ -1534,6 +1583,7 @@ export function combatIntrigueStrength(
 ) {
   if (intrigue.automatedCombatSwords) return intrigue.automatedCombatSwords;
   if (isFindWeaknessIntrigue(intrigue)) return 2;
+  if (isQuestionableMethodsIntrigue(intrigue)) return 1;
   if (isSpringTheTrapIntrigue(intrigue)) {
     return spyPostCount(state, actor.id) >= 2 ? 7 : undefined;
   }
@@ -1665,6 +1715,18 @@ export function playCombatIntrigue(
         optional: false,
       }
     : undefined;
+  const canLoseInfluenceForQuestionableMethods =
+    isQuestionableMethodsIntrigue(intrigue) && influenceLossChoices(target).length > 0;
+  const influenceLossPending: PendingAction | undefined = canLoseInfluenceForQuestionableMethods
+    ? {
+        kind: "lose-influence",
+        ownerId: target.id,
+        combatRecipientId: target.id,
+        strength: 4,
+        source: "Questionable Methods",
+        optional: true,
+      }
+    : undefined;
   const immediateCombatSwords = isSpringTheTrapIntrigue(intrigue) ? 0 : combatSwords;
 
   const players = state.players.map((player) => {
@@ -1682,7 +1744,7 @@ export function playCombatIntrigue(
     players,
     combatPasses: [],
     intrigueDiscard: [...state.intrigueDiscard, intrigue],
-    pendingAction: trashPending ?? recallSpyPending ?? springTheTrapPending,
+    pendingAction: trashPending ?? recallSpyPending ?? springTheTrapPending ?? influenceLossPending,
   };
   const actorIds = combatIntrigueActorIds(nextState);
   const pendingText = canTrashFromDevour
@@ -1691,6 +1753,8 @@ export function playCombatIntrigue(
       ? " and may recall a spy"
       : springTheTrapPending
         ? " and must recall 2 spies"
+        : influenceLossPending
+          ? " and may lose 1 Influence"
       : "";
   const strengthText = isSpringTheTrapIntrigue(intrigue)
     ? "preparing to add 7 strength"

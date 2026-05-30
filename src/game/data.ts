@@ -61,6 +61,7 @@ const intrigueSummariesByCatalogId: Partial<Record<number, string>> = {
   147: "Gain 2 Solari as a Plot Intrigue OR add 3 strength as a Combat Intrigue.",
   149: "Add 2 strength; you may recall 1 spy to add 3 more strength.",
   153: "Recall 2 spies to add 7 strength.",
+  156: "Add 1 strength; the recipient may lose 1 Influence to add 4 more strength.",
   137: "Pay 2 water to deploy a sandworm to the Conflict; may remove the Shield Wall.",
   151: "Add 2 strength; if the recipient has one or more sandworms in the Conflict, add 4 strength instead and they may trash a card.",
   154: "Add 3 strength; add 5 instead if you have at least 3 Bene Gesserit Influence.",

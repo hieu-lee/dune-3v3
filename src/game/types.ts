@@ -213,6 +213,14 @@ export type PendingAction =
       optional: boolean;
     }
   | {
+      kind: "lose-influence";
+      ownerId: string;
+      combatRecipientId: string;
+      strength: number;
+      source: string;
+      optional: boolean;
+    }
+  | {
       kind: "trash-card";
       ownerId: string;
       source: string;

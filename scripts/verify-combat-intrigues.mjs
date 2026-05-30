@@ -92,6 +92,7 @@ try {
 
   const impress = intrigueBySourceId(data, 152);
   const findWeakness = intrigueBySourceId(data, 149);
+  const questionableMethods = intrigueBySourceId(data, 156);
   const springTheTrap = intrigueBySourceId(data, 153);
   const weirdingCombat = intrigueBySourceId(data, 154);
   const contingencyPlan = intrigueBySourceId(data, 147);
@@ -114,6 +115,12 @@ try {
     "Recall 2 spies to add 7 strength.",
     "Spring The Trap should expose its two-spy cost and Combat strength",
   );
+  assert.equal(questionableMethods.combatSwords, 5, "Questionable Methods should expose its maximum structured Combat strength");
+  assert.equal(
+    questionableMethods.summary,
+    "Add 1 strength; the recipient may lose 1 Influence to add 4 more strength.",
+    "Questionable Methods should expose its base strength and optional Influence loss",
+  );
   assert.equal(weirdingCombat.combatSwords, 5, "Weirding Combat should expose its structured Combat strength");
   assert.equal(
     weirdingCombat.summary,
@@ -131,6 +138,7 @@ try {
   assert.equal(backedByChoam.combatSwords, 4, "Backed by CHOAM should expose its structured Combat strength");
   assert.equal(impress.automatedCombatSwords, undefined, "Impress has extra printed text and should not auto-resolve");
   assert.equal(findWeakness.automatedCombatSwords, undefined, "Find Weakness should resolve through spy-recall state");
+  assert.equal(questionableMethods.automatedCombatSwords, undefined, "Questionable Methods should resolve through Influence-loss state");
   assert.equal(springTheTrap.automatedCombatSwords, undefined, "Spring The Trap should resolve through spy-recall state");
   assert.equal(weirdingCombat.automatedCombatSwords, undefined, "Weirding Combat should resolve from state-aware Influence");
   assert.equal(devour.automatedCombatSwords, undefined, "Devour should resolve from target sandworm state");
@@ -460,6 +468,101 @@ try {
   assert.equal(playerById(findWeaknessRecalled, "p2").conflict, 7, "Find Weakness recall should add the 3 strength bonus");
   assert.match(findWeaknessRecalled.log[0], /recalls a spy from Secrets for Find Weakness, adding 3 strength/);
 
+  const questionableNoInfluenceFixture = combatFixture(state, data, (players) =>
+    players.map((player) =>
+      player.id === "p2"
+        ? { ...player, conflict: 2, deployedTroops: 1, intrigues: [questionableMethods] }
+        : player.id === "p3"
+          ? { ...player, conflict: 4, deployedTroops: 1 }
+          : player,
+    ),
+  );
+  const questionableNoInfluence = state.startCombatPhase(questionableNoInfluenceFixture);
+  assert.equal(
+    state.combatIntrigueStrength(questionableNoInfluence, playerById(questionableNoInfluence, "p2"), questionableMethods),
+    1,
+    "Questionable Methods should add its base 1 strength before any Influence loss",
+  );
+  const questionableNoInfluencePlayed = state.playCombatIntrigue(
+    questionableNoInfluence,
+    "p2",
+    questionableMethods.id,
+  );
+  assert.equal(playerById(questionableNoInfluencePlayed, "p2").conflict, 3);
+  assert.equal(
+    questionableNoInfluencePlayed.pendingAction,
+    undefined,
+    "Questionable Methods should not queue Influence loss when the recipient has no Influence",
+  );
+  assert.equal(questionableNoInfluencePlayed.intrigueDiscard.at(-1).id, questionableMethods.id);
+  assert.match(questionableNoInfluencePlayed.log[0], /plays Questionable Methods for Feyd-Rautha Harkonnen, adding 1 strength/);
+
+  const questionableInfluenceFixture = combatFixture(state, data, (players) =>
+    players.map((player) =>
+      player.id === "p2"
+        ? {
+            ...player,
+            conflict: 2,
+            deployedTroops: 1,
+            intrigues: [questionableMethods],
+            influence: { ...player.influence, bene: 2 },
+            vp: 1,
+          }
+        : player.id === "p3"
+          ? { ...player, conflict: 4, deployedTroops: 1, intrigues: [verifierCombat] }
+          : player,
+    ),
+  );
+  const questionableInfluence = state.startCombatPhase(questionableInfluenceFixture);
+  const questionableInfluencePlayed = state.playCombatIntrigue(questionableInfluence, "p2", questionableMethods.id);
+  assert.equal(playerById(questionableInfluencePlayed, "p2").conflict, 3, "Questionable Methods should add base strength immediately");
+  assert.deepEqual(questionableInfluencePlayed.pendingAction, {
+    kind: "lose-influence",
+    ownerId: "p2",
+    combatRecipientId: "p2",
+    strength: 4,
+    source: "Questionable Methods",
+    optional: true,
+  });
+  assert.deepEqual(
+    state.influenceLossChoices(playerById(questionableInfluencePlayed, "p2")),
+    ["bene"],
+    "Questionable Methods should list only positive Influence tracks",
+  );
+  assert.equal(
+    state.passCombatIntrigue(questionableInfluencePlayed, questionableInfluencePlayed.players[questionableInfluencePlayed.activeSeat].id),
+    questionableInfluencePlayed,
+    "Combat should stay locked while Questionable Methods Influence loss is pending",
+  );
+  assert.equal(
+    state.playCombatIntrigue(questionableInfluencePlayed, questionableInfluencePlayed.players[questionableInfluencePlayed.activeSeat].id, verifierCombat.id),
+    questionableInfluencePlayed,
+    "Additional Combat Intrigues should wait for Questionable Methods Influence loss to resolve",
+  );
+  assert.equal(
+    state.loseInfluenceForPending(questionableInfluencePlayed, questionableInfluencePlayed.pendingAction, "emperor"),
+    questionableInfluencePlayed,
+    "Questionable Methods should reject Influence tracks the recipient cannot lose",
+  );
+  const questionableActiveSeatAfterPlay = questionableInfluencePlayed.activeSeat;
+  const questionableSkipped = state.skipLoseInfluence(questionableInfluencePlayed, questionableInfluencePlayed.pendingAction);
+  assert.equal(questionableSkipped.pendingAction, undefined, "Skipping Questionable Methods should clear the pending action");
+  assert.equal(questionableSkipped.activeSeat, questionableActiveSeatAfterPlay, "Skipping Questionable Methods should not advance Combat again");
+  assert.equal(playerById(questionableSkipped, "p2").influence.bene, 2, "Skipping Questionable Methods should keep Influence");
+  assert.equal(playerById(questionableSkipped, "p2").conflict, 3, "Skipping Questionable Methods should keep only the base strength");
+  assert.match(questionableSkipped.log[0], /declines to lose Influence for Questionable Methods/);
+  const questionableLostInfluence = state.loseInfluenceForPending(
+    questionableInfluencePlayed,
+    questionableInfluencePlayed.pendingAction,
+    "bene",
+  );
+  assert.equal(questionableLostInfluence.pendingAction, undefined, "Resolving Questionable Methods should clear the pending action");
+  assert.equal(questionableLostInfluence.activeSeat, questionableActiveSeatAfterPlay, "Resolving Questionable Methods should not advance Combat again");
+  assert.equal(playerById(questionableLostInfluence, "p2").influence.bene, 1, "Questionable Methods should remove 1 Influence");
+  assert.equal(playerById(questionableLostInfluence, "p2").vp, 0, "Questionable Methods should remove the Influence threshold VP");
+  assert.equal(playerById(questionableLostInfluence, "p2").conflict, 7, "Questionable Methods Influence loss should add 4 strength");
+  assert.match(questionableLostInfluence.log[0], /loses 1 Bene Gesserit Influence for Questionable Methods, adding 4 strength/);
+
   const springTheTrapOneSpyFixture = {
     ...combatFixture(state, data, (players) =>
       players.map((player) =>
@@ -764,6 +867,99 @@ try {
   );
   assert.equal(playerById(commanderFindWeaknessAllySpyPlayed, "p6").conflict, 3);
   assert.equal(commanderFindWeaknessAllySpyPlayed.spyPosts[secretsSpace.id], "p6");
+
+  const commanderQuestionableMethodsFixture = combatFixture(
+    state,
+    data,
+    (players) =>
+      players.map((player) => {
+        if (player.id === "p2") return { ...player, conflict: 5, deployedTroops: 1 };
+        if (player.id === "p4") return { ...player, intrigues: [questionableMethods] };
+        if (player.id === "p6") {
+          return {
+            ...player,
+            conflict: 1,
+            deployedTroops: 1,
+            influence: { ...player.influence, fringeWorlds: 2 },
+            vp: 1,
+          };
+        }
+        return player;
+      }),
+    3,
+  );
+  const commanderQuestionableMethods = state.startCombatPhase(commanderQuestionableMethodsFixture);
+  assert.equal(
+    state.playCombatIntrigue(commanderQuestionableMethods, "p4", questionableMethods.id),
+    commanderQuestionableMethods,
+    "Commander Questionable Methods should require an explicit Ally target",
+  );
+  const commanderQuestionableMethodsPlayed = state.playCombatIntrigue(
+    commanderQuestionableMethods,
+    "p4",
+    questionableMethods.id,
+    "p6",
+  );
+  assert.equal(playerById(commanderQuestionableMethodsPlayed, "p6").conflict, 2, "Commander Questionable Methods base strength should go to the target");
+  assert.equal(playerById(commanderQuestionableMethodsPlayed, "p2").conflict, 5, "Commander Questionable Methods should not split strength");
+  assert.deepEqual(commanderQuestionableMethodsPlayed.pendingAction, {
+    kind: "lose-influence",
+    ownerId: "p6",
+    combatRecipientId: "p6",
+    strength: 4,
+    source: "Questionable Methods",
+    optional: true,
+  });
+  const commanderQuestionableMethodsLostInfluence = state.loseInfluenceForPending(
+    commanderQuestionableMethodsPlayed,
+    commanderQuestionableMethodsPlayed.pendingAction,
+    "fringeWorlds",
+  );
+  assert.equal(
+    playerById(commanderQuestionableMethodsLostInfluence, "p6").influence.fringeWorlds,
+    1,
+    "Commander Questionable Methods should spend the target Ally's Influence",
+  );
+  assert.equal(
+    playerById(commanderQuestionableMethodsLostInfluence, "p6").conflict,
+    6,
+    "Commander Questionable Methods should add bonus strength to the target Ally",
+  );
+  assert.equal(
+    playerById(commanderQuestionableMethodsLostInfluence, "p4").influence.fringeWorlds,
+    0,
+    "Commander Questionable Methods should not spend the Commander's Influence",
+  );
+  assert.equal(playerById(commanderQuestionableMethodsLostInfluence, "p2").conflict, 5);
+
+  const commanderQuestionableMethodsActorInfluenceFixture = combatFixture(
+    state,
+    data,
+    (players) =>
+      players.map((player) => {
+        if (player.id === "p2") return { ...player, conflict: 5, deployedTroops: 1 };
+        if (player.id === "p4") {
+          return { ...player, intrigues: [questionableMethods], influence: { ...player.influence, emperor: 2 }, vp: 1 };
+        }
+        if (player.id === "p6") return { ...player, conflict: 1, deployedTroops: 1 };
+        return player;
+      }),
+    3,
+  );
+  const commanderQuestionableMethodsActorInfluence = state.startCombatPhase(commanderQuestionableMethodsActorInfluenceFixture);
+  const commanderQuestionableMethodsActorInfluencePlayed = state.playCombatIntrigue(
+    commanderQuestionableMethodsActorInfluence,
+    "p4",
+    questionableMethods.id,
+    "p6",
+  );
+  assert.equal(
+    commanderQuestionableMethodsActorInfluencePlayed.pendingAction,
+    undefined,
+    "Commander Questionable Methods should not use actor Influence when the target Ally has none",
+  );
+  assert.equal(playerById(commanderQuestionableMethodsActorInfluencePlayed, "p6").conflict, 2);
+  assert.equal(playerById(commanderQuestionableMethodsActorInfluencePlayed, "p4").influence.emperor, 2);
 
   const commanderSpringFixture = {
     ...combatFixture(

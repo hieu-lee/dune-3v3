@@ -71,6 +71,7 @@ const backedByChoamSourceId = 448;
 const spiceMustFlowSourceId = 538;
 const shadowAllianceSourceId = 160;
 const demandAttentionSourceId = 548;
+const desertCallSourceId = 549;
 const usulSourceId = 552;
 const criticalShipmentsSourceId = 557;
 const demandResultsSourceId = 558;
@@ -718,6 +719,10 @@ export function isDemandAttentionCommanderCard(card: Card) {
   return card.sourceId === demandAttentionSourceId || card.name === "Demand Attention";
 }
 
+export function isDesertCallCommanderCard(card: Card) {
+  return card.sourceId === desertCallSourceId || card.name === "Desert Call";
+}
+
 export function isCriticalShipmentsCommanderCard(card: Card) {
   return card.sourceId === criticalShipmentsSourceId || card.name === "Critical Shipments";
 }
@@ -798,6 +803,25 @@ export function pendingActionForCard(
       { commanderResource: "water", commanderAmount: 1, allyResource: "solari", allyAmount: 2 },
       { commanderResource: "solari", commanderAmount: 2, allyResource: "water", allyAmount: 1 },
     ]);
+  }
+  if (
+    isDesertCallCommanderCard(card) &&
+    source.team === "muaddib" &&
+    source.role === "Commander" &&
+    source.resources.water >= 1 &&
+    state &&
+    space?.icon === "spice" &&
+    target?.team === source.team &&
+    target.role === "Ally" &&
+    canSummonSandworms(state, target, 1)
+  ) {
+    return {
+      kind: "desert-call",
+      commanderId: source.id,
+      allyId: target.id,
+      cardId: card.id,
+      source: card.name,
+    };
   }
   if (
     isDemandResultsCommanderCard(card) &&
@@ -896,6 +920,7 @@ type RevealAdjustPendingAction = Extract<PendingAction, { kind: "reveal-adjust" 
 type CommanderResourceSplitPendingAction = Extract<PendingAction, { kind: "commander-resource-split" }>;
 type DemandResultsPendingAction = Extract<PendingAction, { kind: "demand-results" }>;
 type DemandAttentionPendingAction = Extract<PendingAction, { kind: "demand-attention" }>;
+type DesertCallPendingAction = Extract<PendingAction, { kind: "desert-call" }>;
 
 function addPurchasedCard(player: Player, card: Card, fromReserve: boolean): Player {
   const purchaseSequence = player.purchaseSequence + 1;
@@ -2862,6 +2887,65 @@ export function skipDemandAttention(state: GameState, pending: DemandAttentionPe
     ...state,
     ...advancePendingAction(state),
     log: [`${commander?.leader ?? "Muad'Dib"} declines to pay 4 Solari for ${pending.source}.`, ...state.log],
+  };
+}
+
+export function resolveDesertCallChoice(
+  state: GameState,
+  pending: DesertCallPendingAction,
+): GameState {
+  const commander = state.players.find((player) => player.id === pending.commanderId);
+  const ally = state.players.find((player) => player.id === pending.allyId);
+  if (
+    !commander ||
+    commander.team !== "muaddib" ||
+    commander.role !== "Commander" ||
+    commander.resources.water < 1 ||
+    !commander.playArea.some((card) => card.id === pending.cardId && isDesertCallCommanderCard(card)) ||
+    !ally ||
+    ally.team !== commander.team ||
+    ally.role !== "Ally" ||
+    !canSummonSandworms(state, ally, 1)
+  ) {
+    return state;
+  }
+
+  const players = state.players.map((player) => {
+    let next = player;
+    if (player.id === commander.id) {
+      next = {
+        ...next,
+        resources: { ...next.resources, water: next.resources.water - 1 },
+        playArea: next.playArea.filter((card) => card.id !== pending.cardId),
+      };
+    }
+    if (player.id === ally.id) {
+      next = {
+        ...next,
+        conflict: next.conflict + 3,
+        deployedSandworms: next.deployedSandworms + 1,
+      };
+    }
+    return next;
+  });
+
+  return {
+    ...state,
+    players,
+    ...advancePendingAction(state),
+    log: [
+      `${commander.leader} spends 1 water for ${pending.source}; ${ally.leader} summons 1 sandworm.`,
+      ...state.log,
+    ],
+  };
+}
+
+export function skipDesertCall(state: GameState, pending: DesertCallPendingAction): GameState {
+  const commander = state.players.find((player) => player.id === pending.commanderId);
+  return {
+    ...state,
+    ...advancePendingAction(state),
+    log: [`${commander?.leader ?? "Muad'Dib"} declines to pay 1 water for ${pending.source}.`, ...state.log],
   };
 }
 

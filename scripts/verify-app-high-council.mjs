@@ -61,6 +61,21 @@ try {
     "Non-High Council Intrigue rewards should be unaffected",
   );
 
+  const deployPending = { kind: "deploy", ownerId: "p3", remaining: 1, source: "Hagga Basin" };
+  const desertCallPending = { kind: "desert-call", commanderId: "p1", allyId: "p3", cardId: "desert-call", source: "Desert Call" };
+  assert.equal(app.pendingLocksTableState(deployPending), false, "Deploy pending alone should not lock table toggles");
+  assert.equal(app.pendingLocksTableState(desertCallPending), true, "Desert Call pending should lock table toggles");
+  assert.equal(
+    app.tableStateLockedByPendingActions({ pendingAction: deployPending, pendingQueue: [desertCallPending] }),
+    true,
+    "Queued Desert Call should lock table toggles while earlier pending actions resolve",
+  );
+  assert.equal(
+    app.tableStateLockedByPendingActions({ pendingAction: deployPending, pendingQueue: [] }),
+    false,
+    "Deploy-only queues should not lock table toggles",
+  );
+
   console.log("app High Council verification passed");
 } finally {
   await server.close();

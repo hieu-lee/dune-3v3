@@ -109,10 +109,12 @@ import {
   resolveCommanderResourceSplitChoice,
   resolveDemandAttentionChoice,
   resolveDemandResultsChoice,
+  resolveDesertCallChoice,
   resolveMakerChoice,
   resolveSietchTabrChoice,
   skipDemandAttention,
   skipDemandResults,
+  skipDesertCall,
   skipLoseInfluence,
   skipRecallSpy,
   skipTrashCard,
@@ -123,7 +125,7 @@ import {
   transferTradeGood,
   updateTradeSelection,
 } from "./game/state";
-import type { BoardSpace, Card, FactionId, GameState, Player, ResourceId, Resources, TeamId, TradeGoodId, TrashCardZone } from "./game/types";
+import type { BoardSpace, Card, FactionId, GameState, PendingAction, Player, ResourceId, Resources, TeamId, TradeGoodId, TrashCardZone } from "./game/types";
 import type { CombatIntrigueChoice } from "./game/state";
 
 const resources: Array<{ id: ResourceId; label: string; Icon: LucideIcon }> = [
@@ -153,6 +155,14 @@ export function revealPersuasionFor(player: Player) {
 
 export function boardSpaceIntrigueGainFor(space: BoardSpace, player: Player) {
   return boardSpaceRewardApplies(space, player) ? space.gain?.intrigue ?? 0 : 0;
+}
+
+export function pendingLocksTableState(action: PendingAction | undefined) {
+  return action?.kind === "maker-choice" || action?.kind === "sietch-tabr" || action?.kind === "desert-call";
+}
+
+export function tableStateLockedByPendingActions(state: Pick<GameState, "pendingAction" | "pendingQueue">) {
+  return pendingLocksTableState(state.pendingAction) || state.pendingQueue.some(pendingLocksTableState);
 }
 
 export default function App() {
@@ -614,6 +624,24 @@ export default function App() {
     });
   }
 
+  function chooseDesertCall() {
+    if (game.pendingAction?.kind !== "desert-call") return;
+    setGame((current) => {
+      const pending = current.pendingAction;
+      if (!pending || pending.kind !== "desert-call") return current;
+      return maybeStartCombatPhase(resolveDesertCallChoice(current, pending));
+    });
+  }
+
+  function skipDesertCallChoice() {
+    if (game.pendingAction?.kind !== "desert-call") return;
+    setGame((current) => {
+      const pending = current.pendingAction;
+      if (!pending || pending.kind !== "desert-call") return current;
+      return maybeStartCombatPhase(skipDesertCall(current, pending));
+    });
+  }
+
   function deployOne() {
     if (game.pendingAction?.kind !== "deploy") return;
     setGame((current) => {
@@ -678,14 +706,14 @@ export default function App() {
 
   function updateMakerHooks(playerId: string, hasHooks: boolean) {
     setGame((current) => {
-      if (current.pendingAction?.kind === "maker-choice" || current.pendingAction?.kind === "sietch-tabr") return current;
+      if (tableStateLockedByPendingActions(current)) return current;
       return setMakerHooks(current, playerId, hasHooks);
     });
   }
 
   function updateShieldWall(standing: boolean) {
     setGame((current) => {
-      if (current.pendingAction?.kind === "maker-choice" || current.pendingAction?.kind === "sietch-tabr") return current;
+      if (tableStateLockedByPendingActions(current)) return current;
       return setShieldWall(current, standing);
     });
   }
@@ -815,7 +843,7 @@ export default function App() {
   const sandwormRewardDoublers = game.conflict ? game.players.filter(playerDoublesConflictRewards) : [];
   const sandwormRewardLabel = sandwormRewardDoublers.map((player) => player.leader).join(", ");
   const pendingAction = game.pendingAction;
-  const tableStateLockedByPending = pendingAction?.kind === "maker-choice" || pendingAction?.kind === "sietch-tabr";
+  const tableStateLockedByPending = tableStateLockedByPendingActions(game);
   const pendingOwner = pendingAction?.kind === "deploy" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingActor = pendingAction?.kind === "trade" ? game.players.find((player) => player.id === pendingAction.actorId) : undefined;
   const pendingPartner = pendingAction?.kind === "trade" ? game.players.find((player) => player.id === pendingAction.partnerId) : undefined;
@@ -875,6 +903,14 @@ export default function App() {
   const pendingDemandAttentionRecipient =
     pendingAction?.kind === "demand-attention"
       ? game.players.find((player) => player.id === pendingAction.recipientId)
+      : undefined;
+  const pendingDesertCallCommander =
+    pendingAction?.kind === "desert-call"
+      ? game.players.find((player) => player.id === pendingAction.commanderId)
+      : undefined;
+  const pendingDesertCallAlly =
+    pendingAction?.kind === "desert-call"
+      ? game.players.find((player) => player.id === pendingAction.allyId)
       : undefined;
   const pendingThroneOwner =
     pendingAction?.kind === "throne-row" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
@@ -1601,6 +1637,7 @@ export default function App() {
                 {pendingAction.kind === "commander-resource-split" && `${pendingResourceSplitCommander?.leader ?? "Commander"} ${pendingAction.source}`}
                 {pendingAction.kind === "demand-results" && `${pendingDemandResultsCommander?.leader ?? "Shaddam"} Demand Results`}
                 {pendingAction.kind === "demand-attention" && `${pendingDemandAttentionCommander?.leader ?? "Muad'Dib"} Demand Attention`}
+                {pendingAction.kind === "desert-call" && `${pendingDesertCallCommander?.leader ?? "Muad'Dib"} Desert Call`}
                 {pendingAction.kind === "throne-row" && `${pendingThroneOwner?.leader ?? "Shaddam"} Throne Row`}
                 {pendingAction.kind === "trash-card" && `${pendingTrashOwner?.leader ?? "Player"} optional trash`}
                 {pendingAction.kind === "recall-spy" && `${pendingRecallSpyOwner?.leader ?? "Player"} recall spy`}
@@ -1805,6 +1842,20 @@ export default function App() {
                   <span>Demand Attention can no longer resolve with the current table state.</span>
                 )}
                 <button type="button" onClick={skipDemandAttentionChoice}>Skip</button>
+              </div>
+            )}
+
+            {pendingAction.kind === "desert-call" && (
+              <div className="pending-controls">
+                {pendingDesertCallAlly ? (
+                  <button type="button" onClick={chooseDesertCall}>
+                    <Droplets size={15} />
+                    Spend 1 water: {pendingDesertCallAlly.leader} summons 1 sandworm
+                  </button>
+                ) : (
+                  <span>Desert Call can no longer resolve with the current table state.</span>
+                )}
+                <button type="button" onClick={skipDesertCallChoice}>Skip</button>
               </div>
             )}
 

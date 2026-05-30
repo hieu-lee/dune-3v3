@@ -300,6 +300,13 @@ export type PendingAction =
       source: string;
     }
   | {
+      kind: "desert-call";
+      commanderId: string;
+      allyId: string;
+      cardId: string;
+      source: string;
+    }
+  | {
       kind: "conflict-tie";
       team: TeamId;
       tiedPlayerIds: string[];

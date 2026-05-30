@@ -44,6 +44,7 @@ import {
   moveImperiumCardToThroneRow,
   resolveConflictTie,
   scoreEndgameBattleIconIntrigue,
+  scorePlotBattleIconIntrigue,
   startNextRound,
   takeChoamContract,
   transferTradeGood,
@@ -456,6 +457,10 @@ export default function App() {
 
   function scoreEndgameIntrigue(playerId: string, intrigueId: string, conflictId: string) {
     setGame((current) => scoreEndgameBattleIconIntrigue(current, playerId, intrigueId, conflictId));
+  }
+
+  function scorePlotIntrigue(intrigueId: string) {
+    setGame((current) => scorePlotBattleIconIntrigue(current, current.players[current.activeSeat].id, intrigueId));
   }
 
   function finalizeEndgame() {
@@ -1096,9 +1101,19 @@ export default function App() {
                 {activePlayer.intrigues.map((card) => (
                   <article className="intrigue-card" key={card.id}>
                     {card.thumbnailPath && <img className="card-art" src={card.thumbnailPath} alt="" loading="lazy" />}
-                    <span>{card.battleIcon ? `Endgame / ${battleIconLabels[card.battleIcon]}` : "Intrigue"}</span>
+                    <span>{card.battleIcon ? `Plot / Endgame / ${battleIconLabels[card.battleIcon]}` : "Intrigue"}</span>
                     <strong>{card.name}</strong>
                     <p>{card.summary}</p>
+                    {card.battleIcon && (
+                      <button
+                        type="button"
+                        onClick={() => scorePlotIntrigue(card.id)}
+                        disabled={!playingPhase || Boolean(game.pendingAction)}
+                      >
+                        <Crown size={14} />
+                        Score Plot VP
+                      </button>
+                    )}
                   </article>
                 ))}
               </div>

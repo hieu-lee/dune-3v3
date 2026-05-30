@@ -21,6 +21,12 @@ function assertLocalArt(card) {
   );
 }
 
+function playerById(game, playerId) {
+  const player = game.players.find((candidate) => candidate.id === playerId);
+  assert.ok(player, `Expected player ${playerId}`);
+  return player;
+}
+
 const server = await createServer({
   appType: "custom",
   logLevel: "silent",
@@ -67,6 +73,47 @@ try {
   assert.equal(drawn.intrigueDeck.length, 37, "Drawing two Intrigue cards should consume the deck");
   assert.equal(drawn.intrigueDiscard.length, 0, "Drawing should not create a discard");
   assert.match(drawn.log[0], /draws 2 Intrigue cards from Test/);
+
+  const crysknife = data.intrigueCards.find((card) => card.sourceId === 159);
+  const mercenaries = data.intrigueCards.find((card) => card.sourceId === 128);
+  assert.ok(crysknife, "Crysknife Intrigue should be available");
+  assert.ok(mercenaries, "Mercenaries Intrigue should be available");
+  const plotFixture = {
+    ...game,
+    activeSeat: game.players.findIndex((candidate) => candidate.id === "p2"),
+    pendingAction: undefined,
+    intrigueDiscard: [],
+    players: game.players.map((candidate) =>
+      candidate.id === "p2"
+        ? { ...candidate, intrigues: [crysknife, mercenaries] }
+        : { ...candidate, intrigues: [] },
+    ),
+  };
+  const scoredPlot = state.scorePlotBattleIconIntrigue(plotFixture, "p2", crysknife.id);
+  assert.equal(playerById(scoredPlot, "p2").vp, playerById(plotFixture, "p2").vp + 1, "Plot battle-icon Intrigues should score 1 VP");
+  assert.deepEqual(playerById(scoredPlot, "p2").intrigues.map((card) => card.id), [mercenaries.id]);
+  assert.equal(scoredPlot.intrigueDiscard.at(-1).id, crysknife.id, "Scored Plot Intrigue should go to discard");
+  assert.match(scoredPlot.log[0], /scores Crysknife as a Plot Intrigue/);
+
+  const pendingPlot = {
+    ...plotFixture,
+    pendingAction: { kind: "spy", ownerId: "p2", remaining: 1, source: "Test" },
+  };
+  assert.equal(
+    state.scorePlotBattleIconIntrigue(pendingPlot, "p2", crysknife.id),
+    pendingPlot,
+    "Plot Intrigues should wait for pending actions to resolve",
+  );
+  assert.equal(
+    state.scorePlotBattleIconIntrigue(plotFixture, "p3", crysknife.id),
+    plotFixture,
+    "Only the active player should play Plot Intrigues",
+  );
+  assert.equal(
+    state.scorePlotBattleIconIntrigue(plotFixture, "p2", mercenaries.id),
+    plotFixture,
+    "Non-battle-icon Intrigues should not use the Plot battle-icon scorer",
+  );
 
   for (const space of data.boardSpaces.filter((candidate) => candidate.gain?.intrigue)) {
     const source = game.players.find((candidate) => candidate.id === "p2");

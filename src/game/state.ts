@@ -856,6 +856,34 @@ export function scoreEndgameBattleIconIntrigue(
   };
 }
 
+export function scorePlotBattleIconIntrigue(
+  state: GameState,
+  playerId: string,
+  intrigueId: string,
+): GameState {
+  if (state.phase !== "playing" || state.pendingAction) return state;
+  const player = state.players[state.activeSeat];
+  if (!player || player.id !== playerId) return state;
+  const intrigue = player.intrigues.find((card) => card.id === intrigueId);
+  if (!intrigue?.battleIcon) return state;
+
+  const players = state.players.map((candidate) =>
+    candidate.id === player.id
+      ? {
+          ...candidate,
+          vp: candidate.vp + 1,
+          intrigues: candidate.intrigues.filter((card) => card.id !== intrigue.id),
+        }
+      : candidate,
+  );
+  return {
+    ...state,
+    players,
+    intrigueDiscard: [...state.intrigueDiscard, intrigue],
+    log: [`${player.leader} scores ${intrigue.name} as a Plot Intrigue for 1 VP.`, ...state.log],
+  };
+}
+
 export function deployTroopToConflict(state: GameState, pending: DeployPendingAction): GameState {
   const owner = state.players.find((player) => player.id === pending.ownerId);
   if (!owner || owner.garrison <= 0 || pending.remaining <= 0) return { ...state, ...advancePendingAction(state) };

@@ -906,6 +906,11 @@ h2 {
   margin-top: 10px;
 }
 
+.intrigue-card button {
+  width: 100%;
+  margin-top: 10px;
+}
+
 .hand-card footer {
   display: flex;
   gap: 8px;

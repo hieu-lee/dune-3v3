@@ -53,6 +53,7 @@ import {
   isFindWeaknessIntrigue,
   isGoToGroundIntrigue,
   isIntelligenceReportIntrigue,
+  isMarketOpportunityIntrigue,
   isQuestionableMethodsIntrigue,
   isReachAgreementIntrigue,
   isShaddamsFavorIntrigue,
@@ -91,6 +92,7 @@ import {
   playContingencyPlanPlotIntrigue,
   playDetonationIntrigue,
   playIntelligenceReportPlotIntrigue,
+  playMarketOpportunityPlotIntrigue,
   playPlotBattleIconIntrigue,
   playShaddamsFavorPlotIntrigue,
   playStrategicStockpilingPlotIntrigue,
@@ -652,6 +654,10 @@ export default function App() {
         : undefined;
       return playShaddamsFavorPlotIntrigue(current, player.id, intrigueId, troopOwnerId);
     });
+  }
+
+  function playMarketOpportunityPlot(intrigueId: string, choice: "spice-to-solari" | "solari-to-spice") {
+    setGame((current) => playMarketOpportunityPlotIntrigue(current, current.players[current.activeSeat].id, intrigueId, choice));
   }
 
   function playBackedByChoamPlot(intrigueId: string, faction: FactionId) {
@@ -1819,6 +1825,8 @@ export default function App() {
                     activePlayer.resources.water >= 3 &&
                     effectiveRequirementInfluence(activePlayer, "spacing", game.players) >= 3;
                   const shaddamsFavorGainsSolari = effectiveEmperorIconInfluence(activePlayer, game.players) >= 3;
+                  const marketOpportunityCanSellSpice = activePlayer.resources.spice >= 2;
+                  const marketOpportunityCanBuySpice = activePlayer.resources.solari >= 5;
                   return (
                     <article className="intrigue-card" key={card.id}>
                       {card.thumbnailPath && <img className="card-art" src={card.thumbnailPath} alt="" loading="lazy" />}
@@ -1831,6 +1839,8 @@ export default function App() {
                             ? "Plot / spend stockpiles for VP"
                           : isShaddamsFavorIntrigue(card)
                             ? `Plot / recruit${shaddamsFavorGainsSolari ? " / 3 Solari" : ""}`
+                          : isMarketOpportunityIntrigue(card)
+                            ? "Plot / exchange spice and Solari"
                           : isFindWeaknessIntrigue(card)
                             ? "Combat / +2 / recall spy for +3"
                           : isQuestionableMethodsIntrigue(card)
@@ -1935,6 +1945,28 @@ export default function App() {
                           Recruit{activePlayer.role === "Commander" ? `: ${shaddamsFavorOwner.leader}` : ""}
                           {shaddamsFavorGainsSolari ? " + 3 Solari" : ""}
                         </button>
+                      )}
+                      {isMarketOpportunityIntrigue(card) && (
+                        <div className="intrigue-actions">
+                          <button
+                            type="button"
+                            onClick={() => playMarketOpportunityPlot(card.id, "spice-to-solari")}
+                            disabled={plotIntrigueLocked || !marketOpportunityCanSellSpice}
+                            title="Spend 2 spice to gain 5 Solari"
+                          >
+                            <CircleDollarSign size={14} />
+                            2 Spice -&gt; 5 Solari
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => playMarketOpportunityPlot(card.id, "solari-to-spice")}
+                            disabled={plotIntrigueLocked || !marketOpportunityCanBuySpice}
+                            title="Spend 5 Solari to gain 5 spice"
+                          >
+                            <Sparkles size={14} />
+                            5 Solari -&gt; 5 Spice
+                          </button>
+                        </div>
                       )}
                       {isBackedByChoamIntrigue(card) && (
                         <div className="intrigue-actions">

@@ -53,6 +53,7 @@ const detonationSourceId = 131;
 const unexpectedAlliesSourceId = 137;
 const shaddamsFavorSourceId = 141;
 const intelligenceReportSourceId = 142;
+const marketOpportunitySourceId = 145;
 const contingencyPlanSourceId = 147;
 const goToGroundSourceId = 146;
 const findWeaknessSourceId = 149;
@@ -79,6 +80,7 @@ export type SpiceIsPowerChoice = "spend-spice" | "retreat-troops";
 export type TacticalOptionChoice = "add-strength" | { kind: "retreat-troops"; count: number };
 export type CombatIntrigueChoice = SpiceIsPowerChoice | TacticalOptionChoice;
 export type StrategicStockpilingChoice = "spice" | "water" | "both";
+export type MarketOpportunityChoice = "spice-to-solari" | "solari-to-spice";
 
 export function cloneCards(cards: Card[]) {
   return cards.map((card) => ({
@@ -187,6 +189,10 @@ export function isStrategicStockpilingIntrigue(intrigue: IntrigueCard) {
 
 export function isShaddamsFavorIntrigue(intrigue: IntrigueCard) {
   return intrigue.sourceId === shaddamsFavorSourceId;
+}
+
+export function isMarketOpportunityIntrigue(intrigue: IntrigueCard) {
+  return intrigue.sourceId === marketOpportunitySourceId;
 }
 
 function buildSixPlayerConflictDeck() {
@@ -1686,6 +1692,48 @@ export function playShaddamsFavorPlotIntrigue(
       `${player.leader} plays Shaddam's Favor${troopLabel}, recruits 1 troop${solariLabel}.`,
       ...state.log,
     ],
+  };
+}
+
+export function playMarketOpportunityPlotIntrigue(
+  state: GameState,
+  playerId: string,
+  intrigueId: string,
+  choice: MarketOpportunityChoice,
+): GameState {
+  if (state.phase !== "playing" || state.pendingAction || state.pendingQueue.length > 0) return state;
+  const player = state.players[state.activeSeat];
+  if (!player || player.id !== playerId) return state;
+  const intrigue = player.intrigues.find((card) => card.id === intrigueId);
+  if (!intrigue || !isMarketOpportunityIntrigue(intrigue)) return state;
+  if (choice !== "spice-to-solari" && choice !== "solari-to-spice") return state;
+  if (choice === "spice-to-solari" && player.resources.spice < 2) return state;
+  if (choice === "solari-to-spice" && player.resources.solari < 5) return state;
+
+  const players = state.players.map((candidate) => {
+    if (candidate.id !== player.id) return candidate;
+    const resources = { ...candidate.resources };
+    if (choice === "spice-to-solari") {
+      resources.spice -= 2;
+      resources.solari += 5;
+    } else {
+      resources.solari -= 5;
+      resources.spice += 5;
+    }
+    return {
+      ...candidate,
+      resources,
+      intrigues: candidate.intrigues.filter((card) => card.id !== intrigue.id),
+    };
+  });
+  const logText = choice === "spice-to-solari"
+    ? `${player.leader} plays Market Opportunity, spends 2 spice, and gains 5 Solari.`
+    : `${player.leader} plays Market Opportunity, spends 5 Solari, and gains 5 spice.`;
+  return {
+    ...state,
+    players,
+    intrigueDiscard: [...state.intrigueDiscard, intrigue],
+    log: [logText, ...state.log],
   };
 }
 

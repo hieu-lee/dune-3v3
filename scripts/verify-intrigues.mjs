@@ -86,6 +86,7 @@ try {
   const unexpectedAllies = data.intrigueCards.find((card) => card.sourceId === 137);
   const shaddamsFavor = data.intrigueCards.find((card) => card.sourceId === 141);
   const intelligenceReport = data.intrigueCards.find((card) => card.sourceId === 142);
+  const marketOpportunity = data.intrigueCards.find((card) => card.sourceId === 145);
   const contingencyPlan = data.intrigueCards.find((card) => card.sourceId === 147);
   const findWeakness = data.intrigueCards.find((card) => card.sourceId === 149);
   const goToGround = data.intrigueCards.find((card) => card.sourceId === 146);
@@ -100,6 +101,7 @@ try {
   assert.ok(unexpectedAllies, "Unexpected Allies Intrigue should be available");
   assert.ok(shaddamsFavor, "Shaddam's Favor Intrigue should be available");
   assert.ok(intelligenceReport, "Intelligence Report Intrigue should be available");
+  assert.ok(marketOpportunity, "Market Opportunity Intrigue should be available");
   assert.ok(contingencyPlan, "Contingency Plan Intrigue should be available");
   assert.ok(findWeakness, "Find Weakness Intrigue should be available");
   assert.ok(goToGround, "Go To Ground Intrigue should be available");
@@ -132,6 +134,11 @@ try {
     intelligenceReport.summary,
     "Draw 1 card; draw 1 more if you have two or more spies on the board.",
     "Intelligence Report should expose its conditional card draw",
+  );
+  assert.equal(
+    marketOpportunity.summary,
+    "Spend 2 spice to gain 5 Solari OR spend 5 Solari to gain 5 spice.",
+    "Market Opportunity should expose both resource exchange branches",
   );
   assert.equal(
     contingencyPlan.summary,
@@ -767,6 +774,148 @@ try {
     state.playShaddamsFavorPlotIntrigue(shaddamsFavorWrongCardFixture, "p2", mercenaries.id),
     shaddamsFavorWrongCardFixture,
     "Shaddam's Favor should reject other Intrigue cards",
+  );
+
+  const marketOpportunityFixture = {
+    ...game,
+    activeSeat: game.players.findIndex((candidate) => candidate.id === "p2"),
+    pendingAction: undefined,
+    pendingQueue: [],
+    intrigueDiscard: [],
+    players: game.players.map((candidate) =>
+      candidate.id === "p2"
+        ? {
+            ...candidate,
+            resources: { ...candidate.resources, spice: 2, solari: 5 },
+            intrigues: [marketOpportunity],
+          }
+        : { ...candidate, intrigues: [] },
+    ),
+  };
+  assert.equal(
+    state.isMarketOpportunityIntrigue(marketOpportunity),
+    true,
+    "Market Opportunity should be recognized as a structured Plot Intrigue",
+  );
+  const marketSpiceSold = state.playMarketOpportunityPlotIntrigue(
+    marketOpportunityFixture,
+    "p2",
+    marketOpportunity.id,
+    "spice-to-solari",
+  );
+  assert.equal(playerById(marketSpiceSold, "p2").resources.spice, 0, "Market Opportunity should spend 2 spice");
+  assert.equal(playerById(marketSpiceSold, "p2").resources.solari, 10, "Market Opportunity should gain 5 Solari");
+  assert.deepEqual(playerById(marketSpiceSold, "p2").intrigues, []);
+  assert.equal(marketSpiceSold.intrigueDiscard.at(-1).id, marketOpportunity.id);
+  assert.match(marketSpiceSold.log[0], /plays Market Opportunity, spends 2 spice, and gains 5 Solari/);
+
+  const marketSpiceBought = state.playMarketOpportunityPlotIntrigue(
+    marketOpportunityFixture,
+    "p2",
+    marketOpportunity.id,
+    "solari-to-spice",
+  );
+  assert.equal(playerById(marketSpiceBought, "p2").resources.spice, 7, "Market Opportunity should gain 5 spice");
+  assert.equal(playerById(marketSpiceBought, "p2").resources.solari, 0, "Market Opportunity should spend 5 Solari");
+  assert.equal(marketSpiceBought.intrigueDiscard.at(-1).id, marketOpportunity.id);
+  assert.match(marketSpiceBought.log[0], /plays Market Opportunity, spends 5 Solari, and gains 5 spice/);
+
+  const marketMissingSpice = {
+    ...marketOpportunityFixture,
+    players: marketOpportunityFixture.players.map((candidate) =>
+      candidate.id === "p2"
+        ? { ...candidate, resources: { ...candidate.resources, spice: 1 } }
+        : candidate,
+    ),
+  };
+  assert.equal(
+    state.playMarketOpportunityPlotIntrigue(marketMissingSpice, "p2", marketOpportunity.id, "spice-to-solari"),
+    marketMissingSpice,
+    "Market Opportunity spice-to-Solari branch should require 2 spice",
+  );
+  const marketMissingSolari = {
+    ...marketOpportunityFixture,
+    players: marketOpportunityFixture.players.map((candidate) =>
+      candidate.id === "p2"
+        ? { ...candidate, resources: { ...candidate.resources, solari: 4 } }
+        : candidate,
+    ),
+  };
+  assert.equal(
+    state.playMarketOpportunityPlotIntrigue(marketMissingSolari, "p2", marketOpportunity.id, "solari-to-spice"),
+    marketMissingSolari,
+    "Market Opportunity Solari-to-spice branch should require 5 Solari",
+  );
+  assert.equal(
+    state.playMarketOpportunityPlotIntrigue(marketOpportunityFixture, "p2", marketOpportunity.id, "bad-choice"),
+    marketOpportunityFixture,
+    "Market Opportunity should reject unknown exchange choices",
+  );
+  const commanderMarketFixture = {
+    ...marketOpportunityFixture,
+    activeSeat: game.players.findIndex((candidate) => candidate.id === "p4"),
+    players: game.players.map((candidate) =>
+      candidate.id === "p4"
+        ? {
+            ...candidate,
+            resources: { ...candidate.resources, spice: 2, solari: 5 },
+            intrigues: [marketOpportunity],
+          }
+        : { ...candidate, intrigues: [] },
+    ),
+  };
+  const commanderMarket = state.playMarketOpportunityPlotIntrigue(
+    commanderMarketFixture,
+    "p4",
+    marketOpportunity.id,
+    "spice-to-solari",
+  );
+  assert.equal(playerById(commanderMarket, "p4").resources.spice, 0);
+  assert.equal(playerById(commanderMarket, "p4").resources.solari, 10);
+  assert.deepEqual(playerById(commanderMarket, "p4").intrigues, []);
+  const commanderMarketBuy = state.playMarketOpportunityPlotIntrigue(
+    commanderMarketFixture,
+    "p4",
+    marketOpportunity.id,
+    "solari-to-spice",
+  );
+  assert.equal(playerById(commanderMarketBuy, "p4").resources.spice, 7);
+  assert.equal(playerById(commanderMarketBuy, "p4").resources.solari, 0);
+  assert.deepEqual(playerById(commanderMarketBuy, "p4").intrigues, []);
+
+  const pendingMarket = {
+    ...marketOpportunityFixture,
+    pendingAction: { kind: "spy", ownerId: "p2", remaining: 1, source: "Test" },
+  };
+  assert.equal(
+    state.playMarketOpportunityPlotIntrigue(pendingMarket, "p2", marketOpportunity.id, "spice-to-solari"),
+    pendingMarket,
+    "Market Opportunity should wait for pending actions to resolve",
+  );
+  const queuedMarket = {
+    ...marketOpportunityFixture,
+    pendingQueue: [{ kind: "spy", ownerId: "p2", remaining: 1, source: "Test" }],
+  };
+  assert.equal(
+    state.playMarketOpportunityPlotIntrigue(queuedMarket, "p2", marketOpportunity.id, "spice-to-solari"),
+    queuedMarket,
+    "Market Opportunity should wait for queued pending actions to resolve",
+  );
+  assert.equal(
+    state.playMarketOpportunityPlotIntrigue(marketOpportunityFixture, "p3", marketOpportunity.id, "spice-to-solari"),
+    marketOpportunityFixture,
+    "Only the active player should play Market Opportunity as a Plot Intrigue",
+  );
+  const marketWrongCardFixture = {
+    ...marketOpportunityFixture,
+    players: marketOpportunityFixture.players.map((candidate) =>
+      candidate.id === "p2" ? { ...candidate, intrigues: [mercenaries] } : candidate,
+    ),
+  };
+  assert.equal(
+    state.playMarketOpportunityPlotIntrigue(marketWrongCardFixture, "p2", mercenaries.id, "spice-to-solari"),
+    marketWrongCardFixture,
+    "Market Opportunity should reject other Intrigue cards",
   );
 
   const backedPlotFixture = {

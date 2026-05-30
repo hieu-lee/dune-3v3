@@ -18,6 +18,7 @@ Private web-table implementation for a six-player `Dune: Imperium - Uprising` te
 - Catalog-backed Intrigue deck with physical card draws and active-player references.
 - Team trade flow supports spice, water, Solari, and chosen Intrigue-card transfers.
 - Shaddam Throne Row support for Emperor-board setup, Imperial Tent movement, and Shaddam-team acquisition.
+- Demand Attention lets Muad'Dib spend 4 Solari to upgrade a faction visit to two Influence for the board-effect recipient.
 - Usul queues Muad'Dib's Commander/activated-Ally water-or-spice split when played.
 - Critical Shipments queues Shaddam's Commander/activated-Ally water-or-2-Solari split when played.
 - Devastating Assault gives Shaddam 1 Solari and recruits 1 troop for the activated Ally before deployment choices.

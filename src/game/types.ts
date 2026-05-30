@@ -292,6 +292,14 @@ export type PendingAction =
       source: string;
     }
   | {
+      kind: "demand-attention";
+      commanderId: string;
+      recipientId: string;
+      faction: FactionId;
+      cardId: string;
+      source: string;
+    }
+  | {
       kind: "conflict-tie";
       team: TeamId;
       tiedPlayerIds: string[];

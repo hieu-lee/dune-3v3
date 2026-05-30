@@ -70,6 +70,7 @@ const questionableMethodsSourceId = 156;
 const backedByChoamSourceId = 448;
 const spiceMustFlowSourceId = 538;
 const shadowAllianceSourceId = 160;
+const demandAttentionSourceId = 548;
 const usulSourceId = 552;
 const criticalShipmentsSourceId = 557;
 const demandResultsSourceId = 558;
@@ -713,6 +714,10 @@ export function isUsulCommanderCard(card: Card) {
   return card.sourceId === usulSourceId || card.name === "Usul";
 }
 
+export function isDemandAttentionCommanderCard(card: Card) {
+  return card.sourceId === demandAttentionSourceId || card.name === "Demand Attention";
+}
+
 export function isCriticalShipmentsCommanderCard(card: Card) {
   return card.sourceId === criticalShipmentsSourceId || card.name === "Critical Shipments";
 }
@@ -729,6 +734,11 @@ function shaddamAllyIds(state: GameState, source: Player): [string, string] | un
   const allies = state.players.filter((player) => player.team === source.team && player.role === "Ally");
   if (allies.length < 2) return undefined;
   return [allies[0].id, allies[1].id];
+}
+
+function demandAttentionRecipient(source: Player, target: Player | undefined, space: BoardSpace) {
+  if (space.personal) return source;
+  return target;
 }
 
 export function pendingActionForShaddamPersonalBoard(state: GameState): PendingAction | undefined {
@@ -767,6 +777,7 @@ export function pendingActionForCard(
   source: Player,
   state?: GameState,
   target?: Player,
+  space?: BoardSpace,
 ): PendingAction | undefined {
   if (
     (card.sourceId === 561 || card.name === "Imperial Tent") &&
@@ -803,6 +814,32 @@ export function pendingActionForCard(
       commanderId: source.id,
       allyIds,
       contractIds: [state.contractOffer[0].id, state.contractOffer[1].id],
+      cardId: card.id,
+      source: card.name,
+    };
+  }
+  const demandAttentionFaction = space ? resolveInfluence(space, source) : null;
+  if (
+    space &&
+    demandAttentionFaction &&
+    isDemandAttentionCommanderCard(card) &&
+    source.team === "muaddib" &&
+    source.role === "Commander" &&
+    source.resources.solari >= 4
+  ) {
+    const recipient = demandAttentionRecipient(source, target, space);
+    if (
+      !recipient ||
+      recipient.team !== source.team ||
+      (recipient.id !== source.id && recipient.role !== "Ally")
+    ) {
+      return undefined;
+    }
+    return {
+      kind: "demand-attention",
+      commanderId: source.id,
+      recipientId: recipient.id,
+      faction: demandAttentionFaction,
       cardId: card.id,
       source: card.name,
     };
@@ -858,6 +895,7 @@ type LoseInfluencePendingAction = Extract<PendingAction, { kind: "lose-influence
 type RevealAdjustPendingAction = Extract<PendingAction, { kind: "reveal-adjust" }>;
 type CommanderResourceSplitPendingAction = Extract<PendingAction, { kind: "commander-resource-split" }>;
 type DemandResultsPendingAction = Extract<PendingAction, { kind: "demand-results" }>;
+type DemandAttentionPendingAction = Extract<PendingAction, { kind: "demand-attention" }>;
 
 function addPurchasedCard(player: Player, card: Card, fromReserve: boolean): Player {
   const purchaseSequence = player.purchaseSequence + 1;
@@ -2770,6 +2808,60 @@ export function skipDemandResults(state: GameState, pending: DemandResultsPendin
     ...state,
     ...advancePendingAction(state),
     log: [`${commander?.leader ?? "Shaddam"} declines to pay 2 Solari for ${pending.source}.`, ...state.log],
+  };
+}
+
+export function resolveDemandAttentionChoice(
+  state: GameState,
+  pending: DemandAttentionPendingAction,
+): GameState {
+  const commander = state.players.find((player) => player.id === pending.commanderId);
+  const recipient = state.players.find((player) => player.id === pending.recipientId);
+  if (
+    !commander ||
+    commander.team !== "muaddib" ||
+    commander.role !== "Commander" ||
+    commander.resources.solari < 4 ||
+    !commander.playArea.some((card) => card.id === pending.cardId && isDemandAttentionCommanderCard(card)) ||
+    !recipient ||
+    recipient.team !== commander.team ||
+    (recipient.id !== commander.id && recipient.role !== "Ally")
+  ) {
+    return state;
+  }
+
+  const players = state.players.map((player) => {
+    let next = player;
+    if (player.id === commander.id) {
+      next = {
+        ...next,
+        resources: { ...next.resources, solari: next.resources.solari - 4 },
+        playArea: next.playArea.filter((card) => card.id !== pending.cardId),
+      };
+    }
+    if (player.id === recipient.id) {
+      next = adjustInfluence(next, pending.faction, 1);
+    }
+    return next;
+  });
+
+  return {
+    ...state,
+    players,
+    ...advancePendingAction(state),
+    log: [
+      `${commander.leader} spends 4 Solari for ${pending.source}; ${recipient.leader} gains 1 more ${factionLabels[pending.faction]} Influence.`,
+      ...state.log,
+    ],
+  };
+}
+
+export function skipDemandAttention(state: GameState, pending: DemandAttentionPendingAction): GameState {
+  const commander = state.players.find((player) => player.id === pending.commanderId);
+  return {
+    ...state,
+    ...advancePendingAction(state),
+    log: [`${commander?.leader ?? "Muad'Dib"} declines to pay 4 Solari for ${pending.source}.`, ...state.log],
   };
 }
 

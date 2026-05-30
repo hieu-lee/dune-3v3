@@ -107,9 +107,11 @@ import {
   playStrategicStockpilingPlotIntrigue,
   playUnexpectedAlliesIntrigue,
   resolveCommanderResourceSplitChoice,
+  resolveDemandAttentionChoice,
   resolveDemandResultsChoice,
   resolveMakerChoice,
   resolveSietchTabrChoice,
+  skipDemandAttention,
   skipDemandResults,
   skipLoseInfluence,
   skipRecallSpy,
@@ -292,6 +294,7 @@ export default function App() {
         source,
         current,
         player.role === "Commander" ? effectedTarget : source,
+        selectedSpace,
       );
       const pendingActions = pendingActionsFor(spacePending, cardPending, source.spies);
       if (sietchTabrPending) pendingActions.unshift(sietchTabrPending);
@@ -593,6 +596,24 @@ export default function App() {
     });
   }
 
+  function chooseDemandAttention() {
+    if (game.pendingAction?.kind !== "demand-attention") return;
+    setGame((current) => {
+      const pending = current.pendingAction;
+      if (!pending || pending.kind !== "demand-attention") return current;
+      return maybeStartCombatPhase(resolveDemandAttentionChoice(current, pending));
+    });
+  }
+
+  function skipDemandAttentionChoice() {
+    if (game.pendingAction?.kind !== "demand-attention") return;
+    setGame((current) => {
+      const pending = current.pendingAction;
+      if (!pending || pending.kind !== "demand-attention") return current;
+      return maybeStartCombatPhase(skipDemandAttention(current, pending));
+    });
+  }
+
   function deployOne() {
     if (game.pendingAction?.kind !== "deploy") return;
     setGame((current) => {
@@ -847,6 +868,14 @@ export default function App() {
     pendingAction?.kind === "demand-results"
       ? pendingAction.contractIds.map((contractId) => game.contractOffer.find((contract) => contract.id === contractId))
       : [];
+  const pendingDemandAttentionCommander =
+    pendingAction?.kind === "demand-attention"
+      ? game.players.find((player) => player.id === pendingAction.commanderId)
+      : undefined;
+  const pendingDemandAttentionRecipient =
+    pendingAction?.kind === "demand-attention"
+      ? game.players.find((player) => player.id === pendingAction.recipientId)
+      : undefined;
   const pendingThroneOwner =
     pendingAction?.kind === "throne-row" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingTrashOwner =
@@ -1571,6 +1600,7 @@ export default function App() {
                 {pendingAction.kind === "sietch-tabr" && `${pendingSietchLabel ?? "Player"} Sietch Tabr`}
                 {pendingAction.kind === "commander-resource-split" && `${pendingResourceSplitCommander?.leader ?? "Commander"} ${pendingAction.source}`}
                 {pendingAction.kind === "demand-results" && `${pendingDemandResultsCommander?.leader ?? "Shaddam"} Demand Results`}
+                {pendingAction.kind === "demand-attention" && `${pendingDemandAttentionCommander?.leader ?? "Muad'Dib"} Demand Attention`}
                 {pendingAction.kind === "throne-row" && `${pendingThroneOwner?.leader ?? "Shaddam"} Throne Row`}
                 {pendingAction.kind === "trash-card" && `${pendingTrashOwner?.leader ?? "Player"} optional trash`}
                 {pendingAction.kind === "recall-spy" && `${pendingRecallSpyOwner?.leader ?? "Player"} recall spy`}
@@ -1761,6 +1791,20 @@ export default function App() {
                   <span>Demand Results can no longer resolve with the current table state.</span>
                 )}
                 <button type="button" onClick={skipDemandResultsChoice}>Skip</button>
+              </div>
+            )}
+
+            {pendingAction.kind === "demand-attention" && (
+              <div className="pending-controls">
+                {pendingDemandAttentionRecipient ? (
+                  <button type="button" onClick={chooseDemandAttention}>
+                    <CircleDollarSign size={15} />
+                    Spend 4: {pendingDemandAttentionRecipient.leader} +1 {factionLabels[pendingAction.faction]} Influence
+                  </button>
+                ) : (
+                  <span>Demand Attention can no longer resolve with the current table state.</span>
+                )}
+                <button type="button" onClick={skipDemandAttentionChoice}>Skip</button>
               </div>
             )}
 

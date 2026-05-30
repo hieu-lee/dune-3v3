@@ -18,6 +18,7 @@ import {
 import type {
   BoardSpace,
   Card,
+  CommanderResourceSplitOption,
   ConflictCard,
   ContractCard,
   FactionId,
@@ -70,6 +71,7 @@ const backedByChoamSourceId = 448;
 const spiceMustFlowSourceId = 538;
 const shadowAllianceSourceId = 160;
 const usulSourceId = 552;
+const criticalShipmentsSourceId = 557;
 const shadowAllianceFactions: FactionId[] = [
   "emperor",
   "spacing",
@@ -708,10 +710,39 @@ export function isUsulCommanderCard(card: Card) {
   return card.sourceId === usulSourceId || card.name === "Usul";
 }
 
+export function isCriticalShipmentsCommanderCard(card: Card) {
+  return card.sourceId === criticalShipmentsSourceId || card.name === "Critical Shipments";
+}
+
 export function pendingActionForShaddamPersonalBoard(state: GameState): PendingAction | undefined {
   const shaddam = state.players.find((player) => player.team === "shaddam" && player.role === "Commander");
   if (!shaddam || !state.imperiumRow.some(canMoveCardToThroneRow)) return undefined;
   return { kind: "throne-row", ownerId: shaddam.id, source: shaddamPersonalBoardThroneSource };
+}
+
+function commanderResourceSplitPendingAction(
+  card: Card,
+  source: Player,
+  target: Player | undefined,
+  team: TeamId,
+  options: CommanderResourceSplitOption[],
+): PendingAction | undefined {
+  if (
+    source.team !== team ||
+    source.role !== "Commander" ||
+    target?.team !== source.team ||
+    target.role !== "Ally"
+  ) {
+    return undefined;
+  }
+  return {
+    kind: "commander-resource-split",
+    commanderId: source.id,
+    allyId: target.id,
+    team,
+    source: card.name,
+    options,
+  };
 }
 
 export function pendingActionForCard(
@@ -728,14 +759,17 @@ export function pendingActionForCard(
   ) {
     return { kind: "throne-row", ownerId: source.id, source: card.name };
   }
-  if (
-    isUsulCommanderCard(card) &&
-    source.team === "muaddib" &&
-    source.role === "Commander" &&
-    target?.team === source.team &&
-    target.role === "Ally"
-  ) {
-    return { kind: "usul-resource", commanderId: source.id, allyId: target.id, source: card.name };
+  if (isUsulCommanderCard(card)) {
+    return commanderResourceSplitPendingAction(card, source, target, "muaddib", [
+      { commanderResource: "water", commanderAmount: 1, allyResource: "spice", allyAmount: 1 },
+      { commanderResource: "spice", commanderAmount: 1, allyResource: "water", allyAmount: 1 },
+    ]);
+  }
+  if (isCriticalShipmentsCommanderCard(card)) {
+    return commanderResourceSplitPendingAction(card, source, target, "shaddam", [
+      { commanderResource: "water", commanderAmount: 1, allyResource: "solari", allyAmount: 2 },
+      { commanderResource: "solari", commanderAmount: 2, allyResource: "water", allyAmount: 1 },
+    ]);
   }
   return undefined;
 }
@@ -786,7 +820,7 @@ type TrashCardPendingAction = Extract<PendingAction, { kind: "trash-card" }>;
 type RecallSpyPendingAction = Extract<PendingAction, { kind: "recall-spy" }>;
 type LoseInfluencePendingAction = Extract<PendingAction, { kind: "lose-influence" }>;
 type RevealAdjustPendingAction = Extract<PendingAction, { kind: "reveal-adjust" }>;
-type UsulResourcePendingAction = Extract<PendingAction, { kind: "usul-resource" }>;
+type CommanderResourceSplitPendingAction = Extract<PendingAction, { kind: "commander-resource-split" }>;
 
 function addPurchasedCard(player: Player, card: Card, fromReserve: boolean): Player {
   const purchaseSequence = player.purchaseSequence + 1;
@@ -2511,19 +2545,27 @@ export function finishRevealAdjustment(state: GameState, pending: RevealAdjustPe
   };
 }
 
-type UsulResourceChoice = "water" | "spice";
+function resourceLogLabel(resource: ResourceId) {
+  return resource === "solari" ? "Solari" : resource;
+}
 
-export function resolveUsulResourceChoice(
+function resourceGainLog(amount: number, resource: ResourceId) {
+  return `${amount} ${resourceLogLabel(resource)}`;
+}
+
+export function resolveCommanderResourceSplitChoice(
   state: GameState,
-  pending: UsulResourcePendingAction,
-  commanderResource: UsulResourceChoice,
+  pending: CommanderResourceSplitPendingAction,
+  optionIndex: number,
 ): GameState {
+  const option = pending.options[optionIndex];
+  if (!option) return state;
   const commander = state.players.find((player) => player.id === pending.commanderId);
   const ally = state.players.find((player) => player.id === pending.allyId);
   if (
     !commander ||
-    commander.team !== "muaddib" ||
     commander.role !== "Commander" ||
+    commander.team !== pending.team ||
     !ally ||
     ally.team !== commander.team ||
     ally.role !== "Ally"
@@ -2531,14 +2573,13 @@ export function resolveUsulResourceChoice(
     return { ...state, ...advancePendingAction(state) };
   }
 
-  const allyResource: UsulResourceChoice = commanderResource === "water" ? "spice" : "water";
   const players = state.players.map((player) => {
     if (player.id === commander.id) {
       return {
         ...player,
         resources: {
           ...player.resources,
-          [commanderResource]: player.resources[commanderResource] + 1,
+          [option.commanderResource]: player.resources[option.commanderResource] + option.commanderAmount,
         },
       };
     }
@@ -2547,7 +2588,7 @@ export function resolveUsulResourceChoice(
         ...player,
         resources: {
           ...player.resources,
-          [allyResource]: player.resources[allyResource] + 1,
+          [option.allyResource]: player.resources[option.allyResource] + option.allyAmount,
         },
       };
     }
@@ -2559,7 +2600,7 @@ export function resolveUsulResourceChoice(
     players,
     ...advancePendingAction(state),
     log: [
-      `${commander.leader} resolves ${pending.source}: gains 1 ${commanderResource}; ${ally.leader} gains 1 ${allyResource}.`,
+      `${commander.leader} resolves ${pending.source}: gains ${resourceGainLog(option.commanderAmount, option.commanderResource)}; ${ally.leader} gains ${resourceGainLog(option.allyAmount, option.allyResource)}.`,
       ...state.log,
     ],
   };

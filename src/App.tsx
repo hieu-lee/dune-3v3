@@ -105,9 +105,9 @@ import {
   playShaddamsFavorPlotIntrigue,
   playStrategicStockpilingPlotIntrigue,
   playUnexpectedAlliesIntrigue,
+  resolveCommanderResourceSplitChoice,
   resolveMakerChoice,
   resolveSietchTabrChoice,
-  resolveUsulResourceChoice,
   skipLoseInfluence,
   skipRecallSpy,
   skipTrashCard,
@@ -554,12 +554,12 @@ export default function App() {
     });
   }
 
-  function chooseUsulResource(commanderResource: "water" | "spice") {
-    if (game.pendingAction?.kind !== "usul-resource") return;
+  function chooseCommanderResourceSplit(optionIndex: number) {
+    if (game.pendingAction?.kind !== "commander-resource-split") return;
     setGame((current) => {
       const pending = current.pendingAction;
-      if (!pending || pending.kind !== "usul-resource") return current;
-      return maybeStartCombatPhase(resolveUsulResourceChoice(current, pending, commanderResource));
+      if (!pending || pending.kind !== "commander-resource-split") return current;
+      return maybeStartCombatPhase(resolveCommanderResourceSplitChoice(current, pending, optionIndex));
     });
   }
 
@@ -797,10 +797,14 @@ export default function App() {
   const pendingSietchLabel = pendingSietchSplit
     ? `${pendingSietchWaterOwner.leader} water / ${pendingSietchOwner.leader} units`
     : pendingSietchOwner?.leader;
-  const pendingUsulCommander =
-    pendingAction?.kind === "usul-resource" ? game.players.find((player) => player.id === pendingAction.commanderId) : undefined;
-  const pendingUsulAlly =
-    pendingAction?.kind === "usul-resource" ? game.players.find((player) => player.id === pendingAction.allyId) : undefined;
+  const pendingResourceSplitCommander =
+    pendingAction?.kind === "commander-resource-split"
+      ? game.players.find((player) => player.id === pendingAction.commanderId)
+      : undefined;
+  const pendingResourceSplitAlly =
+    pendingAction?.kind === "commander-resource-split"
+      ? game.players.find((player) => player.id === pendingAction.allyId)
+      : undefined;
   const pendingThroneOwner =
     pendingAction?.kind === "throne-row" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingTrashOwner =
@@ -1523,7 +1527,7 @@ export default function App() {
                 {pendingAction.kind === "contract" && `${pendingContractOwner?.leader ?? "Player"} CHOAM contract`}
                 {pendingAction.kind === "maker-choice" && `${pendingMakerLabel ?? "Player"} Maker space`}
                 {pendingAction.kind === "sietch-tabr" && `${pendingSietchLabel ?? "Player"} Sietch Tabr`}
-                {pendingAction.kind === "usul-resource" && `${pendingUsulCommander?.leader ?? "Commander"} Usul`}
+                {pendingAction.kind === "commander-resource-split" && `${pendingResourceSplitCommander?.leader ?? "Commander"} ${pendingAction.source}`}
                 {pendingAction.kind === "throne-row" && `${pendingThroneOwner?.leader ?? "Shaddam"} Throne Row`}
                 {pendingAction.kind === "trash-card" && `${pendingTrashOwner?.leader ?? "Player"} optional trash`}
                 {pendingAction.kind === "recall-spy" && `${pendingRecallSpyOwner?.leader ?? "Player"} recall spy`}
@@ -1677,17 +1681,22 @@ export default function App() {
               </div>
             )}
 
-            {pendingAction.kind === "usul-resource" && pendingUsulCommander && pendingUsulAlly && (
+            {pendingAction.kind === "commander-resource-split" && pendingResourceSplitCommander && pendingResourceSplitAlly && (
               <div className="pending-controls">
-                <span>{pendingUsulCommander.leader} / {pendingUsulAlly.leader}</span>
-                <button type="button" onClick={() => chooseUsulResource("water")}>
-                  <Droplets size={15} />
-                  Commander water / Ally spice
-                </button>
-                <button type="button" onClick={() => chooseUsulResource("spice")}>
-                  <Sparkles size={15} />
-                  Commander spice / Ally water
-                </button>
+                <span>{pendingResourceSplitCommander.leader} / {pendingResourceSplitAlly.leader}</span>
+                {pendingAction.options.map((option, index) => {
+                  const Icon = resources.find((resource) => resource.id === option.commanderResource)?.Icon ?? Sparkles;
+                  return (
+                    <button
+                      type="button"
+                      key={`${option.commanderResource}-${option.allyResource}`}
+                      onClick={() => chooseCommanderResourceSplit(index)}
+                    >
+                      <Icon size={15} />
+                      Commander {resourceChoiceLabel(option.commanderAmount, option.commanderResource)} / Ally {resourceChoiceLabel(option.allyAmount, option.allyResource)}
+                    </button>
+                  );
+                })}
               </div>
             )}
 
@@ -2249,6 +2258,11 @@ function costLabel(cost?: Partial<Resources>) {
   return Object.entries(cost)
     .map(([key, value]) => `${value} ${key}`)
     .join(", ");
+}
+
+function resourceChoiceLabel(amount: number, resource: ResourceId) {
+  const label = resource === "solari" ? "Solari" : resource;
+  return amount === 1 ? label : `${amount} ${label}`;
 }
 
 function addResources(resources: Resources, gain: Partial<Resources>) {

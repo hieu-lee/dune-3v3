@@ -26,6 +26,12 @@ export type Influence = Record<FactionId, number>;
 export type AllianceOwners = Partial<Record<FactionId, string>>;
 export type BoardGain = Partial<Resources> & { intrigue?: number };
 export type TradeGoodId = ResourceId | "intrigue";
+export type CommanderResourceSplitOption = {
+  commanderResource: ResourceId;
+  commanderAmount: number;
+  allyResource: ResourceId;
+  allyAmount: number;
+};
 export type InfluenceRequirement = {
   faction: FactionId;
   amount: number;
@@ -270,10 +276,12 @@ export type PendingAction =
       source: string;
     }
   | {
-      kind: "usul-resource";
+      kind: "commander-resource-split";
       commanderId: string;
       allyId: string;
+      team: TeamId;
       source: string;
+      options: CommanderResourceSplitOption[];
     }
   | {
       kind: "conflict-tie";

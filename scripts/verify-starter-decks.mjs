@@ -139,10 +139,15 @@ try {
   assert.equal(state.isUsulCommanderCard(usul), true, "Usul should be recognized as its Commander starter card");
   const usulPending = state.pendingActionForCard(usul, muadDib, game, muadDibAllyA);
   assert.deepEqual(usulPending, {
-    kind: "usul-resource",
+    kind: "commander-resource-split",
     commanderId: muadDib.id,
     allyId: muadDibAllyA.id,
+    team: "muaddib",
     source: "Usul",
+    options: [
+      { commanderResource: "water", commanderAmount: 1, allyResource: "spice", allyAmount: 1 },
+      { commanderResource: "spice", commanderAmount: 1, allyResource: "water", allyAmount: 1 },
+    ],
   });
   assert.equal(
     state.pendingActionForCard(usul, muadDib, game, shaddamAlly),
@@ -171,14 +176,14 @@ try {
     ),
     log: [],
   };
-  const waterSplit = state.resolveUsulResourceChoice(baseUsulResolution, usulPending, "water");
+  const waterSplit = state.resolveCommanderResourceSplitChoice(baseUsulResolution, usulPending, 0);
   assert.equal(playerById(waterSplit, muadDib.id).resources.water, 1, "Usul water choice gives Commander water");
   assert.equal(playerById(waterSplit, muadDib.id).resources.spice, 0, "Usul water choice does not give Commander spice");
   assert.equal(playerById(waterSplit, muadDibAllyA.id).resources.spice, 1, "Usul water choice gives Ally spice");
   assert.equal(waterSplit.pendingAction, undefined, "Usul resolution should advance pending action");
   assert.match(waterSplit.log[0], /resolves Usul/, "Usul resolution should log the split");
 
-  const spiceSplit = state.resolveUsulResourceChoice(baseUsulResolution, usulPending, "spice");
+  const spiceSplit = state.resolveCommanderResourceSplitChoice(baseUsulResolution, usulPending, 1);
   assert.equal(playerById(spiceSplit, muadDib.id).resources.spice, 1, "Usul spice choice gives Commander spice");
   assert.equal(playerById(spiceSplit, muadDib.id).resources.water, 0, "Usul spice choice does not give Commander water");
   assert.equal(playerById(spiceSplit, muadDibAllyA.id).resources.water, 1, "Usul spice choice gives Ally water");
@@ -206,10 +211,181 @@ try {
   assert.deepEqual(queuedUsulState.pendingQueue, [usulPending], "Usul should be queued after deployment");
   const skippedDeployState = state.finishPendingAction(queuedUsulState);
   assert.deepEqual(skippedDeployState.pendingAction, usulPending, "Finishing deployment should expose Usul next");
-  const queuedWaterSplit = state.resolveUsulResourceChoice(skippedDeployState, usulPending, "water");
+  const queuedWaterSplit = state.resolveCommanderResourceSplitChoice(skippedDeployState, usulPending, 0);
   assert.equal(playerById(queuedWaterSplit, muadDib.id).resources.water, 1, "Queued Usul gives Commander water");
   assert.equal(playerById(queuedWaterSplit, muadDibAllyA.id).resources.spice, 1, "Queued Usul gives Ally spice");
   assert.equal(queuedWaterSplit.pendingAction, undefined, "Queued Usul resolution clears the pending queue");
+
+  const wrongTeamUsulState = state.resolveCommanderResourceSplitChoice(
+    {
+      ...baseUsulResolution,
+      pendingAction: { ...usulPending, team: "shaddam" },
+    },
+    { ...usulPending, team: "shaddam" },
+    0,
+  );
+  assert.equal(playerById(wrongTeamUsulState, muadDib.id).resources.water, 0, "Wrong-team Usul should not pay Muad'Dib");
+  assert.equal(playerById(wrongTeamUsulState, muadDibAllyA.id).resources.spice, 0, "Wrong-team Usul should not pay Ally");
+
+  const criticalShipments = data.emperorCommanderCards.find((card) => card.name === "Critical Shipments");
+  assert.ok(criticalShipments, "Emperor Commander deck should include Critical Shipments");
+  assert.equal(
+    state.isCriticalShipmentsCommanderCard(criticalShipments),
+    true,
+    "Critical Shipments should be recognized as its Commander starter card",
+  );
+  const criticalShipmentsPending = state.pendingActionForCard(criticalShipments, emperor, game, shaddamAlly);
+  assert.deepEqual(criticalShipmentsPending, {
+    kind: "commander-resource-split",
+    commanderId: emperor.id,
+    allyId: shaddamAlly.id,
+    team: "shaddam",
+    source: "Critical Shipments",
+    options: [
+      { commanderResource: "water", commanderAmount: 1, allyResource: "solari", allyAmount: 2 },
+      { commanderResource: "solari", commanderAmount: 2, allyResource: "water", allyAmount: 1 },
+    ],
+  });
+  assert.equal(
+    state.pendingActionForCard(criticalShipments, emperor, game, muadDibAllyA),
+    undefined,
+    "Critical Shipments should not target an opposing Ally",
+  );
+  assert.equal(
+    state.pendingActionForCard(criticalShipments, shaddamAlly, game, shaddamAllyB),
+    undefined,
+    "Critical Shipments should not trigger from an Ally starter deck owner",
+  );
+  assert.equal(
+    state.pendingActionForCard(criticalShipments, emperor, game),
+    undefined,
+    "Critical Shipments needs the activated Ally target",
+  );
+
+  const baseCriticalShipmentsResolution = {
+    ...game,
+    pendingAction: criticalShipmentsPending,
+    pendingQueue: [],
+    players: game.players.map((player) =>
+      player.id === emperor.id || player.id === shaddamAlly.id
+        ? { ...player, resources: { solari: 0, spice: 0, water: 0 } }
+        : player,
+    ),
+    log: [],
+  };
+  const commanderWaterSplit = state.resolveCommanderResourceSplitChoice(
+    baseCriticalShipmentsResolution,
+    criticalShipmentsPending,
+    0,
+  );
+  assert.equal(
+    playerById(commanderWaterSplit, emperor.id).resources.water,
+    1,
+    "Critical Shipments water choice gives Commander water",
+  );
+  assert.equal(
+    playerById(commanderWaterSplit, shaddamAlly.id).resources.solari,
+    2,
+    "Critical Shipments water choice gives Ally 2 Solari",
+  );
+  assert.match(
+    commanderWaterSplit.log[0],
+    /resolves Critical Shipments/,
+    "Critical Shipments resolution should log the split",
+  );
+  const commanderSolariSplit = state.resolveCommanderResourceSplitChoice(
+    baseCriticalShipmentsResolution,
+    criticalShipmentsPending,
+    1,
+  );
+  assert.equal(
+    playerById(commanderSolariSplit, emperor.id).resources.solari,
+    2,
+    "Critical Shipments Solari choice gives Commander 2 Solari",
+  );
+  assert.equal(
+    playerById(commanderSolariSplit, shaddamAlly.id).resources.water,
+    1,
+    "Critical Shipments Solari choice gives Ally water",
+  );
+
+  const acceptContract = data.boardSpaces.find((space) => space.id === "accept-contract");
+  assert.ok(acceptContract, "Accept Contract should exist for Critical Shipments queue regression");
+  const contractPending = state.pendingActionForSpace(acceptContract, emperor, shaddamAlly, game.players);
+  assert.deepEqual(contractPending, {
+    kind: "contract",
+    ownerId: emperor.id,
+    source: "Accept Contract",
+    spaceId: "accept-contract",
+  });
+  const queuedCriticalShipmentsActions = state.pendingActionsFor(
+    contractPending,
+    criticalShipmentsPending,
+    emperor.spies,
+  );
+  const queueBaseCriticalShipmentsResolution = {
+    ...baseCriticalShipmentsResolution,
+    pendingAction: undefined,
+    pendingQueue: [],
+  };
+  const queuedCriticalShipmentsState = {
+    ...queueBaseCriticalShipmentsResolution,
+    ...state.queuePendingActions(queueBaseCriticalShipmentsResolution, queuedCriticalShipmentsActions),
+  };
+  assert.deepEqual(
+    queuedCriticalShipmentsState.pendingAction,
+    contractPending,
+    "Critical Shipments should wait behind the spice-space contract choice",
+  );
+  assert.deepEqual(
+    queuedCriticalShipmentsState.pendingQueue,
+    [criticalShipmentsPending],
+    "Critical Shipments should be queued after the spice-space choice",
+  );
+  const skippedContractState = state.finishPendingAction(queuedCriticalShipmentsState);
+  assert.deepEqual(
+    skippedContractState.pendingAction,
+    criticalShipmentsPending,
+    "Finishing the spice-space choice should expose Critical Shipments next",
+  );
+  const queuedCriticalShipmentsSplit = state.resolveCommanderResourceSplitChoice(
+    skippedContractState,
+    criticalShipmentsPending,
+    1,
+  );
+  assert.equal(
+    playerById(queuedCriticalShipmentsSplit, emperor.id).resources.solari,
+    2,
+    "Queued Critical Shipments gives Commander 2 Solari",
+  );
+  assert.equal(
+    playerById(queuedCriticalShipmentsSplit, shaddamAlly.id).resources.water,
+    1,
+    "Queued Critical Shipments gives Ally water",
+  );
+  assert.equal(
+    queuedCriticalShipmentsSplit.pendingAction,
+    undefined,
+    "Queued Critical Shipments resolution clears the pending queue",
+  );
+  const wrongTeamCriticalShipmentsState = state.resolveCommanderResourceSplitChoice(
+    {
+      ...baseCriticalShipmentsResolution,
+      pendingAction: { ...criticalShipmentsPending, team: "muaddib" },
+    },
+    { ...criticalShipmentsPending, team: "muaddib" },
+    1,
+  );
+  assert.equal(
+    playerById(wrongTeamCriticalShipmentsState, emperor.id).resources.solari,
+    0,
+    "Wrong-team Critical Shipments should not pay Shaddam",
+  );
+  assert.equal(
+    playerById(wrongTeamCriticalShipmentsState, shaddamAlly.id).resources.water,
+    0,
+    "Wrong-team Critical Shipments should not pay Ally",
+  );
 
   console.log("starter deck verification passed");
 } finally {

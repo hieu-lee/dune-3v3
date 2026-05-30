@@ -14,6 +14,7 @@
     "verify:board-spaces": "node scripts/verify-board-spaces.mjs",
     "verify:conflict-awards": "node scripts/verify-conflict-awards.mjs",
     "verify:contracts": "node scripts/verify-contracts.mjs",
+    "verify:endgame": "node scripts/verify-endgame.mjs",
     "verify:intrigues": "node scripts/verify-intrigues.mjs",
     "verify:leaders": "node scripts/verify-leaders.mjs",
     "verify:maker-spice": "node scripts/verify-maker-spice.mjs",

@@ -269,6 +269,7 @@ export function initialGame(): GameState {
   const { players, firstSeat } = dealSixPlayerObjectives(playersBeforeObjectives);
 
   const game: GameState = {
+    phase: "playing",
     round: 1,
     activeSeat: firstSeat,
     firstSeat,
@@ -793,6 +794,68 @@ export function drawIntrigueCards(state: GameState, ownerId: string, count: numb
   };
 }
 
+function faceUpBattleIconConflicts(player: Player, battleIcon: BattleIconId) {
+  return player.wonConflicts.filter(
+    (conflict) => !conflict.scored && (conflict.battleIcon === battleIcon || conflict.battleIcon === "wild"),
+  );
+}
+
+export function endgameBattleIconChoices(state: GameState) {
+  if (state.phase !== "endgame") return [];
+  return state.players.flatMap((player) => {
+    if (player.role !== "Ally") return [];
+    return player.intrigues.flatMap((intrigue) => {
+      if (!intrigue.battleIcon) return [];
+      const battleIcon = intrigue.battleIcon;
+      return faceUpBattleIconConflicts(player, battleIcon).map((conflict) => ({
+        playerId: player.id,
+        intrigueId: intrigue.id,
+        conflictId: conflict.id,
+        battleIcon,
+      }));
+    });
+  });
+}
+
+export function scoreEndgameBattleIconIntrigue(
+  state: GameState,
+  playerId: string,
+  intrigueId: string,
+  conflictId?: string,
+): GameState {
+  if (state.phase !== "endgame") return state;
+  const player = state.players.find((candidate) => candidate.id === playerId);
+  if (!player || player.role !== "Ally") return state;
+  const intrigue = player.intrigues.find((card) => card.id === intrigueId);
+  if (!intrigue?.battleIcon) return state;
+  const matches = faceUpBattleIconConflicts(player, intrigue.battleIcon);
+  const conflict = conflictId
+    ? matches.find((candidate) => candidate.id === conflictId)
+    : matches[0];
+  if (!conflict) return state;
+
+  const players = state.players.map((candidate) => {
+    if (candidate.id !== player.id) return candidate;
+    return {
+      ...candidate,
+      vp: candidate.vp + 1,
+      intrigues: candidate.intrigues.filter((card) => card.id !== intrigue.id),
+      wonConflicts: candidate.wonConflicts.map((wonConflict) =>
+        wonConflict.id === conflict.id ? { ...wonConflict, scored: true } : wonConflict,
+      ),
+    };
+  });
+  return {
+    ...state,
+    players,
+    intrigueDiscard: [...state.intrigueDiscard, intrigue],
+    log: [
+      `${player.leader} scores ${intrigue.name} by flipping ${conflict.name} for 1 VP.`,
+      ...state.log,
+    ],
+  };
+}
+
 export function deployTroopToConflict(state: GameState, pending: DeployPendingAction): GameState {
   const owner = state.players.find((player) => player.id === pending.ownerId);
   if (!owner || owner.garrison <= 0 || pending.remaining <= 0) return { ...state, ...advancePendingAction(state) };
@@ -1022,9 +1085,55 @@ export function collectMakerSpice(state: GameState, space: BoardSpace): Record<s
   return { ...emptyMakerSpice(), ...state.makerSpice, [space.id]: 0 };
 }
 
+function teamVictoryPoints(players: Player[], team: TeamId) {
+  return players
+    .filter((player) => player.team === team)
+    .reduce((sum, player) => sum + player.vp, 0);
+}
+
+export function endgameTriggerReason(state: GameState): string | undefined {
+  const leader = state.players.find((player) => player.vp >= 10);
+  if (leader) return `${leader.leader} reached 10 VP.`;
+  if (state.conflictDeck.length === 0) return "The Conflict deck is empty.";
+  return undefined;
+}
+
+export function finishEndgame(state: GameState): GameState {
+  if (state.phase === "finished") return state;
+  const muaddibVp = teamVictoryPoints(state.players, "muaddib");
+  const shaddamVp = teamVictoryPoints(state.players, "shaddam");
+  const winningTeam = muaddibVp === shaddamVp ? undefined : muaddibVp > shaddamVp ? "muaddib" : "shaddam";
+  return {
+    ...state,
+    phase: "finished",
+    winningTeam,
+    log: [
+      winningTeam
+        ? `${teams[winningTeam].name} wins ${Math.max(muaddibVp, shaddamVp)}-${Math.min(muaddibVp, shaddamVp)}.`
+        : `The game ends tied at ${muaddibVp}-${shaddamVp}.`,
+      ...state.log,
+    ],
+  };
+}
+
 export function startNextRound(state: GameState): GameState {
   const resolvedState = resolveCurrentConflict(state);
   if (resolvedState.pendingAction?.kind === "conflict-tie") return resolvedState;
+
+  const endgameReason = endgameTriggerReason(resolvedState);
+  if (endgameReason) {
+    return {
+      ...resolvedState,
+      phase: "endgame",
+      pendingAction: undefined,
+      pendingQueue: [],
+      endgameReason,
+      log: [
+        `Endgame triggered: ${endgameReason} Resolve Endgame Intrigue cards, then finalize team scores.`,
+        ...resolvedState.log,
+      ],
+    };
+  }
 
   const firstSeat = (resolvedState.firstSeat + 1) % resolvedState.players.length;
   const [nextConflict, ...conflictDeck] = resolvedState.conflictDeck;

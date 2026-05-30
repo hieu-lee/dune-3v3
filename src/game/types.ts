@@ -1,5 +1,6 @@
 export type TeamId = "muaddib" | "shaddam";
 export type Role = "Commander" | "Ally";
+export type GamePhase = "playing" | "endgame" | "finished";
 export type IconId =
   | "emperor"
   | "spacing"
@@ -74,6 +75,7 @@ export type IntrigueCard = {
   id: string;
   name: string;
   summary: string;
+  battleIcon?: BattleIconId;
   imagePath?: string;
   thumbnailPath?: string;
   sourceId?: number;
@@ -218,6 +220,7 @@ export type PendingAction =
     };
 
 export type GameState = {
+  phase: GamePhase;
   round: number;
   activeSeat: number;
   firstSeat: number;
@@ -240,5 +243,7 @@ export type GameState = {
   swordmasterClaimed: boolean;
   pendingAction?: PendingAction;
   pendingQueue: PendingAction[];
+  winningTeam?: TeamId;
+  endgameReason?: string;
   log: string[];
 };

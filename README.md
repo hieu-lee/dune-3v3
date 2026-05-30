@@ -21,6 +21,7 @@ Private web-table implementation for a six-player `Dune: Imperium - Uprising` te
 - Maker-space bonus spice tracks and pays out on the four six-player Maker desert spaces.
 - Six-player Objective setup deals only to Allies and balances Desert Mouse/Crysknife icons across teams.
 - Conflict winners keep won Conflict cards and score immediate non-wild battle-icon pairs with Objectives or prior Conflicts.
+- Endgame phase triggers at 10 VP or an empty Conflict deck and scores battle-icon Endgame Intrigues against matching or wild Conflict cards.
 - Catalog-backed board-space art on matching placement tiles.
 - Printed reveal adjustments and spy-post targeting for cards whose text is not reducible to a fixed number.
 - Asset pipeline conventions for owned scans or public reference images.

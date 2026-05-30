@@ -39,6 +39,18 @@ try {
     assert.ok(card.summary, `${card.name} should include a summary`);
     assertLocalArt(card);
   }
+  assert.deepEqual(
+    data.intrigueCards
+      .filter((card) => card.battleIcon)
+      .map((card) => [card.name, card.battleIcon])
+      .sort(),
+    [
+      ["Crysknife", "crysknife"],
+      ["Desert Mouse", "desertMouse"],
+      ["Ornitopter", "ornithopter"],
+    ],
+    "Battle-icon Endgame Intrigues should expose structured icons",
+  );
 
   const game = state.initialGame();
   assert.equal(game.intrigueDeck.length, 39, "Initial game should shuffle the full Intrigue deck");

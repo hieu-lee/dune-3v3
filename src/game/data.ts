@@ -615,10 +615,12 @@ export const conflictCards: ConflictCard[] = catalog.cards
   .map(toConflictCard);
 
 function toIntrigueCard(card: HubCard): IntrigueCard {
+  const battleIcon = intrigueBattleIconsByCatalogId[card.id];
   return {
     id: `intrigue-${card.id}`,
     name: card.name,
     summary: summarizeAttributes(card),
+    battleIcon,
     imagePath: card.localImagePath ?? card.fullImageUrl ?? undefined,
     thumbnailPath: card.localThumbnailPath ?? card.thumbnailImageUrl ?? undefined,
     sourceId: card.id,
@@ -626,6 +628,12 @@ function toIntrigueCard(card: HubCard): IntrigueCard {
     traits: card.attributes.map(([name]) => name),
   };
 }
+
+const intrigueBattleIconsByCatalogId: Partial<Record<number, BattleIconId>> = {
+  157: "desertMouse",
+  158: "ornithopter",
+  159: "crysknife",
+};
 
 export const intrigueCards: IntrigueCard[] = catalog.cards
   .filter((card) => card.type === "intrigue")

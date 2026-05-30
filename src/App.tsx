@@ -31,7 +31,9 @@ import {
   defaultActivatedAllyId,
   deployTroopToConflict,
   drawIntrigueCards,
+  endgameBattleIconChoices,
   effectiveCost,
+  finishEndgame,
   iconCanReach,
   initialGame,
   pendingActionForCard,
@@ -41,6 +43,7 @@ import {
   reinforceTroop,
   moveImperiumCardToThroneRow,
   resolveConflictTie,
+  scoreEndgameBattleIconIntrigue,
   startNextRound,
   takeChoamContract,
   transferTradeGood,
@@ -126,7 +129,7 @@ export default function App() {
   }, [selectedLeaderId]);
 
   const legalSpaces = useMemo(() => {
-    if (!selectedCard || activePlayer.agentsReady <= 0 || game.pendingAction) return new Set<string>();
+    if (game.phase !== "playing" || !selectedCard || activePlayer.agentsReady <= 0 || game.pendingAction) return new Set<string>();
     return new Set(
       boardSpaces
         .filter((space) => !game.spaces[space.id])
@@ -134,12 +137,12 @@ export default function App() {
         .filter((space) => canPay(activePlayer, effectiveCost(space, game.players)))
         .map((space) => space.id),
     );
-  }, [activePlayer, game.pendingAction, game.players, game.spaces, game.spyPosts, game.swordmasterClaimed, selectedCard]);
+  }, [activePlayer, game.pendingAction, game.phase, game.players, game.spaces, game.spyPosts, game.swordmasterClaimed, selectedCard]);
 
-  const canPlayAgent = Boolean(selectedCard && selectedSpace && legalSpaces.has(selectedSpace.id) && !game.pendingAction);
+  const canPlayAgent = Boolean(game.phase === "playing" && selectedCard && selectedSpace && legalSpaces.has(selectedSpace.id) && !game.pendingAction);
 
   function playAgent() {
-    if (!canPlayAgent || !selectedCard || !selectedSpace) return;
+    if (game.phase !== "playing" || !canPlayAgent || !selectedCard || !selectedSpace) return;
     setGame((current) => {
       const player = current.players[current.activeSeat];
       const targetId =
@@ -211,6 +214,7 @@ export default function App() {
   }
 
   function revealTurn() {
+    if (game.phase !== "playing") return;
     if (game.pendingAction) return;
     if (activePlayer.revealed) return;
     const persuasion = activePlayer.hand.reduce((sum, card) => sum + card.persuasion, 0);
@@ -282,6 +286,7 @@ export default function App() {
   }
 
   function buyCard(card: Card) {
+    if (game.phase !== "playing") return;
     if (game.pendingAction) return;
     if (!activePlayer.revealed || activePlayer.persuasion < (card.cost ?? 0)) return;
     setGame((current) => {
@@ -300,6 +305,7 @@ export default function App() {
   }
 
   function endReveal() {
+    if (game.phase !== "playing") return;
     if (game.pendingAction) return;
     if (!activePlayer.revealed) return;
     setGame((current) => {
@@ -448,6 +454,14 @@ export default function App() {
     });
   }
 
+  function scoreEndgameIntrigue(playerId: string, intrigueId: string, conflictId: string) {
+    setGame((current) => scoreEndgameBattleIconIntrigue(current, playerId, intrigueId, conflictId));
+  }
+
+  function finalizeEndgame() {
+    setGame((current) => finishEndgame(current));
+  }
+
   function resetGame() {
     setGame(initialGame());
     setSelectedCardId(null);
@@ -493,6 +507,8 @@ export default function App() {
     pendingAction?.kind === "conflict-tie"
       ? game.players.filter((player) => pendingAction.tiedPlayerIds.includes(player.id))
       : [];
+  const endgameChoices = endgameBattleIconChoices(game);
+  const playingPhase = game.phase === "playing";
   const spyPlacementSpaces = pendingSpyOwner
     ? boardSpaces.filter((space) => canPlaceSpyPost(space, pendingSpyOwner, game))
     : [];
@@ -505,9 +521,9 @@ export default function App() {
           <h1>Dune: Imperium - Uprising 3v3</h1>
         </div>
         <div className="round-panel">
-          <span>Round {game.round}</span>
-          <strong>{activePlayer.leader}</strong>
-          <small>{activePlayer.agentsReady > 0 ? "Agent turn" : "Reveal turn"}</small>
+          <span>{game.phase === "playing" ? `Round ${game.round}` : game.phase}</span>
+          <strong>{game.phase === "playing" ? activePlayer.leader : game.winningTeam ? `${teams[game.winningTeam].name} wins` : "Team scores"}</strong>
+          <small>{game.phase === "playing" ? (activePlayer.agentsReady > 0 ? "Agent turn" : "Reveal turn") : game.endgameReason}</small>
         </div>
         <button className="icon-button" type="button" onClick={resetGame} title="Reset table">
           <RotateCcw size={18} />
@@ -638,13 +654,14 @@ export default function App() {
               const spyOwner = game.players.find((player) => player.id === game.spyPosts[space.id]);
               const unavailable = space.id === "swordmaster" && game.swordmasterClaimed;
               const legal = legalSpaces.has(space.id);
-              const selected = selectedSpaceId === space.id;
+              const selected = playingPhase && selectedSpaceId === space.id;
               return (
                 <button
                   key={space.id}
                   className={`space-tile ${legal ? "legal" : ""} ${selected ? "selected" : ""} ${occupant || unavailable ? "occupied" : ""}`}
                   type="button"
-                  onClick={() => setSelectedSpaceId(space.id)}
+                  onClick={() => playingPhase && setSelectedSpaceId(space.id)}
+                  disabled={!playingPhase}
                   title={space.detail}
                 >
                   <span className="space-zone">{space.zone}</span>
@@ -779,6 +796,36 @@ export default function App() {
       )}
 
       <section className="action-dock">
+        {game.phase !== "playing" && (
+          <div className="pending-panel endgame-panel">
+            <div>
+              <p className="eyebrow">{game.phase === "finished" ? "Final result" : "Endgame"}</p>
+              <h2>{game.phase === "finished" ? "Team Scores Locked" : game.endgameReason}</h2>
+            </div>
+            {game.phase === "endgame" && (
+              <div className="pending-controls support-grid">
+                {endgameChoices.map((choice) => {
+                  const owner = game.players.find((player) => player.id === choice.playerId);
+                  const intrigue = owner?.intrigues.find((card) => card.id === choice.intrigueId);
+                  const conflict = owner?.wonConflicts.find((card) => card.id === choice.conflictId);
+                  if (!owner || !intrigue || !conflict) return null;
+                  return (
+                    <div className="support-target" key={`${choice.playerId}-${choice.intrigueId}-${choice.conflictId}`}>
+                      <strong>{owner.leader}</strong>
+                      <span>{intrigue.name} / {conflict.name}</span>
+                      <button type="button" onClick={() => scoreEndgameIntrigue(owner.id, intrigue.id, conflict.id)}>
+                        Score {battleIconLabels[choice.battleIcon]}
+                      </button>
+                    </div>
+                  );
+                })}
+                {endgameChoices.length === 0 && <span>No battle-icon Endgame Intrigues are scoreable.</span>}
+                <button type="button" onClick={finalizeEndgame}>Finalize Scores</button>
+              </div>
+            )}
+          </div>
+        )}
+
         {pendingAction && (
           <div className="pending-panel">
             <div>
@@ -987,11 +1034,11 @@ export default function App() {
                 <HandCoins size={17} />
                 Place Agent
               </button>
-              <button type="button" onClick={revealTurn} disabled={activePlayer.revealed || Boolean(game.pendingAction)}>
+              <button type="button" onClick={revealTurn} disabled={!playingPhase || activePlayer.revealed || Boolean(game.pendingAction)}>
                 <BookOpen size={17} />
                 Reveal
               </button>
-              <button type="button" onClick={endReveal} disabled={!activePlayer.revealed || Boolean(game.pendingAction)}>
+              <button type="button" onClick={endReveal} disabled={!playingPhase || !activePlayer.revealed || Boolean(game.pendingAction)}>
                 <SkipForward size={17} />
                 End
               </button>
@@ -1005,6 +1052,7 @@ export default function App() {
                   type="button"
                   key={ally.id}
                   className={activatedAlly.id === ally.id ? "selected" : ""}
+                  disabled={!playingPhase}
                   onClick={() =>
                     setCommanderTargets((current) => ({
                       ...current,
@@ -1021,9 +1069,10 @@ export default function App() {
             {activePlayer.hand.map((card) => (
               <button
                 type="button"
-                className={`hand-card ${selectedCardId === card.id ? "selected" : ""}`}
+                className={`hand-card ${playingPhase && selectedCardId === card.id ? "selected" : ""}`}
                 key={card.id}
-                onClick={() => setSelectedCardId(card.id)}
+                onClick={() => playingPhase && setSelectedCardId(card.id)}
+                disabled={!playingPhase}
               >
                 {card.thumbnailPath && <img className="card-art" src={card.thumbnailPath} alt="" loading="lazy" />}
                 <span>{card.icons.map((icon) => iconLabels[icon]).join(" / ") || "Reveal"}</span>
@@ -1047,7 +1096,7 @@ export default function App() {
                 {activePlayer.intrigues.map((card) => (
                   <article className="intrigue-card" key={card.id}>
                     {card.thumbnailPath && <img className="card-art" src={card.thumbnailPath} alt="" loading="lazy" />}
-                    <span>Intrigue</span>
+                    <span>{card.battleIcon ? `Endgame / ${battleIconLabels[card.battleIcon]}` : "Intrigue"}</span>
                     <strong>{card.name}</strong>
                     <p>{card.summary}</p>
                   </article>
@@ -1072,7 +1121,7 @@ export default function App() {
                 className="market-card"
                 key={card.id}
                 onClick={() => buyCard(card)}
-                disabled={Boolean(game.pendingAction) || !activePlayer.revealed || activePlayer.persuasion < (card.cost ?? 0)}
+                disabled={!playingPhase || Boolean(game.pendingAction) || !activePlayer.revealed || activePlayer.persuasion < (card.cost ?? 0)}
               >
                 {card.thumbnailPath && <img className="card-art" src={card.thumbnailPath} alt="" loading="lazy" />}
                 <span>
@@ -1102,6 +1151,7 @@ export default function App() {
                     key={card.id}
                     onClick={() => buyCard(card)}
                     disabled={
+                      !playingPhase ||
                       Boolean(game.pendingAction) ||
                       !activePlayer.revealed ||
                       activePlayer.team !== "shaddam" ||

@@ -44,6 +44,7 @@ These notes are implementation scaffolding, not a replacement for the rulebook. 
 - Current Maker-space implementation tracks bonus spice on Imperial Basin, Habbanya Erg, Hagga Basin, and Deep Desert, then pays and clears that bonus when an Agent visits the space.
 - Current Objective setup deals the four Objectives valid for six players only to Allies, applies the 4/6P Desert Mouse cross-team trade, and uses the first-player Desert Mouse Objective for the first seat.
 - Current Conflict-card implementation awards the won card to the unique winning Ally, pauses for same-team first-place tie concessions, and scores immediate non-wild battle-icon pairs against that Ally's face-up Objectives or won Conflicts.
+- Current Endgame implementation triggers during Recall when a player reaches 10 VP or the Conflict deck is empty, then lets Allies score Crysknife, Desert Mouse, and Ornithopter Endgame Intrigues against matching or wild face-up Conflict cards before finalizing team scores.
 - Full leader card images are available from the player seats as table references while icon-heavy leader powers await structured automation.
 - Board-space tiles render local location-card art where the catalog has exact name matches; six-player-only and commander personal-board spaces stay text-only until scanned board art is available.
 
@@ -55,7 +56,7 @@ These notes are implementation scaffolding, not a replacement for the rulebook. 
 - Final board-space coordinates over scanned board art.
 - Remaining component images and card fronts/backs from owned scans or approved source assets.
 - Maker Hooks, worm deployment, and Shaddam's no-hooks replacement behavior.
-- Printed Conflict rewards, Combat Intrigue timing, endgame wild battle-icon matching, and Intrigue-card battle-icon scoring.
+- Printed Conflict rewards, non-battle-icon Endgame Intrigues, Combat Intrigue timing, and Plot-mode use of battle-icon Intrigues.
 
 ## Asset Conventions
 

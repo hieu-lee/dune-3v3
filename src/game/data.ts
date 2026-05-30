@@ -1,5 +1,5 @@
 import catalogJson from "./uprising-catalog.generated.json";
-import type { BoardSpace, Card, ConflictCard, ContractCard, IconId, TeamId } from "./types";
+import type { BoardSpace, Card, ConflictCard, ContractCard, IconId, LeaderCard, TeamId } from "./types";
 
 type HubAttribute = [string, number | string | null];
 type HubCard = {
@@ -52,6 +52,29 @@ export const iconLabels: Record<IconId, string> = {
 };
 
 export const catalogStats = catalog.counts;
+
+function toLeaderCard(card: HubCard): LeaderCard {
+  return {
+    id: `leader-${card.id}`,
+    name: card.name,
+    imagePath: card.localImagePath ?? card.fullImageUrl ?? undefined,
+    thumbnailPath: card.localThumbnailPath ?? card.thumbnailImageUrl ?? undefined,
+    sourceId: card.id,
+    sourceSlug: card.slug,
+  };
+}
+
+export const leaderCards: LeaderCard[] = catalog.cards
+  .filter((card) => card.type === "leader")
+  .map(toLeaderCard);
+
+const leaderCardsByName = new Map(leaderCards.map((leader) => [leader.name, leader]));
+
+export function leaderCardByName(name: string) {
+  const leader = leaderCardsByName.get(name);
+  if (!leader) throw new Error(`Missing Uprising leader card for ${name}.`);
+  return leader;
+}
 
 export const teams: Record<TeamId, { name: string; accent: string; commander: string; motto: string }> = {
   muaddib: {

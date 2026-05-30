@@ -3,6 +3,7 @@ import {
   commanderStarterDecks,
   conflictCards,
   imperiumDeck,
+  leaderCardByName,
   reserveMarket,
   standardContracts,
 } from "./data";
@@ -112,6 +113,7 @@ function makePlayer(
     id,
     name,
     leader,
+    leaderCard: leaderCardByName(leader),
     team,
     role,
     color,
@@ -144,7 +146,7 @@ export function initialGame(): GameState {
 
   const players = [
     makePlayer("p1", "Seat 1", "Muad'Dib", "muaddib", "Commander", "#45c4b0"),
-    makePlayer("p2", "Seat 2", "Feyd-Rautha", "shaddam", "Ally", "#d26b48"),
+    makePlayer("p2", "Seat 2", "Feyd-Rautha Harkonnen", "shaddam", "Ally", "#d26b48"),
     makePlayer("p3", "Seat 3", "Gurney Halleck", "muaddib", "Ally", "#2f8fdd"),
     makePlayer("p4", "Seat 4", "Shaddam Corrino IV", "shaddam", "Commander", "#efb447"),
     makePlayer("p5", "Seat 5", "Lady Jessica", "muaddib", "Ally", "#8ad5ff"),

@@ -42,7 +42,7 @@ These notes are implementation scaffolding, not a replacement for the rulebook. 
 ## Data Gaps To Fill
 
 - Full automation for printed Commander starting-card effects.
-- Exact leader roster, signet powers, and commander board values.
+- Exact leader powers, signet powers, and commander board values.
 - Full Imperium deck, Intrigue deck, Conflict deck, and reserve card data.
 - Final board-space coordinates over scanned board art.
 - Component images and card fronts/backs from owned scans or approved source assets.
@@ -59,7 +59,7 @@ Expected future paths:
 - `public/assets/cards/imperium/<card-id>.jpg`
 - `public/assets/cards/intrigue/<card-id>.jpg`
 - `public/assets/cards/conflict/<card-id>.jpg`
-- `public/assets/leaders/<leader-id>.jpg`
+- `public/assets/dune-cards-hub/leader/<leader-id>.webp`
 
 The UI should stay usable without these files and automatically upgrade when files exist.
 

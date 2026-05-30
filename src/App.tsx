@@ -612,10 +612,15 @@ export default function App() {
               key={player.id}
               style={{ "--player": player.color } as CSSProperties}
             >
-              <div className="player-topline">
-                <span>{player.name}</span>
-                <strong>{player.leader}</strong>
-                <small>{player.role} - {teams[player.team].name}</small>
+              <div className="player-identity">
+                {player.leaderCard.thumbnailPath && (
+                  <img className="leader-art" src={player.leaderCard.thumbnailPath} alt="" loading="eager" />
+                )}
+                <div className="player-topline">
+                  <span>{player.name}</span>
+                  <strong>{player.leader}</strong>
+                  <small>{player.role} - {teams[player.team].name}</small>
+                </div>
               </div>
               <div className="resource-row">
                 {resources.map(({ id, label, Icon }) => (

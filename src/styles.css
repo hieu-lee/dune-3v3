@@ -410,10 +410,32 @@ h2 {
   background: color-mix(in srgb, var(--player), rgba(30, 24, 20, 0.82) 84%);
 }
 
+.player-identity {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.leader-art {
+  width: 72px;
+  aspect-ratio: 73 / 51;
+  object-fit: cover;
+  border: 1px solid rgba(255, 246, 230, 0.18);
+  border-radius: 6px;
+  background: #120d0a;
+}
+
 .player-topline {
   align-items: flex-start;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
+}
+
+.player-topline strong,
+.player-topline small {
+  overflow-wrap: anywhere;
 }
 
 .player-topline span {

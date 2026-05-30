@@ -64,6 +64,15 @@ export type ContractCard = {
   sourceSlug?: string;
 };
 
+export type LeaderCard = {
+  id: string;
+  name: string;
+  imagePath?: string;
+  thumbnailPath?: string;
+  sourceId?: number;
+  sourceSlug?: string;
+};
+
 export type BoardSpace = {
   id: string;
   name: string;
@@ -93,6 +102,7 @@ export type Player = {
   id: string;
   name: string;
   leader: string;
+  leaderCard: LeaderCard;
   team: TeamId;
   role: Role;
   color: string;

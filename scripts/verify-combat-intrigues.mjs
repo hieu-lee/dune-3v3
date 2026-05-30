@@ -67,9 +67,12 @@ try {
 
   const impress = intrigueBySourceId(data, 152);
   const weirdingCombat = intrigueBySourceId(data, 154);
+  const contingencyPlan = intrigueBySourceId(data, 147);
   const mercenaries = intrigueBySourceId(data, 128);
   assert.equal(impress.combatSwords, 2, "Impress should expose its structured Combat strength");
   assert.equal(weirdingCombat.combatSwords, 5, "Weirding Combat should expose its structured Combat strength");
+  assert.equal(contingencyPlan.combatSwords, 3, "Contingency Plan should expose its printed Combat strength");
+  assert.equal(contingencyPlan.automatedCombatSwords, 3, "Contingency Plan's full Combat branch should auto-resolve");
   assert.equal(impress.automatedCombatSwords, undefined, "Impress has extra printed text and should not auto-resolve");
   assert.equal(weirdingCombat.automatedCombatSwords, undefined, "Weirding Combat should wait for printed text modeling");
   assert.equal(mercenaries.combatSwords, undefined, "Non-Combat Intrigues should not expose Combat strength");
@@ -77,8 +80,8 @@ try {
     data.intrigueCards
       .filter((card) => card.automatedCombatSwords)
       .map((card) => card.name),
-    [],
-    "No catalog Combat Intrigue should auto-resolve until its full printed effect is modeled",
+    ["Contingency Plan"],
+    "Only fully modeled catalog Combat Intrigues should auto-resolve",
   );
   const verifierCombat = {
     ...impress,
@@ -184,6 +187,22 @@ try {
     printedOnlyCombat,
     "Printed Combat Intrigues should not auto-resolve from catalog strength alone",
   );
+
+  const contingencyFixture = combatFixture(state, data, (players) =>
+    players.map((player) =>
+      player.id === "p2"
+        ? { ...player, conflict: 2, deployedTroops: 1, intrigues: [contingencyPlan] }
+        : player.id === "p3"
+          ? { ...player, conflict: 4, deployedTroops: 1 }
+          : player,
+    ),
+  );
+  const contingencyCombat = state.startCombatPhase(contingencyFixture);
+  const contingencyPlayed = state.playCombatIntrigue(contingencyCombat, "p2", contingencyPlan.id);
+  assert.equal(playerById(contingencyPlayed, "p2").conflict, 5, "Contingency Plan Combat should add 3 strength");
+  assert.deepEqual(playerById(contingencyPlayed, "p2").intrigues, []);
+  assert.equal(contingencyPlayed.intrigueDiscard.at(-1).id, contingencyPlan.id);
+  assert.match(contingencyPlayed.log[0], /plays Contingency Plan for Feyd-Rautha Harkonnen, adding 3 strength/);
 
   const resetPassFixture = combatFixture(state, data, (players) =>
     players.map((player) => {

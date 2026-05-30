@@ -47,6 +47,7 @@ const secureSpiceTradeSourceId = 161;
 const choamProfitsSourceId = 450;
 const detonationSourceId = 131;
 const unexpectedAlliesSourceId = 137;
+const contingencyPlanSourceId = 147;
 const spiceMustFlowSourceId = 538;
 const shadowAllianceSourceId = 160;
 const shadowAllianceFactions: FactionId[] = [
@@ -110,6 +111,10 @@ export function isDetonationIntrigue(intrigue: IntrigueCard) {
 
 export function isUnexpectedAlliesIntrigue(intrigue: IntrigueCard) {
   return intrigue.sourceId === unexpectedAlliesSourceId;
+}
+
+export function isContingencyPlanIntrigue(intrigue: IntrigueCard) {
+  return intrigue.sourceId === contingencyPlanSourceId;
 }
 
 function buildSixPlayerConflictDeck() {
@@ -1215,6 +1220,34 @@ export function playPlotBattleIconIntrigue(
     players,
     intrigueDiscard: [...state.intrigueDiscard, intrigue],
     log: [`${player.leader} plays ${intrigue.name} as a Plot Intrigue for 1 spice.`, ...state.log],
+  };
+}
+
+export function playContingencyPlanPlotIntrigue(
+  state: GameState,
+  playerId: string,
+  intrigueId: string,
+): GameState {
+  if (state.phase !== "playing" || state.pendingAction || state.pendingQueue.length > 0) return state;
+  const player = state.players[state.activeSeat];
+  if (!player || player.id !== playerId) return state;
+  const intrigue = player.intrigues.find((card) => card.id === intrigueId);
+  if (!intrigue || !isContingencyPlanIntrigue(intrigue)) return state;
+
+  const players = state.players.map((candidate) =>
+    candidate.id === player.id
+      ? {
+          ...candidate,
+          resources: { ...candidate.resources, solari: candidate.resources.solari + 2 },
+          intrigues: candidate.intrigues.filter((card) => card.id !== intrigue.id),
+        }
+      : candidate,
+  );
+  return {
+    ...state,
+    players,
+    intrigueDiscard: [...state.intrigueDiscard, intrigue],
+    log: [`${player.leader} plays Contingency Plan as a Plot Intrigue for 2 Solari.`, ...state.log],
   };
 }
 

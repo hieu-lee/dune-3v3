@@ -53,9 +53,12 @@ const riseOfIxContractNames = new Set([
   "Tech Negotiation",
 ]);
 const shaddamReservedContractNames = new Set(["Sardaukar I", "Sardaukar II"]);
-const automatedCombatSwordValues: Partial<Record<number, number>> = {};
+const automatedCombatSwordValues: Partial<Record<number, number>> = {
+  147: 3,
+};
 const intrigueSummariesByCatalogId: Partial<Record<number, string>> = {
   131: "Remove the Shield Wall OR deploy up to four troops from your garrison to the Conflict.",
+  147: "Gain 2 Solari as a Plot Intrigue OR add 3 strength as a Combat Intrigue.",
   137: "Pay 2 water to deploy a sandworm to the Conflict; may remove the Shield Wall.",
 };
 

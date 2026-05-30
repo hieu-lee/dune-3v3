@@ -40,6 +40,7 @@ import {
   finishRevealAdjustment as resolveRevealAdjustment,
   iconCanReach,
   initialGame,
+  isContingencyPlanIntrigue,
   isDetonationIntrigue,
   isUnexpectedAlliesIntrigue,
   maybeStartCombatPhase,
@@ -63,6 +64,7 @@ import {
   setShieldWall,
   setAllianceOwner,
   setChoamContractCompleted,
+  playContingencyPlanPlotIntrigue,
   playDetonationIntrigue,
   playPlotBattleIconIntrigue,
   playUnexpectedAlliesIntrigue,
@@ -552,6 +554,10 @@ export default function App() {
 
   function scorePlotIntrigue(intrigueId: string) {
     setGame((current) => playPlotBattleIconIntrigue(current, current.players[current.activeSeat].id, intrigueId));
+  }
+
+  function playContingencyPlanPlot(intrigueId: string) {
+    setGame((current) => playContingencyPlanPlotIntrigue(current, current.players[current.activeSeat].id, intrigueId));
   }
 
   function playDetonation(intrigueId: string, choice: "shield-wall" | "deploy") {
@@ -1434,7 +1440,9 @@ export default function App() {
                   <article className="intrigue-card" key={card.id}>
                     {card.thumbnailPath && <img className="card-art" src={card.thumbnailPath} alt="" loading="lazy" />}
                     <span>
-                      {card.battleIcon
+                      {isContingencyPlanIntrigue(card)
+                        ? "Plot / Combat / +3 strength"
+                        : card.battleIcon
                         ? `Plot / Endgame / ${battleIconLabels[card.battleIcon]}`
                         : card.combatSwords
                           ? `Combat / +${card.combatSwords} printed strength`
@@ -1450,6 +1458,16 @@ export default function App() {
                       >
                         <Sparkles size={14} />
                         Gain Plot Spice
+                      </button>
+                    )}
+                    {isContingencyPlanIntrigue(card) && (
+                      <button
+                        type="button"
+                        onClick={() => playContingencyPlanPlot(card.id)}
+                        disabled={plotIntrigueLocked}
+                      >
+                        <CircleDollarSign size={14} />
+                        Gain 2 Solari
                       </button>
                     )}
                     {isDetonationIntrigue(card) && (

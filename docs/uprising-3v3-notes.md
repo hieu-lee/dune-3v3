@@ -48,7 +48,7 @@ These notes are implementation scaffolding, not a replacement for the rulebook. 
 - Current conditional Endgame Intrigue implementation scores Secure Spice Trade for 1 VP and 2 spice when a player has at least two The Spice Must Flow cards, CHOAM Profits for 1 VP when a player has at least four completed contracts, and Shadow Alliance for 1 VP when a player has 4+ effective Influence on a Faction where the opposing team owns the Alliance.
 - Current Alliance implementation lets table players assign the single Alliance token owner for each Faction from player panels and automatically moves the token VP on claim, transfer, or return.
 - Current CHOAM contract implementation lets table players manually mark taken contracts complete for printed contract requirements.
-- Current Plot Intrigue implementation lets the active player gain 1 spice from the Plot side of Crysknife, Desert Mouse, and Ornithopter during Agent or Reveal turns. Detonation can remove the Shield Wall or queue up to four troop deployments from the player's garrison. Unexpected Allies spends 2 water to summon a sandworm without Maker Hooks and can optionally remove the Shield Wall.
+- Current Plot Intrigue implementation lets the active player gain 1 spice from the Plot side of Crysknife, Desert Mouse, and Ornithopter during Agent or Reveal turns. Contingency Plan can gain 2 Solari as Plot or add 3 strength as Combat. Detonation can remove the Shield Wall or queue up to four troop deployments from the player's garrison. Unexpected Allies spends 2 water to summon a sandworm without Maker Hooks and can optionally remove the Shield Wall.
 - Full leader card images are available from the player seats as table references while icon-heavy leader powers await structured automation.
 - Board-space tiles render local location-card art where the catalog has exact name matches; six-player-only and commander personal-board spaces stay text-only until scanned board art is available.
 
@@ -60,7 +60,7 @@ These notes are implementation scaffolding, not a replacement for the rulebook. 
 - Final board-space coordinates over scanned board art.
 - Remaining component images and card fronts/backs from owned scans or approved source assets.
 - Remaining printed card-driven Maker Hooks, Shield Wall, or other special sandworm effects.
-- Structured printed Conflict rewards, including exact rank reward payment and doubled payment application, plus Combat Intrigue timing.
+- Structured printed Conflict rewards, including exact rank reward payment and doubled payment application, plus remaining Combat Intrigue effects.
 
 ## Asset Conventions
 

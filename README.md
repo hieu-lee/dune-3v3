@@ -32,6 +32,7 @@ Private web-table implementation for a six-player `Dune: Imperium - Uprising` te
 - Alliance tokens can be assigned from player panels and transfer their VP with the token owner.
 - Reaching or dropping below 2 Influence automatically adds or removes the faction-track VP.
 - Active players can play the Plot side of battle-icon Intrigues for 1 spice during normal play.
+- Contingency Plan can be played as a Plot Intrigue for 2 Solari or as a Combat Intrigue for 3 strength.
 - Detonation can be played as a Plot Intrigue to remove the Shield Wall or deploy up to four troops.
 - Unexpected Allies can be played as a Plot Intrigue to spend 2 water, optionally remove the Shield Wall, and summon a sandworm for the active Ally or activated Ally.
 - Catalog-backed board-space art on matching placement tiles.

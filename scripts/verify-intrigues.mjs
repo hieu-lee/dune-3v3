@@ -83,10 +83,12 @@ try {
   const crysknife = data.intrigueCards.find((card) => card.sourceId === 159);
   const detonation = data.intrigueCards.find((card) => card.sourceId === 131);
   const unexpectedAllies = data.intrigueCards.find((card) => card.sourceId === 137);
+  const contingencyPlan = data.intrigueCards.find((card) => card.sourceId === 147);
   const mercenaries = data.intrigueCards.find((card) => card.sourceId === 128);
   assert.ok(crysknife, "Crysknife Intrigue should be available");
   assert.ok(detonation, "Detonation Intrigue should be available");
   assert.ok(unexpectedAllies, "Unexpected Allies Intrigue should be available");
+  assert.ok(contingencyPlan, "Contingency Plan Intrigue should be available");
   assert.ok(mercenaries, "Mercenaries Intrigue should be available");
   assert.equal(
     detonation.summary,
@@ -97,6 +99,11 @@ try {
     unexpectedAllies.summary,
     "Pay 2 water to deploy a sandworm to the Conflict; may remove the Shield Wall.",
     "Unexpected Allies should expose its water, detonation, and sandworm effect",
+  );
+  assert.equal(
+    contingencyPlan.summary,
+    "Gain 2 Solari as a Plot Intrigue OR add 3 strength as a Combat Intrigue.",
+    "Contingency Plan should expose both printed timing branches",
   );
   const plotFixture = {
     ...game,
@@ -143,6 +150,56 @@ try {
     state.playPlotBattleIconIntrigue(plotFixture, "p2", mercenaries.id),
     plotFixture,
     "Non-battle-icon Intrigues should not use the Plot battle-icon scorer",
+  );
+
+  const contingencyFixture = {
+    ...game,
+    activeSeat: game.players.findIndex((candidate) => candidate.id === "p2"),
+    pendingAction: undefined,
+    pendingQueue: [],
+    intrigueDiscard: [],
+    players: game.players.map((candidate) =>
+      candidate.id === "p2"
+        ? { ...candidate, resources: { ...candidate.resources, solari: 1 }, intrigues: [contingencyPlan] }
+        : { ...candidate, intrigues: [] },
+    ),
+  };
+  assert.equal(
+    state.isContingencyPlanIntrigue(contingencyPlan),
+    true,
+    "Contingency Plan should be recognized as a structured Plot Intrigue",
+  );
+  const contingencyPlotted = state.playContingencyPlanPlotIntrigue(
+    contingencyFixture,
+    "p2",
+    contingencyPlan.id,
+  );
+  assert.equal(playerById(contingencyPlotted, "p2").resources.solari, 3, "Contingency Plan Plot should gain 2 Solari");
+  assert.deepEqual(playerById(contingencyPlotted, "p2").intrigues, []);
+  assert.equal(contingencyPlotted.intrigueDiscard.at(-1).id, contingencyPlan.id);
+  assert.match(contingencyPlotted.log[0], /plays Contingency Plan as a Plot Intrigue for 2 Solari/);
+  const pendingContingency = {
+    ...contingencyFixture,
+    pendingAction: { kind: "spy", ownerId: "p2", remaining: 1, source: "Test" },
+  };
+  assert.equal(
+    state.playContingencyPlanPlotIntrigue(pendingContingency, "p2", contingencyPlan.id),
+    pendingContingency,
+    "Contingency Plan should wait for pending actions to resolve",
+  );
+  const queuedContingency = {
+    ...contingencyFixture,
+    pendingQueue: [{ kind: "spy", ownerId: "p2", remaining: 1, source: "Test" }],
+  };
+  assert.equal(
+    state.playContingencyPlanPlotIntrigue(queuedContingency, "p2", contingencyPlan.id),
+    queuedContingency,
+    "Contingency Plan should wait for queued pending actions to resolve",
+  );
+  assert.equal(
+    state.playContingencyPlanPlotIntrigue(contingencyFixture, "p3", contingencyPlan.id),
+    contingencyFixture,
+    "Only the active player should play Contingency Plan as a Plot Intrigue",
   );
 
   const detonationFixture = {

@@ -92,6 +92,7 @@ try {
 
   const impress = intrigueBySourceId(data, 152);
   const findWeakness = intrigueBySourceId(data, 149);
+  const spiceIsPower = intrigueBySourceId(data, 150);
   const questionableMethods = intrigueBySourceId(data, 156);
   const springTheTrap = intrigueBySourceId(data, 153);
   const weirdingCombat = intrigueBySourceId(data, 154);
@@ -114,6 +115,12 @@ try {
     springTheTrap.summary,
     "Recall 2 spies to add 7 strength.",
     "Spring The Trap should expose its two-spy cost and Combat strength",
+  );
+  assert.equal(spiceIsPower.combatSwords, 6, "Spice is Power should expose its maximum structured Combat strength");
+  assert.equal(
+    spiceIsPower.summary,
+    "Retreat 3 troops to gain 3 spice OR spend 3 spice to add 6 strength.",
+    "Spice is Power should expose both printed Combat branches",
   );
   assert.equal(questionableMethods.combatSwords, 5, "Questionable Methods should expose its maximum structured Combat strength");
   assert.equal(
@@ -139,6 +146,7 @@ try {
   assert.equal(impress.automatedCombatSwords, undefined, "Impress has extra printed text and should not auto-resolve");
   assert.equal(findWeakness.automatedCombatSwords, undefined, "Find Weakness should resolve through spy-recall state");
   assert.equal(questionableMethods.automatedCombatSwords, undefined, "Questionable Methods should resolve through Influence-loss state");
+  assert.equal(spiceIsPower.automatedCombatSwords, undefined, "Spice is Power should resolve through an explicit branch choice");
   assert.equal(springTheTrap.automatedCombatSwords, undefined, "Spring The Trap should resolve through spy-recall state");
   assert.equal(weirdingCombat.automatedCombatSwords, undefined, "Weirding Combat should resolve from state-aware Influence");
   assert.equal(devour.automatedCombatSwords, undefined, "Devour should resolve from target sandworm state");
@@ -273,6 +281,99 @@ try {
   assert.deepEqual(playerById(contingencyPlayed, "p2").intrigues, []);
   assert.equal(contingencyPlayed.intrigueDiscard.at(-1).id, contingencyPlan.id);
   assert.match(contingencyPlayed.log[0], /plays Contingency Plan for Feyd-Rautha Harkonnen, adding 3 strength/);
+
+  const spiceSpendFixture = combatFixture(state, data, (players) =>
+    players.map((player) =>
+      player.id === "p2"
+        ? { ...player, conflict: 2, deployedTroops: 1, resources: { ...player.resources, spice: 3 }, intrigues: [spiceIsPower] }
+        : player.id === "p3"
+          ? { ...player, conflict: 4, deployedTroops: 1 }
+          : player,
+    ),
+  );
+  const spiceSpendCombat = state.startCombatPhase(spiceSpendFixture);
+  assert.equal(
+    state.combatIntrigueStrength(spiceSpendCombat, playerById(spiceSpendCombat, "p2"), spiceIsPower),
+    6,
+    "Spice is Power should expose the spend branch when the recipient has 3 spice",
+  );
+  assert.equal(
+    state.playCombatIntrigue(spiceSpendCombat, "p2", spiceIsPower.id),
+    spiceSpendCombat,
+    "Spice is Power should require an explicit branch choice",
+  );
+  const spiceSpendPlayed = state.playCombatIntrigue(spiceSpendCombat, "p2", spiceIsPower.id, undefined, "spend-spice");
+  assert.equal(playerById(spiceSpendPlayed, "p2").resources.spice, 0, "Spice is Power spend branch should spend recipient spice");
+  assert.equal(playerById(spiceSpendPlayed, "p2").conflict, 8, "Spice is Power spend branch should add 6 strength");
+  assert.equal(playerById(spiceSpendPlayed, "p2").deployedTroops, 1, "Spice is Power spend branch should not retreat troops");
+  assert.equal(spiceSpendPlayed.intrigueDiscard.at(-1).id, spiceIsPower.id);
+  assert.match(spiceSpendPlayed.log[0], /spends 3 spice to add 6 strength/);
+
+  const spiceDryFixture = combatFixture(state, data, (players) =>
+    players.map((player) =>
+      player.id === "p2"
+        ? { ...player, conflict: 2, deployedTroops: 1, resources: { ...player.resources, spice: 2 }, intrigues: [spiceIsPower] }
+        : player.id === "p3"
+          ? { ...player, conflict: 4, deployedTroops: 1 }
+          : player,
+    ),
+  );
+  const spiceDryCombat = state.startCombatPhase(spiceDryFixture);
+  assert.equal(
+    state.combatIntrigueStrength(spiceDryCombat, playerById(spiceDryCombat, "p2"), spiceIsPower),
+    undefined,
+    "Spice is Power should not expose the spend branch before the recipient has 3 spice",
+  );
+  assert.equal(
+    state.playCombatIntrigue(spiceDryCombat, "p2", spiceIsPower.id, undefined, "spend-spice"),
+    spiceDryCombat,
+    "Spice is Power spend branch should require 3 spice",
+  );
+  assert.equal(
+    state.playCombatIntrigue(spiceDryCombat, "p2", spiceIsPower.id, undefined, "retreat-troops"),
+    spiceDryCombat,
+    "Spice is Power retreat branch should require 3 deployed troops",
+  );
+
+  const spiceRetreatFixture = combatFixture(state, data, (players) =>
+    players.map((player) =>
+      player.id === "p2"
+        ? { ...player, conflict: 9, deployedTroops: 3, garrison: 1, resources: { ...player.resources, spice: 0 }, intrigues: [spiceIsPower] }
+        : player.id === "p3"
+          ? { ...player, conflict: 4, deployedTroops: 1 }
+          : player,
+    ),
+  );
+  const spiceRetreatCombat = state.startCombatPhase(spiceRetreatFixture);
+  const spiceRetreatPlayed = state.playCombatIntrigue(spiceRetreatCombat, "p2", spiceIsPower.id, undefined, "retreat-troops");
+  assert.equal(playerById(spiceRetreatPlayed, "p2").deployedTroops, 0, "Spice is Power should retreat three troops");
+  assert.equal(playerById(spiceRetreatPlayed, "p2").garrison, 4, "Spice is Power should return retreated troops to garrison");
+  assert.equal(playerById(spiceRetreatPlayed, "p2").resources.spice, 3, "Spice is Power retreat branch should gain 3 spice");
+  assert.equal(playerById(spiceRetreatPlayed, "p2").conflict, 3, "Spice is Power retreat branch should remove the troops' strength");
+  assert.equal(spiceRetreatPlayed.players[spiceRetreatPlayed.activeSeat].id, "p3", "Combat should continue with remaining actors after a retreat");
+  assert.match(spiceRetreatPlayed.log[0], /retreats 3 troops and gains 3 spice/);
+
+  const spiceLastActorFixture = combatFixture(state, data, (players) =>
+    players.map((player) =>
+      player.id === "p2"
+        ? { ...player, conflict: 6, deployedTroops: 3, garrison: 0, resources: { ...player.resources, spice: 0 }, intrigues: [spiceIsPower] }
+        : player,
+    ),
+  );
+  const spiceLastActorCombat = state.startCombatPhase(spiceLastActorFixture);
+  const spiceLastActorPlayed = state.playCombatIntrigue(
+    spiceLastActorCombat,
+    "p2",
+    spiceIsPower.id,
+    undefined,
+    "retreat-troops",
+  );
+  assert.equal(spiceLastActorPlayed.phase, "playing", "Retreating the last units should resolve Combat instead of leaving no actors");
+  assert.equal(spiceLastActorPlayed.round, spiceLastActorFixture.round + 1);
+  assert.ok(
+    spiceLastActorPlayed.log.some((entry) => entry.includes("resolves with no winner")),
+    "Retreating the last units should resolve the Conflict with no winner",
+  );
 
   const weirdingFixture = combatFixture(state, data, (players) =>
     players.map((player) =>
@@ -830,6 +931,80 @@ try {
   assert.equal(playerById(commanderPlayed, "p6").conflict, 3, "Commander Combat Intrigue should add strength to the chosen Ally");
   assert.deepEqual(playerById(commanderPlayed, "p4").intrigues, []);
   assert.equal(playerById(commanderPlayed, "p2").conflict, 5, "Other eligible Allies should not receive the chosen card's strength");
+
+  const commanderSpiceSpendFixture = combatFixture(
+    state,
+    data,
+    (players) =>
+      players.map((player) => {
+        if (player.id === "p2") return { ...player, conflict: 5, deployedTroops: 1 };
+        if (player.id === "p4") {
+          return { ...player, resources: { ...player.resources, spice: 5 }, intrigues: [spiceIsPower] };
+        }
+        if (player.id === "p6") {
+          return { ...player, conflict: 1, deployedTroops: 1, resources: { ...player.resources, spice: 3 } };
+        }
+        return player;
+      }),
+    3,
+  );
+  const commanderSpiceSpend = state.startCombatPhase(commanderSpiceSpendFixture);
+  assert.equal(
+    state.combatIntrigueStrength(commanderSpiceSpend, playerById(commanderSpiceSpend, "p4"), spiceIsPower),
+    undefined,
+    "Commander Spice is Power should need a target before checking spend-branch spice",
+  );
+  assert.equal(
+    state.combatIntrigueStrength(commanderSpiceSpend, playerById(commanderSpiceSpend, "p4"), spiceIsPower, playerById(commanderSpiceSpend, "p6")),
+    6,
+    "Commander Spice is Power should use the target Ally's spice for the spend branch",
+  );
+  assert.equal(
+    state.playCombatIntrigue(commanderSpiceSpend, "p4", spiceIsPower.id, undefined, "spend-spice"),
+    commanderSpiceSpend,
+    "Commander Spice is Power should require an explicit Ally target",
+  );
+  const commanderSpiceSpent = state.playCombatIntrigue(
+    commanderSpiceSpend,
+    "p4",
+    spiceIsPower.id,
+    "p6",
+    "spend-spice",
+  );
+  assert.equal(playerById(commanderSpiceSpent, "p6").resources.spice, 0, "Commander Spice is Power spend branch should spend the target Ally's spice");
+  assert.equal(playerById(commanderSpiceSpent, "p6").conflict, 7, "Commander Spice is Power spend branch should add strength to the target Ally");
+  assert.equal(playerById(commanderSpiceSpent, "p4").resources.spice, 5, "Commander Spice is Power should not spend Commander spice");
+  assert.equal(playerById(commanderSpiceSpent, "p2").conflict, 5, "Commander Spice is Power should not split effects");
+  assert.match(commanderSpiceSpent.log[0], /Princess Irulan spends 3 spice to add 6 strength/);
+
+  const commanderSpiceRetreatFixture = combatFixture(
+    state,
+    data,
+    (players) =>
+      players.map((player) => {
+        if (player.id === "p2") return { ...player, conflict: 5, deployedTroops: 1 };
+        if (player.id === "p4") return { ...player, intrigues: [spiceIsPower] };
+        if (player.id === "p6") {
+          return { ...player, conflict: 8, deployedTroops: 3, garrison: 0, resources: { ...player.resources, spice: 0 } };
+        }
+        return player;
+      }),
+    3,
+  );
+  const commanderSpiceRetreat = state.startCombatPhase(commanderSpiceRetreatFixture);
+  const commanderSpiceRetreated = state.playCombatIntrigue(
+    commanderSpiceRetreat,
+    "p4",
+    spiceIsPower.id,
+    "p6",
+    "retreat-troops",
+  );
+  assert.equal(playerById(commanderSpiceRetreated, "p6").deployedTroops, 0, "Commander Spice is Power should retreat the target Ally's troops");
+  assert.equal(playerById(commanderSpiceRetreated, "p6").garrison, 3);
+  assert.equal(playerById(commanderSpiceRetreated, "p6").resources.spice, 3);
+  assert.equal(playerById(commanderSpiceRetreated, "p6").conflict, 2);
+  assert.equal(playerById(commanderSpiceRetreated, "p2").conflict, 5);
+  assert.match(commanderSpiceRetreated.log[0], /Princess Irulan retreats 3 troops and gains 3 spice/);
 
   const commanderFindWeaknessFixture = {
     ...combatFixture(

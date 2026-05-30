@@ -16,7 +16,7 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import { battleIconLabels, boardSpaces, factionIds, factionLabels, iconLabels, teams } from "./game/data";
 import {
   advancePendingAction,
@@ -48,6 +48,7 @@ import {
   isDetonationIntrigue,
   isFindWeaknessIntrigue,
   isQuestionableMethodsIntrigue,
+  isSpiceIsPowerIntrigue,
   isSpringTheTrapIntrigue,
   isUnexpectedAlliesIntrigue,
   isWeirdingCombatIntrigue,
@@ -93,6 +94,7 @@ import {
   updateTradeSelection,
 } from "./game/state";
 import type { BoardSpace, Card, FactionId, GameState, Player, ResourceId, Resources, TeamId, TradeGoodId, TrashCardZone } from "./game/types";
+import type { SpiceIsPowerChoice } from "./game/state";
 
 const resources: Array<{ id: ResourceId; label: string; Icon: LucideIcon }> = [
   { id: "solari", label: "Solari", Icon: CircleDollarSign },
@@ -604,9 +606,11 @@ export default function App() {
     });
   }
 
-  function playCombatCard(intrigueId: string, targetId?: string) {
+  function playCombatCard(intrigueId: string, targetId?: string, spiceIsPowerChoice?: SpiceIsPowerChoice) {
     if (game.phase !== "combat") return;
-    setGame((current) => playCombatIntrigue(current, current.players[current.activeSeat].id, intrigueId, targetId));
+    setGame((current) =>
+      playCombatIntrigue(current, current.players[current.activeSeat].id, intrigueId, targetId, spiceIsPowerChoice),
+    );
   }
 
   function passCombatCard() {
@@ -1171,9 +1175,15 @@ export default function App() {
                 const devourCard = isDevourIntrigue(card);
                 const findWeaknessCard = isFindWeaknessIntrigue(card);
                 const questionableMethodsCard = isQuestionableMethodsIntrigue(card);
+                const spiceIsPowerCard = isSpiceIsPowerIntrigue(card);
                 const springTheTrapCard = isSpringTheTrapIntrigue(card);
                 const automatedStrength = combatIntrigueStrength(game, combatActor, card);
-                const canAutoResolve = Boolean(automatedStrength || devourCard || findWeaknessCard);
+                const hasSpiceIsPowerBranch = combatTargets.some(
+                  (target) => target.resources.spice >= 3 || target.deployedTroops >= 3,
+                );
+                const canAutoResolve = Boolean(
+                  automatedStrength || devourCard || findWeaknessCard || (spiceIsPowerCard && hasSpiceIsPowerBranch),
+                );
                 return (
                   <div className="support-target combat-target" key={card.id}>
                     <strong>{card.name}</strong>
@@ -1181,6 +1191,8 @@ export default function App() {
                       title={
                         questionableMethodsCard
                           ? "Add 1 strength; the recipient may lose Influence, or a Commander may lose personal Influence, for 4 more strength."
+                          : spiceIsPowerCard
+                            ? "Choose one branch: retreat 3 of the recipient's troops for 3 spice, or spend 3 spice for 6 strength."
                           : undefined
                       }
                     >
@@ -1189,6 +1201,8 @@ export default function App() {
                         ? "+2 / recall spy for +3"
                         : questionableMethodsCard
                           ? "+1 / lose Ally/Cmdr personal Inf. for +4"
+                        : spiceIsPowerCard
+                          ? "Retreat 3 for +3 spice / spend 3 for +6"
                         : springTheTrapCard
                           ? "Recall 2 spies for +7"
                         : devourCard && !automatedStrength
@@ -1197,7 +1211,32 @@ export default function App() {
                         ? "2+ completed contracts"
                         : `+${automatedStrength ?? card.combatSwords} strength`}
                     </span>
-                    {canAutoResolve
+                    {spiceIsPowerCard
+                      ? hasSpiceIsPowerBranch
+                        ? combatTargets.map((target) => (
+                            <Fragment key={target.id}>
+                              {target.resources.spice >= 3 && (
+                                <button
+                                  type="button"
+                                  onClick={() => playCombatCard(card.id, target.id, "spend-spice")}
+                                  title={`Spend 3 spice from ${target.leader} for 6 strength`}
+                                >
+                                  {combatActor.role === "Commander" ? `${target.leader}: spend 3 (+6)` : "Spend 3 spice (+6)"}
+                                </button>
+                              )}
+                              {target.deployedTroops >= 3 && (
+                                <button
+                                  type="button"
+                                  onClick={() => playCombatCard(card.id, target.id, "retreat-troops")}
+                                  title={`Retreat 3 troops from ${target.leader} to gain 3 spice`}
+                                >
+                                  {combatActor.role === "Commander" ? `${target.leader}: retreat 3` : "Retreat 3 troops (+3 spice)"}
+                                </button>
+                              )}
+                            </Fragment>
+                          ))
+                        : <span>Requires 3 spice or 3 deployed troops.</span>
+                    : canAutoResolve
                       ? combatTargets.map((target) => {
                           const targetStrength = combatIntrigueStrength(game, combatActor, card, target);
                           if (!targetStrength) return null;
@@ -1658,6 +1697,8 @@ export default function App() {
                             ? "Combat / +2 / recall spy for +3"
                           : isQuestionableMethodsIntrigue(card)
                             ? "Combat / +1 / lose Ally/Cmdr personal Inf. for +4"
+                          : isSpiceIsPowerIntrigue(card)
+                            ? "Combat / retreat 3 troops for spice / spend 3 spice for +6"
                           : isSpringTheTrapIntrigue(card)
                             ? "Combat / recall 2 spies for +7"
                           : isDevourIntrigue(card)

@@ -60,6 +60,7 @@ const intrigueSummariesByCatalogId: Partial<Record<number, string>> = {
   131: "Remove the Shield Wall OR deploy up to four troops from your garrison to the Conflict.",
   147: "Gain 2 Solari as a Plot Intrigue OR add 3 strength as a Combat Intrigue.",
   149: "Add 2 strength; you may recall 1 spy to add 3 more strength.",
+  150: "Retreat 3 troops to gain 3 spice OR spend 3 spice to add 6 strength.",
   153: "Recall 2 spies to add 7 strength.",
   156: "Add 1 strength; the recipient may lose 1 Influence, or a Commander may lose personal Influence, to add 4 more strength.",
   137: "Pay 2 water to deploy a sandworm to the Conflict; may remove the Shield Wall.",

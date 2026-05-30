@@ -47,6 +47,7 @@ const emptyInfluence = (): Influence => ({
 
 const secureSpiceTradeSourceId = 161;
 const choamProfitsSourceId = 450;
+const reachAgreementSourceId = 449;
 const detonationSourceId = 131;
 const unexpectedAlliesSourceId = 137;
 const contingencyPlanSourceId = 147;
@@ -153,6 +154,10 @@ export function isWeirdingCombatIntrigue(intrigue: IntrigueCard) {
 
 export function isQuestionableMethodsIntrigue(intrigue: IntrigueCard) {
   return intrigue.sourceId === questionableMethodsSourceId;
+}
+
+export function isReachAgreementIntrigue(intrigue: IntrigueCard) {
+  return intrigue.sourceId === reachAgreementSourceId;
 }
 
 export function isTacticalOptionIntrigue(intrigue: IntrigueCard) {
@@ -824,12 +829,12 @@ export function takeChoamContract(state: GameState, pending: ContractPendingActi
           }
         : player,
     );
-    return {
+    return finishCombatIfNoActors({
       ...state,
       players,
       ...advancePendingAction(state),
       log: [`${owner.leader} takes the reserved ${reservedContract.name} CHOAM contract from ${pending.source}.`, ...state.log],
-    };
+    });
   }
 
   const [replacement, ...contractDeck] = state.contractDeck;
@@ -853,14 +858,14 @@ export function takeChoamContract(state: GameState, pending: ContractPendingActi
         }
       : player,
   );
-  return {
+  return finishCombatIfNoActors({
     ...state,
     players,
     contractOffer,
     contractDeck,
     ...advancePendingAction(state),
     log: [`${owner.leader} takes the ${contract.name} CHOAM contract from ${pending.source}.`, ...state.log],
-  };
+  });
 }
 
 export function collectChoamContractFallback(state: GameState, pending: ContractPendingAction): GameState {
@@ -872,12 +877,12 @@ export function collectChoamContractFallback(state: GameState, pending: Contract
       ? { ...player, resources: { ...player.resources, solari: player.resources.solari + 2 } }
       : player,
   );
-  return {
+  return finishCombatIfNoActors({
     ...state,
     players,
     ...advancePendingAction(state),
     log: [`${owner.leader} gains 2 Solari from ${pending.source}; no CHOAM contracts remain.`, ...state.log],
-  };
+  });
 }
 
 export function setChoamContractCompleted(
@@ -1672,8 +1677,15 @@ function nextCombatSeat(state: GameState, actorIds: string[]) {
 
 function advanceAfterCombatIntriguePlay(state: GameState): GameState {
   const actorIds = combatIntrigueActorIds(state);
+  if (actorIds.length === 0 && (state.pendingAction || state.pendingQueue.length > 0)) return state;
   if (actorIds.length === 0) return startNextRound({ ...state, phase: "playing", combatPasses: [] });
   return { ...state, activeSeat: nextCombatSeat(state, actorIds) };
+}
+
+function finishCombatIfNoActors(state: GameState): GameState {
+  if (state.phase !== "combat" || state.pendingAction || state.pendingQueue.length > 0) return state;
+  if (combatIntrigueActorIds(state).length > 0) return state;
+  return startNextRound({ ...state, phase: "playing", combatPasses: [] });
 }
 
 export function startCombatPhase(state: GameState): GameState {
@@ -1813,6 +1825,44 @@ export function playCombatIntrigue(
       combatPasses: [],
       intrigueDiscard: [...state.intrigueDiscard, intrigue],
       log: [logEntry, ...state.log],
+    });
+  }
+  if (isReachAgreementIntrigue(intrigue)) {
+    const retreatCount =
+      typeof combatChoice === "object" && combatChoice.kind === "retreat-troops" ? combatChoice.count : undefined;
+    if (
+      !Number.isInteger(retreatCount) ||
+      (retreatCount ?? 0) < 1 ||
+      (retreatCount ?? 0) > 2 ||
+      (retreatCount ?? 0) > target.deployedTroops
+    ) return state;
+    const count = retreatCount ?? 0;
+
+    const players = state.players.map((player) => {
+      let next = player;
+      if (player.id === actor.id) {
+        next = { ...next, intrigues: next.intrigues.filter((card) => card.id !== intrigue.id) };
+      }
+      if (player.id === target.id) {
+        next = {
+          ...next,
+          conflict: Math.max(0, next.conflict - count * 2),
+          deployedTroops: next.deployedTroops - count,
+          garrison: next.garrison + count,
+        };
+      }
+      return next;
+    });
+    return advanceAfterCombatIntriguePlay({
+      ...state,
+      players,
+      combatPasses: [],
+      intrigueDiscard: [...state.intrigueDiscard, intrigue],
+      pendingAction: { kind: "contract", ownerId: target.id, source: "Reach Agreement" },
+      log: [
+        `${actor.leader} plays Reach Agreement for ${target.leader}; ${target.leader} retreats ${count} ${count === 1 ? "troop" : "troops"} and takes a CHOAM contract.`,
+        ...state.log,
+      ],
     });
   }
   const combatSwords = combatIntrigueStrength(state, actor, intrigue, target);

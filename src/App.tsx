@@ -48,6 +48,7 @@ import {
   isDetonationIntrigue,
   isFindWeaknessIntrigue,
   isQuestionableMethodsIntrigue,
+  isReachAgreementIntrigue,
   isSpiceIsPowerIntrigue,
   isSpringTheTrapIntrigue,
   isTacticalOptionIntrigue,
@@ -753,7 +754,10 @@ export default function App() {
     : [];
   const combatCards =
     combatActor?.intrigues.filter((card) =>
-      card.combatSwords || combatIntrigueStrength(game, combatActor, card) || isDevourIntrigue(card)
+      card.combatSwords ||
+      combatIntrigueStrength(game, combatActor, card) ||
+      isDevourIntrigue(card) ||
+      isReachAgreementIntrigue(card)
     ) ?? [];
   const tradePartners =
     pendingActor && pendingAction?.kind === "trade"
@@ -1176,6 +1180,7 @@ export default function App() {
                 const devourCard = isDevourIntrigue(card);
                 const findWeaknessCard = isFindWeaknessIntrigue(card);
                 const questionableMethodsCard = isQuestionableMethodsIntrigue(card);
+                const reachAgreementCard = isReachAgreementIntrigue(card);
                 const spiceIsPowerCard = isSpiceIsPowerIntrigue(card);
                 const springTheTrapCard = isSpringTheTrapIntrigue(card);
                 const tacticalOptionCard = isTacticalOptionIntrigue(card);
@@ -1193,6 +1198,8 @@ export default function App() {
                       title={
                         questionableMethodsCard
                           ? "Add 1 strength; the recipient may lose Influence, or a Commander may lose personal Influence, for 4 more strength."
+                        : reachAgreementCard
+                          ? "Retreat 1 or 2 troops from the chosen recipient, then take a CHOAM contract for that recipient."
                           : spiceIsPowerCard
                             ? "Choose one branch: retreat 3 of the recipient's troops for 3 spice, or spend 3 spice for 6 strength."
                           : tacticalOptionCard
@@ -1205,6 +1212,8 @@ export default function App() {
                         ? "+2 / recall spy for +3"
                         : questionableMethodsCard
                           ? "+1 / lose Ally/Cmdr personal Inf. for +4"
+                        : reachAgreementCard
+                          ? "Retreat 1-2 troops / take contract"
                         : spiceIsPowerCard
                           ? "Retreat 3 for +3 spice / spend 3 for +6"
                         : springTheTrapCard
@@ -1217,7 +1226,34 @@ export default function App() {
                         ? "2+ completed contracts"
                         : `+${automatedStrength ?? card.combatSwords} strength`}
                     </span>
-                    {tacticalOptionCard
+                    {reachAgreementCard
+                      ? combatTargets.length > 0
+                        ? combatTargets.map((target) => (
+                            <Fragment key={target.id}>
+                              {target.deployedTroops > 0
+                                ? Array.from({ length: Math.min(2, target.deployedTroops) }, (_, index) => index + 1).map((count) => (
+                                    <button
+                                      type="button"
+                                      key={`${target.id}-contract-retreat-${count}`}
+                                      onClick={() => playCombatCard(card.id, target.id, { kind: "retreat-troops", count })}
+                                      title={`Retreat ${count} ${count === 1 ? "troop" : "troops"} from ${target.leader}, then take a CHOAM contract`}
+                                    >
+                                      {combatActor.role === "Commander"
+                                        ? `${target.leader}: retreat ${count} + contract`
+                                        : `Retreat ${count} + contract`}
+                                    </button>
+                                  ))
+                                : (
+                                    <span>
+                                      {combatActor.role === "Commander"
+                                        ? `${target.leader}: requires deployed troops.`
+                                        : "Requires 1 or 2 deployed troops."}
+                                    </span>
+                                  )}
+                            </Fragment>
+                          ))
+                        : <span>Requires 1 or 2 deployed troops.</span>
+                    : tacticalOptionCard
                       ? combatTargets.map((target) => (
                           <Fragment key={target.id}>
                             <button
@@ -1725,6 +1761,8 @@ export default function App() {
                             ? "Combat / +2 / recall spy for +3"
                           : isQuestionableMethodsIntrigue(card)
                             ? "Combat / +1 / lose Ally/Cmdr personal Inf. for +4"
+                          : isReachAgreementIntrigue(card)
+                            ? "Combat / retreat 1-2 troops / take contract"
                           : isSpiceIsPowerIntrigue(card)
                             ? "Combat / retreat 3 troops for spice / spend 3 spice for +6"
                           : isTacticalOptionIntrigue(card)

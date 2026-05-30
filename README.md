@@ -40,6 +40,7 @@ Private web-table implementation for a six-player `Dune: Imperium - Uprising` te
 - Spring The Trap can be played as a Combat Intrigue by recalling two actor-owned spies, adding 7 strength after both recalls resolve.
 - Spice is Power can be played as a Combat Intrigue by retreating three recipient troops for 3 spice, or spending 3 recipient spice for 6 strength.
 - Tactical Option can be played as a Combat Intrigue for 2 strength or to retreat any chosen number of recipient troops.
+- Reach Agreement can be played as a Combat Intrigue to retreat one or two recipient troops, then take a CHOAM contract for that recipient.
 - Devour can be played as a Combat Intrigue for 2 strength, or 4 plus optional card trashing when the recipient has a sandworm in the Conflict.
 - Detonation can be played as a Plot Intrigue to remove the Shield Wall or deploy up to four troops.
 - Unexpected Allies can be played as a Plot Intrigue to spend 2 water, optionally remove the Shield Wall, and summon a sandworm for the active Ally or activated Ally.

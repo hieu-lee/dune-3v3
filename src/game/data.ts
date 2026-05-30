@@ -68,6 +68,7 @@ const intrigueSummariesByCatalogId: Partial<Record<number, string>> = {
   151: "Add 2 strength; if the recipient has one or more sandworms in the Conflict, add 4 strength instead and they may trash a card.",
   154: "Add 3 strength; add 5 instead if you have at least 3 Bene Gesserit Influence.",
   448: "Lose 1 Influence to gain 4 Solari as a Plot Intrigue OR add 4 strength in Combat if you have completed at least two contracts.",
+  449: "Retreat 1 or 2 troops, then take a face-up CHOAM contract.",
 };
 
 export const iconLabels: Record<IconId, string> = {

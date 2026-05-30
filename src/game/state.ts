@@ -374,6 +374,20 @@ export function playerHasConflictUnits(player: Player) {
   return player.deployedTroops + player.deployedSandworms > 0;
 }
 
+export function playerDoublesConflictRewards(player: Player) {
+  return player.deployedSandworms > 0;
+}
+
+function sandwormRewardReminderEntries(players: Player[]) {
+  const doublers = players.filter(playerDoublesConflictRewards);
+  if (doublers.length === 0) return [];
+
+  const names = doublers.map((player) => player.leader).join(", ");
+  return [
+    `${names} ${doublers.length === 1 ? "has" : "have"} sandworms: double printed Conflict-card rewards they take; battle icons and location control are not doubled.`,
+  ];
+}
+
 export function canHaveMakerHooks(player: Player) {
   return player.team === "muaddib" && player.role === "Ally";
 }
@@ -1530,7 +1544,12 @@ function scoreBattleIconMatch(player: Player, conflict: ConflictCard) {
   };
 }
 
-function awardConflictToWinner(state: GameState, winner: Player, conflict: ConflictCard): GameState {
+function awardConflictToWinner(
+  state: GameState,
+  winner: Player,
+  conflict: ConflictCard,
+  rewardReminderEntries: string[] = [],
+): GameState {
   const scored = scoreBattleIconMatch(winner, conflict);
   const players = state.players.map((player) => (player.id === winner.id ? scored.player : player));
   return {
@@ -1542,6 +1561,7 @@ function awardConflictToWinner(state: GameState, winner: Player, conflict: Confl
         ? `${winner.leader} matches ${battleIconLabels[scored.icon]} battle icons and gains 1 VP.`
         : undefined,
       `${winner.leader} wins ${conflict.name} and takes the Conflict card.`,
+      ...rewardReminderEntries,
       ...state.log,
     ].filter((entry): entry is string => Boolean(entry)),
   };
@@ -1553,6 +1573,7 @@ export function resolveCurrentConflict(state: GameState): GameState {
   const contenders = state.players.filter(
     (player) => player.role === "Ally" && playerHasConflictUnits(player) && player.conflict > 0,
   );
+  const rewardReminderEntries = sandwormRewardReminderEntries(contenders);
   const bestStrength = Math.max(0, ...contenders.map((player) => player.conflict));
   const winners = contenders.filter((player) => player.conflict === bestStrength);
 
@@ -1583,11 +1604,11 @@ export function resolveCurrentConflict(state: GameState): GameState {
       ...state,
       conflict: null,
       conflictDiscard: [...state.conflictDiscard, state.conflict],
-      log: [reason, ...state.log],
+      log: [reason, ...rewardReminderEntries, ...state.log],
     };
   }
 
-  return awardConflictToWinner(state, winners[0], state.conflict);
+  return awardConflictToWinner(state, winners[0], state.conflict, rewardReminderEntries);
 }
 
 type ConflictTiePendingAction = Extract<PendingAction, { kind: "conflict-tie" }>;
@@ -1599,13 +1620,22 @@ export function resolveConflictTie(
 ): GameState {
   if (!state.conflict) return state;
 
+  const contenders = state.players.filter(
+    (player) => player.role === "Ally" && playerHasConflictUnits(player) && player.conflict > 0,
+  );
+  const rewardReminderEntries = sandwormRewardReminderEntries(contenders);
+
   if (!winnerId) {
     return {
       ...state,
       conflict: null,
       conflictDiscard: [...state.conflictDiscard, state.conflict],
       ...advancePendingAction(state),
-      log: [`No Ally concedes ${state.conflict.name}; no one takes the Conflict card.`, ...state.log],
+      log: [
+        `No Ally concedes ${state.conflict.name}; no one takes the Conflict card.`,
+        ...rewardReminderEntries,
+        ...state.log,
+      ],
     };
   }
 
@@ -1616,7 +1646,12 @@ export function resolveConflictTie(
     player.role === "Ally"
   );
   if (!winner) return state;
-  const awarded = awardConflictToWinner(state, winner, state.conflict);
+  const awarded = awardConflictToWinner(
+    state,
+    winner,
+    state.conflict,
+    rewardReminderEntries,
+  );
   return {
     ...awarded,
     ...advancePendingAction(state),

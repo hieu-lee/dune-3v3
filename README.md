@@ -24,6 +24,7 @@ Private web-table implementation for a six-player `Dune: Imperium - Uprising` te
 - Sietch Tabr supports the Maker Hooks/troop/water branch, water plus Shield Wall removal, and Commander/activated Ally ownership.
 - Six-player Objective setup deals only to Allies and balances Desert Mouse/Crysknife icons across teams.
 - Conflict winners keep won Conflict cards and score immediate non-wild battle-icon pairs with Objectives or prior Conflicts.
+- Sandworm players are flagged for doubled printed Conflict-card rewards, with battle icons and location control kept outside that doubling.
 - Combat phase opens before Conflict resolution and sequences Combat Intrigue pass/play timing.
 - Endgame phase triggers at 10 VP or an empty Conflict deck and scores battle-icon Endgame Intrigues against matching or wild Conflict cards.
 - Endgame scores Secure Spice Trade, CHOAM Profits, and Shadow Alliance rewards when their printed conditions are met.

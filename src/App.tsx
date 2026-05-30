@@ -46,6 +46,7 @@ import {
   pendingActionForSietchTabr,
   pendingActionsFor,
   pendingActionForSpace,
+  playerDoublesConflictRewards,
   playCombatIntrigue,
   queuePendingActions,
   reinforceTroop,
@@ -567,6 +568,8 @@ export default function App() {
       .filter((player) => player.team === team)
       .reduce((sum, player) => sum + player.conflict, 0),
   }));
+  const sandwormRewardDoublers = game.conflict ? game.players.filter(playerDoublesConflictRewards) : [];
+  const sandwormRewardLabel = sandwormRewardDoublers.map((player) => player.leader).join(", ");
   const pendingAction = game.pendingAction;
   const tableStateLockedByPending = pendingAction?.kind === "maker-choice" || pendingAction?.kind === "sietch-tabr";
   const pendingOwner = pendingAction?.kind === "deploy" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
@@ -709,6 +712,16 @@ export default function App() {
                     <span key={`${reward}-${index}`}>{reward}</span>
                   ))}
                 </div>
+                {sandwormRewardDoublers.length > 0 && (
+                  <div
+                    className="sandworm-reward-note"
+                    role="note"
+                    title="Double printed Conflict-card rewards taken by these players. Battle icons and location control are not doubled."
+                  >
+                    <Sparkles size={14} />
+                    <span>2x printed rewards: {sandwormRewardLabel}; battle icons and location control are not doubled</span>
+                  </div>
+                )}
               </>
             ) : (
               <div className="team-heading">
@@ -877,6 +890,16 @@ export default function App() {
                 <span>{player.garrison} garrison</span>
                 {player.deployedTroops > 0 && <span>{player.deployedTroops} deployed</span>}
                 {player.deployedSandworms > 0 && <span>{player.deployedSandworms} worms</span>}
+                {game.conflict && playerDoublesConflictRewards(player) && (
+                  <span
+                    className="sandworm-reward-chip"
+                    role="note"
+                    aria-label="Double printed Conflict-card rewards. Battle icons and location control are not doubled."
+                    title="Double printed Conflict-card rewards. Battle icons and location control are not doubled."
+                  >
+                    2x printed rewards only
+                  </span>
+                )}
                 <span>{player.conflict} strength</span>
                 {player.makerHooks && <span>Maker Hooks</span>}
                 <span>{player.spies} spies</span>

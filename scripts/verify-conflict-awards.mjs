@@ -120,6 +120,36 @@ try {
   assert.equal(objectiveWinner.conflict, 0, "Round advancement should clear strength");
   assert.equal(objectiveMatched.conflictDiscard.some((conflict) => conflict.sourceId === 454), false);
 
+  const sandwormObjectiveMatch = fixture(state, data, (players) =>
+    players.map((player) =>
+      player.id === "p3"
+        ? { ...player, conflict: 7, deployedSandworms: 1, objectives: [crysknifeObjective] }
+        : player,
+    ),
+  );
+  const sandwormLeader = playerById(sandwormObjectiveMatch, "p3").leader;
+  assert.equal(
+    state.playerDoublesConflictRewards(playerById(sandwormObjectiveMatch, "p3")),
+    true,
+    "A player with a deployed sandworm should double printed Conflict-card rewards",
+  );
+  const sandwormObjectiveResult = state.startNextRound(sandwormObjectiveMatch);
+  const sandwormObjectiveWinner = playerById(sandwormObjectiveResult, "p3");
+  assert.equal(
+    sandwormObjectiveWinner.vp,
+    playerById(sandwormObjectiveMatch, "p3").vp + 1,
+    "Battle icon VP should not double from sandworms",
+  );
+  assert.ok(
+    sandwormObjectiveResult.log.some((entry) =>
+      entry.includes(sandwormLeader) &&
+      entry.includes("double printed Conflict-card rewards") &&
+      entry.includes("battle icons") &&
+      entry.includes("location control")
+    ),
+    "Conflict resolution should remind the table to double only printed card rewards for sandworm players",
+  );
+
   const unmatched = fixture(state, data, (players) =>
     players.map((player) =>
       player.id === "p2"

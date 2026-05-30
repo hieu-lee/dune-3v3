@@ -43,7 +43,7 @@ These notes are implementation scaffolding, not a replacement for the rulebook. 
 - Current Throne Row implementation lets Shaddam's Emperor personal board setup and Imperial Tent move non-Fremen Imperium Row cards into Shaddam's team-only market with immediate row refill.
 - Current Maker-space implementation tracks bonus spice on Imperial Basin, Habbanya Erg, Hagga Basin, and Deep Desert, then pays and clears that bonus when an Agent visits the space. Hagga Basin and Deep Desert defer their base spice into a spice-or-sandworm choice when a Muad'Dib Ally has Maker Hooks and the Shield Wall allows worms. Sietch Tabr handles Maker Hooks/troop/water or water plus Shield Wall removal.
 - Current Objective setup deals the four Objectives valid for six players only to Allies, applies the 4/6P Desert Mouse cross-team trade, and uses the first-player Desert Mouse Objective for the first seat.
-- Current Conflict-card implementation awards the won card to the unique winning Ally, pauses for same-team first-place tie concessions, and scores immediate non-wild battle-icon pairs against that Ally's face-up Objectives or won Conflicts.
+- Current Conflict-card implementation awards the won card to the unique winning Ally, pauses for same-team first-place tie concessions, scores immediate non-wild battle-icon pairs against that Ally's face-up Objectives or won Conflicts, and logs sandworm reward-doubling reminders without doubling battle icons or location control.
 - Current Endgame implementation triggers during Recall when a player reaches 10 VP or the Conflict deck is empty, then lets Allies score Crysknife, Desert Mouse, and Ornithopter Endgame Intrigues against matching or wild face-up Conflict cards before finalizing team scores.
 - Current conditional Endgame Intrigue implementation scores Secure Spice Trade for 1 VP and 2 spice when a player has at least two The Spice Must Flow cards, CHOAM Profits for 1 VP when a player has at least four completed contracts, and Shadow Alliance for 1 VP when a player has 4+ effective Influence on a Faction where the opposing team owns the Alliance.
 - Current Alliance implementation lets table players assign the single Alliance token owner for each Faction from player panels and automatically moves the token VP on claim, transfer, or return.
@@ -59,8 +59,8 @@ These notes are implementation scaffolding, not a replacement for the rulebook. 
 - Full automation for Imperium, Intrigue, Conflict, contract, and reserve printed effects.
 - Final board-space coordinates over scanned board art.
 - Remaining component images and card fronts/backs from owned scans or approved source assets.
-- Sandworm reward doubling and remaining printed card-driven Maker Hooks or Shield Wall effects.
-- Printed Conflict rewards and Combat Intrigue timing.
+- Remaining printed card-driven Maker Hooks or Shield Wall effects.
+- Structured printed Conflict rewards, including exact rank reward payment and doubled payment application, plus Combat Intrigue timing.
 
 ## Asset Conventions
 

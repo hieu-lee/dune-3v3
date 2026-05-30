@@ -1,5 +1,5 @@
 import catalogJson from "./uprising-catalog.generated.json";
-import type { BoardSpace, Card, ConflictCard, ContractCard, IconId, LeaderCard, TeamId } from "./types";
+import type { BoardSpace, Card, ConflictCard, ContractCard, IconId, IntrigueCard, LeaderCard, TeamId } from "./types";
 
 type HubAttribute = [string, number | string | null];
 type HubCard = {
@@ -541,6 +541,23 @@ function toConflictCard(card: HubCard): ConflictCard {
 export const conflictCards: ConflictCard[] = catalog.cards
   .filter((card) => card.type === "conflict")
   .map(toConflictCard);
+
+function toIntrigueCard(card: HubCard): IntrigueCard {
+  return {
+    id: `intrigue-${card.id}`,
+    name: card.name,
+    summary: summarizeAttributes(card),
+    imagePath: card.localImagePath ?? card.fullImageUrl ?? undefined,
+    thumbnailPath: card.localThumbnailPath ?? card.thumbnailImageUrl ?? undefined,
+    sourceId: card.id,
+    sourceSlug: card.slug,
+    traits: card.attributes.map(([name]) => name),
+  };
+}
+
+export const intrigueCards: IntrigueCard[] = catalog.cards
+  .filter((card) => card.type === "intrigue")
+  .map(toIntrigueCard);
 
 function toContractCard(card: HubCard): ContractCard {
   return {

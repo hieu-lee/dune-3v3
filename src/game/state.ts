@@ -3,6 +3,7 @@ import {
   commanderStarterDecks,
   conflictCards,
   imperiumDeck,
+  intrigueCards,
   leaderCardByName,
   reserveMarket,
   shaddamReservedContracts,
@@ -16,6 +17,7 @@ import type {
   FactionId,
   GameState,
   Influence,
+  IntrigueCard,
   PendingAction,
   Player,
   ResourceId,
@@ -63,6 +65,13 @@ function cloneContracts(contracts: ContractCard[]) {
   return contracts.map((contract) => ({ ...contract }));
 }
 
+function cloneIntrigues(intrigues: IntrigueCard[]) {
+  return intrigues.map((intrigue) => ({
+    ...intrigue,
+    traits: intrigue.traits ? [...intrigue.traits] : undefined,
+  }));
+}
+
 function buildSixPlayerConflictDeck() {
   const levelTwo = shuffleItems(conflictCards.filter((conflict) => conflict.level === 2)).slice(0, 5);
   const levelThree = shuffleItems(conflictCards.filter((conflict) => conflict.level === 3));
@@ -81,6 +90,13 @@ function buildShaddamContractReserve() {
     throw new Error(`Expected 2 Shaddam reserved contracts, found ${shaddamReservedContracts.length}.`);
   }
   return cloneContracts(shaddamReservedContracts);
+}
+
+function buildIntrigueDeck() {
+  if (intrigueCards.length !== 39) {
+    throw new Error(`Expected 39 Uprising Intrigue cards, found ${intrigueCards.length}.`);
+  }
+  return shuffleItems(cloneIntrigues(intrigueCards));
 }
 
 function buildStarterDeck(playerId: string, team: TeamId, role: Role) {
@@ -126,12 +142,13 @@ function makePlayer(
     role,
     color,
     vp: role === "Commander" ? 4 : 1,
-    resources: { solari: 2, spice: 0, water: 1, intrigue: 0 },
+    resources: { solari: 2, spice: 0, water: 1 },
     influence: emptyInfluence(),
     deck: buildStarterDeck(id, team, role),
     hand: [],
     discard: [],
     playArea: [],
+    intrigues: [],
     agentsReady: 2,
     agentsTotal: 2,
     garrison: role === "Commander" ? 0 : 3,
@@ -152,6 +169,7 @@ export function initialGame(): GameState {
   const [conflict, ...conflictDeck] = buildSixPlayerConflictDeck();
   if (!conflict) throw new Error("Missing Uprising conflict cards for six-player setup.");
   const contracts = buildChoamContractDeck();
+  const intrigueDeck = buildIntrigueDeck();
 
   const players = [
     makePlayer("p1", "Seat 1", "Muad'Dib", "muaddib", "Commander", "#45c4b0"),
@@ -174,6 +192,8 @@ export function initialGame(): GameState {
     reserveMarket: cloneCards(reserveMarket),
     contractOffer: contracts.slice(0, 2),
     contractDeck: contracts.slice(2),
+    intrigueDeck,
+    intrigueDiscard: [],
     conflict,
     conflictDeck,
     conflictDiscard: [],
@@ -404,6 +424,7 @@ export function applyBoardEffect(
     resourcesNext[key as ResourceId] -= amount ?? 0;
   });
   Object.entries(space.gain ?? {}).forEach(([key, amount]) => {
+    if (key === "intrigue") return;
     resourcesNext[key as ResourceId] += amount ?? 0;
   });
 
@@ -433,6 +454,39 @@ export function applyBoardEffect(
   }
 
   return { source, target };
+}
+
+export function drawIntrigueCards(state: GameState, ownerId: string, count: number, source: string): GameState {
+  const owner = state.players.find((player) => player.id === ownerId);
+  if (!owner || count <= 0) return state;
+
+  let deck = [...state.intrigueDeck];
+  let discard = [...state.intrigueDiscard];
+  const drawn: IntrigueCard[] = [];
+
+  while (drawn.length < count && (deck.length > 0 || discard.length > 0)) {
+    if (deck.length === 0) {
+      deck = shuffleItems(discard);
+      discard = [];
+    }
+    const card = deck.shift();
+    if (card) drawn.push(card);
+  }
+
+  if (drawn.length === 0) return state;
+
+  const players = state.players.map((player) =>
+    player.id === ownerId ? { ...player, intrigues: [...player.intrigues, ...drawn] } : player,
+  );
+  const cardText = drawn.length === 1 ? "an Intrigue card" : `${drawn.length} Intrigue cards`;
+
+  return {
+    ...state,
+    players,
+    intrigueDeck: deck,
+    intrigueDiscard: discard,
+    log: [`${owner.leader} draws ${cardText} from ${source}.`, ...state.log],
+  };
 }
 
 export function advanceSeat(state: GameState): number {

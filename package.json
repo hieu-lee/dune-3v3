@@ -12,6 +12,7 @@
     "sync:card-images": "node scripts/sync-dune-catalog.mjs --download-images",
     "verify:board-spaces": "node scripts/verify-board-spaces.mjs",
     "verify:contracts": "node scripts/verify-contracts.mjs",
+    "verify:intrigues": "node scripts/verify-intrigues.mjs",
     "verify:leaders": "node scripts/verify-leaders.mjs",
     "verify:starter-decks": "node scripts/verify-starter-decks.mjs"
   },

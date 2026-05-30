@@ -26,6 +26,7 @@ import {
   canPay,
   collectChoamContractFallback,
   defaultActivatedAllyId,
+  drawIntrigueCards,
   effectiveCost,
   iconCanReach,
   initialGame,
@@ -42,7 +43,6 @@ const resources: Array<{ id: ResourceId; label: string; Icon: LucideIcon }> = [
   { id: "solari", label: "Solari", Icon: CircleDollarSign },
   { id: "spice", label: "Spice", Icon: Sparkles },
   { id: "water", label: "Water", Icon: Droplets },
-  { id: "intrigue", label: "Intrigue", Icon: Eye },
 ];
 
 export default function App() {
@@ -179,8 +179,12 @@ export default function App() {
           ...current.log,
         ].filter((entry): entry is string => Boolean(entry)),
       };
-      if (allPlayersDone(players)) return startNextRound(nextState);
-      return { ...nextState, activeSeat: advanceSeat(nextState) };
+      const intrigueGain = selectedSpace.gain?.intrigue ?? 0;
+      const resolvedState = intrigueGain > 0
+        ? drawIntrigueCards(nextState, source.id, intrigueGain, selectedSpace.name)
+        : nextState;
+      if (allPlayersDone(resolvedState.players)) return startNextRound(resolvedState);
+      return { ...resolvedState, activeSeat: advanceSeat(resolvedState) };
     });
     setSelectedCardId(null);
     setSelectedSpaceId(null);
@@ -627,6 +631,20 @@ export default function App() {
               </div>
             )}
           </article>
+          <article className="intrigue-deck-card">
+            <div className="team-heading">
+              <Eye size={18} />
+              <div>
+                <span className="conflict-level">{game.intrigueDeck.length} cards queued</span>
+                <h2>Intrigue Deck</h2>
+                <p>Board spaces draw physical Intrigue cards into the owning player's hand.</p>
+              </div>
+            </div>
+            <div className="team-metrics">
+              <span>{game.intrigueDeck.length} deck</span>
+              <span>{game.intrigueDiscard.length} discard</span>
+            </div>
+          </article>
         </aside>
 
         <section className="board-panel" aria-label="Six-player board spaces">
@@ -713,6 +731,7 @@ export default function App() {
                 <span>{player.garrison} garrison</span>
                 <span>{player.conflict} strength</span>
                 <span>{player.spies} spies</span>
+                <span>{player.intrigues.length} intrigue</span>
                 <span>{player.contracts.length} contracts</span>
                 {player.reservedContracts.length > 0 && <span>{player.reservedContracts.length} reserved</span>}
               </div>
@@ -961,6 +980,24 @@ export default function App() {
               </button>
             ))}
           </div>
+          {activePlayer.intrigues.length > 0 && (
+            <section className="intrigue-hand" aria-label={`${activePlayer.leader} Intrigue cards`}>
+              <div className="intrigue-heading">
+                <Eye size={15} />
+                <span>{activePlayer.intrigues.length} Intrigue</span>
+              </div>
+              <div className="intrigue-row">
+                {activePlayer.intrigues.map((card) => (
+                  <article className="intrigue-card" key={card.id}>
+                    {card.thumbnailPath && <img className="card-art" src={card.thumbnailPath} alt="" loading="lazy" />}
+                    <span>Intrigue</span>
+                    <strong>{card.name}</strong>
+                    <p>{card.summary}</p>
+                  </article>
+                ))}
+              </div>
+            </section>
+          )}
         </div>
 
         <div className="market-panel">

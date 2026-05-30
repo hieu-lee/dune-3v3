@@ -16,10 +16,11 @@ export type FactionId =
   | "fremen"
   | "greatHouses"
   | "fringeWorlds";
-export type ResourceId = "solari" | "spice" | "water" | "intrigue";
+export type ResourceId = "solari" | "spice" | "water";
 
 export type Resources = Record<ResourceId, number>;
 export type Influence = Record<FactionId, number>;
+export type BoardGain = Partial<Resources> & { intrigue?: number };
 
 export type Card = {
   id: string;
@@ -64,6 +65,17 @@ export type ContractCard = {
   sourceSlug?: string;
 };
 
+export type IntrigueCard = {
+  id: string;
+  name: string;
+  summary: string;
+  imagePath?: string;
+  thumbnailPath?: string;
+  sourceId?: number;
+  sourceSlug?: string;
+  traits?: string[];
+};
+
 export type LeaderCard = {
   id: string;
   name: string;
@@ -80,7 +92,7 @@ export type BoardSpace = {
   icon: IconId;
   cost?: Partial<Resources>;
   influence?: FactionId;
-  gain?: Partial<Resources>;
+  gain?: BoardGain;
   troops?: number;
   draw?: number;
   combat?: boolean;
@@ -117,6 +129,7 @@ export type Player = {
   hand: Card[];
   discard: Card[];
   playArea: Card[];
+  intrigues: IntrigueCard[];
   agentsReady: number;
   agentsTotal: number;
   garrison: number;
@@ -186,6 +199,8 @@ export type GameState = {
   reserveMarket: Card[];
   contractOffer: ContractCard[];
   contractDeck: ContractCard[];
+  intrigueDeck: IntrigueCard[];
+  intrigueDiscard: IntrigueCard[];
   conflict: ConflictCard | null;
   conflictDeck: ConflictCard[];
   conflictDiscard: ConflictCard[];

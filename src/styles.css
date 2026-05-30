@@ -103,6 +103,7 @@ h2 {
 .team-card,
 .conflict-card,
 .choam-card,
+.intrigue-deck-card,
 .board-panel,
 .player-card,
 .hand-panel,
@@ -164,13 +165,15 @@ h2 {
 .team-card,
 .conflict-card,
 .choam-card,
+.intrigue-deck-card,
 .player-card {
   border-radius: 8px;
   padding: 14px;
 }
 
 .conflict-card,
-.choam-card {
+.choam-card,
+.intrigue-deck-card {
   overflow: hidden;
 }
 
@@ -748,6 +751,55 @@ h2 {
   box-shadow: 0 0 0 2px rgba(91, 192, 190, 0.24);
 }
 
+.intrigue-hand {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 246, 230, 0.11);
+}
+
+.intrigue-heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  color: #f3d89d;
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.intrigue-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: 10px;
+}
+
+.intrigue-card {
+  min-height: 148px;
+  border: 1px solid rgba(255, 246, 230, 0.13);
+  border-radius: 8px;
+  background:
+    linear-gradient(160deg, rgba(41, 36, 54, 0.92), rgba(23, 20, 24, 0.94)),
+    linear-gradient(45deg, rgba(242, 184, 75, 0.12), transparent);
+  color: #fff3df;
+  padding: 10px;
+}
+
+.intrigue-card span {
+  color: #baa98e;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.intrigue-card strong {
+  display: block;
+  margin-top: 5px;
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+.intrigue-card p,
 .hand-card p,
 .market-card p {
   min-height: 42px;

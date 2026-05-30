@@ -38,6 +38,7 @@ These notes are implementation scaffolding, not a replacement for the rulebook. 
 - Current CHOAM implementation uses the 18 public Uprising contracts, reserves Sardaukar I and Sardaukar II for Shaddam, exposes two face-up offers, and gives contract spaces a pending take-contract choice.
 - Conflict deck uses 5 Conflict II cards over 4 Conflict III cards; no Conflict I cards.
 - Current implementation builds that nine-card six-player conflict deck from the imported Uprising catalog and advances it at round setup.
+- Current Intrigue implementation builds the 39-card Uprising Intrigue deck from the imported catalog, draws cards into player hands, and keeps Intrigue out of tradeable resource counters.
 - Full leader card images are available from the player seats as table references while icon-heavy leader powers await structured automation.
 - Board-space tiles render local location-card art where the catalog has exact name matches; six-player-only and commander personal-board spaces stay text-only until scanned board art is available.
 
@@ -45,7 +46,7 @@ These notes are implementation scaffolding, not a replacement for the rulebook. 
 
 - Full automation for printed Commander starting-card effects.
 - Structured automation for leader powers, signet powers, and commander board values.
-- Full Imperium deck, Intrigue deck, Conflict deck, and reserve card data.
+- Full automation for Imperium, Intrigue, Conflict, contract, and reserve printed effects.
 - Final board-space coordinates over scanned board art.
 - Remaining component images and card fronts/backs from owned scans or approved source assets.
 - Throne Row behavior for Shaddam.

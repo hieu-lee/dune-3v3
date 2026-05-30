@@ -60,6 +60,7 @@ button {
 .resource-row,
 .mini-stats,
 .objective-row,
+.conflict-meta,
 .shield-state,
 .space-footer {
   display: flex;
@@ -194,7 +195,24 @@ h2 {
   font-size: 0.72rem;
   font-weight: 900;
   letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.conflict-meta {
+  flex-wrap: wrap;
+  gap: 6px;
   margin-bottom: 4px;
+}
+
+.battle-icon-chip {
+  border: 1px solid rgba(242, 184, 75, 0.34);
+  border-radius: 999px;
+  background: rgba(242, 184, 75, 0.14);
+  color: #f7e0af;
+  font-size: 0.68rem;
+  font-weight: 900;
+  overflow-wrap: anywhere;
+  padding: 3px 6px;
   text-transform: uppercase;
 }
 

@@ -1,5 +1,17 @@
 import catalogJson from "./uprising-catalog.generated.json";
-import type { BoardSpace, Card, ConflictCard, ContractCard, IconId, IntrigueCard, LeaderCard, ObjectiveCard, TeamId } from "./types";
+import type {
+  BattleIconId,
+  BoardSpace,
+  Card,
+  ConflictCard,
+  ConflictBattleIconId,
+  ContractCard,
+  IconId,
+  IntrigueCard,
+  LeaderCard,
+  ObjectiveCard,
+  TeamId,
+} from "./types";
 
 type HubAttribute = [string, number | string | null];
 type HubCard = {
@@ -96,7 +108,8 @@ export const battleIconLabels = {
   crysknife: "Crysknife",
   desertMouse: "Desert Mouse",
   ornithopter: "Ornithopter",
-};
+  wild: "Wild",
+} satisfies Record<ConflictBattleIconId, string>;
 
 export const sixPlayerObjectiveCards: ObjectiveCard[] = [
   {
@@ -555,14 +568,39 @@ function conflictLevel(card: HubCard): ConflictCard["level"] {
   return 1;
 }
 
+const conflictBattleIconsByCatalogId: Partial<Record<number, ConflictBattleIconId>> = {
+  451: "crysknife",
+  452: "ornithopter",
+  453: "desertMouse",
+  454: "crysknife",
+  455: "crysknife",
+  456: "ornithopter",
+  457: "crysknife",
+  458: "ornithopter",
+  459: "ornithopter",
+  460: "desertMouse",
+  461: "desertMouse",
+  462: "desertMouse",
+  463: "wild",
+  464: "ornithopter",
+  465: "crysknife",
+  466: "desertMouse",
+};
+
 function toConflictCard(card: HubCard): ConflictCard {
   const rewards = card.attributes
     .filter(([name]) => !conflictLevelAttributes.has(name))
     .map(([name, value]) => (typeof value === "number" ? `${name} ${value}` : name));
+  const battleIcon = conflictBattleIconsByCatalogId[card.id];
+  if (!battleIcon) {
+    throw new Error(`Missing battle icon for conflict card ${card.id} (${card.name})`);
+  }
+
   return {
     id: `conflict-${card.id}`,
     name: card.name,
     level: conflictLevel(card),
+    battleIcon,
     rewards,
     stakes: rewards.length ? rewards.join(", ") : "Resolve printed conflict rewards.",
     imagePath: card.localImagePath ?? card.fullImageUrl ?? undefined,

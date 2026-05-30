@@ -550,9 +550,14 @@ export default function App() {
                 <div className="team-heading">
                   <Swords size={18} />
                   <div>
-                    <span className="conflict-level">
-                      Conflict {game.conflict.level} - {game.conflictDeck.length} queued
-                    </span>
+                    <div className="conflict-meta">
+                      <span className="conflict-level">
+                        Conflict {game.conflict.level} - {game.conflictDeck.length} queued
+                      </span>
+                      <span className="battle-icon-chip" title="Battle icon">
+                        {battleIconLabels[game.conflict.battleIcon]}
+                      </span>
+                    </div>
                     <h2>{game.conflict.name}</h2>
                     <p>{game.conflict.stakes}</p>
                   </div>

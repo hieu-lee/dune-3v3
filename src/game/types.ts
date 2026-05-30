@@ -18,6 +18,7 @@ export type FactionId =
   | "fringeWorlds";
 export type ResourceId = "solari" | "spice" | "water";
 export type BattleIconId = "crysknife" | "desertMouse" | "ornithopter";
+export type ConflictBattleIconId = BattleIconId | "wild";
 
 export type Resources = Record<ResourceId, number>;
 export type Influence = Record<FactionId, number>;
@@ -50,6 +51,7 @@ export type ConflictCard = {
   id: string;
   name: string;
   level: 1 | 2 | 3;
+  battleIcon: ConflictBattleIconId;
   rewards: string[];
   stakes: string;
   imagePath?: string;

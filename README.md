@@ -13,7 +13,7 @@ Private web-table implementation for a six-player `Dune: Imperium - Uprising` te
 - Exact standard Ally and Commander starting decks with local card fronts.
 - Catalog-backed Uprising leader roster with local leader card art.
 - Full leader-card reference modal from each seat.
-- Catalog-backed six-player Conflict deck display.
+- Catalog-backed six-player Conflict deck display with printed battle icons.
 - CHOAM contract bank with two face-up offers, contract-space pickup flow, and Shaddam's reserved Sardaukar contracts.
 - Catalog-backed Intrigue deck with physical card draws and active-player references.
 - Team trade flow supports spice, water, Solari, and chosen Intrigue-card transfers.

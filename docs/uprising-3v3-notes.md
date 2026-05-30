@@ -37,7 +37,7 @@ These notes are implementation scaffolding, not a replacement for the rulebook. 
 - CHOAM module is mandatory in 6p; contracts and marked cards need first-class data support.
 - Current CHOAM implementation uses the 18 public Uprising contracts, reserves Sardaukar I and Sardaukar II for Shaddam, exposes two face-up offers, and gives contract spaces a pending take-contract choice.
 - Conflict deck uses 5 Conflict II cards over 4 Conflict III cards; no Conflict I cards.
-- Current implementation builds that nine-card six-player conflict deck from the imported Uprising catalog and advances it at round setup.
+- Current implementation builds that nine-card six-player conflict deck from the imported Uprising catalog, preserves printed battle icons, and advances it at round setup.
 - Current Intrigue implementation builds the 39-card Uprising Intrigue deck from the imported catalog, draws cards into player hands, and keeps Intrigue out of tradeable resource counters.
 - Current team-trade implementation transfers normal resource counters or a chosen Intrigue card between teammates.
 - Current Throne Row implementation lets Shaddam's Emperor personal board setup and Imperial Tent move non-Fremen Imperium Row cards into Shaddam's team-only market with immediate row refill.

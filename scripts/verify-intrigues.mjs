@@ -75,9 +75,16 @@ try {
   assert.match(drawn.log[0], /draws 2 Intrigue cards from Test/);
 
   const crysknife = data.intrigueCards.find((card) => card.sourceId === 159);
+  const detonation = data.intrigueCards.find((card) => card.sourceId === 131);
   const mercenaries = data.intrigueCards.find((card) => card.sourceId === 128);
   assert.ok(crysknife, "Crysknife Intrigue should be available");
+  assert.ok(detonation, "Detonation Intrigue should be available");
   assert.ok(mercenaries, "Mercenaries Intrigue should be available");
+  assert.equal(
+    detonation.summary,
+    "Remove the Shield Wall OR deploy up to four troops from your garrison to the Conflict.",
+    "Detonation should expose its printed Plot choice instead of a generic imported-image summary",
+  );
   const plotFixture = {
     ...game,
     activeSeat: game.players.findIndex((candidate) => candidate.id === "p2"),
@@ -114,6 +121,94 @@ try {
     state.playPlotBattleIconIntrigue(plotFixture, "p2", mercenaries.id),
     plotFixture,
     "Non-battle-icon Intrigues should not use the Plot battle-icon scorer",
+  );
+
+  const detonationFixture = {
+    ...game,
+    activeSeat: game.players.findIndex((candidate) => candidate.id === "p2"),
+    shieldWall: true,
+    intrigueDiscard: [],
+    pendingAction: undefined,
+    pendingQueue: [],
+    players: game.players.map((candidate) =>
+      candidate.id === "p2"
+        ? { ...candidate, garrison: 5, conflict: 0, deployedTroops: 0, intrigues: [detonation] }
+        : { ...candidate, intrigues: [] },
+    ),
+  };
+  assert.equal(state.isDetonationIntrigue(detonation), true, "Detonation should be recognized as a structured Plot Intrigue");
+  const wallRemoved = state.playDetonationIntrigue(detonationFixture, "p2", detonation.id, "shield-wall");
+  assert.equal(wallRemoved.shieldWall, false, "Detonation should remove the Shield Wall");
+  assert.deepEqual(playerById(wallRemoved, "p2").intrigues, []);
+  assert.equal(wallRemoved.intrigueDiscard.at(-1).id, detonation.id, "Played Detonation should enter the Intrigue discard");
+  assert.equal(wallRemoved.pendingAction, undefined, "Shield Wall Detonation should resolve immediately");
+  assert.match(wallRemoved.log[0], /plays Detonation and removes the Shield Wall/);
+
+  const wallAlreadyRemoved = { ...detonationFixture, shieldWall: false };
+  assert.equal(
+    state.playDetonationIntrigue(wallAlreadyRemoved, "p2", detonation.id, "shield-wall"),
+    wallAlreadyRemoved,
+    "Detonation should not be discarded for a no-op Shield Wall branch",
+  );
+
+  const deployQueued = state.playDetonationIntrigue(detonationFixture, "p2", detonation.id, "deploy");
+  assert.deepEqual(
+    deployQueued.pendingAction,
+    { kind: "deploy", ownerId: "p2", remaining: 4, source: "Detonation" },
+    "Detonation should queue up to four troop deployments",
+  );
+  assert.equal(playerById(deployQueued, "p2").garrison, 5, "Queued Detonation should not deploy before the player chooses");
+  assert.deepEqual(playerById(deployQueued, "p2").intrigues, []);
+  assert.equal(deployQueued.intrigueDiscard.at(-1).id, detonation.id);
+  assert.match(deployQueued.log[0], /may deploy up to 4 troops/);
+  const detonationDeploy = state.deployTroopToConflict(deployQueued, deployQueued.pendingAction);
+  assert.equal(playerById(detonationDeploy, "p2").garrison, 4, "Detonation deployment should spend a garrison troop");
+  assert.equal(playerById(detonationDeploy, "p2").conflict, 2, "Detonation deployment should add troop strength");
+  assert.equal(playerById(detonationDeploy, "p2").deployedTroops, 1);
+  assert.deepEqual(
+    detonationDeploy.pendingAction,
+    { kind: "deploy", ownerId: "p2", remaining: 3, source: "Detonation" },
+  );
+
+  const commanderDetonation = {
+    ...detonationFixture,
+    activeSeat: game.players.findIndex((candidate) => candidate.id === "p4"),
+    players: game.players.map((candidate) =>
+      candidate.id === "p4"
+        ? { ...candidate, intrigues: [detonation] }
+        : candidate.id === "p6"
+          ? { ...candidate, garrison: 3, conflict: 0, deployedTroops: 0, intrigues: [] }
+          : { ...candidate, intrigues: [] },
+    ),
+  };
+  const commanderDeployQueued = state.playDetonationIntrigue(commanderDetonation, "p4", detonation.id, "deploy", "p6");
+  assert.deepEqual(
+    commanderDeployQueued.pendingAction,
+    { kind: "deploy", ownerId: "p6", remaining: 3, source: "Detonation" },
+    "Commander Detonation deployments should queue for the selected activated Ally",
+  );
+  assert.equal(commanderDeployQueued.intrigueDiscard.at(-1).id, detonation.id);
+  assert.match(commanderDeployQueued.log[0], /Shaddam Corrino IV plays Detonation for Princess Irulan/);
+
+  const zeroTroopDetonation = {
+    ...detonationFixture,
+    players: detonationFixture.players.map((candidate) =>
+      candidate.id === "p2" ? { ...candidate, garrison: 0 } : candidate,
+    ),
+  };
+  const zeroTroops = state.playDetonationIntrigue(zeroTroopDetonation, "p2", detonation.id, "deploy");
+  assert.equal(zeroTroops.pendingAction, undefined, "A zero-troop Detonation deployment should resolve without a queue");
+  assert.equal(zeroTroops.intrigueDiscard.at(-1).id, detonation.id);
+  assert.match(zeroTroops.log[0], /deploys no troops/);
+
+  const pendingDetonation = {
+    ...detonationFixture,
+    pendingAction: { kind: "spy", ownerId: "p2", remaining: 1, source: "Test" },
+  };
+  assert.equal(
+    state.playDetonationIntrigue(pendingDetonation, "p2", detonation.id, "deploy"),
+    pendingDetonation,
+    "Detonation should wait for pending actions to resolve",
   );
 
   for (const space of data.boardSpaces.filter((candidate) => candidate.gain?.intrigue)) {

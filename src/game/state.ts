@@ -45,6 +45,7 @@ const emptyInfluence = (): Influence => ({
 
 const secureSpiceTradeSourceId = 161;
 const choamProfitsSourceId = 450;
+const detonationSourceId = 131;
 const spiceMustFlowSourceId = 538;
 const shadowAllianceSourceId = 160;
 const shadowAllianceFactions: FactionId[] = [
@@ -100,6 +101,10 @@ function cloneObjectives(objectives: ObjectiveCard[]) {
 
 function isStandardBattleIcon(icon: ConflictCard["battleIcon"]): icon is BattleIconId {
   return icon !== "wild";
+}
+
+export function isDetonationIntrigue(intrigue: IntrigueCard) {
+  return intrigue.sourceId === detonationSourceId;
 }
 
 function buildSixPlayerConflictDeck() {
@@ -1205,6 +1210,66 @@ export function playPlotBattleIconIntrigue(
     players,
     intrigueDiscard: [...state.intrigueDiscard, intrigue],
     log: [`${player.leader} plays ${intrigue.name} as a Plot Intrigue for 1 spice.`, ...state.log],
+  };
+}
+
+export function playDetonationIntrigue(
+  state: GameState,
+  playerId: string,
+  intrigueId: string,
+  choice: "shield-wall" | "deploy",
+  deployOwnerId?: string,
+): GameState {
+  if (state.phase !== "playing" || state.pendingAction || state.pendingQueue.length > 0) return state;
+  const player = state.players[state.activeSeat];
+  if (!player || player.id !== playerId) return state;
+  const intrigue = player.intrigues.find((card) => card.id === intrigueId);
+  if (!intrigue || !isDetonationIntrigue(intrigue)) return state;
+  if (choice === "shield-wall" && !state.shieldWall) return state;
+  const resolvedDeployOwnerId = player.role === "Commander"
+    ? deployOwnerId ?? defaultActivatedAllyId(player, state.players)
+    : player.id;
+  const deployOwner = state.players.find((candidate) =>
+    candidate.id === resolvedDeployOwnerId &&
+    candidate.team === player.team &&
+    candidate.role === "Ally"
+  );
+  if (choice === "deploy" && (!state.conflict || !deployOwner)) return state;
+
+  const players = state.players.map((candidate) =>
+    candidate.id === player.id
+      ? { ...candidate, intrigues: candidate.intrigues.filter((card) => card.id !== intrigue.id) }
+      : candidate,
+  );
+  const baseState = {
+    ...state,
+    players,
+    intrigueDiscard: [...state.intrigueDiscard, intrigue],
+  };
+
+  if (choice === "shield-wall") {
+    return {
+      ...baseState,
+      shieldWall: false,
+      log: [`${player.leader} plays Detonation and removes the Shield Wall.`, ...state.log],
+    };
+  }
+
+  if (!deployOwner) return state;
+  const deployable = Math.min(deployOwner.garrison, 4);
+  const deployLabel = deployOwner && deployOwner.id !== player.id ? ` for ${deployOwner.leader}` : "";
+  const deployPending: PendingAction | undefined = deployable > 0
+    ? { kind: "deploy", ownerId: deployOwner.id, remaining: deployable, source: "Detonation" }
+    : undefined;
+  return {
+    ...baseState,
+    pendingAction: deployPending,
+    log: [
+      deployable > 0
+        ? `${player.leader} plays Detonation${deployLabel} and may deploy up to ${deployable} troops.`
+        : `${player.leader} plays Detonation${deployLabel} and deploys no troops.`,
+      ...state.log,
+    ],
   };
 }
 

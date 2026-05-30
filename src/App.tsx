@@ -39,6 +39,7 @@ import {
   finishRevealAdjustment as resolveRevealAdjustment,
   iconCanReach,
   initialGame,
+  isDetonationIntrigue,
   maybeStartCombatPhase,
   passCombatIntrigue,
   pendingActionForCard,
@@ -60,6 +61,7 @@ import {
   setShieldWall,
   setAllianceOwner,
   setChoamContractCompleted,
+  playDetonationIntrigue,
   playPlotBattleIconIntrigue,
   resolveMakerChoice,
   resolveSietchTabrChoice,
@@ -549,6 +551,16 @@ export default function App() {
     setGame((current) => playPlotBattleIconIntrigue(current, current.players[current.activeSeat].id, intrigueId));
   }
 
+  function playDetonation(intrigueId: string, choice: "shield-wall" | "deploy") {
+    setGame((current) => {
+      const player = current.players[current.activeSeat];
+      const deployOwnerId = player.role === "Commander"
+        ? commanderTargets[player.id] ?? defaultActivatedAllyId(player, current.players)
+        : undefined;
+      return playDetonationIntrigue(current, player.id, intrigueId, choice, deployOwnerId);
+    });
+  }
+
   function finalizeEndgame() {
     setGame((current) => finishEndgame(current));
   }
@@ -638,6 +650,8 @@ export default function App() {
   const conditionalEndgameChoices = endgameConditionalIntrigueChoices(game);
   const hasEndgameChoices = endgameChoices.length + conditionalEndgameChoices.length > 0;
   const playingPhase = game.phase === "playing";
+  const plotIntrigueLocked = !playingPhase || Boolean(game.pendingAction) || game.pendingQueue.length > 0;
+  const detonationDeployOwner = activePlayer.role === "Commander" ? activatedAlly : activePlayer;
   const spyPlacementSpaces = pendingSpyOwner
     ? boardSpaces.filter((space) => canPlaceSpyPost(space, pendingSpyOwner, game))
     : [];
@@ -1413,11 +1427,31 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => scorePlotIntrigue(card.id)}
-                        disabled={!playingPhase || Boolean(game.pendingAction)}
+                        disabled={plotIntrigueLocked}
                       >
                         <Sparkles size={14} />
                         Gain Plot Spice
                       </button>
+                    )}
+                    {isDetonationIntrigue(card) && (
+                      <div className="intrigue-actions">
+                        <button
+                          type="button"
+                          onClick={() => playDetonation(card.id, "shield-wall")}
+                          disabled={plotIntrigueLocked || !game.shieldWall}
+                        >
+                          <Shield size={14} />
+                          Remove Shield Wall
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => playDetonation(card.id, "deploy")}
+                          disabled={plotIntrigueLocked || !game.conflict}
+                        >
+                          <Swords size={14} />
+                          Deploy up to {Math.min(detonationDeployOwner.garrison, 4)}
+                        </button>
+                      </div>
                     )}
                   </article>
                 ))}

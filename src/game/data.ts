@@ -54,6 +54,10 @@ const riseOfIxContractNames = new Set([
 ]);
 const shaddamReservedContractNames = new Set(["Sardaukar I", "Sardaukar II"]);
 const automatedCombatSwordValues: Partial<Record<number, number>> = {};
+const intrigueSummariesByCatalogId: Partial<Record<number, string>> = {
+  131: "Remove the Shield Wall OR deploy up to four troops from your garrison to the Conflict.",
+  137: "Pay 2 water to remove the Shield Wall and deploy a sandworm to the Conflict.",
+};
 
 export const iconLabels: Record<IconId, string> = {
   emperor: "Emperor",
@@ -634,7 +638,7 @@ function toIntrigueCard(card: HubCard): IntrigueCard {
   return {
     id: `intrigue-${card.id}`,
     name: card.name,
-    summary: summarizeAttributes(card),
+    summary: intrigueSummariesByCatalogId[card.id] ?? summarizeAttributes(card),
     battleIcon,
     combatSwords: combatSwords > 0 ? combatSwords : undefined,
     automatedCombatSwords,

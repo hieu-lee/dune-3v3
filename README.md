@@ -21,6 +21,7 @@ Private web-table implementation for a six-player `Dune: Imperium - Uprising` te
 - Maker-space bonus spice tracks and pays out on the four six-player Maker desert spaces.
 - Six-player Objective setup deals only to Allies and balances Desert Mouse/Crysknife icons across teams.
 - Conflict winners keep won Conflict cards and score immediate non-wild battle-icon pairs with Objectives or prior Conflicts.
+- Combat phase opens before Conflict resolution and sequences Combat Intrigue pass/play timing.
 - Endgame phase triggers at 10 VP or an empty Conflict deck and scores battle-icon Endgame Intrigues against matching or wild Conflict cards.
 - Endgame scores Secure Spice Trade, CHOAM Profits, and Shadow Alliance rewards when their printed conditions are met.
 - Taken CHOAM contracts can be marked complete from player panels for contract-based Endgame scoring.
@@ -28,6 +29,7 @@ Private web-table implementation for a six-player `Dune: Imperium - Uprising` te
 - Active players can play the Plot side of battle-icon Intrigues for 1 spice during normal play.
 - Catalog-backed board-space art on matching placement tiles.
 - Printed reveal adjustments and spy-post targeting for cards whose text is not reducible to a fixed number.
+- Printed Combat Intrigue costs, choices, and strength effects remain manual until each card is fully modeled.
 - Asset pipeline conventions for owned scans or public reference images.
 
 ## Run

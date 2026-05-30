@@ -861,6 +861,17 @@ h2 {
   gap: 8px;
 }
 
+.combat-target span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.combat-pass {
+  border-color: rgba(242, 184, 75, 0.34);
+  background: rgba(242, 184, 75, 0.16);
+}
+
 .turn-actions .primary-action {
   background: #d9a441;
   color: #18110c;

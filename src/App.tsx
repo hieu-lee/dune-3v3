@@ -28,6 +28,7 @@ import {
   canPay,
   collectChoamContractFallback,
   collectMakerSpice,
+  combatIntrigueTargets,
   defaultActivatedAllyId,
   deployTroopToConflict,
   drawIntrigueCards,
@@ -35,11 +36,15 @@ import {
   endgameConditionalIntrigueChoices,
   effectiveCost,
   finishEndgame,
+  finishRevealAdjustment as resolveRevealAdjustment,
   iconCanReach,
   initialGame,
+  maybeStartCombatPhase,
+  passCombatIntrigue,
   pendingActionForCard,
   pendingActionsFor,
   pendingActionForSpace,
+  playCombatIntrigue,
   queuePendingActions,
   reinforceTroop,
   moveImperiumCardToThroneRow,
@@ -49,6 +54,7 @@ import {
   setAllianceOwner,
   setChoamContractCompleted,
   playPlotBattleIconIntrigue,
+  startCombatPhase,
   startNextRound,
   takeChoamContract,
   transferTradeGood,
@@ -220,7 +226,7 @@ export default function App() {
       const resolvedState = intrigueGain > 0
         ? drawIntrigueCards(nextState, source.id, intrigueGain, selectedSpace.name)
         : nextState;
-      if (allPlayersDone(resolvedState.players)) return startNextRound(resolvedState);
+      if (allPlayersDone(resolvedState.players)) return maybeStartCombatPhase(resolvedState);
       return { ...resolvedState, activeSeat: advanceSeat(resolvedState) };
     });
     setSelectedCardId(null);
@@ -314,7 +320,7 @@ export default function App() {
     setGame((current) => {
       const pending = current.pendingAction;
       if (!pending || pending.kind !== "throne-row") return current;
-      return moveImperiumCardToThroneRow(current, pending, cardId);
+      return maybeStartCombatPhase(moveImperiumCardToThroneRow(current, pending, cardId));
     });
   }
 
@@ -323,7 +329,7 @@ export default function App() {
     if (game.pendingAction) return;
     if (!activePlayer.revealed) return;
     setGame((current) => {
-      if (allPlayersDone(current.players)) return startNextRound(current);
+      if (allPlayersDone(current.players)) return startCombatPhase(current);
       return { ...current, activeSeat: advanceSeat(current) };
     });
     setSelectedCardId(null);
@@ -331,7 +337,7 @@ export default function App() {
   }
 
   function clearPendingAction() {
-    setGame((current) => ({ ...current, ...advancePendingAction(current) }));
+    setGame((current) => maybeStartCombatPhase({ ...current, ...advancePendingAction(current) }));
   }
 
   function placeSpy(spaceId: string) {
@@ -347,13 +353,14 @@ export default function App() {
         player.id === owner.id ? { ...player, spies: nextSpies } : player,
       );
       const remaining = Math.min(pending.remaining - 1, nextSpies);
-      return {
+      const nextState = {
         ...current,
         players,
         spyPosts: { ...current.spyPosts, [space.id]: owner.id },
         ...(remaining > 0 ? { pendingAction: { ...pending, remaining } } : advancePendingAction(current)),
         log: [`${owner.leader} places a spy near ${space.name} from ${pending.source}.`, ...current.log],
       };
+      return maybeStartCombatPhase(nextState);
     });
   }
 
@@ -389,19 +396,12 @@ export default function App() {
     });
   }
 
-  function finishRevealAdjustment() {
+  function finishRevealAdjust() {
     if (game.pendingAction?.kind !== "reveal-adjust") return;
     setGame((current) => {
       const pending = current.pendingAction;
       if (!pending || pending.kind !== "reveal-adjust") return current;
-      return {
-        ...current,
-        ...advancePendingAction(current),
-        log: [
-          `Printed reveal adjustment resolved: ${signed(pending.persuasionAdjustment)} persuasion, ${signed(pending.strengthAdjustment)} strength.`,
-          ...current.log,
-        ],
-      };
+      return resolveRevealAdjustment(current, pending);
     });
   }
 
@@ -410,7 +410,7 @@ export default function App() {
     setGame((current) => {
       const pending = current.pendingAction;
       if (!pending || pending.kind !== "deploy") return current;
-      return deployTroopToConflict(current, pending);
+      return maybeStartCombatPhase(deployTroopToConflict(current, pending));
     });
   }
 
@@ -419,7 +419,7 @@ export default function App() {
     setGame((current) => {
       const pending = current.pendingAction;
       if (!pending || pending.kind !== "reinforce") return current;
-      return reinforceTroop(current, pending, playerId, destination);
+      return maybeStartCombatPhase(reinforceTroop(current, pending, playerId, destination));
     });
   }
 
@@ -446,7 +446,7 @@ export default function App() {
     setGame((current) => {
       const pending = current.pendingAction;
       if (!pending || pending.kind !== "contract") return current;
-      return takeChoamContract(current, pending, contractId);
+      return maybeStartCombatPhase(takeChoamContract(current, pending, contractId));
     });
   }
 
@@ -455,7 +455,7 @@ export default function App() {
     setGame((current) => {
       const pending = current.pendingAction;
       if (!pending || pending.kind !== "contract") return current;
-      return collectChoamContractFallback(current, pending);
+      return maybeStartCombatPhase(collectChoamContractFallback(current, pending));
     });
   }
 
@@ -474,6 +474,16 @@ export default function App() {
       if (!pending || pending.kind !== "conflict-tie") return current;
       return startNextRound(resolveConflictTie(current, pending, winnerId));
     });
+  }
+
+  function playCombatCard(intrigueId: string, targetId?: string) {
+    if (game.phase !== "combat") return;
+    setGame((current) => playCombatIntrigue(current, current.players[current.activeSeat].id, intrigueId, targetId));
+  }
+
+  function passCombatCard() {
+    if (game.phase !== "combat") return;
+    setGame((current) => passCombatIntrigue(current, current.players[current.activeSeat].id));
   }
 
   function scoreEndgameIntrigue(playerId: string, intrigueId: string, conflictId: string) {
@@ -524,6 +534,13 @@ export default function App() {
     pendingAction?.kind === "reveal-adjust"
       ? game.players.find((player) => player.id === pendingAction.combatRecipientId)
       : undefined;
+  const combatActor = game.phase === "combat" ? game.players[game.activeSeat] : undefined;
+  const combatTargets = combatActor
+    ? combatIntrigueTargets(game, combatActor.id)
+        .map((playerId) => game.players.find((player) => player.id === playerId))
+        .filter((player): player is Player => Boolean(player))
+    : [];
+  const combatCards = combatActor?.intrigues.filter((card) => card.combatSwords || card.automatedCombatSwords) ?? [];
   const tradePartners =
     pendingActor && pendingAction?.kind === "trade"
       ? game.players.filter((player) => player.team === pendingActor.team && player.id !== pendingActor.id)
@@ -554,8 +571,20 @@ export default function App() {
         </div>
         <div className="round-panel">
           <span>{game.phase === "playing" ? `Round ${game.round}` : game.phase}</span>
-          <strong>{game.phase === "playing" ? activePlayer.leader : game.winningTeam ? `${teams[game.winningTeam].name} wins` : "Team scores"}</strong>
-          <small>{game.phase === "playing" ? (activePlayer.agentsReady > 0 ? "Agent turn" : "Reveal turn") : game.endgameReason}</small>
+          <strong>
+            {game.phase === "playing" || game.phase === "combat"
+              ? activePlayer.leader
+              : game.winningTeam
+                ? `${teams[game.winningTeam].name} wins`
+                : "Team scores"}
+          </strong>
+          <small>
+            {game.phase === "playing"
+              ? activePlayer.agentsReady > 0 ? "Agent turn" : "Reveal turn"
+              : game.phase === "combat"
+                ? "Combat Intrigues"
+                : game.endgameReason}
+          </small>
         </div>
         <button className="icon-button" type="button" onClick={resetGame} title="Reset table">
           <RotateCcw size={18} />
@@ -860,7 +889,43 @@ export default function App() {
       )}
 
       <section className="action-dock">
-        {game.phase !== "playing" && (
+        {game.phase === "combat" && combatActor && (
+          <div className="pending-panel combat-panel">
+            <div>
+              <p className="eyebrow">Combat Intrigues</p>
+              <h2>{combatActor.leader}</h2>
+            </div>
+            <div className="pending-controls support-grid combat-grid">
+              {combatCards.map((card) => (
+                <div className="support-target combat-target" key={card.id}>
+                  <strong>{card.name}</strong>
+                  <span>
+                    <Swords size={14} />
+                    +{card.automatedCombatSwords ?? card.combatSwords} strength
+                  </span>
+                  {card.automatedCombatSwords
+                    ? combatTargets.map((target) => (
+                        <button
+                          type="button"
+                          key={target.id}
+                          onClick={() => playCombatCard(card.id, target.id)}
+                          title={`Play ${card.name} for ${target.leader}`}
+                        >
+                          {combatActor.role === "Commander" ? target.leader : "Play"}
+                        </button>
+                      ))
+                    : <span>Resolve printed card text.</span>}
+                </div>
+              ))}
+              {combatCards.length === 0 && <span>No structured Combat Intrigues.</span>}
+              <button className="combat-pass" type="button" onClick={passCombatCard}>
+                Pass
+              </button>
+            </div>
+          </div>
+        )}
+
+        {(game.phase === "endgame" || game.phase === "finished") && (
           <div className="pending-panel endgame-panel">
             <div>
               <p className="eyebrow">{game.phase === "finished" ? "Final result" : "Endgame"}</p>
@@ -965,7 +1030,7 @@ export default function App() {
                   -1
                 </button>
                 <button type="button" onClick={() => adjustRevealReward(0, 1)}>+1</button>
-                <button type="button" onClick={finishRevealAdjustment}>Done</button>
+                <button type="button" onClick={finishRevealAdjust}>Done</button>
               </div>
             )}
 
@@ -1175,7 +1240,13 @@ export default function App() {
                 {activePlayer.intrigues.map((card) => (
                   <article className="intrigue-card" key={card.id}>
                     {card.thumbnailPath && <img className="card-art" src={card.thumbnailPath} alt="" loading="lazy" />}
-                    <span>{card.battleIcon ? `Plot / Endgame / ${battleIconLabels[card.battleIcon]}` : "Intrigue"}</span>
+                    <span>
+                      {card.battleIcon
+                        ? `Plot / Endgame / ${battleIconLabels[card.battleIcon]}`
+                        : card.combatSwords
+                          ? `Combat / +${card.combatSwords} printed strength`
+                          : "Intrigue"}
+                    </span>
                     <strong>{card.name}</strong>
                     <p>{card.summary}</p>
                     {card.battleIcon && (
@@ -1302,8 +1373,4 @@ function canPlaceSpyPost(space: BoardSpace, owner: Player, game: GameState) {
   if (space.id === "swordmaster" && game.swordmasterClaimed) return false;
   if (!space.personal) return true;
   return owner.role === "Commander" && owner.team === space.personal;
-}
-
-function signed(value: number) {
-  return value >= 0 ? `+${value}` : `${value}`;
 }

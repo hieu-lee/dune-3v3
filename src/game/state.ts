@@ -291,6 +291,7 @@ export function initialGame(): GameState {
     spaces: {},
     spyPosts: {},
     alliances: {},
+    combatPasses: [],
     makerSpice: emptyMakerSpice(),
     imperiumRow: market.slice(0, 5),
     marketDeck: market.slice(5),
@@ -475,6 +476,7 @@ type DeployPendingAction = Extract<PendingAction, { kind: "deploy" }>;
 type ReinforcePendingAction = Extract<PendingAction, { kind: "reinforce" }>;
 type TradePendingAction = Extract<PendingAction, { kind: "trade" }>;
 type ThroneRowPendingAction = Extract<PendingAction, { kind: "throne-row" }>;
+type RevealAdjustPendingAction = Extract<PendingAction, { kind: "reveal-adjust" }>;
 
 function addPurchasedCard(player: Player, card: Card, fromReserve: boolean): Player {
   const purchaseSequence = player.purchaseSequence + 1;
@@ -1058,6 +1060,150 @@ export function playPlotBattleIconIntrigue(
   };
 }
 
+function allyHasUnitsInConflict(player: Player) {
+  return player.role === "Ally" && player.deployedTroops > 0;
+}
+
+function commanderHasCombatAlly(state: GameState, commander: Player) {
+  return state.players.some(
+    (player) => player.team === commander.team && allyHasUnitsInConflict(player),
+  );
+}
+
+function canActInCombat(state: GameState, player: Player) {
+  if (!state.conflict) return false;
+  if (allyHasUnitsInConflict(player)) return true;
+  return player.role === "Commander" && commanderHasCombatAlly(state, player);
+}
+
+export function combatIntrigueActorIds(state: GameState) {
+  if (!state.conflict) return [];
+  return state.players.filter((player) => canActInCombat(state, player)).map((player) => player.id);
+}
+
+export function combatIntrigueTargets(state: GameState, actorId: string) {
+  const actor = state.players.find((player) => player.id === actorId);
+  if (!actor || !canActInCombat(state, actor)) return [];
+  if (actor.role === "Ally") return allyHasUnitsInConflict(actor) ? [actor.id] : [];
+  return state.players
+    .filter((player) => player.team === actor.team && allyHasUnitsInConflict(player))
+    .map((player) => player.id);
+}
+
+function firstCombatSeat(state: GameState, actorIds: string[]) {
+  for (let offset = 0; offset < state.players.length; offset += 1) {
+    const seat = (state.firstSeat + offset) % state.players.length;
+    if (actorIds.includes(state.players[seat].id)) return seat;
+  }
+  return state.activeSeat;
+}
+
+function nextCombatSeat(state: GameState, actorIds: string[]) {
+  for (let offset = 1; offset <= state.players.length; offset += 1) {
+    const seat = (state.activeSeat + offset) % state.players.length;
+    if (actorIds.includes(state.players[seat].id)) return seat;
+  }
+  return state.activeSeat;
+}
+
+export function startCombatPhase(state: GameState): GameState {
+  if (state.pendingAction || state.pendingQueue.length > 0) return state;
+  const actorIds = combatIntrigueActorIds(state);
+  if (actorIds.length === 0) return startNextRound(state);
+  const activeSeat = firstCombatSeat(state, actorIds);
+  return {
+    ...state,
+    phase: "combat",
+    activeSeat,
+    combatPasses: [],
+    pendingAction: undefined,
+    pendingQueue: [],
+    log: [`Combat begins. ${state.players[activeSeat].leader} may play Combat Intrigues or pass.`, ...state.log],
+  };
+}
+
+export function maybeStartCombatPhase(state: GameState): GameState {
+  if (state.phase !== "playing") return state;
+  if (state.pendingAction || state.pendingQueue.length > 0) return state;
+  if (!allPlayersDone(state.players)) return state;
+  return startCombatPhase(state);
+}
+
+export function passCombatIntrigue(state: GameState, actorId: string): GameState {
+  if (state.phase !== "combat") return state;
+  const actor = state.players[state.activeSeat];
+  const actorIds = combatIntrigueActorIds(state);
+  if (!actor || actor.id !== actorId || !actorIds.includes(actorId)) return state;
+
+  const passLog = [`${actor.leader} passes Combat Intrigues.`, ...state.log];
+  const combatPasses = [...state.combatPasses, actorId];
+  if (combatPasses.length >= actorIds.length) {
+    return startNextRound({ ...state, phase: "playing", combatPasses: [], log: passLog });
+  }
+
+  return {
+    ...state,
+    combatPasses,
+    activeSeat: nextCombatSeat(state, actorIds),
+    log: passLog,
+  };
+}
+
+export function playCombatIntrigue(
+  state: GameState,
+  actorId: string,
+  intrigueId: string,
+  targetId?: string,
+): GameState {
+  if (state.phase !== "combat") return state;
+  const actor = state.players[state.activeSeat];
+  if (!actor || actor.id !== actorId) return state;
+  const intrigue = actor.intrigues.find((card) => card.id === intrigueId);
+  if (!intrigue?.automatedCombatSwords) return state;
+  const combatSwords = intrigue.automatedCombatSwords;
+  const targets = combatIntrigueTargets(state, actor.id);
+  const resolvedTargetId = targetId ?? targets[0];
+  if (!resolvedTargetId || !targets.includes(resolvedTargetId)) return state;
+  const target = state.players.find((player) => player.id === resolvedTargetId);
+  if (!target) return state;
+
+  const players = state.players.map((player) => {
+    let next = player;
+    if (player.id === actor.id) {
+      next = { ...next, intrigues: next.intrigues.filter((card) => card.id !== intrigue.id) };
+    }
+    if (player.id === target.id) {
+      next = { ...next, conflict: next.conflict + combatSwords };
+    }
+    return next;
+  });
+  const nextState = { ...state, players, combatPasses: [], intrigueDiscard: [...state.intrigueDiscard, intrigue] };
+  const actorIds = combatIntrigueActorIds(nextState);
+  return {
+    ...nextState,
+    activeSeat: nextCombatSeat(nextState, actorIds),
+    log: [
+      `${actor.leader} plays ${intrigue.name} for ${target.leader}, adding ${combatSwords} strength.`,
+      ...state.log,
+    ],
+  };
+}
+
+function signedAdjustment(value: number) {
+  return value >= 0 ? `+${value}` : `${value}`;
+}
+
+export function finishRevealAdjustment(state: GameState, pending: RevealAdjustPendingAction): GameState {
+  return {
+    ...state,
+    ...advancePendingAction(state),
+    log: [
+      `Printed reveal adjustment resolved: ${signedAdjustment(pending.persuasionAdjustment)} persuasion, ${signedAdjustment(pending.strengthAdjustment)} strength.`,
+      ...state.log,
+    ],
+  };
+}
+
 export function deployTroopToConflict(state: GameState, pending: DeployPendingAction): GameState {
   const owner = state.players.find((player) => player.id === pending.ownerId);
   if (!owner || owner.garrison <= 0 || pending.remaining <= 0) return { ...state, ...advancePendingAction(state) };
@@ -1329,6 +1475,7 @@ export function startNextRound(state: GameState): GameState {
       phase: "endgame",
       pendingAction: undefined,
       pendingQueue: [],
+      combatPasses: [],
       endgameReason,
       log: [
         `Endgame triggered: ${endgameReason} Resolve Endgame Intrigue cards, then finalize team scores.`,
@@ -1357,6 +1504,7 @@ export function startNextRound(state: GameState): GameState {
   );
   return {
     ...resolvedState,
+    phase: "playing",
     round: resolvedState.round + 1,
     firstSeat,
     activeSeat: firstSeat,
@@ -1365,6 +1513,7 @@ export function startNextRound(state: GameState): GameState {
     makerSpice: advanceMakerSpice(resolvedState),
     pendingAction: undefined,
     pendingQueue: [],
+    combatPasses: [],
     conflict: nextConflict ?? null,
     conflictDeck,
     log: [

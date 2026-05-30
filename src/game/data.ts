@@ -53,6 +53,7 @@ const riseOfIxContractNames = new Set([
   "Tech Negotiation",
 ]);
 const shaddamReservedContractNames = new Set(["Sardaukar I", "Sardaukar II"]);
+const automatedCombatSwordValues: Partial<Record<number, number>> = {};
 
 export const iconLabels: Record<IconId, string> = {
   emperor: "Emperor",
@@ -628,11 +629,15 @@ export const conflictCards: ConflictCard[] = catalog.cards
 
 function toIntrigueCard(card: HubCard): IntrigueCard {
   const battleIcon = intrigueBattleIconsByCatalogId[card.id];
+  const combatSwords = attributeNumber(card, "Swords");
+  const automatedCombatSwords = automatedCombatSwordValues[card.id];
   return {
     id: `intrigue-${card.id}`,
     name: card.name,
     summary: summarizeAttributes(card),
     battleIcon,
+    combatSwords: combatSwords > 0 ? combatSwords : undefined,
+    automatedCombatSwords,
     imagePath: card.localImagePath ?? card.fullImageUrl ?? undefined,
     thumbnailPath: card.localThumbnailPath ?? card.thumbnailImageUrl ?? undefined,
     sourceId: card.id,

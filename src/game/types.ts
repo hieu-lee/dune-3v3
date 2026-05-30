@@ -1,6 +1,6 @@
 export type TeamId = "muaddib" | "shaddam";
 export type Role = "Commander" | "Ally";
-export type GamePhase = "playing" | "endgame" | "finished";
+export type GamePhase = "playing" | "combat" | "endgame" | "finished";
 export type IconId =
   | "emperor"
   | "spacing"
@@ -77,6 +77,8 @@ export type IntrigueCard = {
   name: string;
   summary: string;
   battleIcon?: BattleIconId;
+  combatSwords?: number;
+  automatedCombatSwords?: number;
   imagePath?: string;
   thumbnailPath?: string;
   sourceId?: number;
@@ -229,6 +231,7 @@ export type GameState = {
   spaces: Record<string, string>;
   spyPosts: Record<string, string>;
   alliances: AllianceOwners;
+  combatPasses: string[];
   makerSpice: Record<string, number>;
   imperiumRow: Card[];
   marketDeck: Card[];

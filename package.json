@@ -13,6 +13,7 @@
     "verify:alliances": "node scripts/verify-alliances.mjs",
     "verify:battle-icons": "node scripts/verify-battle-icons.mjs",
     "verify:board-spaces": "node scripts/verify-board-spaces.mjs",
+    "verify:combat-intrigues": "node scripts/verify-combat-intrigues.mjs",
     "verify:conflict-awards": "node scripts/verify-conflict-awards.mjs",
     "verify:contracts": "node scripts/verify-contracts.mjs",
     "verify:endgame": "node scripts/verify-endgame.mjs",

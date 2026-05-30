@@ -81,6 +81,7 @@ try {
   assert.match(drawn.log[0], /draws 2 Intrigue cards from Test/);
 
   const crysknife = data.intrigueCards.find((card) => card.sourceId === 159);
+  const strategicStockpiling = data.intrigueCards.find((card) => card.sourceId === 130);
   const detonation = data.intrigueCards.find((card) => card.sourceId === 131);
   const unexpectedAllies = data.intrigueCards.find((card) => card.sourceId === 137);
   const intelligenceReport = data.intrigueCards.find((card) => card.sourceId === 142);
@@ -93,6 +94,7 @@ try {
   const backedByChoam = data.intrigueCards.find((card) => card.sourceId === 448);
   const mercenaries = data.intrigueCards.find((card) => card.sourceId === 128);
   assert.ok(crysknife, "Crysknife Intrigue should be available");
+  assert.ok(strategicStockpiling, "Strategic Stockpiling Intrigue should be available");
   assert.ok(detonation, "Detonation Intrigue should be available");
   assert.ok(unexpectedAllies, "Unexpected Allies Intrigue should be available");
   assert.ok(intelligenceReport, "Intelligence Report Intrigue should be available");
@@ -104,6 +106,11 @@ try {
   assert.ok(devour, "Devour Intrigue should be available");
   assert.ok(backedByChoam, "Backed by CHOAM Intrigue should be available");
   assert.ok(mercenaries, "Mercenaries Intrigue should be available");
+  assert.equal(
+    strategicStockpiling.summary,
+    "Spend 5 spice to gain 1 VP; with 3+ Spacing Guild Influence, you may also spend 3 water to gain 1 VP.",
+    "Strategic Stockpiling should expose both VP conversion branches",
+  );
   assert.equal(
     detonation.summary,
     "Remove the Shield Wall OR deploy up to four troops from your garrison to the Conflict.",
@@ -331,6 +338,198 @@ try {
     state.playIntelligenceReportPlotIntrigue(intelligenceWrongCardFixture, "p2", mercenaries.id),
     intelligenceWrongCardFixture,
     "Intelligence Report should reject other Intrigue cards",
+  );
+
+  const strategicStockpilingFixture = {
+    ...game,
+    activeSeat: game.players.findIndex((candidate) => candidate.id === "p2"),
+    pendingAction: undefined,
+    pendingQueue: [],
+    intrigueDiscard: [],
+    players: game.players.map((candidate) =>
+      candidate.id === "p2"
+        ? {
+            ...candidate,
+            resources: { ...candidate.resources, spice: 5, water: 3 },
+            influence: { ...candidate.influence, spacing: 3 },
+            intrigues: [strategicStockpiling],
+          }
+        : { ...candidate, intrigues: [] },
+    ),
+  };
+  assert.equal(
+    state.isStrategicStockpilingIntrigue(strategicStockpiling),
+    true,
+    "Strategic Stockpiling should be recognized as a structured Plot Intrigue",
+  );
+  const strategicBoth = state.playStrategicStockpilingPlotIntrigue(
+    strategicStockpilingFixture,
+    "p2",
+    strategicStockpiling.id,
+    "both",
+  );
+  assert.equal(
+    playerById(strategicBoth, "p2").vp,
+    playerById(strategicStockpilingFixture, "p2").vp + 2,
+    "Strategic Stockpiling should score both branches together",
+  );
+  assert.equal(playerById(strategicBoth, "p2").resources.spice, 0);
+  assert.equal(playerById(strategicBoth, "p2").resources.water, 0);
+  assert.deepEqual(playerById(strategicBoth, "p2").intrigues, []);
+  assert.equal(strategicBoth.intrigueDiscard.at(-1).id, strategicStockpiling.id);
+  assert.match(strategicBoth.log[0], /plays Strategic Stockpiling, spends 5 spice and 3 water, and gains 2 VP/);
+
+  const strategicSpiceFixture = {
+    ...strategicStockpilingFixture,
+    players: strategicStockpilingFixture.players.map((candidate) =>
+      candidate.id === "p2"
+        ? {
+            ...candidate,
+            resources: { ...candidate.resources, spice: 5, water: 0 },
+            influence: { ...candidate.influence, spacing: 0 },
+            intrigues: [strategicStockpiling],
+          }
+        : candidate,
+    ),
+  };
+  const strategicSpice = state.playStrategicStockpilingPlotIntrigue(
+    strategicSpiceFixture,
+    "p2",
+    strategicStockpiling.id,
+    "spice",
+  );
+  assert.equal(playerById(strategicSpice, "p2").vp, playerById(strategicSpiceFixture, "p2").vp + 1);
+  assert.equal(playerById(strategicSpice, "p2").resources.spice, 0);
+  assert.equal(playerById(strategicSpice, "p2").resources.water, 0);
+  assert.match(strategicSpice.log[0], /spends 5 spice, and gains 1 VP/);
+
+  const strategicWaterFixture = {
+    ...strategicStockpilingFixture,
+    players: strategicStockpilingFixture.players.map((candidate) =>
+      candidate.id === "p2"
+        ? {
+            ...candidate,
+            resources: { ...candidate.resources, spice: 0, water: 3 },
+            influence: { ...candidate.influence, spacing: 3 },
+            intrigues: [strategicStockpiling],
+          }
+        : candidate,
+    ),
+  };
+  const strategicWater = state.playStrategicStockpilingPlotIntrigue(
+    strategicWaterFixture,
+    "p2",
+    strategicStockpiling.id,
+    "water",
+  );
+  assert.equal(playerById(strategicWater, "p2").vp, playerById(strategicWaterFixture, "p2").vp + 1);
+  assert.equal(playerById(strategicWater, "p2").resources.spice, 0);
+  assert.equal(playerById(strategicWater, "p2").resources.water, 0);
+  assert.match(strategicWater.log[0], /spends 3 water, and gains 1 VP/);
+
+  const strategicNoGuild = {
+    ...strategicWaterFixture,
+    players: strategicWaterFixture.players.map((candidate) =>
+      candidate.id === "p2"
+        ? { ...candidate, influence: { ...candidate.influence, spacing: 2 } }
+        : candidate,
+    ),
+  };
+  assert.equal(
+    state.playStrategicStockpilingPlotIntrigue(strategicNoGuild, "p2", strategicStockpiling.id, "water"),
+    strategicNoGuild,
+    "Strategic Stockpiling water branch should require 3 Spacing Guild Influence",
+  );
+  const strategicMissingWater = {
+    ...strategicStockpilingFixture,
+    players: strategicStockpilingFixture.players.map((candidate) =>
+      candidate.id === "p2"
+        ? { ...candidate, resources: { ...candidate.resources, spice: 5, water: 2 } }
+        : candidate,
+    ),
+  };
+  assert.equal(
+    state.playStrategicStockpilingPlotIntrigue(strategicMissingWater, "p2", strategicStockpiling.id, "both"),
+    strategicMissingWater,
+    "Strategic Stockpiling should reject the combined branch when either cost is missing",
+  );
+  const strategicMissingSpice = {
+    ...strategicSpiceFixture,
+    players: strategicSpiceFixture.players.map((candidate) =>
+      candidate.id === "p2"
+        ? { ...candidate, resources: { ...candidate.resources, spice: 4 } }
+        : candidate,
+    ),
+  };
+  assert.equal(
+    state.playStrategicStockpilingPlotIntrigue(strategicMissingSpice, "p2", strategicStockpiling.id, "spice"),
+    strategicMissingSpice,
+    "Strategic Stockpiling spice branch should require 5 spice",
+  );
+  const commanderStrategicFixture = {
+    ...strategicStockpilingFixture,
+    activeSeat: game.players.findIndex((candidate) => candidate.id === "p4"),
+    players: game.players.map((candidate) => {
+      if (candidate.id === "p4") {
+        return {
+          ...candidate,
+          resources: { ...candidate.resources, spice: 0, water: 3 },
+          influence: { ...candidate.influence, spacing: 0 },
+          intrigues: [strategicStockpiling],
+        };
+      }
+      if (candidate.id === "p2") {
+        return { ...candidate, influence: { ...candidate.influence, spacing: 3 }, intrigues: [] };
+      }
+      return { ...candidate, intrigues: [] };
+    }),
+  };
+  const commanderStrategic = state.playStrategicStockpilingPlotIntrigue(
+    commanderStrategicFixture,
+    "p4",
+    strategicStockpiling.id,
+    "water",
+  );
+  assert.equal(
+    playerById(commanderStrategic, "p4").vp,
+    playerById(commanderStrategicFixture, "p4").vp + 1,
+    "Commander Strategic Stockpiling should use team effective Spacing Guild Influence",
+  );
+  assert.equal(playerById(commanderStrategic, "p4").resources.water, 0);
+
+  const pendingStrategic = {
+    ...strategicStockpilingFixture,
+    pendingAction: { kind: "spy", ownerId: "p2", remaining: 1, source: "Test" },
+  };
+  assert.equal(
+    state.playStrategicStockpilingPlotIntrigue(pendingStrategic, "p2", strategicStockpiling.id, "both"),
+    pendingStrategic,
+    "Strategic Stockpiling should wait for pending actions to resolve",
+  );
+  const queuedStrategic = {
+    ...strategicStockpilingFixture,
+    pendingQueue: [{ kind: "spy", ownerId: "p2", remaining: 1, source: "Test" }],
+  };
+  assert.equal(
+    state.playStrategicStockpilingPlotIntrigue(queuedStrategic, "p2", strategicStockpiling.id, "both"),
+    queuedStrategic,
+    "Strategic Stockpiling should wait for queued pending actions to resolve",
+  );
+  assert.equal(
+    state.playStrategicStockpilingPlotIntrigue(strategicStockpilingFixture, "p3", strategicStockpiling.id, "both"),
+    strategicStockpilingFixture,
+    "Only the active player should play Strategic Stockpiling as a Plot Intrigue",
+  );
+  const strategicWrongCardFixture = {
+    ...strategicStockpilingFixture,
+    players: strategicStockpilingFixture.players.map((candidate) =>
+      candidate.id === "p2" ? { ...candidate, intrigues: [mercenaries] } : candidate,
+    ),
+  };
+  assert.equal(
+    state.playStrategicStockpilingPlotIntrigue(strategicWrongCardFixture, "p2", mercenaries.id, "both"),
+    strategicWrongCardFixture,
+    "Strategic Stockpiling should reject other Intrigue cards",
   );
 
   const backedPlotFixture = {

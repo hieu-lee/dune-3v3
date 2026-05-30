@@ -37,6 +37,7 @@ import {
   endgameBattleIconChoices,
   endgameConditionalIntrigueChoices,
   effectiveCost,
+  effectiveRequirementInfluence,
   finishEndgame,
   finishPendingAction,
   finishRevealAdjustment as resolveRevealAdjustment,
@@ -55,6 +56,7 @@ import {
   isReachAgreementIntrigue,
   isSpiceIsPowerIntrigue,
   isSpringTheTrapIntrigue,
+  isStrategicStockpilingIntrigue,
   isTacticalOptionIntrigue,
   isUnexpectedAlliesIntrigue,
   isWeirdingCombatIntrigue,
@@ -88,6 +90,7 @@ import {
   playDetonationIntrigue,
   playIntelligenceReportPlotIntrigue,
   playPlotBattleIconIntrigue,
+  playStrategicStockpilingPlotIntrigue,
   playUnexpectedAlliesIntrigue,
   resolveMakerChoice,
   resolveSietchTabrChoice,
@@ -630,6 +633,12 @@ export default function App() {
 
   function playIntelligenceReportPlot(intrigueId: string) {
     setGame((current) => playIntelligenceReportPlotIntrigue(current, current.players[current.activeSeat].id, intrigueId));
+  }
+
+  function playStrategicStockpilingPlot(intrigueId: string, choice: "spice" | "water" | "both") {
+    setGame((current) =>
+      playStrategicStockpilingPlotIntrigue(current, current.players[current.activeSeat].id, intrigueId, choice),
+    );
   }
 
   function playBackedByChoamPlot(intrigueId: string, faction: FactionId) {
@@ -1791,6 +1800,10 @@ export default function App() {
                   const intelligenceReportDrawCount = boardSpaces.filter((space) =>
                     game.spyPosts[space.id] === activePlayer.id
                   ).length >= 2 ? 2 : 1;
+                  const strategicStockpilingCanSpice = activePlayer.resources.spice >= 5;
+                  const strategicStockpilingCanWater =
+                    activePlayer.resources.water >= 3 &&
+                    effectiveRequirementInfluence(activePlayer, "spacing", game.players) >= 3;
                   return (
                     <article className="intrigue-card" key={card.id}>
                       {card.thumbnailPath && <img className="card-art" src={card.thumbnailPath} alt="" loading="lazy" />}
@@ -1799,6 +1812,8 @@ export default function App() {
                           ? "Plot / Combat / +3 strength"
                           : isIntelligenceReportIntrigue(card)
                             ? `Plot / draw ${intelligenceReportDrawCount}`
+                          : isStrategicStockpilingIntrigue(card)
+                            ? "Plot / spend stockpiles for VP"
                           : isFindWeaknessIntrigue(card)
                             ? "Combat / +2 / recall spy for +3"
                           : isQuestionableMethodsIntrigue(card)
@@ -1858,6 +1873,37 @@ export default function App() {
                           <BookOpen size={14} />
                           Draw {intelligenceReportDrawCount}
                         </button>
+                      )}
+                      {isStrategicStockpilingIntrigue(card) && (
+                        <div className="intrigue-actions">
+                          <button
+                            type="button"
+                            onClick={() => playStrategicStockpilingPlot(card.id, "spice")}
+                            disabled={plotIntrigueLocked || !strategicStockpilingCanSpice}
+                            title="Spend 5 spice to gain 1 VP"
+                          >
+                            <Sparkles size={14} />
+                            5 Spice -&gt; VP
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => playStrategicStockpilingPlot(card.id, "water")}
+                            disabled={plotIntrigueLocked || !strategicStockpilingCanWater}
+                            title="Requires 3 Spacing Guild Influence; spend 3 water to gain 1 VP"
+                          >
+                            <Droplets size={14} />
+                            3 Water -&gt; VP
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => playStrategicStockpilingPlot(card.id, "both")}
+                            disabled={plotIntrigueLocked || !strategicStockpilingCanSpice || !strategicStockpilingCanWater}
+                            title="Resolve both Strategic Stockpiling effects"
+                          >
+                            <Crown size={14} />
+                            Both -&gt; 2 VP
+                          </button>
+                        </div>
                       )}
                       {isBackedByChoamIntrigue(card) && (
                         <div className="intrigue-actions">

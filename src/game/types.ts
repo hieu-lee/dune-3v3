@@ -23,6 +23,7 @@ export type ConflictBattleIconId = BattleIconId | "wild";
 
 export type Resources = Record<ResourceId, number>;
 export type Influence = Record<FactionId, number>;
+export type AllianceOwners = Partial<Record<FactionId, string>>;
 export type BoardGain = Partial<Resources> & { intrigue?: number };
 export type TradeGoodId = ResourceId | "intrigue";
 
@@ -227,6 +228,7 @@ export type GameState = {
   players: Player[];
   spaces: Record<string, string>;
   spyPosts: Record<string, string>;
+  alliances: AllianceOwners;
   makerSpice: Record<string, number>;
   imperiumRow: Card[];
   marketDeck: Card[];

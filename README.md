@@ -22,8 +22,9 @@ Private web-table implementation for a six-player `Dune: Imperium - Uprising` te
 - Six-player Objective setup deals only to Allies and balances Desert Mouse/Crysknife icons across teams.
 - Conflict winners keep won Conflict cards and score immediate non-wild battle-icon pairs with Objectives or prior Conflicts.
 - Endgame phase triggers at 10 VP or an empty Conflict deck and scores battle-icon Endgame Intrigues against matching or wild Conflict cards.
-- Endgame scores Secure Spice Trade and CHOAM Profits rewards when their printed conditions are met.
+- Endgame scores Secure Spice Trade, CHOAM Profits, and Shadow Alliance rewards when their printed conditions are met.
 - Taken CHOAM contracts can be marked complete from player panels for contract-based Endgame scoring.
+- Alliance tokens can be assigned from player panels and transfer their VP with the token owner.
 - Active players can play the Plot side of battle-icon Intrigues for 1 spice during normal play.
 - Catalog-backed board-space art on matching placement tiles.
 - Printed reveal adjustments and spy-post targeting for cards whose text is not reducible to a fixed number.

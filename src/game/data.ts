@@ -6,6 +6,7 @@ import type {
   ConflictCard,
   ConflictBattleIconId,
   ContractCard,
+  FactionId,
   IconId,
   IntrigueCard,
   LeaderCard,
@@ -63,6 +64,17 @@ export const iconLabels: Record<IconId, string> = {
   spice: "Spice Trade",
   spy: "Spy",
 };
+
+export const factionLabels: Record<FactionId, string> = {
+  emperor: "Emperor",
+  spacing: "Spacing Guild",
+  bene: "Bene Gesserit",
+  fremen: "Fremen",
+  greatHouses: "Great Houses",
+  fringeWorlds: "Fringe Worlds",
+};
+
+export const factionIds = Object.keys(factionLabels) as FactionId[];
 
 export const catalogStats = catalog.counts;
 

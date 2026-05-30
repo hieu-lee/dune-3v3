@@ -4,6 +4,7 @@ import {
   boardSpaces,
   commanderStarterDecks,
   conflictCards,
+  factionLabels,
   imperiumDeck,
   intrigueCards,
   leaderCardByName,
@@ -45,6 +46,15 @@ const emptyInfluence = (): Influence => ({
 const secureSpiceTradeSourceId = 161;
 const choamProfitsSourceId = 450;
 const spiceMustFlowSourceId = 538;
+const shadowAllianceSourceId = 160;
+const shadowAllianceFactions: FactionId[] = [
+  "emperor",
+  "spacing",
+  "bene",
+  "fremen",
+  "greatHouses",
+  "fringeWorlds",
+];
 
 export function cloneCards(cards: Card[]) {
   return cards.map((card) => ({
@@ -280,6 +290,7 @@ export function initialGame(): GameState {
     players,
     spaces: {},
     spyPosts: {},
+    alliances: {},
     makerSpice: emptyMakerSpice(),
     imperiumRow: market.slice(0, 5),
     marketDeck: market.slice(5),
@@ -687,6 +698,44 @@ export function setChoamContractCompleted(
   };
 }
 
+export function setAllianceOwner(state: GameState, faction: FactionId, ownerId?: string): GameState {
+  const previousOwnerId = state.alliances[faction];
+  if (previousOwnerId === ownerId) return state;
+
+  const owner = ownerId ? state.players.find((player) => player.id === ownerId) : undefined;
+  if (ownerId && !owner) return state;
+  const previousOwner = previousOwnerId
+    ? state.players.find((player) => player.id === previousOwnerId)
+    : undefined;
+
+  const alliances = { ...state.alliances };
+  if (ownerId) alliances[faction] = ownerId;
+  else delete alliances[faction];
+
+  const players = state.players.map((player) => {
+    let vpDelta = 0;
+    if (player.id === previousOwnerId) vpDelta -= 1;
+    if (player.id === ownerId) vpDelta += 1;
+    return vpDelta === 0 ? player : { ...player, vp: player.vp + vpDelta };
+  });
+
+  const label = factionLabels[faction];
+  const logEntry = owner
+    ? previousOwner
+      ? `${owner.leader} takes the ${label} Alliance from ${previousOwner.leader}.`
+      : `${owner.leader} claims the ${label} Alliance.`
+    : previousOwner
+      ? `${previousOwner.leader} returns the ${label} Alliance.`
+      : undefined;
+
+  return {
+    ...state,
+    alliances,
+    players,
+    log: logEntry ? [logEntry, ...state.log] : state.log,
+  };
+}
+
 export function transferTradeGood(
   state: GameState,
   pending: TradePendingAction,
@@ -896,12 +945,40 @@ function countPlayerCardsBySourceId(player: Player, sourceId: number) {
     .length;
 }
 
-function scoreableConditionalEndgameReward(player: Player, intrigue: IntrigueCard) {
+function commanderPersonalFaction(player: Player): FactionId | undefined {
+  if (player.role !== "Commander") return undefined;
+  return player.team === "muaddib" ? "fremen" : "emperor";
+}
+
+function effectiveEndgameInfluence(player: Player, faction: FactionId, players: Player[]) {
+  if (player.role !== "Commander") return player.influence[faction];
+  if (commanderPersonalFaction(player) === faction) return player.influence[faction];
+  return Math.max(
+    0,
+    ...players
+      .filter((candidate) => candidate.team === player.team && candidate.role === "Ally")
+      .map((ally) => ally.influence[faction]),
+  );
+}
+
+function hasShadowAllianceMatch(state: GameState, player: Player) {
+  return shadowAllianceFactions.some((faction) => {
+    if (effectiveEndgameInfluence(player, faction, state.players) < 4) return false;
+    const ownerId = state.alliances[faction];
+    const owner = ownerId ? state.players.find((candidate) => candidate.id === ownerId) : undefined;
+    return Boolean(owner && owner.team !== player.team);
+  });
+}
+
+function scoreableConditionalEndgameReward(state: GameState, player: Player, intrigue: IntrigueCard) {
   if (intrigue.sourceId === secureSpiceTradeSourceId) {
     return countPlayerCardsBySourceId(player, spiceMustFlowSourceId) >= 2 ? { vp: 1, spice: 2 } : undefined;
   }
   if (intrigue.sourceId === choamProfitsSourceId) {
     return player.contracts.filter((contract) => contract.completed).length >= 4 ? { vp: 1 } : undefined;
+  }
+  if (intrigue.sourceId === shadowAllianceSourceId) {
+    return hasShadowAllianceMatch(state, player) ? { vp: 1 } : undefined;
   }
   return undefined;
 }
@@ -910,7 +987,7 @@ export function endgameConditionalIntrigueChoices(state: GameState) {
   if (state.phase !== "endgame") return [];
   return state.players.flatMap((player) =>
     player.intrigues.flatMap((intrigue) => {
-      const reward = scoreableConditionalEndgameReward(player, intrigue);
+      const reward = scoreableConditionalEndgameReward(state, player, intrigue);
       return reward ? [{ playerId: player.id, intrigueId: intrigue.id, ...reward }] : [];
     }),
   );
@@ -926,7 +1003,7 @@ export function scoreEndgameConditionalIntrigue(
   if (!player) return state;
   const intrigue = player.intrigues.find((card) => card.id === intrigueId);
   if (!intrigue) return state;
-  const reward = scoreableConditionalEndgameReward(player, intrigue);
+  const reward = scoreableConditionalEndgameReward(state, player, intrigue);
   if (!reward) return state;
 
   const players = state.players.map((candidate) =>

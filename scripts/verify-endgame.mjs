@@ -62,6 +62,7 @@ try {
   const desertMouseIntrigue = intrigueBySourceId(data, 157);
   const secureSpiceTrade = intrigueBySourceId(data, 161);
   const choamProfits = intrigueBySourceId(data, 450);
+  const shadowAlliance = intrigueBySourceId(data, 160);
   const spiceMustFlow = data.reserveMarket.find((card) => card.sourceId === 538);
   assert.ok(spiceMustFlow, "The Spice Must Flow reserve card should be available");
   const contracts = data.standardContracts.slice(0, 4);
@@ -248,6 +249,92 @@ try {
     ),
   );
   assert.deepEqual(state.endgameConditionalIntrigueChoices(choamProfitsIneligible), []);
+
+  const shadowAllianceEligibleBase = endgameFixture(state, (players) =>
+    players.map((player) =>
+      player.id === "p2"
+        ? {
+            ...player,
+            influence: { ...player.influence, greatHouses: 4 },
+            intrigues: [shadowAlliance],
+          }
+        : player,
+    ),
+  );
+  const shadowAllianceEligible = state.setAllianceOwner(shadowAllianceEligibleBase, "greatHouses", "p3");
+  assert.deepEqual(state.endgameConditionalIntrigueChoices(shadowAllianceEligible), [{
+    playerId: "p2",
+    intrigueId: shadowAlliance.id,
+    vp: 1,
+  }]);
+  const shadowAllianceScored = state.scoreEndgameConditionalIntrigue(
+    shadowAllianceEligible,
+    "p2",
+    shadowAlliance.id,
+  );
+  assert.equal(playerById(shadowAllianceScored, "p2").vp, playerById(shadowAllianceEligible, "p2").vp + 1);
+  assert.equal(playerById(shadowAllianceScored, "p2").intrigues.length, 0);
+  assert.equal(shadowAllianceScored.intrigueDiscard.at(-1).id, shadowAlliance.id);
+
+  const shadowAllianceSameTeamOwner = state.setAllianceOwner(shadowAllianceEligibleBase, "greatHouses", "p6");
+  assert.deepEqual(
+    state.endgameConditionalIntrigueChoices(shadowAllianceSameTeamOwner),
+    [],
+    "Shadow Alliance requires an opposing team to hold the matching Alliance",
+  );
+
+  const shadowAllianceTooLow = state.setAllianceOwner(
+    endgameFixture(state, (players) =>
+      players.map((player) =>
+        player.id === "p2"
+          ? {
+              ...player,
+              influence: { ...player.influence, greatHouses: 3 },
+              intrigues: [shadowAlliance],
+            }
+          : player,
+      ),
+    ),
+    "greatHouses",
+    "p3",
+  );
+  assert.deepEqual(state.endgameConditionalIntrigueChoices(shadowAllianceTooLow), []);
+
+  const commanderShadowAllianceBase = endgameFixture(state, (players) =>
+    players.map((player) => {
+      if (player.id === "p4") return { ...player, intrigues: [shadowAlliance] };
+      if (player.id === "p6") return { ...player, influence: { ...player.influence, spacing: 4 } };
+      return player;
+    }),
+  );
+  const commanderShadowAlliance = state.setAllianceOwner(commanderShadowAllianceBase, "spacing", "p3");
+  assert.deepEqual(
+    state.endgameConditionalIntrigueChoices(commanderShadowAlliance),
+    [{
+      playerId: "p4",
+      intrigueId: shadowAlliance.id,
+      vp: 1,
+    }],
+    "Commanders should use their highest Ally influence for Shadow Alliance",
+  );
+
+  const commanderPersonalShadowAllianceBase = endgameFixture(state, (players) =>
+    players.map((player) =>
+      player.id === "p4"
+        ? {
+            ...player,
+            influence: { ...player.influence, emperor: 4 },
+            intrigues: [shadowAlliance],
+          }
+        : player,
+    ),
+  );
+  const commanderPersonalShadowAlliance = state.setAllianceOwner(commanderPersonalShadowAllianceBase, "emperor", "p1");
+  assert.deepEqual(state.endgameConditionalIntrigueChoices(commanderPersonalShadowAlliance), [{
+    playerId: "p4",
+    intrigueId: shadowAlliance.id,
+    vp: 1,
+  }]);
 
   const vpTrigger = {
     ...state.initialGame(),

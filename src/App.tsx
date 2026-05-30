@@ -17,7 +17,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
-import { battleIconLabels, boardSpaces, iconLabels, teams } from "./game/data";
+import { battleIconLabels, boardSpaces, factionIds, factionLabels, iconLabels, teams } from "./game/data";
 import {
   advancePendingAction,
   advanceSeat,
@@ -46,6 +46,7 @@ import {
   resolveConflictTie,
   scoreEndgameBattleIconIntrigue,
   scoreEndgameConditionalIntrigue,
+  setAllianceOwner,
   setChoamContractCompleted,
   playPlotBattleIconIntrigue,
   startNextRound,
@@ -53,7 +54,7 @@ import {
   transferTradeGood,
   updateTradeSelection,
 } from "./game/state";
-import type { BoardSpace, Card, GameState, Player, ResourceId, Resources, TeamId, TradeGoodId } from "./game/types";
+import type { BoardSpace, Card, FactionId, GameState, Player, ResourceId, Resources, TeamId, TradeGoodId } from "./game/types";
 
 const resources: Array<{ id: ResourceId; label: string; Icon: LucideIcon }> = [
   { id: "solari", label: "Solari", Icon: CircleDollarSign },
@@ -65,6 +66,15 @@ const tradeGoods: Array<{ id: TradeGoodId; label: string; Icon: LucideIcon }> = 
   ...resources,
   { id: "intrigue", label: "Intrigue", Icon: Eye },
 ];
+
+const factionShortLabels: Record<FactionId, string> = {
+  emperor: "EMP",
+  spacing: "SG",
+  bene: "BG",
+  fremen: "FRE",
+  greatHouses: "GH",
+  fringeWorlds: "FW",
+};
 
 export default function App() {
   const [game, setGame] = useState<GameState>(() => initialGame());
@@ -453,6 +463,10 @@ export default function App() {
     setGame((current) => setChoamContractCompleted(current, playerId, contractId, completed));
   }
 
+  function updateAllianceOwner(playerId: string, faction: FactionId, ownsAlliance: boolean) {
+    setGame((current) => setAllianceOwner(current, faction, ownsAlliance ? playerId : undefined));
+  }
+
   function chooseConflictTieWinner(winnerId?: string) {
     if (game.pendingAction?.kind !== "conflict-tie") return;
     setGame((current) => {
@@ -769,6 +783,22 @@ export default function App() {
                   ))}
                 </div>
               )}
+              <div className="alliance-status-row" aria-label={`${player.leader} alliance tokens`}>
+                {factionIds.map((faction) => {
+                  const ownsAlliance = game.alliances[faction] === player.id;
+                  return (
+                    <label className={ownsAlliance ? "selected" : ""} key={faction} title={`${factionLabels[faction]} Alliance`}>
+                      <input
+                        type="checkbox"
+                        checked={ownsAlliance}
+                        aria-label={`${factionLabels[faction]} Alliance`}
+                        onChange={(event) => updateAllianceOwner(player.id, faction, event.currentTarget.checked)}
+                      />
+                      <span>{factionShortLabels[faction]}</span>
+                    </label>
+                  );
+                })}
+              </div>
               {player.contracts.length > 0 && (
                 <div className="contract-status-row">
                   {player.contracts.map((contract) => (

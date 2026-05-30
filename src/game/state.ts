@@ -55,6 +55,7 @@ const shadowAllianceFactions: FactionId[] = [
   "greatHouses",
   "fringeWorlds",
 ];
+const influenceVictoryPointThreshold = 2;
 
 export function cloneCards(cards: Card[]) {
   return cards.map((card) => ({
@@ -339,6 +340,22 @@ function canEnterSpace(space: BoardSpace, player: Player, swordmasterClaimed = f
   return player.role === "Commander" && player.team === space.personal;
 }
 
+export function adjustInfluence(player: Player, faction: FactionId, amount: number): Player {
+  const previous = player.influence[faction];
+  const next = Math.max(0, previous + amount);
+  const vpDelta =
+    previous < influenceVictoryPointThreshold && next >= influenceVictoryPointThreshold
+      ? 1
+      : previous >= influenceVictoryPointThreshold && next < influenceVictoryPointThreshold
+        ? -1
+        : 0;
+  return {
+    ...player,
+    vp: player.vp + vpDelta,
+    influence: { ...player.influence, [faction]: next },
+  };
+}
+
 export function iconCanReach(
   card: Card,
   space: BoardSpace,
@@ -361,8 +378,8 @@ export function iconCanReach(
 function resolveInfluence(space: BoardSpace, player: Player): FactionId | null {
   if (!space.influence) return null;
   if (space.personal) return space.influence;
-  if (space.influence === "emperor") return player.team === "shaddam" && player.role === "Commander" ? "emperor" : "greatHouses";
-  if (space.influence === "fremen") return player.team === "muaddib" && player.role === "Commander" ? "fremen" : "fringeWorlds";
+  if (space.influence === "emperor") return "greatHouses";
+  if (space.influence === "fremen") return "fringeWorlds";
   return space.influence;
 }
 
@@ -824,9 +841,9 @@ export function applyBoardEffect(
   const influence = resolveInfluence(space, sourcePlayer);
   if (influence) {
     if (sourcePlayer.role === "Commander" && !space.personal) {
-      target = { ...target, influence: { ...target.influence, [influence]: target.influence[influence] + 1 } };
+      target = adjustInfluence(target, influence, 1);
     } else {
-      source = { ...source, influence: { ...source.influence, [influence]: source.influence[influence] + 1 } };
+      source = adjustInfluence(source, influence, 1);
     }
   }
 

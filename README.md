@@ -26,6 +26,7 @@ Private web-table implementation for a six-player `Dune: Imperium - Uprising` te
 - Endgame scores Secure Spice Trade, CHOAM Profits, and Shadow Alliance rewards when their printed conditions are met.
 - Taken CHOAM contracts can be marked complete from player panels for contract-based Endgame scoring.
 - Alliance tokens can be assigned from player panels and transfer their VP with the token owner.
+- Reaching or dropping below 2 Influence automatically adds or removes the faction-track VP.
 - Active players can play the Plot side of battle-icon Intrigues for 1 spice during normal play.
 - Catalog-backed board-space art on matching placement tiles.
 - Printed reveal adjustments and spy-post targeting for cards whose text is not reducible to a fixed number.

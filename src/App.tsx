@@ -41,12 +41,14 @@ import {
   effectiveRequirementInfluence,
   finishEndgame,
   finishPendingAction,
+  finishRevealTurn,
   finishRevealAdjustment as resolveRevealAdjustment,
   iconCanReach,
   initialGame,
   influenceLossChoices,
   influenceLossOptions,
   isBackedByChoamIntrigue,
+  isCallToArmsIntrigue,
   isContingencyPlanIntrigue,
   isDevourIntrigue,
   isDetonationIntrigue,
@@ -89,6 +91,7 @@ import {
   setAllianceOwner,
   setChoamContractCompleted,
   playBackedByChoamPlotIntrigue,
+  playCallToArmsPlotIntrigue,
   playContingencyPlanPlotIntrigue,
   playDetonationIntrigue,
   playIntelligenceReportPlotIntrigue,
@@ -102,7 +105,6 @@ import {
   skipLoseInfluence,
   skipRecallSpy,
   skipTrashCard,
-  startCombatPhase,
   startNextRound,
   takeChoamContract,
   trashableCards,
@@ -144,9 +146,14 @@ export default function App() {
   const leaderOpenerRef = useRef<HTMLButtonElement | null>(null);
   const activePlayer = game.players[game.activeSeat];
   const activeAllies = game.players.filter((player) => player.team === activePlayer.team && player.role === "Ally");
+  function activatedAllyIdFor(player: Player, players: Player[]) {
+    if (player.role !== "Commander") return player.id;
+    if (player.revealed && player.revealActivatedAllyId) return player.revealActivatedAllyId;
+    return commanderTargets[player.id] ?? defaultActivatedAllyId(player, players);
+  }
   const activatedAlly =
     activePlayer.role === "Commander"
-      ? activeAllies.find((player) => player.id === commanderTargets[activePlayer.id]) ?? activeAllies[0]
+      ? activeAllies.find((player) => player.id === activatedAllyIdFor(activePlayer, game.players)) ?? activeAllies[0]
       : activePlayer;
   const selectedCard = activePlayer.hand.find((card) => card.id === selectedCardId) ?? null;
   const selectedSpace = boardSpaces.find((space) => space.id === selectedSpaceId) ?? null;
@@ -218,7 +225,7 @@ export default function App() {
       const player = current.players[current.activeSeat];
       const targetId =
         player.role === "Commander"
-          ? commanderTargets[player.id] ?? defaultActivatedAllyId(player, current.players)
+          ? activatedAllyIdFor(player, current.players)
           : player.id;
       const target = current.players.find((candidate) => candidate.id === targetId) ?? player;
       const hand = player.hand.filter((card) => card.id !== selectedCard.id);
@@ -312,7 +319,7 @@ export default function App() {
       const player = current.players[current.activeSeat];
       const targetId =
         player.role === "Commander"
-          ? commanderTargets[player.id] ?? defaultActivatedAllyId(player, current.players)
+          ? activatedAllyIdFor(player, current.players)
           : player.id;
       const target = current.players.find((candidate) => candidate.id === targetId);
       const combatRecipient = player.role === "Commander" ? target : player;
@@ -325,6 +332,7 @@ export default function App() {
             agentsReady: 0,
             resources: addResources(candidate.resources, revealGain),
             persuasion,
+            revealActivatedAllyId: candidate.role === "Commander" ? target?.id : undefined,
             conflict: candidate.role === "Commander" ? candidate.conflict : candidate.conflict + combatSwords,
             playArea: [...candidate.playArea, ...candidate.hand],
             hand: [],
@@ -367,11 +375,15 @@ export default function App() {
 
   function buyCard(card: Card) {
     if (game.phase !== "playing") return;
-    if (game.pendingAction) return;
+    if (game.pendingAction || game.pendingQueue.length > 0) return;
     if (!activePlayer.revealed || activePlayer.persuasion < (card.cost ?? 0)) return;
     setGame((current) => {
       const buyer = current.players[current.activeSeat];
-      return acquireMarketCard(current, buyer.id, card.id);
+      const callToArmsRecruitOwnerId =
+        buyer.callToArmsActive && buyer.role === "Commander"
+          ? activatedAllyIdFor(buyer, current.players)
+          : undefined;
+      return acquireMarketCard(current, buyer.id, card.id, callToArmsRecruitOwnerId);
     });
   }
 
@@ -389,8 +401,7 @@ export default function App() {
     if (game.pendingAction) return;
     if (!activePlayer.revealed) return;
     setGame((current) => {
-      if (allPlayersDone(current.players)) return startCombatPhase(current);
-      return { ...current, activeSeat: advanceSeat(current) };
+      return finishRevealTurn(current, current.players[current.activeSeat].id);
     });
     setSelectedCardId(null);
     setSelectedSpaceId(null);
@@ -636,6 +647,10 @@ export default function App() {
     setGame((current) => playContingencyPlanPlotIntrigue(current, current.players[current.activeSeat].id, intrigueId));
   }
 
+  function playCallToArmsPlot(intrigueId: string) {
+    setGame((current) => playCallToArmsPlotIntrigue(current, current.players[current.activeSeat].id, intrigueId));
+  }
+
   function playIntelligenceReportPlot(intrigueId: string) {
     setGame((current) => playIntelligenceReportPlotIntrigue(current, current.players[current.activeSeat].id, intrigueId));
   }
@@ -650,7 +665,7 @@ export default function App() {
     setGame((current) => {
       const player = current.players[current.activeSeat];
       const troopOwnerId = player.role === "Commander"
-        ? commanderTargets[player.id] ?? defaultActivatedAllyId(player, current.players)
+        ? activatedAllyIdFor(player, current.players)
         : undefined;
       return playShaddamsFavorPlotIntrigue(current, player.id, intrigueId, troopOwnerId);
     });
@@ -668,7 +683,7 @@ export default function App() {
     setGame((current) => {
       const player = current.players[current.activeSeat];
       const deployOwnerId = player.role === "Commander"
-        ? commanderTargets[player.id] ?? defaultActivatedAllyId(player, current.players)
+        ? activatedAllyIdFor(player, current.players)
         : undefined;
       return playDetonationIntrigue(current, player.id, intrigueId, choice, deployOwnerId);
     });
@@ -678,7 +693,7 @@ export default function App() {
     setGame((current) => {
       const player = current.players[current.activeSeat];
       const sandwormOwnerId = player.role === "Commander"
-        ? commanderTargets[player.id] ?? defaultActivatedAllyId(player, current.players)
+        ? activatedAllyIdFor(player, current.players)
         : undefined;
       return playUnexpectedAlliesIntrigue(current, player.id, intrigueId, removeShieldWall, sandwormOwnerId);
     });
@@ -805,7 +820,8 @@ export default function App() {
   const conditionalEndgameChoices = endgameConditionalIntrigueChoices(game);
   const hasEndgameChoices = endgameChoices.length + conditionalEndgameChoices.length > 0;
   const playingPhase = game.phase === "playing";
-  const plotIntrigueLocked = !playingPhase || Boolean(game.pendingAction) || game.pendingQueue.length > 0;
+  const pendingLocked = Boolean(game.pendingAction) || game.pendingQueue.length > 0;
+  const plotIntrigueLocked = !playingPhase || pendingLocked;
   const detonationDeployOwner = activePlayer.role === "Commander" ? activatedAlly : activePlayer;
   const unexpectedAlliesOwner = activePlayer.role === "Commander" ? activatedAlly : activePlayer;
   const shaddamsFavorOwner = activePlayer.role === "Commander" ? activatedAlly : activePlayer;
@@ -1773,7 +1789,7 @@ export default function App() {
                   type="button"
                   key={ally.id}
                   className={activatedAlly.id === ally.id ? "selected" : ""}
-                  disabled={!playingPhase}
+                  disabled={!playingPhase || activePlayer.revealed}
                   onClick={() =>
                     setCommanderTargets((current) => ({
                       ...current,
@@ -1833,6 +1849,8 @@ export default function App() {
                       <span>
                         {isContingencyPlanIntrigue(card)
                           ? "Plot / Combat / +3 strength"
+                          : isCallToArmsIntrigue(card)
+                            ? "Plot / reveal acquisitions recruit"
                           : isIntelligenceReportIntrigue(card)
                             ? `Plot / draw ${intelligenceReportDrawCount}`
                           : isStrategicStockpilingIntrigue(card)
@@ -1889,6 +1907,17 @@ export default function App() {
                         >
                           <CircleDollarSign size={14} />
                           Gain 2 Solari
+                        </button>
+                      )}
+                      {isCallToArmsIntrigue(card) && (
+                        <button
+                          type="button"
+                          onClick={() => playCallToArmsPlot(card.id)}
+                          disabled={plotIntrigueLocked}
+                          title="Each card you acquire during this Reveal turn recruits 1 troop"
+                        >
+                          <Users size={14} />
+                          Arm Acquisitions
                         </button>
                       )}
                       {isIntelligenceReportIntrigue(card) && (
@@ -2056,7 +2085,7 @@ export default function App() {
                 className="market-card"
                 key={card.id}
                 onClick={() => buyCard(card)}
-                disabled={!playingPhase || Boolean(game.pendingAction) || !activePlayer.revealed || activePlayer.persuasion < (card.cost ?? 0)}
+                disabled={!playingPhase || pendingLocked || !activePlayer.revealed || activePlayer.persuasion < (card.cost ?? 0)}
               >
                 {card.thumbnailPath && <img className="card-art" src={card.thumbnailPath} alt="" loading="lazy" />}
                 <span>
@@ -2087,7 +2116,7 @@ export default function App() {
                     onClick={() => buyCard(card)}
                     disabled={
                       !playingPhase ||
-                      Boolean(game.pendingAction) ||
+                      pendingLocked ||
                       !activePlayer.revealed ||
                       activePlayer.team !== "shaddam" ||
                       activePlayer.persuasion < (card.cost ?? 0)

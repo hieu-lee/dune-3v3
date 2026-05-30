@@ -51,6 +51,7 @@ const reachAgreementSourceId = 449;
 const strategicStockpilingSourceId = 130;
 const detonationSourceId = 131;
 const unexpectedAlliesSourceId = 137;
+const callToArmsSourceId = 138;
 const shaddamsFavorSourceId = 141;
 const intelligenceReportSourceId = 142;
 const marketOpportunitySourceId = 145;
@@ -133,6 +134,10 @@ export function isDetonationIntrigue(intrigue: IntrigueCard) {
 
 export function isUnexpectedAlliesIntrigue(intrigue: IntrigueCard) {
   return intrigue.sourceId === unexpectedAlliesSourceId;
+}
+
+export function isCallToArmsIntrigue(intrigue: IntrigueCard) {
+  return intrigue.sourceId === callToArmsSourceId;
 }
 
 export function isContingencyPlanIntrigue(intrigue: IntrigueCard) {
@@ -351,6 +356,7 @@ function makePlayer(
     spies: 3,
     revealed: false,
     persuasion: 0,
+    callToArmsActive: false,
     purchaseSequence: 0,
     swordmasterBonus: false,
     contracts: [],
@@ -754,10 +760,37 @@ function addPurchasedCard(player: Player, card: Card, fromReserve: boolean): Pla
   };
 }
 
-export function acquireMarketCard(state: GameState, buyerId: string, cardId: string): GameState {
-  if (state.pendingAction) return state;
-  const buyer = state.players.find((player) => player.id === buyerId);
-  if (!buyer || !buyer.revealed) return state;
+function activatedAllyEffectOwner(state: GameState, player: Player, ownerId?: string) {
+  if (player.role !== "Commander") return { valid: true, owner: player };
+  const lockedOwnerId = player.revealed ? player.revealActivatedAllyId : undefined;
+  if (lockedOwnerId && ownerId && ownerId !== lockedOwnerId) {
+    return { valid: false, owner: undefined };
+  }
+  const resolvedOwnerId = lockedOwnerId ?? ownerId ?? defaultActivatedAllyId(player, state.players);
+  const owner = state.players.find(
+    (candidate) =>
+      candidate.id === resolvedOwnerId &&
+      candidate.team === player.team &&
+      candidate.role === "Ally",
+  );
+  return { valid: Boolean(owner), owner };
+}
+
+function callToArmsRecruitOwner(state: GameState, buyer: Player, recruitOwnerId?: string) {
+  if (!buyer.callToArmsActive) return { valid: true, owner: undefined };
+  if (buyer.role !== "Commander") return { valid: true, owner: buyer };
+  return activatedAllyEffectOwner(state, buyer, recruitOwnerId);
+}
+
+export function acquireMarketCard(
+  state: GameState,
+  buyerId: string,
+  cardId: string,
+  callToArmsRecruitOwnerId?: string,
+): GameState {
+  if (state.phase !== "playing" || state.pendingAction || state.pendingQueue.length > 0) return state;
+  const buyer = state.players[state.activeSeat];
+  if (!buyer || buyer.id !== buyerId || !buyer.revealed) return state;
 
   const reserveCard = state.reserveMarket.find((card) => card.id === cardId);
   const throneCard = state.throneRow.find((card) => card.id === cardId);
@@ -777,9 +810,20 @@ export function acquireMarketCard(state: GameState, buyerId: string, cardId: str
       })
     : state.imperiumRow;
   const throneRow = throneCard ? state.throneRow.filter((candidate) => candidate.id !== card.id) : state.throneRow;
-  const players = state.players.map((player) =>
-    player.id === buyer.id ? addPurchasedCard(player, card, fromReserve) : player,
-  );
+  const callToArmsRecruit = callToArmsRecruitOwner(state, buyer, callToArmsRecruitOwnerId);
+  if (!callToArmsRecruit.valid) return state;
+  const recruitOwner = callToArmsRecruit.owner;
+  const players = state.players.map((player) => {
+    let next = player;
+    if (player.id === buyer.id) next = addPurchasedCard(next, card, fromReserve);
+    if (recruitOwner && player.id === recruitOwner.id) next = { ...next, garrison: next.garrison + 1 };
+    return next;
+  });
+  const recruitText = recruitOwner
+    ? recruitOwner.id === buyer.id
+      ? " and recruits 1 troop"
+      : ` and ${recruitOwner.leader} recruits 1 troop`
+    : "";
 
   return {
     ...state,
@@ -788,7 +832,7 @@ export function acquireMarketCard(state: GameState, buyerId: string, cardId: str
     marketDeck,
     throneRow,
     log: [
-      `${buyer.leader} acquires ${card.name}${card.acquired ? ` for ${card.acquired} VP` : ""}.`,
+      `${buyer.leader} acquires ${card.name}${card.acquired ? ` for ${card.acquired} VP` : ""}${recruitText}.`,
       ...state.log,
     ],
   };
@@ -1654,15 +1698,9 @@ export function playShaddamsFavorPlotIntrigue(
   const intrigue = player.intrigues.find((card) => card.id === intrigueId);
   if (!intrigue || !isShaddamsFavorIntrigue(intrigue)) return state;
 
-  const resolvedTroopOwnerId = player.role === "Commander"
-    ? troopOwnerId ?? defaultActivatedAllyId(player, state.players)
-    : player.id;
-  const troopOwner = state.players.find((candidate) =>
-    candidate.id === resolvedTroopOwnerId &&
-    candidate.team === player.team &&
-    candidate.role === "Ally"
-  );
-  if (!troopOwner) return state;
+  const troopOwnerResult = activatedAllyEffectOwner(state, player, troopOwnerId);
+  if (!troopOwnerResult.valid || !troopOwnerResult.owner) return state;
+  const troopOwner = troopOwnerResult.owner;
 
   const gainsSolari = effectiveEmperorIconInfluence(player, state.players) >= 3;
   const players = state.players.map((candidate) => {
@@ -1782,15 +1820,10 @@ export function playDetonationIntrigue(
   const intrigue = player.intrigues.find((card) => card.id === intrigueId);
   if (!intrigue || !isDetonationIntrigue(intrigue)) return state;
   if (choice === "shield-wall" && !state.shieldWall) return state;
-  const resolvedDeployOwnerId = player.role === "Commander"
-    ? deployOwnerId ?? defaultActivatedAllyId(player, state.players)
-    : player.id;
-  const deployOwner = state.players.find((candidate) =>
-    candidate.id === resolvedDeployOwnerId &&
-    candidate.team === player.team &&
-    candidate.role === "Ally"
-  );
-  if (choice === "deploy" && (!state.conflict || !deployOwner)) return state;
+  const deployOwnerResult = choice === "deploy"
+    ? activatedAllyEffectOwner(state, player, deployOwnerId)
+    : { valid: true, owner: undefined };
+  if (choice === "deploy" && (!state.conflict || !deployOwnerResult.valid || !deployOwnerResult.owner)) return state;
 
   const players = state.players.map((candidate) =>
     candidate.id === player.id
@@ -1811,6 +1844,7 @@ export function playDetonationIntrigue(
     };
   }
 
+  const deployOwner = deployOwnerResult.owner;
   if (!deployOwner) return state;
   const deployable = Math.min(deployOwner.garrison, 4);
   const deployLabel = deployOwner && deployOwner.id !== player.id ? ` for ${deployOwner.leader}` : "";
@@ -1844,15 +1878,9 @@ export function playUnexpectedAlliesIntrigue(
   if (!state.conflict || player.resources.water < 2) return state;
   if (state.shieldWall && conflictProtectedByShieldWall(state.conflict) && !removeShieldWall) return state;
 
-  const resolvedOwnerId = player.role === "Commander"
-    ? sandwormOwnerId ?? defaultActivatedAllyId(player, state.players)
-    : player.id;
-  const sandwormOwner = state.players.find((candidate) =>
-    candidate.id === resolvedOwnerId &&
-    candidate.team === player.team &&
-    candidate.role === "Ally"
-  );
-  if (!sandwormOwner) return state;
+  const sandwormOwnerResult = activatedAllyEffectOwner(state, player, sandwormOwnerId);
+  if (!sandwormOwnerResult.valid || !sandwormOwnerResult.owner) return state;
+  const sandwormOwner = sandwormOwnerResult.owner;
 
   const removedShieldWall = removeShieldWall && state.shieldWall;
   const ownerLabel = sandwormOwner.id !== player.id ? ` for ${sandwormOwner.leader}` : "";
@@ -1884,6 +1912,37 @@ export function playUnexpectedAlliesIntrigue(
     intrigueDiscard: [...state.intrigueDiscard, intrigue],
     log: [
       `${player.leader} plays Unexpected Allies${ownerLabel}, spends 2 water,${shieldLabel} and summons 1 sandworm.`,
+      ...state.log,
+    ],
+  };
+}
+
+export function playCallToArmsPlotIntrigue(
+  state: GameState,
+  playerId: string,
+  intrigueId: string,
+): GameState {
+  if (state.phase !== "playing" || state.pendingAction || state.pendingQueue.length > 0) return state;
+  const player = state.players[state.activeSeat];
+  if (!player || player.id !== playerId) return state;
+  const intrigue = player.intrigues.find((card) => card.id === intrigueId);
+  if (!intrigue || !isCallToArmsIntrigue(intrigue)) return state;
+
+  const players = state.players.map((candidate) =>
+    candidate.id === player.id
+      ? {
+          ...candidate,
+          callToArmsActive: true,
+          intrigues: candidate.intrigues.filter((card) => card.id !== intrigue.id),
+        }
+      : candidate,
+  );
+  return {
+    ...state,
+    players,
+    intrigueDiscard: [...state.intrigueDiscard, intrigue],
+    log: [
+      `${player.leader} plays Call to Arms; acquisitions during this Reveal turn will recruit 1 troop.`,
       ...state.log,
     ],
   };
@@ -1981,11 +2040,12 @@ function finishCombatIfNoActors(state: GameState): GameState {
 
 export function startCombatPhase(state: GameState): GameState {
   if (state.pendingAction || state.pendingQueue.length > 0) return state;
-  const actorIds = combatIntrigueActorIds(state);
-  if (actorIds.length === 0) return startNextRound(state);
-  const activeSeat = firstCombatSeat(state, actorIds);
+  const clearedState = clearRevealTurnEffects(state);
+  const actorIds = combatIntrigueActorIds(clearedState);
+  if (actorIds.length === 0) return startNextRound(clearedState);
+  const activeSeat = firstCombatSeat(clearedState, actorIds);
   return {
-    ...state,
+    ...clearedState,
     phase: "combat",
     activeSeat,
     combatPasses: [],
@@ -1998,8 +2058,36 @@ export function startCombatPhase(state: GameState): GameState {
 export function maybeStartCombatPhase(state: GameState): GameState {
   if (state.phase !== "playing") return state;
   if (state.pendingAction || state.pendingQueue.length > 0) return state;
+  if (state.players[state.activeSeat]?.revealed) return state;
   if (!allPlayersDone(state.players)) return state;
   return startCombatPhase(state);
+}
+
+function clearRevealTurnEffects(state: GameState): GameState {
+  return {
+    ...state,
+    players: state.players.map((player) =>
+      player.callToArmsActive || player.revealActivatedAllyId
+        ? { ...player, callToArmsActive: false, revealActivatedAllyId: undefined }
+        : player,
+    ),
+  };
+}
+
+export function finishRevealTurn(state: GameState, playerId: string): GameState {
+  if (state.phase !== "playing" || state.pendingAction || state.pendingQueue.length > 0) return state;
+  const player = state.players[state.activeSeat];
+  if (!player || player.id !== playerId || !player.revealed) return state;
+  const clearedState = {
+    ...state,
+    players: state.players.map((candidate) =>
+      candidate.id === player.id
+        ? { ...candidate, callToArmsActive: false, revealActivatedAllyId: undefined }
+        : candidate,
+    ),
+  };
+  if (allPlayersDone(clearedState.players)) return startCombatPhase(clearedState);
+  return { ...clearedState, activeSeat: advanceSeat(clearedState) };
 }
 
 export function passCombatIntrigue(state: GameState, actorId: string): GameState {
@@ -2664,7 +2752,7 @@ export function finishEndgame(state: GameState): GameState {
 }
 
 export function startNextRound(state: GameState): GameState {
-  const resolvedState = resolveCurrentConflict(state);
+  const resolvedState = resolveCurrentConflict(clearRevealTurnEffects(state));
   if (resolvedState.pendingAction?.kind === "conflict-tie") return resolvedState;
 
   const endgameReason = endgameTriggerReason(resolvedState);
@@ -2692,6 +2780,8 @@ export function startNextRound(state: GameState): GameState {
         agentsReady: player.agentsTotal,
         revealed: false,
         persuasion: 0,
+        revealActivatedAllyId: undefined,
+        callToArmsActive: false,
         conflict: 0,
         deployedTroops: 0,
         deployedSandworms: 0,

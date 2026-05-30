@@ -34,6 +34,7 @@ Private web-table implementation for a six-player `Dune: Imperium - Uprising` te
 - Active players can play the Plot side of battle-icon Intrigues for 1 spice during normal play.
 - Contingency Plan can be played as a Plot Intrigue for 2 Solari or as a Combat Intrigue for 3 strength.
 - Intelligence Report can be played as a Plot Intrigue to draw 1 card, or 2 cards with two or more own spies on the board.
+- Call to Arms can be played as a Plot Intrigue so each card acquired during that Reveal turn recruits 1 troop.
 - Strategic Stockpiling can be played as a Plot Intrigue to spend 5 spice and/or the 3 Spacing Guild Influence 3-water branch for VP.
 - Shaddam's Favor can be played as a Plot Intrigue to recruit 1 troop and gain 3 Solari with enough Emperor/Great Houses Influence.
 - Market Opportunity can be played as a Plot Intrigue to exchange 2 spice for 5 Solari or 5 Solari for 5 spice.

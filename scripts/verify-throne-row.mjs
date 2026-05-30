@@ -106,9 +106,9 @@ try {
 
   const buyFixture = {
     ...moved,
+    activeSeat: moved.players.findIndex((player) => player.id === "p2"),
     players: moved.players.map((player) => {
       if (player.id === "p2") return { ...player, revealed: true, persuasion: eligible.cost ?? 0 };
-      if (player.id === "p3") return { ...player, revealed: true, persuasion: eligible.cost ?? 0 };
       return player;
     }),
   };
@@ -129,14 +129,22 @@ try {
     eligible.id,
     "Acquired Throne Row card should go to the buyer discard",
   );
+  const muadDibBuyFixture = {
+    ...buyFixture,
+    activeSeat: buyFixture.players.findIndex((player) => player.id === "p3"),
+    players: buyFixture.players.map((player) =>
+      player.id === "p3" ? { ...player, revealed: true, persuasion: eligible.cost ?? 0 } : player,
+    ),
+  };
   assert.equal(
-    state.acquireMarketCard(buyFixture, "p3", eligible.id),
-    buyFixture,
+    state.acquireMarketCard(muadDibBuyFixture, "p3", eligible.id),
+    muadDibBuyFixture,
     "Muad'Dib team must not acquire Throne Row cards",
   );
 
   const rowBuyFixture = {
     ...fixture,
+    activeSeat: fixture.players.findIndex((player) => player.id === "p3"),
     players: fixture.players.map((player) =>
       player.id === "p3" ? { ...player, revealed: true, persuasion: rowPurchaseCard.cost ?? 0 } : player,
     ),

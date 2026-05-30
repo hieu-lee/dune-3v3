@@ -223,10 +223,16 @@ try {
     pendingCombat,
     "Automatic Combat transition should wait for pending actions",
   );
+  const pendingResolvedRevealTurn = { ...pendingCombat, pendingAction: undefined };
   assert.equal(
-    state.maybeStartCombatPhase({ ...pendingCombat, pendingAction: undefined }).phase,
+    state.maybeStartCombatPhase(pendingResolvedRevealTurn),
+    pendingResolvedRevealTurn,
+    "Automatic Combat transition should wait for the active revealed player to end their Reveal turn",
+  );
+  assert.equal(
+    state.startCombatPhase(pendingResolvedRevealTurn).phase,
     "combat",
-    "Automatic Combat transition should start once the pending queue is empty",
+    "Explicit Reveal end should start Combat once the pending queue is empty",
   );
   const revealAdjust = {
     kind: "reveal-adjust",

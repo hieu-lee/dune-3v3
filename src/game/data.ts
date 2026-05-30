@@ -59,6 +59,7 @@ const automatedCombatSwordValues: Partial<Record<number, number>> = {
 const intrigueSummariesByCatalogId: Partial<Record<number, string>> = {
   131: "Remove the Shield Wall OR deploy up to four troops from your garrison to the Conflict.",
   130: "Spend 5 spice to gain 1 VP; with 3+ Spacing Guild Influence, you may also spend 3 water to gain 1 VP.",
+  138: "During your Reveal turn this round, whenever you acquire a card, recruit 1 troop.",
   142: "Draw 1 card; draw 1 more if you have two or more spies on the board.",
   141: "Recruit 1 troop; with 3+ Emperor/Great Houses Influence, gain 3 Solari.",
   147: "Gain 2 Solari as a Plot Intrigue OR add 3 strength as a Combat Intrigue.",

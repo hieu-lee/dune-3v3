@@ -15,7 +15,8 @@
     "verify:intrigues": "node scripts/verify-intrigues.mjs",
     "verify:leaders": "node scripts/verify-leaders.mjs",
     "verify:starter-decks": "node scripts/verify-starter-decks.mjs",
-    "verify:team-trade": "node scripts/verify-team-trade.mjs"
+    "verify:team-trade": "node scripts/verify-team-trade.mjs",
+    "verify:throne-row": "node scripts/verify-throne-row.mjs"
   },
   "dependencies": {
     "lucide-react": "0.554.0",

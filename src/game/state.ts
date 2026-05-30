@@ -191,6 +191,7 @@ export function initialGame(): GameState {
     imperiumRow: market.slice(0, 5),
     marketDeck: market.slice(5),
     reserveMarket: cloneCards(reserveMarket),
+    throneRow: [],
     contractOffer: contracts.slice(0, 2),
     contractDeck: contracts.slice(2),
     intrigueDeck,
@@ -295,7 +296,23 @@ export function pendingActionForSpace(
   return undefined;
 }
 
-export function pendingActionForCard(card: Card, source: Player): PendingAction | undefined {
+export function isFremenCard(card: Card) {
+  return card.traits?.includes("Faction: Fremen") ?? false;
+}
+
+export function canMoveCardToThroneRow(card: Card) {
+  return !isFremenCard(card);
+}
+
+export function pendingActionForCard(card: Card, source: Player, state?: GameState): PendingAction | undefined {
+  if (
+    (card.sourceId === 561 || card.name === "Imperial Tent") &&
+    source.team === "shaddam" &&
+    source.role === "Commander" &&
+    state?.imperiumRow.some(canMoveCardToThroneRow)
+  ) {
+    return { kind: "throne-row", ownerId: source.id, source: card.name };
+  }
   return undefined;
 }
 
@@ -331,6 +348,89 @@ export function advancePendingAction(state: GameState) {
 
 type ContractPendingAction = Extract<PendingAction, { kind: "contract" }>;
 type TradePendingAction = Extract<PendingAction, { kind: "trade" }>;
+type ThroneRowPendingAction = Extract<PendingAction, { kind: "throne-row" }>;
+
+function addPurchasedCard(player: Player, card: Card, fromReserve: boolean): Player {
+  const purchaseSequence = player.purchaseSequence + 1;
+  const acquiredCard = fromReserve
+    ? { ...card, id: `${card.id}-${player.id}-${purchaseSequence}` }
+    : card;
+  return {
+    ...player,
+    vp: player.vp + (card.acquired ?? 0),
+    persuasion: player.persuasion - (card.cost ?? 0),
+    purchaseSequence,
+    discard: [...player.discard, acquiredCard],
+  };
+}
+
+export function acquireMarketCard(state: GameState, buyerId: string, cardId: string): GameState {
+  if (state.pendingAction) return state;
+  const buyer = state.players.find((player) => player.id === buyerId);
+  if (!buyer || !buyer.revealed) return state;
+
+  const reserveCard = state.reserveMarket.find((card) => card.id === cardId);
+  const throneCard = state.throneRow.find((card) => card.id === cardId);
+  const rowIndex = state.imperiumRow.findIndex((card) => card.id === cardId);
+  const rowCard = rowIndex >= 0 ? state.imperiumRow[rowIndex] : undefined;
+  const card = reserveCard ?? throneCard ?? rowCard;
+  if (!card || buyer.persuasion < (card.cost ?? 0)) return state;
+  if (throneCard && buyer.team !== "shaddam") return state;
+
+  const fromReserve = Boolean(reserveCard);
+  const [replacement, ...marketDeckAfterDraw] = state.marketDeck;
+  const marketDeck = rowCard ? marketDeckAfterDraw : state.marketDeck;
+  const imperiumRow = rowCard
+    ? state.imperiumRow.flatMap((candidate, index) => {
+        if (index !== rowIndex) return [candidate];
+        return replacement ? [replacement] : [];
+      })
+    : state.imperiumRow;
+  const throneRow = throneCard ? state.throneRow.filter((candidate) => candidate.id !== card.id) : state.throneRow;
+  const players = state.players.map((player) =>
+    player.id === buyer.id ? addPurchasedCard(player, card, fromReserve) : player,
+  );
+
+  return {
+    ...state,
+    players,
+    imperiumRow,
+    marketDeck,
+    throneRow,
+    log: [
+      `${buyer.leader} acquires ${card.name}${card.acquired ? ` for ${card.acquired} VP` : ""}.`,
+      ...state.log,
+    ],
+  };
+}
+
+export function moveImperiumCardToThroneRow(
+  state: GameState,
+  pending: ThroneRowPendingAction,
+  cardId: string,
+): GameState {
+  const owner = state.players.find((player) => player.id === pending.ownerId);
+  if (!owner || owner.team !== "shaddam" || owner.role !== "Commander") return state;
+
+  const rowIndex = state.imperiumRow.findIndex((card) => card.id === cardId);
+  const card = state.imperiumRow[rowIndex];
+  if (!card || !canMoveCardToThroneRow(card)) return state;
+
+  const [replacement, ...marketDeck] = state.marketDeck;
+  const imperiumRow = state.imperiumRow.flatMap((candidate, index) => {
+    if (index !== rowIndex) return [candidate];
+    return replacement ? [replacement] : [];
+  });
+
+  return {
+    ...state,
+    imperiumRow,
+    marketDeck,
+    throneRow: [...state.throneRow, card],
+    ...advancePendingAction(state),
+    log: [`${owner.leader} moves ${card.name} to the Throne Row from ${pending.source}.`, ...state.log],
+  };
+}
 
 export function updateTradeSelection(
   state: GameState,

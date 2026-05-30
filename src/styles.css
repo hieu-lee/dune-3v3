@@ -657,6 +657,10 @@ h2 {
   overflow-wrap: anywhere;
 }
 
+.throne-choice button {
+  border-color: rgba(239, 180, 71, 0.34);
+}
+
 .trade-intrigue-grid {
   width: 100%;
   display: grid;
@@ -862,6 +866,30 @@ h2 {
 .market-card {
   min-height: 128px;
   background: linear-gradient(160deg, rgba(51, 47, 35, 0.94), rgba(25, 22, 18, 0.94));
+}
+
+.throne-market {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(239, 180, 71, 0.22);
+}
+
+.throne-market .panel-heading {
+  margin-bottom: 10px;
+}
+
+.throne-market .panel-heading > span {
+  color: #f3d89d;
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.throne-card {
+  border-color: rgba(239, 180, 71, 0.28);
+  background:
+    linear-gradient(160deg, rgba(58, 45, 26, 0.94), rgba(25, 22, 18, 0.94)),
+    linear-gradient(45deg, rgba(239, 180, 71, 0.18), transparent);
 }
 
 .persuasion {

@@ -21,8 +21,10 @@ import { boardSpaces, iconLabels, teams } from "./game/data";
 import {
   advancePendingAction,
   advanceSeat,
+  acquireMarketCard,
   allPlayersDone,
   applyBoardEffect,
+  canMoveCardToThroneRow,
   canPay,
   collectChoamContractFallback,
   defaultActivatedAllyId,
@@ -34,6 +36,7 @@ import {
   pendingActionsFor,
   pendingActionForSpace,
   queuePendingActions,
+  moveImperiumCardToThroneRow,
   startNextRound,
   takeChoamContract,
   transferTradeGood,
@@ -165,7 +168,7 @@ export default function App() {
         player.role === "Commander" ? effectedTarget : source,
         players,
       );
-      const cardPending = pendingActionForCard(selectedCard, source);
+      const cardPending = pendingActionForCard(selectedCard, source, current);
       const pending = queuePendingActions(
         current,
         pendingActionsFor(spacePending, cardPending, source.spies),
@@ -270,27 +273,17 @@ export default function App() {
     if (game.pendingAction) return;
     if (!activePlayer.revealed || activePlayer.persuasion < (card.cost ?? 0)) return;
     setGame((current) => {
-      const fromReserve = current.reserveMarket.some((candidate) => candidate.id === card.id);
-      const [replacement, ...marketDeckAfterDraw] = current.marketDeck;
-      const marketDeck = fromReserve ? current.marketDeck : marketDeckAfterDraw;
-      const imperiumRow = fromReserve
-        ? current.imperiumRow
-        : current.imperiumRow.filter((candidate) => candidate.id !== card.id).concat(replacement ? [replacement] : []);
-      const players = current.players.map((player, index) =>
-        index === current.activeSeat
-          ? acquireCard(player, card, fromReserve)
-          : player,
-      );
-      return {
-        ...current,
-        players,
-        imperiumRow,
-        marketDeck,
-        log: [
-          `${activePlayer.leader} acquires ${card.name}${card.acquired ? ` for ${card.acquired} VP` : ""}.`,
-          ...current.log,
-        ],
-      };
+      const buyer = current.players[current.activeSeat];
+      return acquireMarketCard(current, buyer.id, card.id);
+    });
+  }
+
+  function chooseThroneRowCard(cardId: string) {
+    if (game.pendingAction?.kind !== "throne-row") return;
+    setGame((current) => {
+      const pending = current.pendingAction;
+      if (!pending || pending.kind !== "throne-row") return current;
+      return moveImperiumCardToThroneRow(current, pending, cardId);
     });
   }
 
@@ -486,6 +479,8 @@ export default function App() {
   const pendingSpyOwner = pendingAction?.kind === "spy" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingContractOwner =
     pendingAction?.kind === "contract" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
+  const pendingThroneOwner =
+    pendingAction?.kind === "throne-row" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const shaddamCommander = game.players.find((player) => player.team === "shaddam" && player.role === "Commander");
   const reservedContractChoices = pendingContractOwner?.reservedContracts ?? [];
   const revealAdjustOwner =
@@ -768,6 +763,7 @@ export default function App() {
                 {pendingAction.kind === "spy" && `Spy placement - ${pendingAction.remaining}`}
                 {pendingAction.kind === "reveal-adjust" && "Printed reveal adjustment"}
                 {pendingAction.kind === "contract" && `${pendingContractOwner?.leader ?? "Player"} CHOAM contract`}
+                {pendingAction.kind === "throne-row" && `${pendingThroneOwner?.leader ?? "Shaddam"} Throne Row`}
               </h2>
             </div>
 
@@ -922,6 +918,20 @@ export default function App() {
                 )}
               </div>
             )}
+
+            {pendingAction.kind === "throne-row" && pendingThroneOwner && (
+              <div className="pending-controls contract-choice throne-choice">
+                {game.imperiumRow.filter(canMoveCardToThroneRow).map((card) => (
+                  <button type="button" key={card.id} onClick={() => chooseThroneRowCard(card.id)}>
+                    {card.thumbnailPath && <img src={card.thumbnailPath} alt="" />}
+                    <span>{card.name}</span>
+                  </button>
+                ))}
+                {game.imperiumRow.every((card) => !canMoveCardToThroneRow(card)) && (
+                  <button type="button" onClick={clearPendingAction}>No eligible card</button>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -1034,6 +1044,38 @@ export default function App() {
               </button>
             ))}
           </div>
+          {game.throneRow.length > 0 && (
+            <section className="throne-market">
+              <div className="panel-heading">
+                <div>
+                  <p className="eyebrow">Shaddam team market</p>
+                  <h2>Throne Row</h2>
+                </div>
+                <span>{game.throneRow.length} held</span>
+              </div>
+              <div className="market-row throne-row">
+                {game.throneRow.map((card) => (
+                  <button
+                    type="button"
+                    className="market-card throne-card"
+                    key={card.id}
+                    onClick={() => buyCard(card)}
+                    disabled={
+                      Boolean(game.pendingAction) ||
+                      !activePlayer.revealed ||
+                      activePlayer.team !== "shaddam" ||
+                      activePlayer.persuasion < (card.cost ?? 0)
+                    }
+                  >
+                    {card.thumbnailPath && <img className="card-art" src={card.thumbnailPath} alt="" loading="lazy" />}
+                    <span>{card.cost} persuasion</span>
+                    <strong>{card.name}</strong>
+                    <p>{card.conditionalPersuasion || card.conditionalSwords ? "Resolve the printed reveal text on the card." : card.reveal}</p>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
         </div>
 
         <div className="log-panel">
@@ -1073,20 +1115,6 @@ function revealGainLabel(gain: Partial<Resources>) {
   const entries = Object.entries(gain).filter(([, value]) => (value ?? 0) > 0);
   if (entries.length === 0) return "";
   return ` and gains ${entries.map(([key, value]) => `${value} ${key}`).join(", ")}`;
-}
-
-function acquireCard(player: Player, card: Card, fromReserve: boolean): Player {
-  const purchaseSequence = player.purchaseSequence + 1;
-  const acquiredCard = fromReserve
-    ? { ...card, id: `${card.id}-${player.id}-${purchaseSequence}` }
-    : card;
-  return {
-    ...player,
-    vp: player.vp + (card.acquired ?? 0),
-    persuasion: player.persuasion - (card.cost ?? 0),
-    purchaseSequence,
-    discard: [...player.discard, acquiredCard],
-  };
 }
 
 function canPlaceSpyPost(space: BoardSpace, owner: Player, game: GameState) {

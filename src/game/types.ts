@@ -186,6 +186,11 @@ export type PendingAction =
       ownerId: string;
       source: string;
       spaceId?: string;
+    }
+  | {
+      kind: "throne-row";
+      ownerId: string;
+      source: string;
     };
 
 export type GameState = {
@@ -198,6 +203,7 @@ export type GameState = {
   imperiumRow: Card[];
   marketDeck: Card[];
   reserveMarket: Card[];
+  throneRow: Card[];
   contractOffer: ContractCard[];
   contractDeck: ContractCard[];
   intrigueDeck: IntrigueCard[];

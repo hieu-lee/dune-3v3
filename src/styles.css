@@ -99,6 +99,7 @@ h2 {
 
 .round-panel,
 .icon-button,
+.leader-art-button,
 .team-card,
 .conflict-card,
 .choam-card,
@@ -426,6 +427,20 @@ h2 {
   background: color-mix(in srgb, var(--player), rgba(30, 24, 20, 0.82) 84%);
 }
 
+.leader-art-button {
+  width: 72px;
+  min-width: 0;
+  border-radius: 6px;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+
+.leader-art-button:focus-visible {
+  outline: 2px solid var(--player);
+  outline-offset: 3px;
+}
+
 .player-identity {
   display: grid;
   grid-template-columns: 72px minmax(0, 1fr);
@@ -471,6 +486,44 @@ h2 {
 .resource-row span {
   display: inline-flex;
   gap: 4px;
+}
+
+.modal-backdrop {
+  position: fixed;
+  z-index: 20;
+  inset: 0;
+  display: grid;
+  align-items: center;
+  justify-items: center;
+  overflow: auto;
+  background: rgba(11, 8, 6, 0.78);
+  padding: 24px;
+}
+
+.leader-modal {
+  width: min(980px, 100%);
+  border: 1px solid rgba(255, 246, 230, 0.16);
+  border-radius: 8px;
+  background: rgba(28, 22, 18, 0.96);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.52);
+  padding: 14px;
+}
+
+.leader-modal header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.leader-reference-art {
+  display: block;
+  width: 100%;
+  aspect-ratio: 73 / 51;
+  object-fit: contain;
+  border-radius: 6px;
+  background: #120d0a;
 }
 
 .action-dock {
@@ -750,6 +803,7 @@ h2 {
   .command-bar,
   .panel-heading,
   .board-header,
+  .leader-modal header,
   .pending-panel {
     align-items: stretch;
     flex-direction: column;

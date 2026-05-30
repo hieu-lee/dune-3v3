@@ -13,9 +13,10 @@ import {
   Sparkles,
   Swords,
   Users,
+  X,
   type LucideIcon,
 } from "lucide-react";
-import { type CSSProperties, useMemo, useState } from "react";
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import { boardSpaces, iconLabels, teams } from "./game/data";
 import {
   advancePendingAction,
@@ -48,7 +49,11 @@ export default function App() {
   const [game, setGame] = useState<GameState>(() => initialGame());
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [selectedSpaceId, setSelectedSpaceId] = useState<string | null>(null);
+  const [selectedLeaderId, setSelectedLeaderId] = useState<string | null>(null);
   const [commanderTargets, setCommanderTargets] = useState<Record<string, string>>({});
+  const leaderDialogRef = useRef<HTMLElement | null>(null);
+  const leaderCloseButtonRef = useRef<HTMLButtonElement | null>(null);
+  const leaderOpenerRef = useRef<HTMLButtonElement | null>(null);
   const activePlayer = game.players[game.activeSeat];
   const activeAllies = game.players.filter((player) => player.team === activePlayer.team && player.role === "Ally");
   const activatedAlly =
@@ -57,6 +62,54 @@ export default function App() {
       : activePlayer;
   const selectedCard = activePlayer.hand.find((card) => card.id === selectedCardId) ?? null;
   const selectedSpace = boardSpaces.find((space) => space.id === selectedSpaceId) ?? null;
+  const selectedLeader = game.players.find((player) => player.id === selectedLeaderId) ?? null;
+
+  function closeLeaderReference() {
+    setSelectedLeaderId(null);
+    window.setTimeout(() => leaderOpenerRef.current?.focus(), 0);
+  }
+
+  function openLeaderReference(playerId: string, opener: HTMLButtonElement) {
+    leaderOpenerRef.current = opener;
+    setSelectedLeaderId(playerId);
+  }
+
+  useEffect(() => {
+    if (!selectedLeaderId) return;
+    const focusableSelector = [
+      "a[href]",
+      "button:not([disabled])",
+      "input:not([disabled])",
+      "select:not([disabled])",
+      "textarea:not([disabled])",
+      "[tabindex]:not([tabindex='-1'])",
+    ].join(",");
+    window.setTimeout(() => leaderCloseButtonRef.current?.focus(), 0);
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        closeLeaderReference();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusable = Array.from(leaderDialogRef.current?.querySelectorAll<HTMLElement>(focusableSelector) ?? []);
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (!first || !last) {
+        event.preventDefault();
+        leaderDialogRef.current?.focus();
+        return;
+      }
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [selectedLeaderId]);
 
   const legalSpaces = useMemo(() => {
     if (!selectedCard || activePlayer.agentsReady <= 0 || game.pendingAction) return new Set<string>();
@@ -435,6 +488,7 @@ export default function App() {
     setGame(initialGame());
     setSelectedCardId(null);
     setSelectedSpaceId(null);
+    setSelectedLeaderId(null);
     setCommanderTargets({});
   }
 
@@ -629,7 +683,15 @@ export default function App() {
             >
               <div className="player-identity">
                 {player.leaderCard.thumbnailPath && (
-                  <img className="leader-art" src={player.leaderCard.thumbnailPath} alt="" loading="eager" />
+                  <button
+                    className="leader-art-button"
+                    type="button"
+                    onClick={(event) => openLeaderReference(player.id, event.currentTarget)}
+                    aria-label={`View ${player.leader} leader card`}
+                    title={`View ${player.leader} leader card`}
+                  >
+                    <img className="leader-art" src={player.leaderCard.thumbnailPath} alt="" loading="eager" />
+                  </button>
                 )}
                 <div className="player-topline">
                   <span>{player.name}</span>
@@ -657,6 +719,45 @@ export default function App() {
           ))}
         </aside>
       </section>
+
+      {selectedLeader && (
+        <div className="modal-backdrop" role="presentation" onClick={closeLeaderReference}>
+          <article
+            className="leader-modal"
+            ref={leaderDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label={`${selectedLeader.leader} leader card`}
+            tabIndex={-1}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header>
+              <div>
+                <p className="eyebrow">{selectedLeader.role} - {teams[selectedLeader.team].name}</p>
+                <h2>{selectedLeader.leader}</h2>
+              </div>
+              <button
+                className="icon-button"
+                ref={leaderCloseButtonRef}
+                type="button"
+                onClick={closeLeaderReference}
+                title="Close leader card"
+              >
+                <X size={18} />
+              </button>
+            </header>
+            {selectedLeader.leaderCard.imagePath ? (
+              <img
+                className="leader-reference-art"
+                src={selectedLeader.leaderCard.imagePath}
+                alt={`${selectedLeader.leader} leader card`}
+              />
+            ) : (
+              <p>Leader card art is unavailable.</p>
+            )}
+          </article>
+        </div>
+      )}
 
       <section className="action-dock">
         {pendingAction && (

@@ -65,6 +65,7 @@ const intrigueSummariesByCatalogId: Partial<Record<number, string>> = {
   155: "Add 2 strength OR retreat any number of your troops.",
   156: "Add 1 strength; the recipient may lose 1 Influence, or a Commander may lose personal Influence, to add 4 more strength.",
   137: "Pay 2 water to deploy a sandworm to the Conflict; may remove the Shield Wall.",
+  146: "Retreat 1 or 2 troops, then optionally place a spy.",
   151: "Add 2 strength; if the recipient has one or more sandworms in the Conflict, add 4 strength instead and they may trash a card.",
   154: "Add 3 strength; add 5 instead if you have at least 3 Bene Gesserit Influence.",
   448: "Lose 1 Influence to gain 4 Solari as a Plot Intrigue OR add 4 strength in Combat if you have completed at least two contracts.",

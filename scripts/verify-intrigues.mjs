@@ -85,6 +85,7 @@ try {
   const unexpectedAllies = data.intrigueCards.find((card) => card.sourceId === 137);
   const contingencyPlan = data.intrigueCards.find((card) => card.sourceId === 147);
   const findWeakness = data.intrigueCards.find((card) => card.sourceId === 149);
+  const goToGround = data.intrigueCards.find((card) => card.sourceId === 146);
   const questionableMethods = data.intrigueCards.find((card) => card.sourceId === 156);
   const springTheTrap = data.intrigueCards.find((card) => card.sourceId === 153);
   const devour = data.intrigueCards.find((card) => card.sourceId === 151);
@@ -95,6 +96,7 @@ try {
   assert.ok(unexpectedAllies, "Unexpected Allies Intrigue should be available");
   assert.ok(contingencyPlan, "Contingency Plan Intrigue should be available");
   assert.ok(findWeakness, "Find Weakness Intrigue should be available");
+  assert.ok(goToGround, "Go To Ground Intrigue should be available");
   assert.ok(questionableMethods, "Questionable Methods Intrigue should be available");
   assert.ok(springTheTrap, "Spring The Trap Intrigue should be available");
   assert.ok(devour, "Devour Intrigue should be available");
@@ -119,6 +121,11 @@ try {
     findWeakness.summary,
     "Add 2 strength; you may recall 1 spy to add 3 more strength.",
     "Find Weakness should expose its base strength and optional spy recall",
+  );
+  assert.equal(
+    goToGround.summary,
+    "Retreat 1 or 2 troops, then optionally place a spy.",
+    "Go To Ground should expose its troop retreat and spy placement effect",
   );
   assert.equal(
     questionableMethods.summary,

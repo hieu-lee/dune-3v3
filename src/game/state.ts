@@ -51,6 +51,7 @@ const reachAgreementSourceId = 449;
 const detonationSourceId = 131;
 const unexpectedAlliesSourceId = 137;
 const contingencyPlanSourceId = 147;
+const goToGroundSourceId = 146;
 const findWeaknessSourceId = 149;
 const spiceIsPowerSourceId = 150;
 const devourSourceId = 151;
@@ -138,6 +139,10 @@ export function isDevourIntrigue(intrigue: IntrigueCard) {
 
 export function isFindWeaknessIntrigue(intrigue: IntrigueCard) {
   return intrigue.sourceId === findWeaknessSourceId;
+}
+
+export function isGoToGroundIntrigue(intrigue: IntrigueCard) {
+  return intrigue.sourceId === goToGroundSourceId;
 }
 
 export function isSpiceIsPowerIntrigue(intrigue: IntrigueCard) {
@@ -529,6 +534,13 @@ export function iconCanReach(
   return false;
 }
 
+export function canPlaceSpyPost(state: GameState, space: BoardSpace, owner: Player) {
+  if (state.spyPosts[space.id]) return false;
+  if (space.id === "swordmaster" && state.swordmasterClaimed) return false;
+  if (!space.personal) return true;
+  return owner.role === "Commander" && owner.team === space.personal;
+}
+
 function resolveInfluence(space: BoardSpace, player: Player): FactionId | null {
   if (!space.influence) return null;
   if (space.personal) return space.influence;
@@ -681,11 +693,16 @@ export function advancePendingAction(state: GameState) {
   return { pendingAction, pendingQueue };
 }
 
+export function finishPendingAction(state: GameState): GameState {
+  return finishCombatIfNoActors({ ...state, ...advancePendingAction(state) });
+}
+
 type ContractPendingAction = Extract<PendingAction, { kind: "contract" }>;
 type DeployPendingAction = Extract<PendingAction, { kind: "deploy" }>;
 type MakerChoicePendingAction = Extract<PendingAction, { kind: "maker-choice" }>;
 type ReinforcePendingAction = Extract<PendingAction, { kind: "reinforce" }>;
 type SietchTabrPendingAction = Extract<PendingAction, { kind: "sietch-tabr" }>;
+type SpyPendingAction = Extract<PendingAction, { kind: "spy" }>;
 type TradePendingAction = Extract<PendingAction, { kind: "trade" }>;
 type ThroneRowPendingAction = Extract<PendingAction, { kind: "throne-row" }>;
 type TrashCardPendingAction = Extract<PendingAction, { kind: "trash-card" }>;
@@ -1152,8 +1169,39 @@ export function recallableSpySpaces(state: GameState, pending: RecallSpyPendingA
   return boardSpaces.filter((space) => state.spyPosts[space.id] === pending.ownerId);
 }
 
+export function placeableSpySpaces(state: GameState, pending: SpyPendingAction) {
+  const owner = state.players.find((player) => player.id === pending.ownerId);
+  if (!owner || owner.spies <= 0) return [];
+  return boardSpaces.filter((space) => canPlaceSpyPost(state, space, owner));
+}
+
 function spyPostCount(state: GameState, ownerId: string) {
   return boardSpaces.filter((space) => state.spyPosts[space.id] === ownerId).length;
+}
+
+export function placeSpyForPending(
+  state: GameState,
+  pending: SpyPendingAction,
+  spaceId: string,
+): GameState {
+  const owner = state.players.find((player) => player.id === pending.ownerId);
+  const space = boardSpaces.find((candidate) => candidate.id === spaceId);
+  if (!owner || !space || owner.spies <= 0 || pending.remaining <= 0 || !canPlaceSpyPost(state, space, owner)) {
+    return state;
+  }
+
+  const nextSpies = owner.spies - 1;
+  const players = state.players.map((player) =>
+    player.id === owner.id ? { ...player, spies: nextSpies } : player,
+  );
+  const remaining = Math.min(pending.remaining - 1, nextSpies);
+  return finishCombatIfNoActors({
+    ...state,
+    players,
+    spyPosts: { ...state.spyPosts, [space.id]: owner.id },
+    ...(remaining > 0 ? { pendingAction: { ...pending, remaining } } : advancePendingAction(state)),
+    log: [`${owner.leader} places a spy near ${space.name} from ${pending.source}.`, ...state.log],
+  });
 }
 
 export function recallSpyForPending(
@@ -1749,6 +1797,46 @@ export function playCombatIntrigue(
   if (!resolvedTargetId || !targets.includes(resolvedTargetId)) return state;
   const target = state.players.find((player) => player.id === resolvedTargetId);
   if (!target) return state;
+  if (isGoToGroundIntrigue(intrigue)) {
+    const retreatCount =
+      typeof combatChoice === "object" && combatChoice.kind === "retreat-troops" ? combatChoice.count : undefined;
+    if (
+      !Number.isInteger(retreatCount) ||
+      (retreatCount ?? 0) < 1 ||
+      (retreatCount ?? 0) > 2 ||
+      (retreatCount ?? 0) > target.deployedTroops
+    ) return state;
+    const count = retreatCount ?? 0;
+    const spyPending: SpyPendingAction = { kind: "spy", ownerId: target.id, remaining: 1, source: "Go To Ground" };
+    const canPlaceSpy = placeableSpySpaces(state, spyPending).length > 0;
+
+    const players = state.players.map((player) => {
+      let next = player;
+      if (player.id === actor.id) {
+        next = { ...next, intrigues: next.intrigues.filter((card) => card.id !== intrigue.id) };
+      }
+      if (player.id === target.id) {
+        next = {
+          ...next,
+          conflict: Math.max(0, next.conflict - count * 2),
+          deployedTroops: next.deployedTroops - count,
+          garrison: next.garrison + count,
+        };
+      }
+      return next;
+    });
+    return advanceAfterCombatIntriguePlay({
+      ...state,
+      players,
+      combatPasses: [],
+      intrigueDiscard: [...state.intrigueDiscard, intrigue],
+      pendingAction: canPlaceSpy ? spyPending : undefined,
+      log: [
+        `${actor.leader} plays Go To Ground for ${target.leader}; ${target.leader} retreats ${count} ${count === 1 ? "troop" : "troops"}${canPlaceSpy ? " and may place a spy" : ""}.`,
+        ...state.log,
+      ],
+    });
+  }
   if (isSpiceIsPowerIntrigue(intrigue)) {
     if (combatChoice !== "spend-spice" && combatChoice !== "retreat-troops") return state;
     if (combatChoice === "spend-spice" && target.resources.spice < 3) return state;

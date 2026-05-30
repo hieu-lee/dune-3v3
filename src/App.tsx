@@ -19,11 +19,11 @@ import {
 import { Fragment, type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import { battleIconLabels, boardSpaces, factionIds, factionLabels, iconLabels, teams } from "./game/data";
 import {
-  advancePendingAction,
   advanceSeat,
   acquireMarketCard,
   allPlayersDone,
   applyBoardEffect,
+  canPlaceSpyPost,
   canMoveCardToThroneRow,
   canPay,
   collectChoamContractFallback,
@@ -38,6 +38,7 @@ import {
   endgameConditionalIntrigueChoices,
   effectiveCost,
   finishEndgame,
+  finishPendingAction,
   finishRevealAdjustment as resolveRevealAdjustment,
   iconCanReach,
   initialGame,
@@ -47,6 +48,7 @@ import {
   isDevourIntrigue,
   isDetonationIntrigue,
   isFindWeaknessIntrigue,
+  isGoToGroundIntrigue,
   isQuestionableMethodsIntrigue,
   isReachAgreementIntrigue,
   isSpiceIsPowerIntrigue,
@@ -64,6 +66,7 @@ import {
   pendingActionForSpace,
   playerDoublesConflictRewards,
   playCombatIntrigue,
+  placeSpyForPending,
   queuePendingActions,
   recallableSpySpaces,
   recallSpyForPending,
@@ -95,7 +98,7 @@ import {
   transferTradeGood,
   updateTradeSelection,
 } from "./game/state";
-import type { BoardSpace, Card, FactionId, GameState, Player, ResourceId, Resources, TeamId, TradeGoodId, TrashCardZone } from "./game/types";
+import type { Card, FactionId, GameState, Player, ResourceId, Resources, TeamId, TradeGoodId, TrashCardZone } from "./game/types";
 import type { CombatIntrigueChoice } from "./game/state";
 
 const resources: Array<{ id: ResourceId; label: string; Icon: LucideIcon }> = [
@@ -382,7 +385,7 @@ export default function App() {
   }
 
   function clearPendingAction() {
-    setGame((current) => maybeStartCombatPhase({ ...current, ...advancePendingAction(current) }));
+    setGame((current) => maybeStartCombatPhase(finishPendingAction(current)));
   }
 
   function trashCard(zone: TrashCardZone, cardId: string) {
@@ -443,23 +446,8 @@ export default function App() {
     if (game.pendingAction?.kind !== "spy") return;
     setGame((current) => {
       const pending = current.pendingAction;
-      if (!pending || pending.kind !== "spy" || pending.remaining <= 0) return current;
-      const owner = current.players.find((player) => player.id === pending.ownerId);
-      const space = boardSpaces.find((candidate) => candidate.id === spaceId);
-      if (!owner || !space || owner.spies <= 0 || !canPlaceSpyPost(space, owner, current)) return current;
-      const nextSpies = owner.spies - 1;
-      const players = current.players.map((player) =>
-        player.id === owner.id ? { ...player, spies: nextSpies } : player,
-      );
-      const remaining = Math.min(pending.remaining - 1, nextSpies);
-      const nextState = {
-        ...current,
-        players,
-        spyPosts: { ...current.spyPosts, [space.id]: owner.id },
-        ...(remaining > 0 ? { pendingAction: { ...pending, remaining } } : advancePendingAction(current)),
-        log: [`${owner.leader} places a spy near ${space.name} from ${pending.source}.`, ...current.log],
-      };
-      return maybeStartCombatPhase(nextState);
+      if (!pending || pending.kind !== "spy") return current;
+      return maybeStartCombatPhase(placeSpyForPending(current, pending, spaceId));
     });
   }
 
@@ -757,6 +745,7 @@ export default function App() {
       card.combatSwords ||
       combatIntrigueStrength(game, combatActor, card) ||
       isDevourIntrigue(card) ||
+      isGoToGroundIntrigue(card) ||
       isReachAgreementIntrigue(card)
     ) ?? [];
   const tradePartners =
@@ -785,7 +774,7 @@ export default function App() {
   const unexpectedAlliesCanSummonWithoutWall = Boolean(game.conflict && (!game.shieldWall || !currentConflictProtected));
   const unexpectedAlliesDisabled = plotIntrigueLocked || !game.conflict || !unexpectedAlliesCanPay;
   const spyPlacementSpaces = pendingSpyOwner
-    ? boardSpaces.filter((space) => canPlaceSpyPost(space, pendingSpyOwner, game))
+    ? boardSpaces.filter((space) => canPlaceSpyPost(game, space, pendingSpyOwner))
     : [];
 
   return (
@@ -1179,6 +1168,7 @@ export default function App() {
               {combatCards.map((card) => {
                 const devourCard = isDevourIntrigue(card);
                 const findWeaknessCard = isFindWeaknessIntrigue(card);
+                const goToGroundCard = isGoToGroundIntrigue(card);
                 const questionableMethodsCard = isQuestionableMethodsIntrigue(card);
                 const reachAgreementCard = isReachAgreementIntrigue(card);
                 const spiceIsPowerCard = isSpiceIsPowerIntrigue(card);
@@ -1198,6 +1188,8 @@ export default function App() {
                       title={
                         questionableMethodsCard
                           ? "Add 1 strength; the recipient may lose Influence, or a Commander may lose personal Influence, for 4 more strength."
+                        : goToGroundCard
+                          ? "Retreat 1 or 2 troops from the chosen recipient, then optionally place a spy for that recipient."
                         : reachAgreementCard
                           ? "Retreat 1 or 2 troops from the chosen recipient, then take a CHOAM contract for that recipient."
                           : spiceIsPowerCard
@@ -1212,6 +1204,8 @@ export default function App() {
                         ? "+2 / recall spy for +3"
                         : questionableMethodsCard
                           ? "+1 / lose Ally/Cmdr personal Inf. for +4"
+                        : goToGroundCard
+                          ? "Retreat 1-2 troops / optional spy"
                         : reachAgreementCard
                           ? "Retreat 1-2 troops / take contract"
                         : spiceIsPowerCard
@@ -1226,7 +1220,37 @@ export default function App() {
                         ? "2+ completed contracts"
                         : `+${automatedStrength ?? card.combatSwords} strength`}
                     </span>
-                    {reachAgreementCard
+                    {goToGroundCard
+                      ? combatTargets.length > 0
+                        ? combatTargets.map((target) => (
+                            <Fragment key={target.id}>
+                              {target.deployedTroops > 0
+                                ? Array.from({ length: Math.min(2, target.deployedTroops) }, (_, index) => index + 1).map((count) => {
+                                    const targetCanPlaceSpy = target.spies > 0 && boardSpaces.some((space) => canPlaceSpyPost(game, space, target));
+                                    return (
+                                      <button
+                                        type="button"
+                                        key={`${target.id}-ground-retreat-${count}`}
+                                        onClick={() => playCombatCard(card.id, target.id, { kind: "retreat-troops", count })}
+                                        title={`Retreat ${count} ${count === 1 ? "troop" : "troops"} from ${target.leader}${targetCanPlaceSpy ? ", then optionally place a spy" : ""}`}
+                                      >
+                                        {combatActor.role === "Commander"
+                                          ? `${target.leader}: retreat ${count}${targetCanPlaceSpy ? " + spy" : ""}`
+                                          : `Retreat ${count}${targetCanPlaceSpy ? " + spy" : ""}`}
+                                      </button>
+                                    );
+                                  })
+                                : (
+                                    <span>
+                                      {combatActor.role === "Commander"
+                                        ? `${target.leader}: requires deployed troops.`
+                                        : "Requires 1 or 2 deployed troops."}
+                                    </span>
+                                  )}
+                            </Fragment>
+                          ))
+                        : <span>Requires 1 or 2 deployed troops.</span>
+                    : reachAgreementCard
                       ? combatTargets.length > 0
                         ? combatTargets.map((target) => (
                             <Fragment key={target.id}>
@@ -1761,6 +1785,8 @@ export default function App() {
                             ? "Combat / +2 / recall spy for +3"
                           : isQuestionableMethodsIntrigue(card)
                             ? "Combat / +1 / lose Ally/Cmdr personal Inf. for +4"
+                          : isGoToGroundIntrigue(card)
+                            ? "Combat / retreat 1-2 troops / optional spy"
                           : isReachAgreementIntrigue(card)
                             ? "Combat / retreat 1-2 troops / take contract"
                           : isSpiceIsPowerIntrigue(card)
@@ -1957,11 +1983,4 @@ function revealGainLabel(gain: Partial<Resources>) {
   const entries = Object.entries(gain).filter(([, value]) => (value ?? 0) > 0);
   if (entries.length === 0) return "";
   return ` and gains ${entries.map(([key, value]) => `${value} ${key}`).join(", ")}`;
-}
-
-function canPlaceSpyPost(space: BoardSpace, owner: Player, game: GameState) {
-  if (game.spyPosts[space.id]) return false;
-  if (space.id === "swordmaster" && game.swordmasterClaimed) return false;
-  if (!space.personal) return true;
-  return owner.role === "Commander" && owner.team === space.personal;
 }

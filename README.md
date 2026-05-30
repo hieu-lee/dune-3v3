@@ -37,6 +37,7 @@ Private web-table implementation for a six-player `Dune: Imperium - Uprising` te
 - Backed by CHOAM can be played as a Combat Intrigue for 4 strength once the actor has completed at least two contracts.
 - Find Weakness can be played as a Combat Intrigue for 2 strength, with an optional actor-owned spy recall for 3 more strength.
 - Questionable Methods can be played as a Combat Intrigue for 1 strength, with an optional recipient or Commander personal Influence loss for 4 more strength.
+- Go To Ground can be played as a Combat Intrigue to retreat one or two recipient troops, then optionally place a spy for that recipient.
 - Spring The Trap can be played as a Combat Intrigue by recalling two actor-owned spies, adding 7 strength after both recalls resolve.
 - Spice is Power can be played as a Combat Intrigue by retreating three recipient troops for 3 spice, or spending 3 recipient spice for 6 strength.
 - Tactical Option can be played as a Combat Intrigue for 2 strength or to retreat any chosen number of recipient troops.

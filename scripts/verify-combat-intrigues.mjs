@@ -92,6 +92,7 @@ try {
 
   const impress = intrigueBySourceId(data, 152);
   const findWeakness = intrigueBySourceId(data, 149);
+  const goToGround = intrigueBySourceId(data, 146);
   const spiceIsPower = intrigueBySourceId(data, 150);
   const questionableMethods = intrigueBySourceId(data, 156);
   const springTheTrap = intrigueBySourceId(data, 153);
@@ -104,6 +105,7 @@ try {
   const mercenaries = intrigueBySourceId(data, 128);
   const espionageSpace = boardSpaceByName(data, "Espionage");
   const secretsSpace = boardSpaceByName(data, "Secrets");
+  const vastWealthSpace = boardSpaceByName(data, "Vast Wealth");
   const arrakeenSpace = boardSpaceByName(data, "Arrakeen");
   assert.equal(impress.combatSwords, 2, "Impress should expose its structured Combat strength");
   assert.equal(findWeakness.combatSwords, 5, "Find Weakness should expose its maximum structured Combat strength");
@@ -111,6 +113,12 @@ try {
     findWeakness.summary,
     "Add 2 strength; you may recall 1 spy to add 3 more strength.",
     "Find Weakness should expose its base strength and optional spy recall",
+  );
+  assert.equal(goToGround.combatSwords, undefined, "Go To Ground should resolve through its structured retreat and spy flow");
+  assert.equal(
+    goToGround.summary,
+    "Retreat 1 or 2 troops, then optionally place a spy.",
+    "Go To Ground should expose its retreat and spy placement effect",
   );
   assert.equal(springTheTrap.combatSwords, 7, "Spring The Trap should expose its structured Combat strength");
   assert.equal(
@@ -159,6 +167,7 @@ try {
   assert.equal(backedByChoam.combatSwords, 4, "Backed by CHOAM should expose its structured Combat strength");
   assert.equal(impress.automatedCombatSwords, undefined, "Impress has extra printed text and should not auto-resolve");
   assert.equal(findWeakness.automatedCombatSwords, undefined, "Find Weakness should resolve through spy-recall state");
+  assert.equal(goToGround.automatedCombatSwords, undefined, "Go To Ground should resolve through retreat and spy choices");
   assert.equal(questionableMethods.automatedCombatSwords, undefined, "Questionable Methods should resolve through Influence-loss state");
   assert.equal(spiceIsPower.automatedCombatSwords, undefined, "Spice is Power should resolve through an explicit branch choice");
   assert.equal(tacticalOption.automatedCombatSwords, undefined, "Tactical Option should resolve through an explicit branch choice");
@@ -670,6 +679,321 @@ try {
     reachAgreementLastActorTookContract.log.some((entry) => entry.includes("resolves with no winner")),
     "Reach Agreement should resolve the Conflict with no winner after the last units retreat and the contract resolves",
   );
+
+  const goToGroundFixture = combatFixture(state, data, (players) =>
+    players.map((player) =>
+      player.id === "p2"
+        ? { ...player, conflict: 4, deployedTroops: 2, garrison: 0, intrigues: [goToGround] }
+        : player.id === "p3"
+          ? { ...player, conflict: 4, deployedTroops: 1 }
+          : player,
+    ),
+  );
+  const goToGroundCombat = state.startCombatPhase(goToGroundFixture);
+  assert.equal(state.isGoToGroundIntrigue(goToGround), true, "Go To Ground should be recognized as a structured Combat Intrigue");
+  assert.equal(
+    state.combatIntrigueStrength(goToGroundCombat, playerById(goToGroundCombat, "p2"), goToGround),
+    undefined,
+    "Go To Ground should not expose fixed Combat strength",
+  );
+  assert.equal(
+    state.playCombatIntrigue(goToGroundCombat, "p2", goToGround.id),
+    goToGroundCombat,
+    "Go To Ground should require an explicit retreat count",
+  );
+  assert.equal(
+    state.playCombatIntrigue(goToGroundCombat, "p2", goToGround.id, undefined, { kind: "retreat-troops", count: 0 }),
+    goToGroundCombat,
+    "Go To Ground should reject zero troops",
+  );
+  assert.equal(
+    state.playCombatIntrigue(goToGroundCombat, "p2", goToGround.id, undefined, { kind: "retreat-troops", count: 3 }),
+    goToGroundCombat,
+    "Go To Ground should reject more than two troops",
+  );
+  assert.equal(
+    state.playCombatIntrigue(goToGroundCombat, "p2", goToGround.id, undefined, { kind: "retreat-troops", count: 1.5 }),
+    goToGroundCombat,
+    "Go To Ground should reject fractional troop counts",
+  );
+  const goToGroundPlayed = state.playCombatIntrigue(
+    goToGroundCombat,
+    "p2",
+    goToGround.id,
+    undefined,
+    { kind: "retreat-troops", count: 2 },
+  );
+  assert.equal(playerById(goToGroundPlayed, "p2").deployedTroops, 0, "Go To Ground should retreat the chosen troop count");
+  assert.equal(playerById(goToGroundPlayed, "p2").garrison, 2, "Go To Ground should return retreated troops to garrison");
+  assert.equal(playerById(goToGroundPlayed, "p2").conflict, 0, "Go To Ground should remove retreated troop strength");
+  assert.deepEqual(playerById(goToGroundPlayed, "p2").intrigues, [], "Go To Ground should leave the player's hand");
+  assert.equal(goToGroundPlayed.intrigueDiscard.at(-1).id, goToGround.id);
+  assert.deepEqual(goToGroundPlayed.pendingAction, {
+    kind: "spy",
+    ownerId: "p2",
+    remaining: 1,
+    source: "Go To Ground",
+  });
+  assert.equal(
+    goToGroundPlayed.players[goToGroundPlayed.activeSeat].id,
+    "p3",
+    "Go To Ground should continue with the next remaining Combat actor while spy placement is pending",
+  );
+  assert.equal(
+    state.passCombatIntrigue(goToGroundPlayed, goToGroundPlayed.players[goToGroundPlayed.activeSeat].id),
+    goToGroundPlayed,
+    "Combat should stay locked while Go To Ground spy placement is pending",
+  );
+  const goToGroundSkippedSpy = state.finishPendingAction(goToGroundPlayed);
+  assert.equal(goToGroundSkippedSpy.pendingAction, undefined, "Skipping the Go To Ground spy should clear the pending action");
+  assert.equal(goToGroundSkippedSpy.phase, "combat", "Skipping the Go To Ground spy should resume Combat when actors remain");
+  assert.equal(goToGroundSkippedSpy.players[goToGroundSkippedSpy.activeSeat].id, "p3");
+  assert.equal(playerById(goToGroundSkippedSpy, "p2").spies, playerById(goToGroundPlayed, "p2").spies);
+  assert.equal(goToGroundSkippedSpy.spyPosts[secretsSpace.id], undefined);
+  assert.ok(
+    state.placeableSpySpaces(goToGroundPlayed, goToGroundPlayed.pendingAction).some((space) => space.id === secretsSpace.id),
+    "Go To Ground should offer legal spy posts to the recipient",
+  );
+  const goToGroundOccupiedSpyPost = {
+    ...goToGroundPlayed,
+    spyPosts: { ...goToGroundPlayed.spyPosts, [secretsSpace.id]: "p3" },
+  };
+  assert.equal(
+    state.placeSpyForPending(goToGroundOccupiedSpyPost, goToGroundOccupiedSpyPost.pendingAction, secretsSpace.id),
+    goToGroundOccupiedSpyPost,
+    "Go To Ground spy placement should reject occupied spy posts",
+  );
+  assert.equal(
+    state.placeSpyForPending(goToGroundPlayed, goToGroundPlayed.pendingAction, vastWealthSpace.id),
+    goToGroundPlayed,
+    "Go To Ground spy placement should reject personal Commander-board posts for an Ally",
+  );
+  const goToGroundSpyPlaced = state.placeSpyForPending(goToGroundPlayed, goToGroundPlayed.pendingAction, secretsSpace.id);
+  assert.equal(goToGroundSpyPlaced.pendingAction, undefined, "Placing the Go To Ground spy should clear the pending action");
+  assert.equal(goToGroundSpyPlaced.phase, "combat", "Combat should resume after Go To Ground if actors remain");
+  assert.equal(goToGroundSpyPlaced.players[goToGroundSpyPlaced.activeSeat].id, "p3");
+  assert.equal(playerById(goToGroundSpyPlaced, "p2").spies, playerById(goToGroundPlayed, "p2").spies - 1);
+  assert.equal(goToGroundSpyPlaced.spyPosts[secretsSpace.id], "p2");
+  assert.match(goToGroundSpyPlaced.log[0], /places a spy near Secrets from Go To Ground/);
+
+  const goToGroundOneTroopFixture = combatFixture(state, data, (players) =>
+    players.map((player) =>
+      player.id === "p2"
+        ? { ...player, conflict: 7, deployedTroops: 2, garrison: 1, intrigues: [goToGround] }
+        : player.id === "p3"
+          ? { ...player, conflict: 4, deployedTroops: 1 }
+          : player,
+    ),
+  );
+  const goToGroundOneTroop = state.startCombatPhase(goToGroundOneTroopFixture);
+  const goToGroundOneTroopOnlyFixture = combatFixture(state, data, (players) =>
+    players.map((player) =>
+      player.id === "p2"
+        ? { ...player, conflict: 5, deployedTroops: 1, garrison: 0, intrigues: [goToGround] }
+        : player.id === "p3"
+          ? { ...player, conflict: 4, deployedTroops: 1 }
+          : player,
+    ),
+  );
+  const goToGroundOneTroopOnly = state.startCombatPhase(goToGroundOneTroopOnlyFixture);
+  assert.equal(
+    state.playCombatIntrigue(goToGroundOneTroopOnly, "p2", goToGround.id, undefined, { kind: "retreat-troops", count: 2 }),
+    goToGroundOneTroopOnly,
+    "Go To Ground should reject retreating more troops than the recipient has",
+  );
+  const goToGroundRetreatedOne = state.playCombatIntrigue(
+    goToGroundOneTroop,
+    "p2",
+    goToGround.id,
+    undefined,
+    { kind: "retreat-troops", count: 1 },
+  );
+  assert.equal(playerById(goToGroundRetreatedOne, "p2").deployedTroops, 1, "Go To Ground should allow retreating one troop");
+  assert.equal(playerById(goToGroundRetreatedOne, "p2").garrison, 2);
+  assert.equal(playerById(goToGroundRetreatedOne, "p2").conflict, 5);
+  assert.deepEqual(goToGroundRetreatedOne.pendingAction, {
+    kind: "spy",
+    ownerId: "p2",
+    remaining: 1,
+    source: "Go To Ground",
+  });
+
+  const goToGroundWormOnlyFixture = combatFixture(state, data, (players) =>
+    players.map((player) =>
+      player.id === "p2"
+        ? { ...player, conflict: 3, deployedTroops: 0, deployedSandworms: 1, intrigues: [goToGround] }
+        : player,
+    ),
+  );
+  const goToGroundWormOnly = state.startCombatPhase(goToGroundWormOnlyFixture);
+  assert.equal(
+    state.playCombatIntrigue(goToGroundWormOnly, "p2", goToGround.id, undefined, { kind: "retreat-troops", count: 1 }),
+    goToGroundWormOnly,
+    "Go To Ground should reject a sandworm-only recipient with no troops to retreat",
+  );
+
+  const goToGroundMixedWormFixture = combatFixture(state, data, (players) =>
+    players.map((player) =>
+      player.id === "p2"
+        ? {
+            ...player,
+            conflict: 4,
+            deployedTroops: 1,
+            deployedSandworms: 1,
+            spies: 0,
+            intrigues: [goToGround],
+          }
+        : player.id === "p3"
+          ? { ...player, conflict: 1, deployedTroops: 1 }
+          : player,
+    ),
+  );
+  const goToGroundMixedWorm = state.startCombatPhase(goToGroundMixedWormFixture);
+  const goToGroundMixedWormPlayed = state.playCombatIntrigue(
+    goToGroundMixedWorm,
+    "p2",
+    goToGround.id,
+    undefined,
+    { kind: "retreat-troops", count: 1 },
+  );
+  assert.equal(playerById(goToGroundMixedWormPlayed, "p2").deployedTroops, 0, "Go To Ground should retreat troops from a mixed troop/sandworm force");
+  assert.equal(playerById(goToGroundMixedWormPlayed, "p2").deployedSandworms, 1, "Go To Ground should not retreat sandworms");
+  assert.equal(playerById(goToGroundMixedWormPlayed, "p2").conflict, 2, "Go To Ground should only remove troop strength from a mixed troop/sandworm force");
+  assert.equal(goToGroundMixedWormPlayed.phase, "combat", "A remaining sandworm should keep the recipient in Combat");
+  assert.ok(
+    state.combatIntrigueActorIds(goToGroundMixedWormPlayed).includes("p2"),
+    "A recipient with only sandworms left should remain a Combat actor",
+  );
+  let goToGroundMixedWormResolved = goToGroundMixedWormPlayed;
+  for (let passCount = 0; passCount < 10 && goToGroundMixedWormResolved.phase === "combat"; passCount += 1) {
+    goToGroundMixedWormResolved = passCurrent(state, goToGroundMixedWormResolved);
+  }
+  assert.equal(goToGroundMixedWormResolved.phase, "playing", "Combat should resolve after the mixed sandworm survivor passes");
+  assert.ok(
+    playerById(goToGroundMixedWormResolved, "p2").wonConflicts.some((conflict) => conflict.sourceId === goToGroundMixedWormFixture.conflict.sourceId),
+    "A sandworm survivor with remaining strength should still be eligible to win the Conflict",
+  );
+
+  const goToGroundNoSpyFixture = combatFixture(state, data, (players) =>
+    players.map((player) =>
+      player.id === "p2"
+        ? { ...player, conflict: 4, deployedTroops: 2, garrison: 0, spies: 0, intrigues: [goToGround] }
+        : player.id === "p3"
+          ? { ...player, conflict: 4, deployedTroops: 1 }
+          : player,
+    ),
+  );
+  const goToGroundNoSpy = state.startCombatPhase(goToGroundNoSpyFixture);
+  const goToGroundNoSpyPlayed = state.playCombatIntrigue(
+    goToGroundNoSpy,
+    "p2",
+    goToGround.id,
+    undefined,
+    { kind: "retreat-troops", count: 2 },
+  );
+  assert.equal(goToGroundNoSpyPlayed.pendingAction, undefined, "Go To Ground should not queue spy placement with no spies in supply");
+  assert.equal(goToGroundNoSpyPlayed.phase, "combat", "Combat should continue with remaining actors after a no-spy Go To Ground");
+  assert.equal(goToGroundNoSpyPlayed.players[goToGroundNoSpyPlayed.activeSeat].id, "p3");
+  assert.match(goToGroundNoSpyPlayed.log[0], /retreats 2 troops\./);
+
+  const occupiedNonPersonalSpyPosts = Object.fromEntries(
+    data.boardSpaces.filter((space) => !space.personal).map((space) => [space.id, "p3"]),
+  );
+  const goToGroundNoLegalSpyFixture = {
+    ...combatFixture(state, data, (players) =>
+      players.map((player) =>
+        player.id === "p2"
+          ? { ...player, conflict: 4, deployedTroops: 2, garrison: 0, spies: 3, intrigues: [goToGround] }
+          : player.id === "p3"
+            ? { ...player, conflict: 4, deployedTroops: 1 }
+            : player,
+      ),
+    ),
+    spyPosts: occupiedNonPersonalSpyPosts,
+  };
+  const goToGroundNoLegalSpy = state.startCombatPhase(goToGroundNoLegalSpyFixture);
+  assert.deepEqual(
+    state.placeableSpySpaces(goToGroundNoLegalSpy, { kind: "spy", ownerId: "p2", remaining: 1, source: "Go To Ground" }),
+    [],
+    "Test fixture should leave the Go To Ground recipient with spies but no legal spy posts",
+  );
+  const goToGroundNoLegalSpyPlayed = state.playCombatIntrigue(
+    goToGroundNoLegalSpy,
+    "p2",
+    goToGround.id,
+    undefined,
+    { kind: "retreat-troops", count: 2 },
+  );
+  assert.equal(goToGroundNoLegalSpyPlayed.pendingAction, undefined, "Go To Ground should not queue spy placement when every legal post is occupied");
+  assert.equal(goToGroundNoLegalSpyPlayed.phase, "combat", "Combat should continue when Go To Ground has spies but no legal spy post");
+  assert.equal(goToGroundNoLegalSpyPlayed.players[goToGroundNoLegalSpyPlayed.activeSeat].id, "p3");
+  assert.match(goToGroundNoLegalSpyPlayed.log[0], /retreats 2 troops\./);
+
+  const goToGroundNoSpyLastActorFixture = combatFixture(state, data, (players) =>
+    players.map((player) =>
+      player.id === "p2"
+        ? { ...player, conflict: 4, deployedTroops: 2, garrison: 0, spies: 0, intrigues: [goToGround] }
+        : player,
+    ),
+  );
+  const goToGroundNoSpyLastActor = state.startCombatPhase(goToGroundNoSpyLastActorFixture);
+  const goToGroundNoSpyLastActorPlayed = state.playCombatIntrigue(
+    goToGroundNoSpyLastActor,
+    "p2",
+    goToGround.id,
+    undefined,
+    { kind: "retreat-troops", count: 2 },
+  );
+  assert.equal(goToGroundNoSpyLastActorPlayed.phase, "playing", "Go To Ground should resolve empty Combat immediately when no spy can be placed");
+  assert.equal(goToGroundNoSpyLastActorPlayed.round, goToGroundNoSpyLastActorFixture.round + 1);
+  assert.ok(
+    goToGroundNoSpyLastActorPlayed.log.some((entry) => entry.includes("resolves with no winner")),
+    "Go To Ground should resolve with no winner when the last units retreat and no spy is pending",
+  );
+
+  const goToGroundLastActorFixture = combatFixture(state, data, (players) =>
+    players.map((player) =>
+      player.id === "p2"
+        ? { ...player, conflict: 4, deployedTroops: 2, garrison: 0, intrigues: [goToGround] }
+        : player,
+    ),
+  );
+  const goToGroundLastActor = state.startCombatPhase(goToGroundLastActorFixture);
+  const goToGroundLastActorPlayed = state.playCombatIntrigue(
+    goToGroundLastActor,
+    "p2",
+    goToGround.id,
+    undefined,
+    { kind: "retreat-troops", count: 2 },
+  );
+  assert.equal(goToGroundLastActorPlayed.phase, "combat", "Go To Ground should keep Combat open while spy placement is pending");
+  assert.deepEqual(goToGroundLastActorPlayed.pendingAction, {
+    kind: "spy",
+    ownerId: "p2",
+    remaining: 1,
+    source: "Go To Ground",
+  });
+  assert.deepEqual(
+    state.combatIntrigueActorIds(goToGroundLastActorPlayed),
+    [],
+    "Go To Ground may leave no Combat actors before the spy choice resolves",
+  );
+  const goToGroundLastActorSpyPlaced = state.placeSpyForPending(
+    goToGroundLastActorPlayed,
+    goToGroundLastActorPlayed.pendingAction,
+    secretsSpace.id,
+  );
+  assert.equal(goToGroundLastActorSpyPlaced.phase, "playing", "Placing the pending spy should then resolve empty Combat");
+  assert.equal(goToGroundLastActorSpyPlaced.round, goToGroundLastActorFixture.round + 1);
+  assert.equal(goToGroundLastActorSpyPlaced.spyPosts[secretsSpace.id], "p2");
+  assert.ok(
+    goToGroundLastActorSpyPlaced.log.some((entry) => entry.includes("resolves with no winner")),
+    "Go To Ground should resolve the Conflict with no winner after the last units retreat and the spy resolves",
+  );
+  const goToGroundLastActorSkippedSpy = state.finishPendingAction(goToGroundLastActorPlayed);
+  assert.equal(goToGroundLastActorSkippedSpy.phase, "playing", "Skipping the pending spy should also resolve empty Combat");
+  assert.equal(goToGroundLastActorSkippedSpy.round, goToGroundLastActorFixture.round + 1);
+  assert.equal(goToGroundLastActorSkippedSpy.spyPosts[secretsSpace.id], undefined);
 
   const weirdingFixture = combatFixture(state, data, (players) =>
     players.map((player) =>
@@ -1428,6 +1752,59 @@ try {
   assert.equal(commanderReachAgreementTookContract.phase, "combat");
   assert.equal(commanderReachAgreementTookContract.players[commanderReachAgreementTookContract.activeSeat].id, "p2");
   assert.match(commanderReachAgreementTookContract.log[0], /Princess Irulan takes the .* CHOAM contract from Reach Agreement/);
+
+  const commanderGoToGroundFixture = combatFixture(
+    state,
+    data,
+    (players) =>
+      players.map((player) => {
+        if (player.id === "p2") return { ...player, conflict: 5, deployedTroops: 1 };
+        if (player.id === "p4") return { ...player, intrigues: [goToGround] };
+        if (player.id === "p6") return { ...player, conflict: 4, deployedTroops: 2, garrison: 0 };
+        return player;
+      }),
+    3,
+  );
+  const commanderGoToGround = state.startCombatPhase(commanderGoToGroundFixture);
+  assert.equal(
+    state.playCombatIntrigue(commanderGoToGround, "p4", goToGround.id, undefined, { kind: "retreat-troops", count: 1 }),
+    commanderGoToGround,
+    "Commander Go To Ground should require an explicit Ally target",
+  );
+  const commanderGoToGroundPlayed = state.playCombatIntrigue(
+    commanderGoToGround,
+    "p4",
+    goToGround.id,
+    "p6",
+    { kind: "retreat-troops", count: 2 },
+  );
+  assert.equal(playerById(commanderGoToGroundPlayed, "p6").deployedTroops, 0, "Commander Go To Ground should retreat target Ally troops");
+  assert.equal(playerById(commanderGoToGroundPlayed, "p6").garrison, 2);
+  assert.equal(playerById(commanderGoToGroundPlayed, "p6").conflict, 0);
+  assert.equal(playerById(commanderGoToGroundPlayed, "p2").conflict, 5, "Commander Go To Ground should not split effects");
+  assert.deepEqual(playerById(commanderGoToGroundPlayed, "p4").intrigues, [], "Commander Go To Ground should leave the Commander's hand");
+  assert.deepEqual(commanderGoToGroundPlayed.pendingAction, {
+    kind: "spy",
+    ownerId: "p6",
+    remaining: 1,
+    source: "Go To Ground",
+  });
+  assert.equal(
+    commanderGoToGroundPlayed.players[commanderGoToGroundPlayed.activeSeat].id,
+    "p2",
+    "Commander Go To Ground should continue with another eligible Ally after the target retreats fully",
+  );
+  const commanderGoToGroundSpyPlaced = state.placeSpyForPending(
+    commanderGoToGroundPlayed,
+    commanderGoToGroundPlayed.pendingAction,
+    espionageSpace.id,
+  );
+  assert.equal(commanderGoToGroundSpyPlaced.phase, "combat");
+  assert.equal(commanderGoToGroundSpyPlaced.players[commanderGoToGroundSpyPlaced.activeSeat].id, "p2");
+  assert.equal(playerById(commanderGoToGroundSpyPlaced, "p6").spies, playerById(commanderGoToGroundPlayed, "p6").spies - 1);
+  assert.equal(playerById(commanderGoToGroundSpyPlaced, "p4").spies, playerById(commanderGoToGroundPlayed, "p4").spies, "Commander Go To Ground should not spend a Commander spy");
+  assert.equal(commanderGoToGroundSpyPlaced.spyPosts[espionageSpace.id], "p6", "Commander Go To Ground should place the target Ally's spy");
+  assert.match(commanderGoToGroundSpyPlaced.log[0], /Princess Irulan places a spy near Espionage from Go To Ground/);
 
   const commanderFindWeaknessFixture = {
     ...combatFixture(

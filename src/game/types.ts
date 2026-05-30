@@ -21,6 +21,7 @@ export type ResourceId = "solari" | "spice" | "water";
 export type Resources = Record<ResourceId, number>;
 export type Influence = Record<FactionId, number>;
 export type BoardGain = Partial<Resources> & { intrigue?: number };
+export type TradeGoodId = ResourceId | "intrigue";
 
 export type Card = {
   id: string;
@@ -160,7 +161,7 @@ export type PendingAction =
       kind: "trade";
       actorId: string;
       partnerId: string;
-      resource: ResourceId;
+      resource: TradeGoodId;
       actorGiven: number;
       partnerGiven: number;
       source: string;

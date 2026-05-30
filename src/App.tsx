@@ -36,13 +36,20 @@ import {
   queuePendingActions,
   startNextRound,
   takeChoamContract,
+  transferTradeGood,
+  updateTradeSelection,
 } from "./game/state";
-import type { BoardSpace, Card, GameState, Player, ResourceId, Resources, TeamId } from "./game/types";
+import type { BoardSpace, Card, GameState, Player, ResourceId, Resources, TeamId, TradeGoodId } from "./game/types";
 
 const resources: Array<{ id: ResourceId; label: string; Icon: LucideIcon }> = [
   { id: "solari", label: "Solari", Icon: CircleDollarSign },
   { id: "spice", label: "Spice", Icon: Sparkles },
   { id: "water", label: "Water", Icon: Droplets },
+];
+
+const tradeGoods: Array<{ id: TradeGoodId; label: string; Icon: LucideIcon }> = [
+  ...resources,
+  { id: "intrigue", label: "Intrigue", Icon: Eye },
 ];
 
 export default function App() {
@@ -421,52 +428,21 @@ export default function App() {
     });
   }
 
-  function updateTrade(resource: ResourceId, partnerId?: string) {
+  function updateTrade(resource: TradeGoodId, partnerId?: string) {
     if (game.pendingAction?.kind !== "trade") return;
     setGame((current) => {
       const pending = current.pendingAction;
       if (!pending || pending.kind !== "trade") return current;
-      return {
-        ...current,
-        pendingAction: {
-          ...pending,
-          resource,
-          partnerId: partnerId ?? pending.partnerId,
-          actorGiven: partnerId ? 0 : pending.actorGiven,
-          partnerGiven: partnerId ? 0 : pending.partnerGiven,
-        },
-      };
+      return updateTradeSelection(current, pending, resource, partnerId);
     });
   }
 
-  function transferTrade(fromId: string, toId: string) {
+  function transferTrade(fromId: string, toId: string, intrigueId?: string) {
     if (game.pendingAction?.kind !== "trade") return;
     setGame((current) => {
       const pending = current.pendingAction;
       if (!pending || pending.kind !== "trade") return current;
-      const from = current.players.find((player) => player.id === fromId);
-      const to = current.players.find((player) => player.id === toId);
-      if (!from || !to || from.resources[pending.resource] <= 0) return current;
-      const players = current.players.map((player) => {
-        if (player.id === fromId) {
-          return { ...player, resources: { ...player.resources, [pending.resource]: player.resources[pending.resource] - 1 } };
-        }
-        if (player.id === toId) {
-          return { ...player, resources: { ...player.resources, [pending.resource]: player.resources[pending.resource] + 1 } };
-        }
-        return player;
-      });
-      const actorMoved = fromId === pending.actorId;
-      return {
-        ...current,
-        players,
-        pendingAction: {
-          ...pending,
-          actorGiven: pending.actorGiven + (actorMoved ? 1 : 0),
-          partnerGiven: pending.partnerGiven + (actorMoved ? 0 : 1),
-        },
-        log: [`${from.leader} trades 1 ${pending.resource} to ${to.leader}.`, ...current.log],
-      };
+      return transferTradeGood(current, pending, fromId, toId, intrigueId);
     });
   }
 
@@ -522,6 +498,7 @@ export default function App() {
     pendingActor && pendingAction?.kind === "trade"
       ? game.players.filter((player) => player.team === pendingActor.team && player.id !== pendingActor.id)
       : [];
+  const tradeLocked = pendingAction?.kind === "trade" && pendingAction.actorGiven + pendingAction.partnerGiven > 0;
   const reinforceAllies =
     pendingAction?.kind === "reinforce"
       ? game.players.filter((player) => player.team === pendingAction.team && player.role === "Ally")
@@ -857,12 +834,13 @@ export default function App() {
             {pendingAction.kind === "trade" && pendingActor && pendingPartner && (
               <div className="pending-controls trade-controls">
                 <div className="resource-picker">
-                  {resources.map(({ id, label, Icon }) => (
+                  {tradeGoods.map(({ id, label, Icon }) => (
                     <button
                       type="button"
                       className={pendingAction.resource === id ? "selected" : ""}
                       key={id}
                       onClick={() => updateTrade(id)}
+                      disabled={tradeLocked && pendingAction.resource !== id}
                       title={label}
                     >
                       <Icon size={14} />
@@ -877,17 +855,45 @@ export default function App() {
                       className={pendingPartner.id === partner.id ? "selected" : ""}
                       key={partner.id}
                       onClick={() => updateTrade(pendingAction.resource, partner.id)}
+                      disabled={tradeLocked && pendingPartner.id !== partner.id}
                     >
                       {partner.leader}
                     </button>
                   ))}
                 </div>
-                <button type="button" onClick={() => transferTrade(pendingActor.id, pendingPartner.id)}>
-                  {pendingActor.leader} gives 1 ({pendingAction.actorGiven})
-                </button>
-                <button type="button" onClick={() => transferTrade(pendingPartner.id, pendingActor.id)}>
-                  {pendingPartner.leader} gives 1 ({pendingAction.partnerGiven})
-                </button>
+                {pendingAction.resource === "intrigue" ? (
+                  <div className="trade-intrigue-grid">
+                    {[pendingActor, pendingPartner].map((owner) => {
+                      const recipient = owner.id === pendingActor.id ? pendingPartner : pendingActor;
+                      return (
+                        <div className="trade-intrigue-column" key={owner.id}>
+                          <strong>{owner.leader}</strong>
+                          {owner.intrigues.length === 0 && <span>No Intrigues</span>}
+                          {owner.intrigues.map((card) => (
+                            <button
+                              type="button"
+                              key={card.id}
+                              onClick={() => transferTrade(owner.id, recipient.id, card.id)}
+                              title={`Trade ${card.name} to ${recipient.leader}`}
+                            >
+                              {card.thumbnailPath && <img src={card.thumbnailPath} alt="" />}
+                              <span>{card.name}</span>
+                            </button>
+                          ))}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <>
+                    <button type="button" onClick={() => transferTrade(pendingActor.id, pendingPartner.id)}>
+                      {pendingActor.leader} gives 1 ({pendingAction.actorGiven})
+                    </button>
+                    <button type="button" onClick={() => transferTrade(pendingPartner.id, pendingActor.id)}>
+                      {pendingPartner.leader} gives 1 ({pendingAction.partnerGiven})
+                    </button>
+                  </>
+                )}
                 <button type="button" onClick={clearPendingAction}>Done</button>
               </div>
             )}

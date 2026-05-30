@@ -657,6 +657,44 @@ h2 {
   overflow-wrap: anywhere;
 }
 
+.trade-intrigue-grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.trade-intrigue-column {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+
+.trade-intrigue-column > span {
+  color: #b8ab98;
+}
+
+.trade-intrigue-column button {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  justify-content: start;
+  text-align: left;
+  padding: 7px;
+}
+
+.trade-intrigue-column img {
+  width: 46px;
+  aspect-ratio: 63 / 88;
+  object-fit: contain;
+  border-radius: 4px;
+  background: rgba(8, 7, 6, 0.64);
+}
+
+.trade-intrigue-column button span {
+  overflow-wrap: anywhere;
+}
+
 .resource-picker button.selected {
   border-color: #f2b84b;
   background: rgba(242, 184, 75, 0.18);
@@ -878,6 +916,7 @@ h2 {
   .space-grid,
   .card-row,
   .market-row,
+  .trade-intrigue-grid,
   .support-grid {
     grid-template-columns: 1fr;
   }

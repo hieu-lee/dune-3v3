@@ -29,7 +29,7 @@ These notes are implementation scaffolding, not a replacement for the rulebook. 
 - Commanders do not own troops or combat markers directly; their Agent and Reveal turns activate an Ally.
 - Activated Allies receive main-board influence changes, recruited troops, deployment choices, and Commander swords.
 - Six-player icon mapping adds Great Houses and Fringe Worlds while retaining the normal icon vocabulary.
-- Team actions include troop reinforcement and trade of one trade-good type between teammates.
+- Team actions include troop reinforcement and trade of one trade-good type between teammates: Intrigue cards, spice, water, or Solari.
 - Swordmaster is single-use in six-player mode and then grants reveal strength each round.
 - Spy icons require an owned spy on a connected observation post; the current board model tracks spy posts by nearby board space until scanned board coordinates are available.
 - Dune Cards Hub's generic `Spy` attribute appears in reveal text, acquire bonuses, and conditions. Do not treat it as a play-time spy placement unless grouped/detail text confirms that timing.
@@ -39,6 +39,7 @@ These notes are implementation scaffolding, not a replacement for the rulebook. 
 - Conflict deck uses 5 Conflict II cards over 4 Conflict III cards; no Conflict I cards.
 - Current implementation builds that nine-card six-player conflict deck from the imported Uprising catalog and advances it at round setup.
 - Current Intrigue implementation builds the 39-card Uprising Intrigue deck from the imported catalog, draws cards into player hands, and keeps Intrigue out of tradeable resource counters.
+- Current team-trade implementation transfers normal resource counters or a chosen Intrigue card between teammates.
 - Full leader card images are available from the player seats as table references while icon-heavy leader powers await structured automation.
 - Board-space tiles render local location-card art where the catalog has exact name matches; six-player-only and commander personal-board spaces stay text-only until scanned board art is available.
 

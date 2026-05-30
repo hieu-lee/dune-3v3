@@ -16,6 +16,7 @@ Private web-table implementation for a six-player `Dune: Imperium - Uprising` te
 - Catalog-backed six-player Conflict deck display.
 - CHOAM contract bank with two face-up offers, contract-space pickup flow, and Shaddam's reserved Sardaukar contracts.
 - Catalog-backed Intrigue deck with physical card draws and active-player references.
+- Team trade flow supports spice, water, Solari, and chosen Intrigue-card transfers.
 - Catalog-backed board-space art on matching placement tiles.
 - Printed reveal adjustments and spy-post targeting for cards whose text is not reducible to a fixed number.
 - Asset pipeline conventions for owned scans or public reference images.

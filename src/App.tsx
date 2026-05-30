@@ -46,6 +46,7 @@ import {
   isDevourIntrigue,
   isDetonationIntrigue,
   isFindWeaknessIntrigue,
+  isSpringTheTrapIntrigue,
   isUnexpectedAlliesIntrigue,
   isWeirdingCombatIntrigue,
   maybeStartCombatPhase,
@@ -1132,6 +1133,7 @@ export default function App() {
               {combatCards.map((card) => {
                 const devourCard = isDevourIntrigue(card);
                 const findWeaknessCard = isFindWeaknessIntrigue(card);
+                const springTheTrapCard = isSpringTheTrapIntrigue(card);
                 const automatedStrength = combatIntrigueStrength(game, combatActor, card);
                 const canAutoResolve = Boolean(automatedStrength || devourCard || findWeaknessCard);
                 return (
@@ -1141,6 +1143,8 @@ export default function App() {
                       <Swords size={14} />
                       {findWeaknessCard
                         ? "+2 / recall spy for +3"
+                        : springTheTrapCard
+                          ? "Recall 2 spies for +7"
                         : devourCard && !automatedStrength
                         ? "+2 / +4 with worm"
                         : isBackedByChoamIntrigue(card) && !automatedStrength
@@ -1159,12 +1163,18 @@ export default function App() {
                               title={`Play ${card.name} for ${target.leader}`}
                             >
                               {combatActor.role === "Commander"
-                                ? `${target.leader}${devourCard || findWeaknessCard ? ` (+${targetStrength})` : ""}`
+                                ? `${target.leader}${devourCard || findWeaknessCard || springTheTrapCard ? ` (+${targetStrength})` : ""}`
                                 : "Play"}
                             </button>
                           );
                         })
-                      : <span>{isBackedByChoamIntrigue(card) ? "Requires 2 completed contracts." : "Resolve printed card text."}</span>}
+                      : <span>
+                          {isBackedByChoamIntrigue(card)
+                            ? "Requires 2 completed contracts."
+                            : springTheTrapCard
+                              ? "Requires 2 own spy posts."
+                              : "Resolve printed card text."}
+                        </span>}
                   </div>
                 );
               })}
@@ -1288,7 +1298,7 @@ export default function App() {
             {pendingAction.kind === "recall-spy" && pendingRecallSpyOwner && (
               <div className="pending-controls spy-grid">
                 <span>
-                  {pendingRecallSpyOwner.leader}: {pendingAction.remaining} spy for +{pendingAction.strength} strength
+                  {pendingRecallSpyOwner.leader}: {pendingAction.remaining} {pendingAction.remaining === 1 ? "spy" : "spies"} for +{pendingAction.strength} strength
                   {pendingRecallSpyRecipient ? ` to ${pendingRecallSpyRecipient.leader}` : ""}
                 </span>
                 {pendingRecallSpyChoices.map((space) => (
@@ -1569,6 +1579,8 @@ export default function App() {
                           ? "Plot / Combat / +3 strength"
                           : isFindWeaknessIntrigue(card)
                             ? "Combat / +2 / recall spy for +3"
+                          : isSpringTheTrapIntrigue(card)
+                            ? "Combat / recall 2 spies for +7"
                           : isDevourIntrigue(card)
                             ? activeCombatStrength
                               ? `Combat / +${activeCombatStrength} strength${activePlayer.deployedSandworms > 0 ? " / optional trash" : ""}`

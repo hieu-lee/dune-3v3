@@ -51,6 +51,7 @@ const unexpectedAlliesSourceId = 137;
 const contingencyPlanSourceId = 147;
 const findWeaknessSourceId = 149;
 const devourSourceId = 151;
+const springTheTrapSourceId = 153;
 const weirdingCombatSourceId = 154;
 const backedByChoamSourceId = 448;
 const spiceMustFlowSourceId = 538;
@@ -128,6 +129,10 @@ export function isDevourIntrigue(intrigue: IntrigueCard) {
 
 export function isFindWeaknessIntrigue(intrigue: IntrigueCard) {
   return intrigue.sourceId === findWeaknessSourceId;
+}
+
+export function isSpringTheTrapIntrigue(intrigue: IntrigueCard) {
+  return intrigue.sourceId === springTheTrapSourceId;
 }
 
 export function isWeirdingCombatIntrigue(intrigue: IntrigueCard) {
@@ -1121,6 +1126,10 @@ export function recallableSpySpaces(state: GameState, pending: RecallSpyPendingA
   return boardSpaces.filter((space) => state.spyPosts[space.id] === pending.ownerId);
 }
 
+function spyPostCount(state: GameState, ownerId: string) {
+  return boardSpaces.filter((space) => state.spyPosts[space.id] === ownerId).length;
+}
+
 export function recallSpyForPending(
   state: GameState,
   pending: RecallSpyPendingAction,
@@ -1525,6 +1534,9 @@ export function combatIntrigueStrength(
 ) {
   if (intrigue.automatedCombatSwords) return intrigue.automatedCombatSwords;
   if (isFindWeaknessIntrigue(intrigue)) return 2;
+  if (isSpringTheTrapIntrigue(intrigue)) {
+    return spyPostCount(state, actor.id) >= 2 ? 7 : undefined;
+  }
   if (isDevourIntrigue(intrigue)) {
     // In six-player Combat, Commanders play Intrigues on behalf of one Ally and apply the effects to that Ally.
     const effectOwner = actor.role === "Commander" ? target : actor;
@@ -1630,7 +1642,7 @@ export function playCombatIntrigue(
   const trashPending: PendingAction | undefined = canTrashFromDevour
     ? { kind: "trash-card", ownerId: target.id, source: "Devour", optional: true }
     : undefined;
-  const canRecallSpyForFindWeakness = isFindWeaknessIntrigue(intrigue) && Object.values(state.spyPosts).includes(actor.id);
+  const canRecallSpyForFindWeakness = isFindWeaknessIntrigue(intrigue) && spyPostCount(state, actor.id) > 0;
   const recallSpyPending: PendingAction | undefined = canRecallSpyForFindWeakness
     ? {
         kind: "recall-spy",
@@ -1642,14 +1654,26 @@ export function playCombatIntrigue(
         optional: true,
       }
     : undefined;
+  const springTheTrapPending: PendingAction | undefined = isSpringTheTrapIntrigue(intrigue)
+    ? {
+        kind: "recall-spy",
+        ownerId: actor.id,
+        combatRecipientId: target.id,
+        remaining: 2,
+        strength: 7,
+        source: "Spring The Trap",
+        optional: false,
+      }
+    : undefined;
+  const immediateCombatSwords = isSpringTheTrapIntrigue(intrigue) ? 0 : combatSwords;
 
   const players = state.players.map((player) => {
     let next = player;
     if (player.id === actor.id) {
       next = { ...next, intrigues: next.intrigues.filter((card) => card.id !== intrigue.id) };
     }
-    if (player.id === target.id) {
-      next = { ...next, conflict: next.conflict + combatSwords };
+    if (immediateCombatSwords > 0 && player.id === target.id) {
+      next = { ...next, conflict: next.conflict + immediateCombatSwords };
     }
     return next;
   });
@@ -1658,19 +1682,24 @@ export function playCombatIntrigue(
     players,
     combatPasses: [],
     intrigueDiscard: [...state.intrigueDiscard, intrigue],
-    pendingAction: trashPending ?? recallSpyPending,
+    pendingAction: trashPending ?? recallSpyPending ?? springTheTrapPending,
   };
   const actorIds = combatIntrigueActorIds(nextState);
   const pendingText = canTrashFromDevour
     ? " and may trash a card"
     : canRecallSpyForFindWeakness
       ? " and may recall a spy"
+      : springTheTrapPending
+        ? " and must recall 2 spies"
       : "";
+  const strengthText = isSpringTheTrapIntrigue(intrigue)
+    ? "preparing to add 7 strength"
+    : `adding ${combatSwords} strength`;
   return {
     ...nextState,
     activeSeat: nextCombatSeat(nextState, actorIds),
     log: [
-      `${actor.leader} plays ${intrigue.name} for ${target.leader}, adding ${combatSwords} strength${pendingText}.`,
+      `${actor.leader} plays ${intrigue.name} for ${target.leader}, ${strengthText}${pendingText}.`,
       ...state.log,
     ],
   };

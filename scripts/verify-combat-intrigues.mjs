@@ -92,18 +92,27 @@ try {
 
   const impress = intrigueBySourceId(data, 152);
   const findWeakness = intrigueBySourceId(data, 149);
+  const springTheTrap = intrigueBySourceId(data, 153);
   const weirdingCombat = intrigueBySourceId(data, 154);
   const contingencyPlan = intrigueBySourceId(data, 147);
   const devour = intrigueBySourceId(data, 151);
   const backedByChoam = intrigueBySourceId(data, 448);
   const mercenaries = intrigueBySourceId(data, 128);
+  const espionageSpace = boardSpaceByName(data, "Espionage");
   const secretsSpace = boardSpaceByName(data, "Secrets");
+  const arrakeenSpace = boardSpaceByName(data, "Arrakeen");
   assert.equal(impress.combatSwords, 2, "Impress should expose its structured Combat strength");
   assert.equal(findWeakness.combatSwords, 5, "Find Weakness should expose its maximum structured Combat strength");
   assert.equal(
     findWeakness.summary,
     "Add 2 strength; you may recall 1 spy to add 3 more strength.",
     "Find Weakness should expose its base strength and optional spy recall",
+  );
+  assert.equal(springTheTrap.combatSwords, 7, "Spring The Trap should expose its structured Combat strength");
+  assert.equal(
+    springTheTrap.summary,
+    "Recall 2 spies to add 7 strength.",
+    "Spring The Trap should expose its two-spy cost and Combat strength",
   );
   assert.equal(weirdingCombat.combatSwords, 5, "Weirding Combat should expose its structured Combat strength");
   assert.equal(
@@ -122,6 +131,7 @@ try {
   assert.equal(backedByChoam.combatSwords, 4, "Backed by CHOAM should expose its structured Combat strength");
   assert.equal(impress.automatedCombatSwords, undefined, "Impress has extra printed text and should not auto-resolve");
   assert.equal(findWeakness.automatedCombatSwords, undefined, "Find Weakness should resolve through spy-recall state");
+  assert.equal(springTheTrap.automatedCombatSwords, undefined, "Spring The Trap should resolve through spy-recall state");
   assert.equal(weirdingCombat.automatedCombatSwords, undefined, "Weirding Combat should resolve from state-aware Influence");
   assert.equal(devour.automatedCombatSwords, undefined, "Devour should resolve from target sandworm state");
   assert.equal(backedByChoam.automatedCombatSwords, undefined, "Backed by CHOAM should resolve from completed contract state");
@@ -426,7 +436,7 @@ try {
     "Additional Combat Intrigues should wait for Find Weakness recall to resolve",
   );
   assert.equal(
-    state.recallSpyForPending(findWeaknessSpyPlayed, findWeaknessSpyPlayed.pendingAction, "arrakeen"),
+    state.recallSpyForPending(findWeaknessSpyPlayed, findWeaknessSpyPlayed.pendingAction, arrakeenSpace.id),
     findWeaknessSpyPlayed,
     "Find Weakness recall should reject unowned spy posts",
   );
@@ -449,6 +459,119 @@ try {
   assert.equal(findWeaknessRecalled.spyPosts[secretsSpace.id], undefined, "Find Weakness should remove the recalled spy post");
   assert.equal(playerById(findWeaknessRecalled, "p2").conflict, 7, "Find Weakness recall should add the 3 strength bonus");
   assert.match(findWeaknessRecalled.log[0], /recalls a spy from Secrets for Find Weakness, adding 3 strength/);
+
+  const springTheTrapOneSpyFixture = {
+    ...combatFixture(state, data, (players) =>
+      players.map((player) =>
+        player.id === "p2"
+          ? { ...player, conflict: 2, deployedTroops: 1, spies: 2, intrigues: [springTheTrap] }
+          : player.id === "p3"
+            ? { ...player, conflict: 4, deployedTroops: 1 }
+            : player,
+      ),
+    ),
+    spyPosts: { [secretsSpace.id]: "p2" },
+  };
+  const springTheTrapOneSpy = state.startCombatPhase(springTheTrapOneSpyFixture);
+  assert.equal(
+    state.combatIntrigueStrength(springTheTrapOneSpy, playerById(springTheTrapOneSpy, "p2"), springTheTrap),
+    undefined,
+    "Spring The Trap should require two actor-owned spy posts",
+  );
+  assert.equal(
+    state.playCombatIntrigue(springTheTrapOneSpy, "p2", springTheTrap.id),
+    springTheTrapOneSpy,
+    "Spring The Trap should not play with only one actor-owned spy post",
+  );
+  const springTheTrapMixedSpy = {
+    ...springTheTrapOneSpy,
+    spyPosts: { [secretsSpace.id]: "p2", [espionageSpace.id]: "p3" },
+  };
+  assert.equal(
+    state.combatIntrigueStrength(springTheTrapMixedSpy, playerById(springTheTrapMixedSpy, "p2"), springTheTrap),
+    undefined,
+    "Spring The Trap should not count another player's spy post",
+  );
+  assert.equal(
+    state.playCombatIntrigue(springTheTrapMixedSpy, "p2", springTheTrap.id),
+    springTheTrapMixedSpy,
+    "Spring The Trap should stay blocked with mixed spy ownership",
+  );
+
+  const springTheTrapTwoSpyFixture = {
+    ...combatFixture(state, data, (players) =>
+      players.map((player) =>
+        player.id === "p2"
+          ? { ...player, conflict: 2, deployedTroops: 1, spies: 1, intrigues: [springTheTrap] }
+          : player.id === "p3"
+            ? { ...player, conflict: 4, deployedTroops: 1, intrigues: [verifierCombat] }
+            : player,
+      ),
+    ),
+    spyPosts: { [secretsSpace.id]: "p2", [espionageSpace.id]: "p2" },
+  };
+  const springTheTrapTwoSpy = state.startCombatPhase(springTheTrapTwoSpyFixture);
+  assert.equal(
+    state.combatIntrigueStrength(springTheTrapTwoSpy, playerById(springTheTrapTwoSpy, "p2"), springTheTrap),
+    7,
+    "Spring The Trap should become playable with two actor-owned spy posts",
+  );
+  const springTheTrapPlayed = state.playCombatIntrigue(springTheTrapTwoSpy, "p2", springTheTrap.id);
+  assert.deepEqual(playerById(springTheTrapPlayed, "p2").intrigues, [], "Spring The Trap should leave the player's hand");
+  assert.equal(springTheTrapPlayed.intrigueDiscard.at(-1).id, springTheTrap.id, "Spring The Trap should be discarded when played");
+  assert.equal(playerById(springTheTrapPlayed, "p2").conflict, 2, "Spring The Trap should not add strength before recalls resolve");
+  assert.deepEqual(springTheTrapPlayed.pendingAction, {
+    kind: "recall-spy",
+    ownerId: "p2",
+    combatRecipientId: "p2",
+    remaining: 2,
+    strength: 7,
+    source: "Spring The Trap",
+    optional: false,
+  });
+  assert.deepEqual(
+    state.recallableSpySpaces(springTheTrapPlayed, springTheTrapPlayed.pendingAction).map((space) => space.name),
+    ["Secrets", "Espionage"],
+    "Spring The Trap should list the actor's two spy posts for recall",
+  );
+  assert.equal(
+    state.skipRecallSpy(springTheTrapPlayed, springTheTrapPlayed.pendingAction),
+    springTheTrapPlayed,
+    "Spring The Trap recall should be required",
+  );
+  assert.equal(
+    state.passCombatIntrigue(springTheTrapPlayed, springTheTrapPlayed.players[springTheTrapPlayed.activeSeat].id),
+    springTheTrapPlayed,
+    "Combat should stay locked while Spring The Trap recall is pending",
+  );
+  assert.equal(
+    state.playCombatIntrigue(springTheTrapPlayed, springTheTrapPlayed.players[springTheTrapPlayed.activeSeat].id, verifierCombat.id),
+    springTheTrapPlayed,
+    "Additional Combat Intrigues should wait for Spring The Trap recall to resolve",
+  );
+  const springActiveSeatAfterPlay = springTheTrapPlayed.activeSeat;
+  const springFirstRecall = state.recallSpyForPending(springTheTrapPlayed, springTheTrapPlayed.pendingAction, secretsSpace.id);
+  assert.equal(springFirstRecall.activeSeat, springActiveSeatAfterPlay, "First Spring The Trap recall should not advance Combat again");
+  assert.equal(playerById(springFirstRecall, "p2").spies, 2, "First Spring The Trap recall should return one spy to supply");
+  assert.equal(playerById(springFirstRecall, "p2").conflict, 2, "First Spring The Trap recall should not add partial strength");
+  assert.equal(springFirstRecall.spyPosts[secretsSpace.id], undefined);
+  assert.equal(springFirstRecall.spyPosts[espionageSpace.id], "p2");
+  assert.deepEqual(springFirstRecall.pendingAction, {
+    kind: "recall-spy",
+    ownerId: "p2",
+    combatRecipientId: "p2",
+    remaining: 1,
+    strength: 7,
+    source: "Spring The Trap",
+    optional: false,
+  });
+  const springSecondRecall = state.recallSpyForPending(springFirstRecall, springFirstRecall.pendingAction, espionageSpace.id);
+  assert.equal(springSecondRecall.pendingAction, undefined, "Second Spring The Trap recall should clear the pending action");
+  assert.equal(springSecondRecall.activeSeat, springActiveSeatAfterPlay, "Second Spring The Trap recall should not advance Combat again");
+  assert.equal(playerById(springSecondRecall, "p2").spies, 3, "Spring The Trap should return both recalled spies to supply");
+  assert.equal(springSecondRecall.spyPosts[espionageSpace.id], undefined);
+  assert.equal(playerById(springSecondRecall, "p2").conflict, 9, "Spring The Trap should add 7 strength after the second recall");
+  assert.match(springSecondRecall.log[0], /recalls a spy from Espionage for Spring The Trap, adding 7 strength/);
 
   const devourNoWormFixture = combatFixture(state, data, (players) =>
     players.map((player) =>
@@ -641,6 +764,85 @@ try {
   );
   assert.equal(playerById(commanderFindWeaknessAllySpyPlayed, "p6").conflict, 3);
   assert.equal(commanderFindWeaknessAllySpyPlayed.spyPosts[secretsSpace.id], "p6");
+
+  const commanderSpringFixture = {
+    ...combatFixture(
+      state,
+      data,
+      (players) =>
+        players.map((player) => {
+          if (player.id === "p2") return { ...player, conflict: 5, deployedTroops: 1 };
+          if (player.id === "p4") return { ...player, spies: 1, intrigues: [springTheTrap] };
+          if (player.id === "p6") return { ...player, conflict: 1, deployedTroops: 1 };
+          return player;
+        }),
+      3,
+    ),
+    spyPosts: { [secretsSpace.id]: "p4", [espionageSpace.id]: "p4" },
+  };
+  const commanderSpring = state.startCombatPhase(commanderSpringFixture);
+  assert.equal(
+    state.combatIntrigueStrength(commanderSpring, playerById(commanderSpring, "p4"), springTheTrap),
+    7,
+    "Commander Spring The Trap should use the Commander's own spy posts",
+  );
+  assert.equal(
+    state.playCombatIntrigue(commanderSpring, "p4", springTheTrap.id),
+    commanderSpring,
+    "Commander Spring The Trap should require an explicit Ally target",
+  );
+  const commanderSpringPlayed = state.playCombatIntrigue(commanderSpring, "p4", springTheTrap.id, "p6");
+  assert.deepEqual(playerById(commanderSpringPlayed, "p4").intrigues, [], "Commander Spring The Trap should leave the Commander's hand");
+  assert.equal(commanderSpringPlayed.intrigueDiscard.at(-1).id, springTheTrap.id);
+  assert.equal(playerById(commanderSpringPlayed, "p6").conflict, 1, "Commander Spring The Trap should wait to add strength until recalls resolve");
+  assert.equal(playerById(commanderSpringPlayed, "p2").conflict, 5, "Commander Spring The Trap should not split strength");
+  assert.deepEqual(commanderSpringPlayed.pendingAction, {
+    kind: "recall-spy",
+    ownerId: "p4",
+    combatRecipientId: "p6",
+    remaining: 2,
+    strength: 7,
+    source: "Spring The Trap",
+    optional: false,
+  });
+  const commanderSpringFirstRecall = state.recallSpyForPending(commanderSpringPlayed, commanderSpringPlayed.pendingAction, secretsSpace.id);
+  const commanderSpringSecondRecall = state.recallSpyForPending(
+    commanderSpringFirstRecall,
+    commanderSpringFirstRecall.pendingAction,
+    espionageSpace.id,
+  );
+  assert.equal(playerById(commanderSpringSecondRecall, "p4").spies, 3, "Commander Spring The Trap should recall the Commander's own spies");
+  assert.equal(playerById(commanderSpringSecondRecall, "p6").conflict, 8, "Commander Spring The Trap should add strength to the target Ally");
+  assert.equal(playerById(commanderSpringSecondRecall, "p2").conflict, 5);
+  assert.equal(commanderSpringSecondRecall.spyPosts[secretsSpace.id], undefined);
+  assert.equal(commanderSpringSecondRecall.spyPosts[espionageSpace.id], undefined);
+
+  const commanderSpringAllySpyFixture = {
+    ...combatFixture(
+      state,
+      data,
+      (players) =>
+        players.map((player) => {
+          if (player.id === "p2") return { ...player, conflict: 5, deployedTroops: 1 };
+          if (player.id === "p4") return { ...player, intrigues: [springTheTrap] };
+          if (player.id === "p6") return { ...player, conflict: 1, deployedTroops: 1, spies: 1 };
+          return player;
+        }),
+      3,
+    ),
+    spyPosts: { [secretsSpace.id]: "p6", [espionageSpace.id]: "p6" },
+  };
+  const commanderSpringAllySpy = state.startCombatPhase(commanderSpringAllySpyFixture);
+  assert.equal(
+    state.combatIntrigueStrength(commanderSpringAllySpy, playerById(commanderSpringAllySpy, "p4"), springTheTrap),
+    undefined,
+    "Commander Spring The Trap should not count the target Ally's spy posts",
+  );
+  assert.equal(
+    state.playCombatIntrigue(commanderSpringAllySpy, "p4", springTheTrap.id, "p6"),
+    commanderSpringAllySpy,
+    "Commander Spring The Trap should stay blocked when only the target Ally has spy posts",
+  );
 
   const commanderDevourTrashChoice = starterCard(data, 1);
   const commanderDevourFixture = combatFixture(

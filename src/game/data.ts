@@ -62,6 +62,7 @@ const intrigueSummariesByCatalogId: Partial<Record<number, string>> = {
   149: "Add 2 strength; you may recall 1 spy to add 3 more strength.",
   150: "Retreat 3 troops to gain 3 spice OR spend 3 spice to add 6 strength.",
   153: "Recall 2 spies to add 7 strength.",
+  155: "Add 2 strength OR retreat any number of your troops.",
   156: "Add 1 strength; the recipient may lose 1 Influence, or a Commander may lose personal Influence, to add 4 more strength.",
   137: "Pay 2 water to deploy a sandworm to the Conflict; may remove the Shield Wall.",
   151: "Add 2 strength; if the recipient has one or more sandworms in the Conflict, add 4 strength instead and they may trash a card.",

@@ -95,6 +95,7 @@ try {
   const spiceIsPower = intrigueBySourceId(data, 150);
   const questionableMethods = intrigueBySourceId(data, 156);
   const springTheTrap = intrigueBySourceId(data, 153);
+  const tacticalOption = intrigueBySourceId(data, 155);
   const weirdingCombat = intrigueBySourceId(data, 154);
   const contingencyPlan = intrigueBySourceId(data, 147);
   const devour = intrigueBySourceId(data, 151);
@@ -122,6 +123,12 @@ try {
     "Retreat 3 troops to gain 3 spice OR spend 3 spice to add 6 strength.",
     "Spice is Power should expose both printed Combat branches",
   );
+  assert.equal(tacticalOption.combatSwords, 2, "Tactical Option should expose its structured Combat strength");
+  assert.equal(
+    tacticalOption.summary,
+    "Add 2 strength OR retreat any number of your troops.",
+    "Tactical Option should expose both printed Combat branches",
+  );
   assert.equal(questionableMethods.combatSwords, 5, "Questionable Methods should expose its maximum structured Combat strength");
   assert.equal(
     questionableMethods.summary,
@@ -147,6 +154,7 @@ try {
   assert.equal(findWeakness.automatedCombatSwords, undefined, "Find Weakness should resolve through spy-recall state");
   assert.equal(questionableMethods.automatedCombatSwords, undefined, "Questionable Methods should resolve through Influence-loss state");
   assert.equal(spiceIsPower.automatedCombatSwords, undefined, "Spice is Power should resolve through an explicit branch choice");
+  assert.equal(tacticalOption.automatedCombatSwords, undefined, "Tactical Option should resolve through an explicit branch choice");
   assert.equal(springTheTrap.automatedCombatSwords, undefined, "Spring The Trap should resolve through spy-recall state");
   assert.equal(weirdingCombat.automatedCombatSwords, undefined, "Weirding Combat should resolve from state-aware Influence");
   assert.equal(devour.automatedCombatSwords, undefined, "Devour should resolve from target sandworm state");
@@ -373,6 +381,113 @@ try {
   assert.ok(
     spiceLastActorPlayed.log.some((entry) => entry.includes("resolves with no winner")),
     "Retreating the last units should resolve the Conflict with no winner",
+  );
+
+  const tacticalAddFixture = combatFixture(state, data, (players) =>
+    players.map((player) =>
+      player.id === "p2"
+        ? { ...player, conflict: 2, deployedTroops: 1, intrigues: [tacticalOption] }
+        : player.id === "p3"
+          ? { ...player, conflict: 4, deployedTroops: 1 }
+          : player,
+    ),
+  );
+  const tacticalAddCombat = state.startCombatPhase(tacticalAddFixture);
+  assert.equal(
+    state.combatIntrigueStrength(tacticalAddCombat, playerById(tacticalAddCombat, "p2"), tacticalOption),
+    2,
+    "Tactical Option should expose its +2 strength branch",
+  );
+  assert.equal(
+    state.playCombatIntrigue(tacticalAddCombat, "p2", tacticalOption.id),
+    tacticalAddCombat,
+    "Tactical Option should require an explicit branch choice",
+  );
+  const tacticalAdded = state.playCombatIntrigue(tacticalAddCombat, "p2", tacticalOption.id, undefined, "add-strength");
+  assert.equal(playerById(tacticalAdded, "p2").conflict, 4, "Tactical Option strength branch should add 2 strength");
+  assert.equal(playerById(tacticalAdded, "p2").deployedTroops, 1, "Tactical Option strength branch should not retreat troops");
+  assert.equal(tacticalAdded.intrigueDiscard.at(-1).id, tacticalOption.id);
+  assert.match(tacticalAdded.log[0], /plays Tactical Option for Feyd-Rautha Harkonnen, adding 2 strength/);
+
+  const tacticalRetreatFixture = combatFixture(state, data, (players) =>
+    players.map((player) =>
+      player.id === "p2"
+        ? { ...player, conflict: 10, deployedTroops: 4, garrison: 1, intrigues: [tacticalOption] }
+        : player.id === "p3"
+          ? { ...player, conflict: 4, deployedTroops: 1 }
+          : player,
+    ),
+  );
+  const tacticalRetreatCombat = state.startCombatPhase(tacticalRetreatFixture);
+  assert.equal(
+    state.playCombatIntrigue(tacticalRetreatCombat, "p2", tacticalOption.id, undefined, { kind: "retreat-troops", count: 0 }),
+    tacticalRetreatCombat,
+    "Tactical Option retreat branch should reject zero troops",
+  );
+  assert.equal(
+    state.playCombatIntrigue(tacticalRetreatCombat, "p2", tacticalOption.id, undefined, { kind: "retreat-troops", count: 5 }),
+    tacticalRetreatCombat,
+    "Tactical Option retreat branch should reject more troops than are deployed",
+  );
+  assert.equal(
+    state.playCombatIntrigue(tacticalRetreatCombat, "p2", tacticalOption.id, undefined, { kind: "retreat-troops", count: 1.5 }),
+    tacticalRetreatCombat,
+    "Tactical Option retreat branch should reject fractional troop counts",
+  );
+  const tacticalRetreated = state.playCombatIntrigue(
+    tacticalRetreatCombat,
+    "p2",
+    tacticalOption.id,
+    undefined,
+    { kind: "retreat-troops", count: 3 },
+  );
+  assert.equal(playerById(tacticalRetreated, "p2").deployedTroops, 1, "Tactical Option should retreat the chosen troop count");
+  assert.equal(playerById(tacticalRetreated, "p2").garrison, 4, "Tactical Option should return retreated troops to garrison");
+  assert.equal(playerById(tacticalRetreated, "p2").conflict, 4, "Tactical Option retreat should remove each retreated troop's strength");
+  assert.match(tacticalRetreated.log[0], /retreats 3 troops/);
+
+  const tacticalWormFixture = combatFixture(state, data, (players) =>
+    players.map((player) =>
+      player.id === "p2"
+        ? { ...player, conflict: 10, deployedTroops: 2, deployedSandworms: 1, garrison: 0, intrigues: [tacticalOption] }
+        : player.id === "p3"
+          ? { ...player, conflict: 4, deployedTroops: 1 }
+          : player,
+    ),
+  );
+  const tacticalWormCombat = state.startCombatPhase(tacticalWormFixture);
+  const tacticalWormRetreated = state.playCombatIntrigue(
+    tacticalWormCombat,
+    "p2",
+    tacticalOption.id,
+    undefined,
+    { kind: "retreat-troops", count: 2 },
+  );
+  assert.equal(playerById(tacticalWormRetreated, "p2").deployedTroops, 0, "Tactical Option should allow all troops to retreat");
+  assert.equal(playerById(tacticalWormRetreated, "p2").deployedSandworms, 1, "Tactical Option should not retreat sandworms");
+  assert.equal(playerById(tacticalWormRetreated, "p2").conflict, 6, "Tactical Option should preserve non-troop strength after retreat");
+  assert.equal(tacticalWormRetreated.phase, "combat", "A remaining sandworm should keep the player in Combat");
+
+  const tacticalLastActorFixture = combatFixture(state, data, (players) =>
+    players.map((player) =>
+      player.id === "p2"
+        ? { ...player, conflict: 4, deployedTroops: 2, garrison: 0, intrigues: [tacticalOption] }
+        : player,
+    ),
+  );
+  const tacticalLastActorCombat = state.startCombatPhase(tacticalLastActorFixture);
+  const tacticalLastActorRetreated = state.playCombatIntrigue(
+    tacticalLastActorCombat,
+    "p2",
+    tacticalOption.id,
+    undefined,
+    { kind: "retreat-troops", count: 2 },
+  );
+  assert.equal(tacticalLastActorRetreated.phase, "playing", "Retreating the last Tactical Option units should resolve Combat");
+  assert.equal(tacticalLastActorRetreated.round, tacticalLastActorFixture.round + 1);
+  assert.ok(
+    tacticalLastActorRetreated.log.some((entry) => entry.includes("resolves with no winner")),
+    "Retreating the last Tactical Option units should resolve the Conflict with no winner",
   );
 
   const weirdingFixture = combatFixture(state, data, (players) =>
@@ -1005,6 +1120,76 @@ try {
   assert.equal(playerById(commanderSpiceRetreated, "p6").conflict, 2);
   assert.equal(playerById(commanderSpiceRetreated, "p2").conflict, 5);
   assert.match(commanderSpiceRetreated.log[0], /Princess Irulan retreats 3 troops and gains 3 spice/);
+
+  const commanderTacticalFixture = combatFixture(
+    state,
+    data,
+    (players) =>
+      players.map((player) => {
+        if (player.id === "p2") return { ...player, conflict: 5, deployedTroops: 1 };
+        if (player.id === "p4") return { ...player, intrigues: [tacticalOption] };
+        if (player.id === "p6") return { ...player, conflict: 7, deployedTroops: 3, garrison: 0 };
+        return player;
+      }),
+    3,
+  );
+  const commanderTactical = state.startCombatPhase(commanderTacticalFixture);
+  assert.equal(
+    state.playCombatIntrigue(commanderTactical, "p4", tacticalOption.id, undefined, "add-strength"),
+    commanderTactical,
+    "Commander Tactical Option should require an explicit Ally target",
+  );
+  const commanderTacticalAdded = state.playCombatIntrigue(
+    commanderTactical,
+    "p4",
+    tacticalOption.id,
+    "p6",
+    "add-strength",
+  );
+  assert.equal(playerById(commanderTacticalAdded, "p6").conflict, 9, "Commander Tactical Option should add strength to the target Ally");
+  assert.equal(playerById(commanderTacticalAdded, "p2").conflict, 5, "Commander Tactical Option should not split effects");
+
+  const commanderTacticalRetreated = state.playCombatIntrigue(
+    commanderTactical,
+    "p4",
+    tacticalOption.id,
+    "p6",
+    { kind: "retreat-troops", count: 2 },
+  );
+  assert.equal(playerById(commanderTacticalRetreated, "p6").deployedTroops, 1, "Commander Tactical Option should retreat target Ally troops");
+  assert.equal(playerById(commanderTacticalRetreated, "p6").garrison, 2);
+  assert.equal(playerById(commanderTacticalRetreated, "p6").conflict, 3);
+  assert.equal(playerById(commanderTacticalRetreated, "p2").conflict, 5);
+  assert.match(commanderTacticalRetreated.log[0], /Princess Irulan retreats 2 troops/);
+
+  const commanderTacticalAllRetreatFixture = combatFixture(
+    state,
+    data,
+    (players) =>
+      players.map((player) => {
+        if (player.id === "p2") return { ...player, conflict: 5, deployedTroops: 1 };
+        if (player.id === "p4") return { ...player, intrigues: [tacticalOption] };
+        if (player.id === "p6") return { ...player, conflict: 6, deployedTroops: 3, garrison: 0 };
+        return player;
+      }),
+    3,
+  );
+  const commanderTacticalAllRetreat = state.startCombatPhase(commanderTacticalAllRetreatFixture);
+  const commanderTacticalAllRetreated = state.playCombatIntrigue(
+    commanderTacticalAllRetreat,
+    "p4",
+    tacticalOption.id,
+    "p6",
+    { kind: "retreat-troops", count: 3 },
+  );
+  assert.equal(playerById(commanderTacticalAllRetreated, "p6").deployedTroops, 0);
+  assert.equal(playerById(commanderTacticalAllRetreated, "p6").conflict, 0);
+  assert.equal(playerById(commanderTacticalAllRetreated, "p2").conflict, 5);
+  assert.equal(
+    commanderTacticalAllRetreated.players[commanderTacticalAllRetreated.activeSeat].id,
+    "p2",
+    "Commander Tactical Option should continue with another eligible same-team Ally after the target retreats fully",
+  );
 
   const commanderFindWeaknessFixture = {
     ...combatFixture(

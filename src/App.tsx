@@ -50,6 +50,7 @@ import {
   isQuestionableMethodsIntrigue,
   isSpiceIsPowerIntrigue,
   isSpringTheTrapIntrigue,
+  isTacticalOptionIntrigue,
   isUnexpectedAlliesIntrigue,
   isWeirdingCombatIntrigue,
   loseInfluenceForPending,
@@ -94,7 +95,7 @@ import {
   updateTradeSelection,
 } from "./game/state";
 import type { BoardSpace, Card, FactionId, GameState, Player, ResourceId, Resources, TeamId, TradeGoodId, TrashCardZone } from "./game/types";
-import type { SpiceIsPowerChoice } from "./game/state";
+import type { CombatIntrigueChoice } from "./game/state";
 
 const resources: Array<{ id: ResourceId; label: string; Icon: LucideIcon }> = [
   { id: "solari", label: "Solari", Icon: CircleDollarSign },
@@ -606,10 +607,10 @@ export default function App() {
     });
   }
 
-  function playCombatCard(intrigueId: string, targetId?: string, spiceIsPowerChoice?: SpiceIsPowerChoice) {
+  function playCombatCard(intrigueId: string, targetId?: string, combatChoice?: CombatIntrigueChoice) {
     if (game.phase !== "combat") return;
     setGame((current) =>
-      playCombatIntrigue(current, current.players[current.activeSeat].id, intrigueId, targetId, spiceIsPowerChoice),
+      playCombatIntrigue(current, current.players[current.activeSeat].id, intrigueId, targetId, combatChoice),
     );
   }
 
@@ -1177,6 +1178,7 @@ export default function App() {
                 const questionableMethodsCard = isQuestionableMethodsIntrigue(card);
                 const spiceIsPowerCard = isSpiceIsPowerIntrigue(card);
                 const springTheTrapCard = isSpringTheTrapIntrigue(card);
+                const tacticalOptionCard = isTacticalOptionIntrigue(card);
                 const automatedStrength = combatIntrigueStrength(game, combatActor, card);
                 const hasSpiceIsPowerBranch = combatTargets.some(
                   (target) => target.resources.spice >= 3 || target.deployedTroops >= 3,
@@ -1193,6 +1195,8 @@ export default function App() {
                           ? "Add 1 strength; the recipient may lose Influence, or a Commander may lose personal Influence, for 4 more strength."
                           : spiceIsPowerCard
                             ? "Choose one branch: retreat 3 of the recipient's troops for 3 spice, or spend 3 spice for 6 strength."
+                          : tacticalOptionCard
+                            ? "Choose either 2 strength or a troop count to retreat from the chosen recipient."
                           : undefined
                       }
                     >
@@ -1205,13 +1209,37 @@ export default function App() {
                           ? "Retreat 3 for +3 spice / spend 3 for +6"
                         : springTheTrapCard
                           ? "Recall 2 spies for +7"
+                        : tacticalOptionCard
+                          ? "+2 strength OR retreat troops"
                         : devourCard && !automatedStrength
                         ? "+2 / +4 with worm"
                         : isBackedByChoamIntrigue(card) && !automatedStrength
                         ? "2+ completed contracts"
                         : `+${automatedStrength ?? card.combatSwords} strength`}
                     </span>
-                    {spiceIsPowerCard
+                    {tacticalOptionCard
+                      ? combatTargets.map((target) => (
+                          <Fragment key={target.id}>
+                            <button
+                              type="button"
+                              onClick={() => playCombatCard(card.id, target.id, "add-strength")}
+                              title={`Play ${card.name} for ${target.leader}`}
+                            >
+                              {combatActor.role === "Commander" ? `${target.leader}: +2` : "Add +2"}
+                            </button>
+                            {Array.from({ length: target.deployedTroops }, (_, index) => index + 1).map((count) => (
+                              <button
+                                type="button"
+                                key={`${target.id}-retreat-${count}`}
+                                onClick={() => playCombatCard(card.id, target.id, { kind: "retreat-troops", count })}
+                                title={`Retreat ${count} ${count === 1 ? "troop" : "troops"} from ${target.leader}`}
+                              >
+                                {combatActor.role === "Commander" ? `${target.leader}: retreat ${count}` : `Retreat ${count}`}
+                              </button>
+                            ))}
+                          </Fragment>
+                        ))
+                    : spiceIsPowerCard
                       ? hasSpiceIsPowerBranch
                         ? combatTargets.map((target) => (
                             <Fragment key={target.id}>
@@ -1699,6 +1727,8 @@ export default function App() {
                             ? "Combat / +1 / lose Ally/Cmdr personal Inf. for +4"
                           : isSpiceIsPowerIntrigue(card)
                             ? "Combat / retreat 3 troops for spice / spend 3 spice for +6"
+                          : isTacticalOptionIntrigue(card)
+                            ? "Combat / +2 strength / retreat troops"
                           : isSpringTheTrapIntrigue(card)
                             ? "Combat / recall 2 spies for +7"
                           : isDevourIntrigue(card)

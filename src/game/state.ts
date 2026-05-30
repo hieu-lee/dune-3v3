@@ -55,6 +55,7 @@ const spiceIsPowerSourceId = 150;
 const devourSourceId = 151;
 const springTheTrapSourceId = 153;
 const weirdingCombatSourceId = 154;
+const tacticalOptionSourceId = 155;
 const questionableMethodsSourceId = 156;
 const backedByChoamSourceId = 448;
 const spiceMustFlowSourceId = 538;
@@ -70,6 +71,8 @@ const shadowAllianceFactions: FactionId[] = [
 const influenceVictoryPointThreshold = 2;
 
 export type SpiceIsPowerChoice = "spend-spice" | "retreat-troops";
+export type TacticalOptionChoice = "add-strength" | { kind: "retreat-troops"; count: number };
+export type CombatIntrigueChoice = SpiceIsPowerChoice | TacticalOptionChoice;
 
 export function cloneCards(cards: Card[]) {
   return cards.map((card) => ({
@@ -150,6 +153,10 @@ export function isWeirdingCombatIntrigue(intrigue: IntrigueCard) {
 
 export function isQuestionableMethodsIntrigue(intrigue: IntrigueCard) {
   return intrigue.sourceId === questionableMethodsSourceId;
+}
+
+export function isTacticalOptionIntrigue(intrigue: IntrigueCard) {
+  return intrigue.sourceId === tacticalOptionSourceId;
 }
 
 export function isBackedByChoamIntrigue(intrigue: IntrigueCard) {
@@ -1620,6 +1627,7 @@ export function combatIntrigueStrength(
     const effectOwner = actor.role === "Commander" ? target : actor;
     return effectOwner && effectOwner.resources.spice >= 3 ? 6 : undefined;
   }
+  if (isTacticalOptionIntrigue(intrigue)) return 2;
   if (isSpringTheTrapIntrigue(intrigue)) {
     return spyPostCount(state, actor.id) >= 2 ? 7 : undefined;
   }
@@ -1716,7 +1724,7 @@ export function playCombatIntrigue(
   actorId: string,
   intrigueId: string,
   targetId?: string,
-  spiceIsPowerChoice?: SpiceIsPowerChoice,
+  combatChoice?: CombatIntrigueChoice,
 ): GameState {
   if (state.phase !== "combat" || state.pendingAction || state.pendingQueue.length > 0) return state;
   const actor = state.players[state.activeSeat];
@@ -1730,23 +1738,23 @@ export function playCombatIntrigue(
   const target = state.players.find((player) => player.id === resolvedTargetId);
   if (!target) return state;
   if (isSpiceIsPowerIntrigue(intrigue)) {
-    if (!spiceIsPowerChoice) return state;
-    if (spiceIsPowerChoice === "spend-spice" && target.resources.spice < 3) return state;
-    if (spiceIsPowerChoice === "retreat-troops" && target.deployedTroops < 3) return state;
+    if (combatChoice !== "spend-spice" && combatChoice !== "retreat-troops") return state;
+    if (combatChoice === "spend-spice" && target.resources.spice < 3) return state;
+    if (combatChoice === "retreat-troops" && target.deployedTroops < 3) return state;
 
     const players = state.players.map((player) => {
       let next = player;
       if (player.id === actor.id) {
         next = { ...next, intrigues: next.intrigues.filter((card) => card.id !== intrigue.id) };
       }
-      if (player.id === target.id && spiceIsPowerChoice === "spend-spice") {
+      if (player.id === target.id && combatChoice === "spend-spice") {
         next = {
           ...next,
           conflict: next.conflict + 6,
           resources: { ...next.resources, spice: next.resources.spice - 3 },
         };
       }
-      if (player.id === target.id && spiceIsPowerChoice === "retreat-troops") {
+      if (player.id === target.id && combatChoice === "retreat-troops") {
         next = {
           ...next,
           conflict: Math.max(0, next.conflict - 6),
@@ -1757,9 +1765,48 @@ export function playCombatIntrigue(
       }
       return next;
     });
-    const logEntry = spiceIsPowerChoice === "spend-spice"
+    const logEntry = combatChoice === "spend-spice"
       ? `${actor.leader} plays Spice is Power for ${target.leader}; ${target.leader} spends 3 spice to add 6 strength.`
       : `${actor.leader} plays Spice is Power for ${target.leader}; ${target.leader} retreats 3 troops and gains 3 spice.`;
+    return advanceAfterCombatIntriguePlay({
+      ...state,
+      players,
+      combatPasses: [],
+      intrigueDiscard: [...state.intrigueDiscard, intrigue],
+      log: [logEntry, ...state.log],
+    });
+  }
+  if (isTacticalOptionIntrigue(intrigue)) {
+    const retreatCount =
+      typeof combatChoice === "object" && combatChoice.kind === "retreat-troops" ? combatChoice.count : undefined;
+    const addsStrength = combatChoice === "add-strength";
+    if (!addsStrength && !retreatCount) return state;
+    if (
+      retreatCount !== undefined &&
+      (!Number.isInteger(retreatCount) || retreatCount < 1 || retreatCount > target.deployedTroops)
+    ) return state;
+
+    const players = state.players.map((player) => {
+      let next = player;
+      if (player.id === actor.id) {
+        next = { ...next, intrigues: next.intrigues.filter((card) => card.id !== intrigue.id) };
+      }
+      if (player.id === target.id && addsStrength) {
+        next = { ...next, conflict: next.conflict + 2 };
+      }
+      if (player.id === target.id && retreatCount !== undefined) {
+        next = {
+          ...next,
+          conflict: Math.max(0, next.conflict - retreatCount * 2),
+          deployedTroops: next.deployedTroops - retreatCount,
+          garrison: next.garrison + retreatCount,
+        };
+      }
+      return next;
+    });
+    const logEntry = addsStrength
+      ? `${actor.leader} plays Tactical Option for ${target.leader}, adding 2 strength.`
+      : `${actor.leader} plays Tactical Option for ${target.leader}; ${target.leader} retreats ${retreatCount} ${retreatCount === 1 ? "troop" : "troops"}.`;
     return advanceAfterCombatIntriguePlay({
       ...state,
       players,

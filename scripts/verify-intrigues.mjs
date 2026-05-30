@@ -84,6 +84,7 @@ try {
   const strategicStockpiling = data.intrigueCards.find((card) => card.sourceId === 130);
   const detonation = data.intrigueCards.find((card) => card.sourceId === 131);
   const unexpectedAllies = data.intrigueCards.find((card) => card.sourceId === 137);
+  const shaddamsFavor = data.intrigueCards.find((card) => card.sourceId === 141);
   const intelligenceReport = data.intrigueCards.find((card) => card.sourceId === 142);
   const contingencyPlan = data.intrigueCards.find((card) => card.sourceId === 147);
   const findWeakness = data.intrigueCards.find((card) => card.sourceId === 149);
@@ -97,6 +98,7 @@ try {
   assert.ok(strategicStockpiling, "Strategic Stockpiling Intrigue should be available");
   assert.ok(detonation, "Detonation Intrigue should be available");
   assert.ok(unexpectedAllies, "Unexpected Allies Intrigue should be available");
+  assert.ok(shaddamsFavor, "Shaddam's Favor Intrigue should be available");
   assert.ok(intelligenceReport, "Intelligence Report Intrigue should be available");
   assert.ok(contingencyPlan, "Contingency Plan Intrigue should be available");
   assert.ok(findWeakness, "Find Weakness Intrigue should be available");
@@ -120,6 +122,11 @@ try {
     unexpectedAllies.summary,
     "Pay 2 water to deploy a sandworm to the Conflict; may remove the Shield Wall.",
     "Unexpected Allies should expose its water, detonation, and sandworm effect",
+  );
+  assert.equal(
+    shaddamsFavor.summary,
+    "Recruit 1 troop; with 3+ Emperor/Great Houses Influence, gain 3 Solari.",
+    "Shaddam's Favor should expose its recruit and conditional Solari effects",
   );
   assert.equal(
     intelligenceReport.summary,
@@ -530,6 +537,236 @@ try {
     state.playStrategicStockpilingPlotIntrigue(strategicWrongCardFixture, "p2", mercenaries.id, "both"),
     strategicWrongCardFixture,
     "Strategic Stockpiling should reject other Intrigue cards",
+  );
+
+  const shaddamsFavorFixture = {
+    ...game,
+    activeSeat: game.players.findIndex((candidate) => candidate.id === "p2"),
+    pendingAction: undefined,
+    pendingQueue: [],
+    intrigueDiscard: [],
+    players: game.players.map((candidate) =>
+      candidate.id === "p2"
+        ? {
+            ...candidate,
+            resources: { ...candidate.resources, solari: 1 },
+            influence: { ...candidate.influence, greatHouses: 0 },
+            garrison: 2,
+            intrigues: [shaddamsFavor],
+          }
+        : { ...candidate, intrigues: [] },
+    ),
+  };
+  assert.equal(
+    state.isShaddamsFavorIntrigue(shaddamsFavor),
+    true,
+    "Shaddam's Favor should be recognized as a structured Plot Intrigue",
+  );
+  const shaddamsFavorRecruit = state.playShaddamsFavorPlotIntrigue(
+    shaddamsFavorFixture,
+    "p2",
+    shaddamsFavor.id,
+  );
+  assert.equal(playerById(shaddamsFavorRecruit, "p2").garrison, 3, "Shaddam's Favor should recruit 1 troop");
+  assert.equal(
+    playerById(shaddamsFavorRecruit, "p2").resources.solari,
+    1,
+    "Shaddam's Favor should not gain Solari below the Emperor-icon threshold",
+  );
+  assert.deepEqual(playerById(shaddamsFavorRecruit, "p2").intrigues, []);
+  assert.equal(shaddamsFavorRecruit.intrigueDiscard.at(-1).id, shaddamsFavor.id);
+  assert.match(shaddamsFavorRecruit.log[0], /plays Shaddam's Favor, recruits 1 troop\./);
+
+  const shaddamsFavorGreatHousesFixture = {
+    ...shaddamsFavorFixture,
+    players: shaddamsFavorFixture.players.map((candidate) =>
+      candidate.id === "p2"
+        ? {
+            ...candidate,
+            resources: { ...candidate.resources, solari: 1 },
+            influence: { ...candidate.influence, greatHouses: 3, emperor: 0 },
+            garrison: 2,
+            intrigues: [shaddamsFavor],
+          }
+        : candidate,
+    ),
+  };
+  const shaddamsFavorGreatHouses = state.playShaddamsFavorPlotIntrigue(
+    shaddamsFavorGreatHousesFixture,
+    "p2",
+    shaddamsFavor.id,
+  );
+  assert.equal(playerById(shaddamsFavorGreatHouses, "p2").garrison, 3);
+  assert.equal(
+    playerById(shaddamsFavorGreatHouses, "p2").resources.solari,
+    4,
+    "Allies should use Great Houses for Emperor-icon card effects in six-player mode",
+  );
+  assert.match(shaddamsFavorGreatHouses.log[0], /recruits 1 troop and gains 3 Solari/);
+
+  const shaddamsFavorAllyEmperorFixture = {
+    ...shaddamsFavorFixture,
+    players: shaddamsFavorFixture.players.map((candidate) =>
+      candidate.id === "p2"
+        ? {
+            ...candidate,
+            resources: { ...candidate.resources, solari: 1 },
+            influence: { ...candidate.influence, greatHouses: 0, emperor: 3 },
+            garrison: 2,
+            intrigues: [shaddamsFavor],
+          }
+        : candidate,
+    ),
+  };
+  const shaddamsFavorAllyEmperor = state.playShaddamsFavorPlotIntrigue(
+    shaddamsFavorAllyEmperorFixture,
+    "p2",
+    shaddamsFavor.id,
+  );
+  assert.equal(
+    playerById(shaddamsFavorAllyEmperor, "p2").resources.solari,
+    1,
+    "Allies should not use the personal Emperor track for Emperor-icon card effects",
+  );
+
+  const commanderFavorFixture = {
+    ...shaddamsFavorFixture,
+    activeSeat: game.players.findIndex((candidate) => candidate.id === "p4"),
+    players: game.players.map((candidate) => {
+      if (candidate.id === "p4") {
+        return {
+          ...candidate,
+          resources: { ...candidate.resources, solari: 2 },
+          influence: { ...candidate.influence, emperor: 3, greatHouses: 0 },
+          intrigues: [shaddamsFavor],
+        };
+      }
+      if (candidate.id === "p6") return { ...candidate, garrison: 2, intrigues: [] };
+      return { ...candidate, intrigues: [] };
+    }),
+  };
+  const commanderFavor = state.playShaddamsFavorPlotIntrigue(
+    commanderFavorFixture,
+    "p4",
+    shaddamsFavor.id,
+    "p6",
+  );
+  assert.equal(
+    playerById(commanderFavor, "p6").garrison,
+    3,
+    "Commander Shaddam's Favor should recruit for the activated Ally",
+  );
+  assert.equal(
+    playerById(commanderFavor, "p4").resources.solari,
+    5,
+    "Commander Shaddam's Favor should gain Solari for the Commander",
+  );
+  assert.deepEqual(playerById(commanderFavor, "p4").intrigues, []);
+  assert.equal(commanderFavor.intrigueDiscard.at(-1).id, shaddamsFavor.id);
+  assert.match(commanderFavor.log[0], /Shaddam Corrino IV plays Shaddam's Favor for Princess Irulan/);
+
+  const commanderGreatHousesFavorFixture = {
+    ...commanderFavorFixture,
+    players: commanderFavorFixture.players.map((candidate) => {
+      if (candidate.id === "p4") {
+        return {
+          ...candidate,
+          resources: { ...candidate.resources, solari: 2 },
+          influence: { ...candidate.influence, emperor: 0, greatHouses: 0 },
+          intrigues: [shaddamsFavor],
+        };
+      }
+      if (candidate.id === "p2") {
+        return { ...candidate, influence: { ...candidate.influence, greatHouses: 3 }, intrigues: [] };
+      }
+      return candidate;
+    }),
+  };
+  const commanderGreatHousesFavor = state.playShaddamsFavorPlotIntrigue(
+    commanderGreatHousesFavorFixture,
+    "p4",
+    shaddamsFavor.id,
+    "p6",
+  );
+  assert.equal(
+    playerById(commanderGreatHousesFavor, "p4").resources.solari,
+    5,
+    "Shaddam should be able to use Great Houses for Emperor-icon card effects",
+  );
+
+  const commanderAllyEmperorFavorFixture = {
+    ...commanderFavorFixture,
+    players: commanderFavorFixture.players.map((candidate) => {
+      if (candidate.id === "p4") {
+        return {
+          ...candidate,
+          resources: { ...candidate.resources, solari: 2 },
+          influence: { ...candidate.influence, emperor: 0, greatHouses: 0 },
+          intrigues: [shaddamsFavor],
+        };
+      }
+      if (candidate.id === "p6") {
+        return {
+          ...candidate,
+          influence: { ...candidate.influence, emperor: 3, greatHouses: 0 },
+          garrison: 2,
+          intrigues: [],
+        };
+      }
+      return candidate;
+    }),
+  };
+  const commanderAllyEmperorFavor = state.playShaddamsFavorPlotIntrigue(
+    commanderAllyEmperorFavorFixture,
+    "p4",
+    shaddamsFavor.id,
+    "p6",
+  );
+  assert.equal(
+    playerById(commanderAllyEmperorFavor, "p4").resources.solari,
+    2,
+    "Shaddam should not use a same-team Ally's personal Emperor track for Emperor-icon card effects",
+  );
+  assert.equal(playerById(commanderAllyEmperorFavor, "p6").garrison, 3);
+
+  assert.equal(
+    state.playShaddamsFavorPlotIntrigue(commanderFavorFixture, "p4", shaddamsFavor.id, "p3"),
+    commanderFavorFixture,
+    "Commander Shaddam's Favor should reject non-team troop owners",
+  );
+  const pendingFavor = {
+    ...shaddamsFavorFixture,
+    pendingAction: { kind: "spy", ownerId: "p2", remaining: 1, source: "Test" },
+  };
+  assert.equal(
+    state.playShaddamsFavorPlotIntrigue(pendingFavor, "p2", shaddamsFavor.id),
+    pendingFavor,
+    "Shaddam's Favor should wait for pending actions to resolve",
+  );
+  const queuedFavor = {
+    ...shaddamsFavorFixture,
+    pendingQueue: [{ kind: "spy", ownerId: "p2", remaining: 1, source: "Test" }],
+  };
+  assert.equal(
+    state.playShaddamsFavorPlotIntrigue(queuedFavor, "p2", shaddamsFavor.id),
+    queuedFavor,
+    "Shaddam's Favor should wait for queued pending actions to resolve",
+  );
+  assert.equal(
+    state.playShaddamsFavorPlotIntrigue(shaddamsFavorFixture, "p3", shaddamsFavor.id),
+    shaddamsFavorFixture,
+    "Only the active player should play Shaddam's Favor as a Plot Intrigue",
+  );
+  const shaddamsFavorWrongCardFixture = {
+    ...shaddamsFavorFixture,
+    players: shaddamsFavorFixture.players.map((candidate) =>
+      candidate.id === "p2" ? { ...candidate, intrigues: [mercenaries] } : candidate,
+    ),
+  };
+  assert.equal(
+    state.playShaddamsFavorPlotIntrigue(shaddamsFavorWrongCardFixture, "p2", mercenaries.id),
+    shaddamsFavorWrongCardFixture,
+    "Shaddam's Favor should reject other Intrigue cards",
   );
 
   const backedPlotFixture = {

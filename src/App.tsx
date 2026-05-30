@@ -37,6 +37,7 @@ import {
   endgameBattleIconChoices,
   endgameConditionalIntrigueChoices,
   effectiveCost,
+  effectiveEmperorIconInfluence,
   effectiveRequirementInfluence,
   finishEndgame,
   finishPendingAction,
@@ -54,6 +55,7 @@ import {
   isIntelligenceReportIntrigue,
   isQuestionableMethodsIntrigue,
   isReachAgreementIntrigue,
+  isShaddamsFavorIntrigue,
   isSpiceIsPowerIntrigue,
   isSpringTheTrapIntrigue,
   isStrategicStockpilingIntrigue,
@@ -90,6 +92,7 @@ import {
   playDetonationIntrigue,
   playIntelligenceReportPlotIntrigue,
   playPlotBattleIconIntrigue,
+  playShaddamsFavorPlotIntrigue,
   playStrategicStockpilingPlotIntrigue,
   playUnexpectedAlliesIntrigue,
   resolveMakerChoice,
@@ -641,6 +644,16 @@ export default function App() {
     );
   }
 
+  function playShaddamsFavorPlot(intrigueId: string) {
+    setGame((current) => {
+      const player = current.players[current.activeSeat];
+      const troopOwnerId = player.role === "Commander"
+        ? commanderTargets[player.id] ?? defaultActivatedAllyId(player, current.players)
+        : undefined;
+      return playShaddamsFavorPlotIntrigue(current, player.id, intrigueId, troopOwnerId);
+    });
+  }
+
   function playBackedByChoamPlot(intrigueId: string, faction: FactionId) {
     setGame((current) => playBackedByChoamPlotIntrigue(current, current.players[current.activeSeat].id, intrigueId, faction));
   }
@@ -789,6 +802,7 @@ export default function App() {
   const plotIntrigueLocked = !playingPhase || Boolean(game.pendingAction) || game.pendingQueue.length > 0;
   const detonationDeployOwner = activePlayer.role === "Commander" ? activatedAlly : activePlayer;
   const unexpectedAlliesOwner = activePlayer.role === "Commander" ? activatedAlly : activePlayer;
+  const shaddamsFavorOwner = activePlayer.role === "Commander" ? activatedAlly : activePlayer;
   const currentConflictProtected = conflictProtectedByShieldWall(game.conflict);
   const unexpectedAlliesCanPay = activePlayer.resources.water >= 2;
   const unexpectedAlliesBlockedByShieldWall = Boolean(game.conflict && game.shieldWall && currentConflictProtected);
@@ -1804,6 +1818,7 @@ export default function App() {
                   const strategicStockpilingCanWater =
                     activePlayer.resources.water >= 3 &&
                     effectiveRequirementInfluence(activePlayer, "spacing", game.players) >= 3;
+                  const shaddamsFavorGainsSolari = effectiveEmperorIconInfluence(activePlayer, game.players) >= 3;
                   return (
                     <article className="intrigue-card" key={card.id}>
                       {card.thumbnailPath && <img className="card-art" src={card.thumbnailPath} alt="" loading="lazy" />}
@@ -1814,6 +1829,8 @@ export default function App() {
                             ? `Plot / draw ${intelligenceReportDrawCount}`
                           : isStrategicStockpilingIntrigue(card)
                             ? "Plot / spend stockpiles for VP"
+                          : isShaddamsFavorIntrigue(card)
+                            ? `Plot / recruit${shaddamsFavorGainsSolari ? " / 3 Solari" : ""}`
                           : isFindWeaknessIntrigue(card)
                             ? "Combat / +2 / recall spy for +3"
                           : isQuestionableMethodsIntrigue(card)
@@ -1904,6 +1921,20 @@ export default function App() {
                             Both -&gt; 2 VP
                           </button>
                         </div>
+                      )}
+                      {isShaddamsFavorIntrigue(card) && (
+                        <button
+                          type="button"
+                          onClick={() => playShaddamsFavorPlot(card.id)}
+                          disabled={plotIntrigueLocked}
+                          title={shaddamsFavorGainsSolari
+                            ? "Recruit 1 troop and gain 3 Solari"
+                            : "Recruit 1 troop"}
+                        >
+                          <Users size={14} />
+                          Recruit{activePlayer.role === "Commander" ? `: ${shaddamsFavorOwner.leader}` : ""}
+                          {shaddamsFavorGainsSolari ? " + 3 Solari" : ""}
+                        </button>
                       )}
                       {isBackedByChoamIntrigue(card) && (
                         <div className="intrigue-actions">

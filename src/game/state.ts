@@ -51,6 +51,7 @@ const reachAgreementSourceId = 449;
 const strategicStockpilingSourceId = 130;
 const detonationSourceId = 131;
 const unexpectedAlliesSourceId = 137;
+const shaddamsFavorSourceId = 141;
 const intelligenceReportSourceId = 142;
 const contingencyPlanSourceId = 147;
 const goToGroundSourceId = 146;
@@ -182,6 +183,10 @@ export function isBackedByChoamIntrigue(intrigue: IntrigueCard) {
 
 export function isStrategicStockpilingIntrigue(intrigue: IntrigueCard) {
   return intrigue.sourceId === strategicStockpilingSourceId;
+}
+
+export function isShaddamsFavorIntrigue(intrigue: IntrigueCard) {
+  return intrigue.sourceId === shaddamsFavorSourceId;
 }
 
 function buildSixPlayerConflictDeck() {
@@ -432,6 +437,14 @@ export function effectiveRequirementInfluence(player: Player, faction: FactionId
       .filter((candidate) => candidate.team === player.team && candidate.role === "Ally")
       .map((ally) => ally.influence[faction]),
   );
+}
+
+export function effectiveEmperorIconInfluence(player: Player, players: Player[]) {
+  const greatHousesInfluence = effectiveRequirementInfluence(player, "greatHouses", players);
+  if (player.role === "Commander" && player.team === "shaddam") {
+    return Math.max(greatHousesInfluence, player.influence.emperor);
+  }
+  return greatHousesInfluence;
 }
 
 export function canMeetInfluenceRequirement(space: BoardSpace, player: Player, players: Player[]) {
@@ -1618,6 +1631,59 @@ export function playStrategicStockpilingPlotIntrigue(
     intrigueDiscard: [...state.intrigueDiscard, intrigue],
     log: [
       `${player.leader} plays Strategic Stockpiling, ${paymentText}, and gains ${vp} VP.`,
+      ...state.log,
+    ],
+  };
+}
+
+export function playShaddamsFavorPlotIntrigue(
+  state: GameState,
+  playerId: string,
+  intrigueId: string,
+  troopOwnerId?: string,
+): GameState {
+  if (state.phase !== "playing" || state.pendingAction || state.pendingQueue.length > 0) return state;
+  const player = state.players[state.activeSeat];
+  if (!player || player.id !== playerId) return state;
+  const intrigue = player.intrigues.find((card) => card.id === intrigueId);
+  if (!intrigue || !isShaddamsFavorIntrigue(intrigue)) return state;
+
+  const resolvedTroopOwnerId = player.role === "Commander"
+    ? troopOwnerId ?? defaultActivatedAllyId(player, state.players)
+    : player.id;
+  const troopOwner = state.players.find((candidate) =>
+    candidate.id === resolvedTroopOwnerId &&
+    candidate.team === player.team &&
+    candidate.role === "Ally"
+  );
+  if (!troopOwner) return state;
+
+  const gainsSolari = effectiveEmperorIconInfluence(player, state.players) >= 3;
+  const players = state.players.map((candidate) => {
+    let next = candidate;
+    if (candidate.id === player.id) {
+      next = {
+        ...next,
+        resources: {
+          ...next.resources,
+          solari: next.resources.solari + (gainsSolari ? 3 : 0),
+        },
+        intrigues: next.intrigues.filter((card) => card.id !== intrigue.id),
+      };
+    }
+    if (candidate.id === troopOwner.id) {
+      next = { ...next, garrison: next.garrison + 1 };
+    }
+    return next;
+  });
+  const troopLabel = troopOwner.id !== player.id ? ` for ${troopOwner.leader}` : "";
+  const solariLabel = gainsSolari ? " and gains 3 Solari" : "";
+  return {
+    ...state,
+    players,
+    intrigueDiscard: [...state.intrigueDiscard, intrigue],
+    log: [
+      `${player.leader} plays Shaddam's Favor${troopLabel}, recruits 1 troop${solariLabel}.`,
       ...state.log,
     ],
   };

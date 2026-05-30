@@ -35,6 +35,7 @@ Private web-table implementation for a six-player `Dune: Imperium - Uprising` te
 - Contingency Plan can be played as a Plot Intrigue for 2 Solari or as a Combat Intrigue for 3 strength.
 - Intelligence Report can be played as a Plot Intrigue to draw 1 card, or 2 cards with two or more own spies on the board.
 - Strategic Stockpiling can be played as a Plot Intrigue to spend 5 spice and/or the 3 Spacing Guild Influence 3-water branch for VP.
+- Shaddam's Favor can be played as a Plot Intrigue to recruit 1 troop and gain 3 Solari with enough Emperor/Great Houses Influence.
 - Weirding Combat can be played as a Combat Intrigue for 3 strength, or 5 with 3+ effective Bene Gesserit Influence.
 - Backed by CHOAM can be played as a Plot Intrigue by losing 1 Influence for 4 Solari, or as a Combat Intrigue for 4 strength once the actor has completed at least two contracts.
 - Find Weakness can be played as a Combat Intrigue for 2 strength, with an optional actor-owned spy recall for 3 more strength.

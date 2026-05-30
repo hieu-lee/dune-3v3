@@ -204,6 +204,15 @@ export type PendingAction =
       source: string;
     }
   | {
+      kind: "recall-spy";
+      ownerId: string;
+      combatRecipientId: string;
+      remaining: number;
+      strength: number;
+      source: string;
+      optional: boolean;
+    }
+  | {
       kind: "trash-card";
       ownerId: string;
       source: string;

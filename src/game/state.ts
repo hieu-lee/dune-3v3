@@ -49,6 +49,7 @@ const choamProfitsSourceId = 450;
 const detonationSourceId = 131;
 const unexpectedAlliesSourceId = 137;
 const contingencyPlanSourceId = 147;
+const findWeaknessSourceId = 149;
 const devourSourceId = 151;
 const weirdingCombatSourceId = 154;
 const backedByChoamSourceId = 448;
@@ -123,6 +124,10 @@ export function isContingencyPlanIntrigue(intrigue: IntrigueCard) {
 
 export function isDevourIntrigue(intrigue: IntrigueCard) {
   return intrigue.sourceId === devourSourceId;
+}
+
+export function isFindWeaknessIntrigue(intrigue: IntrigueCard) {
+  return intrigue.sourceId === findWeaknessSourceId;
 }
 
 export function isWeirdingCombatIntrigue(intrigue: IntrigueCard) {
@@ -654,6 +659,7 @@ type SietchTabrPendingAction = Extract<PendingAction, { kind: "sietch-tabr" }>;
 type TradePendingAction = Extract<PendingAction, { kind: "trade" }>;
 type ThroneRowPendingAction = Extract<PendingAction, { kind: "throne-row" }>;
 type TrashCardPendingAction = Extract<PendingAction, { kind: "trash-card" }>;
+type RecallSpyPendingAction = Extract<PendingAction, { kind: "recall-spy" }>;
 type RevealAdjustPendingAction = Extract<PendingAction, { kind: "reveal-adjust" }>;
 
 function addPurchasedCard(player: Player, card: Card, fromReserve: boolean): Player {
@@ -1111,6 +1117,56 @@ export function skipTrashCard(state: GameState, pending: TrashCardPendingAction)
   };
 }
 
+export function recallableSpySpaces(state: GameState, pending: RecallSpyPendingAction) {
+  return boardSpaces.filter((space) => state.spyPosts[space.id] === pending.ownerId);
+}
+
+export function recallSpyForPending(
+  state: GameState,
+  pending: RecallSpyPendingAction,
+  spaceId: string,
+): GameState {
+  const owner = state.players.find((player) => player.id === pending.ownerId);
+  if (!owner) return { ...state, ...advancePendingAction(state) };
+  const space = boardSpaces.find((candidate) => candidate.id === spaceId);
+  if (!space || state.spyPosts[space.id] !== owner.id || pending.remaining <= 0) return state;
+
+  const spyPosts = { ...state.spyPosts };
+  delete spyPosts[space.id];
+  const remaining = pending.remaining - 1;
+  const finalRecall = remaining <= 0;
+  const recipient = state.players.find((player) => player.id === pending.combatRecipientId);
+  const players = state.players.map((player) => {
+    let next = player;
+    if (player.id === owner.id) next = { ...next, spies: next.spies + 1 };
+    if (finalRecall && player.id === pending.combatRecipientId) {
+      next = { ...next, conflict: next.conflict + pending.strength };
+    }
+    return next;
+  });
+  const strengthText = finalRecall
+    ? `, adding ${pending.strength} strength to ${recipient?.leader ?? "the chosen combatant"}`
+    : "";
+
+  return {
+    ...state,
+    players,
+    spyPosts,
+    ...(finalRecall ? advancePendingAction(state) : { pendingAction: { ...pending, remaining } }),
+    log: [`${owner.leader} recalls a spy from ${space.name} for ${pending.source}${strengthText}.`, ...state.log],
+  };
+}
+
+export function skipRecallSpy(state: GameState, pending: RecallSpyPendingAction): GameState {
+  if (!pending.optional) return state;
+  const owner = state.players.find((player) => player.id === pending.ownerId);
+  return {
+    ...state,
+    ...advancePendingAction(state),
+    log: [`${owner?.leader ?? "Player"} declines to recall a spy for ${pending.source}.`, ...state.log],
+  };
+}
+
 function faceUpBattleIconConflicts(player: Player, battleIcon: BattleIconId) {
   return player.wonConflicts.filter(
     (conflict) => !conflict.scored && (conflict.battleIcon === battleIcon || conflict.battleIcon === "wild"),
@@ -1468,6 +1524,7 @@ export function combatIntrigueStrength(
   target?: Player,
 ) {
   if (intrigue.automatedCombatSwords) return intrigue.automatedCombatSwords;
+  if (isFindWeaknessIntrigue(intrigue)) return 2;
   if (isDevourIntrigue(intrigue)) {
     // In six-player Combat, Commanders play Intrigues on behalf of one Ally and apply the effects to that Ally.
     const effectOwner = actor.role === "Commander" ? target : actor;
@@ -1573,6 +1630,18 @@ export function playCombatIntrigue(
   const trashPending: PendingAction | undefined = canTrashFromDevour
     ? { kind: "trash-card", ownerId: target.id, source: "Devour", optional: true }
     : undefined;
+  const canRecallSpyForFindWeakness = isFindWeaknessIntrigue(intrigue) && Object.values(state.spyPosts).includes(actor.id);
+  const recallSpyPending: PendingAction | undefined = canRecallSpyForFindWeakness
+    ? {
+        kind: "recall-spy",
+        ownerId: actor.id,
+        combatRecipientId: target.id,
+        remaining: 1,
+        strength: 3,
+        source: "Find Weakness",
+        optional: true,
+      }
+    : undefined;
 
   const players = state.players.map((player) => {
     let next = player;
@@ -1589,14 +1658,19 @@ export function playCombatIntrigue(
     players,
     combatPasses: [],
     intrigueDiscard: [...state.intrigueDiscard, intrigue],
-    pendingAction: trashPending,
+    pendingAction: trashPending ?? recallSpyPending,
   };
   const actorIds = combatIntrigueActorIds(nextState);
+  const pendingText = canTrashFromDevour
+    ? " and may trash a card"
+    : canRecallSpyForFindWeakness
+      ? " and may recall a spy"
+      : "";
   return {
     ...nextState,
     activeSeat: nextCombatSeat(nextState, actorIds),
     log: [
-      `${actor.leader} plays ${intrigue.name} for ${target.leader}, adding ${combatSwords} strength${canTrashFromDevour ? " and may trash a card" : ""}.`,
+      `${actor.leader} plays ${intrigue.name} for ${target.leader}, adding ${combatSwords} strength${pendingText}.`,
       ...state.log,
     ],
   };

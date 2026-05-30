@@ -45,6 +45,7 @@ import {
   isContingencyPlanIntrigue,
   isDevourIntrigue,
   isDetonationIntrigue,
+  isFindWeaknessIntrigue,
   isUnexpectedAlliesIntrigue,
   isWeirdingCombatIntrigue,
   maybeStartCombatPhase,
@@ -57,6 +58,8 @@ import {
   playerDoublesConflictRewards,
   playCombatIntrigue,
   queuePendingActions,
+  recallableSpySpaces,
+  recallSpyForPending,
   reinforceTroop,
   moveImperiumCardToThroneRow,
   resolveConflictTie,
@@ -74,6 +77,7 @@ import {
   playUnexpectedAlliesIntrigue,
   resolveMakerChoice,
   resolveSietchTabrChoice,
+  skipRecallSpy,
   skipTrashCard,
   startCombatPhase,
   startNextRound,
@@ -390,6 +394,24 @@ export default function App() {
     });
   }
 
+  function recallSpy(spaceId: string) {
+    if (game.pendingAction?.kind !== "recall-spy") return;
+    setGame((current) => {
+      const pending = current.pendingAction;
+      if (!pending || pending.kind !== "recall-spy") return current;
+      return maybeStartCombatPhase(recallSpyForPending(current, pending, spaceId));
+    });
+  }
+
+  function skipRecall() {
+    if (game.pendingAction?.kind !== "recall-spy") return;
+    setGame((current) => {
+      const pending = current.pendingAction;
+      if (!pending || pending.kind !== "recall-spy") return current;
+      return maybeStartCombatPhase(skipRecallSpy(current, pending));
+    });
+  }
+
   function placeSpy(spaceId: string) {
     if (game.pendingAction?.kind !== "spy") return;
     setGame((current) => {
@@ -665,6 +687,13 @@ export default function App() {
   const pendingTrashOwner =
     pendingAction?.kind === "trash-card" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingTrashChoices = pendingTrashOwner ? trashableCards(pendingTrashOwner) : [];
+  const pendingRecallSpyOwner =
+    pendingAction?.kind === "recall-spy" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
+  const pendingRecallSpyRecipient =
+    pendingAction?.kind === "recall-spy"
+      ? game.players.find((player) => player.id === pendingAction.combatRecipientId)
+      : undefined;
+  const pendingRecallSpyChoices = pendingAction?.kind === "recall-spy" ? recallableSpySpaces(game, pendingAction) : [];
   const shaddamCommander = game.players.find((player) => player.team === "shaddam" && player.role === "Commander");
   const reservedContractChoices = pendingContractOwner?.reservedContracts ?? [];
   const revealAdjustOwner =
@@ -1102,14 +1131,17 @@ export default function App() {
             <div className="pending-controls support-grid combat-grid">
               {combatCards.map((card) => {
                 const devourCard = isDevourIntrigue(card);
+                const findWeaknessCard = isFindWeaknessIntrigue(card);
                 const automatedStrength = combatIntrigueStrength(game, combatActor, card);
-                const canAutoResolve = Boolean(automatedStrength || devourCard);
+                const canAutoResolve = Boolean(automatedStrength || devourCard || findWeaknessCard);
                 return (
                   <div className="support-target combat-target" key={card.id}>
                     <strong>{card.name}</strong>
                     <span>
                       <Swords size={14} />
-                      {devourCard && !automatedStrength
+                      {findWeaknessCard
+                        ? "+2 / recall spy for +3"
+                        : devourCard && !automatedStrength
                         ? "+2 / +4 with worm"
                         : isBackedByChoamIntrigue(card) && !automatedStrength
                         ? "2+ completed contracts"
@@ -1127,7 +1159,7 @@ export default function App() {
                               title={`Play ${card.name} for ${target.leader}`}
                             >
                               {combatActor.role === "Commander"
-                                ? `${target.leader}${devourCard ? ` (+${targetStrength})` : ""}`
+                                ? `${target.leader}${devourCard || findWeaknessCard ? ` (+${targetStrength})` : ""}`
                                 : "Play"}
                             </button>
                           );
@@ -1204,6 +1236,7 @@ export default function App() {
                 {pendingAction.kind === "sietch-tabr" && `${pendingSietchLabel ?? "Player"} Sietch Tabr`}
                 {pendingAction.kind === "throne-row" && `${pendingThroneOwner?.leader ?? "Shaddam"} Throne Row`}
                 {pendingAction.kind === "trash-card" && `${pendingTrashOwner?.leader ?? "Player"} optional trash`}
+                {pendingAction.kind === "recall-spy" && `${pendingRecallSpyOwner?.leader ?? "Player"} recall spy`}
                 {pendingAction.kind === "conflict-tie" && `${teams[pendingAction.team].name} conflict tie`}
               </h2>
             </div>
@@ -1249,6 +1282,28 @@ export default function App() {
                   ))}
                 </div>
                 <button type="button" onClick={skipTrash}>Skip</button>
+              </div>
+            )}
+
+            {pendingAction.kind === "recall-spy" && pendingRecallSpyOwner && (
+              <div className="pending-controls spy-grid">
+                <span>
+                  {pendingRecallSpyOwner.leader}: {pendingAction.remaining} spy for +{pendingAction.strength} strength
+                  {pendingRecallSpyRecipient ? ` to ${pendingRecallSpyRecipient.leader}` : ""}
+                </span>
+                {pendingRecallSpyChoices.map((space) => (
+                  <button
+                    type="button"
+                    key={space.id}
+                    onClick={() => recallSpy(space.id)}
+                    title={`Recall spy from ${space.name}`}
+                  >
+                    <RotateCcw size={14} />
+                    {space.name}
+                  </button>
+                ))}
+                {pendingRecallSpyChoices.length === 0 && <span>No spy posts</span>}
+                {pendingAction.optional && <button type="button" onClick={skipRecall}>Skip</button>}
               </div>
             )}
 
@@ -1512,6 +1567,8 @@ export default function App() {
                       <span>
                         {isContingencyPlanIntrigue(card)
                           ? "Plot / Combat / +3 strength"
+                          : isFindWeaknessIntrigue(card)
+                            ? "Combat / +2 / recall spy for +3"
                           : isDevourIntrigue(card)
                             ? activeCombatStrength
                               ? `Combat / +${activeCombatStrength} strength${activePlayer.deployedSandworms > 0 ? " / optional trash" : ""}`

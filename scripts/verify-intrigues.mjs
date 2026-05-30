@@ -84,6 +84,7 @@ try {
   const detonation = data.intrigueCards.find((card) => card.sourceId === 131);
   const unexpectedAllies = data.intrigueCards.find((card) => card.sourceId === 137);
   const contingencyPlan = data.intrigueCards.find((card) => card.sourceId === 147);
+  const findWeakness = data.intrigueCards.find((card) => card.sourceId === 149);
   const devour = data.intrigueCards.find((card) => card.sourceId === 151);
   const backedByChoam = data.intrigueCards.find((card) => card.sourceId === 448);
   const mercenaries = data.intrigueCards.find((card) => card.sourceId === 128);
@@ -91,6 +92,7 @@ try {
   assert.ok(detonation, "Detonation Intrigue should be available");
   assert.ok(unexpectedAllies, "Unexpected Allies Intrigue should be available");
   assert.ok(contingencyPlan, "Contingency Plan Intrigue should be available");
+  assert.ok(findWeakness, "Find Weakness Intrigue should be available");
   assert.ok(devour, "Devour Intrigue should be available");
   assert.ok(backedByChoam, "Backed by CHOAM Intrigue should be available");
   assert.ok(mercenaries, "Mercenaries Intrigue should be available");
@@ -108,6 +110,11 @@ try {
     contingencyPlan.summary,
     "Gain 2 Solari as a Plot Intrigue OR add 3 strength as a Combat Intrigue.",
     "Contingency Plan should expose both printed timing branches",
+  );
+  assert.equal(
+    findWeakness.summary,
+    "Add 2 strength; you may recall 1 spy to add 3 more strength.",
+    "Find Weakness should expose its base strength and optional spy recall",
   );
   assert.equal(
     devour.summary,

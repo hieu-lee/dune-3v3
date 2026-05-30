@@ -1,5 +1,5 @@
 import catalogJson from "./uprising-catalog.generated.json";
-import type { BoardSpace, Card, ConflictCard, ContractCard, IconId, IntrigueCard, LeaderCard, TeamId } from "./types";
+import type { BoardSpace, Card, ConflictCard, ContractCard, IconId, IntrigueCard, LeaderCard, ObjectiveCard, TeamId } from "./types";
 
 type HubAttribute = [string, number | string | null];
 type HubCard = {
@@ -91,6 +91,40 @@ export const teams: Record<TeamId, { name: string; accent: string; commander: st
     motto: "Imperial control, Sardaukar pressure, wealth",
   },
 };
+
+export const battleIconLabels = {
+  crysknife: "Crysknife",
+  desertMouse: "Desert Mouse",
+  ornithopter: "Ornithopter",
+};
+
+export const sixPlayerObjectiveCards: ObjectiveCard[] = [
+  {
+    id: "objective-crysknife-1",
+    name: "Crysknife Objective",
+    battleIcon: "crysknife",
+    playerCount: "All",
+  },
+  {
+    id: "objective-crysknife-4-6p",
+    name: "Crysknife Objective",
+    battleIcon: "crysknife",
+    playerCount: "4/6P",
+  },
+  {
+    id: "objective-desert-mouse-first",
+    name: "Desert Mouse Objective",
+    battleIcon: "desertMouse",
+    playerCount: "All",
+    firstPlayer: true,
+  },
+  {
+    id: "objective-desert-mouse-4-6p",
+    name: "Desert Mouse Objective",
+    battleIcon: "desertMouse",
+    playerCount: "4/6P",
+  },
+];
 
 type StarterCardSpec = Omit<Card, "id"> & {
   id: string;

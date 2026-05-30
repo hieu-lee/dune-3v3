@@ -17,6 +17,7 @@ export type FactionId =
   | "greatHouses"
   | "fringeWorlds";
 export type ResourceId = "solari" | "spice" | "water";
+export type BattleIconId = "crysknife" | "desertMouse" | "ornithopter";
 
 export type Resources = Record<ResourceId, number>;
 export type Influence = Record<FactionId, number>;
@@ -86,6 +87,14 @@ export type LeaderCard = {
   sourceSlug?: string;
 };
 
+export type ObjectiveCard = {
+  id: string;
+  name: string;
+  battleIcon: BattleIconId;
+  playerCount: "All" | "4/6P";
+  firstPlayer?: boolean;
+};
+
 export type BoardSpace = {
   id: string;
   name: string;
@@ -143,6 +152,7 @@ export type Player = {
   swordmasterBonus: boolean;
   contracts: PlayerContract[];
   reservedContracts: ContractCard[];
+  objectives: ObjectiveCard[];
 };
 
 export type PendingAction =

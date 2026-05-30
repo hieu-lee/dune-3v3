@@ -8,6 +8,7 @@ import {
   leaderCardByName,
   reserveMarket,
   shaddamReservedContracts,
+  sixPlayerObjectiveCards,
   standardContracts,
 } from "./data";
 import type {
@@ -19,6 +20,7 @@ import type {
   GameState,
   Influence,
   IntrigueCard,
+  ObjectiveCard,
   PendingAction,
   Player,
   ResourceId,
@@ -74,10 +76,76 @@ function cloneIntrigues(intrigues: IntrigueCard[]) {
   }));
 }
 
+function cloneObjectives(objectives: ObjectiveCard[]) {
+  return objectives.map((objective) => ({ ...objective }));
+}
+
 function buildSixPlayerConflictDeck() {
   const levelTwo = shuffleItems(conflictCards.filter((conflict) => conflict.level === 2)).slice(0, 5);
   const levelThree = shuffleItems(conflictCards.filter((conflict) => conflict.level === 3));
   return cloneConflicts([...levelTwo, ...levelThree]);
+}
+
+const opposingAdjacentAllyIds: Record<string, string> = {
+  p2: "p3",
+  p3: "p2",
+  p5: "p6",
+  p6: "p5",
+};
+
+function objectiveIconCount(players: Player[], team: TeamId, battleIcon: ObjectiveCard["battleIcon"]) {
+  return players
+    .filter((player) => player.team === team)
+    .flatMap((player) => player.objectives)
+    .filter((objective) => objective.battleIcon === battleIcon)
+    .length;
+}
+
+export function balanceSixPlayerObjectives(players: Player[]) {
+  const overloadedTeam = (["muaddib", "shaddam"] as TeamId[]).find(
+    (team) => objectiveIconCount(players, team, "desertMouse") === 2,
+  );
+  if (!overloadedTeam) return players;
+
+  const desertMouseOwner = players.find((player) =>
+    player.team === overloadedTeam
+      && player.objectives.some((objective) => objective.id === "objective-desert-mouse-4-6p")
+  );
+  if (!desertMouseOwner) return players;
+
+  const tradePartnerId = opposingAdjacentAllyIds[desertMouseOwner.id];
+  const tradePartner = players.find((player) => player.id === tradePartnerId);
+  if (!tradePartner || tradePartner.team === desertMouseOwner.team || tradePartner.objectives.length !== 1) {
+    return players;
+  }
+
+  const ownerObjective = desertMouseOwner.objectives[0];
+  const partnerObjective = tradePartner.objectives[0];
+  return players.map((player) => {
+    if (player.id === desertMouseOwner.id) return { ...player, objectives: [partnerObjective] };
+    if (player.id === tradePartner.id) return { ...player, objectives: [ownerObjective] };
+    return player;
+  });
+}
+
+export function dealSixPlayerObjectives(players: Player[]) {
+  const objectives = shuffleItems(cloneObjectives(sixPlayerObjectiveCards));
+  const allies = players.filter((player) => player.role === "Ally");
+  if (allies.length !== objectives.length) {
+    throw new Error(`Expected ${objectives.length} Allies for six-player Objectives, found ${allies.length}.`);
+  }
+
+  const objectiveByPlayerId = new Map(allies.map((player, index) => [player.id, objectives[index]]));
+  const assignedPlayers = players.map((player) => ({
+    ...player,
+    objectives: player.role === "Ally" ? [objectiveByPlayerId.get(player.id)!] : [],
+  }));
+  const balancedPlayers = balanceSixPlayerObjectives(assignedPlayers);
+  const firstPlayerId = balancedPlayers.find((player) =>
+    player.objectives.some((objective) => objective.firstPlayer)
+  )?.id;
+  const firstSeat = Math.max(0, balancedPlayers.findIndex((player) => player.id === firstPlayerId));
+  return { players: balancedPlayers, firstSeat };
 }
 
 function buildChoamContractDeck() {
@@ -169,6 +237,7 @@ function makePlayer(
     swordmasterBonus: false,
     contracts: [],
     reservedContracts: team === "shaddam" && role === "Commander" ? buildShaddamContractReserve() : [],
+    objectives: [],
   };
   return drawCards(player, 5);
 }
@@ -180,7 +249,7 @@ export function initialGame(): GameState {
   const contracts = buildChoamContractDeck();
   const intrigueDeck = buildIntrigueDeck();
 
-  const players = [
+  const playersBeforeObjectives = [
     makePlayer("p1", "Seat 1", "Muad'Dib", "muaddib", "Commander", "#45c4b0"),
     makePlayer("p2", "Seat 2", "Feyd-Rautha Harkonnen", "shaddam", "Ally", "#d26b48"),
     makePlayer("p3", "Seat 3", "Gurney Halleck", "muaddib", "Ally", "#2f8fdd"),
@@ -188,11 +257,12 @@ export function initialGame(): GameState {
     makePlayer("p5", "Seat 5", "Lady Jessica", "muaddib", "Ally", "#8ad5ff"),
     makePlayer("p6", "Seat 6", "Princess Irulan", "shaddam", "Ally", "#f08f82"),
   ];
+  const { players, firstSeat } = dealSixPlayerObjectives(playersBeforeObjectives);
 
   const game: GameState = {
     round: 1,
-    activeSeat: 0,
-    firstSeat: 0,
+    activeSeat: firstSeat,
+    firstSeat,
     players,
     spaces: {},
     spyPosts: {},
@@ -211,7 +281,10 @@ export function initialGame(): GameState {
     shieldWall: true,
     swordmasterClaimed: false,
     pendingQueue: [],
-    log: [`Round 1 begins. ${conflict.name} is revealed. Muad'Dib has first action.`],
+    log: [
+      `Round 1 begins. ${conflict.name} is revealed. ${players[firstSeat].leader} has first action.`,
+      `Only Allies draw Objectives; ${players[firstSeat].leader} has the First Player marker.`,
+    ],
   };
   const setupPending = pendingActionForShaddamPersonalBoard(game);
   return setupPending

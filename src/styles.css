@@ -59,6 +59,7 @@ button {
 .team-metrics,
 .resource-row,
 .mini-stats,
+.objective-row,
 .shield-state,
 .space-footer {
   display: flex;
@@ -291,6 +292,7 @@ h2 {
 .team-metrics span,
 .shield-state,
 .mini-stats span,
+.objective-row span,
 .resource-row span,
 .persuasion {
   border-radius: 999px;
@@ -303,6 +305,7 @@ h2 {
 .team-metrics span,
 .shield-state,
 .mini-stats span,
+.objective-row span,
 .resource-row span {
   padding: 6px 8px;
 }
@@ -507,10 +510,21 @@ h2 {
 }
 
 .resource-row,
-.mini-stats {
+.mini-stats,
+.objective-row {
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 10px;
+}
+
+.objective-row {
+  margin-top: 8px;
+}
+
+.objective-row span {
+  border: 1px solid rgba(242, 184, 75, 0.3);
+  background: rgba(242, 184, 75, 0.12);
+  color: #f4d08b;
 }
 
 .resource-row span {

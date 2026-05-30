@@ -17,7 +17,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
-import { boardSpaces, iconLabels, teams } from "./game/data";
+import { battleIconLabels, boardSpaces, iconLabels, teams } from "./game/data";
 import {
   advancePendingAction,
   advanceSeat,
@@ -720,6 +720,16 @@ export default function App() {
                 <span>{player.contracts.length} contracts</span>
                 {player.reservedContracts.length > 0 && <span>{player.reservedContracts.length} reserved</span>}
               </div>
+              {player.objectives.length > 0 && (
+                <div className="objective-row">
+                  {player.objectives.map((objective) => (
+                    <span key={objective.id} title={objective.name}>
+                      {battleIconLabels[objective.battleIcon]}
+                      {objective.firstPlayer ? " - first" : ""}
+                    </span>
+                  ))}
+                </div>
+              )}
             </article>
           ))}
         </aside>

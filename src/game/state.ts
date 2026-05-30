@@ -100,6 +100,8 @@ function buildIntrigueDeck() {
   return shuffleItems(cloneIntrigues(intrigueCards));
 }
 
+const shaddamPersonalBoardThroneSource = "Emperor personal board";
+
 function buildStarterDeck(playerId: string, team: TeamId, role: Role) {
   const starterDeck = role === "Commander" ? commanderStarterDecks[team] : allyStarterCards;
   if (starterDeck.length !== 10) {
@@ -181,7 +183,7 @@ export function initialGame(): GameState {
     makePlayer("p6", "Seat 6", "Princess Irulan", "shaddam", "Ally", "#f08f82"),
   ];
 
-  return {
+  const game: GameState = {
     round: 1,
     activeSeat: 0,
     firstSeat: 0,
@@ -204,6 +206,17 @@ export function initialGame(): GameState {
     pendingQueue: [],
     log: [`Round 1 begins. ${conflict.name} is revealed. Muad'Dib has first action.`],
   };
+  const setupPending = pendingActionForShaddamPersonalBoard(game);
+  return setupPending
+    ? {
+        ...game,
+        pendingAction: setupPending,
+        log: [
+          "Resolve Shaddam's starting Throne Row choice from the Emperor personal board.",
+          ...game.log,
+        ],
+      }
+    : game;
 }
 
 export function canPay(player: Player, cost: Partial<Resources> = {}) {
@@ -302,6 +315,12 @@ export function isFremenCard(card: Card) {
 
 export function canMoveCardToThroneRow(card: Card) {
   return !isFremenCard(card);
+}
+
+export function pendingActionForShaddamPersonalBoard(state: GameState): PendingAction | undefined {
+  const shaddam = state.players.find((player) => player.team === "shaddam" && player.role === "Commander");
+  if (!shaddam || !state.imperiumRow.some(canMoveCardToThroneRow)) return undefined;
+  return { kind: "throne-row", ownerId: shaddam.id, source: shaddamPersonalBoardThroneSource };
 }
 
 export function pendingActionForCard(card: Card, source: Player, state?: GameState): PendingAction | undefined {

@@ -13,6 +13,15 @@ try {
 
   const game = state.initialGame();
   assert.deepEqual(game.throneRow, [], "Initial Throne Row should start empty");
+  if (game.imperiumRow.some(state.canMoveCardToThroneRow)) {
+    assert.deepEqual(
+      game.pendingAction,
+      { kind: "throne-row", ownerId: "p4", source: "Emperor personal board" },
+      "Shaddam's Emperor board should queue a starting Throne Row choice",
+    );
+  } else {
+    assert.equal(game.pendingAction, undefined, "No starting Throne Row choice should queue without an eligible card");
+  }
 
   const shaddam = game.players.find((player) => player.id === "p4");
   const muadDib = game.players.find((player) => player.id === "p1");
@@ -45,7 +54,19 @@ try {
       ![eligible.id, fremen.id, replacement.id, rowPurchaseCard.id].includes(card.id)
     )],
     throneRow: [],
+    pendingAction: undefined,
+    pendingQueue: [],
   };
+  assert.deepEqual(
+    state.pendingActionForShaddamPersonalBoard(fixture),
+    { kind: "throne-row", ownerId: shaddam.id, source: "Emperor personal board" },
+    "The Emperor personal board should queue a game-start Throne Row choice",
+  );
+  assert.equal(
+    state.pendingActionForShaddamPersonalBoard({ ...fixture, imperiumRow: [fremen] }),
+    undefined,
+    "The Emperor personal board should not queue when no non-Fremen row card is available",
+  );
   const pending = state.pendingActionForCard(imperialTent, shaddam, fixture);
   assert.deepEqual(
     pending,
@@ -64,7 +85,13 @@ try {
   assert.equal(moved.imperiumRow.some((card) => card.id === eligible.id), false);
   assert.equal(moved.imperiumRow.some((card) => card.id === replacement.id), true);
   assert.equal(moved.marketDeck.length, fixture.marketDeck.length - 1);
+  assert.equal(moved.pendingAction, undefined, "Choosing a Throne Row card should advance the pending action");
   assert.match(moved.log[0], /moves .* to the Throne Row/);
+
+  const setupPending = state.pendingActionForShaddamPersonalBoard(fixture);
+  const setupMoved = state.moveImperiumCardToThroneRow(fixture, setupPending, eligible.id);
+  assert.deepEqual(setupMoved.throneRow.map((card) => card.id), [eligible.id]);
+  assert.match(setupMoved.log[0], /Emperor personal board/);
 
   assert.equal(
     state.moveImperiumCardToThroneRow(fixture, pending, fremen.id),
@@ -78,9 +105,8 @@ try {
   );
 
   const buyFixture = {
-    ...fixture,
-    throneRow: [eligible],
-    players: fixture.players.map((player) => {
+    ...moved,
+    players: moved.players.map((player) => {
       if (player.id === "p2") return { ...player, revealed: true, persuasion: eligible.cost ?? 0 };
       if (player.id === "p3") return { ...player, revealed: true, persuasion: eligible.cost ?? 0 };
       return player;
@@ -88,6 +114,16 @@ try {
   };
   const shaddamBuy = state.acquireMarketCard(buyFixture, "p2", eligible.id);
   assert.equal(shaddamBuy.throneRow.length, 0, "Shaddam team should acquire from the Throne Row");
+  assert.deepEqual(
+    shaddamBuy.imperiumRow.map((card) => card.id),
+    buyFixture.imperiumRow.map((card) => card.id),
+    "Buying from the Throne Row must not refill or mutate the Imperium Row",
+  );
+  assert.equal(
+    shaddamBuy.marketDeck.length,
+    buyFixture.marketDeck.length,
+    "Buying from the Throne Row must not draw from the market deck",
+  );
   assert.equal(
     shaddamBuy.players.find((player) => player.id === "p2")?.discard.at(-1)?.id,
     eligible.id,

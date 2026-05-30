@@ -28,6 +28,7 @@ import {
   canPay,
   collectChoamContractFallback,
   collectMakerSpice,
+  combatIntrigueStrength,
   combatIntrigueTargets,
   conflictProtectedByShieldWall,
   defaultActivatedAllyId,
@@ -43,6 +44,7 @@ import {
   isContingencyPlanIntrigue,
   isDetonationIntrigue,
   isUnexpectedAlliesIntrigue,
+  isWeirdingCombatIntrigue,
   maybeStartCombatPhase,
   passCombatIntrigue,
   pendingActionForCard,
@@ -651,7 +653,7 @@ export default function App() {
         .map((playerId) => game.players.find((player) => player.id === playerId))
         .filter((player): player is Player => Boolean(player))
     : [];
-  const combatCards = combatActor?.intrigues.filter((card) => card.combatSwords || card.automatedCombatSwords) ?? [];
+  const combatCards = combatActor?.intrigues.filter((card) => card.combatSwords || combatIntrigueStrength(game, combatActor, card)) ?? [];
   const tradePartners =
     pendingActor && pendingAction?.kind === "trade"
       ? game.players.filter((player) => player.team === pendingActor.team && player.id !== pendingActor.id)
@@ -1069,27 +1071,30 @@ export default function App() {
               <h2>{combatActor.leader}</h2>
             </div>
             <div className="pending-controls support-grid combat-grid">
-              {combatCards.map((card) => (
-                <div className="support-target combat-target" key={card.id}>
-                  <strong>{card.name}</strong>
-                  <span>
-                    <Swords size={14} />
-                    +{card.automatedCombatSwords ?? card.combatSwords} strength
-                  </span>
-                  {card.automatedCombatSwords
-                    ? combatTargets.map((target) => (
-                        <button
-                          type="button"
-                          key={target.id}
-                          onClick={() => playCombatCard(card.id, target.id)}
-                          title={`Play ${card.name} for ${target.leader}`}
-                        >
-                          {combatActor.role === "Commander" ? target.leader : "Play"}
-                        </button>
-                      ))
-                    : <span>Resolve printed card text.</span>}
-                </div>
-              ))}
+              {combatCards.map((card) => {
+                const automatedStrength = combatIntrigueStrength(game, combatActor, card);
+                return (
+                  <div className="support-target combat-target" key={card.id}>
+                    <strong>{card.name}</strong>
+                    <span>
+                      <Swords size={14} />
+                      +{automatedStrength ?? card.combatSwords} strength
+                    </span>
+                    {automatedStrength
+                      ? combatTargets.map((target) => (
+                          <button
+                            type="button"
+                            key={target.id}
+                            onClick={() => playCombatCard(card.id, target.id)}
+                            title={`Play ${card.name} for ${target.leader}`}
+                          >
+                            {combatActor.role === "Commander" ? target.leader : "Play"}
+                          </button>
+                        ))
+                      : <span>Resolve printed card text.</span>}
+                  </div>
+                );
+              })}
               {combatCards.length === 0 && <span>No structured Combat Intrigues.</span>}
               <button className="combat-pass" type="button" onClick={passCombatCard}>
                 Pass
@@ -1436,86 +1441,91 @@ export default function App() {
                 <span>{activePlayer.intrigues.length} Intrigue</span>
               </div>
               <div className="intrigue-row">
-                {activePlayer.intrigues.map((card) => (
-                  <article className="intrigue-card" key={card.id}>
-                    {card.thumbnailPath && <img className="card-art" src={card.thumbnailPath} alt="" loading="lazy" />}
-                    <span>
-                      {isContingencyPlanIntrigue(card)
-                        ? "Plot / Combat / +3 strength"
-                        : card.battleIcon
-                        ? `Plot / Endgame / ${battleIconLabels[card.battleIcon]}`
-                        : card.combatSwords
-                          ? `Combat / +${card.combatSwords} printed strength`
-                          : "Intrigue"}
-                    </span>
-                    <strong>{card.name}</strong>
-                    <p>{card.summary}</p>
-                    {card.battleIcon && (
-                      <button
-                        type="button"
-                        onClick={() => scorePlotIntrigue(card.id)}
-                        disabled={plotIntrigueLocked}
-                      >
-                        <Sparkles size={14} />
-                        Gain Plot Spice
-                      </button>
-                    )}
-                    {isContingencyPlanIntrigue(card) && (
-                      <button
-                        type="button"
-                        onClick={() => playContingencyPlanPlot(card.id)}
-                        disabled={plotIntrigueLocked}
-                      >
-                        <CircleDollarSign size={14} />
-                        Gain 2 Solari
-                      </button>
-                    )}
-                    {isDetonationIntrigue(card) && (
-                      <div className="intrigue-actions">
+                {activePlayer.intrigues.map((card) => {
+                  const activeCombatStrength = combatIntrigueStrength(game, activePlayer, card);
+                  return (
+                    <article className="intrigue-card" key={card.id}>
+                      {card.thumbnailPath && <img className="card-art" src={card.thumbnailPath} alt="" loading="lazy" />}
+                      <span>
+                        {isContingencyPlanIntrigue(card)
+                          ? "Plot / Combat / +3 strength"
+                          : isWeirdingCombatIntrigue(card) && activeCombatStrength
+                            ? `Combat / +${activeCombatStrength} strength`
+                            : card.battleIcon
+                              ? `Plot / Endgame / ${battleIconLabels[card.battleIcon]}`
+                              : card.combatSwords
+                                ? `Combat / +${card.combatSwords} printed strength`
+                                : "Intrigue"}
+                      </span>
+                      <strong>{card.name}</strong>
+                      <p>{card.summary}</p>
+                      {card.battleIcon && (
                         <button
                           type="button"
-                          onClick={() => playDetonation(card.id, "shield-wall")}
-                          disabled={plotIntrigueLocked || !game.shieldWall}
+                          onClick={() => scorePlotIntrigue(card.id)}
+                          disabled={plotIntrigueLocked}
                         >
-                          <Shield size={14} />
-                          Remove Shield Wall
+                          <Sparkles size={14} />
+                          Gain Plot Spice
                         </button>
+                      )}
+                      {isContingencyPlanIntrigue(card) && (
                         <button
                           type="button"
-                          onClick={() => playDetonation(card.id, "deploy")}
-                          disabled={plotIntrigueLocked || !game.conflict}
+                          onClick={() => playContingencyPlanPlot(card.id)}
+                          disabled={plotIntrigueLocked}
                         >
-                          <Swords size={14} />
-                          Deploy up to {Math.min(detonationDeployOwner.garrison, 4)}
+                          <CircleDollarSign size={14} />
+                          Gain 2 Solari
                         </button>
-                      </div>
-                    )}
-                    {isUnexpectedAlliesIntrigue(card) && (
-                      <div className="intrigue-actions">
-                        {unexpectedAlliesCanSummonWithoutWall && (
+                      )}
+                      {isDetonationIntrigue(card) && (
+                        <div className="intrigue-actions">
                           <button
                             type="button"
-                            onClick={() => playUnexpectedAllies(card.id, false)}
-                            disabled={unexpectedAlliesDisabled}
-                          >
-                            <Sparkles size={14} />
-                            Worm{unexpectedAlliesOwner.id !== activePlayer.id ? `: ${unexpectedAlliesOwner.leader}` : ""}
-                          </button>
-                        )}
-                        {game.shieldWall && (
-                          <button
-                            type="button"
-                            onClick={() => playUnexpectedAllies(card.id, true)}
-                            disabled={unexpectedAlliesDisabled}
+                            onClick={() => playDetonation(card.id, "shield-wall")}
+                            disabled={plotIntrigueLocked || !game.shieldWall}
                           >
                             <Shield size={14} />
-                            {unexpectedAlliesBlockedByShieldWall ? "Wall + worm" : "Remove wall + worm"}
+                            Remove Shield Wall
                           </button>
-                        )}
-                      </div>
-                    )}
-                  </article>
-                ))}
+                          <button
+                            type="button"
+                            onClick={() => playDetonation(card.id, "deploy")}
+                            disabled={plotIntrigueLocked || !game.conflict}
+                          >
+                            <Swords size={14} />
+                            Deploy up to {Math.min(detonationDeployOwner.garrison, 4)}
+                          </button>
+                        </div>
+                      )}
+                      {isUnexpectedAlliesIntrigue(card) && (
+                        <div className="intrigue-actions">
+                          {unexpectedAlliesCanSummonWithoutWall && (
+                            <button
+                              type="button"
+                              onClick={() => playUnexpectedAllies(card.id, false)}
+                              disabled={unexpectedAlliesDisabled}
+                            >
+                              <Sparkles size={14} />
+                              Worm{unexpectedAlliesOwner.id !== activePlayer.id ? `: ${unexpectedAlliesOwner.leader}` : ""}
+                            </button>
+                          )}
+                          {game.shieldWall && (
+                            <button
+                              type="button"
+                              onClick={() => playUnexpectedAllies(card.id, true)}
+                              disabled={unexpectedAlliesDisabled}
+                            >
+                              <Shield size={14} />
+                              {unexpectedAlliesBlockedByShieldWall ? "Wall + worm" : "Remove wall + worm"}
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </article>
+                  );
+                })}
               </div>
             </section>
           )}

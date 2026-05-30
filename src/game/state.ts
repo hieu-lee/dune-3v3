@@ -48,6 +48,7 @@ const choamProfitsSourceId = 450;
 const detonationSourceId = 131;
 const unexpectedAlliesSourceId = 137;
 const contingencyPlanSourceId = 147;
+const weirdingCombatSourceId = 154;
 const spiceMustFlowSourceId = 538;
 const shadowAllianceSourceId = 160;
 const shadowAllianceFactions: FactionId[] = [
@@ -115,6 +116,10 @@ export function isUnexpectedAlliesIntrigue(intrigue: IntrigueCard) {
 
 export function isContingencyPlanIntrigue(intrigue: IntrigueCard) {
   return intrigue.sourceId === contingencyPlanSourceId;
+}
+
+export function isWeirdingCombatIntrigue(intrigue: IntrigueCard) {
+  return intrigue.sourceId === weirdingCombatSourceId;
 }
 
 function buildSixPlayerConflictDeck() {
@@ -1392,6 +1397,14 @@ export function combatIntrigueActorIds(state: GameState) {
   return state.players.filter((player) => canActInCombat(state, player)).map((player) => player.id);
 }
 
+export function combatIntrigueStrength(state: GameState, actor: Player, intrigue: IntrigueCard) {
+  if (intrigue.automatedCombatSwords) return intrigue.automatedCombatSwords;
+  if (isWeirdingCombatIntrigue(intrigue)) {
+    return effectiveRequirementInfluence(actor, "bene", state.players) >= 3 ? 5 : 3;
+  }
+  return undefined;
+}
+
 export function combatIntrigueTargets(state: GameState, actorId: string) {
   const actor = state.players.find((player) => player.id === actorId);
   if (!actor || !canActInCombat(state, actor)) return [];
@@ -1470,8 +1483,9 @@ export function playCombatIntrigue(
   const actor = state.players[state.activeSeat];
   if (!actor || actor.id !== actorId) return state;
   const intrigue = actor.intrigues.find((card) => card.id === intrigueId);
-  if (!intrigue?.automatedCombatSwords) return state;
-  const combatSwords = intrigue.automatedCombatSwords;
+  if (!intrigue) return state;
+  const combatSwords = combatIntrigueStrength(state, actor, intrigue);
+  if (!combatSwords) return state;
   const targets = combatIntrigueTargets(state, actor.id);
   const resolvedTargetId = targetId ?? targets[0];
   if (!resolvedTargetId || !targets.includes(resolvedTargetId)) return state;

@@ -71,10 +71,15 @@ try {
   const mercenaries = intrigueBySourceId(data, 128);
   assert.equal(impress.combatSwords, 2, "Impress should expose its structured Combat strength");
   assert.equal(weirdingCombat.combatSwords, 5, "Weirding Combat should expose its structured Combat strength");
+  assert.equal(
+    weirdingCombat.summary,
+    "Add 3 strength; add 5 instead if you have at least 3 Bene Gesserit Influence.",
+    "Weirding Combat should expose its conditional Influence threshold",
+  );
   assert.equal(contingencyPlan.combatSwords, 3, "Contingency Plan should expose its printed Combat strength");
   assert.equal(contingencyPlan.automatedCombatSwords, 3, "Contingency Plan's full Combat branch should auto-resolve");
   assert.equal(impress.automatedCombatSwords, undefined, "Impress has extra printed text and should not auto-resolve");
-  assert.equal(weirdingCombat.automatedCombatSwords, undefined, "Weirding Combat should wait for printed text modeling");
+  assert.equal(weirdingCombat.automatedCombatSwords, undefined, "Weirding Combat should resolve from state-aware Influence");
   assert.equal(mercenaries.combatSwords, undefined, "Non-Combat Intrigues should not expose Combat strength");
   assert.deepEqual(
     data.intrigueCards
@@ -204,6 +209,51 @@ try {
   assert.equal(contingencyPlayed.intrigueDiscard.at(-1).id, contingencyPlan.id);
   assert.match(contingencyPlayed.log[0], /plays Contingency Plan for Feyd-Rautha Harkonnen, adding 3 strength/);
 
+  const weirdingFixture = combatFixture(state, data, (players) =>
+    players.map((player) =>
+      player.id === "p2"
+        ? { ...player, conflict: 2, deployedTroops: 1, intrigues: [weirdingCombat] }
+        : player.id === "p3"
+          ? { ...player, conflict: 4, deployedTroops: 1 }
+          : player,
+    ),
+  );
+  const weirdingLow = state.startCombatPhase(weirdingFixture);
+  assert.equal(
+    state.combatIntrigueStrength(weirdingLow, playerById(weirdingLow, "p2"), weirdingCombat),
+    3,
+    "Weirding Combat should add 3 strength below the Bene Gesserit threshold",
+  );
+  const weirdingLowPlayed = state.playCombatIntrigue(weirdingLow, "p2", weirdingCombat.id);
+  assert.equal(playerById(weirdingLowPlayed, "p2").conflict, 5);
+  assert.equal(weirdingLowPlayed.intrigueDiscard.at(-1).id, weirdingCombat.id);
+  assert.match(weirdingLowPlayed.log[0], /plays Weirding Combat for Feyd-Rautha Harkonnen, adding 3 strength/);
+
+  const weirdingHighFixture = combatFixture(state, data, (players) =>
+    players.map((player) =>
+      player.id === "p2"
+        ? {
+            ...player,
+            conflict: 2,
+            deployedTroops: 1,
+            influence: { ...player.influence, bene: 3 },
+            intrigues: [weirdingCombat],
+          }
+        : player.id === "p3"
+          ? { ...player, conflict: 4, deployedTroops: 1 }
+          : player,
+    ),
+  );
+  const weirdingHigh = state.startCombatPhase(weirdingHighFixture);
+  assert.equal(
+    state.combatIntrigueStrength(weirdingHigh, playerById(weirdingHigh, "p2"), weirdingCombat),
+    5,
+    "Weirding Combat should add 5 strength at 3+ Bene Gesserit Influence",
+  );
+  const weirdingHighPlayed = state.playCombatIntrigue(weirdingHigh, "p2", weirdingCombat.id);
+  assert.equal(playerById(weirdingHighPlayed, "p2").conflict, 7);
+  assert.match(weirdingHighPlayed.log[0], /adding 5 strength/);
+
   const resetPassFixture = combatFixture(state, data, (players) =>
     players.map((player) => {
       if (player.id === "p2") return { ...player, conflict: 2, deployedTroops: 1 };
@@ -239,6 +289,31 @@ try {
   assert.equal(playerById(commanderPlayed, "p6").conflict, 3, "Commander Combat Intrigue should add strength to the chosen Ally");
   assert.deepEqual(playerById(commanderPlayed, "p4").intrigues, []);
   assert.equal(playerById(commanderPlayed, "p2").conflict, 5, "Other eligible Allies should not receive the chosen card's strength");
+
+  const commanderWeirdingFixture = combatFixture(
+    state,
+    data,
+    (players) =>
+      players.map((player) => {
+        if (player.id === "p2") {
+          return { ...player, conflict: 5, deployedTroops: 1, influence: { ...player.influence, bene: 3 } };
+        }
+        if (player.id === "p4") return { ...player, intrigues: [weirdingCombat] };
+        if (player.id === "p6") return { ...player, conflict: 1, deployedTroops: 1 };
+        return player;
+      }),
+    3,
+  );
+  const commanderWeirding = state.startCombatPhase(commanderWeirdingFixture);
+  assert.equal(
+    state.combatIntrigueStrength(commanderWeirding, playerById(commanderWeirding, "p4"), weirdingCombat),
+    5,
+    "Commander Weirding Combat should use the team's effective Bene Gesserit Influence",
+  );
+  const commanderWeirdingPlayed = state.playCombatIntrigue(commanderWeirding, "p4", weirdingCombat.id, "p6");
+  assert.equal(playerById(commanderWeirdingPlayed, "p6").conflict, 6);
+  assert.equal(playerById(commanderWeirdingPlayed, "p2").conflict, 5);
+  assert.match(commanderWeirdingPlayed.log[0], /Shaddam Corrino IV plays Weirding Combat for Princess Irulan, adding 5 strength/);
 
   const nonCombatFixture = combatFixture(state, data, (players) =>
     players.map((player) =>

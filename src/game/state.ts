@@ -54,6 +54,7 @@ const unexpectedAlliesSourceId = 137;
 const callToArmsSourceId = 138;
 const shaddamsFavorSourceId = 141;
 const intelligenceReportSourceId = 142;
+const councilorsAmbitionSourceId = 129;
 const marketOpportunitySourceId = 145;
 const contingencyPlanSourceId = 147;
 const goToGroundSourceId = 146;
@@ -138,6 +139,10 @@ export function isUnexpectedAlliesIntrigue(intrigue: IntrigueCard) {
 
 export function isCallToArmsIntrigue(intrigue: IntrigueCard) {
   return intrigue.sourceId === callToArmsSourceId;
+}
+
+export function isCouncilorsAmbitionIntrigue(intrigue: IntrigueCard) {
+  return intrigue.sourceId === councilorsAmbitionSourceId;
 }
 
 export function isContingencyPlanIntrigue(intrigue: IntrigueCard) {
@@ -356,6 +361,7 @@ function makePlayer(
     spies: 3,
     revealed: false,
     persuasion: 0,
+    highCouncilSeat: false,
     callToArmsActive: false,
     purchaseSequence: 0,
     swordmasterBonus: false,
@@ -435,8 +441,19 @@ export function effectiveCost(space: BoardSpace, players: Player[]) {
   return space.cost;
 }
 
-function canEnterSpace(space: BoardSpace, player: Player, swordmasterClaimed = false) {
+const highCouncilSeatLimit = 4;
+
+export function highCouncilSeatsTaken(players: Player[]) {
+  return players.filter((player) => player.highCouncilSeat).length;
+}
+
+export function boardSpaceRewardApplies(space: BoardSpace, player: Player) {
+  return space.id !== "high-council" || player.highCouncilSeat;
+}
+
+function canEnterSpace(space: BoardSpace, player: Player, swordmasterClaimed = false, players: Player[] = [player]) {
   if (space.id === "swordmaster" && (player.swordmasterBonus || swordmasterClaimed)) return false;
+  if (space.id === "high-council" && !player.highCouncilSeat && highCouncilSeatsTaken(players) >= highCouncilSeatLimit) return false;
   if (!space.personal) return true;
   return player.role === "Commander" && player.team === space.personal;
 }
@@ -557,7 +574,7 @@ export function iconCanReach(
   spyPosts: Record<string, string> = {},
   players: Player[] = [player],
 ) {
-  if (!canEnterSpace(space, player, swordmasterClaimed)) return false;
+  if (!canEnterSpace(space, player, swordmasterClaimed, players)) return false;
   if (!canMeetInfluenceRequirement(space, player, players)) return false;
   if (card.icons.includes(space.icon)) return true;
   if (card.icons.includes("spy") && spyPosts[space.id] === player.id) return true;
@@ -1119,7 +1136,10 @@ export function applyBoardEffect(
   Object.entries(cost).forEach(([key, amount]) => {
     resourcesNext[key as ResourceId] -= amount ?? 0;
   });
-  const gain = deferMakerChoice && space.makerWorms && space.gain ? { ...space.gain, spice: 0 } : space.gain;
+  const rewardsApply = boardSpaceRewardApplies(space, sourcePlayer);
+  const gain = rewardsApply
+    ? deferMakerChoice && space.makerWorms && space.gain ? { ...space.gain, spice: 0 } : space.gain
+    : undefined;
   Object.entries(gain ?? {}).forEach(([key, amount]) => {
     if (key === "intrigue") return;
     resourcesNext[key as ResourceId] += amount ?? 0;
@@ -1138,9 +1158,9 @@ export function applyBoardEffect(
     }
   }
 
-  if (space.draw) source = drawCards(source, source.hand.length + space.draw);
+  if (rewardsApply && space.draw) source = drawCards(source, source.hand.length + space.draw);
 
-  if (space.troops && space.team !== "reinforce") {
+  if (rewardsApply && space.troops && space.team !== "reinforce") {
     const troopOwner = sourcePlayer.role === "Commander" ? target : source;
     const troopNext = { ...troopOwner, garrison: troopOwner.garrison + space.troops };
     if (sourcePlayer.role === "Commander") target = troopNext;
@@ -1149,6 +1169,10 @@ export function applyBoardEffect(
 
   if (space.id === "swordmaster" && !source.swordmasterBonus) {
     source = { ...source, agentsTotal: 3, agentsReady: source.agentsReady + 1, swordmasterBonus: true };
+  }
+
+  if (space.id === "high-council" && !source.highCouncilSeat) {
+    source = { ...source, highCouncilSeat: true };
   }
 
   return { source, target };
@@ -1629,6 +1653,34 @@ export function playIntelligenceReportPlotIntrigue(
     players,
     intrigueDiscard: [...state.intrigueDiscard, intrigue],
     log: [`${player.leader} plays Intelligence Report as a Plot Intrigue and draws ${cardText}.`, ...state.log],
+  };
+}
+
+export function playCouncilorsAmbitionPlotIntrigue(
+  state: GameState,
+  playerId: string,
+  intrigueId: string,
+): GameState {
+  if (state.phase !== "playing" || state.pendingAction || state.pendingQueue.length > 0) return state;
+  const player = state.players[state.activeSeat];
+  if (!player || player.id !== playerId) return state;
+  const intrigue = player.intrigues.find((card) => card.id === intrigueId);
+  if (!intrigue || !isCouncilorsAmbitionIntrigue(intrigue) || !player.highCouncilSeat) return state;
+
+  const players = state.players.map((candidate) =>
+    candidate.id === player.id
+      ? {
+          ...candidate,
+          resources: { ...candidate.resources, water: candidate.resources.water + 2 },
+          intrigues: candidate.intrigues.filter((card) => card.id !== intrigue.id),
+        }
+      : candidate,
+  );
+  return {
+    ...state,
+    players,
+    intrigueDiscard: [...state.intrigueDiscard, intrigue],
+    log: [`${player.leader} plays Councilor's Ambition and gains 2 water.`, ...state.log],
   };
 }
 
@@ -2780,6 +2832,7 @@ export function startNextRound(state: GameState): GameState {
         agentsReady: player.agentsTotal,
         revealed: false,
         persuasion: 0,
+        highCouncilSeat: player.highCouncilSeat,
         revealActivatedAllyId: undefined,
         callToArmsActive: false,
         conflict: 0,

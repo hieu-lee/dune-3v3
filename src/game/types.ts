@@ -167,6 +167,7 @@ export type Player = {
   spies: number;
   revealed: boolean;
   persuasion: number;
+  highCouncilSeat: boolean;
   revealActivatedAllyId?: string;
   callToArmsActive: boolean;
   purchaseSequence: number;

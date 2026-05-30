@@ -25,6 +25,7 @@ Private web-table implementation for a six-player `Dune: Imperium - Uprising` te
 - Six-player Objective setup deals only to Allies and balances Desert Mouse/Crysknife icons across teams.
 - Conflict winners keep won Conflict cards and score immediate non-wild battle-icon pairs with Objectives or prior Conflicts.
 - Sandworm players are flagged for doubled printed Conflict-card rewards, with battle icons and location control kept outside that doubling.
+- High Council seats persist and add 2 persuasion on Reveal turns; later High Council visits take the printed repeat rewards.
 - Combat phase opens before Conflict resolution and sequences Combat Intrigue pass/play timing.
 - Endgame phase triggers at 10 VP or an empty Conflict deck and scores battle-icon Endgame Intrigues against matching or wild Conflict cards.
 - Endgame scores Secure Spice Trade, CHOAM Profits, and Shadow Alliance rewards when their printed conditions are met.
@@ -34,6 +35,7 @@ Private web-table implementation for a six-player `Dune: Imperium - Uprising` te
 - Active players can play the Plot side of battle-icon Intrigues for 1 spice during normal play.
 - Contingency Plan can be played as a Plot Intrigue for 2 Solari or as a Combat Intrigue for 3 strength.
 - Intelligence Report can be played as a Plot Intrigue to draw 1 card, or 2 cards with two or more own spies on the board.
+- Councilor's Ambition can be played as a Plot Intrigue for 2 water once the player has a High Council seat.
 - Call to Arms can be played as a Plot Intrigue so each card acquired during that Reveal turn recruits 1 troop.
 - Strategic Stockpiling can be played as a Plot Intrigue to spend 5 spice and/or the 3 Spacing Guild Influence 3-water branch for VP.
 - Shaddam's Favor can be played as a Plot Intrigue to recruit 1 troop and gain 3 Solari with enough Emperor/Great Houses Influence.

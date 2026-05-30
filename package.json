@@ -11,6 +11,7 @@
     "sync:cards": "node scripts/sync-dune-catalog.mjs",
     "sync:card-images": "node scripts/sync-dune-catalog.mjs --download-images",
     "verify:alliances": "node scripts/verify-alliances.mjs",
+    "verify:app-high-council": "node scripts/verify-app-high-council.mjs",
     "verify:battle-icons": "node scripts/verify-battle-icons.mjs",
     "verify:board-requirements": "node scripts/verify-board-requirements.mjs",
     "verify:board-spaces": "node scripts/verify-board-spaces.mjs",

@@ -87,6 +87,7 @@ try {
   const callToArms = data.intrigueCards.find((card) => card.sourceId === 138);
   const shaddamsFavor = data.intrigueCards.find((card) => card.sourceId === 141);
   const intelligenceReport = data.intrigueCards.find((card) => card.sourceId === 142);
+  const councilorsAmbition = data.intrigueCards.find((card) => card.sourceId === 129);
   const marketOpportunity = data.intrigueCards.find((card) => card.sourceId === 145);
   const contingencyPlan = data.intrigueCards.find((card) => card.sourceId === 147);
   const findWeakness = data.intrigueCards.find((card) => card.sourceId === 149);
@@ -103,6 +104,7 @@ try {
   assert.ok(callToArms, "Call to Arms Intrigue should be available");
   assert.ok(shaddamsFavor, "Shaddam's Favor Intrigue should be available");
   assert.ok(intelligenceReport, "Intelligence Report Intrigue should be available");
+  assert.ok(councilorsAmbition, "Councilor's Ambition Intrigue should be available");
   assert.ok(marketOpportunity, "Market Opportunity Intrigue should be available");
   assert.ok(contingencyPlan, "Contingency Plan Intrigue should be available");
   assert.ok(findWeakness, "Find Weakness Intrigue should be available");
@@ -131,6 +133,11 @@ try {
     callToArms.summary,
     "During your Reveal turn this round, whenever you acquire a card, recruit 1 troop.",
     "Call to Arms should expose its reveal-turn acquisition trigger",
+  );
+  assert.equal(
+    councilorsAmbition.summary,
+    "If you have a seat on the High Council, gain 2 water.",
+    "Councilor's Ambition should expose its High Council requirement",
   );
   assert.equal(
     shaddamsFavor.summary,
@@ -622,6 +629,78 @@ try {
     state.playCallToArmsPlotIntrigue(callToArmsWrongCardFixture, "p2", mercenaries.id),
     callToArmsWrongCardFixture,
     "Call to Arms should reject other Intrigue cards",
+  );
+
+  const councilorsAmbitionFixture = {
+    ...game,
+    activeSeat: game.players.findIndex((candidate) => candidate.id === "p2"),
+    pendingAction: undefined,
+    pendingQueue: [],
+    intrigueDiscard: [],
+    players: game.players.map((candidate) =>
+      candidate.id === "p2"
+        ? { ...candidate, highCouncilSeat: true, resources: { ...candidate.resources, water: 0 }, intrigues: [councilorsAmbition] }
+        : { ...candidate, intrigues: [] },
+    ),
+  };
+  assert.equal(
+    state.isCouncilorsAmbitionIntrigue(councilorsAmbition),
+    true,
+    "Councilor's Ambition should be recognized as a structured Plot Intrigue",
+  );
+  const councilorsAmbitionPlayed = state.playCouncilorsAmbitionPlotIntrigue(
+    councilorsAmbitionFixture,
+    "p2",
+    councilorsAmbition.id,
+  );
+  assert.equal(playerById(councilorsAmbitionPlayed, "p2").resources.water, 2, "Councilor's Ambition should gain 2 water");
+  assert.deepEqual(playerById(councilorsAmbitionPlayed, "p2").intrigues, []);
+  assert.equal(councilorsAmbitionPlayed.intrigueDiscard.at(-1).id, councilorsAmbition.id);
+  assert.match(councilorsAmbitionPlayed.log[0], /plays Councilor's Ambition and gains 2 water/);
+  const noCouncilSeatAmbition = {
+    ...councilorsAmbitionFixture,
+    players: councilorsAmbitionFixture.players.map((candidate) =>
+      candidate.id === "p2" ? { ...candidate, highCouncilSeat: false, intrigues: [councilorsAmbition] } : candidate,
+    ),
+  };
+  assert.equal(
+    state.playCouncilorsAmbitionPlotIntrigue(noCouncilSeatAmbition, "p2", councilorsAmbition.id),
+    noCouncilSeatAmbition,
+    "Councilor's Ambition should require a High Council seat",
+  );
+  const pendingCouncilorsAmbition = {
+    ...councilorsAmbitionFixture,
+    pendingAction: { kind: "spy", ownerId: "p2", remaining: 1, source: "Test" },
+  };
+  assert.equal(
+    state.playCouncilorsAmbitionPlotIntrigue(pendingCouncilorsAmbition, "p2", councilorsAmbition.id),
+    pendingCouncilorsAmbition,
+    "Councilor's Ambition should wait for pending actions to resolve",
+  );
+  const queuedCouncilorsAmbition = {
+    ...councilorsAmbitionFixture,
+    pendingQueue: [{ kind: "spy", ownerId: "p2", remaining: 1, source: "Test" }],
+  };
+  assert.equal(
+    state.playCouncilorsAmbitionPlotIntrigue(queuedCouncilorsAmbition, "p2", councilorsAmbition.id),
+    queuedCouncilorsAmbition,
+    "Councilor's Ambition should wait for queued pending actions to resolve",
+  );
+  assert.equal(
+    state.playCouncilorsAmbitionPlotIntrigue(councilorsAmbitionFixture, "p3", councilorsAmbition.id),
+    councilorsAmbitionFixture,
+    "Only the active player should play Councilor's Ambition as a Plot Intrigue",
+  );
+  const councilorsAmbitionWrongCardFixture = {
+    ...councilorsAmbitionFixture,
+    players: councilorsAmbitionFixture.players.map((candidate) =>
+      candidate.id === "p2" ? { ...candidate, intrigues: [mercenaries] } : candidate,
+    ),
+  };
+  assert.equal(
+    state.playCouncilorsAmbitionPlotIntrigue(councilorsAmbitionWrongCardFixture, "p2", mercenaries.id),
+    councilorsAmbitionWrongCardFixture,
+    "Councilor's Ambition should reject other Intrigue cards",
   );
 
   const strategicStockpilingFixture = {

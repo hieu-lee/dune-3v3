@@ -23,6 +23,7 @@ import {
   acquireMarketCard,
   allPlayersDone,
   applyBoardEffect,
+  boardSpaceRewardApplies,
   canPlaceSpyPost,
   canMoveCardToThroneRow,
   canPay,
@@ -50,6 +51,7 @@ import {
   isBackedByChoamIntrigue,
   isCallToArmsIntrigue,
   isContingencyPlanIntrigue,
+  isCouncilorsAmbitionIntrigue,
   isDevourIntrigue,
   isDetonationIntrigue,
   isFindWeaknessIntrigue,
@@ -93,6 +95,7 @@ import {
   playBackedByChoamPlotIntrigue,
   playCallToArmsPlotIntrigue,
   playContingencyPlanPlotIntrigue,
+  playCouncilorsAmbitionPlotIntrigue,
   playDetonationIntrigue,
   playIntelligenceReportPlotIntrigue,
   playMarketOpportunityPlotIntrigue,
@@ -112,7 +115,7 @@ import {
   transferTradeGood,
   updateTradeSelection,
 } from "./game/state";
-import type { Card, FactionId, GameState, Player, ResourceId, Resources, TeamId, TradeGoodId, TrashCardZone } from "./game/types";
+import type { BoardSpace, Card, FactionId, GameState, Player, ResourceId, Resources, TeamId, TradeGoodId, TrashCardZone } from "./game/types";
 import type { CombatIntrigueChoice } from "./game/state";
 
 const resources: Array<{ id: ResourceId; label: string; Icon: LucideIcon }> = [
@@ -134,6 +137,15 @@ const factionShortLabels: Record<FactionId, string> = {
   greatHouses: "GH",
   fringeWorlds: "FW",
 };
+
+export function revealPersuasionFor(player: Player) {
+  const highCouncilPersuasion = player.highCouncilSeat ? 2 : 0;
+  return player.hand.reduce((sum, card) => sum + card.persuasion, 0) + highCouncilPersuasion;
+}
+
+export function boardSpaceIntrigueGainFor(space: BoardSpace, player: Player) {
+  return boardSpaceRewardApplies(space, player) ? space.gain?.intrigue ?? 0 : 0;
+}
 
 export default function App() {
   const [game, setGame] = useState<GameState>(() => initialGame());
@@ -289,7 +301,7 @@ export default function App() {
           ...current.log,
         ].filter((entry): entry is string => Boolean(entry)),
       };
-      const intrigueGain = selectedSpace.gain?.intrigue ?? 0;
+      const intrigueGain = boardSpaceIntrigueGainFor(selectedSpace, player);
       const resolvedState = intrigueGain > 0
         ? drawIntrigueCards(nextState, source.id, intrigueGain, selectedSpace.name)
         : nextState;
@@ -304,7 +316,7 @@ export default function App() {
     if (game.phase !== "playing") return;
     if (game.pendingAction) return;
     if (activePlayer.revealed) return;
-    const persuasion = activePlayer.hand.reduce((sum, card) => sum + card.persuasion, 0);
+    const persuasion = revealPersuasionFor(activePlayer);
     const swords = activePlayer.hand.reduce((sum, card) => sum + card.swords, 0) + (activePlayer.swordmasterBonus ? 2 : 0);
     const revealGain = activePlayer.hand.reduce<Partial<Resources>>((gain, card) => {
       Object.entries(card.revealGain ?? {}).forEach(([resource, amount]) => {
@@ -653,6 +665,10 @@ export default function App() {
 
   function playIntelligenceReportPlot(intrigueId: string) {
     setGame((current) => playIntelligenceReportPlotIntrigue(current, current.players[current.activeSeat].id, intrigueId));
+  }
+
+  function playCouncilorsAmbitionPlot(intrigueId: string) {
+    setGame((current) => playCouncilorsAmbitionPlotIntrigue(current, current.players[current.activeSeat].id, intrigueId));
   }
 
   function playStrategicStockpilingPlot(intrigueId: string, choice: "spice" | "water" | "both") {
@@ -1093,6 +1109,7 @@ export default function App() {
                   </span>
                 )}
                 <span>{player.conflict} strength</span>
+                {player.highCouncilSeat && <span>High Council</span>}
                 {player.makerHooks && <span>Maker Hooks</span>}
                 <span>{player.spies} spies</span>
                 <span>{player.intrigues.length} intrigue</span>
@@ -1836,6 +1853,7 @@ export default function App() {
                   const intelligenceReportDrawCount = boardSpaces.filter((space) =>
                     game.spyPosts[space.id] === activePlayer.id
                   ).length >= 2 ? 2 : 1;
+                  const councilorsAmbitionCanPlay = activePlayer.highCouncilSeat;
                   const strategicStockpilingCanSpice = activePlayer.resources.spice >= 5;
                   const strategicStockpilingCanWater =
                     activePlayer.resources.water >= 3 &&
@@ -1853,6 +1871,8 @@ export default function App() {
                             ? "Plot / reveal acquisitions recruit"
                           : isIntelligenceReportIntrigue(card)
                             ? `Plot / draw ${intelligenceReportDrawCount}`
+                          : isCouncilorsAmbitionIntrigue(card)
+                            ? "Plot / High Council water"
                           : isStrategicStockpilingIntrigue(card)
                             ? "Plot / spend stockpiles for VP"
                           : isShaddamsFavorIntrigue(card)
@@ -1928,6 +1948,17 @@ export default function App() {
                         >
                           <BookOpen size={14} />
                           Draw {intelligenceReportDrawCount}
+                        </button>
+                      )}
+                      {isCouncilorsAmbitionIntrigue(card) && (
+                        <button
+                          type="button"
+                          onClick={() => playCouncilorsAmbitionPlot(card.id)}
+                          disabled={plotIntrigueLocked || !councilorsAmbitionCanPlay}
+                          title="Requires a High Council seat"
+                        >
+                          <Droplets size={14} />
+                          Gain 2 Water
                         </button>
                       )}
                       {isStrategicStockpilingIntrigue(card) && (

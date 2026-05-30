@@ -71,6 +71,54 @@ try {
   const nonMakerCollected = state.collectMakerSpice(game, highCouncil);
   assert.equal(nonMakerCollected, game.makerSpice, "Non-Maker spaces should not rewrite Maker spice state");
 
+  const feydBase = game.players.find((player) => player.id === "p2");
+  assert.ok(feydBase, "Verifier needs Feyd");
+  const firstCouncilVisit = state.applyBoardEffect(
+    { ...feydBase, resources: { ...feydBase.resources, solari: 5 }, garrison: 0, highCouncilSeat: false },
+    feydBase,
+    highCouncil,
+    { solari: 5 },
+  );
+  assert.equal(firstCouncilVisit.source.highCouncilSeat, true, "First High Council visit should take a Council seat");
+  assert.equal(firstCouncilVisit.source.resources.solari, 0, "High Council should cost 5 Solari");
+  assert.equal(firstCouncilVisit.source.resources.spice, 0, "First High Council visit should not take the repeat spice reward");
+  assert.equal(firstCouncilVisit.source.garrison, 0, "First High Council visit should not take the repeat troop reward");
+  assert.equal(
+    state.boardSpaceRewardApplies(highCouncil, firstCouncilVisit.source),
+    true,
+    "High Council repeat rewards should apply after the seat is taken",
+  );
+
+  const repeatCouncilVisit = state.applyBoardEffect(
+    { ...feydBase, resources: { ...feydBase.resources, solari: 5 }, garrison: 0, highCouncilSeat: true },
+    feydBase,
+    highCouncil,
+    { solari: 5 },
+  );
+  assert.equal(repeatCouncilVisit.source.highCouncilSeat, true);
+  assert.equal(repeatCouncilVisit.source.resources.solari, 0);
+  assert.equal(repeatCouncilVisit.source.resources.spice, 2, "Repeat High Council visits should gain 2 spice");
+  assert.equal(repeatCouncilVisit.source.garrison, 3, "Repeat High Council visits should recruit 3 troops");
+
+  const fourSeatsFilled = game.players.map((player, index) => ({ ...player, highCouncilSeat: index < 4 }));
+  const noSeatPlayer = { ...fourSeatsFilled[4], highCouncilSeat: false, resources: { ...fourSeatsFilled[4].resources, solari: 5 } };
+  const seatedPlayer = { ...fourSeatsFilled[0], resources: { ...fourSeatsFilled[0].resources, solari: 5 } };
+  assert.equal(
+    state.highCouncilSeatsTaken(fourSeatsFilled),
+    4,
+    "High Council should track the four physical Council seats",
+  );
+  assert.equal(
+    state.iconCanReach({ icons: ["landsraad"] }, highCouncil, noSeatPlayer, false, {}, fourSeatsFilled),
+    false,
+    "A player without a seat should not take a fifth High Council seat",
+  );
+  assert.equal(
+    state.iconCanReach({ icons: ["landsraad"] }, highCouncil, seatedPlayer, false, {}, fourSeatsFilled),
+    true,
+    "A player with a seat should still be able to use the High Council repeat space",
+  );
+
   console.log("maker spice verification passed");
 } finally {
   await server.close();

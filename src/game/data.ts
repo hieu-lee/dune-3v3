@@ -58,6 +58,7 @@ const automatedCombatSwordValues: Partial<Record<number, number>> = {
 };
 const intrigueSummariesByCatalogId: Partial<Record<number, string>> = {
   131: "Remove the Shield Wall OR deploy up to four troops from your garrison to the Conflict.",
+  129: "If you have a seat on the High Council, gain 2 water.",
   130: "Spend 5 spice to gain 1 VP; with 3+ Spacing Guild Influence, you may also spend 3 water to gain 1 VP.",
   138: "During your Reveal turn this round, whenever you acquire a card, recruit 1 troop.",
   142: "Draw 1 card; draw 1 more if you have two or more spies on the board.",

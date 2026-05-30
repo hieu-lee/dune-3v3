@@ -899,9 +899,10 @@ const boardSpaceSpecs: BoardSpace[] = [
     zone: "Spice Trade",
     icon: "spice",
     cost: { spice: 3 },
+    requirement: { faction: "spacing", amount: 2 },
     influence: "spacing",
     gain: { solari: 5 },
-    detail: "Requires Guild influence in the full rules.",
+    detail: "Requires 2 Spacing Guild Influence, then gains Guild influence and Solari.",
   },
   {
     id: "spice-refinery",

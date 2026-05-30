@@ -153,7 +153,7 @@ export default function App() {
     return new Set(
       boardSpaces
         .filter((space) => !game.spaces[space.id])
-        .filter((space) => iconCanReach(selectedCard, space, activePlayer, game.swordmasterClaimed, game.spyPosts))
+        .filter((space) => iconCanReach(selectedCard, space, activePlayer, game.swordmasterClaimed, game.spyPosts, game.players))
         .filter((space) => canPay(activePlayer, effectiveCost(space, game.players)))
         .map((space) => space.id),
     );

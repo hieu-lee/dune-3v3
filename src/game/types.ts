@@ -26,6 +26,10 @@ export type Influence = Record<FactionId, number>;
 export type AllianceOwners = Partial<Record<FactionId, string>>;
 export type BoardGain = Partial<Resources> & { intrigue?: number };
 export type TradeGoodId = ResourceId | "intrigue";
+export type InfluenceRequirement = {
+  faction: FactionId;
+  amount: number;
+};
 
 export type Card = {
   id: string;
@@ -110,6 +114,7 @@ export type BoardSpace = {
   zone: "Faction" | "Landsraad" | "City" | "Desert" | "Spice Trade";
   icon: IconId;
   cost?: Partial<Resources>;
+  requirement?: InfluenceRequirement;
   influence?: FactionId;
   gain?: BoardGain;
   troops?: number;

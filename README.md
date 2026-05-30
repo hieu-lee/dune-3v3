@@ -19,6 +19,7 @@ Private web-table implementation for a six-player `Dune: Imperium - Uprising` te
 - Team trade flow supports spice, water, Solari, and chosen Intrigue-card transfers.
 - Shaddam Throne Row support for Emperor-board setup, Imperial Tent movement, and Shaddam-team acquisition.
 - Maker-space bonus spice tracks and pays out on the four six-player Maker desert spaces.
+- Shipping enforces its 2 Spacing Guild Influence requirement, including Commander shared team influence.
 - Six-player Objective setup deals only to Allies and balances Desert Mouse/Crysknife icons across teams.
 - Conflict winners keep won Conflict cards and score immediate non-wild battle-icon pairs with Objectives or prior Conflicts.
 - Combat phase opens before Conflict resolution and sequences Combat Intrigue pass/play timing.

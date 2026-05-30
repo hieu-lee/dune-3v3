@@ -340,6 +340,21 @@ function canEnterSpace(space: BoardSpace, player: Player, swordmasterClaimed = f
   return player.role === "Commander" && player.team === space.personal;
 }
 
+export function effectiveRequirementInfluence(player: Player, faction: FactionId, players: Player[]) {
+  if (player.role !== "Commander") return player.influence[faction];
+  return Math.max(
+    player.influence[faction],
+    ...players
+      .filter((candidate) => candidate.team === player.team && candidate.role === "Ally")
+      .map((ally) => ally.influence[faction]),
+  );
+}
+
+export function canMeetInfluenceRequirement(space: BoardSpace, player: Player, players: Player[]) {
+  if (!space.requirement) return true;
+  return effectiveRequirementInfluence(player, space.requirement.faction, players) >= space.requirement.amount;
+}
+
 export function adjustInfluence(player: Player, faction: FactionId, amount: number): Player {
   const previous = player.influence[faction];
   const next = Math.max(0, previous + amount);
@@ -362,8 +377,10 @@ export function iconCanReach(
   player: Player,
   swordmasterClaimed = false,
   spyPosts: Record<string, string> = {},
+  players: Player[] = [player],
 ) {
   if (!canEnterSpace(space, player, swordmasterClaimed)) return false;
+  if (!canMeetInfluenceRequirement(space, player, players)) return false;
   if (card.icons.includes(space.icon)) return true;
   if (card.icons.includes("spy") && spyPosts[space.id] === player.id) return true;
   if (player.role === "Commander" && player.team === "muaddib" && space.icon === "fremen") {

@@ -84,12 +84,14 @@ try {
   const detonation = data.intrigueCards.find((card) => card.sourceId === 131);
   const unexpectedAllies = data.intrigueCards.find((card) => card.sourceId === 137);
   const contingencyPlan = data.intrigueCards.find((card) => card.sourceId === 147);
+  const devour = data.intrigueCards.find((card) => card.sourceId === 151);
   const backedByChoam = data.intrigueCards.find((card) => card.sourceId === 448);
   const mercenaries = data.intrigueCards.find((card) => card.sourceId === 128);
   assert.ok(crysknife, "Crysknife Intrigue should be available");
   assert.ok(detonation, "Detonation Intrigue should be available");
   assert.ok(unexpectedAllies, "Unexpected Allies Intrigue should be available");
   assert.ok(contingencyPlan, "Contingency Plan Intrigue should be available");
+  assert.ok(devour, "Devour Intrigue should be available");
   assert.ok(backedByChoam, "Backed by CHOAM Intrigue should be available");
   assert.ok(mercenaries, "Mercenaries Intrigue should be available");
   assert.equal(
@@ -106,6 +108,11 @@ try {
     contingencyPlan.summary,
     "Gain 2 Solari as a Plot Intrigue OR add 3 strength as a Combat Intrigue.",
     "Contingency Plan should expose both printed timing branches",
+  );
+  assert.equal(
+    devour.summary,
+    "Add 2 strength; if the recipient has one or more sandworms in the Conflict, add 4 strength instead and they may trash a card.",
+    "Devour should expose its sandworm threshold and optional trash effect",
   );
   assert.equal(
     backedByChoam.summary,

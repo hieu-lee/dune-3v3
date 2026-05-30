@@ -43,6 +43,7 @@ import {
   initialGame,
   isBackedByChoamIntrigue,
   isContingencyPlanIntrigue,
+  isDevourIntrigue,
   isDetonationIntrigue,
   isUnexpectedAlliesIntrigue,
   isWeirdingCombatIntrigue,
@@ -73,13 +74,16 @@ import {
   playUnexpectedAlliesIntrigue,
   resolveMakerChoice,
   resolveSietchTabrChoice,
+  skipTrashCard,
   startCombatPhase,
   startNextRound,
   takeChoamContract,
+  trashableCards,
+  trashPlayerCard,
   transferTradeGood,
   updateTradeSelection,
 } from "./game/state";
-import type { BoardSpace, Card, FactionId, GameState, Player, ResourceId, Resources, TeamId, TradeGoodId } from "./game/types";
+import type { BoardSpace, Card, FactionId, GameState, Player, ResourceId, Resources, TeamId, TradeGoodId, TrashCardZone } from "./game/types";
 
 const resources: Array<{ id: ResourceId; label: string; Icon: LucideIcon }> = [
   { id: "solari", label: "Solari", Icon: CircleDollarSign },
@@ -368,6 +372,24 @@ export default function App() {
     setGame((current) => maybeStartCombatPhase({ ...current, ...advancePendingAction(current) }));
   }
 
+  function trashCard(zone: TrashCardZone, cardId: string) {
+    if (game.pendingAction?.kind !== "trash-card") return;
+    setGame((current) => {
+      const pending = current.pendingAction;
+      if (!pending || pending.kind !== "trash-card") return current;
+      return maybeStartCombatPhase(trashPlayerCard(current, pending, zone, cardId));
+    });
+  }
+
+  function skipTrash() {
+    if (game.pendingAction?.kind !== "trash-card") return;
+    setGame((current) => {
+      const pending = current.pendingAction;
+      if (!pending || pending.kind !== "trash-card") return current;
+      return maybeStartCombatPhase(skipTrashCard(current, pending));
+    });
+  }
+
   function placeSpy(spaceId: string) {
     if (game.pendingAction?.kind !== "spy") return;
     setGame((current) => {
@@ -640,6 +662,9 @@ export default function App() {
     : pendingSietchOwner?.leader;
   const pendingThroneOwner =
     pendingAction?.kind === "throne-row" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
+  const pendingTrashOwner =
+    pendingAction?.kind === "trash-card" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
+  const pendingTrashChoices = pendingTrashOwner ? trashableCards(pendingTrashOwner) : [];
   const shaddamCommander = game.players.find((player) => player.team === "shaddam" && player.role === "Commander");
   const reservedContractChoices = pendingContractOwner?.reservedContracts ?? [];
   const revealAdjustOwner =
@@ -654,7 +679,10 @@ export default function App() {
         .map((playerId) => game.players.find((player) => player.id === playerId))
         .filter((player): player is Player => Boolean(player))
     : [];
-  const combatCards = combatActor?.intrigues.filter((card) => card.combatSwords || combatIntrigueStrength(game, combatActor, card)) ?? [];
+  const combatCards =
+    combatActor?.intrigues.filter((card) =>
+      card.combatSwords || combatIntrigueStrength(game, combatActor, card) || isDevourIntrigue(card)
+    ) ?? [];
   const tradePartners =
     pendingActor && pendingAction?.kind === "trade"
       ? game.players.filter((player) => player.team === pendingActor.team && player.id !== pendingActor.id)
@@ -1065,7 +1093,7 @@ export default function App() {
       )}
 
       <section className="action-dock">
-        {game.phase === "combat" && combatActor && (
+        {game.phase === "combat" && combatActor && !pendingAction && (
           <div className="pending-panel combat-panel">
             <div>
               <p className="eyebrow">Combat Intrigues</p>
@@ -1073,27 +1101,37 @@ export default function App() {
             </div>
             <div className="pending-controls support-grid combat-grid">
               {combatCards.map((card) => {
+                const devourCard = isDevourIntrigue(card);
                 const automatedStrength = combatIntrigueStrength(game, combatActor, card);
+                const canAutoResolve = Boolean(automatedStrength || devourCard);
                 return (
                   <div className="support-target combat-target" key={card.id}>
                     <strong>{card.name}</strong>
                     <span>
                       <Swords size={14} />
-                      {isBackedByChoamIntrigue(card) && !automatedStrength
+                      {devourCard && !automatedStrength
+                        ? "+2 / +4 with worm"
+                        : isBackedByChoamIntrigue(card) && !automatedStrength
                         ? "2+ completed contracts"
                         : `+${automatedStrength ?? card.combatSwords} strength`}
                     </span>
-                    {automatedStrength
-                      ? combatTargets.map((target) => (
-                          <button
-                            type="button"
-                            key={target.id}
-                            onClick={() => playCombatCard(card.id, target.id)}
-                            title={`Play ${card.name} for ${target.leader}`}
-                          >
-                            {combatActor.role === "Commander" ? target.leader : "Play"}
-                          </button>
-                        ))
+                    {canAutoResolve
+                      ? combatTargets.map((target) => {
+                          const targetStrength = combatIntrigueStrength(game, combatActor, card, target);
+                          if (!targetStrength) return null;
+                          return (
+                            <button
+                              type="button"
+                              key={target.id}
+                              onClick={() => playCombatCard(card.id, target.id)}
+                              title={`Play ${card.name} for ${target.leader}`}
+                            >
+                              {combatActor.role === "Commander"
+                                ? `${target.leader}${devourCard ? ` (+${targetStrength})` : ""}`
+                                : "Play"}
+                            </button>
+                          );
+                        })
                       : <span>{isBackedByChoamIntrigue(card) ? "Requires 2 completed contracts." : "Resolve printed card text."}</span>}
                   </div>
                 );
@@ -1165,6 +1203,7 @@ export default function App() {
                 {pendingAction.kind === "maker-choice" && `${pendingMakerLabel ?? "Player"} Maker space`}
                 {pendingAction.kind === "sietch-tabr" && `${pendingSietchLabel ?? "Player"} Sietch Tabr`}
                 {pendingAction.kind === "throne-row" && `${pendingThroneOwner?.leader ?? "Shaddam"} Throne Row`}
+                {pendingAction.kind === "trash-card" && `${pendingTrashOwner?.leader ?? "Player"} optional trash`}
                 {pendingAction.kind === "conflict-tie" && `${teams[pendingAction.team].name} conflict tie`}
               </h2>
             </div>
@@ -1189,6 +1228,27 @@ export default function App() {
                   </button>
                 ))}
                 <button type="button" onClick={clearPendingAction}>Done</button>
+              </div>
+            )}
+
+            {pendingAction.kind === "trash-card" && pendingTrashOwner && (
+              <div className="pending-controls trade-intrigue-grid">
+                <div className="trade-intrigue-column">
+                  <strong>{pendingTrashOwner.leader}</strong>
+                  {pendingTrashChoices.length === 0 && <span>No trashable cards</span>}
+                  {pendingTrashChoices.map(({ zone, card }) => (
+                    <button
+                      type="button"
+                      key={`${zone}-${card.id}`}
+                      onClick={() => trashCard(zone, card.id)}
+                      title={`Trash ${card.name}`}
+                    >
+                      {card.thumbnailPath && <img src={card.thumbnailPath} alt="" />}
+                      <span>{card.name} ({zone === "playArea" ? "in play" : zone})</span>
+                    </button>
+                  ))}
+                </div>
+                <button type="button" onClick={skipTrash}>Skip</button>
               </div>
             )}
 
@@ -1452,6 +1512,10 @@ export default function App() {
                       <span>
                         {isContingencyPlanIntrigue(card)
                           ? "Plot / Combat / +3 strength"
+                          : isDevourIntrigue(card)
+                            ? activeCombatStrength
+                              ? `Combat / +${activeCombatStrength} strength${activePlayer.deployedSandworms > 0 ? " / optional trash" : ""}`
+                              : "Combat / +2 or +4 with worm"
                           : isBackedByChoamIntrigue(card)
                             ? activeCombatStrength ? `Plot / Combat / +${activeCombatStrength} strength` : "Plot / Combat / 2+ completed contracts"
                           : isWeirdingCombatIntrigue(card) && activeCombatStrength

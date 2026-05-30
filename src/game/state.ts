@@ -31,6 +31,7 @@ import type {
   Resources,
   Role,
   TradeGoodId,
+  TrashCardZone,
   TeamId,
 } from "./types";
 
@@ -48,6 +49,7 @@ const choamProfitsSourceId = 450;
 const detonationSourceId = 131;
 const unexpectedAlliesSourceId = 137;
 const contingencyPlanSourceId = 147;
+const devourSourceId = 151;
 const weirdingCombatSourceId = 154;
 const backedByChoamSourceId = 448;
 const spiceMustFlowSourceId = 538;
@@ -117,6 +119,10 @@ export function isUnexpectedAlliesIntrigue(intrigue: IntrigueCard) {
 
 export function isContingencyPlanIntrigue(intrigue: IntrigueCard) {
   return intrigue.sourceId === contingencyPlanSourceId;
+}
+
+export function isDevourIntrigue(intrigue: IntrigueCard) {
+  return intrigue.sourceId === devourSourceId;
 }
 
 export function isWeirdingCombatIntrigue(intrigue: IntrigueCard) {
@@ -647,6 +653,7 @@ type ReinforcePendingAction = Extract<PendingAction, { kind: "reinforce" }>;
 type SietchTabrPendingAction = Extract<PendingAction, { kind: "sietch-tabr" }>;
 type TradePendingAction = Extract<PendingAction, { kind: "trade" }>;
 type ThroneRowPendingAction = Extract<PendingAction, { kind: "throne-row" }>;
+type TrashCardPendingAction = Extract<PendingAction, { kind: "trash-card" }>;
 type RevealAdjustPendingAction = Extract<PendingAction, { kind: "reveal-adjust" }>;
 
 function addPurchasedCard(player: Player, card: Card, fromReserve: boolean): Player {
@@ -1052,6 +1059,58 @@ export function drawIntrigueCards(state: GameState, ownerId: string, count: numb
   };
 }
 
+function cardsForTrashZone(player: Player, zone: TrashCardZone) {
+  if (zone === "hand") return player.hand;
+  if (zone === "discard") return player.discard;
+  return player.playArea;
+}
+
+function updateTrashZone(player: Player, zone: TrashCardZone, cards: Card[]) {
+  if (zone === "hand") return { ...player, hand: cards };
+  if (zone === "discard") return { ...player, discard: cards };
+  return { ...player, playArea: cards };
+}
+
+export function trashableCards(player: Player) {
+  return (["hand", "discard", "playArea"] as TrashCardZone[]).flatMap((zone) =>
+    cardsForTrashZone(player, zone).map((card) => ({ zone, card })),
+  );
+}
+
+export function trashPlayerCard(
+  state: GameState,
+  pending: TrashCardPendingAction,
+  zone: TrashCardZone,
+  cardId: string,
+): GameState {
+  const owner = state.players.find((player) => player.id === pending.ownerId);
+  if (!owner) return { ...state, ...advancePendingAction(state) };
+  const cards = cardsForTrashZone(owner, zone);
+  const card = cards.find((candidate) => candidate.id === cardId);
+  if (!card) return state;
+  const players = state.players.map((player) =>
+    player.id === owner.id
+      ? updateTrashZone(player, zone, cards.filter((candidate) => candidate.id !== card.id))
+      : player,
+  );
+  return {
+    ...state,
+    players,
+    ...advancePendingAction(state),
+    log: [`${owner.leader} trashes ${card.name} from ${pending.source}.`, ...state.log],
+  };
+}
+
+export function skipTrashCard(state: GameState, pending: TrashCardPendingAction): GameState {
+  if (!pending.optional) return state;
+  const owner = state.players.find((player) => player.id === pending.ownerId);
+  return {
+    ...state,
+    ...advancePendingAction(state),
+    log: [`${owner?.leader ?? "Player"} declines to trash a card from ${pending.source}.`, ...state.log],
+  };
+}
+
 function faceUpBattleIconConflicts(player: Player, battleIcon: BattleIconId) {
   return player.wonConflicts.filter(
     (conflict) => !conflict.scored && (conflict.battleIcon === battleIcon || conflict.battleIcon === "wild"),
@@ -1402,8 +1461,18 @@ export function combatIntrigueActorIds(state: GameState) {
   return state.players.filter((player) => canActInCombat(state, player)).map((player) => player.id);
 }
 
-export function combatIntrigueStrength(state: GameState, actor: Player, intrigue: IntrigueCard) {
+export function combatIntrigueStrength(
+  state: GameState,
+  actor: Player,
+  intrigue: IntrigueCard,
+  target?: Player,
+) {
   if (intrigue.automatedCombatSwords) return intrigue.automatedCombatSwords;
+  if (isDevourIntrigue(intrigue)) {
+    // In six-player Combat, Commanders play Intrigues on behalf of one Ally and apply the effects to that Ally.
+    const effectOwner = actor.role === "Commander" ? target : actor;
+    return effectOwner ? (effectOwner.deployedSandworms > 0 ? 4 : 2) : undefined;
+  }
   if (isWeirdingCombatIntrigue(intrigue)) {
     return effectiveRequirementInfluence(actor, "bene", state.players) >= 3 ? 5 : 3;
   }
@@ -1462,7 +1531,7 @@ export function maybeStartCombatPhase(state: GameState): GameState {
 }
 
 export function passCombatIntrigue(state: GameState, actorId: string): GameState {
-  if (state.phase !== "combat") return state;
+  if (state.phase !== "combat" || state.pendingAction || state.pendingQueue.length > 0) return state;
   const actor = state.players[state.activeSeat];
   const actorIds = combatIntrigueActorIds(state);
   if (!actor || actor.id !== actorId || !actorIds.includes(actorId)) return state;
@@ -1487,19 +1556,23 @@ export function playCombatIntrigue(
   intrigueId: string,
   targetId?: string,
 ): GameState {
-  if (state.phase !== "combat") return state;
+  if (state.phase !== "combat" || state.pendingAction || state.pendingQueue.length > 0) return state;
   const actor = state.players[state.activeSeat];
   if (!actor || actor.id !== actorId) return state;
   const intrigue = actor.intrigues.find((card) => card.id === intrigueId);
   if (!intrigue) return state;
-  const combatSwords = combatIntrigueStrength(state, actor, intrigue);
-  if (!combatSwords) return state;
   const targets = combatIntrigueTargets(state, actor.id);
   if (actor.role === "Commander" && !targetId) return state;
   const resolvedTargetId = targetId ?? targets[0];
   if (!resolvedTargetId || !targets.includes(resolvedTargetId)) return state;
   const target = state.players.find((player) => player.id === resolvedTargetId);
   if (!target) return state;
+  const combatSwords = combatIntrigueStrength(state, actor, intrigue, target);
+  if (!combatSwords) return state;
+  const canTrashFromDevour = isDevourIntrigue(intrigue) && target.deployedSandworms > 0 && trashableCards(target).length > 0;
+  const trashPending: PendingAction | undefined = canTrashFromDevour
+    ? { kind: "trash-card", ownerId: target.id, source: "Devour", optional: true }
+    : undefined;
 
   const players = state.players.map((player) => {
     let next = player;
@@ -1511,13 +1584,19 @@ export function playCombatIntrigue(
     }
     return next;
   });
-  const nextState = { ...state, players, combatPasses: [], intrigueDiscard: [...state.intrigueDiscard, intrigue] };
+  const nextState = {
+    ...state,
+    players,
+    combatPasses: [],
+    intrigueDiscard: [...state.intrigueDiscard, intrigue],
+    pendingAction: trashPending,
+  };
   const actorIds = combatIntrigueActorIds(nextState);
   return {
     ...nextState,
     activeSeat: nextCombatSeat(nextState, actorIds),
     log: [
-      `${actor.leader} plays ${intrigue.name} for ${target.leader}, adding ${combatSwords} strength.`,
+      `${actor.leader} plays ${intrigue.name} for ${target.leader}, adding ${combatSwords} strength${canTrashFromDevour ? " and may trash a card" : ""}.`,
       ...state.log,
     ],
   };

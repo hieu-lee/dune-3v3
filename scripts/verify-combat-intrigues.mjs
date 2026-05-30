@@ -33,6 +33,17 @@ function incompleteContract(data, index) {
   return { card: data.standardContracts[index], completed: false, takenRound: 1 };
 }
 
+function starterCard(data, index) {
+  const card = data.allyStarterCards[index];
+  assert.ok(card, `Expected starter card ${index}`);
+  return {
+    ...card,
+    icons: [...card.icons],
+    revealGain: card.revealGain ? { ...card.revealGain } : undefined,
+    traits: card.traits ? [...card.traits] : undefined,
+  };
+}
+
 function combatFixture(state, data, setupPlayers, firstSeat = 1) {
   const game = state.initialGame();
   return {
@@ -76,6 +87,7 @@ try {
   const impress = intrigueBySourceId(data, 152);
   const weirdingCombat = intrigueBySourceId(data, 154);
   const contingencyPlan = intrigueBySourceId(data, 147);
+  const devour = intrigueBySourceId(data, 151);
   const backedByChoam = intrigueBySourceId(data, 448);
   const mercenaries = intrigueBySourceId(data, 128);
   assert.equal(impress.combatSwords, 2, "Impress should expose its structured Combat strength");
@@ -87,9 +99,16 @@ try {
   );
   assert.equal(contingencyPlan.combatSwords, 3, "Contingency Plan should expose its printed Combat strength");
   assert.equal(contingencyPlan.automatedCombatSwords, 3, "Contingency Plan's full Combat branch should auto-resolve");
+  assert.equal(devour.combatSwords, 4, "Devour should expose its maximum structured Combat strength");
+  assert.equal(
+    devour.summary,
+    "Add 2 strength; if the recipient has one or more sandworms in the Conflict, add 4 strength instead and they may trash a card.",
+    "Devour should expose its sandworm bonus and optional trash text",
+  );
   assert.equal(backedByChoam.combatSwords, 4, "Backed by CHOAM should expose its structured Combat strength");
   assert.equal(impress.automatedCombatSwords, undefined, "Impress has extra printed text and should not auto-resolve");
   assert.equal(weirdingCombat.automatedCombatSwords, undefined, "Weirding Combat should resolve from state-aware Influence");
+  assert.equal(devour.automatedCombatSwords, undefined, "Devour should resolve from target sandworm state");
   assert.equal(backedByChoam.automatedCombatSwords, undefined, "Backed by CHOAM should resolve from completed contract state");
   assert.equal(mercenaries.combatSwords, undefined, "Non-Combat Intrigues should not expose Combat strength");
   assert.deepEqual(
@@ -332,6 +351,85 @@ try {
   assert.equal(backedCompletePlayed.intrigueDiscard.at(-1).id, backedByChoam.id);
   assert.match(backedCompletePlayed.log[0], /plays Backed by CHOAM for Feyd-Rautha Harkonnen, adding 4 strength/);
 
+  const devourNoWormFixture = combatFixture(state, data, (players) =>
+    players.map((player) =>
+      player.id === "p2"
+        ? { ...player, conflict: 2, deployedTroops: 1, deployedSandworms: 0, intrigues: [devour] }
+        : player.id === "p3"
+          ? { ...player, conflict: 4, deployedTroops: 1 }
+          : player,
+    ),
+  );
+  const devourNoWorm = state.startCombatPhase(devourNoWormFixture);
+  assert.equal(
+    state.combatIntrigueStrength(devourNoWorm, playerById(devourNoWorm, "p2"), devour),
+    2,
+    "Devour should add 2 strength without a sandworm in the recipient's Conflict",
+  );
+  const devourNoWormPlayed = state.playCombatIntrigue(devourNoWorm, "p2", devour.id);
+  assert.equal(playerById(devourNoWormPlayed, "p2").conflict, 4);
+  assert.equal(devourNoWormPlayed.pendingAction, undefined, "Devour should not offer trash without a sandworm");
+  assert.equal(devourNoWormPlayed.intrigueDiscard.at(-1).id, devour.id);
+  assert.match(devourNoWormPlayed.log[0], /plays Devour for Feyd-Rautha Harkonnen, adding 2 strength/);
+
+  const devourTrashChoice = starterCard(data, 0);
+  const devourWormFixture = combatFixture(state, data, (players) =>
+    players.map((player) =>
+      player.id === "p2"
+        ? {
+            ...player,
+            conflict: 2,
+            deployedTroops: 1,
+            deployedSandworms: 1,
+            playArea: [devourTrashChoice],
+            intrigues: [devour],
+          }
+        : player.id === "p3"
+          ? { ...player, conflict: 4, deployedTroops: 1 }
+          : player,
+    ),
+  );
+  const devourWorm = state.startCombatPhase(devourWormFixture);
+  assert.equal(
+    state.combatIntrigueStrength(devourWorm, playerById(devourWorm, "p2"), devour),
+    4,
+    "Devour should add 4 strength when the recipient has a sandworm in the Conflict",
+  );
+  const devourWormPlayed = state.playCombatIntrigue(devourWorm, "p2", devour.id);
+  assert.equal(playerById(devourWormPlayed, "p2").conflict, 6);
+  assert.deepEqual(devourWormPlayed.pendingAction, {
+    kind: "trash-card",
+    ownerId: "p2",
+    source: "Devour",
+    optional: true,
+  });
+  assert.match(devourWormPlayed.log[0], /adding 4 strength and may trash a card/);
+  assert.ok(devourWormPlayed.pendingAction, "Devour should queue an optional trash choice");
+  assert.equal(
+    state.passCombatIntrigue(devourWormPlayed, devourWormPlayed.players[devourWormPlayed.activeSeat].id),
+    devourWormPlayed,
+    "Combat should stay locked while Devour trash is pending",
+  );
+  assert.equal(
+    state.playCombatIntrigue(devourWormPlayed, devourWormPlayed.players[devourWormPlayed.activeSeat].id, verifierCombat.id),
+    devourWormPlayed,
+    "Additional Combat Intrigues should wait for Devour trash to resolve",
+  );
+  const devourActiveSeatAfterPlay = devourWormPlayed.activeSeat;
+  const devourSkipped = state.skipTrashCard(devourWormPlayed, devourWormPlayed.pendingAction);
+  assert.equal(devourSkipped.pendingAction, undefined, "Skipping Devour trash should clear the pending action");
+  assert.equal(devourSkipped.activeSeat, devourActiveSeatAfterPlay, "Skipping Devour trash should not advance Combat again");
+  assert.equal(playerById(devourSkipped, "p2").playArea.length, 1, "Skipping Devour trash should keep the card");
+  assert.match(devourSkipped.log[0], /declines to trash a card from Devour/);
+  const devourTrashed = state.trashPlayerCard(devourWormPlayed, devourWormPlayed.pendingAction, "playArea", devourTrashChoice.id);
+  assert.equal(devourTrashed.pendingAction, undefined, "Trashing from Devour should clear the pending action");
+  assert.equal(devourTrashed.activeSeat, devourActiveSeatAfterPlay, "Resolving Devour trash should not advance Combat again");
+  assert.deepEqual(playerById(devourTrashed, "p2").playArea, []);
+  assert.ok(
+    devourTrashed.log[0].includes(`trashes ${devourTrashChoice.name} from Devour`),
+    "Devour trash should log the selected card",
+  );
+
   const resetPassFixture = combatFixture(state, data, (players) =>
     players.map((player) => {
       if (player.id === "p2") return { ...player, conflict: 2, deployedTroops: 1 };
@@ -372,6 +470,94 @@ try {
   assert.equal(playerById(commanderPlayed, "p6").conflict, 3, "Commander Combat Intrigue should add strength to the chosen Ally");
   assert.deepEqual(playerById(commanderPlayed, "p4").intrigues, []);
   assert.equal(playerById(commanderPlayed, "p2").conflict, 5, "Other eligible Allies should not receive the chosen card's strength");
+
+  const commanderDevourTrashChoice = starterCard(data, 1);
+  const commanderDevourFixture = combatFixture(
+    state,
+    data,
+    (players) =>
+      players.map((player) => {
+        if (player.id === "p2") return { ...player, conflict: 5, deployedTroops: 1, deployedSandworms: 0 };
+        if (player.id === "p4") return { ...player, intrigues: [devour] };
+        if (player.id === "p6") {
+          return {
+            ...player,
+            conflict: 1,
+            deployedTroops: 1,
+            deployedSandworms: 1,
+            discard: [commanderDevourTrashChoice],
+          };
+        }
+        return player;
+      }),
+    3,
+  );
+  const commanderDevour = state.startCombatPhase(commanderDevourFixture);
+  assert.equal(
+    state.combatIntrigueStrength(commanderDevour, playerById(commanderDevour, "p4"), devour),
+    undefined,
+    "Commander Devour needs a target before resolving sandworm-dependent strength",
+  );
+  assert.equal(
+    state.combatIntrigueStrength(commanderDevour, playerById(commanderDevour, "p4"), devour, playerById(commanderDevour, "p2")),
+    2,
+    "Commander Devour should add 2 for a target without sandworms",
+  );
+  assert.equal(
+    state.combatIntrigueStrength(commanderDevour, playerById(commanderDevour, "p4"), devour, playerById(commanderDevour, "p6")),
+    4,
+    "Commander Devour should add 4 for a target with sandworms",
+  );
+  assert.equal(
+    state.playCombatIntrigue(commanderDevour, "p4", devour.id),
+    commanderDevour,
+    "Commander Devour should require an explicit Ally target",
+  );
+  const commanderDevourPlayed = state.playCombatIntrigue(commanderDevour, "p4", devour.id, "p6");
+  assert.equal(playerById(commanderDevourPlayed, "p6").conflict, 5);
+  assert.equal(playerById(commanderDevourPlayed, "p2").conflict, 5);
+  assert.deepEqual(commanderDevourPlayed.pendingAction, {
+    kind: "trash-card",
+    ownerId: "p6",
+    source: "Devour",
+    optional: true,
+  });
+  assert.match(commanderDevourPlayed.log[0], /Shaddam Corrino IV plays Devour for Princess Irulan, adding 4 strength/);
+  const commanderDevourHandTrashed = state.trashPlayerCard(
+    commanderDevourPlayed,
+    commanderDevourPlayed.pendingAction,
+    "discard",
+    commanderDevourTrashChoice.id,
+  );
+  assert.deepEqual(playerById(commanderDevourHandTrashed, "p6").discard, [], "Devour should trash from discard when selected");
+
+  const devourHandTrashChoice = starterCard(data, 2);
+  const devourHandFixture = combatFixture(state, data, (players) =>
+    players.map((player) =>
+      player.id === "p2"
+        ? {
+            ...player,
+            conflict: 2,
+            deployedTroops: 1,
+            deployedSandworms: 1,
+            hand: [devourHandTrashChoice],
+            intrigues: [devour],
+          }
+        : player.id === "p3"
+          ? { ...player, conflict: 4, deployedTroops: 1 }
+          : player,
+    ),
+  );
+  const devourHand = state.startCombatPhase(devourHandFixture);
+  const devourHandPlayed = state.playCombatIntrigue(devourHand, "p2", devour.id);
+  assert.ok(devourHandPlayed.pendingAction, "Devour should queue trash when the only eligible card is in hand");
+  const devourHandTrashed = state.trashPlayerCard(
+    devourHandPlayed,
+    devourHandPlayed.pendingAction,
+    "hand",
+    devourHandTrashChoice.id,
+  );
+  assert.deepEqual(playerById(devourHandTrashed, "p2").hand, [], "Devour should trash from hand when selected");
 
   const commanderWeirdingFixture = combatFixture(
     state,

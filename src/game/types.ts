@@ -204,6 +204,12 @@ export type PendingAction =
       source: string;
     }
   | {
+      kind: "trash-card";
+      ownerId: string;
+      source: string;
+      optional: boolean;
+    }
+  | {
       kind: "reveal-adjust";
       ownerId: string;
       combatRecipientId: string;
@@ -249,6 +255,8 @@ export type PendingAction =
       strength: number;
       source: string;
     };
+
+export type TrashCardZone = "hand" | "discard" | "playArea";
 
 export type GameState = {
   phase: GamePhase;

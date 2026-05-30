@@ -51,6 +51,7 @@ const reachAgreementSourceId = 449;
 const strategicStockpilingSourceId = 130;
 const detonationSourceId = 131;
 const unexpectedAlliesSourceId = 137;
+const mercenariesSourceId = 128;
 const callToArmsSourceId = 138;
 const shaddamsFavorSourceId = 141;
 const intelligenceReportSourceId = 142;
@@ -135,6 +136,10 @@ export function isDetonationIntrigue(intrigue: IntrigueCard) {
 
 export function isUnexpectedAlliesIntrigue(intrigue: IntrigueCard) {
   return intrigue.sourceId === unexpectedAlliesSourceId;
+}
+
+export function isMercenariesIntrigue(intrigue: IntrigueCard) {
+  return intrigue.sourceId === mercenariesSourceId;
 }
 
 export function isCallToArmsIntrigue(intrigue: IntrigueCard) {
@@ -1681,6 +1686,56 @@ export function playCouncilorsAmbitionPlotIntrigue(
     players,
     intrigueDiscard: [...state.intrigueDiscard, intrigue],
     log: [`${player.leader} plays Councilor's Ambition and gains 2 water.`, ...state.log],
+  };
+}
+
+export function playMercenariesPlotIntrigue(
+  state: GameState,
+  playerId: string,
+  intrigueId: string,
+  troopOwnerId?: string,
+): GameState {
+  if (state.phase !== "playing" || state.pendingAction || state.pendingQueue.length > 0) return state;
+  const player = state.players[state.activeSeat];
+  if (!player || player.id !== playerId) return state;
+  const intrigue = player.intrigues.find((card) => card.id === intrigueId);
+  if (!intrigue || !isMercenariesIntrigue(intrigue) || player.resources.solari < 3) return state;
+
+  const troopOwnerResult = activatedAllyEffectOwner(state, player, troopOwnerId);
+  if (!troopOwnerResult.valid || !troopOwnerResult.owner) return state;
+  const troopOwner = troopOwnerResult.owner;
+
+  const players = state.players.map((candidate) => {
+    let next = candidate;
+    if (candidate.id === player.id) {
+      next = {
+        ...next,
+        resources: { ...next.resources, solari: next.resources.solari - 3 },
+        intrigues: next.intrigues.filter((card) => card.id !== intrigue.id),
+      };
+    }
+    if (candidate.id === troopOwner.id) {
+      next = { ...next, garrison: next.garrison + 2 };
+    }
+    return next;
+  });
+  const troopLabel = troopOwner.id !== player.id ? ` for ${troopOwner.leader}` : "";
+  const drawnState = drawIntrigueCards(
+    {
+      ...state,
+      players,
+    },
+    player.id,
+    1,
+    "Mercenaries",
+  );
+  return {
+    ...drawnState,
+    intrigueDiscard: [...drawnState.intrigueDiscard, intrigue],
+    log: [
+      `${player.leader} plays Mercenaries${troopLabel}, spends 3 Solari, and recruits 2 troops.`,
+      ...drawnState.log,
+    ],
   };
 }
 

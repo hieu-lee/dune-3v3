@@ -189,6 +189,11 @@ try {
     "Lose 1 Influence to gain 4 Solari as a Plot Intrigue OR add 4 strength in Combat if you have completed at least two contracts.",
     "Backed by CHOAM should expose its Plot branch and completed-contract Combat threshold",
   );
+  assert.equal(
+    mercenaries.summary,
+    "Spend 3 Solari to draw 1 Intrigue and recruit 2 troops.",
+    "Mercenaries should expose its Solari cost, Intrigue draw, and troop recruit",
+  );
   const plotFixture = {
     ...game,
     activeSeat: game.players.findIndex((candidate) => candidate.id === "p2"),
@@ -701,6 +706,145 @@ try {
     state.playCouncilorsAmbitionPlotIntrigue(councilorsAmbitionWrongCardFixture, "p2", mercenaries.id),
     councilorsAmbitionWrongCardFixture,
     "Councilor's Ambition should reject other Intrigue cards",
+  );
+
+  const mercenariesDraw = data.intrigueCards.find((card) => card.sourceId === 144);
+  assert.ok(mercenariesDraw, "Mercenaries verifier needs another Intrigue to draw");
+  const mercenariesFixture = {
+    ...game,
+    activeSeat: game.players.findIndex((candidate) => candidate.id === "p2"),
+    pendingAction: undefined,
+    pendingQueue: [],
+    intrigueDeck: [mercenariesDraw],
+    intrigueDiscard: [],
+    players: game.players.map((candidate) =>
+      candidate.id === "p2"
+        ? {
+            ...candidate,
+            resources: { ...candidate.resources, solari: 3 },
+            garrison: 1,
+            intrigues: [mercenaries],
+          }
+        : { ...candidate, intrigues: [] },
+    ),
+  };
+  assert.equal(
+    state.isMercenariesIntrigue(mercenaries),
+    true,
+    "Mercenaries should be recognized as a structured Plot Intrigue",
+  );
+  const mercenariesPlayed = state.playMercenariesPlotIntrigue(
+    mercenariesFixture,
+    "p2",
+    mercenaries.id,
+  );
+  assert.equal(playerById(mercenariesPlayed, "p2").resources.solari, 0, "Mercenaries should spend 3 Solari");
+  assert.equal(playerById(mercenariesPlayed, "p2").garrison, 3, "Mercenaries should recruit 2 troops");
+  assert.deepEqual(playerById(mercenariesPlayed, "p2").intrigues.map((card) => card.id), [mercenariesDraw.id]);
+  assert.equal(mercenariesPlayed.intrigueDeck.length, 0, "Mercenaries should draw from the Intrigue deck");
+  assert.equal(mercenariesPlayed.intrigueDiscard.at(-1).id, mercenaries.id);
+  assert.match(mercenariesPlayed.log[0], /plays Mercenaries, spends 3 Solari, and recruits 2 troops/);
+  assert.match(mercenariesPlayed.log[1], /draws an Intrigue card from Mercenaries/);
+
+  const poorMercenaries = {
+    ...mercenariesFixture,
+    players: mercenariesFixture.players.map((candidate) =>
+      candidate.id === "p2"
+        ? { ...candidate, resources: { ...candidate.resources, solari: 2 }, intrigues: [mercenaries] }
+        : candidate,
+    ),
+  };
+  assert.equal(
+    state.playMercenariesPlotIntrigue(poorMercenaries, "p2", mercenaries.id),
+    poorMercenaries,
+    "Mercenaries should require 3 Solari",
+  );
+  const commanderMercenariesFixture = {
+    ...mercenariesFixture,
+    activeSeat: game.players.findIndex((candidate) => candidate.id === "p4"),
+    intrigueDeck: [mercenariesDraw],
+    players: game.players.map((candidate) => {
+      if (candidate.id === "p4") {
+        return {
+          ...candidate,
+          resources: { ...candidate.resources, solari: 3 },
+          intrigues: [mercenaries],
+        };
+      }
+      if (candidate.id === "p2" || candidate.id === "p6") return { ...candidate, garrison: 1, intrigues: [] };
+      return { ...candidate, intrigues: [] };
+    }),
+  };
+  const commanderMercenaries = state.playMercenariesPlotIntrigue(
+    commanderMercenariesFixture,
+    "p4",
+    mercenaries.id,
+    "p6",
+  );
+  assert.equal(playerById(commanderMercenaries, "p4").resources.solari, 0, "Commander Mercenaries should spend Commander Solari");
+  assert.deepEqual(
+    playerById(commanderMercenaries, "p4").intrigues.map((card) => card.id),
+    [mercenariesDraw.id],
+    "Commander Mercenaries should draw the Intrigue for the Commander",
+  );
+  assert.equal(
+    playerById(commanderMercenaries, "p6").garrison,
+    3,
+    "Commander Mercenaries should recruit for the activated Ally",
+  );
+  assert.equal(playerById(commanderMercenaries, "p2").garrison, 1, "Commander Mercenaries should not recruit for another Ally");
+  assert.match(commanderMercenaries.log[0], /Shaddam Corrino IV plays Mercenaries for Princess Irulan/);
+  assert.equal(
+    state.playMercenariesPlotIntrigue(commanderMercenariesFixture, "p4", mercenaries.id, "p3"),
+    commanderMercenariesFixture,
+    "Commander Mercenaries should reject non-team troop owners",
+  );
+  const lockedCommanderMercenariesFixture = {
+    ...commanderMercenariesFixture,
+    players: commanderMercenariesFixture.players.map((candidate) =>
+      candidate.id === "p4"
+        ? { ...candidate, revealed: true, revealActivatedAllyId: "p6", intrigues: [mercenaries] }
+        : candidate,
+    ),
+  };
+  assert.equal(
+    state.playMercenariesPlotIntrigue(lockedCommanderMercenariesFixture, "p4", mercenaries.id, "p2"),
+    lockedCommanderMercenariesFixture,
+    "Revealed Commander Mercenaries should reject a same-team Ally who was not activated for Reveal",
+  );
+  const pendingMercenaries = {
+    ...mercenariesFixture,
+    pendingAction: { kind: "spy", ownerId: "p2", remaining: 1, source: "Test" },
+  };
+  assert.equal(
+    state.playMercenariesPlotIntrigue(pendingMercenaries, "p2", mercenaries.id),
+    pendingMercenaries,
+    "Mercenaries should wait for pending actions to resolve",
+  );
+  const queuedMercenaries = {
+    ...mercenariesFixture,
+    pendingQueue: [{ kind: "spy", ownerId: "p2", remaining: 1, source: "Test" }],
+  };
+  assert.equal(
+    state.playMercenariesPlotIntrigue(queuedMercenaries, "p2", mercenaries.id),
+    queuedMercenaries,
+    "Mercenaries should wait for queued pending actions to resolve",
+  );
+  assert.equal(
+    state.playMercenariesPlotIntrigue(mercenariesFixture, "p3", mercenaries.id),
+    mercenariesFixture,
+    "Only the active player should play Mercenaries as a Plot Intrigue",
+  );
+  const mercenariesWrongCardFixture = {
+    ...mercenariesFixture,
+    players: mercenariesFixture.players.map((candidate) =>
+      candidate.id === "p2" ? { ...candidate, intrigues: [councilorsAmbition] } : candidate,
+    ),
+  };
+  assert.equal(
+    state.playMercenariesPlotIntrigue(mercenariesWrongCardFixture, "p2", councilorsAmbition.id),
+    mercenariesWrongCardFixture,
+    "Mercenaries should reject other Intrigue cards",
   );
 
   const strategicStockpilingFixture = {

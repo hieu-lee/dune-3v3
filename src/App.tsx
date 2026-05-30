@@ -58,6 +58,7 @@ import {
   isGoToGroundIntrigue,
   isIntelligenceReportIntrigue,
   isMarketOpportunityIntrigue,
+  isMercenariesIntrigue,
   isQuestionableMethodsIntrigue,
   isReachAgreementIntrigue,
   isShaddamsFavorIntrigue,
@@ -99,6 +100,7 @@ import {
   playDetonationIntrigue,
   playIntelligenceReportPlotIntrigue,
   playMarketOpportunityPlotIntrigue,
+  playMercenariesPlotIntrigue,
   playPlotBattleIconIntrigue,
   playShaddamsFavorPlotIntrigue,
   playStrategicStockpilingPlotIntrigue,
@@ -691,6 +693,16 @@ export default function App() {
     setGame((current) => playMarketOpportunityPlotIntrigue(current, current.players[current.activeSeat].id, intrigueId, choice));
   }
 
+  function playMercenariesPlot(intrigueId: string) {
+    setGame((current) => {
+      const player = current.players[current.activeSeat];
+      const troopOwnerId = player.role === "Commander"
+        ? activatedAllyIdFor(player, current.players)
+        : undefined;
+      return playMercenariesPlotIntrigue(current, player.id, intrigueId, troopOwnerId);
+    });
+  }
+
   function playBackedByChoamPlot(intrigueId: string, faction: FactionId) {
     setGame((current) => playBackedByChoamPlotIntrigue(current, current.players[current.activeSeat].id, intrigueId, faction));
   }
@@ -841,6 +853,7 @@ export default function App() {
   const detonationDeployOwner = activePlayer.role === "Commander" ? activatedAlly : activePlayer;
   const unexpectedAlliesOwner = activePlayer.role === "Commander" ? activatedAlly : activePlayer;
   const shaddamsFavorOwner = activePlayer.role === "Commander" ? activatedAlly : activePlayer;
+  const mercenariesOwner = activePlayer.role === "Commander" ? activatedAlly : activePlayer;
   const currentConflictProtected = conflictProtectedByShieldWall(game.conflict);
   const unexpectedAlliesCanPay = activePlayer.resources.water >= 2;
   const unexpectedAlliesBlockedByShieldWall = Boolean(game.conflict && game.shieldWall && currentConflictProtected);
@@ -1861,6 +1874,7 @@ export default function App() {
                   const shaddamsFavorGainsSolari = effectiveEmperorIconInfluence(activePlayer, game.players) >= 3;
                   const marketOpportunityCanSellSpice = activePlayer.resources.spice >= 2;
                   const marketOpportunityCanBuySpice = activePlayer.resources.solari >= 5;
+                  const mercenariesCanPay = activePlayer.resources.solari >= 3;
                   return (
                     <article className="intrigue-card" key={card.id}>
                       {card.thumbnailPath && <img className="card-art" src={card.thumbnailPath} alt="" loading="lazy" />}
@@ -1879,6 +1893,8 @@ export default function App() {
                             ? `Plot / recruit${shaddamsFavorGainsSolari ? " / 3 Solari" : ""}`
                           : isMarketOpportunityIntrigue(card)
                             ? "Plot / exchange spice and Solari"
+                          : isMercenariesIntrigue(card)
+                            ? "Plot / hire troops and Intrigue"
                           : isFindWeaknessIntrigue(card)
                             ? "Combat / +2 / recall spy for +3"
                           : isQuestionableMethodsIntrigue(card)
@@ -2027,6 +2043,18 @@ export default function App() {
                             5 Solari -&gt; 5 Spice
                           </button>
                         </div>
+                      )}
+                      {isMercenariesIntrigue(card) && (
+                        <button
+                          type="button"
+                          onClick={() => playMercenariesPlot(card.id)}
+                          disabled={plotIntrigueLocked || !mercenariesCanPay}
+                          title="Spend 3 Solari to draw 1 Intrigue and recruit 2 troops"
+                        >
+                          <Users size={14} />
+                          Hire Mercs
+                          {activePlayer.role === "Commander" ? `: ${mercenariesOwner.leader}` : ""}
+                        </button>
                       )}
                       {isBackedByChoamIntrigue(card) && (
                         <div className="intrigue-actions">

@@ -57,6 +57,7 @@ const automatedCombatSwordValues: Partial<Record<number, number>> = {
   147: 3,
 };
 const intrigueSummariesByCatalogId: Partial<Record<number, string>> = {
+  128: "Spend 3 Solari to draw 1 Intrigue and recruit 2 troops.",
   131: "Remove the Shield Wall OR deploy up to four troops from your garrison to the Conflict.",
   129: "If you have a seat on the High Council, gain 2 water.",
   130: "Spend 5 spice to gain 1 VP; with 3+ Spacing Guild Influence, you may also spend 3 water to gain 1 VP.",

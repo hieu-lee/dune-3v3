@@ -20,6 +20,7 @@ const expectedArtSpaces = [
   "Research Station",
   "Secrets",
   "Shipping",
+  "Sietch Tabr",
   "Spice Refinery",
   "Swordmaster",
 ];
@@ -42,7 +43,7 @@ const server = await createServer({
 
 try {
   const data = await server.ssrLoadModule("/src/game/data.ts");
-  assert.equal(data.boardSpaces.length, 26, "Six-player board model should expose 26 placement spaces");
+  assert.equal(data.boardSpaces.length, 27, "Six-player board model should expose 27 placement spaces");
 
   const names = data.boardSpaces.map((space) => space.name);
   assert.equal(new Set(names).size, names.length, "Board-space names should be unique");
@@ -55,6 +56,13 @@ try {
     assert.ok(space.sourceSlug, `${spaceName} should preserve source slug`);
     assertLocalArt(space);
   }
+
+  const sietch = data.boardSpaces.find((space) => space.id === "sietch-tabr");
+  assert.ok(sietch, "Sietch Tabr should be present in the board-space model");
+  assert.equal(sietch.icon, "city");
+  assert.equal(sietch.combat, true);
+  assert.equal(sietch.sietchTabr, true);
+  assert.deepEqual(sietch.requirement, { faction: "fringeWorlds", amount: 2 });
 
   for (const space of data.boardSpaces.filter((candidate) => candidate.sourceId || candidate.sourceSlug)) {
     assert.equal(space.personal, undefined, `${space.name} personal-board space should wait for commander-board art`);

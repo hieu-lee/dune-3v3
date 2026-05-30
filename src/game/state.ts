@@ -354,6 +354,12 @@ export function effectiveRequirementInfluence(player: Player, faction: FactionId
 
 export function canMeetInfluenceRequirement(space: BoardSpace, player: Player, players: Player[]) {
   if (!space.requirement) return true;
+  if (space.id === "sietch-tabr" && player.team === "muaddib" && player.role === "Commander") {
+    return Math.max(
+      player.influence.fremen,
+      effectiveRequirementInfluence(player, "fringeWorlds", players),
+    ) >= space.requirement.amount;
+  }
   return effectiveRequirementInfluence(player, space.requirement.faction, players) >= space.requirement.amount;
 }
 
@@ -521,6 +527,24 @@ export function pendingActionForMakerChoice(
   };
 }
 
+export function pendingActionForSietchTabr(
+  state: GameState,
+  space: BoardSpace,
+  owner: Player,
+  waterOwner: Player = owner,
+): PendingAction | undefined {
+  if (!space.sietchTabr) return undefined;
+  return {
+    kind: "sietch-tabr",
+    ownerId: owner.id,
+    waterOwnerId: waterOwner.id,
+    canTakeMakerHooks: canHaveMakerHooks(owner) && !owner.makerHooks,
+    canRemoveShieldWall: state.shieldWall,
+    source: space.name,
+    spaceId: space.id,
+  };
+}
+
 export function isFremenCard(card: Card) {
   return card.traits?.includes("Faction: Fremen") ?? false;
 }
@@ -581,6 +605,7 @@ type ContractPendingAction = Extract<PendingAction, { kind: "contract" }>;
 type DeployPendingAction = Extract<PendingAction, { kind: "deploy" }>;
 type MakerChoicePendingAction = Extract<PendingAction, { kind: "maker-choice" }>;
 type ReinforcePendingAction = Extract<PendingAction, { kind: "reinforce" }>;
+type SietchTabrPendingAction = Extract<PendingAction, { kind: "sietch-tabr" }>;
 type TradePendingAction = Extract<PendingAction, { kind: "trade" }>;
 type ThroneRowPendingAction = Extract<PendingAction, { kind: "throne-row" }>;
 type RevealAdjustPendingAction = Extract<PendingAction, { kind: "reveal-adjust" }>;
@@ -1348,6 +1373,52 @@ export function resolveMakerChoice(
       summon
         ? `${owner.leader} summons ${pending.sandworms} sandworm${pending.sandworms === 1 ? "" : "s"} from ${pending.source}.`
         : `${spiceRecipient.leader} gains ${pending.spice} spice from ${pending.source}.`,
+      ...state.log,
+    ],
+  };
+}
+
+export function resolveSietchTabrChoice(
+  state: GameState,
+  pending: SietchTabrPendingAction,
+  choice: "hooks" | "shield-wall",
+): GameState {
+  const owner = state.players.find((player) => player.id === pending.ownerId);
+  const waterOwner = state.players.find((player) => player.id === pending.waterOwnerId);
+  if (!owner || !waterOwner) return { ...state, ...advancePendingAction(state) };
+
+  const takeHooks = choice === "hooks";
+  const shareMakerHooks = takeHooks && canHaveMakerHooks(owner);
+  const players = state.players.map((player) => {
+    let next = player;
+    if (shareMakerHooks && canHaveMakerHooks(next)) {
+      next = { ...next, makerHooks: true };
+    }
+    if (next.id === owner.id && takeHooks) {
+      next = { ...next, garrison: next.garrison + 1 };
+    }
+    if (next.id === waterOwner.id) {
+      next = { ...next, resources: { ...next.resources, water: next.resources.water + 1 } };
+    }
+    return next;
+  });
+  const ownerAfter = players.find((player) => player.id === owner.id) ?? owner;
+  const deployable = Math.min(ownerAfter.garrison, (takeHooks ? 1 : 0) + 2);
+  const deployPending: PendingAction | undefined = deployable > 0
+    ? { kind: "deploy", ownerId: owner.id, remaining: deployable, source: pending.source }
+    : undefined;
+  const [nextAction, ...nextQueue] = state.pendingQueue;
+
+  return {
+    ...state,
+    players,
+    shieldWall: takeHooks ? state.shieldWall : false,
+    pendingAction: deployPending ?? nextAction,
+    pendingQueue: deployPending ? state.pendingQueue : nextQueue,
+    log: [
+      takeHooks
+        ? `${owner.leader} resolves ${pending.source}: ${pending.canTakeMakerHooks ? "takes Maker Hooks, " : ""}recruits 1 troop, and ${waterOwner.leader} gains 1 water.`
+        : `${waterOwner.leader} gains 1 water from ${pending.source}${pending.canRemoveShieldWall ? " and removes the Shield Wall" : ""}.`,
       ...state.log,
     ],
   };

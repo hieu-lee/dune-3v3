@@ -795,6 +795,16 @@ const boardSpaceSpecs: BoardSpace[] = [
     detail: "Fremen influence, card draw, spice, combat.",
   },
   {
+    id: "sietch-tabr",
+    name: "Sietch Tabr",
+    zone: "City",
+    icon: "city",
+    requirement: { faction: "fringeWorlds", amount: 2 },
+    combat: true,
+    sietchTabr: true,
+    detail: "Requires 2 Fremen/Fringe influence; choose Hooks, troop, water or water and remove the Shield Wall.",
+  },
+  {
     id: "arrakeen",
     name: "Arrakeen",
     zone: "City",

@@ -43,6 +43,7 @@ import {
   passCombatIntrigue,
   pendingActionForCard,
   pendingActionForMakerChoice,
+  pendingActionForSietchTabr,
   pendingActionsFor,
   pendingActionForSpace,
   playCombatIntrigue,
@@ -60,6 +61,7 @@ import {
   setChoamContractCompleted,
   playPlotBattleIconIntrigue,
   resolveMakerChoice,
+  resolveSietchTabrChoice,
   startCombatPhase,
   startNextRound,
   takeChoamContract,
@@ -182,6 +184,7 @@ export default function App() {
       const makerBonus = selectedSpace.maker ? current.makerSpice[selectedSpace.id] ?? 0 : 0;
       const makerChoiceOwner = player.role === "Commander" ? target : player;
       const makerChoicePending = pendingActionForMakerChoice(current, selectedSpace, makerChoiceOwner, player);
+      const sietchTabrPending = pendingActionForSietchTabr(current, selectedSpace, makerChoiceOwner, player);
       const { source, target: effectedTarget } = applyBoardEffect(
         {
           ...player,
@@ -200,14 +203,17 @@ export default function App() {
         if (candidate.id === effectedTarget.id) return effectedTarget;
         return candidate;
       });
-      const spacePending = pendingActionForSpace(
-        selectedSpace,
-        source,
-        player.role === "Commander" ? effectedTarget : source,
-        players,
-      );
+      const spacePending = sietchTabrPending
+        ? undefined
+        : pendingActionForSpace(
+          selectedSpace,
+          source,
+          player.role === "Commander" ? effectedTarget : source,
+          players,
+        );
       const cardPending = pendingActionForCard(selectedCard, source, current);
       const pendingActions = pendingActionsFor(spacePending, cardPending, source.spies);
+      if (sietchTabrPending) pendingActions.unshift(sietchTabrPending);
       if (makerChoicePending) pendingActions.unshift(makerChoicePending);
       const pending = queuePendingActions(
         current,
@@ -426,6 +432,15 @@ export default function App() {
     });
   }
 
+  function chooseSietchTabr(choice: "hooks" | "shield-wall") {
+    if (game.pendingAction?.kind !== "sietch-tabr") return;
+    setGame((current) => {
+      const pending = current.pendingAction;
+      if (!pending || pending.kind !== "sietch-tabr") return current;
+      return maybeStartCombatPhase(resolveSietchTabrChoice(current, pending, choice));
+    });
+  }
+
   function deployOne() {
     if (game.pendingAction?.kind !== "deploy") return;
     setGame((current) => {
@@ -490,14 +505,14 @@ export default function App() {
 
   function updateMakerHooks(playerId: string, hasHooks: boolean) {
     setGame((current) => {
-      if (current.pendingAction?.kind === "maker-choice") return current;
+      if (current.pendingAction?.kind === "maker-choice" || current.pendingAction?.kind === "sietch-tabr") return current;
       return setMakerHooks(current, playerId, hasHooks);
     });
   }
 
   function updateShieldWall(standing: boolean) {
     setGame((current) => {
-      if (current.pendingAction?.kind === "maker-choice") return current;
+      if (current.pendingAction?.kind === "maker-choice" || current.pendingAction?.kind === "sietch-tabr") return current;
       return setShieldWall(current, standing);
     });
   }
@@ -553,6 +568,7 @@ export default function App() {
       .reduce((sum, player) => sum + player.conflict, 0),
   }));
   const pendingAction = game.pendingAction;
+  const tableStateLockedByPending = pendingAction?.kind === "maker-choice" || pendingAction?.kind === "sietch-tabr";
   const pendingOwner = pendingAction?.kind === "deploy" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingActor = pendingAction?.kind === "trade" ? game.players.find((player) => player.id === pendingAction.actorId) : undefined;
   const pendingPartner = pendingAction?.kind === "trade" ? game.players.find((player) => player.id === pendingAction.partnerId) : undefined;
@@ -573,6 +589,18 @@ export default function App() {
   const pendingMakerLabel = pendingMakerSplit
     ? `${pendingMakerSpiceOwner.leader} spice / ${pendingMakerOwner.leader} worms`
     : pendingMakerOwner?.leader;
+  const pendingSietchOwner =
+    pendingAction?.kind === "sietch-tabr" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
+  const pendingSietchWaterOwner =
+    pendingAction?.kind === "sietch-tabr" ? game.players.find((player) => player.id === pendingAction.waterOwnerId) : undefined;
+  const pendingSietchSplit =
+    pendingAction?.kind === "sietch-tabr" &&
+    pendingSietchOwner &&
+    pendingSietchWaterOwner &&
+    pendingSietchOwner.id !== pendingSietchWaterOwner.id;
+  const pendingSietchLabel = pendingSietchSplit
+    ? `${pendingSietchWaterOwner.leader} water / ${pendingSietchOwner.leader} units`
+    : pendingSietchOwner?.leader;
   const pendingThroneOwner =
     pendingAction?.kind === "throne-row" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const shaddamCommander = game.players.find((player) => player.team === "shaddam" && player.role === "Commander");
@@ -695,14 +723,14 @@ export default function App() {
             <div className="shield-state">
               <Shield size={16} />
               <label
-                className={[game.shieldWall ? "selected" : "", pendingAction?.kind === "maker-choice" ? "disabled" : ""]
+                className={[game.shieldWall ? "selected" : "", tableStateLockedByPending ? "disabled" : ""]
                   .filter(Boolean)
                   .join(" ")}
               >
                 <input
                   type="checkbox"
                   checked={game.shieldWall}
-                  disabled={pendingAction?.kind === "maker-choice"}
+                  disabled={tableStateLockedByPending}
                   aria-label="Shield Wall standing"
                   onChange={(event) => updateShieldWall(event.currentTarget.checked)}
                 />
@@ -895,7 +923,7 @@ export default function App() {
               {canHaveMakerHooks(player) && (
                 <div className="alliance-status-row" aria-label={`${player.leader} Maker Hooks`}>
                   <label
-                    className={[player.makerHooks ? "selected" : "", pendingAction?.kind === "maker-choice" ? "disabled" : ""]
+                    className={[player.makerHooks ? "selected" : "", tableStateLockedByPending ? "disabled" : ""]
                       .filter(Boolean)
                       .join(" ")}
                     title="Maker Hooks"
@@ -903,7 +931,7 @@ export default function App() {
                     <input
                       type="checkbox"
                       checked={player.makerHooks}
-                      disabled={pendingAction?.kind === "maker-choice"}
+                      disabled={tableStateLockedByPending}
                       aria-label="Maker Hooks"
                       onChange={(event) => updateMakerHooks(player.id, event.currentTarget.checked)}
                     />
@@ -1065,6 +1093,7 @@ export default function App() {
                 {pendingAction.kind === "reveal-adjust" && "Printed reveal adjustment"}
                 {pendingAction.kind === "contract" && `${pendingContractOwner?.leader ?? "Player"} CHOAM contract`}
                 {pendingAction.kind === "maker-choice" && `${pendingMakerLabel ?? "Player"} Maker space`}
+                {pendingAction.kind === "sietch-tabr" && `${pendingSietchLabel ?? "Player"} Sietch Tabr`}
                 {pendingAction.kind === "throne-row" && `${pendingThroneOwner?.leader ?? "Shaddam"} Throne Row`}
                 {pendingAction.kind === "conflict-tie" && `${teams[pendingAction.team].name} conflict tie`}
               </h2>
@@ -1126,6 +1155,18 @@ export default function App() {
                 </button>
                 <button type="button" onClick={() => chooseMakerReward("sandworms")} disabled={!pendingMakerCanSummon}>
                   Summon {pendingAction.sandworms}{pendingMakerSplit ? `: ${pendingMakerOwner.leader}` : ""}
+                </button>
+              </div>
+            )}
+
+            {pendingAction.kind === "sietch-tabr" && pendingSietchOwner && pendingSietchWaterOwner && (
+              <div className="pending-controls">
+                <span>{pendingSietchLabel}</span>
+                <button type="button" onClick={() => chooseSietchTabr("hooks")}>
+                  {pendingAction.canTakeMakerHooks ? "Hooks + " : ""}Troop + water
+                </button>
+                <button type="button" onClick={() => chooseSietchTabr("shield-wall")}>
+                  Water{pendingAction.canRemoveShieldWall ? " + remove Shield Wall" : ""}
                 </button>
               </div>
             )}

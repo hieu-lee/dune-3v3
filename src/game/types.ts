@@ -122,6 +122,7 @@ export type BoardSpace = {
   combat?: boolean;
   maker?: boolean;
   makerWorms?: number;
+  sietchTabr?: boolean;
   team?: "trade" | "reinforce" | "commander";
   personal?: TeamId;
   detail: string;
@@ -224,6 +225,15 @@ export type PendingAction =
       spice: number;
       sandworms: number;
       canSummonSandworms: boolean;
+      source: string;
+      spaceId: string;
+    }
+  | {
+      kind: "sietch-tabr";
+      ownerId: string;
+      waterOwnerId: string;
+      canTakeMakerHooks: boolean;
+      canRemoveShieldWall: boolean;
       source: string;
       spaceId: string;
     }

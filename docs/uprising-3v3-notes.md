@@ -39,6 +39,7 @@ These notes are implementation scaffolding, not a replacement for the rulebook. 
 - Conflict deck uses 5 Conflict II cards over 4 Conflict III cards; no Conflict I cards.
 - Current implementation builds that nine-card six-player conflict deck from the imported Uprising catalog and advances it at round setup.
 - Full leader card images are available from the player seats as table references while icon-heavy leader powers await structured automation.
+- Board-space tiles render local location-card art where the catalog has exact name matches; six-player-only and commander personal-board spaces stay text-only until scanned board art is available.
 
 ## Data Gaps To Fill
 
@@ -46,7 +47,7 @@ These notes are implementation scaffolding, not a replacement for the rulebook. 
 - Structured automation for leader powers, signet powers, and commander board values.
 - Full Imperium deck, Intrigue deck, Conflict deck, and reserve card data.
 - Final board-space coordinates over scanned board art.
-- Component images and card fronts/backs from owned scans or approved source assets.
+- Remaining component images and card fronts/backs from owned scans or approved source assets.
 - Throne Row behavior for Shaddam.
 - Objective-card distribution and team-balanced Desert Mouse/Crysknife setup.
 

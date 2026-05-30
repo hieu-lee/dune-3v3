@@ -89,6 +89,10 @@ export type BoardSpace = {
   detail: string;
   spy?: number;
   contract?: boolean;
+  imagePath?: string;
+  thumbnailPath?: string;
+  sourceId?: number;
+  sourceSlug?: string;
 };
 
 export type PlayerContract = {

@@ -564,7 +564,22 @@ export const shaddamReservedContracts: ContractCard[] = catalog.cards
   .filter((card) => shaddamReservedContractNames.has(card.name))
   .map(toContractCard);
 
-export const boardSpaces: BoardSpace[] = [
+const locationCardsByName = new Map(catalog.cards.filter((card) => card.type === "location").map((card) => [card.name, card]));
+
+function withBoardSpaceArt(space: BoardSpace): BoardSpace {
+  if (space.personal) return space;
+  const card = locationCardsByName.get(space.name);
+  if (!card) return space;
+  return {
+    ...space,
+    imagePath: card.localImagePath ?? card.fullImageUrl ?? undefined,
+    thumbnailPath: card.localThumbnailPath ?? card.thumbnailImageUrl ?? card.localImagePath ?? undefined,
+    sourceId: card.id,
+    sourceSlug: card.slug,
+  };
+}
+
+const boardSpaceSpecs: BoardSpace[] = [
   {
     id: "dutiful-service",
     name: "Dutiful Service",
@@ -836,6 +851,8 @@ export const boardSpaces: BoardSpace[] = [
     detail: "Deep maker space; two-worm payoff later.",
   },
 ];
+
+export const boardSpaces: BoardSpace[] = boardSpaceSpecs.map(withBoardSpaceArt);
 
 export const reserveMarket: Card[] = catalog.cards
   .filter((card) => card.name === "The Spice Must Flow")

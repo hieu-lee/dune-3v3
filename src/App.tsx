@@ -658,6 +658,7 @@ export default function App() {
                   title={space.detail}
                 >
                   <span className="space-zone">{space.zone}</span>
+                  {space.thumbnailPath && <img className="space-art" src={space.thumbnailPath} alt="" loading="lazy" />}
                   <strong>{space.name}</strong>
                   <small>{iconLabels[space.icon]}</small>
                   <span className="space-detail">{space.detail}</span>

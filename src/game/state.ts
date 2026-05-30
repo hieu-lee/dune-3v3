@@ -69,6 +69,7 @@ const questionableMethodsSourceId = 156;
 const backedByChoamSourceId = 448;
 const spiceMustFlowSourceId = 538;
 const shadowAllianceSourceId = 160;
+const usulSourceId = 552;
 const shadowAllianceFactions: FactionId[] = [
   "emperor",
   "spacing",
@@ -703,13 +704,22 @@ export function canMoveCardToThroneRow(card: Card) {
   return !isFremenCard(card);
 }
 
+export function isUsulCommanderCard(card: Card) {
+  return card.sourceId === usulSourceId || card.name === "Usul";
+}
+
 export function pendingActionForShaddamPersonalBoard(state: GameState): PendingAction | undefined {
   const shaddam = state.players.find((player) => player.team === "shaddam" && player.role === "Commander");
   if (!shaddam || !state.imperiumRow.some(canMoveCardToThroneRow)) return undefined;
   return { kind: "throne-row", ownerId: shaddam.id, source: shaddamPersonalBoardThroneSource };
 }
 
-export function pendingActionForCard(card: Card, source: Player, state?: GameState): PendingAction | undefined {
+export function pendingActionForCard(
+  card: Card,
+  source: Player,
+  state?: GameState,
+  target?: Player,
+): PendingAction | undefined {
   if (
     (card.sourceId === 561 || card.name === "Imperial Tent") &&
     source.team === "shaddam" &&
@@ -717,6 +727,15 @@ export function pendingActionForCard(card: Card, source: Player, state?: GameSta
     state?.imperiumRow.some(canMoveCardToThroneRow)
   ) {
     return { kind: "throne-row", ownerId: source.id, source: card.name };
+  }
+  if (
+    isUsulCommanderCard(card) &&
+    source.team === "muaddib" &&
+    source.role === "Commander" &&
+    target?.team === source.team &&
+    target.role === "Ally"
+  ) {
+    return { kind: "usul-resource", commanderId: source.id, allyId: target.id, source: card.name };
   }
   return undefined;
 }
@@ -767,6 +786,7 @@ type TrashCardPendingAction = Extract<PendingAction, { kind: "trash-card" }>;
 type RecallSpyPendingAction = Extract<PendingAction, { kind: "recall-spy" }>;
 type LoseInfluencePendingAction = Extract<PendingAction, { kind: "lose-influence" }>;
 type RevealAdjustPendingAction = Extract<PendingAction, { kind: "reveal-adjust" }>;
+type UsulResourcePendingAction = Extract<PendingAction, { kind: "usul-resource" }>;
 
 function addPurchasedCard(player: Player, card: Card, fromReserve: boolean): Player {
   const purchaseSequence = player.purchaseSequence + 1;
@@ -2486,6 +2506,60 @@ export function finishRevealAdjustment(state: GameState, pending: RevealAdjustPe
     ...advancePendingAction(state),
     log: [
       `Printed reveal adjustment resolved: ${signedAdjustment(pending.persuasionAdjustment)} persuasion, ${signedAdjustment(pending.strengthAdjustment)} strength.`,
+      ...state.log,
+    ],
+  };
+}
+
+type UsulResourceChoice = "water" | "spice";
+
+export function resolveUsulResourceChoice(
+  state: GameState,
+  pending: UsulResourcePendingAction,
+  commanderResource: UsulResourceChoice,
+): GameState {
+  const commander = state.players.find((player) => player.id === pending.commanderId);
+  const ally = state.players.find((player) => player.id === pending.allyId);
+  if (
+    !commander ||
+    commander.team !== "muaddib" ||
+    commander.role !== "Commander" ||
+    !ally ||
+    ally.team !== commander.team ||
+    ally.role !== "Ally"
+  ) {
+    return { ...state, ...advancePendingAction(state) };
+  }
+
+  const allyResource: UsulResourceChoice = commanderResource === "water" ? "spice" : "water";
+  const players = state.players.map((player) => {
+    if (player.id === commander.id) {
+      return {
+        ...player,
+        resources: {
+          ...player.resources,
+          [commanderResource]: player.resources[commanderResource] + 1,
+        },
+      };
+    }
+    if (player.id === ally.id) {
+      return {
+        ...player,
+        resources: {
+          ...player.resources,
+          [allyResource]: player.resources[allyResource] + 1,
+        },
+      };
+    }
+    return player;
+  });
+
+  return {
+    ...state,
+    players,
+    ...advancePendingAction(state),
+    log: [
+      `${commander.leader} resolves ${pending.source}: gains 1 ${commanderResource}; ${ally.leader} gains 1 ${allyResource}.`,
       ...state.log,
     ],
   };

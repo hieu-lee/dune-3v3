@@ -270,6 +270,12 @@ export type PendingAction =
       source: string;
     }
   | {
+      kind: "usul-resource";
+      commanderId: string;
+      allyId: string;
+      source: string;
+    }
+  | {
       kind: "conflict-tie";
       team: TeamId;
       tiedPlayerIds: string[];

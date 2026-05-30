@@ -16,6 +16,12 @@ function allPlayerStarterCards(player) {
   return [...player.deck, ...player.hand, ...player.discard, ...player.playArea];
 }
 
+function playerById(game, playerId) {
+  const player = game.players.find((candidate) => candidate.id === playerId);
+  assert.ok(player, `Expected player ${playerId}`);
+  return player;
+}
+
 function assertLocalArt(cards, label) {
   for (const card of cards) {
     const artPath = card.thumbnailPath ?? card.imagePath;
@@ -127,6 +133,83 @@ try {
     assert.equal(names["Seek Allies"], 1, `${player.id} should use the Ally deck`);
     assert.equal(names["Command Respect"] ?? 0, 0, `${player.id} should not use a Commander deck`);
   }
+
+  const usul = data.muadDibCommanderCards.find((card) => card.name === "Usul");
+  assert.ok(usul, "Muad'Dib Commander deck should include Usul");
+  assert.equal(state.isUsulCommanderCard(usul), true, "Usul should be recognized as its Commander starter card");
+  const usulPending = state.pendingActionForCard(usul, muadDib, game, muadDibAllyA);
+  assert.deepEqual(usulPending, {
+    kind: "usul-resource",
+    commanderId: muadDib.id,
+    allyId: muadDibAllyA.id,
+    source: "Usul",
+  });
+  assert.equal(
+    state.pendingActionForCard(usul, muadDib, game, shaddamAlly),
+    undefined,
+    "Usul should not target an opposing Ally",
+  );
+  assert.equal(
+    state.pendingActionForCard(usul, muadDibAllyA, game, muadDibAllyB),
+    undefined,
+    "Usul should not trigger from an Ally starter deck owner",
+  );
+  assert.equal(
+    state.pendingActionForCard(usul, muadDib, game),
+    undefined,
+    "Usul needs the activated Ally target",
+  );
+
+  const baseUsulResolution = {
+    ...game,
+    pendingAction: usulPending,
+    pendingQueue: [],
+    players: game.players.map((player) =>
+      player.id === muadDib.id || player.id === muadDibAllyA.id
+        ? { ...player, resources: { solari: 0, spice: 0, water: 0 } }
+        : player,
+    ),
+    log: [],
+  };
+  const waterSplit = state.resolveUsulResourceChoice(baseUsulResolution, usulPending, "water");
+  assert.equal(playerById(waterSplit, muadDib.id).resources.water, 1, "Usul water choice gives Commander water");
+  assert.equal(playerById(waterSplit, muadDib.id).resources.spice, 0, "Usul water choice does not give Commander spice");
+  assert.equal(playerById(waterSplit, muadDibAllyA.id).resources.spice, 1, "Usul water choice gives Ally spice");
+  assert.equal(waterSplit.pendingAction, undefined, "Usul resolution should advance pending action");
+  assert.match(waterSplit.log[0], /resolves Usul/, "Usul resolution should log the split");
+
+  const spiceSplit = state.resolveUsulResourceChoice(baseUsulResolution, usulPending, "spice");
+  assert.equal(playerById(spiceSplit, muadDib.id).resources.spice, 1, "Usul spice choice gives Commander spice");
+  assert.equal(playerById(spiceSplit, muadDib.id).resources.water, 0, "Usul spice choice does not give Commander water");
+  assert.equal(playerById(spiceSplit, muadDibAllyA.id).resources.water, 1, "Usul spice choice gives Ally water");
+
+  const arrakeen = data.boardSpaces.find((space) => space.id === "arrakeen");
+  assert.ok(arrakeen, "Arrakeen should exist for Usul queue regression");
+  const arrakeenDeployPending = state.pendingActionForSpace(arrakeen, muadDib, muadDibAllyA, game.players);
+  assert.deepEqual(arrakeenDeployPending, {
+    kind: "deploy",
+    ownerId: muadDibAllyA.id,
+    remaining: 3,
+    source: "Arrakeen",
+  });
+  const queuedUsulActions = state.pendingActionsFor(arrakeenDeployPending, usulPending, muadDib.spies);
+  const queueBaseUsulResolution = { ...baseUsulResolution, pendingAction: undefined, pendingQueue: [] };
+  const queuedUsulState = {
+    ...queueBaseUsulResolution,
+    ...state.queuePendingActions(queueBaseUsulResolution, queuedUsulActions),
+  };
+  assert.deepEqual(
+    queuedUsulState.pendingAction,
+    arrakeenDeployPending,
+    "Usul should wait behind the combat-space deployment choice",
+  );
+  assert.deepEqual(queuedUsulState.pendingQueue, [usulPending], "Usul should be queued after deployment");
+  const skippedDeployState = state.finishPendingAction(queuedUsulState);
+  assert.deepEqual(skippedDeployState.pendingAction, usulPending, "Finishing deployment should expose Usul next");
+  const queuedWaterSplit = state.resolveUsulResourceChoice(skippedDeployState, usulPending, "water");
+  assert.equal(playerById(queuedWaterSplit, muadDib.id).resources.water, 1, "Queued Usul gives Commander water");
+  assert.equal(playerById(queuedWaterSplit, muadDibAllyA.id).resources.spice, 1, "Queued Usul gives Ally spice");
+  assert.equal(queuedWaterSplit.pendingAction, undefined, "Queued Usul resolution clears the pending queue");
 
   console.log("starter deck verification passed");
 } finally {

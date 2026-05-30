@@ -18,6 +18,7 @@ Private web-table implementation for a six-player `Dune: Imperium - Uprising` te
 - Catalog-backed Intrigue deck with physical card draws and active-player references.
 - Team trade flow supports spice, water, Solari, and chosen Intrigue-card transfers.
 - Shaddam Throne Row support for Emperor-board setup, Imperial Tent movement, and Shaddam-team acquisition.
+- Usul queues Muad'Dib's Commander/activated-Ally water-or-spice split when played.
 - Maker-space bonus spice tracks and pays out on the four six-player Maker desert spaces.
 - Shipping enforces its 2 Spacing Guild Influence requirement, including Commander shared team influence.
 - Hagga Basin and Deep Desert support Maker Hooks sandworm choices, shield-wall checks, and worm combat strength.

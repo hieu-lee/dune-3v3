@@ -107,6 +107,7 @@ import {
   playUnexpectedAlliesIntrigue,
   resolveMakerChoice,
   resolveSietchTabrChoice,
+  resolveUsulResourceChoice,
   skipLoseInfluence,
   skipRecallSpy,
   skipTrashCard,
@@ -275,7 +276,12 @@ export default function App() {
           player.role === "Commander" ? effectedTarget : source,
           players,
         );
-      const cardPending = pendingActionForCard(selectedCard, source, current);
+      const cardPending = pendingActionForCard(
+        selectedCard,
+        source,
+        current,
+        player.role === "Commander" ? effectedTarget : source,
+      );
       const pendingActions = pendingActionsFor(spacePending, cardPending, source.spies);
       if (sietchTabrPending) pendingActions.unshift(sietchTabrPending);
       if (makerChoicePending) pendingActions.unshift(makerChoicePending);
@@ -548,6 +554,15 @@ export default function App() {
     });
   }
 
+  function chooseUsulResource(commanderResource: "water" | "spice") {
+    if (game.pendingAction?.kind !== "usul-resource") return;
+    setGame((current) => {
+      const pending = current.pendingAction;
+      if (!pending || pending.kind !== "usul-resource") return current;
+      return maybeStartCombatPhase(resolveUsulResourceChoice(current, pending, commanderResource));
+    });
+  }
+
   function deployOne() {
     if (game.pendingAction?.kind !== "deploy") return;
     setGame((current) => {
@@ -782,6 +797,10 @@ export default function App() {
   const pendingSietchLabel = pendingSietchSplit
     ? `${pendingSietchWaterOwner.leader} water / ${pendingSietchOwner.leader} units`
     : pendingSietchOwner?.leader;
+  const pendingUsulCommander =
+    pendingAction?.kind === "usul-resource" ? game.players.find((player) => player.id === pendingAction.commanderId) : undefined;
+  const pendingUsulAlly =
+    pendingAction?.kind === "usul-resource" ? game.players.find((player) => player.id === pendingAction.allyId) : undefined;
   const pendingThroneOwner =
     pendingAction?.kind === "throne-row" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingTrashOwner =
@@ -1504,6 +1523,7 @@ export default function App() {
                 {pendingAction.kind === "contract" && `${pendingContractOwner?.leader ?? "Player"} CHOAM contract`}
                 {pendingAction.kind === "maker-choice" && `${pendingMakerLabel ?? "Player"} Maker space`}
                 {pendingAction.kind === "sietch-tabr" && `${pendingSietchLabel ?? "Player"} Sietch Tabr`}
+                {pendingAction.kind === "usul-resource" && `${pendingUsulCommander?.leader ?? "Commander"} Usul`}
                 {pendingAction.kind === "throne-row" && `${pendingThroneOwner?.leader ?? "Shaddam"} Throne Row`}
                 {pendingAction.kind === "trash-card" && `${pendingTrashOwner?.leader ?? "Player"} optional trash`}
                 {pendingAction.kind === "recall-spy" && `${pendingRecallSpyOwner?.leader ?? "Player"} recall spy`}
@@ -1653,6 +1673,20 @@ export default function App() {
                 </button>
                 <button type="button" onClick={() => chooseSietchTabr("shield-wall")}>
                   Water{pendingAction.canRemoveShieldWall ? " + remove Shield Wall" : ""}
+                </button>
+              </div>
+            )}
+
+            {pendingAction.kind === "usul-resource" && pendingUsulCommander && pendingUsulAlly && (
+              <div className="pending-controls">
+                <span>{pendingUsulCommander.leader} / {pendingUsulAlly.leader}</span>
+                <button type="button" onClick={() => chooseUsulResource("water")}>
+                  <Droplets size={15} />
+                  Commander water / Ally spice
+                </button>
+                <button type="button" onClick={() => chooseUsulResource("spice")}>
+                  <Sparkles size={15} />
+                  Commander spice / Ally water
                 </button>
               </div>
             )}

@@ -50,6 +50,7 @@ const choamProfitsSourceId = 450;
 const reachAgreementSourceId = 449;
 const detonationSourceId = 131;
 const unexpectedAlliesSourceId = 137;
+const intelligenceReportSourceId = 142;
 const contingencyPlanSourceId = 147;
 const goToGroundSourceId = 146;
 const findWeaknessSourceId = 149;
@@ -131,6 +132,10 @@ export function isUnexpectedAlliesIntrigue(intrigue: IntrigueCard) {
 
 export function isContingencyPlanIntrigue(intrigue: IntrigueCard) {
   return intrigue.sourceId === contingencyPlanSourceId;
+}
+
+export function isIntelligenceReportIntrigue(intrigue: IntrigueCard) {
+  return intrigue.sourceId === intelligenceReportSourceId;
 }
 
 export function isDevourIntrigue(intrigue: IntrigueCard) {
@@ -1523,6 +1528,38 @@ export function playContingencyPlanPlotIntrigue(
     players,
     intrigueDiscard: [...state.intrigueDiscard, intrigue],
     log: [`${player.leader} plays Contingency Plan as a Plot Intrigue for 2 Solari.`, ...state.log],
+  };
+}
+
+export function playIntelligenceReportPlotIntrigue(
+  state: GameState,
+  playerId: string,
+  intrigueId: string,
+): GameState {
+  if (state.phase !== "playing" || state.pendingAction || state.pendingQueue.length > 0) return state;
+  const player = state.players[state.activeSeat];
+  if (!player || player.id !== playerId) return state;
+  const intrigue = player.intrigues.find((card) => card.id === intrigueId);
+  if (!intrigue || !isIntelligenceReportIntrigue(intrigue)) return state;
+
+  const cardsToDraw = spyPostCount(state, player.id) >= 2 ? 2 : 1;
+  let cardsDrawn = 0;
+  const players = state.players.map((candidate) => {
+    if (candidate.id !== player.id) return candidate;
+    const withoutIntrigue = {
+      ...candidate,
+      intrigues: candidate.intrigues.filter((card) => card.id !== intrigue.id),
+    };
+    const drawn = drawCards(withoutIntrigue, withoutIntrigue.hand.length + cardsToDraw);
+    cardsDrawn = drawn.hand.length - withoutIntrigue.hand.length;
+    return drawn;
+  });
+  const cardText = cardsDrawn === 1 ? "1 card" : `${cardsDrawn} cards`;
+  return {
+    ...state,
+    players,
+    intrigueDiscard: [...state.intrigueDiscard, intrigue],
+    log: [`${player.leader} plays Intelligence Report as a Plot Intrigue and draws ${cardText}.`, ...state.log],
   };
 }
 

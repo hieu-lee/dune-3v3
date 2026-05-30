@@ -50,6 +50,7 @@ import {
   isDetonationIntrigue,
   isFindWeaknessIntrigue,
   isGoToGroundIntrigue,
+  isIntelligenceReportIntrigue,
   isQuestionableMethodsIntrigue,
   isReachAgreementIntrigue,
   isSpiceIsPowerIntrigue,
@@ -85,6 +86,7 @@ import {
   playBackedByChoamPlotIntrigue,
   playContingencyPlanPlotIntrigue,
   playDetonationIntrigue,
+  playIntelligenceReportPlotIntrigue,
   playPlotBattleIconIntrigue,
   playUnexpectedAlliesIntrigue,
   resolveMakerChoice,
@@ -624,6 +626,10 @@ export default function App() {
 
   function playContingencyPlanPlot(intrigueId: string) {
     setGame((current) => playContingencyPlanPlotIntrigue(current, current.players[current.activeSeat].id, intrigueId));
+  }
+
+  function playIntelligenceReportPlot(intrigueId: string) {
+    setGame((current) => playIntelligenceReportPlotIntrigue(current, current.players[current.activeSeat].id, intrigueId));
   }
 
   function playBackedByChoamPlot(intrigueId: string, faction: FactionId) {
@@ -1782,12 +1788,17 @@ export default function App() {
                 {activePlayer.intrigues.map((card) => {
                   const activeCombatStrength = combatIntrigueStrength(game, activePlayer, card);
                   const backedByChoamPlotChoices = isBackedByChoamIntrigue(card) ? influenceLossChoices(activePlayer) : [];
+                  const intelligenceReportDrawCount = boardSpaces.filter((space) =>
+                    game.spyPosts[space.id] === activePlayer.id
+                  ).length >= 2 ? 2 : 1;
                   return (
                     <article className="intrigue-card" key={card.id}>
                       {card.thumbnailPath && <img className="card-art" src={card.thumbnailPath} alt="" loading="lazy" />}
                       <span>
                         {isContingencyPlanIntrigue(card)
                           ? "Plot / Combat / +3 strength"
+                          : isIntelligenceReportIntrigue(card)
+                            ? `Plot / draw ${intelligenceReportDrawCount}`
                           : isFindWeaknessIntrigue(card)
                             ? "Combat / +2 / recall spy for +3"
                           : isQuestionableMethodsIntrigue(card)
@@ -1836,6 +1847,16 @@ export default function App() {
                         >
                           <CircleDollarSign size={14} />
                           Gain 2 Solari
+                        </button>
+                      )}
+                      {isIntelligenceReportIntrigue(card) && (
+                        <button
+                          type="button"
+                          onClick={() => playIntelligenceReportPlot(card.id)}
+                          disabled={plotIntrigueLocked}
+                        >
+                          <BookOpen size={14} />
+                          Draw {intelligenceReportDrawCount}
                         </button>
                       )}
                       {isBackedByChoamIntrigue(card) && (

@@ -58,6 +58,7 @@ const automatedCombatSwordValues: Partial<Record<number, number>> = {
 };
 const intrigueSummariesByCatalogId: Partial<Record<number, string>> = {
   131: "Remove the Shield Wall OR deploy up to four troops from your garrison to the Conflict.",
+  142: "Draw 1 card; draw 1 more if you have two or more spies on the board.",
   147: "Gain 2 Solari as a Plot Intrigue OR add 3 strength as a Combat Intrigue.",
   149: "Add 2 strength; you may recall 1 spy to add 3 more strength.",
   150: "Retreat 3 troops to gain 3 spice OR spend 3 spice to add 6 strength.",

@@ -83,6 +83,7 @@ try {
   const crysknife = data.intrigueCards.find((card) => card.sourceId === 159);
   const detonation = data.intrigueCards.find((card) => card.sourceId === 131);
   const unexpectedAllies = data.intrigueCards.find((card) => card.sourceId === 137);
+  const intelligenceReport = data.intrigueCards.find((card) => card.sourceId === 142);
   const contingencyPlan = data.intrigueCards.find((card) => card.sourceId === 147);
   const findWeakness = data.intrigueCards.find((card) => card.sourceId === 149);
   const goToGround = data.intrigueCards.find((card) => card.sourceId === 146);
@@ -94,6 +95,7 @@ try {
   assert.ok(crysknife, "Crysknife Intrigue should be available");
   assert.ok(detonation, "Detonation Intrigue should be available");
   assert.ok(unexpectedAllies, "Unexpected Allies Intrigue should be available");
+  assert.ok(intelligenceReport, "Intelligence Report Intrigue should be available");
   assert.ok(contingencyPlan, "Contingency Plan Intrigue should be available");
   assert.ok(findWeakness, "Find Weakness Intrigue should be available");
   assert.ok(goToGround, "Go To Ground Intrigue should be available");
@@ -111,6 +113,11 @@ try {
     unexpectedAllies.summary,
     "Pay 2 water to deploy a sandworm to the Conflict; may remove the Shield Wall.",
     "Unexpected Allies should expose its water, detonation, and sandworm effect",
+  );
+  assert.equal(
+    intelligenceReport.summary,
+    "Draw 1 card; draw 1 more if you have two or more spies on the board.",
+    "Intelligence Report should expose its conditional card draw",
   );
   assert.equal(
     contingencyPlan.summary,
@@ -242,6 +249,88 @@ try {
     state.playContingencyPlanPlotIntrigue(contingencyFixture, "p3", contingencyPlan.id),
     contingencyFixture,
     "Only the active player should play Contingency Plan as a Plot Intrigue",
+  );
+
+  const [firstSpySpace, secondSpySpace, opposingSpySpace] = data.boardSpaces.map((space) => space.id);
+  assert.ok(firstSpySpace && secondSpySpace && opposingSpySpace, "Expected at least three board spaces for spy fixtures");
+  const intelligenceFixture = {
+    ...game,
+    activeSeat: game.players.findIndex((candidate) => candidate.id === "p2"),
+    pendingAction: undefined,
+    pendingQueue: [],
+    intrigueDiscard: [],
+    spyPosts: { [firstSpySpace]: "p2", [secondSpySpace]: "p3" },
+    players: game.players.map((candidate) =>
+      candidate.id === "p2"
+        ? { ...candidate, hand: [], deck: candidate.deck.slice(0, 3), discard: [], intrigues: [intelligenceReport] }
+        : { ...candidate, intrigues: [] },
+    ),
+  };
+  assert.equal(
+    state.isIntelligenceReportIntrigue(intelligenceReport),
+    true,
+    "Intelligence Report should be recognized as a structured Plot Intrigue",
+  );
+  const intelligenceOne = state.playIntelligenceReportPlotIntrigue(
+    intelligenceFixture,
+    "p2",
+    intelligenceReport.id,
+  );
+  assert.equal(playerById(intelligenceOne, "p2").hand.length, 1, "Intelligence Report should draw 1 card without two own spies");
+  assert.equal(playerById(intelligenceOne, "p2").deck.length, 2, "Intelligence Report should consume the drawn card from deck");
+  assert.deepEqual(playerById(intelligenceOne, "p2").intrigues, []);
+  assert.equal(intelligenceOne.intrigueDiscard.at(-1).id, intelligenceReport.id);
+  assert.match(intelligenceOne.log[0], /plays Intelligence Report as a Plot Intrigue and draws 1 card/);
+  const intelligenceTwoFixture = {
+    ...intelligenceFixture,
+    spyPosts: { [firstSpySpace]: "p2", [secondSpySpace]: "p2", [opposingSpySpace]: "p3" },
+    players: intelligenceFixture.players.map((candidate) =>
+      candidate.id === "p2"
+        ? { ...candidate, hand: [], deck: playerById(game, "p2").deck.slice(0, 3), discard: [], intrigues: [intelligenceReport] }
+        : candidate,
+    ),
+  };
+  const intelligenceTwo = state.playIntelligenceReportPlotIntrigue(
+    intelligenceTwoFixture,
+    "p2",
+    intelligenceReport.id,
+  );
+  assert.equal(playerById(intelligenceTwo, "p2").hand.length, 2, "Intelligence Report should draw 2 cards with two own spies");
+  assert.equal(playerById(intelligenceTwo, "p2").deck.length, 1);
+  assert.match(intelligenceTwo.log[0], /draws 2 cards/);
+  const pendingIntelligence = {
+    ...intelligenceFixture,
+    pendingAction: { kind: "spy", ownerId: "p2", remaining: 1, source: "Test" },
+  };
+  assert.equal(
+    state.playIntelligenceReportPlotIntrigue(pendingIntelligence, "p2", intelligenceReport.id),
+    pendingIntelligence,
+    "Intelligence Report should wait for pending actions to resolve",
+  );
+  const queuedIntelligence = {
+    ...intelligenceFixture,
+    pendingQueue: [{ kind: "spy", ownerId: "p2", remaining: 1, source: "Test" }],
+  };
+  assert.equal(
+    state.playIntelligenceReportPlotIntrigue(queuedIntelligence, "p2", intelligenceReport.id),
+    queuedIntelligence,
+    "Intelligence Report should wait for queued pending actions to resolve",
+  );
+  assert.equal(
+    state.playIntelligenceReportPlotIntrigue(intelligenceFixture, "p3", intelligenceReport.id),
+    intelligenceFixture,
+    "Only the active player should play Intelligence Report as a Plot Intrigue",
+  );
+  const intelligenceWrongCardFixture = {
+    ...intelligenceFixture,
+    players: intelligenceFixture.players.map((candidate) =>
+      candidate.id === "p2" ? { ...candidate, intrigues: [mercenaries] } : candidate,
+    ),
+  };
+  assert.equal(
+    state.playIntelligenceReportPlotIntrigue(intelligenceWrongCardFixture, "p2", mercenaries.id),
+    intelligenceWrongCardFixture,
+    "Intelligence Report should reject other Intrigue cards",
   );
 
   const backedPlotFixture = {

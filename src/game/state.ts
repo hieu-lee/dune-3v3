@@ -45,6 +45,13 @@ import {
   stabanTuekLeaderName,
 } from "./player-setup";
 import {
+  canPlaceSharedSpyPost,
+  canPlaceSpyPost,
+  playerHasSpyPost,
+  removeSpyPostOwner,
+  spyPostOwnerIds,
+} from "./spy-posts";
+import {
   hasDeployedThreeOrMoreUnitsThisTurn,
   hasGainedSpiceThisTurn,
   hasUsedReverendMotherJessicaRepeat,
@@ -154,6 +161,11 @@ export {
 export {
   leaderStarterDeckCards,
 } from "./player-setup";
+
+export {
+  canPlaceSpyPost,
+  spyPostOwnerIds,
+} from "./spy-posts";
 
 export {
   hasDeployedThreeOrMoreUnitsThisTurn,
@@ -401,40 +413,6 @@ export function playerDoublesConflictRewards(player: Player) {
   return player.deployedSandworms > 0;
 }
 
-export function spyPostOwnerIds(
-  state: Pick<GameState, "spyPosts" | "sharedSpyPosts">,
-  spaceId: string,
-) {
-  return Array.from(new Set([
-    state.spyPosts[spaceId],
-    ...(state.sharedSpyPosts[spaceId] ?? []),
-  ].filter((ownerId): ownerId is string => Boolean(ownerId))));
-}
-
-function spyPostOccupied(state: Pick<GameState, "spyPosts" | "sharedSpyPosts">, spaceId: string) {
-  return spyPostOwnerIds(state, spaceId).length > 0;
-}
-
-function playerHasSpyPost(state: Pick<GameState, "spyPosts" | "sharedSpyPosts">, spaceId: string, playerId: string) {
-  return spyPostOwnerIds(state, spaceId).includes(playerId);
-}
-
-function removeSpyPostOwner(
-  state: Pick<GameState, "spyPosts" | "sharedSpyPosts">,
-  spaceId: string,
-  ownerId: string,
-) {
-  const spyPosts = { ...state.spyPosts };
-  const sharedSpyPosts = { ...state.sharedSpyPosts };
-  if (spyPosts[spaceId] === ownerId) delete spyPosts[spaceId];
-  if (sharedSpyPosts[spaceId]?.includes(ownerId)) {
-    const remainingOwners = sharedSpyPosts[spaceId].filter((candidate) => candidate !== ownerId);
-    if (remainingOwners.length > 0) sharedSpyPosts[spaceId] = remainingOwners;
-    else delete sharedSpyPosts[spaceId];
-  }
-  return { spyPosts, sharedSpyPosts };
-}
-
 function sandwormRewardReminderEntries(players: Player[]) {
   const doublers = players.filter(playerDoublesConflictRewards);
   if (doublers.length === 0) return [];
@@ -637,17 +615,6 @@ export function iconCanReach(
     return card.icons.includes("emperor");
   }
   return false;
-}
-
-export function canPlaceSpyPost(state: GameState, space: BoardSpace, owner: Player) {
-  if (spyPostOccupied(state, space.id)) return false;
-  return canUseSpyPost(state, space, owner);
-}
-
-function canUseSpyPost(state: GameState, space: BoardSpace, owner: Player) {
-  if (space.id === "swordmaster" && state.swordmasterClaimed) return false;
-  if (!space.personal) return true;
-  return owner.role === "Commander" && owner.team === space.personal;
 }
 
 function resolveInfluence(space: BoardSpace, player: Player): FactionId | null {
@@ -2064,12 +2031,6 @@ export function skipTrashCard(state: GameState, pending: TrashCardPendingAction)
 
 export function recallableSpySpaces(state: GameState, pending: RecallSpyPendingAction) {
   return boardSpaces.filter((space) => playerHasSpyPost(state, space.id, pending.ownerId));
-}
-
-function canPlaceSharedSpyPost(state: GameState, space: BoardSpace, owner: Player) {
-  if (!canUseSpyPost(state, space, owner)) return false;
-  const owners = spyPostOwnerIds(state, space.id);
-  return owners.length > 0 && owners.some((ownerId) => ownerId !== owner.id) && !owners.includes(owner.id);
 }
 
 export function placeableSpySpaces(state: GameState, pending: SpyPendingAction) {

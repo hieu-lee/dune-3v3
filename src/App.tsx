@@ -41,7 +41,9 @@ import {
   combatIntrigueTargets,
   conflictDeploymentBlockedFor,
   conflictProtectedByShieldWall,
+  criticalLocationNames,
   defaultActivatedAllyId,
+  deployControlDefenseTroop,
   deployTroopToConflict,
   drawIntrigueCards,
   endgameBattleIconChoices,
@@ -188,6 +190,7 @@ import {
   spyPostCount,
   spyPostOwnerIds,
   skipCommandRespect,
+  skipControlDefenseTroop,
   skipDemandAttention,
   skipCorrinoMight,
   skipDemandResults,
@@ -208,6 +211,18 @@ import {
 } from "./game/state";
 import type { BoardSpace, Card, FactionId, GameState, PendingAction, Player, ResourceId, Resources, TeamId, TradeGoodId, TrashCardZone } from "./game/types";
 import type { BuyAccessChoice, ChangeAllegiancesChoice, CombatIntrigueChoice, ImperiumPoliticsChoice, InfluenceLossPair, IrulanSignetRingChoice, JessicaOtherMemoriesChoice, JessicaReverendMotherChoice, JessicaSpiceAgonyChoice, JessicaWaterOfLifeChoice, LadyAmberDesertScoutsChoice, ShaddamSignetRingChoice, SietchRitualChoice, SpecialMissionChoice, StabanUnseenNetworkChoice } from "./game/state";
+
+declare global {
+  interface Window {
+    __DUNE_DEBUG__?: {
+      getGame: () => GameState;
+      setGame: (game: GameState) => void;
+    };
+  }
+}
+
+const appEnv = (import.meta as ImportMeta & { env?: { DEV?: boolean; VITE_DUNE_DEBUG?: string } }).env;
+const browserDebugEnabled = Boolean(appEnv?.DEV || appEnv?.VITE_DUNE_DEBUG === "1");
 
 const resources: Array<{ id: ResourceId; label: string; Icon: LucideIcon }> = [
   { id: "solari", label: "Solari", Icon: CircleDollarSign },
@@ -266,7 +281,10 @@ function boardSpaceSpiceGainFor(space: BoardSpace, player: Player, bonusSpice: n
 }
 
 export function pendingLocksTableState(action: PendingAction | undefined) {
-  return action?.kind === "maker-choice" || action?.kind === "sietch-tabr" || action?.kind === "desert-call";
+  return action?.kind === "maker-choice" ||
+    action?.kind === "sietch-tabr" ||
+    action?.kind === "desert-call" ||
+    action?.kind === "control-defense";
 }
 
 export function tableStateLockedByPendingActions(state: Pick<GameState, "pendingAction" | "pendingQueue">) {
@@ -283,6 +301,21 @@ export default function App() {
   const leaderDialogRef = useRef<HTMLElement | null>(null);
   const leaderCloseButtonRef = useRef<HTMLButtonElement | null>(null);
   const leaderOpenerRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    if (!browserDebugEnabled) {
+      delete window.__DUNE_DEBUG__;
+      return;
+    }
+    window.__DUNE_DEBUG__ = {
+      getGame: () => game,
+      setGame: (nextGame) => setGame(nextGame),
+    };
+    return () => {
+      delete window.__DUNE_DEBUG__;
+    };
+  }, [game]);
+
   const activePlayer = game.players[game.activeSeat];
   const activeAllies = game.players.filter((player) => player.team === activePlayer.team && player.role === "Ally");
   function activatedAllyIdFor(player: Player, players: Player[]) {
@@ -980,6 +1013,24 @@ export default function App() {
     });
   }
 
+  function deployControlDefense() {
+    if (game.pendingAction?.kind !== "control-defense") return;
+    setGame((current) => {
+      const pending = current.pendingAction;
+      if (!pending || pending.kind !== "control-defense") return current;
+      return deployControlDefenseTroop(current, pending);
+    });
+  }
+
+  function skipControlDefense() {
+    if (game.pendingAction?.kind !== "control-defense") return;
+    setGame((current) => {
+      const pending = current.pendingAction;
+      if (!pending || pending.kind !== "control-defense") return current;
+      return skipControlDefenseTroop(current, pending);
+    });
+  }
+
   function reinforceOne(playerId: string, destination: "garrison" | "conflict") {
     if (game.pendingAction?.kind !== "reinforce") return;
     setGame((current) => {
@@ -1303,6 +1354,9 @@ export default function App() {
   const pendingAction = game.pendingAction;
   const tableStateLockedByPending = tableStateLockedByPendingActions(game);
   const pendingOwner = pendingAction?.kind === "deploy" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
+  const pendingControlDefenseOwner =
+    pendingAction?.kind === "control-defense" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
+  const pendingControlDefenseSupply = pendingControlDefenseOwner ? playerTroopSupply(pendingControlDefenseOwner) : 0;
   const pendingActor = pendingAction?.kind === "trade" ? game.players.find((player) => player.id === pendingAction.actorId) : undefined;
   const pendingPartner = pendingAction?.kind === "trade" ? game.players.find((player) => player.id === pendingAction.partnerId) : undefined;
   const pendingSpyOwner = pendingAction?.kind === "spy" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
@@ -2212,6 +2266,7 @@ export default function App() {
               <p className="eyebrow">Pending table choice</p>
               <h2>
                 {pendingAction.kind === "deploy" && `${pendingOwner?.leader ?? "Player"} deployment`}
+                {pendingAction.kind === "control-defense" && `${pendingControlDefenseOwner?.leader ?? "Player"} control deployment`}
                 {pendingAction.kind === "reinforce" && `Military Support - ${pendingAction.remaining} troops`}
                 {pendingAction.kind === "trade" && `Trade from ${pendingAction.source}`}
                 {pendingAction.kind === "spy" && `${pendingAction.placementIcon ? `${iconLabels[pendingAction.placementIcon]} ` : ""}Spy placement - ${pendingAction.remaining}`}
@@ -2252,6 +2307,32 @@ export default function App() {
                   Deploy 1
                 </button>
                 <button type="button" onClick={clearPendingAction}>Done</button>
+              </div>
+            )}
+
+            {pendingAction.kind === "control-defense" && (
+              <div className="pending-controls">
+                {pendingControlDefenseOwner ? (
+                  <>
+                    <span>
+                      {criticalLocationNames[pendingAction.location]} control: {pendingControlDefenseSupply} in supply
+                    </span>
+                    <button
+                      type="button"
+                      onClick={deployControlDefense}
+                      disabled={pendingControlDefenseSupply <= 0}
+                    >
+                      <Swords size={15} />
+                      Deploy 1
+                    </button>
+                    <button type="button" onClick={skipControlDefense}>Skip</button>
+                  </>
+                ) : (
+                  <>
+                    <span>Control marker owner can no longer resolve this deployment.</span>
+                    <button type="button" onClick={skipControlDefense}>Skip</button>
+                  </>
+                )}
               </div>
             )}
 

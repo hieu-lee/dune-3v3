@@ -46,6 +46,26 @@ function fixture(state, data, setupPlayers, conflictSourceId = 454) {
   };
 }
 
+function roundStartFixture(state, data, setupPlayers, conflictSourceId = 460) {
+  const game = state.initialGame();
+  return {
+    ...game,
+    conflict: null,
+    conflictDeck: [conflictBySourceId(data, conflictSourceId)],
+    conflictDiscard: [],
+    pendingAction: undefined,
+    pendingQueue: [],
+    players: setupPlayers(game.players.map((player) => ({
+      ...player,
+      conflict: 0,
+      deployedTroops: 0,
+      deployedSandworms: 0,
+      revealed: true,
+      agentsReady: 0,
+    }))),
+  };
+}
+
 try {
   const data = await server.ssrLoadModule("/src/game/data.ts");
   const state = await server.ssrLoadModule("/src/game/state.ts");
@@ -101,6 +121,88 @@ try {
   assert.equal(reinforcedGarrisonPlayer.garrison, playerById(reinforceFixture, "p2").garrison + 1);
   assert.equal(reinforcedGarrisonPlayer.conflict, 0);
   assert.equal(reinforcedGarrisonPlayer.deployedTroops, 0, "Garrison reinforcement should not mark a Conflict unit");
+
+  const controlledImperialBasin = {
+    ...roundStartFixture(state, data, (players) => players, 460),
+    firstSeat: 1,
+    activeSeat: 1,
+    locationControl: { "imperial-basin": "p2" },
+  };
+  const controlledImperialBasinRound = state.startNextRound(controlledImperialBasin);
+  assert.equal(controlledImperialBasinRound.round, controlledImperialBasin.round + 1);
+  assert.equal(controlledImperialBasinRound.conflict.sourceId, 460, "Secure Imperial Basin should reveal as the new Conflict");
+  assert.deepEqual(controlledImperialBasinRound.pendingAction, {
+    kind: "control-defense",
+    ownerId: "p2",
+    location: "imperial-basin",
+    source: "Secure Imperial Basin",
+  });
+  assert.equal(controlledImperialBasinRound.pendingQueue.length, 0);
+  assert.equal(controlledImperialBasinRound.activeSeat, controlledImperialBasinRound.firstSeat);
+  const controlDefenseDeployed = state.deployControlDefenseTroop(
+    controlledImperialBasinRound,
+    controlledImperialBasinRound.pendingAction,
+  );
+  assert.equal(playerById(controlDefenseDeployed, "p2").garrison, playerById(controlledImperialBasinRound, "p2").garrison);
+  assert.equal(playerById(controlDefenseDeployed, "p2").deployedTroops, 1);
+  assert.equal(playerById(controlDefenseDeployed, "p2").conflict, 2);
+  assert.deepEqual(controlDefenseDeployed.turnUnitDeployments, {}, "Control defense should not count as a turn deployment");
+  assert.equal(controlDefenseDeployed.pendingAction, undefined);
+  assert.equal(controlDefenseDeployed.round, controlledImperialBasinRound.round, "Control defense should not advance the round");
+  assert.equal(controlDefenseDeployed.activeSeat, controlledImperialBasinRound.firstSeat);
+  assert.notEqual(
+    controlledImperialBasinRound.players[controlledImperialBasinRound.activeSeat].id,
+    controlledImperialBasinRound.pendingAction.ownerId,
+    "Control defense owner can differ from the first action seat",
+  );
+
+  const skippedControlDefense = state.skipControlDefenseTroop(
+    controlledImperialBasinRound,
+    controlledImperialBasinRound.pendingAction,
+  );
+  assert.equal(playerById(skippedControlDefense, "p2").deployedTroops, 0);
+  assert.equal(playerById(skippedControlDefense, "p2").conflict, 0);
+  assert.equal(skippedControlDefense.pendingAction, undefined);
+
+  const controlledArrakeen = {
+    ...roundStartFixture(state, data, (players) => players, 456),
+    locationControl: { arrakeen: "p2" },
+  };
+  assert.equal(state.startNextRound(controlledArrakeen).pendingAction?.kind, "control-defense");
+
+  const noSupplyControl = {
+    ...roundStartFixture(state, data, (players) =>
+      players.map((player) => (player.id === "p2" ? { ...player, garrison: 12 } : player)),
+    ),
+    locationControl: { "imperial-basin": "p2" },
+  };
+  assert.equal(state.startNextRound(noSupplyControl).pendingAction, undefined, "No supply troops should skip control defense");
+
+  const uncontrolledLocationConflict = {
+    ...roundStartFixture(state, data, (players) => players, 457),
+    locationControl: { "imperial-basin": "p2" },
+  };
+  assert.equal(
+    state.startNextRound(uncontrolledLocationConflict).pendingAction,
+    undefined,
+    "Control defense should require control of the revealed location",
+  );
+
+  const nonLocationConflict = {
+    ...roundStartFixture(state, data, (players) => players, 454),
+    locationControl: { "imperial-basin": "p2" },
+  };
+  assert.equal(state.startNextRound(nonLocationConflict).pendingAction, undefined, "Non-location Conflicts should not queue control defense");
+
+  const endgameBeforeConflictReveal = {
+    ...roundStartFixture(state, data, (players) =>
+      players.map((player) => (player.id === "p2" ? { ...player, vp: 10 } : player)),
+    ),
+    locationControl: { "imperial-basin": "p2" },
+  };
+  const endgameBeforeConflictRevealResult = state.startNextRound(endgameBeforeConflictReveal);
+  assert.equal(endgameBeforeConflictRevealResult.phase, "endgame");
+  assert.equal(endgameBeforeConflictRevealResult.pendingAction, undefined, "Endgame should prevent a new control-defense reveal");
 
   const objectiveMatch = fixture(state, data, (players) =>
     players.map((player) =>
@@ -247,6 +349,29 @@ try {
   assert.equal(playerById(spiceRefineryPaid, "p2").vp, 2, "Battle For Spice Refinery conversion should spend Solari for 1 VP");
   assert.equal(playerById(spiceRefineryPaid, "p2").resources.solari, 0);
 
+  const conversionBeforeDefense = {
+    ...fixture(state, data, (players) =>
+      players.map((player) =>
+        player.id === "p2"
+          ? { ...player, conflict: 9, deployedTroops: 1, resources: { ...player.resources, solari: 6 }, vp: 0 }
+          : player,
+      ), 466),
+    conflictDeck: [conflictBySourceId(data, 460)],
+    locationControl: { "imperial-basin": "p3" },
+  };
+  const conversionBeforeDefensePending = state.startNextRound(conversionBeforeDefense);
+  assert.equal(conversionBeforeDefensePending.pendingAction?.kind, "conflict-vp-conversion");
+  assert.equal(conversionBeforeDefensePending.conflict, null, "Conflict conversion should pause before the next Conflict reveal");
+  const defenseAfterConversion = state.startNextRound(
+    state.payConflictVpConversion(conversionBeforeDefensePending, conversionBeforeDefensePending.pendingAction),
+  );
+  assert.deepEqual(defenseAfterConversion.pendingAction, {
+    kind: "control-defense",
+    ownerId: "p3",
+    location: "imperial-basin",
+    source: "Secure Imperial Basin",
+  });
+
   const arrakeenBattle = {
     ...fixture(state, data, (players) =>
       players.map((player) =>
@@ -271,7 +396,16 @@ try {
   );
   assert.equal(playerById(arrakeenRecalledTwice, "p2").vp, 2);
   assert.equal(playerById(arrakeenRecalledTwice, "p2").spies, 3);
-  assert.equal(arrakeenRecalledTwice.pendingAction, undefined);
+  assert.deepEqual(arrakeenRecalledTwice.pendingAction, {
+    kind: "control-defense",
+    ownerId: "p2",
+    location: "arrakeen",
+    source: "Siege Of Arrakeen",
+  });
+  assert.equal(
+    state.skipControlDefenseTroop(arrakeenRecalledTwice, arrakeenRecalledTwice.pendingAction).pendingAction,
+    undefined,
+  );
 
   const doubledArrakeenWithPartialSecondConversion = {
     ...fixture(state, data, (players) =>
@@ -306,7 +440,12 @@ try {
   const skippedPartialSecond = state.startNextRound(
     state.skipConflictVpConversion(blockedPartialSecondRecall, blockedPartialSecondRecall.pendingAction),
   );
-  assert.equal(skippedPartialSecond.pendingAction, undefined);
+  assert.deepEqual(skippedPartialSecond.pendingAction, {
+    kind: "control-defense",
+    ownerId: "p3",
+    location: "arrakeen",
+    source: "Siege Of Arrakeen",
+  });
   assert.equal(playerById(skippedPartialSecond, "p3").vp, 3, "First doubled printed VP plus one completed spy conversion should remain");
 
   const previousCrysknife = { ...conflictBySourceId(data, 455), scored: false };

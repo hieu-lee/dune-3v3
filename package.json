@@ -8,6 +8,8 @@
     "dev": "vite --host 0.0.0.0",
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 0.0.0.0",
+    "debug:browser": "node scripts/browser-debug.mjs",
+    "debug:browser:headed": "node scripts/browser-debug.mjs --headed --keep-open",
     "sync:cards": "node scripts/sync-dune-catalog.mjs",
     "sync:card-images": "node scripts/sync-dune-catalog.mjs --download-images",
     "verify:alliances": "node scripts/verify-alliances.mjs",
@@ -39,6 +41,7 @@
   },
   "devDependencies": {
     "@types/react": "19.2.15",
-    "@types/react-dom": "19.2.3"
+    "@types/react-dom": "19.2.3",
+    "playwright": "1.60.0"
   }
 }

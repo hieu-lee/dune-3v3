@@ -197,6 +197,12 @@ export type PendingAction =
       conflictBlocked?: boolean;
     }
   | {
+      kind: "control-defense";
+      ownerId: string;
+      location: CriticalLocationId;
+      source: string;
+    }
+  | {
       kind: "reinforce";
       team: TeamId;
       remaining: number;

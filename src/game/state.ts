@@ -663,7 +663,7 @@ export function conflictProtectedByShieldWall(conflict: ConflictCard | null) {
   );
 }
 
-const criticalLocationNames: Record<CriticalLocationId, string> = {
+export const criticalLocationNames: Record<CriticalLocationId, string> = {
   arrakeen: "Arrakeen",
   "spice-refinery": "Spice Refinery",
   "imperial-basin": "Imperial Basin",
@@ -680,6 +680,26 @@ function criticalLocationForConflict(conflict: ConflictCard): CriticalLocationId
   if (conflict.name.includes("Spice Refinery")) return "spice-refinery";
   if (conflict.name.includes("Imperial Basin")) return "imperial-basin";
   return undefined;
+}
+
+type ControlDefensePendingAction = Extract<PendingAction, { kind: "control-defense" }>;
+
+function pendingActionForControlDefense(
+  state: Pick<GameState, "locationControl">,
+  conflict: ConflictCard | null | undefined,
+  players: Player[],
+): ControlDefensePendingAction | undefined {
+  if (!conflict) return undefined;
+  const location = criticalLocationForConflict(conflict);
+  const ownerId = location ? state.locationControl[location] : undefined;
+  const owner = ownerId ? players.find((player) => player.id === ownerId) : undefined;
+  if (!location || !owner || owner.role !== "Ally" || playerTroopSupply(owner) <= 0) return undefined;
+  return {
+    kind: "control-defense",
+    ownerId: owner.id,
+    location,
+    source: conflict.name,
+  };
 }
 
 function criticalLocationForSpace(spaceId: string): CriticalLocationId | undefined {
@@ -5851,6 +5871,41 @@ export function deployTroopToConflict(state: GameState, pending: DeployPendingAc
   return actor ? recordTurnUnitDeployment(deployedState, actor.id, 1) : deployedState;
 }
 
+export function deployControlDefenseTroop(state: GameState, pending: ControlDefensePendingAction): GameState {
+  const owner = state.players.find((player) => player.id === pending.ownerId);
+  if (!owner || playerTroopSupply(owner) <= 0) return { ...state, ...advancePendingAction(state) };
+
+  return {
+    ...state,
+    players: state.players.map((player) =>
+      player.id === owner.id
+        ? {
+            ...player,
+            conflict: player.conflict + 2,
+            deployedTroops: player.deployedTroops + 1,
+          }
+        : player,
+    ),
+    ...advancePendingAction(state),
+    log: [
+      `${owner.leader} deploys 1 troop from supply to defend ${criticalLocationNames[pending.location]}.`,
+      ...state.log,
+    ],
+  };
+}
+
+export function skipControlDefenseTroop(state: GameState, pending: ControlDefensePendingAction): GameState {
+  const owner = state.players.find((player) => player.id === pending.ownerId);
+  return {
+    ...state,
+    ...advancePendingAction(state),
+    log: [
+      `${owner?.leader ?? "Player"} declines the defensive deployment for ${pending.source}.`,
+      ...state.log,
+    ],
+  };
+}
+
 export function reinforceTroop(
   state: GameState,
   pending: ReinforcePendingAction,
@@ -6378,6 +6433,7 @@ export function startNextRound(state: GameState): GameState {
       5,
     ),
   );
+  const controlDefensePending = pendingActionForControlDefense(resolvedState, nextConflict, players);
   return {
     ...resolvedState,
     phase: "playing",
@@ -6391,17 +6447,20 @@ export function startNextRound(state: GameState): GameState {
     players,
     spaces: {},
     makerSpice: advanceMakerSpice(resolvedState),
-    pendingAction: undefined,
+    pendingAction: controlDefensePending,
     pendingQueue: [],
     conflictDeploymentBlock: undefined,
     combatPasses: [],
     conflict: nextConflict ?? null,
     conflictDeck,
     log: [
+      controlDefensePending
+        ? `${players.find((player) => player.id === controlDefensePending.ownerId)?.leader ?? "Player"} controls ${criticalLocationNames[controlDefensePending.location]} and may deploy 1 troop from supply to the Conflict.`
+        : undefined,
       nextConflict
         ? `Round ${resolvedState.round + 1} begins. ${nextConflict.name} is revealed. ${players[firstSeat].leader} has first action.`
         : `Round ${resolvedState.round + 1} begins with no conflict cards remaining. ${players[firstSeat].leader} has first action.`,
       ...resolvedState.log,
-    ],
+    ].filter((entry): entry is string => Boolean(entry)),
   };
 }

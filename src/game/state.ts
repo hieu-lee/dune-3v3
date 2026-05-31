@@ -23,6 +23,17 @@ import {
   criticalLocationNames,
 } from "./critical-locations";
 import {
+  cloneCards,
+  cloneConflicts,
+  cloneContracts,
+  cloneIntrigues,
+  cloneObjectives,
+  drawCards,
+  playerTroopSupply,
+  shuffleCards,
+  shuffleItems,
+} from "./deck-utils";
+import {
   canMoveCardToThroneRow,
   choamProfitsSourceId,
   isBackedByChoamIntrigue,
@@ -97,6 +108,12 @@ import type {
   TrashCardZone,
   TeamId,
 } from "./types";
+
+export {
+  cloneCards,
+  drawCards,
+  playerTroopSupply,
+} from "./deck-utils";
 
 export {
   canMoveCardToThroneRow,
@@ -177,7 +194,6 @@ const irulanBirthrightThreshold = 2;
 const irulanSignetAcquireCost = 1;
 const irulanSignetTrashRewardCost = 1;
 const irulanSignetTrashRewardSpice = 2;
-const playerTroopPieceCount = 12;
 export const threatenSpiceProductionCost = 7;
 export const corrinoMightCost = 3;
 
@@ -217,52 +233,6 @@ const shaddamSignetRingInfluenceChoices: FactionId[] = [
   "bene",
   "fringeWorlds",
 ];
-
-export function cloneCards(cards: Card[]) {
-  return cards.map((card) => ({
-    ...card,
-    icons: [...card.icons],
-    revealGain: card.revealGain ? { ...card.revealGain } : undefined,
-    traits: card.traits ? [...card.traits] : undefined,
-  }));
-}
-
-export function playerTroopSupply(player: Player) {
-  if (player.role === "Commander") return 0;
-  return Math.max(0, playerTroopPieceCount - player.garrison - player.deployedTroops - player.jessicaMemories);
-}
-
-function shuffleCards(cards: Card[]) {
-  return shuffleItems(cards);
-}
-
-function shuffleItems<T>(items: T[]) {
-  const shuffled = [...items];
-  for (let index = shuffled.length - 1; index > 0; index -= 1) {
-    const swapIndex = Math.floor(Math.random() * (index + 1));
-    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
-  }
-  return shuffled;
-}
-
-function cloneConflicts(conflicts: ConflictCard[]) {
-  return conflicts.map((conflict) => ({ ...conflict, rewards: [...conflict.rewards] }));
-}
-
-function cloneContracts(contracts: ContractCard[]) {
-  return contracts.map((contract) => ({ ...contract }));
-}
-
-function cloneIntrigues(intrigues: IntrigueCard[]) {
-  return intrigues.map((intrigue) => ({
-    ...intrigue,
-    traits: intrigue.traits ? [...intrigue.traits] : undefined,
-  }));
-}
-
-function cloneObjectives(objectives: ObjectiveCard[]) {
-  return objectives.map((objective) => ({ ...objective }));
-}
 
 function isStandardBattleIcon(icon: ConflictCard["battleIcon"]): icon is BattleIconId {
   return icon !== "wild";
@@ -380,22 +350,6 @@ function buildStarterDeck(playerId: string, team: TeamId, role: Role, leader: st
   return shuffleCards(
     cloneCards(starterDeck).map((card, index) => ({ ...card, id: `${playerId}-${card.id}-${index + 1}` })),
   );
-}
-
-export function drawCards(player: Player, count: number): Player {
-  const deck = [...player.deck];
-  const hand = [...player.hand];
-  const discard = [...player.discard];
-
-  while (hand.length < count && (deck.length > 0 || discard.length > 0)) {
-    if (deck.length === 0) {
-      deck.push(...shuffleCards(discard.splice(0)));
-    }
-    const card = deck.shift();
-    if (card) hand.push(card);
-  }
-
-  return { ...player, deck, hand, discard };
 }
 
 function makePlayer(

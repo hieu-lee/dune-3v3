@@ -76,6 +76,11 @@ const firstPlaceBattleRewardsBySourceId: Record<number, FirstPlaceBattleReward> 
     fixedVp: 0,
     resources: { solari: 2 },
   },
+  455: {
+    fixedVp: 0,
+    influenceChoices: 1,
+    conversion: { kind: "resource", resource: "spice", amount: 3, vp: 1 },
+  },
   456: {
     fixedVp: 0,
     resources: { solari: 2 },
@@ -157,7 +162,10 @@ function pendingActionForConflictConversion(
   multiplier: number,
 ): ConflictVpConversionPendingAction | undefined {
   const conversion = reward?.conversion;
-  if (!conversion || !canPayConflictConversion(state, owner, conversion)) return undefined;
+  const delayedInfluenceMayEnablePayment = (reward?.influenceChoices ?? 0) > 0;
+  if (!conversion || (!delayedInfluenceMayEnablePayment && !canPayConflictConversion(state, owner, conversion))) {
+    return undefined;
+  }
   if (conversion.kind === "resource") {
     return {
       kind: "conflict-vp-conversion",
@@ -449,7 +457,23 @@ export function gainConflictInfluenceForPending(
       ...state.log,
     ],
   };
-  return resolveLeaderInfluenceThresholdRewards(influencedState, previousPlayers);
+  return skipUnpayableConflictConversion(
+    resolveLeaderInfluenceThresholdRewards(influencedState, previousPlayers),
+  );
+}
+
+function skipUnpayableConflictConversion(state: GameState) {
+  const pending = state.pendingAction;
+  if (pending?.kind !== "conflict-vp-conversion" || canPayConflictVpConversion(state, pending)) return state;
+  const owner = state.players.find((player) => player.id === pending.ownerId);
+  return {
+    ...state,
+    ...advancePendingAction(state),
+    log: [
+      `${owner?.leader ?? "Player"} cannot pay the VP conversion from ${pending.source}.`,
+      ...state.log,
+    ],
+  };
 }
 
 export function conflictVpConversionSpyChoices(

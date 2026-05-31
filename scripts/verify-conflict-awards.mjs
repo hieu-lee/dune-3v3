@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { createServer } from "vite";
 import { verifySeizeSpiceRefineryConflictAwards } from "./verify-conflict-awards-seize.mjs";
+import { verifySpiceFreightersConflictAwards } from "./verify-conflict-awards-spice-freighters.mjs";
 import { verifySkirmishConflictAwards } from "./verify-conflict-awards-skirmish.mjs";
 import { verifyTestOfLoyaltyConflictAwards } from "./verify-conflict-awards-test-of-loyalty.mjs";
 
@@ -341,6 +342,13 @@ try {
   );
 
   verifySeizeSpiceRefineryConflictAwards({
+    state,
+    data,
+    fixture,
+    conflictBySourceId,
+    playerById,
+  });
+  verifySpiceFreightersConflictAwards({
     state,
     data,
     fixture,

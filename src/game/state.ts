@@ -70,6 +70,7 @@ const questionableMethodsSourceId = 156;
 const backedByChoamSourceId = 448;
 const spiceMustFlowSourceId = 538;
 const shadowAllianceSourceId = 160;
+const muadDibSignetRingSourceId = 545;
 const demandAttentionSourceId = 548;
 const desertCallSourceId = 549;
 const threatenSpiceProductionSourceId = 553;
@@ -734,6 +735,13 @@ export function isThreatenSpiceProductionCommanderCard(card: Card) {
 
 export function isCommandRespectCommanderCard(card: Card) {
   return card.sourceId === commandRespectSourceId || card.name === "Command Respect";
+}
+
+export function isMuadDibSignetRingCard(card: Card) {
+  return (
+    card.sourceId === muadDibSignetRingSourceId ||
+    (card.name === "Signet Ring" && card.id.includes("muaddib-signet-ring"))
+  );
 }
 
 export function isCorrinoMightCommanderCard(card: Card) {
@@ -1486,6 +1494,22 @@ export function applyCardAgentEffect(
   sourcePlayer: Player,
   targetPlayer: Player,
 ): { source: Player; target: Player; log?: string; recruitedTroops?: number } {
+  if (
+    isMuadDibSignetRingCard(card) &&
+    sourcePlayer.team === "muaddib" &&
+    sourcePlayer.role === "Commander"
+  ) {
+    const source = drawCards(sourcePlayer, sourcePlayer.hand.length + 1);
+    const drewCard = source.hand.length > sourcePlayer.hand.length;
+    return {
+      source,
+      target: targetPlayer,
+      log: drewCard
+        ? `${sourcePlayer.leader} resolves Lead the Way: draws 1 card.`
+        : `${sourcePlayer.leader} resolves Lead the Way: no card to draw.`,
+    };
+  }
+
   if (
     isDevastatingAssaultCommanderCard(card) &&
     sourcePlayer.team === "shaddam" &&

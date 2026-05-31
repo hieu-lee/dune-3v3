@@ -407,7 +407,7 @@ const muadDibCommanderSpecs: Array<StarterCardSpec & { sourceId: number }> = [
     icons: ["landsraad", "city", "spice"],
     persuasion: 1,
     swords: 0,
-    play: "Trigger the leader signet ability.",
+    play: "Lead the Way: draw 1 card.",
     reveal: starterRevealText(1, 0),
   },
   {

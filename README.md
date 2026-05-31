@@ -18,6 +18,7 @@ Private web-table implementation for a six-player `Dune: Imperium - Uprising` te
 - Catalog-backed Intrigue deck with physical card draws and active-player references.
 - Team trade flow supports spice, water, Solari, and chosen Intrigue-card transfers.
 - Shaddam Throne Row support for Emperor-board setup, Imperial Tent movement, and Shaddam-team acquisition.
+- Muad'Dib's Signet Ring resolves Lead the Way by drawing 1 card for Muad'Dib.
 - Command Respect lets Swordmaster Muad'Dib trash the card to trade with one Muad'Dib Ally.
 - Demand Attention lets Muad'Dib spend 4 Solari to upgrade a faction visit to two Influence for the board-effect recipient.
 - Desert Call lets Muad'Dib spend 1 water to summon a sandworm for the activated hooked Ally, then trash the card.

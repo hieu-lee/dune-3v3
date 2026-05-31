@@ -57,6 +57,7 @@ const unexpectedAlliesSourceId = 137;
 const mercenariesSourceId = 128;
 const cunningSourceId = 133;
 const opportunismSourceId = 134;
+const changeAllegiancesSourceId = 135;
 const buyAccessSourceId = 139;
 const imperiumPoliticsSourceId = 140;
 const callToArmsSourceId = 138;
@@ -110,6 +111,10 @@ export type CunningPlotChoice = "draw" | "paid-trash";
 export type InfluenceLossPair = [FactionId, FactionId];
 export type BuyAccessChoice = [FactionId, FactionId];
 export type SietchRitualChoice = "bene" | "fremen" | "fringeWorlds";
+export type ChangeAllegiancesChoice =
+  | { kind: "shift"; loseFaction: FactionId; gainFaction: FactionId }
+  | { kind: "spend-spice"; gainFaction: FactionId }
+  | { kind: "both"; loseFaction: FactionId; shiftGainFaction: FactionId; spiceGainFaction: FactionId };
 export type ImperiumPoliticsChoice = "greatHouses" | "emperor" | "spacing";
 export type StrategicStockpilingChoice = "spice" | "water" | "both";
 export type MarketOpportunityChoice = "spice-to-solari" | "solari-to-spice";
@@ -196,6 +201,10 @@ export function isCunningIntrigue(intrigue: IntrigueCard) {
 
 export function isOpportunismIntrigue(intrigue: IntrigueCard) {
   return intrigue.sourceId === opportunismSourceId;
+}
+
+export function isChangeAllegiancesIntrigue(intrigue: IntrigueCard) {
+  return intrigue.sourceId === changeAllegiancesSourceId;
 }
 
 export function isBuyAccessIntrigue(intrigue: IntrigueCard) {
@@ -1897,6 +1906,49 @@ function validSietchRitualChoice(player: Player, faction: SietchRitualChoice) {
   return sietchRitualFactionChoices(player).includes(faction);
 }
 
+const mainBoardInfluenceChoices: FactionId[] = ["greatHouses", "spacing", "bene", "fringeWorlds"];
+
+export function changeAllegiancesGainChoices(player: Player): FactionId[] {
+  if (player.role === "Commander" && player.team === "shaddam") {
+    return ["emperor", ...mainBoardInfluenceChoices];
+  }
+  if (player.role === "Commander" && player.team === "muaddib") {
+    return ["greatHouses", "spacing", "bene", "fremen", "fringeWorlds"];
+  }
+  return mainBoardInfluenceChoices;
+}
+
+function influenceEffectOwnerForChoice(
+  state: GameState,
+  player: Player,
+  faction: FactionId,
+  influenceOwnerId?: string,
+) {
+  const personalFaction = commanderPersonalFaction(player);
+  return player.role === "Commander" && faction !== personalFaction
+    ? activatedAllyEffectOwner(state, player, influenceOwnerId)
+    : { valid: true, owner: player };
+}
+
+export function changeAllegiancesLossChoices(
+  state: GameState,
+  player: Player,
+  influenceOwnerId?: string,
+): FactionId[] {
+  if (player.role !== "Commander") {
+    return mainBoardInfluenceChoices.filter((faction) => player.influence[faction] > 0);
+  }
+  const personalFaction = commanderPersonalFaction(player);
+  const ownerResult = activatedAllyEffectOwner(state, player, influenceOwnerId);
+  const activatedAlly = ownerResult.owner;
+  return [
+    ...(personalFaction && player.influence[personalFaction] > 0 ? [personalFaction] : []),
+    ...(activatedAlly
+      ? mainBoardInfluenceChoices.filter((faction) => activatedAlly.influence[faction] > 0)
+      : []),
+  ];
+}
+
 export function influenceLossPairChoices(player: Player): InfluenceLossPair[] {
   const pairs: InfluenceLossPair[] = [];
   factionIds.forEach((first, firstIndex) => {
@@ -2370,6 +2422,130 @@ export function playSietchRitualPlotIntrigue(
       `${player.leader} plays Sietch Ritual, discards ${discardedCard.name}, and ${influenceText}.`,
       ...state.log,
     ],
+  };
+}
+
+function changeAllegiancesChoiceValid(
+  state: GameState,
+  player: Player,
+  choice: ChangeAllegiancesChoice,
+  influenceOwnerId?: string,
+) {
+  if (!choice || typeof choice !== "object") return false;
+  if (choice.kind === "spend-spice") {
+    return changeAllegiancesGainChoices(player).includes(choice.gainFaction);
+  }
+  if (choice.kind === "shift") {
+    return (
+      changeAllegiancesLossChoices(state, player, influenceOwnerId).includes(choice.loseFaction) &&
+      changeAllegiancesGainChoices(player).includes(choice.gainFaction)
+    );
+  }
+  if (choice.kind === "both") {
+    const gainChoices = changeAllegiancesGainChoices(player);
+    return (
+      changeAllegiancesLossChoices(state, player, influenceOwnerId).includes(choice.loseFaction) &&
+      gainChoices.includes(choice.shiftGainFaction) &&
+      gainChoices.includes(choice.spiceGainFaction)
+    );
+  }
+  return false;
+}
+
+function changeAllegiancesShiftGainFaction(choice: ChangeAllegiancesChoice) {
+  if (choice.kind === "shift") return choice.gainFaction;
+  if (choice.kind === "both") return choice.shiftGainFaction;
+  return undefined;
+}
+
+function changeAllegiancesSpiceGainFaction(choice: ChangeAllegiancesChoice) {
+  if (choice.kind === "spend-spice") return choice.gainFaction;
+  if (choice.kind === "both") return choice.spiceGainFaction;
+  return undefined;
+}
+
+export function playChangeAllegiancesPlotIntrigue(
+  state: GameState,
+  playerId: string,
+  intrigueId: string,
+  choice: ChangeAllegiancesChoice,
+  influenceOwnerId?: string,
+): GameState {
+  if (state.phase !== "playing" || state.pendingAction || state.pendingQueue.length > 0) return state;
+  const player = state.players[state.activeSeat];
+  if (!player || player.id !== playerId) return state;
+  const intrigue = player.intrigues.find((card) => card.id === intrigueId);
+  if (!intrigue || !isChangeAllegiancesIntrigue(intrigue)) return state;
+  if (!changeAllegiancesChoiceValid(state, player, choice, influenceOwnerId)) return state;
+  const spendsSpice = choice.kind === "spend-spice" || choice.kind === "both";
+  if (spendsSpice && player.resources.spice < 3) return state;
+
+  const shiftGainFaction = changeAllegiancesShiftGainFaction(choice);
+  const spiceGainFaction = changeAllegiancesSpiceGainFaction(choice);
+  const shiftGainOwnerResult = shiftGainFaction
+    ? influenceEffectOwnerForChoice(state, player, shiftGainFaction, influenceOwnerId)
+    : undefined;
+  if (shiftGainOwnerResult && (!shiftGainOwnerResult.valid || !shiftGainOwnerResult.owner)) return state;
+  const spiceGainOwnerResult = spiceGainFaction
+    ? influenceEffectOwnerForChoice(state, player, spiceGainFaction, influenceOwnerId)
+    : undefined;
+  if (spiceGainOwnerResult && (!spiceGainOwnerResult.valid || !spiceGainOwnerResult.owner)) return state;
+  const lossFaction = choice.kind === "shift" || choice.kind === "both" ? choice.loseFaction : undefined;
+  const lossOwnerResult = lossFaction
+    ? influenceEffectOwnerForChoice(state, player, lossFaction, influenceOwnerId)
+    : undefined;
+  if (lossOwnerResult && (!lossOwnerResult.valid || !lossOwnerResult.owner)) return state;
+  if (lossOwnerResult?.owner && lossFaction && lossOwnerResult.owner.influence[lossFaction] <= 0) return state;
+
+  const lossOwner = lossOwnerResult?.owner;
+  const players = state.players.map((candidate) => {
+    let next = candidate;
+    if (candidate.id === player.id) {
+      next = {
+        ...next,
+        resources: spendsSpice
+          ? { ...next.resources, spice: next.resources.spice - 3 }
+          : next.resources,
+        intrigues: next.intrigues.filter((card) => card.id !== intrigue.id),
+      };
+    }
+    if (lossOwner && lossFaction && candidate.id === lossOwner.id) {
+      next = adjustInfluence(next, lossFaction, -1);
+    }
+    if (shiftGainFaction && shiftGainOwnerResult?.owner && candidate.id === shiftGainOwnerResult.owner.id) {
+      next = adjustInfluence(next, shiftGainFaction, 1);
+    }
+    if (spiceGainFaction && spiceGainOwnerResult?.owner && candidate.id === spiceGainOwnerResult.owner.id) {
+      next = adjustInfluence(next, spiceGainFaction, 1);
+    }
+    return next;
+  });
+  const gainEffects = [
+    ...(shiftGainFaction && shiftGainOwnerResult?.owner
+      ? [{ owner: shiftGainOwnerResult.owner, faction: shiftGainFaction }]
+      : []),
+    ...(spiceGainFaction && spiceGainOwnerResult?.owner
+      ? [{ owner: spiceGainOwnerResult.owner, faction: spiceGainFaction }]
+      : []),
+  ];
+  const gainText = gainEffects
+    .map(({ owner, faction }) =>
+      owner.id === player.id
+        ? `gains 1 ${factionLabels[faction]} Influence`
+        : `${owner.leader} gains 1 ${factionLabels[faction]} Influence`
+    )
+    .join(" and ");
+  const logEntry = choice.kind === "spend-spice"
+    ? `${player.leader} plays Change Allegiances, spends 3 spice, and ${gainText}.`
+    : choice.kind === "shift"
+      ? `${player.leader} plays Change Allegiances; ${lossOwner?.leader ?? player.leader} loses 1 ${factionLabels[choice.loseFaction]} Influence and ${gainText}.`
+      : `${player.leader} plays Change Allegiances; ${lossOwner?.leader ?? player.leader} loses 1 ${factionLabels[choice.loseFaction]} Influence, ${player.leader} spends 3 spice, and ${gainText}.`;
+
+  return {
+    ...state,
+    players,
+    intrigueDiscard: [...state.intrigueDiscard, intrigue],
+    log: [logEntry, ...state.log],
   };
 }
 

@@ -30,6 +30,8 @@ import {
   canPlaceSpyPost,
   canMoveCardToThroneRow,
   canPay,
+  changeAllegiancesGainChoices,
+  changeAllegiancesLossChoices,
   collectChoamContractFallback,
   collectMakerSpice,
   combatIntrigueStrength,
@@ -57,6 +59,7 @@ import {
   isBackedByChoamIntrigue,
   isBuyAccessIntrigue,
   isCallToArmsIntrigue,
+  isChangeAllegiancesIntrigue,
   isContingencyPlanIntrigue,
   isCunningIntrigue,
   isCouncilorsAmbitionIntrigue,
@@ -110,6 +113,7 @@ import {
   playBackedByChoamPlotIntrigue,
   playBuyAccessPlotIntrigue,
   playCallToArmsPlotIntrigue,
+  playChangeAllegiancesPlotIntrigue,
   playContingencyPlanPlotIntrigue,
   playCunningPlotIntrigue,
   playCouncilorsAmbitionPlotIntrigue,
@@ -157,7 +161,7 @@ import {
   buyAccessPairChoices,
 } from "./game/state";
 import type { BoardSpace, Card, FactionId, GameState, PendingAction, Player, ResourceId, Resources, TeamId, TradeGoodId, TrashCardZone } from "./game/types";
-import type { BuyAccessChoice, CombatIntrigueChoice, ImperiumPoliticsChoice, InfluenceLossPair, ShaddamSignetRingChoice, SietchRitualChoice } from "./game/state";
+import type { BuyAccessChoice, ChangeAllegiancesChoice, CombatIntrigueChoice, ImperiumPoliticsChoice, InfluenceLossPair, ShaddamSignetRingChoice, SietchRitualChoice } from "./game/state";
 
 const resources: Array<{ id: ResourceId; label: string; Icon: LucideIcon }> = [
   { id: "solari", label: "Solari", Icon: CircleDollarSign },
@@ -180,6 +184,16 @@ const factionShortLabels: Record<FactionId, string> = {
 };
 
 const shaddamSignetInfluenceFactions: FactionId[] = ["emperor", "greatHouses", "spacing", "bene", "fringeWorlds"];
+
+type ChangeAllegiancesSelection = Partial<{
+  loseFaction: FactionId;
+  shiftGainFaction: FactionId;
+  spiceGainFaction: FactionId;
+}>;
+
+function selectedFactionChoice(selected: FactionId | undefined, choices: FactionId[]) {
+  return selected && choices.includes(selected) ? selected : choices[0];
+}
 
 export function revealPersuasionFor(player: Player) {
   const highCouncilPersuasion = player.highCouncilSeat ? 2 : 0;
@@ -204,6 +218,7 @@ export default function App() {
   const [selectedSpaceId, setSelectedSpaceId] = useState<string | null>(null);
   const [selectedLeaderId, setSelectedLeaderId] = useState<string | null>(null);
   const [commanderTargets, setCommanderTargets] = useState<Record<string, string>>({});
+  const [changeAllegiancesSelections, setChangeAllegiancesSelections] = useState<Record<string, ChangeAllegiancesSelection>>({});
   const leaderDialogRef = useRef<HTMLElement | null>(null);
   const leaderCloseButtonRef = useRef<HTMLButtonElement | null>(null);
   const leaderOpenerRef = useRef<HTMLButtonElement | null>(null);
@@ -899,6 +914,23 @@ export default function App() {
         ? activatedAllyIdFor(player, current.players)
         : undefined;
       return playSietchRitualPlotIntrigue(current, player.id, intrigueId, discardCardId, faction, influenceOwnerId);
+    });
+  }
+
+  function updateChangeAllegiancesSelection(intrigueId: string, selection: ChangeAllegiancesSelection) {
+    setChangeAllegiancesSelections((current) => ({
+      ...current,
+      [intrigueId]: { ...current[intrigueId], ...selection },
+    }));
+  }
+
+  function playChangeAllegiancesPlot(intrigueId: string, choice: ChangeAllegiancesChoice) {
+    setGame((current) => {
+      const player = current.players[current.activeSeat];
+      const influenceOwnerId = player.role === "Commander"
+        ? activatedAllyIdFor(player, current.players)
+        : undefined;
+      return playChangeAllegiancesPlotIntrigue(current, player.id, intrigueId, choice, influenceOwnerId);
     });
   }
 
@@ -2445,6 +2477,34 @@ export default function App() {
                   const sietchRitualChoices = isSietchRitualIntrigue(card)
                     ? sietchRitualFactionChoices(activePlayer)
                     : [];
+                  const changeAllegiancesInfluenceOwnerId = activePlayer.role === "Commander" ? activatedAlly.id : undefined;
+                  const changeAllegiancesGainOptions = isChangeAllegiancesIntrigue(card)
+                    ? changeAllegiancesGainChoices(activePlayer)
+                    : [];
+                  const changeAllegiancesLossOptions = isChangeAllegiancesIntrigue(card)
+                    ? changeAllegiancesLossChoices(game, activePlayer, changeAllegiancesInfluenceOwnerId)
+                    : [];
+                  const changeAllegiancesSelection = changeAllegiancesSelections[card.id] ?? {};
+                  const selectedChangeLoss = selectedFactionChoice(
+                    changeAllegiancesSelection.loseFaction,
+                    changeAllegiancesLossOptions,
+                  );
+                  const selectedChangeShiftGain = selectedFactionChoice(
+                    changeAllegiancesSelection.shiftGainFaction,
+                    changeAllegiancesGainOptions,
+                  );
+                  const selectedChangeSpiceGain = selectedFactionChoice(
+                    changeAllegiancesSelection.spiceGainFaction,
+                    changeAllegiancesGainOptions,
+                  );
+                  const changeAllegiancesCanPaySpice = activePlayer.resources.spice >= 3;
+                  const changeAllegiancesPersonalFaction = activePlayer.role === "Commander"
+                    ? activePlayer.team === "muaddib" ? "fremen" : "emperor"
+                    : undefined;
+                  const changeAllegiancesOwnerLabel = (faction: FactionId) =>
+                    activePlayer.role === "Commander" && faction !== changeAllegiancesPersonalFaction
+                      ? `: ${activatedAlly.leader}`
+                      : "";
                   const opportunismCanPay = activePlayer.resources.solari >= 2;
                   const opportunismChoices = isOpportunismIntrigue(card) ? influenceLossPairChoices(activePlayer) : [];
                   const buyAccessCanPay = activePlayer.resources.solari >= 5;
@@ -2469,6 +2529,8 @@ export default function App() {
                             ? "Plot / draw or pay to trash"
                           : isSietchRitualIntrigue(card)
                             ? "Plot / discard for Influence"
+                          : isChangeAllegiancesIntrigue(card)
+                            ? "Plot / shift or buy Influence"
                           : isOpportunismIntrigue(card)
                             ? "Plot / cash Influence for VP"
                           : isBuyAccessIntrigue(card)
@@ -2604,6 +2666,125 @@ export default function App() {
                               );
                             }),
                           )}
+                        </div>
+                      )}
+                      {isChangeAllegiancesIntrigue(card) && (
+                        <div className="intrigue-actions">
+                          {changeAllegiancesLossOptions.length > 0 && (
+                            <div className="intrigue-choice-row">
+                              <label>
+                                <span>Lose</span>
+                                <select
+                                  className="intrigue-select"
+                                  value={selectedChangeLoss ?? ""}
+                                  onChange={(event) =>
+                                    updateChangeAllegiancesSelection(card.id, {
+                                      loseFaction: event.target.value as FactionId,
+                                    })
+                                  }
+                                >
+                                  {changeAllegiancesLossOptions.map((faction) => (
+                                    <option key={faction} value={faction}>
+                                      {factionShortLabels[faction]}{changeAllegiancesOwnerLabel(faction)}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                              <label>
+                                <span>Gain</span>
+                                <select
+                                  className="intrigue-select"
+                                  value={selectedChangeShiftGain ?? ""}
+                                  onChange={(event) =>
+                                    updateChangeAllegiancesSelection(card.id, {
+                                      shiftGainFaction: event.target.value as FactionId,
+                                    })
+                                  }
+                                >
+                                  {changeAllegiancesGainOptions.map((faction) => (
+                                    <option key={faction} value={faction}>
+                                      {factionShortLabels[faction]}{changeAllegiancesOwnerLabel(faction)}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (!selectedChangeLoss || !selectedChangeShiftGain) return;
+                                  playChangeAllegiancesPlot(card.id, {
+                                    kind: "shift",
+                                    loseFaction: selectedChangeLoss,
+                                    gainFaction: selectedChangeShiftGain,
+                                  });
+                                }}
+                                disabled={plotIntrigueLocked || !selectedChangeLoss || !selectedChangeShiftGain}
+                                title="Lose 1 Influence to gain 1 Influence"
+                              >
+                                <Minus size={14} />
+                                Lose -&gt; Gain
+                              </button>
+                            </div>
+                          )}
+                          {changeAllegiancesLossOptions.length === 0 && <span>Lose branch requires Influence.</span>}
+                          <div className="intrigue-choice-row">
+                            <label>
+                              <span>3 Spice gain</span>
+                              <select
+                                className="intrigue-select"
+                                value={selectedChangeSpiceGain ?? ""}
+                                onChange={(event) =>
+                                  updateChangeAllegiancesSelection(card.id, {
+                                    spiceGainFaction: event.target.value as FactionId,
+                                  })
+                                }
+                              >
+                                {changeAllegiancesGainOptions.map((faction) => (
+                                  <option key={faction} value={faction}>
+                                    {factionShortLabels[faction]}{changeAllegiancesOwnerLabel(faction)}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!selectedChangeSpiceGain) return;
+                                playChangeAllegiancesPlot(card.id, {
+                                  kind: "spend-spice",
+                                  gainFaction: selectedChangeSpiceGain,
+                                });
+                              }}
+                              disabled={plotIntrigueLocked || !changeAllegiancesCanPaySpice || !selectedChangeSpiceGain}
+                              title="Spend 3 spice to gain 1 Influence"
+                            >
+                              <HandCoins size={14} />
+                              3 Spice -&gt; Gain
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!selectedChangeLoss || !selectedChangeShiftGain || !selectedChangeSpiceGain) return;
+                                playChangeAllegiancesPlot(card.id, {
+                                  kind: "both",
+                                  loseFaction: selectedChangeLoss,
+                                  shiftGainFaction: selectedChangeShiftGain,
+                                  spiceGainFaction: selectedChangeSpiceGain,
+                                });
+                              }}
+                              disabled={
+                                plotIntrigueLocked ||
+                                !changeAllegiancesCanPaySpice ||
+                                !selectedChangeLoss ||
+                                !selectedChangeShiftGain ||
+                                !selectedChangeSpiceGain
+                              }
+                              title="Resolve both rows: lose Influence, spend 3 spice, and gain twice"
+                            >
+                              <Sparkles size={14} />
+                              Both rows
+                            </button>
+                          </div>
                         </div>
                       )}
                       {isOpportunismIntrigue(card) && (

@@ -16,9 +16,27 @@ import {
   Swords,
   Users,
   X,
-  type LucideIcon,
 } from "lucide-react";
 import { Fragment, type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
+import {
+  addResources,
+  boardSpaceIntrigueGainFor,
+  boardSpaceSpiceGainFor,
+  costLabel,
+  factionShortLabels,
+  memoryCountLabel,
+  pendingLocksTableState,
+  resourceChoiceLabel,
+  resources,
+  revealGainLabel,
+  revealPersuasionFor,
+  selectedFactionChoice,
+  shaddamSignetInfluenceFactions,
+  tableStateLockedByPendingActions,
+  tradeGoods,
+  troopSupplyLabel,
+  type ChangeAllegiancesSelection,
+} from "./app-helpers";
 import {
   canMoveCardToThroneRow,
   isBackedByChoamIntrigue,
@@ -64,7 +82,6 @@ import {
   acquireMarketCard,
   applyBoardEffect,
   applyCardAgentEffect,
-  boardSpaceRewardApplies,
   canPlaceSpyPost,
   canPlayDistractionPlotIntrigue,
   canPay,
@@ -209,8 +226,27 @@ import {
   updateTradeSelection,
   buyAccessPairChoices,
 } from "./game/state";
-import type { BoardSpace, Card, FactionId, GameState, PendingAction, Player, ResourceId, Resources, TeamId, TradeGoodId, TrashCardZone } from "./game/types";
+import type {
+  BoardSpace,
+  Card,
+  FactionId,
+  GameState,
+  PendingAction,
+  Player,
+  ResourceId,
+  Resources,
+  TeamId,
+  TradeGoodId,
+  TrashCardZone,
+} from "./game/types";
 import type { BuyAccessChoice, ChangeAllegiancesChoice, CombatIntrigueChoice, ImperiumPoliticsChoice, InfluenceLossPair, IrulanSignetRingChoice, JessicaOtherMemoriesChoice, JessicaReverendMotherChoice, JessicaSpiceAgonyChoice, JessicaWaterOfLifeChoice, LadyAmberDesertScoutsChoice, ShaddamSignetRingChoice, SietchRitualChoice, SpecialMissionChoice, StabanUnseenNetworkChoice } from "./game/state";
+
+export {
+  boardSpaceIntrigueGainFor,
+  pendingLocksTableState,
+  revealPersuasionFor,
+  tableStateLockedByPendingActions,
+} from "./app-helpers";
 
 declare global {
   interface Window {
@@ -223,73 +259,6 @@ declare global {
 
 const appEnv = (import.meta as ImportMeta & { env?: { DEV?: boolean; VITE_DUNE_DEBUG?: string } }).env;
 const browserDebugEnabled = Boolean(appEnv?.DEV || appEnv?.VITE_DUNE_DEBUG === "1");
-
-const resources: Array<{ id: ResourceId; label: string; Icon: LucideIcon }> = [
-  { id: "solari", label: "Solari", Icon: CircleDollarSign },
-  { id: "spice", label: "Spice", Icon: Sparkles },
-  { id: "water", label: "Water", Icon: Droplets },
-];
-
-const tradeGoods: Array<{ id: TradeGoodId; label: string; Icon: LucideIcon }> = [
-  ...resources,
-  { id: "intrigue", label: "Intrigue", Icon: Eye },
-];
-
-const factionShortLabels: Record<FactionId, string> = {
-  emperor: "EMP",
-  spacing: "SG",
-  bene: "BG",
-  fremen: "FRE",
-  greatHouses: "GH",
-  fringeWorlds: "FW",
-};
-
-const shaddamSignetInfluenceFactions: FactionId[] = ["emperor", "greatHouses", "spacing", "bene", "fringeWorlds"];
-
-type ChangeAllegiancesSelection = Partial<{
-  loseFaction: FactionId;
-  shiftGainFaction: FactionId;
-  spiceGainFaction: FactionId;
-}>;
-
-function memoryCountLabel(count: number) {
-  return `${count} ${count === 1 ? "memory" : "memories"}`;
-}
-
-function troopSupplyLabel(count: number) {
-  return `${count} supply ${count === 1 ? "troop" : "troops"}`;
-}
-
-function selectedFactionChoice(selected: FactionId | undefined, choices: FactionId[]) {
-  return selected && choices.includes(selected) ? selected : choices[0];
-}
-
-export function revealPersuasionFor(player: Player) {
-  const highCouncilPersuasion = player.highCouncilSeat ? 2 : 0;
-  return player.hand.reduce((sum, card) => sum + card.persuasion, 0) + highCouncilPersuasion;
-}
-
-export function boardSpaceIntrigueGainFor(space: BoardSpace, player: Player) {
-  return boardSpaceRewardApplies(space, player) ? space.gain?.intrigue ?? 0 : 0;
-}
-
-function boardSpaceSpiceGainFor(space: BoardSpace, player: Player, bonusSpice: number, deferMakerChoice: boolean) {
-  const printedSpice = boardSpaceRewardApplies(space, player)
-    ? deferMakerChoice && space.makerWorms ? 0 : space.gain?.spice ?? 0
-    : 0;
-  return printedSpice + bonusSpice;
-}
-
-export function pendingLocksTableState(action: PendingAction | undefined) {
-  return action?.kind === "maker-choice" ||
-    action?.kind === "sietch-tabr" ||
-    action?.kind === "desert-call" ||
-    action?.kind === "control-defense";
-}
-
-export function tableStateLockedByPendingActions(state: Pick<GameState, "pendingAction" | "pendingQueue">) {
-  return pendingLocksTableState(state.pendingAction) || state.pendingQueue.some(pendingLocksTableState);
-}
 
 export default function App() {
   const [game, setGame] = useState<GameState>(() => initialGame());
@@ -3912,30 +3881,4 @@ export default function App() {
       </section>
     </main>
   );
-}
-
-function costLabel(cost?: Partial<Resources>) {
-  if (!cost || Object.keys(cost).length === 0) return "Free";
-  return Object.entries(cost)
-    .map(([key, value]) => `${value} ${key}`)
-    .join(", ");
-}
-
-function resourceChoiceLabel(amount: number, resource: ResourceId) {
-  const label = resource === "solari" ? "Solari" : resource;
-  return amount === 1 ? label : `${amount} ${label}`;
-}
-
-function addResources(resources: Resources, gain: Partial<Resources>) {
-  const next = { ...resources };
-  Object.entries(gain).forEach(([key, value]) => {
-    next[key as ResourceId] += value ?? 0;
-  });
-  return next;
-}
-
-function revealGainLabel(gain: Partial<Resources>) {
-  const entries = Object.entries(gain).filter(([, value]) => (value ?? 0) > 0);
-  if (entries.length === 0) return "";
-  return ` and gains ${entries.map(([key, value]) => `${value} ${key}`).join(", ")}`;
 }

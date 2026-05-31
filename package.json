@@ -11,6 +11,8 @@
     "debug:browser": "node scripts/browser-debug.mjs",
     "debug:browser:headed": "node scripts/browser-debug.mjs --headed --keep-open",
     "debug:browser:manual": "node scripts/browser-debug.mjs --headed --keep-open --scenario manual",
+    "debug:game": "node scripts/browser-debug.mjs --headed --keep-open --scenario manual --out artifacts/qa/browser-debug-manual",
+    "debug:game:smoke": "node scripts/browser-debug.mjs --scenario manual --capture-smoke --out artifacts/qa/browser-debug-manual-smoke --no-trace",
     "sync:cards": "node scripts/sync-dune-catalog.mjs",
     "sync:card-images": "node scripts/sync-dune-catalog.mjs --download-images",
     "verify:alliances": "node scripts/verify-alliances.mjs",

@@ -107,11 +107,17 @@ pnpm run debug:browser
 pnpm run debug:browser -- --scenario control-defense
 pnpm run debug:browser:headed -- --scenario all
 pnpm run debug:browser:manual
+pnpm run debug:game
+pnpm run debug:game:smoke
 ```
 
-The default debug run starts a local Vite server, drives scripted Playwright scenarios, and writes screenshots, per-capture game state, console logs, request failures, a Playwright trace, and `summary.json` under `artifacts/qa/browser-debug`. Use the headed command to watch the scripted scenarios.
+The default debug run starts a local Vite server, drives scripted Playwright scenarios, and writes screenshots, per-capture game state, `console.json`, `request-failures.json`, `<scenario>-trace.zip`, and `summary.json` under `artifacts/qa/browser-debug`. Use the headed command to watch the scripted scenarios.
 
-Use `pnpm run debug:browser:manual` when you need to play the table in a browser. It keeps Chromium open with the same artifact pipeline; while it is running, press `Ctrl+Shift+S` or `Cmd+Shift+S` to capture the current full-page screenshot and game state, or run `window.__DUNE_DEBUG__.capture("descriptive-label")` from the browser console. Stop it with `Ctrl+C`; the harness writes the final screenshot, console log, request failures, trace, and `summary.json` before shutting down.
+The Codex in-app browser (`iab`) is optional. If it is not exposed in the current Codex session, use the repo-owned Playwright pipeline: `pnpm run debug:game` starts a headed Chromium session with a deterministic playable game and writes artifacts under `artifacts/qa/browser-debug-manual`.
+
+Use `pnpm run debug:game` or `pnpm run debug:browser:manual` when you need to play the table in a browser. While it is running, press `Ctrl+Shift+S` or `Cmd+Shift+S` to capture the current full-page screenshot and game state, or run `window.__DUNE_DEBUG__.capture("descriptive-label")` from the browser console. The harness writes `manual-ready.png` and `manual-ready.state.json` at startup, hotkey captures as `manual-capture-###[-label].png` with matching `.state.json` files, and `manual-final.png`, `manual-final.state.json`, `console.json`, `request-failures.json`, `manual-trace.zip`, and `summary.json` after `Ctrl+C`.
+
+Use `pnpm run debug:game:smoke` to verify the manual capture bridge without keeping a browser open. It exits after writing `manual-ready.png`, `manual-ready.state.json`, `manual-capture-001-smoke-label-with-punctuation-and-enough-length-t.png`, its matching `.state.json`, `console.json`, `request-failures.json`, and `summary.json`.
 
 ## Asset Policy
 

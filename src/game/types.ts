@@ -162,6 +162,7 @@ export type Player = {
   hand: Card[];
   discard: Card[];
   playArea: Card[];
+  manipulatedCards: Card[];
   intrigues: IntrigueCard[];
   agentsReady: number;
   agentsTotal: number;

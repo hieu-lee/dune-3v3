@@ -75,6 +75,7 @@ import {
   isImpressIntrigue,
   isInspireAweIntrigue,
   isIntelligenceReportIntrigue,
+  isManipulateIntrigue,
   isMarketOpportunityIntrigue,
   isMercenariesIntrigue,
   isOpportunismIntrigue,
@@ -90,6 +91,7 @@ import {
   isUnexpectedAlliesIntrigue,
   isWeirdingCombatIntrigue,
   loseInfluenceForPending,
+  manipulateAcquisitionCost,
   maybeStartCombatPhase,
   passCombatIntrigue,
   pendingActionForCard,
@@ -131,6 +133,7 @@ import {
   playImperiumPoliticsPlotIntrigue,
   playInspireAwePlotIntrigue,
   playIntelligenceReportPlotIntrigue,
+  playManipulatePlotIntrigue,
   playMarketOpportunityPlotIntrigue,
   playMercenariesPlotIntrigue,
   playOpportunismPlotIntrigue,
@@ -500,7 +503,9 @@ export default function App() {
   function buyCard(card: Card) {
     if (game.phase !== "playing") return;
     if (game.pendingAction || game.pendingQueue.length > 0) return;
-    if (!activePlayer.revealed || activePlayer.persuasion < (card.cost ?? 0)) return;
+    const manipulatedCard = activePlayer.manipulatedCards.some((candidate) => candidate.id === card.id);
+    const cardCost = manipulatedCard ? manipulateAcquisitionCost(card) : card.cost ?? 0;
+    if (!activePlayer.revealed || activePlayer.persuasion < cardCost) return;
     setGame((current) => {
       const buyer = current.players[current.activeSeat];
       const callToArmsRecruitOwnerId =
@@ -941,6 +946,10 @@ export default function App() {
       const sandwormOwnerId = player.role === "Commander" ? activatedAllyIdFor(player, current.players) : undefined;
       return playInspireAwePlotIntrigue(current, player.id, intrigueId, sandwormOwnerId);
     });
+  }
+
+  function playManipulatePlot(intrigueId: string, cardId: string) {
+    setGame((current) => playManipulatePlotIntrigue(current, current.players[current.activeSeat].id, intrigueId, cardId));
   }
 
   function playCunningPlot(intrigueId: string, choice: "draw" | "paid-trash") {
@@ -2574,6 +2583,7 @@ export default function App() {
                   const inspireAweToHand =
                     activePlayer.deployedSandworms > 0 ||
                     (activePlayer.role === "Commander" && activatedAlly.deployedSandworms > 0);
+                  const manipulateChoices = isManipulateIntrigue(card) ? game.imperiumRow : [];
                   const councilorsAmbitionCanPlay = activePlayer.highCouncilSeat;
                   const strategicStockpilingCanSpice = activePlayer.resources.spice >= 5;
                   const strategicStockpilingCanWater =
@@ -2646,6 +2656,8 @@ export default function App() {
                             ? `Plot / draw ${intelligenceReportDrawCount}`
                           : isInspireAweIntrigue(card)
                             ? `Plot / acquire <=3${inspireAweToHand ? " to hand" : ""}`
+                          : isManipulateIntrigue(card)
+                            ? "Plot / row replace + discount"
                           : isCunningIntrigue(card)
                             ? "Plot / draw or pay to trash"
                           : isSietchRitualIntrigue(card)
@@ -2757,6 +2769,23 @@ export default function App() {
                           <BookOpen size={14} />
                           Acquire &lt;=3{inspireAweToHand ? " to Hand" : ""}
                         </button>
+                      )}
+                      {isManipulateIntrigue(card) && (
+                        <div className="intrigue-actions">
+                          {manipulateChoices.map((rowCard) => (
+                            <button
+                              type="button"
+                              key={rowCard.id}
+                              onClick={() => playManipulatePlot(card.id, rowCard.id)}
+                              disabled={plotIntrigueLocked}
+                              title={`Remove ${rowCard.name} from the Imperium Row and discount it by 1 this round`}
+                            >
+                              <BookOpen size={14} />
+                              Remove {rowCard.name}
+                            </button>
+                          ))}
+                          {manipulateChoices.length === 0 && <span>No Imperium Row cards to remove.</span>}
+                        </div>
                       )}
                       {isCunningIntrigue(card) && (
                         <div className="intrigue-actions">
@@ -3239,24 +3268,29 @@ export default function App() {
             <strong className="persuasion">{activePlayer.persuasion} persuasion</strong>
           </div>
           <div className="market-row">
-            {[...game.imperiumRow, ...game.reserveMarket].map((card) => (
-              <button
-                type="button"
-                className="market-card"
-                key={card.id}
-                onClick={() => buyCard(card)}
-                disabled={!playingPhase || pendingLocked || !activePlayer.revealed || activePlayer.persuasion < (card.cost ?? 0)}
-              >
-                {card.thumbnailPath && <img className="card-art" src={card.thumbnailPath} alt="" loading="lazy" />}
-                <span>
-                  {card.cost} persuasion
-                  {card.acquired ? ` - ${card.acquired} VP` : ""}
-                  {(card.conditionalPersuasion || card.conditionalSwords) ? " - printed reveal" : ""}
-                </span>
-                <strong>{card.name}</strong>
-                <p>{card.conditionalPersuasion || card.conditionalSwords ? "Resolve the printed reveal text on the card." : card.reveal}</p>
-              </button>
-            ))}
+            {[...game.imperiumRow, ...game.reserveMarket, ...activePlayer.manipulatedCards].map((card) => {
+              const manipulatedCard = activePlayer.manipulatedCards.some((candidate) => candidate.id === card.id);
+              const cardCost = manipulatedCard ? manipulateAcquisitionCost(card) : card.cost ?? 0;
+              return (
+                <button
+                  type="button"
+                  className="market-card"
+                  key={card.id}
+                  onClick={() => buyCard(card)}
+                  disabled={!playingPhase || pendingLocked || !activePlayer.revealed || activePlayer.persuasion < cardCost}
+                >
+                  {card.thumbnailPath && <img className="card-art" src={card.thumbnailPath} alt="" loading="lazy" />}
+                  <span>
+                    {cardCost} persuasion
+                    {manipulatedCard ? " - Manipulate" : ""}
+                    {card.acquired ? ` - ${card.acquired} VP` : ""}
+                    {(card.conditionalPersuasion || card.conditionalSwords) ? " - printed reveal" : ""}
+                  </span>
+                  <strong>{card.name}</strong>
+                  <p>{card.conditionalPersuasion || card.conditionalSwords ? "Resolve the printed reveal text on the card." : card.reveal}</p>
+                </button>
+              );
+            })}
           </div>
           {game.throneRow.length > 0 && (
             <section className="throne-market">

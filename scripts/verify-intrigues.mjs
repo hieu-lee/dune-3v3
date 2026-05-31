@@ -88,6 +88,7 @@ try {
   const callToArms = data.intrigueCards.find((card) => card.sourceId === 138);
   const shaddamsFavor = data.intrigueCards.find((card) => card.sourceId === 141);
   const intelligenceReport = data.intrigueCards.find((card) => card.sourceId === 142);
+  const manipulate = data.intrigueCards.find((card) => card.sourceId === 143);
   const cunning = data.intrigueCards.find((card) => card.sourceId === 133);
   const sietchRitual = data.intrigueCards.find((card) => card.sourceId === 127);
   const opportunism = data.intrigueCards.find((card) => card.sourceId === 134);
@@ -115,6 +116,7 @@ try {
   assert.ok(callToArms, "Call to Arms Intrigue should be available");
   assert.ok(shaddamsFavor, "Shaddam's Favor Intrigue should be available");
   assert.ok(intelligenceReport, "Intelligence Report Intrigue should be available");
+  assert.ok(manipulate, "Manipulate Intrigue should be available");
   assert.ok(cunning, "Cunning Intrigue should be available");
   assert.ok(sietchRitual, "Sietch Ritual Intrigue should be available");
   assert.ok(opportunism, "Opportunism Intrigue should be available");
@@ -173,6 +175,11 @@ try {
     intelligenceReport.summary,
     "Draw 1 card; draw 1 more if you have two or more spies on the board.",
     "Intelligence Report should expose its conditional card draw",
+  );
+  assert.equal(
+    manipulate.summary,
+    "Remove and replace a card in the Imperium Row; during your Reveal turn this round, you may acquire it for 1 Persuasion less.",
+    "Manipulate should expose its row removal and Reveal discount effect",
   );
   assert.equal(
     cunning.summary,
@@ -309,6 +316,113 @@ try {
     state.playPlotBattleIconIntrigue(plotFixture, "p2", mercenaries.id),
     plotFixture,
     "Non-battle-icon Intrigues should not use the Plot battle-icon scorer",
+  );
+
+  const manipulateRowCard = data.imperiumDeck.find((card) => (card.cost ?? 0) > 0) ?? data.imperiumDeck[0];
+  const manipulateReplacement = data.imperiumDeck.find((card) => card.id !== manipulateRowCard?.id);
+  assert.ok(manipulateRowCard, "Expected an Imperium Row card for Manipulate");
+  assert.ok(manipulateReplacement, "Expected an Imperium Row replacement card for Manipulate");
+  const manipulateFixture = {
+    ...game,
+    activeSeat: game.players.findIndex((candidate) => candidate.id === "p2"),
+    imperiumRow: [manipulateRowCard],
+    marketDeck: [manipulateReplacement],
+    pendingAction: undefined,
+    pendingQueue: [],
+    intrigueDiscard: [],
+    players: game.players.map((candidate) =>
+      candidate.id === "p2"
+        ? { ...candidate, discard: [], manipulatedCards: [], intrigues: [manipulate] }
+        : { ...candidate, manipulatedCards: [], intrigues: [] },
+    ),
+  };
+  assert.equal(
+    state.isManipulateIntrigue(manipulate),
+    true,
+    "Manipulate should be recognized as a structured Plot Intrigue",
+  );
+  const manipulated = state.playManipulatePlotIntrigue(
+    manipulateFixture,
+    "p2",
+    manipulate.id,
+    manipulateRowCard.id,
+  );
+  assert.deepEqual(manipulated.imperiumRow.map((card) => card.id), [manipulateReplacement.id]);
+  assert.deepEqual(playerById(manipulated, "p2").manipulatedCards.map((card) => card.id), [manipulateRowCard.id]);
+  assert.deepEqual(playerById(manipulated, "p2").intrigues, []);
+  assert.equal(manipulated.intrigueDiscard.at(-1).id, manipulate.id);
+  assert.match(manipulated.log[0], /plays Manipulate, removes .* from the Imperium Row/);
+  const manipulatedReveal = {
+    ...manipulated,
+    players: manipulated.players.map((candidate) =>
+      candidate.id === "p2"
+        ? { ...candidate, revealed: true, persuasion: state.manipulateAcquisitionCost(manipulateRowCard) }
+        : candidate,
+    ),
+  };
+  const manipulatedBought = state.acquireMarketCard(manipulatedReveal, "p2", manipulateRowCard.id);
+  assert.equal(playerById(manipulatedBought, "p2").discard.at(-1).id, manipulateRowCard.id);
+  assert.equal(playerById(manipulatedBought, "p2").persuasion, 0, "Manipulate acquisition should spend the discounted cost");
+  assert.deepEqual(playerById(manipulatedBought, "p2").manipulatedCards, []);
+  assert.deepEqual(manipulatedBought.imperiumRow.map((card) => card.id), [manipulateReplacement.id]);
+  const manipulatedCallToArms = {
+    ...manipulatedReveal,
+    players: manipulatedReveal.players.map((candidate) =>
+      candidate.id === "p2"
+        ? { ...candidate, callToArmsActive: true, garrison: 2 }
+        : candidate,
+    ),
+  };
+  const manipulatedCallToArmsBought = state.acquireMarketCard(manipulatedCallToArms, "p2", manipulateRowCard.id);
+  assert.equal(playerById(manipulatedCallToArmsBought, "p2").garrison, 3, "Call to Arms should recruit on Manipulate acquisition");
+  const manipulatedSkipped = state.finishRevealTurn(
+    {
+      ...manipulated,
+      players: manipulated.players.map((candidate) =>
+        candidate.id === "p2" ? { ...candidate, revealed: true, agentsReady: 0 } : candidate,
+      ),
+    },
+    "p2",
+  );
+  assert.deepEqual(playerById(manipulatedSkipped, "p2").manipulatedCards, [], "Reveal cleanup should clear unbought Manipulate cards");
+  assert.equal(
+    state.playManipulatePlotIntrigue(manipulateFixture, "p2", manipulate.id, "missing-card"),
+    manipulateFixture,
+    "Manipulate should reject cards outside the Imperium Row",
+  );
+  const pendingManipulate = {
+    ...manipulateFixture,
+    pendingAction: { kind: "spy", ownerId: "p2", remaining: 1, source: "Test" },
+  };
+  assert.equal(
+    state.playManipulatePlotIntrigue(pendingManipulate, "p2", manipulate.id, manipulateRowCard.id),
+    pendingManipulate,
+    "Manipulate should wait for pending actions to resolve",
+  );
+  const queuedManipulate = {
+    ...manipulateFixture,
+    pendingQueue: [{ kind: "spy", ownerId: "p2", remaining: 1, source: "Test" }],
+  };
+  assert.equal(
+    state.playManipulatePlotIntrigue(queuedManipulate, "p2", manipulate.id, manipulateRowCard.id),
+    queuedManipulate,
+    "Manipulate should wait for queued pending actions to resolve",
+  );
+  assert.equal(
+    state.playManipulatePlotIntrigue(manipulateFixture, "p3", manipulate.id, manipulateRowCard.id),
+    manipulateFixture,
+    "Only the active player should play Manipulate",
+  );
+  assert.equal(
+    state.playManipulatePlotIntrigue(manipulateFixture, "p2", mercenaries.id, manipulateRowCard.id),
+    manipulateFixture,
+    "Manipulate should reject other Intrigue cards",
+  );
+  const combatManipulate = { ...manipulateFixture, phase: "combat" };
+  assert.equal(
+    state.playManipulatePlotIntrigue(combatManipulate, "p2", manipulate.id, manipulateRowCard.id),
+    combatManipulate,
+    "Manipulate should only resolve during normal play",
   );
 
   const contingencyFixture = {

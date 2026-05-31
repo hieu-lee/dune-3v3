@@ -62,6 +62,7 @@ const intrigueSummariesByCatalogId: Partial<Record<number, string>> = {
   132: "Spend 2 spice to recruit 3 troops; with 3+ Fremen/Fringe Influence, draw 1 card.",
   133: "Draw 1 card OR spend 1 spice to draw 1 card and trash 1 card.",
   134: "Spend 2 Solari and lose 2 Influence to gain 1 VP.",
+  143: "Remove and replace a card in the Imperium Row; during your Reveal turn this round, you may acquire it for 1 Persuasion less.",
   135: "Lose 1 Influence to gain 1 Influence; you may also spend 3 spice to gain 1 Influence.",
   136: "Place 1 spy on a City observation post OR recall 1 spy to remove the Shield Wall and gain 2 spice.",
   131: "Remove the Shield Wall OR deploy up to four troops from your garrison to the Conflict.",

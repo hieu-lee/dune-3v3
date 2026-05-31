@@ -64,6 +64,7 @@ const imperiumPoliticsSourceId = 140;
 const callToArmsSourceId = 138;
 const shaddamsFavorSourceId = 141;
 const intelligenceReportSourceId = 142;
+const manipulateSourceId = 143;
 const councilorsAmbitionSourceId = 129;
 const marketOpportunitySourceId = 145;
 const contingencyPlanSourceId = 147;
@@ -239,6 +240,10 @@ export function isContingencyPlanIntrigue(intrigue: IntrigueCard) {
 
 export function isIntelligenceReportIntrigue(intrigue: IntrigueCard) {
   return intrigue.sourceId === intelligenceReportSourceId;
+}
+
+export function isManipulateIntrigue(intrigue: IntrigueCard) {
+  return intrigue.sourceId === manipulateSourceId;
 }
 
 export function isInspireAweIntrigue(intrigue: IntrigueCard) {
@@ -446,6 +451,7 @@ function makePlayer(
     hand: [],
     discard: [],
     playArea: [],
+    manipulatedCards: [],
     intrigues: [],
     agentsReady: 2,
     agentsTotal: 2,
@@ -1249,8 +1255,8 @@ type DesertCallPendingAction = Extract<PendingAction, { kind: "desert-call" }>;
 type ThreatenSpiceProductionPendingAction = Extract<PendingAction, { kind: "threaten-spice-production" }>;
 type ShaddamSignetRingPendingAction = Extract<PendingAction, { kind: "shaddam-signet-ring" }>;
 
-function addPurchasedCard(player: Player, card: Card, fromReserve: boolean): Player {
-  return addAcquiredCard(player, card, fromReserve, "discard", card.cost ?? 0);
+export function manipulateAcquisitionCost(card: Card) {
+  return Math.max(0, (card.cost ?? 0) - 1);
 }
 
 function addAcquiredCard(
@@ -1312,8 +1318,11 @@ export function acquireMarketCard(
   const throneCard = state.throneRow.find((card) => card.id === cardId);
   const rowIndex = state.imperiumRow.findIndex((card) => card.id === cardId);
   const rowCard = rowIndex >= 0 ? state.imperiumRow[rowIndex] : undefined;
-  const card = reserveCard ?? throneCard ?? rowCard;
-  if (!card || buyer.persuasion < (card.cost ?? 0)) return state;
+  const manipulatedIndex = buyer.manipulatedCards.findIndex((card) => card.id === cardId);
+  const manipulatedCard = manipulatedIndex >= 0 ? buyer.manipulatedCards[manipulatedIndex] : undefined;
+  const card = reserveCard ?? throneCard ?? rowCard ?? manipulatedCard;
+  const persuasionCost = manipulatedCard ? manipulateAcquisitionCost(manipulatedCard) : card?.cost ?? 0;
+  if (!card || buyer.persuasion < persuasionCost) return state;
   if (throneCard && buyer.team !== "shaddam") return state;
 
   const fromReserve = Boolean(reserveCard);
@@ -1331,7 +1340,15 @@ export function acquireMarketCard(
   const recruitOwner = callToArmsRecruit.owner;
   const players = state.players.map((player) => {
     let next = player;
-    if (player.id === buyer.id) next = addPurchasedCard(next, card, fromReserve);
+    if (player.id === buyer.id) {
+      if (manipulatedCard) {
+        next = {
+          ...next,
+          manipulatedCards: next.manipulatedCards.filter((candidate) => candidate.id !== manipulatedCard.id),
+        };
+      }
+      next = addAcquiredCard(next, card, fromReserve, "discard", persuasionCost);
+    }
     if (recruitOwner && player.id === recruitOwner.id) next = { ...next, garrison: next.garrison + 1 };
     return next;
   });
@@ -2474,6 +2491,49 @@ export function playContingencyPlanPlotIntrigue(
   };
 }
 
+export function playManipulatePlotIntrigue(
+  state: GameState,
+  playerId: string,
+  intrigueId: string,
+  cardId: string,
+): GameState {
+  if (state.phase !== "playing" || state.pendingAction || state.pendingQueue.length > 0) return state;
+  const player = state.players[state.activeSeat];
+  if (!player || player.id !== playerId) return state;
+  const intrigue = player.intrigues.find((card) => card.id === intrigueId);
+  if (!intrigue || !isManipulateIntrigue(intrigue)) return state;
+
+  const rowIndex = state.imperiumRow.findIndex((card) => card.id === cardId);
+  const manipulatedCard = state.imperiumRow[rowIndex];
+  if (!manipulatedCard) return state;
+  const [replacement, ...marketDeck] = state.marketDeck;
+  const imperiumRow = state.imperiumRow.flatMap((candidate, index) => {
+    if (index !== rowIndex) return [candidate];
+    return replacement ? [replacement] : [];
+  });
+  const players = state.players.map((candidate) =>
+    candidate.id === player.id
+      ? {
+          ...candidate,
+          manipulatedCards: [...candidate.manipulatedCards, manipulatedCard],
+          intrigues: candidate.intrigues.filter((card) => card.id !== intrigue.id),
+        }
+      : candidate,
+  );
+
+  return {
+    ...state,
+    players,
+    imperiumRow,
+    marketDeck,
+    intrigueDiscard: [...state.intrigueDiscard, intrigue],
+    log: [
+      `${player.leader} plays Manipulate, removes ${manipulatedCard.name} from the Imperium Row, and may acquire it for 1 Persuasion less this round.`,
+      ...state.log,
+    ],
+  };
+}
+
 export function playInspireAwePlotIntrigue(
   state: GameState,
   playerId: string,
@@ -3589,8 +3649,8 @@ function clearRevealTurnEffects(state: GameState): GameState {
     ...state,
     conflictDeploymentBlock: undefined,
     players: state.players.map((player) =>
-      player.callToArmsActive || player.revealActivatedAllyId
-        ? { ...player, callToArmsActive: false, revealActivatedAllyId: undefined }
+      player.callToArmsActive || player.revealActivatedAllyId || player.manipulatedCards.length > 0
+        ? { ...player, callToArmsActive: false, revealActivatedAllyId: undefined, manipulatedCards: [] }
         : player,
     ),
   };
@@ -3605,7 +3665,7 @@ export function finishRevealTurn(state: GameState, playerId: string): GameState 
     conflictDeploymentBlock: undefined,
     players: state.players.map((candidate) =>
       candidate.id === player.id
-        ? { ...candidate, callToArmsActive: false, revealActivatedAllyId: undefined }
+        ? { ...candidate, callToArmsActive: false, revealActivatedAllyId: undefined, manipulatedCards: [] }
         : candidate,
     ),
   };
@@ -4977,6 +5037,7 @@ export function startNextRound(state: GameState): GameState {
         hand: [],
         discard: [...player.discard, ...player.playArea, ...player.hand],
         playArea: [],
+        manipulatedCards: [],
       },
       5,
     ),

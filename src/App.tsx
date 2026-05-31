@@ -16,8 +16,9 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { Fragment, type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { BoardPanel } from "./components/BoardPanel";
+import { PlayerColumn } from "./components/PlayerColumn";
 import { TableSidebar } from "./components/TableSidebar";
 import {
   addResources,
@@ -74,7 +75,7 @@ import {
   isWeirdingCombatIntrigue,
 } from "./game/card-identifiers";
 import { conflictProtectedByShieldWall, criticalLocationNames } from "./game/critical-locations";
-import { battleIconLabels, boardSpaces, factionIds, factionLabels, iconLabels, teams } from "./game/data";
+import { battleIconLabels, boardSpaces, factionLabels, iconLabels, teams } from "./game/data";
 import {
   acquirableCardsForPending,
   acquireCardForPending,
@@ -128,7 +129,6 @@ import {
   pendingActionForSietchTabr,
   pendingActionsFor,
   pendingActionForSpace,
-  playerDoublesConflictRewards,
   playerTroopSupply,
   playCombatIntrigue,
   placeSpyForPending,
@@ -144,7 +144,6 @@ import {
   resolveConflictTie,
   scoreEndgameBattleIconIntrigue,
   scoreEndgameConditionalIntrigue,
-  canHaveMakerHooks,
   canPayConflictVpConversion,
   adjustThreatenSpiceProductionContribution,
   conflictVpConversionSpyChoices,
@@ -1602,137 +1601,14 @@ export default function App() {
           onSelectSpace={setSelectedSpaceId}
         />
 
-        <aside className="player-column">
-          {game.players.map((player, index) => (
-            <article
-              className={`player-card ${index === game.activeSeat ? "active" : ""}`}
-              key={player.id}
-              style={{ "--player": player.color } as CSSProperties}
-            >
-              <div className="player-identity">
-                {player.leaderCard.thumbnailPath && (
-                  <button
-                    className="leader-art-button"
-                    type="button"
-                    onClick={(event) => openLeaderReference(player.id, event.currentTarget)}
-                    aria-label={`View ${player.leader} leader card`}
-                    title={`View ${player.leader} leader card`}
-                  >
-                    <img className="leader-art" src={player.leaderCard.thumbnailPath} alt="" loading="eager" />
-                  </button>
-                )}
-                <div className="player-topline">
-                  <span>{player.name}</span>
-                  <strong>{player.leader}</strong>
-                  <small>{player.role} - {teams[player.team].name}</small>
-                </div>
-              </div>
-              <div className="resource-row">
-                {resources.map(({ id, label, Icon }) => (
-                  <span key={id} title={label}>
-                    <Icon size={14} />
-                    {player.resources[id]}
-                  </span>
-                ))}
-              </div>
-              <div className="mini-stats">
-                <span>{player.agentsReady}/{player.agentsTotal} {player.role === "Commander" ? "activations" : "agents"}</span>
-                <span>{player.garrison} garrison</span>
-                {player.deployedTroops > 0 && <span>{player.deployedTroops} deployed</span>}
-                {player.deployedSandworms > 0 && <span>{player.deployedSandworms} worms</span>}
-                {game.conflict && playerDoublesConflictRewards(player) && (
-                  <span
-                    className="sandworm-reward-chip"
-                    role="note"
-                    aria-label="Double printed Conflict-card rewards. Battle icons and location control are not doubled."
-                    title="Double printed Conflict-card rewards. Battle icons and location control are not doubled."
-                  >
-                    2x printed rewards only
-                  </span>
-                )}
-                <span>{player.conflict} strength</span>
-                {player.highCouncilSeat && <span>High Council</span>}
-                {player.makerHooks && <span>Maker Hooks</span>}
-                {player.jessicaMemories > 0 && <span>{memoryCountLabel(player.jessicaMemories)}</span>}
-                <span>{player.spies} spies</span>
-                <span>{player.intrigues.length} intrigue</span>
-                <span>{player.contracts.length} contracts</span>
-                {player.wonConflicts.length > 0 && <span>{player.wonConflicts.length} conflicts</span>}
-                {player.reservedContracts.length > 0 && <span>{player.reservedContracts.length} reserved</span>}
-              </div>
-              {player.objectives.length > 0 && (
-                <div className="objective-row">
-                  {player.objectives.map((objective) => (
-                    <span className={objective.scored ? "scored" : ""} key={objective.id} title={objective.name}>
-                      {battleIconLabels[objective.battleIcon]}
-                      {objective.firstPlayer ? " - first" : ""}
-                    </span>
-                  ))}
-                </div>
-              )}
-              {player.wonConflicts.length > 0 && (
-                <div className="objective-row conflict-supply-row">
-                  {player.wonConflicts.map((conflict) => (
-                    <span className={conflict.scored ? "scored" : ""} key={conflict.id} title={conflict.name}>
-                      {battleIconLabels[conflict.battleIcon]}
-                    </span>
-                  ))}
-                </div>
-              )}
-              <div className="alliance-status-row" aria-label={`${player.leader} alliance tokens`}>
-                {factionIds.map((faction) => {
-                  const ownsAlliance = game.alliances[faction] === player.id;
-                  return (
-                    <label className={ownsAlliance ? "selected" : ""} key={faction} title={`${factionLabels[faction]} Alliance`}>
-                      <input
-                        type="checkbox"
-                        checked={ownsAlliance}
-                        aria-label={`${factionLabels[faction]} Alliance`}
-                        onChange={(event) => updateAllianceOwner(player.id, faction, event.currentTarget.checked)}
-                      />
-                      <span>{factionShortLabels[faction]}</span>
-                    </label>
-                  );
-                })}
-              </div>
-              {canHaveMakerHooks(player) && (
-                <div className="alliance-status-row" aria-label={`${player.leader} Maker Hooks`}>
-                  <label
-                    className={[player.makerHooks ? "selected" : "", tableStateLockedByPending ? "disabled" : ""]
-                      .filter(Boolean)
-                      .join(" ")}
-                    title="Maker Hooks"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={player.makerHooks}
-                      disabled={tableStateLockedByPending}
-                      aria-label="Maker Hooks"
-                      onChange={(event) => updateMakerHooks(player.id, event.currentTarget.checked)}
-                    />
-                    <span>Hooks</span>
-                  </label>
-                </div>
-              )}
-              {player.contracts.length > 0 && (
-                <div className="contract-status-row">
-                  {player.contracts.map((contract) => (
-                    <label className={contract.completed ? "completed" : ""} key={contract.card.id} title={contract.card.name}>
-                      <input
-                        type="checkbox"
-                        checked={contract.completed}
-                        onChange={(event) =>
-                          updateContractCompleted(player.id, contract.card.id, event.currentTarget.checked)
-                        }
-                      />
-                      <span>{contract.card.name}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
-            </article>
-          ))}
-        </aside>
+        <PlayerColumn
+          game={game}
+          tableStateLockedByPending={tableStateLockedByPending}
+          onOpenLeaderReference={openLeaderReference}
+          onAllianceOwnerChange={updateAllianceOwner}
+          onMakerHooksChange={updateMakerHooks}
+          onContractCompletedChange={updateContractCompleted}
+        />
       </section>
 
       {selectedLeader && (

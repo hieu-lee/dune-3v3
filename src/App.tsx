@@ -61,6 +61,8 @@ import {
   influenceLossChoices,
   influenceLossPairChoices,
   influenceLossOptions,
+  irulanSignetAcquireCards,
+  irulanSignetTrashableCards,
   isBackedByChoamIntrigue,
   isBuyAccessIntrigue,
   isCallToArmsIntrigue,
@@ -156,7 +158,9 @@ import {
   resolveDemandAttentionChoice,
   resolveDemandResultsChoice,
   resolveDesertCallChoice,
+  resolveIrulanSignetRingChoice,
   resolveMakerChoice,
+  resolvePrincessIrulanBirthright,
   resolveSietchTabrChoice,
   resolveShaddamSignetRingChoice,
   scoreGurneyAlwaysSmiling,
@@ -178,7 +182,7 @@ import {
   skipTrashCard,
   startNextRound,
   takeChoamContract,
-  trashableCards,
+  trashableCardsForPending,
   trashPlayerCard,
   transferTradeGood,
   threatenSpiceProductionContributionTotal,
@@ -186,7 +190,7 @@ import {
   buyAccessPairChoices,
 } from "./game/state";
 import type { BoardSpace, Card, FactionId, GameState, PendingAction, Player, ResourceId, Resources, TeamId, TradeGoodId, TrashCardZone } from "./game/types";
-import type { BuyAccessChoice, ChangeAllegiancesChoice, CombatIntrigueChoice, ImperiumPoliticsChoice, InfluenceLossPair, ShaddamSignetRingChoice, SietchRitualChoice, SpecialMissionChoice } from "./game/state";
+import type { BuyAccessChoice, ChangeAllegiancesChoice, CombatIntrigueChoice, ImperiumPoliticsChoice, InfluenceLossPair, IrulanSignetRingChoice, ShaddamSignetRingChoice, SietchRitualChoice, SpecialMissionChoice } from "./game/state";
 
 const resources: Array<{ id: ResourceId; label: string; Icon: LucideIcon }> = [
   { id: "solari", label: "Solari", Icon: CircleDollarSign },
@@ -433,9 +437,10 @@ export default function App() {
         ].filter((entry): entry is string => Boolean(entry)),
       };
       const intrigueGain = boardSpaceIntrigueGainFor(selectedSpace, player);
+      const birthrightState = resolvePrincessIrulanBirthright(nextState, current.players);
       const resolvedState = intrigueGain > 0
-        ? drawIntrigueCards(nextState, source.id, intrigueGain, selectedSpace.name)
-        : nextState;
+        ? drawIntrigueCards(birthrightState, source.id, intrigueGain, selectedSpace.name)
+        : birthrightState;
       return spiceGain > 0 ? recordTurnSpiceGain(resolvedState, source.id, spiceGain) : resolvedState;
     });
     setSelectedCardId(null);
@@ -727,6 +732,15 @@ export default function App() {
       const pending = current.pendingAction;
       if (!pending || pending.kind !== "shaddam-signet-ring") return current;
       return maybeStartCombatPhase(resolveShaddamSignetRingChoice(current, pending, choice));
+    });
+  }
+
+  function chooseIrulanSignet(choice: IrulanSignetRingChoice) {
+    if (game.pendingAction?.kind !== "irulan-signet-ring") return;
+    setGame((current) => {
+      const pending = current.pendingAction;
+      if (!pending || pending.kind !== "irulan-signet-ring") return current;
+      return maybeStartCombatPhase(resolveIrulanSignetRingChoice(current, pending, choice));
     });
   }
 
@@ -1274,7 +1288,16 @@ export default function App() {
     pendingAction?.kind === "throne-row" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingTrashOwner =
     pendingAction?.kind === "trash-card" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
-  const pendingTrashChoices = pendingTrashOwner ? trashableCards(pendingTrashOwner) : [];
+  const pendingTrashChoices =
+    pendingAction?.kind === "trash-card" && pendingTrashOwner
+      ? trashableCardsForPending(pendingTrashOwner, pendingAction)
+      : [];
+  const pendingIrulanSignetOwner =
+    pendingAction?.kind === "irulan-signet-ring" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
+  const pendingIrulanSignetAcquireCards =
+    pendingAction?.kind === "irulan-signet-ring" ? irulanSignetAcquireCards(game, pendingAction) : [];
+  const pendingIrulanSignetTrashChoices =
+    pendingAction?.kind === "irulan-signet-ring" ? irulanSignetTrashableCards(game, pendingAction) : [];
   const pendingRecallSpyOwner =
     pendingAction?.kind === "recall-spy" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingRecallSpyRecipient =
@@ -2032,6 +2055,7 @@ export default function App() {
                 {pendingAction.kind === "sietch-tabr" && `${pendingSietchLabel ?? "Player"} Sietch Tabr`}
                 {pendingAction.kind === "commander-resource-split" && `${pendingResourceSplitCommander?.leader ?? "Commander"} ${pendingAction.source}`}
                 {pendingAction.kind === "shaddam-signet-ring" && `${pendingShaddamSignetCommander?.leader ?? "Shaddam"} Emperor of the Known Universe`}
+                {pendingAction.kind === "irulan-signet-ring" && `${pendingIrulanSignetOwner?.leader ?? "Princess Irulan"} Chronicler's Insight`}
                 {pendingAction.kind === "command-respect" && `${pendingCommandRespectCommander?.leader ?? "Muad'Dib"} Command Respect`}
                 {pendingAction.kind === "demand-results" && `${pendingDemandResultsCommander?.leader ?? "Shaddam"} Demand Results`}
                 {pendingAction.kind === "corrino-might" && `${pendingCorrinoMightCommander?.leader ?? "Shaddam"} Corrino Might`}
@@ -2264,6 +2288,34 @@ export default function App() {
                   <span>Emperor of the Known Universe can no longer resolve with the current table state.</span>
                 )}
                 <button type="button" onClick={() => chooseShaddamSignet("skip")}>Skip</button>
+              </div>
+            )}
+
+            {pendingAction.kind === "irulan-signet-ring" && (
+              <div className="pending-controls">
+                {pendingIrulanSignetOwner ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => chooseIrulanSignet("acquire")}
+                      disabled={pendingIrulanSignetAcquireCards.length === 0}
+                    >
+                      <BookOpen size={15} />
+                      Acquire cost-1 card to hand
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => chooseIrulanSignet("trash")}
+                      disabled={pendingIrulanSignetTrashChoices.length === 0}
+                    >
+                      <X size={15} />
+                      Trash hand card
+                    </button>
+                  </>
+                ) : (
+                  <span>Chronicler's Insight can no longer resolve with the current table state.</span>
+                )}
+                <button type="button" onClick={() => chooseIrulanSignet("skip")}>Skip</button>
               </div>
             )}
 

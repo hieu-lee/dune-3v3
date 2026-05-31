@@ -106,6 +106,12 @@ const shadowAllianceFactions: FactionId[] = [
 const influenceVictoryPointThreshold = 2;
 const gurneyHalleckLeaderName = "Gurney Halleck";
 const gurneyAlwaysSmilingThreshold = 10;
+const princessIrulanLeaderName = "Princess Irulan";
+const irulanBirthrightFaction: FactionId = "greatHouses";
+const irulanBirthrightThreshold = 2;
+const irulanSignetAcquireCost = 1;
+const irulanSignetTrashRewardCost = 1;
+const irulanSignetTrashRewardSpice = 2;
 export const threatenSpiceProductionCost = 7;
 export const corrinoMightCost = 3;
 
@@ -128,6 +134,7 @@ export type ImperiumPoliticsChoice = "greatHouses" | "emperor" | "spacing";
 export type StrategicStockpilingChoice = "spice" | "water" | "both";
 export type MarketOpportunityChoice = "spice-to-solari" | "solari-to-spice";
 export type ShaddamSignetRingChoice = "skip" | "troop" | { kind: "influence"; faction: FactionId };
+export type IrulanSignetRingChoice = "skip" | "acquire" | "trash";
 
 const shaddamSignetRingTroopCost = 1;
 const shaddamSignetRingInfluenceCost = 3;
@@ -799,6 +806,34 @@ export function adjustInfluence(player: Player, faction: FactionId, amount: numb
   };
 }
 
+function reachesPrincessIrulanBirthright(previous: Player, next: Player) {
+  return (
+    previous.leader === princessIrulanLeaderName &&
+    next.leader === princessIrulanLeaderName &&
+    previous.influence[irulanBirthrightFaction] < irulanBirthrightThreshold &&
+    next.influence[irulanBirthrightFaction] >= irulanBirthrightThreshold
+  );
+}
+
+export function resolvePrincessIrulanBirthright(state: GameState, previousPlayers: Player[]): GameState {
+  return previousPlayers.reduce((nextState, previous) => {
+    const current = nextState.players.find((player) => player.id === previous.id);
+    if (!current || !reachesPrincessIrulanBirthright(previous, current)) return nextState;
+    const previousLog = nextState.log;
+    const drawnState = drawIntrigueCards(nextState, current.id, 1, "Imperial Birthright");
+    const addedLogCount = drawnState.log.length - previousLog.length;
+    if (previousLog.length === 0 || addedLogCount <= 0) return drawnState;
+    return {
+      ...drawnState,
+      log: [
+        previousLog[0],
+        ...drawnState.log.slice(0, addedLogCount),
+        ...previousLog.slice(1),
+      ],
+    };
+  }, state);
+}
+
 export function iconCanReach(
   card: Card,
   space: BoardSpace,
@@ -1110,6 +1145,22 @@ export function pendingActionForCard(
     };
   }
   if (
+    isGenericSignetRingCard(card) &&
+    source.leader === princessIrulanLeaderName &&
+    source.role === "Ally" &&
+    source.playArea.some((candidate) => candidate.id === card.id && isGenericSignetRingCard(candidate))
+  ) {
+    const pending: IrulanSignetRingPendingAction = {
+      kind: "irulan-signet-ring",
+      ownerId: source.id,
+      cardId: card.id,
+      source: "Chronicler's Insight",
+    };
+    const canAcquire = state ? irulanSignetAcquireCards(state, pending).length > 0 : false;
+    const canTrash = state ? irulanSignetTrashableCards(state, pending).length > 0 : source.hand.length > 0;
+    return canAcquire || canTrash ? pending : undefined;
+  }
+  if (
     isDesertCallCommanderCard(card) &&
     source.team === "muaddib" &&
     source.role === "Commander" &&
@@ -1337,9 +1388,33 @@ type DemandAttentionPendingAction = Extract<PendingAction, { kind: "demand-atten
 type DesertCallPendingAction = Extract<PendingAction, { kind: "desert-call" }>;
 type ThreatenSpiceProductionPendingAction = Extract<PendingAction, { kind: "threaten-spice-production" }>;
 type ShaddamSignetRingPendingAction = Extract<PendingAction, { kind: "shaddam-signet-ring" }>;
+type IrulanSignetRingPendingAction = Extract<PendingAction, { kind: "irulan-signet-ring" }>;
 
 export function manipulateAcquisitionCost(card: Card) {
   return Math.max(0, (card.cost ?? 0) - 1);
+}
+
+export function irulanSignetAcquirePending(ownerId: string): AcquireCardPendingAction {
+  return {
+    kind: "acquire-card",
+    ownerId,
+    source: "Chronicler's Insight",
+    minCost: irulanSignetAcquireCost,
+    maxCost: irulanSignetAcquireCost,
+    destination: "hand",
+  };
+}
+
+function irulanSignetTrashPending(ownerId: string): TrashCardPendingAction {
+  return {
+    kind: "trash-card",
+    ownerId,
+    source: "Chronicler's Insight",
+    optional: false,
+    zones: ["hand"],
+    spiceRewardCostThreshold: irulanSignetTrashRewardCost,
+    spiceReward: irulanSignetTrashRewardSpice,
+  };
 }
 
 function addAcquiredCard(
@@ -1580,12 +1655,25 @@ export function takeChoamContract(state: GameState, pending: ContractPendingActi
 export function acquirableCardsForPending(state: GameState, pending: AcquireCardPendingAction) {
   const owner = state.players.find((player) => player.id === pending.ownerId);
   if (!owner) return [];
-  const affordable = (card: Card) => (card.cost ?? 0) <= pending.maxCost;
+  const minCost = pending.minCost ?? 0;
+  const affordable = (card: Card) => {
+    const cost = card.cost ?? 0;
+    return cost >= minCost && cost <= pending.maxCost;
+  };
   return [
     ...state.imperiumRow.filter(affordable),
     ...state.reserveMarket.filter(affordable),
     ...(owner.team === "shaddam" ? state.throneRow.filter(affordable) : []),
   ];
+}
+
+export function irulanSignetAcquireCards(state: GameState, pending: IrulanSignetRingPendingAction) {
+  return acquirableCardsForPending(state, irulanSignetAcquirePending(pending.ownerId));
+}
+
+export function irulanSignetTrashableCards(state: GameState, pending: IrulanSignetRingPendingAction) {
+  const owner = state.players.find((player) => player.id === pending.ownerId);
+  return owner ? trashableCardsForPending(owner, irulanSignetTrashPending(owner.id)) : [];
 }
 
 export function acquireCardForPending(
@@ -1602,7 +1690,9 @@ export function acquireCardForPending(
   const rowIndex = state.imperiumRow.findIndex((card) => card.id === cardId);
   const rowCard = rowIndex >= 0 ? state.imperiumRow[rowIndex] : undefined;
   const card = reserveCard ?? throneCard ?? rowCard;
-  if (!card || (card.cost ?? 0) > pending.maxCost) return state;
+  const minCost = pending.minCost ?? 0;
+  const cardCost = card?.cost ?? 0;
+  if (!card || cardCost < minCost || cardCost > pending.maxCost) return state;
 
   const [replacement, ...marketDeckAfterDraw] = state.marketDeck;
   const marketDeck = rowCard ? marketDeckAfterDraw : state.marketDeck;
@@ -1980,6 +2070,11 @@ export function trashableCards(player: Player) {
   );
 }
 
+export function trashableCardsForPending(player: Player, pending: TrashCardPendingAction) {
+  const zones = pending.zones ?? (["hand", "discard", "playArea"] as TrashCardZone[]);
+  return trashableCards(player).filter(({ zone }) => zones.includes(zone));
+}
+
 export function trashPlayerCard(
   state: GameState,
   pending: TrashCardPendingAction,
@@ -1988,20 +2083,36 @@ export function trashPlayerCard(
 ): GameState {
   const owner = state.players.find((player) => player.id === pending.ownerId);
   if (!owner) return { ...state, ...advancePendingAction(state) };
+  if (pending.zones && !pending.zones.includes(zone)) return state;
   const cards = cardsForTrashZone(owner, zone);
   const card = cards.find((candidate) => candidate.id === cardId);
   if (!card) return state;
+  const spiceReward =
+    pending.spiceReward &&
+    (card.cost ?? 0) >= (pending.spiceRewardCostThreshold ?? 0)
+      ? pending.spiceReward
+      : 0;
   const players = state.players.map((player) =>
     player.id === owner.id
-      ? updateTrashZone(player, zone, cards.filter((candidate) => candidate.id !== card.id))
+      ? {
+          ...updateTrashZone(player, zone, cards.filter((candidate) => candidate.id !== card.id)),
+          resources: {
+            ...player.resources,
+            spice: player.resources.spice + spiceReward,
+          },
+        }
       : player,
   );
-  return {
+  const nextState = {
     ...state,
     players,
     ...advancePendingAction(state),
-    log: [`${owner.leader} trashes ${card.name} from ${pending.source}.`, ...state.log],
+    log: [
+      `${owner.leader} trashes ${card.name} from ${pending.source}${spiceReward > 0 ? ` and gains ${spiceReward} spice` : ""}.`,
+      ...state.log,
+    ],
   };
+  return recordTurnSpiceGain(nextState, owner.id, spiceReward);
 }
 
 export function skipTrashCard(state: GameState, pending: TrashCardPendingAction): GameState {
@@ -3042,12 +3153,13 @@ export function playChangeAllegiancesPlotIntrigue(
       ? `${player.leader} plays Change Allegiances; ${lossOwner?.leader ?? player.leader} loses 1 ${factionLabels[choice.loseFaction]} Influence and ${gainText}.`
       : `${player.leader} plays Change Allegiances; ${lossOwner?.leader ?? player.leader} loses 1 ${factionLabels[choice.loseFaction]} Influence, ${player.leader} spends 3 spice, and ${gainText}.`;
 
-  return {
+  const nextState = {
     ...state,
     players,
     intrigueDiscard: [...state.intrigueDiscard, intrigue],
     log: [logEntry, ...state.log],
   };
+  return resolvePrincessIrulanBirthright(nextState, state.players);
 }
 
 export function playSpecialMissionPlotIntrigue(
@@ -3193,7 +3305,7 @@ export function playImperiumPoliticsPlotIntrigue(
   const influenceText = influenceOwner.id === player.id
     ? "gains"
     : `${influenceOwner.leader} gains`;
-  return {
+  const nextState = {
     ...state,
     players,
     intrigueDiscard: [...state.intrigueDiscard, intrigue],
@@ -3202,6 +3314,7 @@ export function playImperiumPoliticsPlotIntrigue(
       ...state.log,
     ],
   };
+  return resolvePrincessIrulanBirthright(nextState, state.players);
 }
 
 export function playBuyAccessPlotIntrigue(
@@ -3257,7 +3370,7 @@ export function playBuyAccessPlotIntrigue(
         return `${owner?.leader ?? "the activated Ally"} gains 1 ${factionLabels[effect.faction]} Influence`;
       })
       .join(" and ");
-  return {
+  const nextState = {
     ...state,
     players,
     intrigueDiscard: [...state.intrigueDiscard, intrigue],
@@ -3266,6 +3379,7 @@ export function playBuyAccessPlotIntrigue(
       ...state.log,
     ],
   };
+  return resolvePrincessIrulanBirthright(nextState, state.players);
 }
 
 export function playDepartForArrakisPlotIntrigue(
@@ -4344,7 +4458,7 @@ export function resolveShaddamSignetRingChoice(
   }
   const influenceOwnerId = choice.faction === "emperor" ? commander.id : ally.id;
   const influenceOwner = influenceOwnerId === commander.id ? commander : ally;
-  return {
+  const nextState = {
     ...state,
     players: state.players.map((player) => {
       if (player.id === commander.id) {
@@ -4366,6 +4480,47 @@ export function resolveShaddamSignetRingChoice(
       `${commander.leader} spends 3 Solari for ${pending.source}: ${influenceOwner.leader} gains 1 ${factionLabels[choice.faction]} Influence.`,
       ...state.log,
     ],
+  };
+  return resolvePrincessIrulanBirthright(nextState, state.players);
+}
+
+export function resolveIrulanSignetRingChoice(
+  state: GameState,
+  pending: IrulanSignetRingPendingAction,
+  choice: IrulanSignetRingChoice,
+): GameState {
+  const owner = state.players.find((player) => player.id === pending.ownerId);
+  if (
+    !owner ||
+    owner.leader !== princessIrulanLeaderName ||
+    owner.role !== "Ally" ||
+    !owner.playArea.some((card) => card.id === pending.cardId && isGenericSignetRingCard(card))
+  ) {
+    return state;
+  }
+
+  if (choice === "skip") {
+    return {
+      ...state,
+      ...advancePendingAction(state),
+      log: [`${owner.leader} declines ${pending.source}.`, ...state.log],
+    };
+  }
+
+  if (choice === "acquire") {
+    if (irulanSignetAcquireCards(state, pending).length === 0) return state;
+    return {
+      ...state,
+      pendingAction: irulanSignetAcquirePending(owner.id),
+      log: [`${owner.leader} chooses the acquisition branch for ${pending.source}.`, ...state.log],
+    };
+  }
+
+  if (irulanSignetTrashableCards(state, pending).length === 0) return state;
+  return {
+    ...state,
+    pendingAction: irulanSignetTrashPending(owner.id),
+    log: [`${owner.leader} chooses the trash branch for ${pending.source}.`, ...state.log],
   };
 }
 

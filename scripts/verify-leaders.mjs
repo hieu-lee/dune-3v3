@@ -79,6 +79,7 @@ try {
   }
 
   const [muadDib, shaddamAlly, muadDibAllyA, emperor] = game.players;
+  const irulan = playerById(game, "p6");
   const gurneySeat = game.players.findIndex((player) => player.id === muadDibAllyA.id);
   assert.notEqual(gurneySeat, -1, "Expected Gurney's active seat");
   const muadDibSignet = data.muadDibCommanderCards.find((card) => card.name === "Signet Ring");
@@ -86,11 +87,15 @@ try {
   const emperorSignet = data.emperorCommanderCards.find((card) => card.name === "Signet Ring");
   const detonation = data.intrigueCards.find((card) => card.sourceId === 131);
   const unexpectedAllies = data.intrigueCards.find((card) => card.sourceId === 137);
+  const costOneImperiumCard = data.imperiumDeck.find((card) => card.cost === 1);
+  const intrigueCard = data.intrigueCards[0];
   assert.ok(muadDibSignet, "Muad'Dib Commander deck should include Signet Ring");
   assert.ok(allySignet, "Ally starter deck should include Signet Ring");
   assert.ok(emperorSignet, "Emperor Commander deck should include Signet Ring");
   assert.ok(detonation, "Detonation should exist for Shaddam deployment-block regression");
   assert.ok(unexpectedAllies, "Unexpected Allies should exist for Shaddam deployment-block regression");
+  assert.ok(costOneImperiumCard, "Verifier needs a cost-1 Imperium card");
+  assert.ok(intrigueCard, "Verifier needs an Intrigue card");
   assert.equal(
     state.isMuadDibSignetRingCard(muadDibSignet),
     true,
@@ -247,6 +252,221 @@ try {
   );
   const jessicaSignet = state.applyCardAgentEffect(allySignet, game.players[4], game.players[4]);
   assert.equal(jessicaSignet.source.garrison, game.players[4].garrison, "Generic Signet should not recruit for a non-Gurney Ally");
+
+  const freeImperiumCard = {
+    ...costOneImperiumCard,
+    id: `${costOneImperiumCard.id}-free-regression`,
+    name: "Free Regression",
+    cost: 0,
+  };
+  const replacementImperiumCard = {
+    ...costOneImperiumCard,
+    id: `${costOneImperiumCard.id}-replacement-regression`,
+    name: "Replacement Regression",
+    cost: 2,
+  };
+  const irulanSignetOwner = {
+    ...irulan,
+    hand: [],
+    playArea: [allySignet],
+  };
+  const irulanSignetState = {
+    ...game,
+    imperiumRow: [freeImperiumCard, costOneImperiumCard],
+    marketDeck: [replacementImperiumCard],
+    reserveMarket: [],
+    throneRow: [],
+    players: game.players.map((player) => (player.id === irulan.id ? irulanSignetOwner : player)),
+  };
+  const irulanSignetPending = state.pendingActionForCard(
+    allySignet,
+    irulanSignetOwner,
+    irulanSignetState,
+    irulanSignetOwner,
+    arrakeen,
+  );
+  assert.deepEqual(irulanSignetPending, {
+    kind: "irulan-signet-ring",
+    ownerId: irulan.id,
+    cardId: allySignet.id,
+    source: "Chronicler's Insight",
+  });
+  assert.deepEqual(
+    state.irulanSignetAcquireCards(irulanSignetState, irulanSignetPending).map((card) => card.id),
+    [costOneImperiumCard.id],
+    "Chronicler's Insight should acquire exactly cost-1 cards, not cost-0 cards",
+  );
+  const irulanAcquireChoice = state.resolveIrulanSignetRingChoice(
+    { ...irulanSignetState, pendingAction: irulanSignetPending, pendingQueue: [] },
+    irulanSignetPending,
+    "acquire",
+  );
+  assert.deepEqual(irulanAcquireChoice.pendingAction, {
+    kind: "acquire-card",
+    ownerId: irulan.id,
+    source: "Chronicler's Insight",
+    minCost: 1,
+    maxCost: 1,
+    destination: "hand",
+  });
+  const blockedFreeAcquire = state.acquireCardForPending(
+    irulanAcquireChoice,
+    irulanAcquireChoice.pendingAction,
+    freeImperiumCard.id,
+  );
+  assert.equal(
+    playerById(blockedFreeAcquire, irulan.id).hand.some((card) => card.id === freeImperiumCard.id),
+    false,
+    "Chronicler's Insight resolver should reject cost-0 cards",
+  );
+  assert.deepEqual(
+    blockedFreeAcquire.pendingAction,
+    irulanAcquireChoice.pendingAction,
+    "Rejected Chronicler's Insight acquisition should keep the pending action unresolved",
+  );
+  const irulanAcquired = state.acquireCardForPending(
+    irulanAcquireChoice,
+    irulanAcquireChoice.pendingAction,
+    costOneImperiumCard.id,
+  );
+  assert.equal(
+    playerById(irulanAcquired, irulan.id).hand.some((card) => card.id === costOneImperiumCard.id),
+    true,
+    "Chronicler's Insight should acquire the cost-1 card to Irulan's hand",
+  );
+  assert.equal(
+    playerById(irulanAcquired, irulan.id).hand.some((card) => card.id === freeImperiumCard.id),
+    false,
+    "Chronicler's Insight should not acquire cost-0 cards",
+  );
+
+  const trashCostOneCard = { ...costOneImperiumCard, id: `${costOneImperiumCard.id}-trash-cost-one`, cost: 1 };
+  const trashFreeCard = { ...costOneImperiumCard, id: `${costOneImperiumCard.id}-trash-free`, name: "Free Trash", cost: 0 };
+  const trashDiscardCard = { ...costOneImperiumCard, id: `${costOneImperiumCard.id}-trash-discard`, cost: 1 };
+  const irulanTrashOwner = {
+    ...irulan,
+    resources: { ...irulan.resources, spice: 0 },
+    hand: [trashCostOneCard, trashFreeCard],
+    discard: [trashDiscardCard],
+    playArea: [allySignet],
+  };
+  const irulanTrashState = {
+    ...game,
+    pendingAction: irulanSignetPending,
+    pendingQueue: [],
+    turnSpiceGains: {},
+    players: game.players.map((player) => (player.id === irulan.id ? irulanTrashOwner : player)),
+  };
+  const irulanTrashChoice = state.resolveIrulanSignetRingChoice(irulanTrashState, irulanSignetPending, "trash");
+  assert.equal(irulanTrashChoice.pendingAction.kind, "trash-card", "Chronicler's Insight should queue a trash-card pending action");
+  assert.deepEqual(irulanTrashChoice.pendingAction.zones, ["hand"], "Chronicler's Insight should only trash from hand");
+  assert.deepEqual(
+    state.trashableCardsForPending(playerById(irulanTrashChoice, irulan.id), irulanTrashChoice.pendingAction)
+      .map(({ zone, card }) => `${zone}:${card.id}`),
+    [`hand:${trashCostOneCard.id}`, `hand:${trashFreeCard.id}`],
+    "Chronicler's Insight trash choices should exclude discard and play area cards",
+  );
+  const blockedDiscardTrash = state.trashPlayerCard(
+    irulanTrashChoice,
+    irulanTrashChoice.pendingAction,
+    "discard",
+    trashDiscardCard.id,
+  );
+  assert.equal(
+    playerById(blockedDiscardTrash, irulan.id).discard.length,
+    1,
+    "Chronicler's Insight should reject non-hand trash targets",
+  );
+  const freeTrash = state.trashPlayerCard(irulanTrashChoice, irulanTrashChoice.pendingAction, "hand", trashFreeCard.id);
+  assert.equal(playerById(freeTrash, irulan.id).resources.spice, 0, "Trashing a cost-0 card should not pay Irulan spice");
+  assert.equal(freeTrash.turnSpiceGains[irulan.id] ?? 0, 0, "Cost-0 Irulan trash should not count as a spice gain");
+  const paidTrash = state.trashPlayerCard(irulanTrashChoice, irulanTrashChoice.pendingAction, "hand", trashCostOneCard.id);
+  assert.equal(playerById(paidTrash, irulan.id).resources.spice, 2, "Trashing a cost-1 card should pay Irulan 2 spice");
+  assert.equal(paidTrash.turnSpiceGains[irulan.id], 2, "Irulan's trash reward should count as a spice gain this turn");
+
+  const irulanBirthrightBase = {
+    ...game,
+    intrigueDeck: [intrigueCard],
+    intrigueDiscard: [],
+    players: game.players.map((player) =>
+      player.id === irulan.id
+        ? { ...player, influence: { ...player.influence, greatHouses: 1 }, intrigues: [] }
+        : player,
+    ),
+  };
+  const irulanBirthrightReached = state.resolvePrincessIrulanBirthright(
+    {
+      ...irulanBirthrightBase,
+      players: irulanBirthrightBase.players.map((player) =>
+        player.id === irulan.id ? state.adjustInfluence(player, "greatHouses", 1) : player,
+      ),
+    },
+    irulanBirthrightBase.players,
+  );
+  assert.equal(playerById(irulanBirthrightReached, irulan.id).influence.greatHouses, 2, "Irulan should reach Great Houses 2 Influence");
+  assert.equal(playerById(irulanBirthrightReached, irulan.id).vp, irulan.vp + 1, "Irulan should still score the 2-Influence VP");
+  assert.equal(playerById(irulanBirthrightReached, irulan.id).intrigues.length, 1, "Imperial Birthright should draw one Intrigue at 2 Great Houses Influence");
+  const irulanBirthrightNoRepeatBase = {
+    ...irulanBirthrightBase,
+    intrigueDeck: [intrigueCard],
+    players: irulanBirthrightBase.players.map((player) =>
+      player.id === irulan.id
+        ? { ...player, influence: { ...player.influence, greatHouses: 2 }, intrigues: [] }
+        : player,
+    ),
+  };
+  const irulanBirthrightNoRepeat = state.resolvePrincessIrulanBirthright(
+    {
+      ...irulanBirthrightNoRepeatBase,
+      players: irulanBirthrightNoRepeatBase.players.map((player) =>
+        player.id === irulan.id ? state.adjustInfluence(player, "greatHouses", 1) : player,
+      ),
+    },
+    irulanBirthrightNoRepeatBase.players,
+  );
+  assert.equal(playerById(irulanBirthrightNoRepeat, irulan.id).intrigues.length, 0, "Imperial Birthright should not trigger at 2 -> 3 Influence");
+  const irulanBirthrightDropped = state.resolvePrincessIrulanBirthright(
+    {
+      ...irulanBirthrightNoRepeatBase,
+      players: irulanBirthrightNoRepeatBase.players.map((player) =>
+        player.id === irulan.id ? state.adjustInfluence(player, "greatHouses", -1) : player,
+      ),
+    },
+    irulanBirthrightNoRepeatBase.players,
+  );
+  const irulanBirthrightRegained = state.resolvePrincessIrulanBirthright(
+    {
+      ...irulanBirthrightDropped,
+      intrigueDeck: [intrigueCard],
+      players: irulanBirthrightDropped.players.map((player) =>
+        player.id === irulan.id ? state.adjustInfluence(player, "greatHouses", 1) : player,
+      ),
+    },
+    irulanBirthrightDropped.players,
+  );
+  assert.equal(playerById(irulanBirthrightRegained, irulan.id).intrigues.length, 1, "Imperial Birthright should trigger again after Irulan drops below 2 and regains it");
+  const shaddamPersonalBirthrightBase = {
+    ...game,
+    intrigueDeck: [intrigueCard],
+    intrigueDiscard: [],
+    players: game.players.map((player) =>
+      player.id === emperor.id
+        ? { ...player, influence: { ...player.influence, emperor: 1 } }
+        : player.id === irulan.id
+          ? { ...player, intrigues: [] }
+          : player,
+    ),
+  };
+  const shaddamPersonalBirthright = state.resolvePrincessIrulanBirthright(
+    {
+      ...shaddamPersonalBirthrightBase,
+      players: shaddamPersonalBirthrightBase.players.map((player) =>
+        player.id === emperor.id ? state.adjustInfluence(player, "emperor", 1) : player,
+      ),
+    },
+    shaddamPersonalBirthrightBase.players,
+  );
+  assert.equal(playerById(shaddamPersonalBirthright, irulan.id).intrigues.length, 0, "Shaddam reaching personal Emperor 2 should not trigger Irulan");
 
   const gurneyRevealBase = {
     ...game,
@@ -629,6 +849,43 @@ try {
   );
   assert.equal(playerById(personalEmperorChoice, emperor.id).vp, emperor.vp + 1, "Shaddam personal Influence can score the 2-Influence VP");
   assert.equal(playerById(personalEmperorChoice, shaddamAlly.id).influence.emperor, 0, "Activated Ally should not take personal Emperor Influence");
+  const irulanShaddamSignetPending = {
+    kind: "shaddam-signet-ring",
+    commanderId: emperor.id,
+    allyId: irulan.id,
+    cardId: emperorSignet.id,
+    source: "Emperor of the Known Universe",
+  };
+  const irulanShaddamSignetBase = {
+    ...signetResolutionBase,
+    pendingAction: irulanShaddamSignetPending,
+    intrigueDeck: [intrigueCard],
+    intrigueDiscard: [],
+    players: signetResolutionBase.players.map((player) => {
+      if (player.id === emperor.id) {
+        return { ...player, resources: { ...player.resources, solari: 3 }, playArea: [emperorSignet] };
+      }
+      if (player.id === irulan.id) {
+        return { ...player, influence: { ...player.influence, greatHouses: 1 }, intrigues: [] };
+      }
+      return player;
+    }),
+  };
+  const irulanShaddamSignetBirthright = state.resolveShaddamSignetRingChoice(
+    irulanShaddamSignetBase,
+    irulanShaddamSignetPending,
+    { kind: "influence", faction: "greatHouses" },
+  );
+  assert.equal(
+    playerById(irulanShaddamSignetBirthright, irulan.id).influence.greatHouses,
+    2,
+    "Shaddam Signet should route Great Houses Influence to activated Irulan",
+  );
+  assert.equal(
+    playerById(irulanShaddamSignetBirthright, irulan.id).intrigues.length,
+    1,
+    "Commander-routed Great Houses Influence should trigger Irulan's Imperial Birthright",
+  );
   const skippedSignet = state.resolveShaddamSignetRingChoice(signetResolutionBase, shaddamSignetPending, "skip");
   assert.equal(playerById(skippedSignet, emperor.id).resources.solari, 3, "Skipping Shaddam Signet should not spend Solari");
   assert.equal(playerById(skippedSignet, shaddamAlly.id).garrison, 0, "Skipping Shaddam Signet should not recruit troops");

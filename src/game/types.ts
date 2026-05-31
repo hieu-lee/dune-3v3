@@ -244,6 +244,9 @@ export type PendingAction =
       ownerId: string;
       source: string;
       optional: boolean;
+      zones?: TrashCardZone[];
+      spiceRewardCostThreshold?: number;
+      spiceReward?: number;
     }
   | {
       kind: "reveal-adjust";
@@ -265,6 +268,7 @@ export type PendingAction =
       kind: "acquire-card";
       ownerId: string;
       source: string;
+      minCost?: number;
       maxCost: number;
       destination: "discard" | "hand";
       optional?: boolean;
@@ -354,6 +358,12 @@ export type PendingAction =
       kind: "shaddam-signet-ring";
       commanderId: string;
       allyId: string;
+      cardId: string;
+      source: string;
+    }
+  | {
+      kind: "irulan-signet-ring";
+      ownerId: string;
       cardId: string;
       source: string;
     }

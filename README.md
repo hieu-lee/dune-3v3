@@ -21,6 +21,7 @@ Private web-table implementation for a six-player `Dune: Imperium - Uprising` te
 - Muad'Dib's Signet Ring resolves Lead the Way by drawing 1 card for Muad'Dib.
 - Shaddam's Signet Ring resolves Emperor of the Known Universe, blocking same-turn Conflict deployment and queuing the Solari troop/Influence choice.
 - Gurney Halleck's Warmaster Signet recruits 1 troop, and Always Smiling scores 1 VP on his Reveal turn at 10+ Conflict strength.
+- Princess Irulan's Imperial Birthright draws an Intrigue when she reaches Great Houses 2 Influence in 3v3 mode, and Chronicler's Insight queues her exact cost-1 acquisition or hand-trash Signet choice.
 - Command Respect lets Swordmaster Muad'Dib trash the card to trade with one Muad'Dib Ally.
 - Demand Attention lets Muad'Dib spend 4 Solari to upgrade a faction visit to two Influence for the board-effect recipient.
 - Desert Call lets Muad'Dib spend 1 water to summon a sandworm for the activated hooked Ally, then trash the card.

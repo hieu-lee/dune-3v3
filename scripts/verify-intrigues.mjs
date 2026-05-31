@@ -83,6 +83,7 @@ try {
   const crysknife = data.intrigueCards.find((card) => card.sourceId === 159);
   const strategicStockpiling = data.intrigueCards.find((card) => card.sourceId === 130);
   const detonation = data.intrigueCards.find((card) => card.sourceId === 131);
+  const departForArrakis = data.intrigueCards.find((card) => card.sourceId === 132);
   const unexpectedAllies = data.intrigueCards.find((card) => card.sourceId === 137);
   const callToArms = data.intrigueCards.find((card) => card.sourceId === 138);
   const shaddamsFavor = data.intrigueCards.find((card) => card.sourceId === 141);
@@ -101,6 +102,7 @@ try {
   assert.ok(crysknife, "Crysknife Intrigue should be available");
   assert.ok(strategicStockpiling, "Strategic Stockpiling Intrigue should be available");
   assert.ok(detonation, "Detonation Intrigue should be available");
+  assert.ok(departForArrakis, "Depart For Arrakis Intrigue should be available");
   assert.ok(unexpectedAllies, "Unexpected Allies Intrigue should be available");
   assert.ok(callToArms, "Call to Arms Intrigue should be available");
   assert.ok(shaddamsFavor, "Shaddam's Favor Intrigue should be available");
@@ -125,6 +127,11 @@ try {
     detonation.summary,
     "Remove the Shield Wall OR deploy up to four troops from your garrison to the Conflict.",
     "Detonation should expose its printed Plot choice instead of a generic imported-image summary",
+  );
+  assert.equal(
+    departForArrakis.summary,
+    "Spend 2 spice to recruit 3 troops; with 3+ Fremen/Fringe Influence, draw 1 card.",
+    "Depart For Arrakis should expose its spice troop cost and conditional card draw",
   );
   assert.equal(
     unexpectedAllies.summary,
@@ -379,6 +386,230 @@ try {
     intelligenceWrongCardFixture,
     "Intelligence Report should reject other Intrigue cards",
   );
+
+  const departFixture = {
+    ...game,
+    activeSeat: game.players.findIndex((candidate) => candidate.id === "p2"),
+    pendingAction: undefined,
+    pendingQueue: [],
+    intrigueDiscard: [],
+    players: game.players.map((candidate) =>
+      candidate.id === "p2"
+        ? {
+            ...candidate,
+            resources: { ...candidate.resources, spice: 2 },
+            influence: { ...candidate.influence, fringeWorlds: 3 },
+            hand: [],
+            deck: candidate.deck.slice(0, 3),
+            discard: [],
+            garrison: 1,
+            intrigues: [departForArrakis],
+          }
+        : { ...candidate, intrigues: [] },
+    ),
+  };
+  assert.equal(
+    state.isDepartForArrakisIntrigue(departForArrakis),
+    true,
+    "Depart For Arrakis should be recognized as a structured Plot Intrigue",
+  );
+  const departDraw = state.playDepartForArrakisPlotIntrigue(departFixture, "p2", departForArrakis.id, "draw");
+  assert.equal(playerById(departDraw, "p2").hand.length, 1, "Depart For Arrakis draw branch should draw 1 card");
+  assert.equal(playerById(departDraw, "p2").resources.spice, 2, "Depart For Arrakis draw branch should not spend spice");
+  assert.equal(playerById(departDraw, "p2").garrison, 1, "Depart For Arrakis draw branch should not recruit troops");
+  assert.deepEqual(playerById(departDraw, "p2").intrigues, []);
+  assert.equal(departDraw.intrigueDiscard.at(-1).id, departForArrakis.id);
+  assert.match(departDraw.log[0], /plays Depart For Arrakis, draws 1 card/);
+  const departBoth = state.playDepartForArrakisPlotIntrigue(departFixture, "p2", departForArrakis.id, "spend-spice");
+  assert.equal(playerById(departBoth, "p2").hand.length, 1, "Depart For Arrakis should draw when the Fremen/Fringe threshold is met");
+  assert.equal(playerById(departBoth, "p2").resources.spice, 0, "Depart For Arrakis should spend 2 spice");
+  assert.equal(playerById(departBoth, "p2").garrison, 4, "Depart For Arrakis should recruit 3 troops");
+  assert.equal(playerById(departBoth, "p2").conflict, 0, "Depart For Arrakis should not deploy recruited troops");
+  assert.equal(playerById(departBoth, "p2").deployedTroops, 0, "Depart For Arrakis should not move troops to the Conflict");
+  assert.match(departBoth.log[0], /draws 1 card, spends 2 spice and recruits 3 troops/);
+  const departTroopsOnlyFixture = {
+    ...departFixture,
+    players: departFixture.players.map((candidate) =>
+      candidate.id === "p2"
+        ? {
+            ...candidate,
+            influence: { ...candidate.influence, fremen: 3, fringeWorlds: 0 },
+            hand: [],
+            deck: candidate.deck.slice(0, 3),
+            resources: { ...candidate.resources, spice: 2 },
+            garrison: 1,
+            intrigues: [departForArrakis],
+          }
+        : candidate,
+    ),
+  };
+  assert.equal(
+    state.playDepartForArrakisPlotIntrigue(departTroopsOnlyFixture, "p2", departForArrakis.id, "draw"),
+    departTroopsOnlyFixture,
+    "Depart For Arrakis should use Fringe Worlds, not an Ally's personal Fremen track, for the draw threshold",
+  );
+  const departTroopsOnly = state.playDepartForArrakisPlotIntrigue(
+    departTroopsOnlyFixture,
+    "p2",
+    departForArrakis.id,
+    "spend-spice",
+  );
+  assert.equal(playerById(departTroopsOnly, "p2").hand.length, 0, "Depart For Arrakis should allow the troop branch without draw eligibility");
+  assert.equal(playerById(departTroopsOnly, "p2").resources.spice, 0);
+  assert.equal(playerById(departTroopsOnly, "p2").garrison, 4);
+  assert.match(departTroopsOnly.log[0], /spends 2 spice and recruits 3 troops/);
+  const poorDepart = {
+    ...departFixture,
+    players: departFixture.players.map((candidate) =>
+      candidate.id === "p2"
+        ? { ...candidate, resources: { ...candidate.resources, spice: 1 }, intrigues: [departForArrakis] }
+        : candidate,
+    ),
+  };
+  assert.equal(
+    state.playDepartForArrakisPlotIntrigue(poorDepart, "p2", departForArrakis.id, "spend-spice"),
+    poorDepart,
+    "Depart For Arrakis troop branch should require 2 spice",
+  );
+  const poorDepartDraw = state.playDepartForArrakisPlotIntrigue(poorDepart, "p2", departForArrakis.id, "draw");
+  assert.equal(playerById(poorDepartDraw, "p2").hand.length, 1, "Depart For Arrakis draw branch should not require spice");
+  assert.equal(playerById(poorDepartDraw, "p2").resources.spice, 1);
+  const dryDepart = {
+    ...departFixture,
+    players: departFixture.players.map((candidate) =>
+      candidate.id === "p2"
+        ? {
+            ...candidate,
+            resources: { ...candidate.resources, spice: 0 },
+            hand: [],
+            deck: [],
+            discard: [],
+            intrigues: [departForArrakis],
+          }
+        : candidate,
+    ),
+  };
+  const dryDepartDraw = state.playDepartForArrakisPlotIntrigue(dryDepart, "p2", departForArrakis.id, "draw");
+  assert.equal(playerById(dryDepartDraw, "p2").hand.length, 0, "Depart For Arrakis should resolve even when no card can be drawn");
+  assert.deepEqual(playerById(dryDepartDraw, "p2").intrigues, []);
+  assert.match(dryDepartDraw.log[0], /draws 0 cards/);
+  assert.equal(
+    state.playDepartForArrakisPlotIntrigue(departFixture, "p2", departForArrakis.id, "bad-choice"),
+    departFixture,
+    "Depart For Arrakis should reject unknown choices",
+  );
+  const pendingDepart = {
+    ...departFixture,
+    pendingAction: { kind: "spy", ownerId: "p2", remaining: 1, source: "Test" },
+  };
+  assert.equal(
+    state.playDepartForArrakisPlotIntrigue(pendingDepart, "p2", departForArrakis.id, "draw"),
+    pendingDepart,
+    "Depart For Arrakis should wait for pending actions to resolve",
+  );
+  const queuedDepart = {
+    ...departFixture,
+    pendingQueue: [{ kind: "spy", ownerId: "p2", remaining: 1, source: "Test" }],
+  };
+  assert.equal(
+    state.playDepartForArrakisPlotIntrigue(queuedDepart, "p2", departForArrakis.id, "draw"),
+    queuedDepart,
+    "Depart For Arrakis should wait for queued pending actions to resolve",
+  );
+  assert.equal(
+    state.playDepartForArrakisPlotIntrigue(departFixture, "p3", departForArrakis.id, "draw"),
+    departFixture,
+    "Only the active player should play Depart For Arrakis",
+  );
+  assert.equal(
+    state.playDepartForArrakisPlotIntrigue(departFixture, "p2", mercenaries.id, "draw"),
+    departFixture,
+    "Depart For Arrakis should reject other Intrigue cards",
+  );
+  const combatDepart = { ...departFixture, phase: "combat" };
+  assert.equal(
+    state.playDepartForArrakisPlotIntrigue(combatDepart, "p2", departForArrakis.id, "draw"),
+    combatDepart,
+    "Depart For Arrakis should only resolve during normal play",
+  );
+  const commanderDepartFixture = {
+    ...departFixture,
+    activeSeat: game.players.findIndex((candidate) => candidate.id === "p4"),
+    players: game.players.map((candidate) => {
+      if (candidate.id === "p4") {
+        return {
+          ...candidate,
+          resources: { ...candidate.resources, spice: 2 },
+          hand: [],
+          deck: candidate.deck.slice(0, 2),
+          discard: [],
+          revealed: true,
+          revealActivatedAllyId: "p6",
+          intrigues: [departForArrakis],
+        };
+      }
+      if (candidate.id === "p6") {
+        return { ...candidate, influence: { ...candidate.influence, fringeWorlds: 3 }, garrison: 1, hand: [], intrigues: [] };
+      }
+      return { ...candidate, intrigues: [] };
+    }),
+  };
+  const commanderDepart = state.playDepartForArrakisPlotIntrigue(
+    commanderDepartFixture,
+    "p4",
+    departForArrakis.id,
+    "spend-spice",
+    "p6",
+  );
+  assert.equal(playerById(commanderDepart, "p4").resources.spice, 0, "Commander Depart For Arrakis should spend Commander spice");
+  assert.equal(playerById(commanderDepart, "p4").hand.length, 1, "Commander Depart For Arrakis should draw for the Commander");
+  assert.equal(playerById(commanderDepart, "p4").garrison, 0, "Commander Depart For Arrakis should not recruit for the Commander");
+  assert.equal(playerById(commanderDepart, "p6").garrison, 4, "Commander Depart For Arrakis should recruit for the activated Ally");
+  assert.equal(playerById(commanderDepart, "p6").conflict, 0, "Commander Depart For Arrakis should recruit without deploying");
+  assert.match(commanderDepart.log[0], /Depart For Arrakis.*for Princess Irulan/);
+  assert.equal(
+    state.playDepartForArrakisPlotIntrigue(commanderDepartFixture, "p4", departForArrakis.id, "spend-spice", "p2"),
+    commanderDepartFixture,
+    "Revealed Commander Depart For Arrakis should reject a same-team Ally who was not activated for Reveal",
+  );
+  assert.equal(
+    state.playDepartForArrakisPlotIntrigue(commanderDepartFixture, "p4", departForArrakis.id, "spend-spice", "p4"),
+    commanderDepartFixture,
+    "Commander Depart For Arrakis should reject recruiting for the Commander",
+  );
+  const unlockedCommanderDepartFixture = {
+    ...commanderDepartFixture,
+    players: commanderDepartFixture.players.map((candidate) =>
+      candidate.id === "p4" ? { ...candidate, revealed: false, revealActivatedAllyId: undefined } : candidate,
+    ),
+  };
+  assert.equal(
+    state.playDepartForArrakisPlotIntrigue(unlockedCommanderDepartFixture, "p4", departForArrakis.id, "spend-spice", "p3"),
+    unlockedCommanderDepartFixture,
+    "Commander Depart For Arrakis should reject non-team troop owners",
+  );
+  const muadDibCommanderDepart = {
+    ...departFixture,
+    activeSeat: game.players.findIndex((candidate) => candidate.id === "p1"),
+    players: game.players.map((candidate) =>
+      candidate.id === "p1"
+        ? {
+            ...candidate,
+            influence: { ...candidate.influence, fremen: 3 },
+            hand: [],
+            deck: candidate.deck.slice(0, 2),
+            intrigues: [departForArrakis],
+          }
+        : { ...candidate, influence: { ...candidate.influence, fringeWorlds: 0 }, intrigues: [] },
+    ),
+  };
+  const muadDibDepartDraw = state.playDepartForArrakisPlotIntrigue(
+    muadDibCommanderDepart,
+    "p1",
+    departForArrakis.id,
+    "draw",
+  );
+  assert.equal(playerById(muadDibDepartDraw, "p1").hand.length, 1, "Muad'Dib should use personal Fremen Influence for Depart For Arrakis");
 
   const cunningFixture = {
     ...game,

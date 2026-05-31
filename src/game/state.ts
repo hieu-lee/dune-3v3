@@ -51,6 +51,7 @@ const choamProfitsSourceId = 450;
 const reachAgreementSourceId = 449;
 const strategicStockpilingSourceId = 130;
 const detonationSourceId = 131;
+const departForArrakisSourceId = 132;
 const unexpectedAlliesSourceId = 137;
 const mercenariesSourceId = 128;
 const cunningSourceId = 133;
@@ -100,6 +101,7 @@ export const corrinoMightCost = 3;
 export type SpiceIsPowerChoice = "spend-spice" | "retreat-troops";
 export type TacticalOptionChoice = "add-strength" | { kind: "retreat-troops"; count: number };
 export type CombatIntrigueChoice = SpiceIsPowerChoice | TacticalOptionChoice;
+export type DepartForArrakisChoice = "draw" | "spend-spice";
 export type CunningPlotChoice = "draw" | "paid-trash";
 export type StrategicStockpilingChoice = "spice" | "water" | "both";
 export type MarketOpportunityChoice = "spice-to-solari" | "solari-to-spice";
@@ -166,6 +168,10 @@ export function isDetonationIntrigue(intrigue: IntrigueCard) {
 
 export function isUnexpectedAlliesIntrigue(intrigue: IntrigueCard) {
   return intrigue.sourceId === unexpectedAlliesSourceId;
+}
+
+export function isDepartForArrakisIntrigue(intrigue: IntrigueCard) {
+  return intrigue.sourceId === departForArrakisSourceId;
 }
 
 export function isMercenariesIntrigue(intrigue: IntrigueCard) {
@@ -515,6 +521,14 @@ export function effectiveEmperorIconInfluence(player: Player, players: Player[])
     return Math.max(greatHousesInfluence, player.influence.emperor);
   }
   return greatHousesInfluence;
+}
+
+export function effectiveFremenIconInfluence(player: Player, players: Player[]) {
+  const fringeWorldsInfluence = effectiveRequirementInfluence(player, "fringeWorlds", players);
+  if (player.role === "Commander" && player.team === "muaddib") {
+    return Math.max(fringeWorldsInfluence, player.influence.fremen);
+  }
+  return fringeWorldsInfluence;
 }
 
 export function canMeetInfluenceRequirement(space: BoardSpace, player: Player, players: Player[]) {
@@ -2198,6 +2212,71 @@ export function playCunningPlotIntrigue(
     intrigueDiscard: [...state.intrigueDiscard, intrigue],
     pendingAction: trashPending,
     log: [log, ...state.log],
+  };
+}
+
+export function playDepartForArrakisPlotIntrigue(
+  state: GameState,
+  playerId: string,
+  intrigueId: string,
+  choice: DepartForArrakisChoice,
+  troopOwnerId?: string,
+): GameState {
+  if (state.phase !== "playing" || state.pendingAction || state.pendingQueue.length > 0) return state;
+  const player = state.players[state.activeSeat];
+  if (!player || player.id !== playerId) return state;
+  const intrigue = player.intrigues.find((card) => card.id === intrigueId);
+  if (!intrigue || !isDepartForArrakisIntrigue(intrigue)) return state;
+  if (choice !== "draw" && choice !== "spend-spice") return state;
+
+  const canDraw = effectiveFremenIconInfluence(player, state.players) >= 3;
+  const spendsSpice = choice === "spend-spice";
+  if (choice === "draw" && !canDraw) return state;
+  if (spendsSpice && player.resources.spice < 2) return state;
+
+  const troopOwnerResult = spendsSpice
+    ? activatedAllyEffectOwner(state, player, troopOwnerId)
+    : { valid: true, owner: undefined };
+  if (!troopOwnerResult.valid) return state;
+  const troopOwner = troopOwnerResult.owner;
+
+  let cardsDrawn = 0;
+  const players = state.players.map((candidate) => {
+    let next = candidate;
+    if (candidate.id === player.id) {
+      next = {
+        ...next,
+        resources: {
+          ...next.resources,
+          spice: next.resources.spice - (spendsSpice ? 2 : 0),
+        },
+        intrigues: next.intrigues.filter((card) => card.id !== intrigue.id),
+      };
+      if (canDraw) {
+        const drawn = drawCards(next, next.hand.length + 1);
+        cardsDrawn = drawn.hand.length - next.hand.length;
+        next = drawn;
+      }
+    }
+    if (spendsSpice && troopOwner && candidate.id === troopOwner.id) {
+      next = { ...next, garrison: next.garrison + 3 };
+    }
+    return next;
+  });
+
+  const cardText = cardsDrawn === 1 ? "1 card" : `${cardsDrawn} cards`;
+  const drawText = canDraw ? `draws ${cardText}` : "";
+  const troopLabel = troopOwner && troopOwner.id !== player.id ? ` for ${troopOwner.leader}` : "";
+  const troopText = spendsSpice ? `spends 2 spice and recruits 3 troops${troopLabel}` : "";
+  const joiner = canDraw && spendsSpice ? ", " : "";
+  return {
+    ...state,
+    players,
+    intrigueDiscard: [...state.intrigueDiscard, intrigue],
+    log: [
+      `${player.leader} plays Depart For Arrakis, ${drawText}${joiner}${troopText}.`,
+      ...state.log,
+    ],
   };
 }
 

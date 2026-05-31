@@ -43,6 +43,7 @@ import {
   endgameConditionalIntrigueChoices,
   effectiveCost,
   effectiveEmperorIconInfluence,
+  effectiveFremenIconInfluence,
   effectiveRequirementInfluence,
   finishEndgame,
   finishPendingAction,
@@ -58,6 +59,7 @@ import {
   isCunningIntrigue,
   isCouncilorsAmbitionIntrigue,
   isDevourIntrigue,
+  isDepartForArrakisIntrigue,
   isDetonationIntrigue,
   isFindWeaknessIntrigue,
   isGoToGroundIntrigue,
@@ -105,6 +107,7 @@ import {
   playContingencyPlanPlotIntrigue,
   playCunningPlotIntrigue,
   playCouncilorsAmbitionPlotIntrigue,
+  playDepartForArrakisPlotIntrigue,
   playDetonationIntrigue,
   playIntelligenceReportPlotIntrigue,
   playMarketOpportunityPlotIntrigue,
@@ -876,6 +879,16 @@ export default function App() {
     setGame((current) => playCunningPlotIntrigue(current, current.players[current.activeSeat].id, intrigueId, choice));
   }
 
+  function playDepartForArrakisPlot(intrigueId: string, choice: "draw" | "spend-spice") {
+    setGame((current) => {
+      const player = current.players[current.activeSeat];
+      const troopOwnerId = player.role === "Commander"
+        ? activatedAllyIdFor(player, current.players)
+        : undefined;
+      return playDepartForArrakisPlotIntrigue(current, player.id, intrigueId, choice, troopOwnerId);
+    });
+  }
+
   function playCouncilorsAmbitionPlot(intrigueId: string) {
     setGame((current) => playCouncilorsAmbitionPlotIntrigue(current, current.players[current.activeSeat].id, intrigueId));
   }
@@ -1151,6 +1164,7 @@ export default function App() {
   const unexpectedAlliesDeploymentBlocked = conflictDeploymentBlockedFor(game, activePlayer.id, unexpectedAlliesOwner.id);
   const shaddamsFavorOwner = activePlayer.role === "Commander" ? activatedAlly : activePlayer;
   const mercenariesOwner = activePlayer.role === "Commander" ? activatedAlly : activePlayer;
+  const departForArrakisOwner = activePlayer.role === "Commander" ? activatedAlly : activePlayer;
   const currentConflictProtected = conflictProtectedByShieldWall(game.conflict);
   const unexpectedAlliesCanPay = activePlayer.resources.water >= 2;
   const unexpectedAlliesBlockedByShieldWall = Boolean(game.conflict && game.shieldWall && currentConflictProtected);
@@ -2380,6 +2394,8 @@ export default function App() {
                   const marketOpportunityCanBuySpice = activePlayer.resources.solari >= 5;
                   const mercenariesCanPay = activePlayer.resources.solari >= 3;
                   const cunningCanPay = activePlayer.resources.spice >= 1;
+                  const departForArrakisCanDraw = effectiveFremenIconInfluence(activePlayer, game.players) >= 3;
+                  const departForArrakisCanPay = activePlayer.resources.spice >= 2;
                   return (
                     <article className="intrigue-card" key={card.id}>
                       {card.thumbnailPath && <img className="card-art" src={card.thumbnailPath} alt="" loading="lazy" />}
@@ -2392,6 +2408,8 @@ export default function App() {
                             ? `Plot / draw ${intelligenceReportDrawCount}`
                           : isCunningIntrigue(card)
                             ? "Plot / draw or pay to trash"
+                          : isDepartForArrakisIntrigue(card)
+                            ? `Plot / ${departForArrakisCanDraw ? "draw / " : ""}spend spice for troops`
                           : isCouncilorsAmbitionIntrigue(card)
                             ? "Plot / High Council water"
                           : isStrategicStockpilingIntrigue(card)
@@ -2491,6 +2509,32 @@ export default function App() {
                           >
                             <X size={14} />
                             1 Spice -&gt; Draw + Trash
+                          </button>
+                        </div>
+                      )}
+                      {isDepartForArrakisIntrigue(card) && (
+                        <div className="intrigue-actions">
+                          <button
+                            type="button"
+                            onClick={() => playDepartForArrakisPlot(card.id, "draw")}
+                            disabled={plotIntrigueLocked || !departForArrakisCanDraw}
+                            title="Requires 3 Fremen/Fringe Influence"
+                          >
+                            <BookOpen size={14} />
+                            Draw 1
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => playDepartForArrakisPlot(card.id, "spend-spice")}
+                            disabled={plotIntrigueLocked || !departForArrakisCanPay}
+                            title={departForArrakisCanDraw
+                              ? "Spend 2 spice to recruit 3 troops, and draw 1 card"
+                              : "Spend 2 spice to recruit 3 troops"}
+                          >
+                            <Users size={14} />
+                            2 Spice -&gt; 3 Troops
+                            {departForArrakisOwner.id !== activePlayer.id ? `: ${departForArrakisOwner.leader}` : ""}
+                            {departForArrakisCanDraw ? " + Draw" : ""}
                           </button>
                         </div>
                       )}

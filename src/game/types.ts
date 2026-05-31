@@ -381,6 +381,12 @@ export type PendingAction =
       source: string;
     }
   | {
+      kind: "jessica-reverend-mother";
+      ownerId: string;
+      spaceId: string;
+      source: string;
+    }
+  | {
       kind: "jessica-other-memories";
       ownerId: string;
       source: string;
@@ -409,6 +415,7 @@ export type GameState = {
   firstSeat: number;
   agentTurnComplete: boolean;
   turnSpiceGains: Record<string, number>;
+  turnReverendMotherJessicaRepeats: Record<string, boolean>;
   players: Player[];
   spaces: Record<string, string>;
   spyPosts: Record<string, string>;

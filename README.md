@@ -22,7 +22,7 @@ Private web-table implementation for a six-player `Dune: Imperium - Uprising` te
 - Shaddam's Signet Ring resolves Emperor of the Known Universe, blocking same-turn Conflict deployment and queuing the Solari troop/Influence choice.
 - Gurney Halleck's Warmaster Signet recruits 1 troop, and Always Smiling scores 1 VP on his Reveal turn at 10+ Conflict strength.
 - Feyd-Rautha Harkonnen's Devious Strength queues an optional Reveal-turn spy recall for +2 strength.
-- Lady Jessica's Spice Agony Intrigue plus troop-memory payment, Other Memories Bene Gesserit-space flip, and Reverend Mother Jessica's Water of Life Signet payment are automated.
+- Lady Jessica's Spice Agony Intrigue plus troop-memory payment, Other Memories Bene Gesserit-space flip, Reverend Mother Jessica's Water of Life Signet payment, and Reverend Mother Bene/Fremen board-space repeat are automated.
 - Princess Irulan's Imperial Birthright draws an Intrigue when she reaches Great Houses 2 Influence in 3v3 mode, and Chronicler's Insight queues her exact cost-1 acquisition or hand-trash Signet choice.
 - Command Respect lets Swordmaster Muad'Dib trash the card to trade with one Muad'Dib Ally.
 - Demand Attention lets Muad'Dib spend 4 Solari to upgrade a faction visit to two Influence for the board-effect recipient.

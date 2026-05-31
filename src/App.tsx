@@ -103,6 +103,7 @@ import {
   pendingActionForCard,
   pendingActionsForReveal,
   pendingActionForJessicaOtherMemories,
+  pendingActionForReverendMotherJessicaRepeat,
   pendingActionForMakerChoice,
   pendingActionForSietchTabr,
   pendingActionsFor,
@@ -162,6 +163,7 @@ import {
   resolveDesertCallChoice,
   resolveIrulanSignetRingChoice,
   resolveJessicaOtherMemoriesChoice,
+  resolveJessicaReverendMotherChoice,
   resolveJessicaSpiceAgonyChoice,
   resolveJessicaWaterOfLifeChoice,
   resolveMakerChoice,
@@ -195,7 +197,7 @@ import {
   buyAccessPairChoices,
 } from "./game/state";
 import type { BoardSpace, Card, FactionId, GameState, PendingAction, Player, ResourceId, Resources, TeamId, TradeGoodId, TrashCardZone } from "./game/types";
-import type { BuyAccessChoice, ChangeAllegiancesChoice, CombatIntrigueChoice, ImperiumPoliticsChoice, InfluenceLossPair, IrulanSignetRingChoice, JessicaOtherMemoriesChoice, JessicaSpiceAgonyChoice, JessicaWaterOfLifeChoice, ShaddamSignetRingChoice, SietchRitualChoice, SpecialMissionChoice } from "./game/state";
+import type { BuyAccessChoice, ChangeAllegiancesChoice, CombatIntrigueChoice, ImperiumPoliticsChoice, InfluenceLossPair, IrulanSignetRingChoice, JessicaOtherMemoriesChoice, JessicaReverendMotherChoice, JessicaSpiceAgonyChoice, JessicaWaterOfLifeChoice, ShaddamSignetRingChoice, SietchRitualChoice, SpecialMissionChoice } from "./game/state";
 
 const resources: Array<{ id: ResourceId; label: string; Icon: LucideIcon }> = [
   { id: "solari", label: "Solari", Icon: CircleDollarSign },
@@ -411,8 +413,23 @@ export default function App() {
         selectedSpace,
       );
       const jessicaOtherMemoriesPending = pendingActionForJessicaOtherMemories(source, selectedSpace);
-      const pendingActions = pendingActionsFor(spacePending, cardPending, source.spies);
-      if (jessicaOtherMemoriesPending) pendingActions.push(jessicaOtherMemoriesPending);
+      const jessicaRepeatDeferredWater = cardPending?.kind === "jessica-water-of-life" ? 1 : 0;
+      const jessicaReverendMotherPending = pendingActionForReverendMotherJessicaRepeat(
+        current,
+        source,
+        selectedSpace,
+        jessicaRepeatDeferredWater,
+      );
+      const prioritizedCardPending =
+        cardPending?.kind === "jessica-spice-agony" || cardPending?.kind === "jessica-water-of-life"
+          ? cardPending
+          : undefined;
+      const pendingActions = prioritizedCardPending || jessicaOtherMemoriesPending || jessicaReverendMotherPending
+        ? [
+            ...[prioritizedCardPending, jessicaOtherMemoriesPending, jessicaReverendMotherPending].filter((action): action is PendingAction => Boolean(action)),
+            ...pendingActionsFor(spacePending, prioritizedCardPending ? undefined : cardPending, source.spies),
+          ]
+        : pendingActionsFor(spacePending, cardPending, source.spies);
       if (sietchTabrPending) {
         const sietchAction = {
           ...sietchTabrPending,
@@ -472,6 +489,7 @@ export default function App() {
         ...current,
         agentTurnComplete: false,
         turnSpiceGains: {},
+        turnReverendMotherJessicaRepeats: {},
         turnUnitDeployments: {},
         activeSeat: advanceSeat(current),
       };
@@ -774,6 +792,15 @@ export default function App() {
       const pending = current.pendingAction;
       if (!pending || pending.kind !== "jessica-water-of-life") return current;
       return maybeStartCombatPhase(resolveJessicaWaterOfLifeChoice(current, pending, choice));
+    });
+  }
+
+  function chooseJessicaReverendMother(choice: JessicaReverendMotherChoice) {
+    if (game.pendingAction?.kind !== "jessica-reverend-mother") return;
+    setGame((current) => {
+      const pending = current.pendingAction;
+      if (!pending || pending.kind !== "jessica-reverend-mother") return current;
+      return maybeStartCombatPhase(resolveJessicaReverendMotherChoice(current, pending, choice));
     });
   }
 
@@ -1344,6 +1371,10 @@ export default function App() {
     pendingAction?.kind === "jessica-spice-agony" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingJessicaWaterOfLifeOwner =
     pendingAction?.kind === "jessica-water-of-life" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
+  const pendingJessicaReverendMotherOwner =
+    pendingAction?.kind === "jessica-reverend-mother" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
+  const pendingJessicaReverendMotherSpace =
+    pendingAction?.kind === "jessica-reverend-mother" ? boardSpaces.find((space) => space.id === pendingAction.spaceId) : undefined;
   const pendingJessicaOtherMemoriesOwner =
     pendingAction?.kind === "jessica-other-memories" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingRecallSpyOwner =
@@ -2107,6 +2138,7 @@ export default function App() {
                 {pendingAction.kind === "irulan-signet-ring" && `${pendingIrulanSignetOwner?.leader ?? "Princess Irulan"} Chronicler's Insight`}
                 {pendingAction.kind === "jessica-spice-agony" && `${pendingJessicaSpiceAgonyOwner?.leader ?? "Lady Jessica"} Spice Agony`}
                 {pendingAction.kind === "jessica-water-of-life" && `${pendingJessicaWaterOfLifeOwner?.leader ?? "Reverend Mother Jessica"} Water of Life`}
+                {pendingAction.kind === "jessica-reverend-mother" && `${pendingJessicaReverendMotherOwner?.leader ?? "Reverend Mother Jessica"} Reverend Mother`}
                 {pendingAction.kind === "jessica-other-memories" && `${pendingJessicaOtherMemoriesOwner?.leader ?? "Lady Jessica"} Other Memories`}
                 {pendingAction.kind === "command-respect" && `${pendingCommandRespectCommander?.leader ?? "Muad'Dib"} Command Respect`}
                 {pendingAction.kind === "demand-results" && `${pendingDemandResultsCommander?.leader ?? "Shaddam"} Demand Results`}
@@ -2407,6 +2439,24 @@ export default function App() {
                   <span>Water of Life can no longer resolve with the current table state.</span>
                 )}
                 <button type="button" onClick={() => chooseJessicaWaterOfLife("skip")}>Skip</button>
+              </div>
+            )}
+
+            {pendingAction.kind === "jessica-reverend-mother" && (
+              <div className="pending-controls">
+                {pendingJessicaReverendMotherOwner && pendingJessicaReverendMotherSpace ? (
+                  <button
+                    type="button"
+                    onClick={() => chooseJessicaReverendMother("repeat")}
+                    disabled={pendingJessicaReverendMotherOwner.resources.water < 1}
+                  >
+                    <Droplets size={15} />
+                    Spend 1 water: repeat {pendingJessicaReverendMotherSpace.name}
+                  </button>
+                ) : (
+                  <span>Reverend Mother can no longer resolve with the current table state.</span>
+                )}
+                <button type="button" onClick={() => chooseJessicaReverendMother("skip")}>Skip</button>
               </div>
             )}
 

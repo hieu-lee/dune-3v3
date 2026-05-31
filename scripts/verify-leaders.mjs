@@ -668,6 +668,224 @@ try {
     "Deferred Water of Life should remain skippable after choosing Maker worms",
   );
 
+  const espionage = data.boardSpaces.find((space) => space.id === "espionage");
+  const expedition = data.boardSpaces.find((space) => space.id === "expedition");
+  const controversialTech = data.boardSpaces.find((space) => space.id === "controversial-tech");
+  const deliverSupplies = data.boardSpaces.find((space) => space.id === "deliver-supplies");
+  const hardyWarriors = data.boardSpaces.find((space) => space.id === "hardy-warriors");
+  assert.ok(espionage, "Espionage should exist for Reverend Mother repeat tests");
+  assert.ok(expedition, "Expedition should exist for Reverend Mother repeat tests");
+  assert.ok(controversialTech, "Controversial Technology should exist for Reverend Mother repeat tests");
+  assert.ok(deliverSupplies, "Deliver Supplies should exist for Reverend Mother repeat negative tests");
+  assert.ok(hardyWarriors, "Hardy Warriors should exist for Reverend Mother personal-space negative tests");
+  const reverendRepeatOwner = {
+    ...reverendJessicaOwner,
+    resources: { ...reverendJessicaOwner.resources, spice: 0, water: 1 },
+    influence: { ...reverendJessicaOwner.influence, bene: 0, fringeWorlds: 0 },
+    hand: [],
+    deck: [leadTheWayDraw],
+    discard: [],
+    intrigues: [],
+  };
+  const reverendRepeatGame = {
+    ...game,
+    intrigueDeck: [intrigueCard],
+    intrigueDiscard: [],
+    players: game.players.map((player) => (player.id === ladyJessica.id ? reverendRepeatOwner : player)),
+  };
+  const reverendRepeatPending = state.pendingActionForReverendMotherJessicaRepeat(
+    reverendRepeatGame,
+    reverendRepeatOwner,
+    secrets,
+  );
+  assert.deepEqual(
+    reverendRepeatPending,
+    {
+      kind: "jessica-reverend-mother",
+      ownerId: ladyJessica.id,
+      source: "Reverend Mother",
+      spaceId: secrets.id,
+    },
+    "Reverend Mother Jessica should be able to repeat a Bene Gesserit space for 1 water",
+  );
+  assert.deepEqual(
+    state.pendingActionForReverendMotherJessicaRepeat(reverendRepeatGame, reverendRepeatOwner, expedition),
+    {
+      kind: "jessica-reverend-mother",
+      ownerId: ladyJessica.id,
+      source: "Reverend Mother",
+      spaceId: expedition.id,
+    },
+    "Reverend Mother Jessica should be able to repeat a Fremen board space for 1 water",
+  );
+  assert.equal(
+    state.pendingActionForReverendMotherJessicaRepeat(
+      reverendRepeatGame,
+      { ...reverendRepeatOwner, resources: { ...reverendRepeatOwner.resources, water: 0 } },
+      secrets,
+    ),
+    undefined,
+    "Reverend Mother should require 1 payable water unless another queued choice can supply it",
+  );
+  assert.deepEqual(
+    state.pendingActionForReverendMotherJessicaRepeat(
+      reverendRepeatGame,
+      { ...reverendRepeatOwner, resources: { ...reverendRepeatOwner.resources, water: 0 } },
+      secrets,
+      1,
+    ),
+    reverendRepeatPending,
+    "Reverend Mother should queue behind Water of Life when that choice can supply the water",
+  );
+  assert.equal(
+    state.pendingActionForReverendMotherJessicaRepeat(reverendRepeatGame, { ...reverendRepeatOwner, leader: "Lady Jessica" }, secrets),
+    undefined,
+    "Reverend Mother should require the Reverend Mother Jessica side",
+  );
+  assert.equal(
+    state.pendingActionForReverendMotherJessicaRepeat(reverendRepeatGame, reverendRepeatOwner, deliverSupplies),
+    undefined,
+    "Reverend Mother should not repeat Spacing Guild spaces",
+  );
+  assert.equal(
+    state.pendingActionForReverendMotherJessicaRepeat(reverendRepeatGame, reverendRepeatOwner, arrakeen),
+    undefined,
+    "Reverend Mother should not repeat City spaces",
+  );
+  assert.equal(
+    state.pendingActionForReverendMotherJessicaRepeat(reverendRepeatGame, reverendRepeatOwner, hardyWarriors),
+    undefined,
+    "Reverend Mother should not repeat Commander personal-board Fremen spaces",
+  );
+  assert.equal(
+    state.pendingActionForReverendMotherJessicaRepeat(
+      { ...reverendRepeatGame, turnReverendMotherJessicaRepeats: { [ladyJessica.id]: true } },
+      reverendRepeatOwner,
+      secrets,
+    ),
+    undefined,
+    "Reverend Mother should be once per turn",
+  );
+  const skippedReverendRepeat = state.resolveJessicaReverendMotherChoice(
+    { ...reverendRepeatGame, pendingAction: reverendRepeatPending, pendingQueue: [] },
+    reverendRepeatPending,
+    "skip",
+  );
+  assert.equal(playerById(skippedReverendRepeat, ladyJessica.id).resources.water, 1, "Skipping Reverend Mother should not spend water");
+  assert.equal(playerById(skippedReverendRepeat, ladyJessica.id).influence.bene, 0, "Skipping Reverend Mother should not repeat Influence");
+  const repeatedSecrets = state.resolveJessicaReverendMotherChoice(
+    { ...reverendRepeatGame, pendingAction: reverendRepeatPending, pendingQueue: [] },
+    reverendRepeatPending,
+    "repeat",
+  );
+  assert.equal(playerById(repeatedSecrets, ladyJessica.id).resources.water, 0, "Reverend Mother should spend 1 water");
+  assert.equal(playerById(repeatedSecrets, ladyJessica.id).influence.bene, 1, "Reverend Mother should repeat the Bene Gesserit Influence");
+  assert.deepEqual(
+    playerById(repeatedSecrets, ladyJessica.id).intrigues.map((card) => card.id),
+    [intrigueCard.id],
+    "Reverend Mother should repeat printed Intrigue gains",
+  );
+  assert.equal(repeatedSecrets.turnReverendMotherJessicaRepeats[ladyJessica.id], true, "Reverend Mother use should be marked for the turn");
+  assert.equal(repeatedSecrets.pendingAction, undefined, "Reverend Mother without deferred space effects should advance pending actions");
+  const duplicateRepeatState = { ...repeatedSecrets, pendingAction: reverendRepeatPending, pendingQueue: [] };
+  assert.equal(
+    state.resolveJessicaReverendMotherChoice(duplicateRepeatState, reverendRepeatPending, "repeat"),
+    duplicateRepeatState,
+    "A duplicate Reverend Mother pending should not resolve after the once-per-turn use",
+  );
+  const controversialRepeatPending = state.pendingActionForReverendMotherJessicaRepeat(
+    reverendRepeatGame,
+    reverendRepeatOwner,
+    controversialTech,
+  );
+  assert.ok(controversialRepeatPending, "Controversial Technology should queue Reverend Mother repeat");
+  const repeatedControversialTech = state.resolveJessicaReverendMotherChoice(
+    {
+      ...reverendRepeatGame,
+      intrigueDeck: [intrigueCard],
+      pendingAction: controversialRepeatPending,
+      pendingQueue: [],
+    },
+    controversialRepeatPending,
+    "repeat",
+  );
+  assert.equal(playerById(repeatedControversialTech, ladyJessica.id).resources.spice, 0, "Reverend Mother should not pay the board-space cost a second time");
+  assert.equal(playerById(repeatedControversialTech, ladyJessica.id).influence.fringeWorlds, 1, "Reverend Mother should repeat Fremen/Fringe Influence");
+  assert.deepEqual(
+    playerById(repeatedControversialTech, ladyJessica.id).hand.map((card) => card.id),
+    [leadTheWayDraw.id],
+    "Reverend Mother should repeat printed card draw",
+  );
+  const espionageRepeatOwner = {
+    ...reverendRepeatOwner,
+    spies: 3,
+    deck: [leadTheWayDraw],
+    intrigues: [],
+  };
+  const espionageRepeatGame = {
+    ...reverendRepeatGame,
+    intrigueDeck: [intrigueCard],
+    players: reverendRepeatGame.players.map((player) =>
+      player.id === ladyJessica.id ? espionageRepeatOwner : player,
+    ),
+  };
+  const espionageRepeatPending = state.pendingActionForReverendMotherJessicaRepeat(
+    espionageRepeatGame,
+    espionageRepeatOwner,
+    espionage,
+  );
+  const espionageSpyPending = state.pendingActionForSpace(
+    espionage,
+    espionageRepeatOwner,
+    espionageRepeatOwner,
+    espionageRepeatGame.players,
+  );
+  assert.ok(espionageSpyPending, "Espionage should create an initial spy pending action");
+  const repeatedEspionage = state.resolveJessicaReverendMotherChoice(
+    {
+      ...espionageRepeatGame,
+      pendingAction: espionageRepeatPending,
+      pendingQueue: [espionageSpyPending],
+    },
+    espionageRepeatPending,
+    "repeat",
+  );
+  assert.deepEqual(
+    repeatedEspionage.pendingAction,
+    {
+      ...espionageSpyPending,
+      remaining: 2,
+      source: "Espionage / Espionage",
+    },
+    "Reverend Mother should merge Espionage's repeated spy placement with the original spy pending",
+  );
+  assert.equal(playerById(repeatedEspionage, ladyJessica.id).influence.bene, 1, "Repeated Espionage should repeat Bene Influence");
+  assert.deepEqual(
+    playerById(repeatedEspionage, ladyJessica.id).hand.map((card) => card.id),
+    [leadTheWayDraw.id],
+    "Repeated Espionage should draw before spy placement",
+  );
+  assert.deepEqual(
+    playerById(repeatedEspionage, ladyJessica.id).intrigues.map((card) => card.id),
+    [intrigueCard.id],
+    "Repeated Espionage should draw its repeated Intrigue before spy placement",
+  );
+  assert.equal(
+    repeatedEspionage.pendingQueue.length,
+    0,
+    "Reverend Mother should not replay Signet or other card effects while repeating a board space",
+  );
+  assert.deepEqual(
+    jessicaOtherMemoriesResolved.pendingAction,
+    {
+      kind: "jessica-reverend-mother",
+      ownerId: ladyJessica.id,
+      source: "Reverend Mother",
+      spaceId: secrets.id,
+    },
+    "Other Memories should let Reverend Mother Jessica repeat the same Bene Gesserit space after flipping",
+  );
+
   const freeImperiumCard = {
     ...costOneImperiumCard,
     id: `${costOneImperiumCard.id}-free-regression`,

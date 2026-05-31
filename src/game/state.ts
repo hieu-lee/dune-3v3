@@ -141,6 +141,7 @@ export type ShaddamSignetRingChoice = "skip" | "troop" | { kind: "influence"; fa
 export type IrulanSignetRingChoice = "skip" | "acquire" | "trash";
 export type JessicaSpiceAgonyChoice = "pay" | "skip";
 export type JessicaWaterOfLifeChoice = "pay" | "skip";
+export type JessicaReverendMotherChoice = "repeat" | "skip";
 export type JessicaOtherMemoriesChoice = "flip" | "skip";
 
 const shaddamSignetRingTroopCost = 1;
@@ -530,6 +531,7 @@ export function initialGame(): GameState {
     firstSeat,
     agentTurnComplete: false,
     turnSpiceGains: {},
+    turnReverendMotherJessicaRepeats: {},
     turnUnitDeployments: {},
     players,
     spaces: {},
@@ -659,6 +661,24 @@ export function recordTurnSpiceGain(state: GameState, playerId: string, amount: 
     turnSpiceGains: {
       ...state.turnSpiceGains,
       [playerId]: (state.turnSpiceGains[playerId] ?? 0) + amount,
+    },
+  };
+}
+
+export function hasUsedReverendMotherJessicaRepeat(
+  state: Pick<GameState, "turnReverendMotherJessicaRepeats">,
+  playerId: string,
+) {
+  return Boolean(state.turnReverendMotherJessicaRepeats[playerId]);
+}
+
+function recordReverendMotherJessicaRepeat(state: GameState, playerId: string): GameState {
+  if (state.phase !== "playing") return state;
+  return {
+    ...state,
+    turnReverendMotherJessicaRepeats: {
+      ...state.turnReverendMotherJessicaRepeats,
+      [playerId]: true,
     },
   };
 }
@@ -1328,6 +1348,30 @@ export function pendingActionForJessicaOtherMemories(
   };
 }
 
+export function pendingActionForReverendMotherJessicaRepeat(
+  state: Pick<GameState, "turnReverendMotherJessicaRepeats">,
+  owner: Player,
+  space: BoardSpace,
+  deferredWater = 0,
+): PendingAction | undefined {
+  if (
+    owner.leader !== reverendMotherJessicaLeaderName ||
+    owner.role !== "Ally" ||
+    (space.icon !== "bene" && space.icon !== "fremen") ||
+    Boolean(space.personal) ||
+    owner.resources.water + deferredWater < 1 ||
+    hasUsedReverendMotherJessicaRepeat(state, owner.id)
+  ) {
+    return undefined;
+  }
+  return {
+    kind: "jessica-reverend-mother",
+    ownerId: owner.id,
+    source: "Reverend Mother",
+    spaceId: space.id,
+  };
+}
+
 export function pendingActionForCorrinoMightReveal(
   card: Card,
   source: Player,
@@ -1437,6 +1481,30 @@ export function advancePendingAction(state: GameState) {
   };
 }
 
+function prependPendingAction(state: GameState, action: PendingAction | undefined) {
+  if (!action) return state;
+  if (
+    action.kind === "spy" &&
+    state.pendingAction?.kind === "spy" &&
+    action.ownerId === state.pendingAction.ownerId
+  ) {
+    const owner = state.players.find((player) => player.id === action.ownerId);
+    return {
+      ...state,
+      pendingAction: {
+        ...state.pendingAction,
+        remaining: Math.min(owner?.spies ?? 0, state.pendingAction.remaining + action.remaining),
+        source: `${state.pendingAction.source} / ${action.source}`,
+      },
+    };
+  }
+  return {
+    ...state,
+    pendingAction: action,
+    pendingQueue: state.pendingAction ? [state.pendingAction, ...state.pendingQueue] : state.pendingQueue,
+  };
+}
+
 export function finishPendingAction(state: GameState): GameState {
   if (state.pendingAction?.kind === "spy" && state.pendingAction.mustPlaceSpy) return state;
   if (state.pendingAction?.kind === "acquire-card" && !state.pendingAction.optional) return state;
@@ -1467,6 +1535,7 @@ type ShaddamSignetRingPendingAction = Extract<PendingAction, { kind: "shaddam-si
 type IrulanSignetRingPendingAction = Extract<PendingAction, { kind: "irulan-signet-ring" }>;
 type JessicaSpiceAgonyPendingAction = Extract<PendingAction, { kind: "jessica-spice-agony" }>;
 type JessicaWaterOfLifePendingAction = Extract<PendingAction, { kind: "jessica-water-of-life" }>;
+type JessicaReverendMotherPendingAction = Extract<PendingAction, { kind: "jessica-reverend-mother" }>;
 type JessicaOtherMemoriesPendingAction = Extract<PendingAction, { kind: "jessica-other-memories" }>;
 
 export function manipulateAcquisitionCost(card: Card) {
@@ -4031,6 +4100,7 @@ export function startCombatPhase(state: GameState): GameState {
     phase: "combat",
     agentTurnComplete: false,
     turnSpiceGains: {},
+    turnReverendMotherJessicaRepeats: {},
     turnUnitDeployments: {},
     activeSeat,
     combatPasses: [],
@@ -4068,6 +4138,7 @@ export function finishRevealTurn(state: GameState, playerId: string): GameState 
     ...state,
     agentTurnComplete: false,
     turnSpiceGains: {},
+    turnReverendMotherJessicaRepeats: {},
     turnUnitDeployments: {},
     conflictDeploymentBlock: undefined,
     players: state.players.map((candidate) =>
@@ -4687,6 +4758,56 @@ export function resolveJessicaWaterOfLifeChoice(
   };
 }
 
+export function resolveJessicaReverendMotherChoice(
+  state: GameState,
+  pending: JessicaReverendMotherPendingAction,
+  choice: JessicaReverendMotherChoice,
+): GameState {
+  const owner = state.players.find((player) => player.id === pending.ownerId);
+  const space = boardSpaces.find((candidate) => candidate.id === pending.spaceId);
+  if (!owner || !space) return state;
+
+  if (choice === "skip") {
+    return {
+      ...state,
+      ...advancePendingAction(state),
+      log: [`${owner.leader} declines ${pending.source}.`, ...state.log],
+    };
+  }
+
+  if (
+    owner.leader !== reverendMotherJessicaLeaderName ||
+    owner.role !== "Ally" ||
+    owner.resources.water < 1 ||
+    (space.icon !== "bene" && space.icon !== "fremen") ||
+    Boolean(space.personal) ||
+    hasUsedReverendMotherJessicaRepeat(state, owner.id)
+  ) {
+    return state;
+  }
+
+  const paidOwner = {
+    ...owner,
+    resources: { ...owner.resources, water: owner.resources.water - 1 },
+  };
+  const { source: repeatedOwner } = applyBoardEffect(paidOwner, paidOwner, space);
+  const players = state.players.map((player) => (player.id === owner.id ? repeatedOwner : player));
+  const baseState = recordReverendMotherJessicaRepeat({
+    ...state,
+    players,
+    ...advancePendingAction(state),
+    log: [`${owner.leader} spends 1 water for ${pending.source} to repeat ${space.name}.`, ...state.log],
+  }, owner.id);
+  const repeatedPending = pendingActionForSpace(space, repeatedOwner, repeatedOwner, players);
+  const withPending = prependPendingAction(baseState, repeatedPending);
+  const intrigueGain = boardSpaceRewardApplies(space, paidOwner) ? space.gain?.intrigue ?? 0 : 0;
+  const withIntrigue = intrigueGain > 0
+    ? drawIntrigueCards(withPending, owner.id, intrigueGain, `${pending.source} / ${space.name}`)
+    : withPending;
+  const spiceGain = boardSpaceRewardApplies(space, paidOwner) ? space.gain?.spice ?? 0 : 0;
+  return spiceGain > 0 ? recordTurnSpiceGain(withIntrigue, owner.id, spiceGain) : withIntrigue;
+}
+
 export function resolveJessicaOtherMemoriesChoice(
   state: GameState,
   pending: JessicaOtherMemoriesPendingAction,
@@ -4717,12 +4838,16 @@ export function resolveJessicaOtherMemoriesChoice(
   const drawn = drawnOwner.hand.length - owner.hand.length;
   const memoryText = `${memories} ${memories === 1 ? "memory" : "memories"}`;
   const cardText = `${drawn} ${drawn === 1 ? "card" : "cards"}`;
-  return {
+  const baseState = {
     ...state,
     players: state.players.map((player) => (player.id === owner.id ? drawnOwner : player)),
     ...advancePendingAction(state),
     log: [`${owner.leader} returns ${memoryText} for ${cardText} and becomes Reverend Mother Jessica.`, ...state.log],
   };
+  return prependPendingAction(
+    baseState,
+    pendingActionForReverendMotherJessicaRepeat(baseState, drawnOwner, space),
+  );
 }
 
 export function resolveCommandRespectTrade(
@@ -5637,6 +5762,7 @@ export function startNextRound(state: GameState): GameState {
     round: resolvedState.round + 1,
     agentTurnComplete: false,
     turnSpiceGains: {},
+    turnReverendMotherJessicaRepeats: {},
     turnUnitDeployments: {},
     firstSeat,
     activeSeat: firstSeat,

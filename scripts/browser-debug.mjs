@@ -7,6 +7,7 @@ import { createBrowserDebugArtifactStore } from "./browser-debug-artifact-store.
 import { artifactStem, generatedArtifactNames, scenarios } from "./browser-debug-artifacts.mjs";
 import { runCardChoicesSmoke } from "./browser-debug-card-choices.mjs";
 import { runConflictVpSmoke } from "./browser-debug-conflict-vp.mjs";
+import { runLeaderCharacterChoicesSmoke } from "./browser-debug-leader-character-choices.mjs";
 import { createBrowserDebugPageTools } from "./browser-debug-page-tools.mjs";
 import { runMilitaryChoicesSmoke } from "./browser-debug-military-choices.mjs";
 import { runPendingChoicesSmoke } from "./browser-debug-pending-choices.mjs";
@@ -734,6 +735,21 @@ try {
     }
     if (scenario === "leader-modal" || scenario === "all") {
       await interruptible(runLeaderModalSmoke(page, url, server, captures));
+    }
+    if (scenario === "leader-character-choices" || scenario === "all") {
+      await interruptible(runLeaderCharacterChoicesSmoke({
+        captures,
+        currentGame,
+        initialPlayableGame,
+        openApp,
+        page,
+        screenshot,
+        server,
+        setDebugGameAndWait,
+        url,
+        waitForNoPending,
+        writeJson,
+      }));
     }
     if (scenario === "manual") await interruptible(runManual(page, url, server, captures));
 

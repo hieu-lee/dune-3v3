@@ -1,10 +1,7 @@
 import {
   boardSpaces,
   factionLabels,
-  imperiumDeck,
   leaderCardByName,
-  reserveMarket,
-  teams,
 } from "./data";
 import {
   applyBoardEffect,
@@ -62,10 +59,8 @@ import type {
   SietchRitualChoice,
 } from "./influence-choices";
 import {
-  cloneCards,
   drawCards,
   playerTroopSupply,
-  shuffleCards,
 } from "./deck-utils";
 import { drawIntrigueCards } from "./intrigue-deck";
 import {
@@ -92,7 +87,6 @@ import {
   irulanSignetTrashableCards,
   irulanSignetTrashPending,
 } from "./market-rules";
-import { balanceSixPlayerObjectives, dealSixPlayerObjectives } from "./objectives";
 import {
   advancePendingAction,
   pendingActionsFor,
@@ -104,13 +98,6 @@ import {
   resolveLocationControlIncome,
 } from "./location-control";
 import {
-  buildChoamContractDeck,
-  buildIntrigueDeck,
-  buildSixPlayerConflictDeck,
-  emptyMakerSpice,
-} from "./setup-utils";
-import {
-  makePlayer,
   stabanTuekLeaderName,
 } from "./player-setup";
 import { pendingActionForSpace } from "./placement-rules";
@@ -299,6 +286,13 @@ export {
 } from "./intrigue-deck";
 
 export {
+  initialGame,
+  pendingActionForShaddamPersonalBoard,
+  setMakerHooks,
+  setShieldWall,
+} from "./game-setup";
+
+export {
   adjustInfluence,
   resolveLeaderInfluenceThresholdRewards,
   scoreGurneyAlwaysSmiling,
@@ -481,105 +475,7 @@ const shaddamSignetRingInfluenceChoices: FactionId[] = [
   "fringeWorlds",
 ];
 
-const shaddamPersonalBoardThroneSource = "Emperor personal board";
-
-export function initialGame(): GameState {
-  const market = shuffleCards(cloneCards(imperiumDeck));
-  const [conflict, ...conflictDeck] = buildSixPlayerConflictDeck();
-  if (!conflict) throw new Error("Missing Uprising conflict cards for six-player setup.");
-  const contracts = buildChoamContractDeck();
-  const intrigueDeck = buildIntrigueDeck();
-
-  const playersBeforeObjectives = [
-    makePlayer("p1", "Seat 1", "Muad'Dib", "muaddib", "Commander", "#45c4b0"),
-    makePlayer("p2", "Seat 2", "Feyd-Rautha Harkonnen", "shaddam", "Ally", "#d26b48"),
-    makePlayer("p3", "Seat 3", "Gurney Halleck", "muaddib", "Ally", "#2f8fdd"),
-    makePlayer("p4", "Seat 4", "Shaddam Corrino IV", "shaddam", "Commander", "#efb447"),
-    makePlayer("p5", "Seat 5", "Lady Jessica", "muaddib", "Ally", "#8ad5ff"),
-    makePlayer("p6", "Seat 6", "Princess Irulan", "shaddam", "Ally", "#f08f82"),
-  ];
-  const { players, firstSeat } = dealSixPlayerObjectives(playersBeforeObjectives);
-
-  const game: GameState = {
-    phase: "playing",
-    round: 1,
-    activeSeat: firstSeat,
-    firstSeat,
-    agentTurnComplete: false,
-    turnSpiceGains: {},
-    turnReverendMotherJessicaRepeats: {},
-    turnUnitDeployments: {},
-    players,
-    spaces: {},
-    spyPosts: {},
-    sharedSpyPosts: {},
-    alliances: {},
-    locationControl: {},
-    combatPasses: [],
-    makerSpice: emptyMakerSpice(),
-    imperiumRow: market.slice(0, 5),
-    marketDeck: market.slice(5),
-    reserveMarket: cloneCards(reserveMarket),
-    throneRow: [],
-    contractOffer: contracts.slice(0, 2),
-    contractDeck: contracts.slice(2),
-    intrigueDeck,
-    intrigueDiscard: [],
-    conflict,
-    conflictDeck,
-    conflictDiscard: [],
-    shieldWall: true,
-    swordmasterClaimed: false,
-    pendingQueue: [],
-    conflictDeploymentBlock: undefined,
-    log: [
-      `Round 1 begins. ${conflict.name} is revealed. ${players[firstSeat].leader} has first action.`,
-      `Only Allies draw Objectives; ${players[firstSeat].leader} has the First Player marker.`,
-    ],
-  };
-  const setupPending = pendingActionForShaddamPersonalBoard(game);
-  return setupPending
-    ? {
-        ...game,
-        pendingAction: setupPending,
-        log: [
-          "Resolve Shaddam's starting Throne Row choice from the Emperor personal board.",
-          ...game.log,
-        ],
-      }
-    : game;
-}
-
 type ControlDefensePendingAction = Extract<PendingAction, { kind: "control-defense" }>;
-
-export function setShieldWall(state: GameState, standing: boolean) {
-  if (state.shieldWall === standing) return state;
-  return {
-    ...state,
-    shieldWall: standing,
-    log: [
-      standing ? "The Shield Wall is standing." : "The Shield Wall has been removed.",
-      ...state.log,
-    ],
-  };
-}
-
-export function setMakerHooks(state: GameState, playerId: string, hasHooks: boolean) {
-  const owner = state.players.find((player) => player.id === playerId);
-  if (!owner || !canHaveMakerHooks(owner) || owner.makerHooks === hasHooks) return state;
-  return {
-    ...state,
-    players: state.players.map((player) =>
-      canHaveMakerHooks(player) ? { ...player, makerHooks: hasHooks } : player,
-    ),
-    log: [
-      hasHooks
-        ? `${teams.muaddib.name} Allies gain Maker Hooks.`
-        : `${teams.muaddib.name} Allies return Maker Hooks.`,
-      ...state.log,
-    ],
-  };
-}
 
 function sameTeamAllies(players: Player[], source: Player): [Player, Player] | undefined {
   const allies = players.filter((player) => player.team === source.team && player.role === "Ally");
@@ -613,12 +509,6 @@ function potentialDeferredMakerChoiceSpice(state: GameState, source: Player, tar
 function demandAttentionRecipient(source: Player, target: Player | undefined, space: BoardSpace) {
   if (space.personal) return source;
   return target;
-}
-
-export function pendingActionForShaddamPersonalBoard(state: GameState): PendingAction | undefined {
-  const shaddam = state.players.find((player) => player.team === "shaddam" && player.role === "Commander");
-  if (!shaddam || !state.imperiumRow.some(canMoveCardToThroneRow)) return undefined;
-  return { kind: "throne-row", ownerId: shaddam.id, source: shaddamPersonalBoardThroneSource };
 }
 
 function commanderResourceSplitPendingAction(

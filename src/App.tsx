@@ -21,6 +21,8 @@ import {
 import { Fragment, type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import { battleIconLabels, boardSpaces, factionIds, factionLabels, iconLabels, teams } from "./game/data";
 import {
+  acquirableCardsForPending,
+  acquireCardForPending,
   advanceSeat,
   acquireMarketCard,
   allPlayersDone,
@@ -70,6 +72,7 @@ import {
   isFindWeaknessIntrigue,
   isGoToGroundIntrigue,
   isImperiumPoliticsIntrigue,
+  isImpressIntrigue,
   isIntelligenceReportIntrigue,
   isMarketOpportunityIntrigue,
   isMercenariesIntrigue,
@@ -843,6 +846,15 @@ export default function App() {
     });
   }
 
+  function acquirePendingCard(cardId: string) {
+    if (game.pendingAction?.kind !== "acquire-card") return;
+    setGame((current) => {
+      const pending = current.pendingAction;
+      if (!pending || pending.kind !== "acquire-card") return current;
+      return maybeStartCombatPhase(acquireCardForPending(current, pending, cardId));
+    });
+  }
+
   function collectContractFallback() {
     if (game.pendingAction?.kind !== "contract") return;
     setGame((current) => {
@@ -1077,6 +1089,9 @@ export default function App() {
   const pendingSpyOwner = pendingAction?.kind === "spy" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingContractOwner =
     pendingAction?.kind === "contract" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
+  const pendingAcquireOwner =
+    pendingAction?.kind === "acquire-card" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
+  const pendingAcquireCards = pendingAction?.kind === "acquire-card" ? acquirableCardsForPending(game, pendingAction) : [];
   const pendingMakerOwner =
     pendingAction?.kind === "maker-choice" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingMakerSpiceOwner =
@@ -1670,6 +1685,7 @@ export default function App() {
                 const devourCard = isDevourIntrigue(card);
                 const findWeaknessCard = isFindWeaknessIntrigue(card);
                 const goToGroundCard = isGoToGroundIntrigue(card);
+                const impressCard = isImpressIntrigue(card);
                 const questionableMethodsCard = isQuestionableMethodsIntrigue(card);
                 const reachAgreementCard = isReachAgreementIntrigue(card);
                 const spiceIsPowerCard = isSpiceIsPowerIntrigue(card);
@@ -1693,7 +1709,9 @@ export default function App() {
                           ? "Retreat 1 or 2 troops from the chosen recipient, then optionally place a spy for that recipient."
                         : reachAgreementCard
                           ? "Retreat 1 or 2 troops from the chosen recipient, then take a CHOAM contract for that recipient."
-                          : spiceIsPowerCard
+                        : impressCard
+                          ? "Add 2 strength to the chosen recipient; that recipient acquires a card that costs 3 or less."
+                        : spiceIsPowerCard
                             ? "Choose one branch: retreat 3 of the recipient's troops for 3 spice, or spend 3 spice for 6 strength."
                           : tacticalOptionCard
                             ? "Choose either 2 strength or a troop count to retreat from the chosen recipient."
@@ -1709,6 +1727,8 @@ export default function App() {
                           ? "Retreat 1-2 troops / optional spy"
                         : reachAgreementCard
                           ? "Retreat 1-2 troops / take contract"
+                        : impressCard
+                          ? "+2 strength / acquire <=3"
                         : spiceIsPowerCard
                           ? "Retreat 3 for +3 spice / spend 3 for +6"
                         : springTheTrapCard
@@ -1721,7 +1741,18 @@ export default function App() {
                         ? "2+ completed contracts"
                         : `+${automatedStrength ?? card.combatSwords} strength`}
                     </span>
-                    {goToGroundCard
+                    {impressCard
+                      ? combatTargets.map((target) => (
+                          <button
+                            type="button"
+                            key={target.id}
+                            onClick={() => playCombatCard(card.id, target.id)}
+                            title={`Add 2 strength to ${target.leader}; ${target.leader} acquires a card that costs 3 or less`}
+                          >
+                            {combatActor.role === "Commander" ? `${target.leader}: +2 + acquire` : "+2 + acquire"}
+                          </button>
+                        ))
+                    : goToGroundCard
                       ? combatTargets.length > 0
                         ? combatTargets.map((target) => (
                             <Fragment key={target.id}>
@@ -1916,6 +1947,7 @@ export default function App() {
                 {pendingAction.kind === "spy" && `${pendingAction.placementIcon ? `${iconLabels[pendingAction.placementIcon]} ` : ""}Spy placement - ${pendingAction.remaining}`}
                 {pendingAction.kind === "reveal-adjust" && "Printed reveal adjustment"}
                 {pendingAction.kind === "contract" && `${pendingContractOwner?.leader ?? "Player"} CHOAM contract`}
+                {pendingAction.kind === "acquire-card" && `${pendingAcquireOwner?.leader ?? "Player"} acquisition`}
                 {pendingAction.kind === "maker-choice" && `${pendingMakerLabel ?? "Player"} Maker space`}
                 {pendingAction.kind === "sietch-tabr" && `${pendingSietchLabel ?? "Player"} Sietch Tabr`}
                 {pendingAction.kind === "commander-resource-split" && `${pendingResourceSplitCommander?.leader ?? "Commander"} ${pendingAction.source}`}
@@ -2399,6 +2431,25 @@ export default function App() {
                     <CircleDollarSign size={15} />
                     Collect 2 Solari
                   </button>
+                )}
+              </div>
+            )}
+
+            {pendingAction.kind === "acquire-card" && pendingAcquireOwner && (
+              <div className="pending-controls contract-choice">
+                {pendingAcquireCards.map((card) => (
+                  <button
+                    type="button"
+                    key={card.id}
+                    onClick={() => acquirePendingCard(card.id)}
+                    title={`Acquire ${card.name} for ${pendingAcquireOwner.leader}`}
+                  >
+                    {card.thumbnailPath && <img src={card.thumbnailPath} alt="" />}
+                    <span>{card.name}</span>
+                  </button>
+                ))}
+                {pendingAcquireCards.length === 0 && (
+                  <span>No eligible cards cost {pendingAction.maxCost} or less.</span>
                 )}
               </div>
             )}

@@ -103,6 +103,7 @@ try {
   const questionableMethods = data.intrigueCards.find((card) => card.sourceId === 156);
   const springTheTrap = data.intrigueCards.find((card) => card.sourceId === 153);
   const devour = data.intrigueCards.find((card) => card.sourceId === 151);
+  const impress = data.intrigueCards.find((card) => card.sourceId === 152);
   const backedByChoam = data.intrigueCards.find((card) => card.sourceId === 448);
   const mercenaries = data.intrigueCards.find((card) => card.sourceId === 128);
   assert.ok(crysknife, "Crysknife Intrigue should be available");
@@ -128,6 +129,7 @@ try {
   assert.ok(questionableMethods, "Questionable Methods Intrigue should be available");
   assert.ok(springTheTrap, "Spring The Trap Intrigue should be available");
   assert.ok(devour, "Devour Intrigue should be available");
+  assert.ok(impress, "Impress Intrigue should be available");
   assert.ok(backedByChoam, "Backed by CHOAM Intrigue should be available");
   assert.ok(mercenaries, "Mercenaries Intrigue should be available");
   assert.equal(
@@ -239,6 +241,11 @@ try {
     devour.summary,
     "Add 2 strength; if the recipient has one or more sandworms in the Conflict, add 4 strength instead and they may trash a card.",
     "Devour should expose its sandworm threshold and optional trash effect",
+  );
+  assert.equal(
+    impress.summary,
+    "Add 2 strength, then acquire a card that costs 3 or less.",
+    "Impress should expose its strength and acquisition effect",
   );
   assert.equal(
     backedByChoam.summary,

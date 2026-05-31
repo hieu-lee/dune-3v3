@@ -76,6 +76,7 @@ const intrigueSummariesByCatalogId: Partial<Record<number, string>> = {
   145: "Spend 2 spice to gain 5 Solari OR spend 5 Solari to gain 5 spice.",
   149: "Add 2 strength; you may recall 1 spy to add 3 more strength.",
   150: "Retreat 3 troops to gain 3 spice OR spend 3 spice to add 6 strength.",
+  152: "Add 2 strength, then acquire a card that costs 3 or less.",
   153: "Recall 2 spies to add 7 strength.",
   155: "Add 2 strength OR retreat any number of your troops.",
   156: "Add 1 strength; the recipient may lose 1 Influence, or a Commander may lose personal Influence, to add 4 more strength.",

@@ -71,6 +71,7 @@ const goToGroundSourceId = 146;
 const findWeaknessSourceId = 149;
 const spiceIsPowerSourceId = 150;
 const devourSourceId = 151;
+const impressSourceId = 152;
 const springTheTrapSourceId = 153;
 const weirdingCombatSourceId = 154;
 const tacticalOptionSourceId = 155;
@@ -253,6 +254,10 @@ export function isGoToGroundIntrigue(intrigue: IntrigueCard) {
 
 export function isSpiceIsPowerIntrigue(intrigue: IntrigueCard) {
   return intrigue.sourceId === spiceIsPowerSourceId;
+}
+
+export function isImpressIntrigue(intrigue: IntrigueCard) {
+  return intrigue.sourceId === impressSourceId;
 }
 
 export function isSpringTheTrapIntrigue(intrigue: IntrigueCard) {
@@ -1213,10 +1218,12 @@ export function advancePendingAction(state: GameState) {
 
 export function finishPendingAction(state: GameState): GameState {
   if (state.pendingAction?.kind === "spy" && state.pendingAction.mustPlaceSpy) return state;
+  if (state.pendingAction?.kind === "acquire-card" && !state.pendingAction.optional) return state;
   return finishCombatIfNoActors({ ...state, ...advancePendingAction(state) });
 }
 
 type ContractPendingAction = Extract<PendingAction, { kind: "contract" }>;
+type AcquireCardPendingAction = Extract<PendingAction, { kind: "acquire-card" }>;
 type DeployPendingAction = Extract<PendingAction, { kind: "deploy" }>;
 type MakerChoicePendingAction = Extract<PendingAction, { kind: "maker-choice" }>;
 type ReinforcePendingAction = Extract<PendingAction, { kind: "reinforce" }>;
@@ -1238,16 +1245,29 @@ type ThreatenSpiceProductionPendingAction = Extract<PendingAction, { kind: "thre
 type ShaddamSignetRingPendingAction = Extract<PendingAction, { kind: "shaddam-signet-ring" }>;
 
 function addPurchasedCard(player: Player, card: Card, fromReserve: boolean): Player {
+  return addAcquiredCard(player, card, fromReserve, "discard", card.cost ?? 0);
+}
+
+function addAcquiredCard(
+  player: Player,
+  card: Card,
+  fromReserve: boolean,
+  destination: AcquireCardPendingAction["destination"],
+  persuasionCost = 0,
+): Player {
   const purchaseSequence = player.purchaseSequence + 1;
   const acquiredCard = fromReserve
     ? { ...card, id: `${card.id}-${player.id}-${purchaseSequence}` }
     : card;
+  const destinationCards = destination === "hand" ? player.hand : player.discard;
   return {
     ...player,
     vp: player.vp + (card.acquired ?? 0),
-    persuasion: player.persuasion - (card.cost ?? 0),
+    persuasion: player.persuasion - persuasionCost,
     purchaseSequence,
-    discard: [...player.discard, acquiredCard],
+    ...(destination === "hand"
+      ? { hand: [...destinationCards, acquiredCard] }
+      : { discard: [...destinationCards, acquiredCard] }),
   };
 }
 
@@ -1448,6 +1468,61 @@ export function takeChoamContract(state: GameState, pending: ContractPendingActi
     contractDeck,
     ...advancePendingAction(state),
     log: [`${owner.leader} takes the ${contract.name} CHOAM contract from ${pending.source}.`, ...state.log],
+  });
+}
+
+export function acquirableCardsForPending(state: GameState, pending: AcquireCardPendingAction) {
+  const owner = state.players.find((player) => player.id === pending.ownerId);
+  if (!owner) return [];
+  const affordable = (card: Card) => (card.cost ?? 0) <= pending.maxCost;
+  return [
+    ...state.imperiumRow.filter(affordable),
+    ...state.reserveMarket.filter(affordable),
+    ...(owner.team === "shaddam" ? state.throneRow.filter(affordable) : []),
+  ];
+}
+
+export function acquireCardForPending(
+  state: GameState,
+  pending: AcquireCardPendingAction,
+  cardId: string,
+): GameState {
+  const owner = state.players.find((player) => player.id === pending.ownerId);
+  if (!owner) return state;
+
+  const reserveCard = state.reserveMarket.find((card) => card.id === cardId);
+  const throneCard = owner.team === "shaddam" ? state.throneRow.find((card) => card.id === cardId) : undefined;
+  const rowIndex = state.imperiumRow.findIndex((card) => card.id === cardId);
+  const rowCard = rowIndex >= 0 ? state.imperiumRow[rowIndex] : undefined;
+  const card = reserveCard ?? throneCard ?? rowCard;
+  if (!card || (card.cost ?? 0) > pending.maxCost) return state;
+
+  const [replacement, ...marketDeckAfterDraw] = state.marketDeck;
+  const marketDeck = rowCard ? marketDeckAfterDraw : state.marketDeck;
+  const imperiumRow = rowCard
+    ? state.imperiumRow.flatMap((candidate, index) => {
+        if (index !== rowIndex) return [candidate];
+        return replacement ? [replacement] : [];
+      })
+    : state.imperiumRow;
+  const throneRow = throneCard ? state.throneRow.filter((candidate) => candidate.id !== card.id) : state.throneRow;
+  const players = state.players.map((player) =>
+    player.id === owner.id
+      ? addAcquiredCard(player, card, Boolean(reserveCard), pending.destination)
+      : player,
+  );
+  const destinationText = pending.destination === "hand" ? "hand" : "discard pile";
+  return finishCombatIfNoActors({
+    ...state,
+    players,
+    imperiumRow,
+    marketDeck,
+    throneRow,
+    ...advancePendingAction(state),
+    log: [
+      `${owner.leader} acquires ${card.name} to their ${destinationText} from ${pending.source}.`,
+      ...state.log,
+    ],
   });
 }
 
@@ -3503,6 +3578,40 @@ export function playCombatIntrigue(
   if (!resolvedTargetId || !targets.includes(resolvedTargetId)) return state;
   const target = state.players.find((player) => player.id === resolvedTargetId);
   if (!target) return state;
+  if (isImpressIntrigue(intrigue)) {
+    const acquirePending: AcquireCardPendingAction = {
+      kind: "acquire-card",
+      ownerId: target.id,
+      source: "Impress",
+      maxCost: 3,
+      destination: "discard",
+    };
+    const canAcquire = acquirableCardsForPending(state, acquirePending).length > 0;
+    const players = state.players.map((player) => {
+      let next = player;
+      if (player.id === actor.id) {
+        next = { ...next, intrigues: next.intrigues.filter((card) => card.id !== intrigue.id) };
+      }
+      if (player.id === target.id) {
+        next = { ...next, conflict: next.conflict + 2 };
+      }
+      return next;
+    });
+    const acquireText = canAcquire
+      ? ` and ${target.leader} must acquire a card that costs 3 or less`
+      : ` and ${target.leader} has no eligible card to acquire`;
+    return advanceAfterCombatIntriguePlay({
+      ...state,
+      players,
+      combatPasses: [],
+      intrigueDiscard: [...state.intrigueDiscard, intrigue],
+      pendingAction: canAcquire ? acquirePending : undefined,
+      log: [
+        `${actor.leader} plays Impress for ${target.leader}, adding 2 strength${acquireText}.`,
+        ...state.log,
+      ],
+    });
+  }
   if (isGoToGroundIntrigue(intrigue)) {
     const retreatCount =
       typeof combatChoice === "object" && combatChoice.kind === "retreat-troops" ? combatChoice.count : undefined;

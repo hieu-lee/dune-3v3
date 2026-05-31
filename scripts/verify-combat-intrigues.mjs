@@ -89,6 +89,10 @@ function passCurrent(state, game) {
 try {
   const data = await server.ssrLoadModule("/src/game/data.ts");
   const state = await server.ssrLoadModule("/src/game/state.ts");
+  const lowCostImperiumCard = data.imperiumDeck.find((card) => (card.cost ?? 0) <= 3);
+  const replacementImperiumCard = data.imperiumDeck.find((card) => card.id !== lowCostImperiumCard?.id);
+  assert.ok(lowCostImperiumCard, "Expected an Imperium Row card that costs 3 or less");
+  assert.ok(replacementImperiumCard, "Expected an Imperium Row replacement card");
 
   const impress = intrigueBySourceId(data, 152);
   const findWeakness = intrigueBySourceId(data, 149);
@@ -108,6 +112,12 @@ try {
   const vastWealthSpace = boardSpaceByName(data, "Vast Wealth");
   const arrakeenSpace = boardSpaceByName(data, "Arrakeen");
   assert.equal(impress.combatSwords, 2, "Impress should expose its structured Combat strength");
+  assert.equal(state.isImpressIntrigue(impress), true, "Impress should be recognized as a structured Combat Intrigue");
+  assert.equal(
+    impress.summary,
+    "Add 2 strength, then acquire a card that costs 3 or less.",
+    "Impress should expose its strength and acquisition effect",
+  );
   assert.equal(findWeakness.combatSwords, 5, "Find Weakness should expose its maximum structured Combat strength");
   assert.equal(
     findWeakness.summary,
@@ -283,19 +293,83 @@ try {
   assert.deepEqual(allyPlayed.combatPasses, [], "A Combat Intrigue play should restart the pass chain");
   assert.equal(allyPlayed.players[allyPlayed.activeSeat].id, "p3", "Play should advance to the next Combat actor");
 
-  const printedOnlyFixture = combatFixture(state, data, (players) =>
+  const impressFixture = combatFixture(state, data, (players) =>
     players.map((player) =>
       player.id === "p2"
         ? { ...player, conflict: 2, deployedTroops: 1, intrigues: [impress] }
+        : player.id === "p3"
+          ? { ...player, conflict: 4, deployedTroops: 1 }
         : player,
     ),
   );
-  const printedOnlyCombat = state.startCombatPhase(printedOnlyFixture);
-  assert.equal(
-    state.playCombatIntrigue(printedOnlyCombat, "p2", impress.id),
-    printedOnlyCombat,
-    "Printed Combat Intrigues should not auto-resolve from catalog strength alone",
+  const impressCombat = state.startCombatPhase({
+    ...impressFixture,
+    imperiumRow: [lowCostImperiumCard],
+    marketDeck: [replacementImperiumCard],
+  });
+  const impressPlayed = state.playCombatIntrigue(impressCombat, "p2", impress.id);
+  assert.equal(playerById(impressPlayed, "p2").conflict, 4, "Impress should add 2 strength to the recipient");
+  assert.deepEqual(playerById(impressPlayed, "p2").intrigues, []);
+  assert.equal(impressPlayed.intrigueDiscard.at(-1).id, impress.id);
+  assert.deepEqual(
+    impressPlayed.pendingAction,
+    { kind: "acquire-card", ownerId: "p2", source: "Impress", maxCost: 3, destination: "discard" },
+    "Impress should require the actor to acquire a card that costs 3 or less",
   );
+  assert.equal(
+    state.finishPendingAction(impressPlayed),
+    impressPlayed,
+    "Impress acquisition should not be skippable while eligible cards are available",
+  );
+  const impressAcquireChoice = state
+    .acquirableCardsForPending(impressPlayed, impressPlayed.pendingAction)
+    .find((card) => card.id === lowCostImperiumCard.id);
+  assert.ok(impressAcquireChoice, "Impress should offer eligible Imperium Row cards");
+  const impressAcquired = state.acquireCardForPending(impressPlayed, impressPlayed.pendingAction, impressAcquireChoice.id);
+  assert.equal(playerById(impressAcquired, "p2").discard.length, 1, "Impress should put the acquired card in discard");
+  assert.equal(playerById(impressAcquired, "p2").discard[0].id, impressAcquireChoice.id);
+  assert.deepEqual(impressAcquired.imperiumRow.map((card) => card.id), [replacementImperiumCard.id]);
+  assert.equal(playerById(impressAcquired, "p2").persuasion, 0, "Impress should not spend persuasion");
+  assert.equal(impressAcquired.pendingAction, undefined);
+  assert.equal(impressAcquired.players[impressAcquired.activeSeat].id, "p3", "Impress pending resolution should not advance Combat again");
+
+  const commanderImpressFixture = combatFixture(
+    state,
+    data,
+    (players) =>
+      players.map((player) =>
+        player.id === "p4"
+          ? { ...player, intrigues: [impress] }
+          : player.id === "p6"
+            ? { ...player, conflict: 2, deployedTroops: 1 }
+            : player,
+      ),
+    3,
+  );
+  const commanderImpressCombat = state.startCombatPhase({
+    ...commanderImpressFixture,
+    imperiumRow: [lowCostImperiumCard],
+    marketDeck: [replacementImperiumCard],
+  });
+  const commanderImpressPlayed = state.playCombatIntrigue(commanderImpressCombat, "p4", impress.id, "p6");
+  assert.equal(playerById(commanderImpressPlayed, "p6").conflict, 4, "Commander Impress should add strength to the chosen Ally");
+  assert.deepEqual(
+    commanderImpressPlayed.pendingAction,
+    { kind: "acquire-card", ownerId: "p6", source: "Impress", maxCost: 3, destination: "discard" },
+    "Commander Impress should make the chosen Ally acquire the card",
+  );
+  const commanderImpressChoice = state.acquirableCardsForPending(
+    commanderImpressPlayed,
+    commanderImpressPlayed.pendingAction,
+  )[0];
+  assert.ok(commanderImpressChoice, "Commander Impress should offer an acquisition to the chosen Ally");
+  const commanderImpressAcquired = state.acquireCardForPending(
+    commanderImpressPlayed,
+    commanderImpressPlayed.pendingAction,
+    commanderImpressChoice.id,
+  );
+  assert.equal(playerById(commanderImpressAcquired, "p6").discard.length, 1);
+  assert.equal(playerById(commanderImpressAcquired, "p4").discard.length, 0, "Commander should not receive the Impress acquisition");
 
   const contingencyFixture = combatFixture(state, data, (players) =>
     players.map((player) =>

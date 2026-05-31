@@ -63,6 +63,7 @@ Private web-table implementation for a six-player `Dune: Imperium - Uprising` te
 - Market Opportunity can be played as a Plot Intrigue to exchange 2 spice for 5 Solari or 5 Solari for 5 spice.
 - Weirding Combat can be played as a Combat Intrigue for 3 strength, or 5 with 3+ effective Bene Gesserit Influence.
 - Backed by CHOAM can be played as a Plot Intrigue by losing 1 Influence for 4 Solari, or as a Combat Intrigue for 4 strength once the actor has completed at least two contracts.
+- Impress can be played as a Combat Intrigue for 2 strength, then the chosen recipient acquires a card that costs 3 or less.
 - Find Weakness can be played as a Combat Intrigue for 2 strength, with an optional actor-owned spy recall for 3 more strength.
 - Questionable Methods can be played as a Combat Intrigue for 1 strength, with an optional recipient or Commander personal Influence loss for 4 more strength.
 - Go To Ground can be played as a Combat Intrigue to retreat one or two recipient troops, then optionally place a spy for that recipient.

@@ -259,6 +259,14 @@ export type PendingAction =
       spaceId?: string;
     }
   | {
+      kind: "acquire-card";
+      ownerId: string;
+      source: string;
+      maxCost: number;
+      destination: "discard" | "hand";
+      optional?: boolean;
+    }
+  | {
       kind: "maker-choice";
       ownerId: string;
       spiceOwnerId: string;

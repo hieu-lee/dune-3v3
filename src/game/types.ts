@@ -215,6 +215,9 @@ export type PendingAction =
       ownerId: string;
       remaining: number;
       source: string;
+      placementIcon?: IconId;
+      recallForSupply?: boolean;
+      mustPlaceSpy?: boolean;
     }
   | {
       kind: "recall-spy";

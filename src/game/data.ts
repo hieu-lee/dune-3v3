@@ -63,6 +63,7 @@ const intrigueSummariesByCatalogId: Partial<Record<number, string>> = {
   133: "Draw 1 card OR spend 1 spice to draw 1 card and trash 1 card.",
   134: "Spend 2 Solari and lose 2 Influence to gain 1 VP.",
   135: "Lose 1 Influence to gain 1 Influence; you may also spend 3 spice to gain 1 Influence.",
+  136: "Place 1 spy on a City observation post OR recall 1 spy to remove the Shield Wall and gain 2 spice.",
   131: "Remove the Shield Wall OR deploy up to four troops from your garrison to the Conflict.",
   129: "If you have a seat on the High Council, gain 2 water.",
   130: "Spend 5 spice to gain 1 VP; with 3+ Spacing Guild Influence, you may also spend 3 water to gain 1 VP.",

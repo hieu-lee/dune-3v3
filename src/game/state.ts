@@ -58,6 +58,7 @@ const mercenariesSourceId = 128;
 const cunningSourceId = 133;
 const opportunismSourceId = 134;
 const changeAllegiancesSourceId = 135;
+const specialMissionSourceId = 136;
 const buyAccessSourceId = 139;
 const imperiumPoliticsSourceId = 140;
 const callToArmsSourceId = 138;
@@ -115,6 +116,9 @@ export type ChangeAllegiancesChoice =
   | { kind: "shift"; loseFaction: FactionId; gainFaction: FactionId }
   | { kind: "spend-spice"; gainFaction: FactionId }
   | { kind: "both"; loseFaction: FactionId; shiftGainFaction: FactionId; spiceGainFaction: FactionId };
+export type SpecialMissionChoice =
+  | { kind: "place-spy" }
+  | { kind: "recall-spy"; spaceId: string };
 export type ImperiumPoliticsChoice = "greatHouses" | "emperor" | "spacing";
 export type StrategicStockpilingChoice = "spice" | "water" | "both";
 export type MarketOpportunityChoice = "spice-to-solari" | "solari-to-spice";
@@ -205,6 +209,10 @@ export function isOpportunismIntrigue(intrigue: IntrigueCard) {
 
 export function isChangeAllegiancesIntrigue(intrigue: IntrigueCard) {
   return intrigue.sourceId === changeAllegiancesSourceId;
+}
+
+export function isSpecialMissionIntrigue(intrigue: IntrigueCard) {
+  return intrigue.sourceId === specialMissionSourceId;
 }
 
 export function isBuyAccessIntrigue(intrigue: IntrigueCard) {
@@ -1204,6 +1212,7 @@ export function advancePendingAction(state: GameState) {
 }
 
 export function finishPendingAction(state: GameState): GameState {
+  if (state.pendingAction?.kind === "spy" && state.pendingAction.mustPlaceSpy) return state;
   return finishCombatIfNoActors({ ...state, ...advancePendingAction(state) });
 }
 
@@ -1813,7 +1822,23 @@ export function recallableSpySpaces(state: GameState, pending: RecallSpyPendingA
 export function placeableSpySpaces(state: GameState, pending: SpyPendingAction) {
   const owner = state.players.find((player) => player.id === pending.ownerId);
   if (!owner || owner.spies <= 0) return [];
-  return boardSpaces.filter((space) => canPlaceSpyPost(state, space, owner));
+  return boardSpaces.filter((space) =>
+    canPlaceSpyPost(state, space, owner) &&
+    (!pending.placementIcon || space.icon === pending.placementIcon)
+  );
+}
+
+export function recallableSpySupplySpaces(state: GameState, pending: SpyPendingAction) {
+  if (!pending.recallForSupply) return [];
+  const owner = state.players.find((player) => player.id === pending.ownerId);
+  if (!owner || owner.spies > 0) return [];
+  const allOwnSpies = boardSpaces.filter((space) => state.spyPosts[space.id] === owner.id);
+  if (placeableSpySpaces({ ...state, players: state.players.map((player) =>
+    player.id === owner.id ? { ...player, spies: 1 } : player,
+  ) }, pending).length > 0) {
+    return allOwnSpies;
+  }
+  return pending.placementIcon ? allOwnSpies.filter((space) => space.icon === pending.placementIcon) : allOwnSpies;
 }
 
 function spyPostCount(state: GameState, ownerId: string) {
@@ -1827,7 +1852,14 @@ export function placeSpyForPending(
 ): GameState {
   const owner = state.players.find((player) => player.id === pending.ownerId);
   const space = boardSpaces.find((candidate) => candidate.id === spaceId);
-  if (!owner || !space || owner.spies <= 0 || pending.remaining <= 0 || !canPlaceSpyPost(state, space, owner)) {
+  if (
+    !owner ||
+    !space ||
+    owner.spies <= 0 ||
+    pending.remaining <= 0 ||
+    !canPlaceSpyPost(state, space, owner) ||
+    (pending.placementIcon && space.icon !== pending.placementIcon)
+  ) {
     return state;
   }
 
@@ -1843,6 +1875,31 @@ export function placeSpyForPending(
     ...(remaining > 0 ? { pendingAction: { ...pending, remaining } } : advancePendingAction(state)),
     log: [`${owner.leader} places a spy near ${space.name} from ${pending.source}.`, ...state.log],
   });
+}
+
+export function recallSpyForSupplyForPending(
+  state: GameState,
+  pending: SpyPendingAction,
+  spaceId: string,
+): GameState {
+  if (!pending.recallForSupply) return state;
+  const owner = state.players.find((player) => player.id === pending.ownerId);
+  if (!owner || owner.spies > 0 || pending.remaining <= 0) return state;
+  const space = boardSpaces.find((candidate) => candidate.id === spaceId);
+  if (!space || state.spyPosts[space.id] !== owner.id) return state;
+  if (!recallableSpySupplySpaces(state, pending).some((candidate) => candidate.id === space.id)) return state;
+
+  const spyPosts = { ...state.spyPosts };
+  delete spyPosts[space.id];
+  return {
+    ...state,
+    players: state.players.map((player) =>
+      player.id === owner.id ? { ...player, spies: player.spies + 1 } : player,
+    ),
+    spyPosts,
+    pendingAction: { ...pending, recallForSupply: false, mustPlaceSpy: true },
+    log: [`${owner.leader} recalls a spy from ${space.name} for ${pending.source}.`, ...state.log],
+  };
 }
 
 export function recallSpyForPending(
@@ -1947,6 +2004,36 @@ export function changeAllegiancesLossChoices(
       ? mainBoardInfluenceChoices.filter((faction) => activatedAlly.influence[faction] > 0)
       : []),
   ];
+}
+
+function specialMissionSpyPending(player: Player): SpyPendingAction {
+  return {
+    kind: "spy",
+    ownerId: player.id,
+    remaining: 1,
+    source: "Special Mission",
+    placementIcon: "city",
+    recallForSupply: true,
+    mustPlaceSpy: true,
+  };
+}
+
+export function specialMissionCitySpySpaces(state: GameState, player: Player) {
+  return boardSpaces.filter((space) =>
+    space.icon === "city" &&
+    canPlaceSpyPost(state, space, player)
+  );
+}
+
+export function specialMissionRecallSpySpaces(state: GameState, player: Player) {
+  return boardSpaces.filter((space) => state.spyPosts[space.id] === player.id);
+}
+
+export function canPlaySpecialMissionPlaceSpy(state: GameState, player: Player) {
+  if (specialMissionCitySpySpaces(state, player).length > 0) {
+    return player.spies > 0 || specialMissionRecallSpySpaces(state, player).length > 0;
+  }
+  return player.spies <= 0 && specialMissionRecallSpySpaces(state, player).some((space) => space.icon === "city");
 }
 
 export function influenceLossPairChoices(player: Player): InfluenceLossPair[] {
@@ -2547,6 +2634,67 @@ export function playChangeAllegiancesPlotIntrigue(
     intrigueDiscard: [...state.intrigueDiscard, intrigue],
     log: [logEntry, ...state.log],
   };
+}
+
+export function playSpecialMissionPlotIntrigue(
+  state: GameState,
+  playerId: string,
+  intrigueId: string,
+  choice: SpecialMissionChoice,
+): GameState {
+  if (state.phase !== "playing" || state.pendingAction || state.pendingQueue.length > 0) return state;
+  const player = state.players[state.activeSeat];
+  if (!player || player.id !== playerId) return state;
+  const intrigue = player.intrigues.find((card) => card.id === intrigueId);
+  if (!intrigue || !isSpecialMissionIntrigue(intrigue) || !choice || typeof choice !== "object") return state;
+
+  if (choice.kind === "place-spy") {
+    if (!canPlaySpecialMissionPlaceSpy(state, player)) return state;
+    return {
+      ...state,
+      players: state.players.map((candidate) =>
+        candidate.id === player.id
+          ? { ...candidate, intrigues: candidate.intrigues.filter((card) => card.id !== intrigue.id) }
+          : candidate,
+      ),
+      pendingAction: specialMissionSpyPending(player),
+      intrigueDiscard: [...state.intrigueDiscard, intrigue],
+      log: [
+        `${player.leader} plays Special Mission and may place a spy on a City observation post.`,
+        ...state.log,
+      ],
+    };
+  }
+
+  if (choice.kind === "recall-spy") {
+    const space = specialMissionRecallSpySpaces(state, player).find((candidate) => candidate.id === choice.spaceId);
+    if (!space) return state;
+    const spyPosts = { ...state.spyPosts };
+    delete spyPosts[space.id];
+    const shieldWallText = state.shieldWall ? ", removes the Shield Wall," : "";
+    return {
+      ...state,
+      shieldWall: false,
+      spyPosts,
+      players: state.players.map((candidate) =>
+        candidate.id === player.id
+          ? {
+              ...candidate,
+              resources: { ...candidate.resources, spice: candidate.resources.spice + 2 },
+              spies: candidate.spies + 1,
+              intrigues: candidate.intrigues.filter((card) => card.id !== intrigue.id),
+            }
+          : candidate,
+      ),
+      intrigueDiscard: [...state.intrigueDiscard, intrigue],
+      log: [
+        `${player.leader} plays Special Mission, recalls a spy from ${space.name}${shieldWallText} and gains 2 spice.`,
+        ...state.log,
+      ],
+    };
+  }
+
+  return state;
 }
 
 function influenceLossPairLog(choice: InfluenceLossPair) {

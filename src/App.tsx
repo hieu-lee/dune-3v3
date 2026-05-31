@@ -30,6 +30,7 @@ import {
   canPlaceSpyPost,
   canMoveCardToThroneRow,
   canPay,
+  canPlaySpecialMissionPlaceSpy,
   changeAllegiancesGainChoices,
   changeAllegiancesLossChoices,
   collectChoamContractFallback,
@@ -77,6 +78,7 @@ import {
   isReachAgreementIntrigue,
   isShaddamsFavorIntrigue,
   isSietchRitualIntrigue,
+  isSpecialMissionIntrigue,
   isSpiceIsPowerIntrigue,
   isSpringTheTrapIntrigue,
   isStrategicStockpilingIntrigue,
@@ -95,8 +97,11 @@ import {
   playerDoublesConflictRewards,
   playCombatIntrigue,
   placeSpyForPending,
+  placeableSpySpaces,
   queuePendingActions,
   recallableSpySpaces,
+  recallableSpySupplySpaces,
+  recallSpyForSupplyForPending,
   recallSpyForPending,
   reinforceTroop,
   moveImperiumCardToThroneRow,
@@ -127,6 +132,7 @@ import {
   playPlotBattleIconIntrigue,
   playShaddamsFavorPlotIntrigue,
   playSietchRitualPlotIntrigue,
+  playSpecialMissionPlotIntrigue,
   playStrategicStockpilingPlotIntrigue,
   playUnexpectedAlliesIntrigue,
   resolveCommandRespectTrade,
@@ -142,6 +148,8 @@ import {
   resolveThreatenSpiceProductionChoice,
   imperiumPoliticsFactionChoices,
   sietchRitualFactionChoices,
+  specialMissionCitySpySpaces,
+  specialMissionRecallSpySpaces,
   skipCommandRespect,
   skipDemandAttention,
   skipCorrinoMight,
@@ -161,7 +169,7 @@ import {
   buyAccessPairChoices,
 } from "./game/state";
 import type { BoardSpace, Card, FactionId, GameState, PendingAction, Player, ResourceId, Resources, TeamId, TradeGoodId, TrashCardZone } from "./game/types";
-import type { BuyAccessChoice, ChangeAllegiancesChoice, CombatIntrigueChoice, ImperiumPoliticsChoice, InfluenceLossPair, ShaddamSignetRingChoice, SietchRitualChoice } from "./game/state";
+import type { BuyAccessChoice, ChangeAllegiancesChoice, CombatIntrigueChoice, ImperiumPoliticsChoice, InfluenceLossPair, ShaddamSignetRingChoice, SietchRitualChoice, SpecialMissionChoice } from "./game/state";
 
 const resources: Array<{ id: ResourceId; label: string; Icon: LucideIcon }> = [
   { id: "solari", label: "Solari", Icon: CircleDollarSign },
@@ -585,6 +593,15 @@ export default function App() {
     });
   }
 
+  function recallSpyForSupply(spaceId: string) {
+    if (game.pendingAction?.kind !== "spy") return;
+    setGame((current) => {
+      const pending = current.pendingAction;
+      if (!pending || pending.kind !== "spy") return current;
+      return recallSpyForSupplyForPending(current, pending, spaceId);
+    });
+  }
+
   function adjustRevealReward(persuasionDelta: number, strengthDelta: number) {
     if (game.pendingAction?.kind !== "reveal-adjust") return;
     setGame((current) => {
@@ -934,6 +951,10 @@ export default function App() {
     });
   }
 
+  function playSpecialMissionPlot(intrigueId: string, choice: SpecialMissionChoice) {
+    setGame((current) => playSpecialMissionPlotIntrigue(current, current.players[current.activeSeat].id, intrigueId, choice));
+  }
+
   function playOpportunismPlot(intrigueId: string, choice: InfluenceLossPair) {
     setGame((current) => playOpportunismPlotIntrigue(current, current.players[current.activeSeat].id, intrigueId, choice));
   }
@@ -1251,8 +1272,9 @@ export default function App() {
   const unexpectedAlliesCanSummonWithoutWall = Boolean(game.conflict && (!game.shieldWall || !currentConflictProtected));
   const unexpectedAlliesDisabled =
     plotIntrigueLocked || !game.conflict || !unexpectedAlliesCanPay || unexpectedAlliesDeploymentBlocked;
-  const spyPlacementSpaces = pendingSpyOwner
-    ? boardSpaces.filter((space) => canPlaceSpyPost(game, space, pendingSpyOwner))
+  const spyPlacementSpaces = pendingAction?.kind === "spy" ? placeableSpySpaces(game, pendingAction) : [];
+  const pendingSpySupplyRecallSpaces = pendingAction?.kind === "spy"
+    ? recallableSpySupplySpaces(game, pendingAction)
     : [];
 
   return (
@@ -1891,7 +1913,7 @@ export default function App() {
                 {pendingAction.kind === "deploy" && `${pendingOwner?.leader ?? "Player"} deployment`}
                 {pendingAction.kind === "reinforce" && `Military Support - ${pendingAction.remaining} troops`}
                 {pendingAction.kind === "trade" && `Trade from ${pendingAction.source}`}
-                {pendingAction.kind === "spy" && `Spy placement - ${pendingAction.remaining}`}
+                {pendingAction.kind === "spy" && `${pendingAction.placementIcon ? `${iconLabels[pendingAction.placementIcon]} ` : ""}Spy placement - ${pendingAction.remaining}`}
                 {pendingAction.kind === "reveal-adjust" && "Printed reveal adjustment"}
                 {pendingAction.kind === "contract" && `${pendingContractOwner?.leader ?? "Player"} CHOAM contract`}
                 {pendingAction.kind === "maker-choice" && `${pendingMakerLabel ?? "Player"} Maker space`}
@@ -1926,12 +1948,34 @@ export default function App() {
             {pendingAction.kind === "spy" && pendingSpyOwner && (
               <div className="pending-controls spy-grid">
                 <span>{pendingSpyOwner.leader}: {pendingSpyOwner.spies} spies ready</span>
+                {pendingSpyOwner.spies <= 0 && pendingSpySupplyRecallSpaces.length > 0 && (
+                  <span>Recall one spy for supply, then place.</span>
+                )}
+                {pendingSpySupplyRecallSpaces.map((space) => (
+                  <button
+                    type="button"
+                    key={`recall-${space.id}`}
+                    onClick={() => recallSpyForSupply(space.id)}
+                    title={`Recall spy from ${space.name} for no effect`}
+                  >
+                    <RotateCcw size={14} />
+                    {space.name}
+                  </button>
+                ))}
                 {spyPlacementSpaces.map((space) => (
                   <button type="button" key={space.id} onClick={() => placeSpy(space.id)}>
                     {space.name}
                   </button>
                 ))}
-                <button type="button" onClick={clearPendingAction}>Done</button>
+                {spyPlacementSpaces.length === 0 && pendingSpyOwner.spies > 0 && <span>No legal spy posts</span>}
+                <button
+                  type="button"
+                  onClick={clearPendingAction}
+                  disabled={pendingAction.mustPlaceSpy}
+                  title={pendingAction.mustPlaceSpy ? "Place the spy to finish this effect" : undefined}
+                >
+                  Done
+                </button>
               </div>
             )}
 
@@ -2505,6 +2549,15 @@ export default function App() {
                     activePlayer.role === "Commander" && faction !== changeAllegiancesPersonalFaction
                       ? `: ${activatedAlly.leader}`
                       : "";
+                  const specialMissionCanPlaceSpy = isSpecialMissionIntrigue(card)
+                    ? canPlaySpecialMissionPlaceSpy(game, activePlayer)
+                    : false;
+                  const specialMissionCitySpaces = isSpecialMissionIntrigue(card)
+                    ? specialMissionCitySpySpaces(game, activePlayer)
+                    : [];
+                  const specialMissionRecallSpaces = isSpecialMissionIntrigue(card)
+                    ? specialMissionRecallSpySpaces(game, activePlayer)
+                    : [];
                   const opportunismCanPay = activePlayer.resources.solari >= 2;
                   const opportunismChoices = isOpportunismIntrigue(card) ? influenceLossPairChoices(activePlayer) : [];
                   const buyAccessCanPay = activePlayer.resources.solari >= 5;
@@ -2531,6 +2584,8 @@ export default function App() {
                             ? "Plot / discard for Influence"
                           : isChangeAllegiancesIntrigue(card)
                             ? "Plot / shift or buy Influence"
+                          : isSpecialMissionIntrigue(card)
+                            ? "Plot / City spy or wall spice"
                           : isOpportunismIntrigue(card)
                             ? "Plot / cash Influence for VP"
                           : isBuyAccessIntrigue(card)
@@ -2785,6 +2840,39 @@ export default function App() {
                               Both rows
                             </button>
                           </div>
+                        </div>
+                      )}
+                      {isSpecialMissionIntrigue(card) && (
+                        <div className="intrigue-actions">
+                          <button
+                            type="button"
+                            onClick={() => playSpecialMissionPlot(card.id, { kind: "place-spy" })}
+                            disabled={plotIntrigueLocked || !specialMissionCanPlaceSpy}
+                            title={
+                              activePlayer.spies > 0
+                                ? "Place 1 spy on a City observation post"
+                                : "Recall one of your spies for supply, then place it on a City observation post"
+                            }
+                          >
+                            <Eye size={14} />
+                            City Spy
+                          </button>
+                          {specialMissionCitySpaces.length === 0 && activePlayer.spies > 0 && (
+                            <span>No open City spy posts.</span>
+                          )}
+                          {specialMissionRecallSpaces.map((space) => (
+                            <button
+                              type="button"
+                              key={space.id}
+                              onClick={() => playSpecialMissionPlot(card.id, { kind: "recall-spy", spaceId: space.id })}
+                              disabled={plotIntrigueLocked}
+                              title={`Recall a spy from ${space.name}, remove the Shield Wall, and gain 2 spice`}
+                            >
+                              <RotateCcw size={14} />
+                              {space.name} -&gt; Wall + 2 Spice
+                            </button>
+                          ))}
+                          {specialMissionRecallSpaces.length === 0 && <span>Recall branch requires one of your spies on the board.</span>}
                         </div>
                       )}
                       {isOpportunismIntrigue(card) && (

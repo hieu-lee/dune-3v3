@@ -22,6 +22,8 @@ import { CommandBar } from "./components/CommandBar";
 import { EndgamePanel } from "./components/EndgamePanel";
 import { LeaderReferenceModal } from "./components/LeaderReferenceModal";
 import { MarketPanel } from "./components/MarketPanel";
+import { PendingInfluenceLossPanel } from "./components/PendingInfluenceLossPanel";
+import { PendingRecallSpyPanel } from "./components/PendingRecallSpyPanel";
 import { PendingSpyPanel } from "./components/PendingSpyPanel";
 import { PendingTrashPanel } from "./components/PendingTrashPanel";
 import { PlayerColumn } from "./components/PlayerColumn";
@@ -1881,55 +1883,26 @@ export default function App() {
             )}
 
             {pendingAction.kind === "recall-spy" && pendingRecallSpyOwner && (
-              <div className="pending-controls spy-grid">
-                <span>
-                  {pendingRecallSpyOwner.leader}: {pendingAction.remaining} {pendingAction.remaining === 1 ? "spy" : "spies"} for +{pendingAction.strength} strength
-                  {pendingRecallSpyRecipient ? ` to ${pendingRecallSpyRecipient.leader}` : ""}
-                </span>
-                {pendingRecallSpyChoices.map((space) => (
-                  <button
-                    type="button"
-                    key={space.id}
-                    onClick={() => recallSpy(space.id)}
-                    title={`Recall spy from ${space.name}`}
-                  >
-                    <RotateCcw size={14} />
-                    {space.name}
-                  </button>
-                ))}
-                {pendingRecallSpyChoices.length === 0 && <span>No spy posts</span>}
-                {pendingAction.optional && <button type="button" onClick={skipRecall}>Skip</button>}
-              </div>
+              <PendingRecallSpyPanel
+                choices={pendingRecallSpyChoices}
+                owner={pendingRecallSpyOwner}
+                pending={pendingAction}
+                recipient={pendingRecallSpyRecipient}
+                onRecall={recallSpy}
+                onSkip={skipRecall}
+              />
             )}
 
             {pendingAction.kind === "lose-influence" && pendingInfluencePayerLabel && (
-              <div className="pending-controls support-grid">
-                <span>
-                  {pendingInfluencePayerLabel}: lose 1 Influence for +{pendingAction.strength} strength
-                  {pendingInfluenceRecipient ? ` to ${pendingInfluenceRecipient.leader}` : ""}
-                </span>
-                {pendingInfluenceChoices.map(({ ownerId, faction }) => {
-                  const owner = game.players.find((player) => player.id === ownerId);
-                  const showOwner = owner && (pendingInfluenceChoiceOwnerIds.length > 1 || owner.id !== pendingAction.ownerId);
-                  const ownerRoleLabel = owner?.id === pendingAction.combatRecipientId ? "Recipient" : "Commander personal";
-                  const label = showOwner
-                    ? `${ownerRoleLabel}: ${owner.leader} / ${factionLabels[faction]}`
-                    : factionLabels[faction];
-                  return (
-                    <button
-                      type="button"
-                      key={`${ownerId}-${faction}`}
-                      onClick={() => loseInfluence(ownerId, faction)}
-                      title={`${owner?.leader ?? "Player"} loses 1 ${factionLabels[faction]} Influence`}
-                    >
-                      <span>{factionShortLabels[faction]}</span>
-                      {label}
-                    </button>
-                  );
-                })}
-                {pendingInfluenceChoices.length === 0 && <span>No Influence to lose</span>}
-                {pendingAction.optional && <button type="button" onClick={skipInfluenceLoss}>Skip</button>}
-              </div>
+              <PendingInfluenceLossPanel
+                choices={pendingInfluenceChoices}
+                payerLabel={pendingInfluencePayerLabel}
+                pending={pendingAction}
+                players={game.players}
+                recipient={pendingInfluenceRecipient}
+                onLoseInfluence={loseInfluence}
+                onSkip={skipInfluenceLoss}
+              />
             )}
 
             {pendingAction.kind === "reveal-adjust" && revealAdjustOwner && revealAdjustRecipient && (

@@ -4,6 +4,7 @@ import { lstat, mkdir, mkdtemp, readdir, realpath, rename, rm, writeFile } from 
 import path from "node:path";
 import { chromium } from "playwright";
 import { createServer } from "vite";
+import { runPendingChoicesSmoke } from "./browser-debug-pending-choices.mjs";
 
 let optionError;
 
@@ -105,7 +106,7 @@ const scenario = optionValue("--scenario", "all");
 const outDir = optionValue("--out", "artifacts/qa/browser-debug");
 const port = optionNumber("--port", 5178);
 const slowMo = optionNumber("--slow-mo", 0);
-const scenarios = new Set(["home", "agent-placement", "control-defense", "leader-modal", "manual", "all"]);
+const scenarios = new Set(["home", "agent-placement", "control-defense", "pending-choices", "leader-modal", "manual", "all"]);
 const generatedScreenshotNames = [
   "home-desktop.png",
   "home-mobile.png",
@@ -115,6 +116,8 @@ const generatedScreenshotNames = [
   "control-defense-pending-desktop.png",
   "control-defense-after-deploy.png",
   "control-defense-pending-mobile.png",
+  "pending-recall-spy.png",
+  "pending-lose-influence.png",
   "leader-modal-open.png",
   "leader-modal-closed.png",
   "manual-ready.png",
@@ -125,6 +128,7 @@ const generatedArtifactNames = new Set([
   "agent-placement-plan.json",
   "console.json",
   "control-defense-state.json",
+  "pending-choice-states.json",
   "request-failures.json",
   "summary.json",
   ...generatedScreenshotNames,
@@ -853,6 +857,21 @@ try {
     }
     if (scenario === "control-defense" || scenario === "all") {
       await interruptible(runControlDefenseSmoke(page, url, server, captures));
+    }
+    if (scenario === "pending-choices" || scenario === "all") {
+      await interruptible(runPendingChoicesSmoke({
+        captures,
+        currentGame,
+        initialPlayableGame,
+        openApp,
+        page,
+        screenshot,
+        server,
+        setDebugGameAndWait,
+        url,
+        waitForNoPending,
+        writeJson,
+      }));
     }
     if (scenario === "leader-modal" || scenario === "all") {
       await interruptible(runLeaderModalSmoke(page, url, server, captures));

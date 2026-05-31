@@ -168,7 +168,7 @@ import {
   resolveJessicaWaterOfLifeChoice,
   resolveLadyAmberDesertScoutsChoice,
   resolveMakerChoice,
-  resolvePrincessIrulanBirthright,
+  resolveLeaderInfluenceThresholdRewards,
   resolveSietchTabrChoice,
   resolveShaddamSignetRingChoice,
   scoreGurneyAlwaysSmiling,
@@ -471,10 +471,10 @@ export default function App() {
         ].filter((entry): entry is string => Boolean(entry)),
       };
       const intrigueGain = boardSpaceIntrigueGainFor(selectedSpace, player);
-      const birthrightState = resolvePrincessIrulanBirthright(nextState, current.players);
+      const influenceThresholdState = resolveLeaderInfluenceThresholdRewards(nextState, current.players);
       const resolvedState = intrigueGain > 0
-        ? drawIntrigueCards(birthrightState, source.id, intrigueGain, selectedSpace.name)
-        : birthrightState;
+        ? drawIntrigueCards(influenceThresholdState, source.id, intrigueGain, selectedSpace.name)
+        : influenceThresholdState;
       const totalSpiceGain = spiceGain + (cardAgentEffect.sourceSpiceGained ?? 0);
       return totalSpiceGain > 0 ? recordTurnSpiceGain(resolvedState, source.id, totalSpiceGain) : resolvedState;
     });

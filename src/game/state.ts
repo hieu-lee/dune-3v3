@@ -108,9 +108,13 @@ const gurneyHalleckLeaderName = "Gurney Halleck";
 const gurneyAlwaysSmilingThreshold = 10;
 const feydRauthaLeaderName = "Feyd-Rautha Harkonnen";
 const ladyAmberMetulliLeaderName = "Lady Amber Metulli";
+const ladyMargotFenringLeaderName = "Lady Margot Fenring";
 const ladyJessicaLeaderName = "Lady Jessica";
 const reverendMotherJessicaLeaderName = "Reverend Mother Jessica";
 const princessIrulanLeaderName = "Princess Irulan";
+const margotLoyaltyFaction: FactionId = "bene";
+const margotLoyaltyThreshold = 2;
+const margotLoyaltySpice = 2;
 const irulanBirthrightFaction: FactionId = "greatHouses";
 const irulanBirthrightThreshold = 2;
 const irulanSignetAcquireCost = 1;
@@ -850,23 +854,70 @@ function reachesPrincessIrulanBirthright(previous: Player, next: Player) {
   );
 }
 
-export function resolvePrincessIrulanBirthright(state: GameState, previousPlayers: Player[]): GameState {
+function reachesLadyMargotLoyalty(previous: Player, next: Player) {
+  return (
+    previous.leader === ladyMargotFenringLeaderName &&
+    next.leader === ladyMargotFenringLeaderName &&
+    previous.influence[margotLoyaltyFaction] < margotLoyaltyThreshold &&
+    next.influence[margotLoyaltyFaction] >= margotLoyaltyThreshold
+  );
+}
+
+export function resolveLeaderInfluenceThresholdRewards(state: GameState, previousPlayers: Player[]): GameState {
   return previousPlayers.reduce((nextState, previous) => {
     const current = nextState.players.find((player) => player.id === previous.id);
-    if (!current || !reachesPrincessIrulanBirthright(previous, current)) return nextState;
-    const previousLog = nextState.log;
-    const drawnState = drawIntrigueCards(nextState, current.id, 1, "Imperial Birthright");
-    const addedLogCount = drawnState.log.length - previousLog.length;
-    if (previousLog.length === 0 || addedLogCount <= 0) return drawnState;
-    return {
-      ...drawnState,
-      log: [
-        previousLog[0],
-        ...drawnState.log.slice(0, addedLogCount),
-        ...previousLog.slice(1),
-      ],
+    if (!current) return nextState;
+    if (reachesPrincessIrulanBirthright(previous, current)) {
+      const previousLog = nextState.log;
+      const drawnState = drawIntrigueCards(nextState, current.id, 1, "Imperial Birthright");
+      const addedLogCount = drawnState.log.length - previousLog.length;
+      if (previousLog.length === 0 || addedLogCount <= 0) return drawnState;
+      return {
+        ...drawnState,
+        log: [
+          previousLog[0],
+          ...drawnState.log.slice(0, addedLogCount),
+          ...previousLog.slice(1),
+        ],
+      };
+    }
+    if (!reachesLadyMargotLoyalty(previous, current)) return nextState;
+    const loyaltyLog = `${current.leader} resolves Loyalty: gains ${margotLoyaltySpice} spice.`;
+    const rewardedState = {
+      ...nextState,
+      players: nextState.players.map((player) =>
+        player.id === current.id
+          ? {
+              ...player,
+              resources: {
+                ...player.resources,
+                spice: player.resources.spice + margotLoyaltySpice,
+              },
+            }
+          : player,
+      ),
+      log: nextState.log.length > 0
+        ? [nextState.log[0], loyaltyLog, ...nextState.log.slice(1)]
+        : [loyaltyLog],
     };
+    return recordTurnSpiceGain(rewardedState, current.id, margotLoyaltySpice);
   }, state);
+}
+
+function adjustInfluenceAndResolveThresholdRewards(
+  state: GameState,
+  playerId: string,
+  faction: FactionId,
+  amount: number,
+): GameState {
+  const previousPlayers = state.players;
+  const nextState = {
+    ...state,
+    players: state.players.map((player) =>
+      player.id === playerId ? adjustInfluence(player, faction, amount) : player,
+    ),
+  };
+  return resolveLeaderInfluenceThresholdRewards(nextState, previousPlayers);
 }
 
 export function iconCanReach(
@@ -1197,6 +1248,25 @@ export function pendingActionForCard(
   }
   if (
     isGenericSignetRingCard(card) &&
+    source.leader === ladyMargotFenringLeaderName &&
+    source.role === "Ally" &&
+    source.playArea.some((candidate) => candidate.id === card.id && isGenericSignetRingCard(candidate))
+  ) {
+    const pending: PendingAction = {
+      kind: "spy",
+      ownerId: source.id,
+      remaining: 1,
+      source: "Arrakis Informant",
+      placementIcon: "bene",
+      recallForSupply: true,
+    };
+    const canPlace = state
+      ? placeableSpySpaces(state, pending).length > 0 || recallableSpySupplySpaces(state, pending).length > 0
+      : source.spies > 0;
+    return canPlace ? pending : undefined;
+  }
+  if (
+    isGenericSignetRingCard(card) &&
     source.leader === ladyJessicaLeaderName &&
     source.role === "Ally" &&
     source.resources.spice + (state && space ? potentialDeferredMakerChoiceSpice(state, source, target, space) : 0) >= 1 &&
@@ -1470,7 +1540,15 @@ export function pendingActionsFor(
   cardPending: PendingAction | undefined,
   spySupply: number,
 ): PendingAction[] {
-  if (spacePending?.kind === "spy" && cardPending?.kind === "spy" && spacePending.ownerId === cardPending.ownerId) {
+  if (
+    spacePending?.kind === "spy" &&
+    cardPending?.kind === "spy" &&
+    spacePending.ownerId === cardPending.ownerId &&
+    spacePending.placementIcon === cardPending.placementIcon &&
+    spacePending.recallForSupply === cardPending.recallForSupply &&
+    spacePending.mustPlaceSpy === cardPending.mustPlaceSpy &&
+    spacePending.allowSharedPost === cardPending.allowSharedPost
+  ) {
     return [{
       ...spacePending,
       remaining: Math.min(spySupply, spacePending.remaining + cardPending.remaining),
@@ -3227,7 +3305,7 @@ export function playSietchRitualPlotIntrigue(
     ? `gains 1 ${factionLabels[faction]} Influence`
     : `${influenceOwner.leader} gains 1 ${factionLabels[faction]} Influence`;
 
-  return {
+  const nextState = {
     ...state,
     players,
     intrigueDiscard: [...state.intrigueDiscard, intrigue],
@@ -3236,6 +3314,7 @@ export function playSietchRitualPlotIntrigue(
       ...state.log,
     ],
   };
+  return resolveLeaderInfluenceThresholdRewards(nextState, state.players);
 }
 
 function changeAllegiancesChoiceValid(
@@ -3322,15 +3401,6 @@ export function playChangeAllegiancesPlotIntrigue(
         intrigues: next.intrigues.filter((card) => card.id !== intrigue.id),
       };
     }
-    if (lossOwner && lossFaction && candidate.id === lossOwner.id) {
-      next = adjustInfluence(next, lossFaction, -1);
-    }
-    if (shiftGainFaction && shiftGainOwnerResult?.owner && candidate.id === shiftGainOwnerResult.owner.id) {
-      next = adjustInfluence(next, shiftGainFaction, 1);
-    }
-    if (spiceGainFaction && spiceGainOwnerResult?.owner && candidate.id === spiceGainOwnerResult.owner.id) {
-      next = adjustInfluence(next, spiceGainFaction, 1);
-    }
     return next;
   });
   const gainEffects = [
@@ -3360,7 +3430,22 @@ export function playChangeAllegiancesPlotIntrigue(
     intrigueDiscard: [...state.intrigueDiscard, intrigue],
     log: [logEntry, ...state.log],
   };
-  return resolvePrincessIrulanBirthright(nextState, state.players);
+  const influenceSteps = [
+    ...(lossOwner && lossFaction
+      ? [{ ownerId: lossOwner.id, faction: lossFaction, amount: -1 }]
+      : []),
+    ...(shiftGainFaction && shiftGainOwnerResult?.owner
+      ? [{ ownerId: shiftGainOwnerResult.owner.id, faction: shiftGainFaction, amount: 1 }]
+      : []),
+    ...(spiceGainFaction && spiceGainOwnerResult?.owner
+      ? [{ ownerId: spiceGainOwnerResult.owner.id, faction: spiceGainFaction, amount: 1 }]
+      : []),
+  ];
+  return influenceSteps.reduce(
+    (next, { ownerId, faction, amount }) =>
+      adjustInfluenceAndResolveThresholdRewards(next, ownerId, faction, amount),
+    nextState,
+  );
 }
 
 export function playSpecialMissionPlotIntrigue(
@@ -3515,7 +3600,7 @@ export function playImperiumPoliticsPlotIntrigue(
       ...state.log,
     ],
   };
-  return resolvePrincessIrulanBirthright(nextState, state.players);
+  return resolveLeaderInfluenceThresholdRewards(nextState, state.players);
 }
 
 export function playBuyAccessPlotIntrigue(
@@ -3580,7 +3665,7 @@ export function playBuyAccessPlotIntrigue(
       ...state.log,
     ],
   };
-  return resolvePrincessIrulanBirthright(nextState, state.players);
+  return resolveLeaderInfluenceThresholdRewards(nextState, state.players);
 }
 
 export function playDepartForArrakisPlotIntrigue(
@@ -4718,7 +4803,7 @@ export function resolveShaddamSignetRingChoice(
       ...state.log,
     ],
   };
-  return resolvePrincessIrulanBirthright(nextState, state.players);
+  return resolveLeaderInfluenceThresholdRewards(nextState, state.players);
 }
 
 export function resolveIrulanSignetRingChoice(
@@ -5190,7 +5275,7 @@ export function resolveDemandAttentionChoice(
     return next;
   });
 
-  return {
+  const nextState = {
     ...state,
     players,
     ...advancePendingAction(state),
@@ -5199,6 +5284,7 @@ export function resolveDemandAttentionChoice(
       ...state.log,
     ],
   };
+  return resolveLeaderInfluenceThresholdRewards(nextState, state.players);
 }
 
 export function skipDemandAttention(state: GameState, pending: DemandAttentionPendingAction): GameState {

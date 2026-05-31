@@ -84,15 +84,21 @@ try {
   const gurneySeat = game.players.findIndex((player) => player.id === muadDibAllyA.id);
   assert.notEqual(gurneySeat, -1, "Expected Gurney's active seat");
   const muadDibSignet = data.muadDibCommanderCards.find((card) => card.name === "Signet Ring");
+  const demandAttention = data.muadDibCommanderCards.find((card) => card.sourceId === 548);
   const allySignet = data.allyStarterCards.find((card) => card.name === "Signet Ring");
   const emperorSignet = data.emperorCommanderCards.find((card) => card.name === "Signet Ring");
+  const sietchRitual = data.intrigueCards.find((card) => card.sourceId === 127);
+  const changeAllegiances = data.intrigueCards.find((card) => card.sourceId === 135);
   const detonation = data.intrigueCards.find((card) => card.sourceId === 131);
   const unexpectedAllies = data.intrigueCards.find((card) => card.sourceId === 137);
   const costOneImperiumCard = data.imperiumDeck.find((card) => card.cost === 1);
   const intrigueCard = data.intrigueCards[0];
   assert.ok(muadDibSignet, "Muad'Dib Commander deck should include Signet Ring");
+  assert.ok(demandAttention, "Muad'Dib Commander deck should include Demand Attention");
   assert.ok(allySignet, "Ally starter deck should include Signet Ring");
   assert.ok(emperorSignet, "Emperor Commander deck should include Signet Ring");
+  assert.ok(sietchRitual, "Sietch Ritual should exist for Margot Loyalty regression");
+  assert.ok(changeAllegiances, "Change Allegiances should exist for influence threshold regression");
   assert.ok(detonation, "Detonation should exist for Shaddam deployment-block regression");
   assert.ok(unexpectedAllies, "Unexpected Allies should exist for Shaddam deployment-block regression");
   assert.ok(costOneImperiumCard, "Verifier needs a cost-1 Imperium card");
@@ -711,6 +717,95 @@ try {
   assert.ok(controversialTech, "Controversial Technology should exist for Reverend Mother repeat tests");
   assert.ok(deliverSupplies, "Deliver Supplies should exist for Reverend Mother repeat negative tests");
   assert.ok(hardyWarriors, "Hardy Warriors should exist for Reverend Mother personal-space negative tests");
+  const ladyMargot = {
+    ...feyd,
+    leader: "Lady Margot Fenring",
+    leaderCard: data.leaderCardByName("Lady Margot Fenring"),
+    playArea: [allySignet],
+  };
+  const margotSignetState = {
+    ...game,
+    players: game.players.map((player) => (player.id === ladyMargot.id ? ladyMargot : player)),
+  };
+  const margotSignetPending = state.pendingActionForCard(
+    allySignet,
+    ladyMargot,
+    margotSignetState,
+    ladyMargot,
+    arrakeen,
+  );
+  assert.deepEqual(margotSignetPending, {
+    kind: "spy",
+    ownerId: ladyMargot.id,
+    remaining: 1,
+    source: "Arrakis Informant",
+    placementIcon: "bene",
+    recallForSupply: true,
+  });
+  assert.deepEqual(
+    state.placeableSpySpaces(margotSignetState, margotSignetPending).map((space) => space.id).sort(),
+    ["espionage", "secrets"],
+    "Arrakis Informant should place spies only on Bene Gesserit observation posts",
+  );
+  assert.equal(
+    state.placeSpyForPending(margotSignetState, margotSignetPending, deliverSupplies.id),
+    margotSignetState,
+    "Arrakis Informant should reject non-Bene Gesserit spy posts",
+  );
+  const margotPlacedSpy = state.placeSpyForPending(
+    { ...margotSignetState, pendingAction: margotSignetPending, pendingQueue: [] },
+    margotSignetPending,
+    secrets.id,
+  );
+  assert.equal(playerById(margotPlacedSpy, ladyMargot.id).spies, ladyMargot.spies - 1, "Arrakis Informant should spend one Margot spy");
+  assert.equal(margotPlacedSpy.spyPosts.secrets, ladyMargot.id, "Arrakis Informant should place Margot's spy on the chosen Bene post");
+  const margotNoSupplyState = {
+    ...margotSignetState,
+    spyPosts: { [deliverSupplies.id]: ladyMargot.id },
+    players: margotSignetState.players.map((player) =>
+      player.id === ladyMargot.id ? { ...ladyMargot, spies: 0 } : player,
+    ),
+  };
+  const margotRecallSupplyPending = state.pendingActionForCard(
+    allySignet,
+    playerById(margotNoSupplyState, ladyMargot.id),
+    margotNoSupplyState,
+    playerById(margotNoSupplyState, ladyMargot.id),
+    arrakeen,
+  );
+  assert.equal(
+    margotRecallSupplyPending?.kind,
+    "spy",
+    "Arrakis Informant should queue when Margot can recall a spy for supply",
+  );
+  assert.deepEqual(
+    state.recallableSpySupplySpaces(margotNoSupplyState, margotRecallSupplyPending).map((space) => space.id),
+    [deliverSupplies.id],
+    "Arrakis Informant should allow recalling an existing spy to place on a Bene post",
+  );
+  const blockedMargotSignet = state.pendingActionForCard(
+    allySignet,
+    playerById(margotNoSupplyState, ladyMargot.id),
+    {
+      ...margotNoSupplyState,
+      spyPosts: { [secrets.id]: irulan.id, [espionage.id]: ladyJessica.id },
+    },
+    playerById(margotNoSupplyState, ladyMargot.id),
+    arrakeen,
+  );
+  assert.equal(blockedMargotSignet, undefined, "Arrakis Informant should not queue without a legal Bene post");
+  assert.deepEqual(
+    state.pendingActionsFor(
+      { kind: "spy", ownerId: ladyMargot.id, remaining: 1, source: "Espionage" },
+      margotSignetPending,
+      3,
+    ),
+    [
+      { kind: "spy", ownerId: ladyMargot.id, remaining: 1, source: "Espionage" },
+      margotSignetPending,
+    ],
+    "Generic spy placement should not merge with Arrakis Informant and relax its Bene-only restriction",
+  );
   const reverendRepeatOwner = {
     ...reverendJessicaOwner,
     resources: { ...reverendJessicaOwner.resources, spice: 0, water: 1 },
@@ -1060,7 +1155,7 @@ try {
         : player,
     ),
   };
-  const irulanBirthrightReached = state.resolvePrincessIrulanBirthright(
+  const irulanBirthrightReached = state.resolveLeaderInfluenceThresholdRewards(
     {
       ...irulanBirthrightBase,
       players: irulanBirthrightBase.players.map((player) =>
@@ -1081,7 +1176,7 @@ try {
         : player,
     ),
   };
-  const irulanBirthrightNoRepeat = state.resolvePrincessIrulanBirthright(
+  const irulanBirthrightNoRepeat = state.resolveLeaderInfluenceThresholdRewards(
     {
       ...irulanBirthrightNoRepeatBase,
       players: irulanBirthrightNoRepeatBase.players.map((player) =>
@@ -1091,7 +1186,7 @@ try {
     irulanBirthrightNoRepeatBase.players,
   );
   assert.equal(playerById(irulanBirthrightNoRepeat, irulan.id).intrigues.length, 0, "Imperial Birthright should not trigger at 2 -> 3 Influence");
-  const irulanBirthrightDropped = state.resolvePrincessIrulanBirthright(
+  const irulanBirthrightDropped = state.resolveLeaderInfluenceThresholdRewards(
     {
       ...irulanBirthrightNoRepeatBase,
       players: irulanBirthrightNoRepeatBase.players.map((player) =>
@@ -1100,7 +1195,7 @@ try {
     },
     irulanBirthrightNoRepeatBase.players,
   );
-  const irulanBirthrightRegained = state.resolvePrincessIrulanBirthright(
+  const irulanBirthrightRegained = state.resolveLeaderInfluenceThresholdRewards(
     {
       ...irulanBirthrightDropped,
       intrigueDeck: [intrigueCard],
@@ -1111,6 +1206,33 @@ try {
     irulanBirthrightDropped.players,
   );
   assert.equal(playerById(irulanBirthrightRegained, irulan.id).intrigues.length, 1, "Imperial Birthright should trigger again after Irulan drops below 2 and regains it");
+  const irulanChangeAllegiancesBase = {
+    ...game,
+    activeSeat: game.players.findIndex((player) => player.id === irulan.id),
+    pendingAction: undefined,
+    pendingQueue: [],
+    intrigueDeck: [intrigueCard],
+    intrigueDiscard: [],
+    players: game.players.map((player) =>
+      player.id === irulan.id
+        ? {
+            ...player,
+            influence: { ...player.influence, greatHouses: 2 },
+            intrigues: [changeAllegiances],
+          }
+        : player,
+    ),
+  };
+  const irulanChangeSameFaction = state.playChangeAllegiancesPlotIntrigue(
+    irulanChangeAllegiancesBase,
+    irulan.id,
+    changeAllegiances.id,
+    { kind: "shift", loseFaction: "greatHouses", gainFaction: "greatHouses" },
+  );
+  assert.equal(playerById(irulanChangeSameFaction, irulan.id).influence.greatHouses, 2, "Change Allegiances should keep same-Faction Great Houses net-zero");
+  assert.equal(playerById(irulanChangeSameFaction, irulan.id).intrigues.length, 1, "Irulan should draw when Change Allegiances drops and regains Great Houses 2 Influence");
+  assert.equal(playerById(irulanChangeSameFaction, irulan.id).intrigues[0].id, intrigueCard.id, "Irulan's Change Allegiances Birthright draw should use the Intrigue deck");
+  assert.match(irulanChangeSameFaction.log[1], /Imperial Birthright/, "Irulan's same-Faction Change Allegiances reward should log after the played Intrigue");
   const shaddamPersonalBirthrightBase = {
     ...game,
     intrigueDeck: [intrigueCard],
@@ -1123,7 +1245,7 @@ try {
           : player,
     ),
   };
-  const shaddamPersonalBirthright = state.resolvePrincessIrulanBirthright(
+  const shaddamPersonalBirthright = state.resolveLeaderInfluenceThresholdRewards(
     {
       ...shaddamPersonalBirthrightBase,
       players: shaddamPersonalBirthrightBase.players.map((player) =>
@@ -1133,6 +1255,188 @@ try {
     shaddamPersonalBirthrightBase.players,
   );
   assert.equal(playerById(shaddamPersonalBirthright, irulan.id).intrigues.length, 0, "Shaddam reaching personal Emperor 2 should not trigger Irulan");
+
+  const margotLoyaltyBase = {
+    ...game,
+    turnSpiceGains: {},
+    players: game.players.map((player) =>
+      player.id === ladyMargot.id
+        ? {
+            ...ladyMargot,
+            resources: { ...ladyMargot.resources, spice: 0 },
+            influence: { ...ladyMargot.influence, bene: 0 },
+          }
+        : player,
+    ),
+  };
+  const margotLoyaltyReached = state.resolveLeaderInfluenceThresholdRewards(
+    {
+      ...margotLoyaltyBase,
+      players: margotLoyaltyBase.players.map((player) =>
+        player.id === ladyMargot.id ? state.adjustInfluence(player, "bene", 2) : player,
+      ),
+    },
+    margotLoyaltyBase.players,
+  );
+  assert.equal(playerById(margotLoyaltyReached, ladyMargot.id).influence.bene, 2, "Margot should reach Bene Gesserit 2 Influence");
+  assert.equal(playerById(margotLoyaltyReached, ladyMargot.id).vp, ladyMargot.vp + 1, "Margot should still score the 2-Influence VP");
+  assert.equal(playerById(margotLoyaltyReached, ladyMargot.id).resources.spice, 2, "Margot's Loyalty should gain 2 spice");
+  assert.equal(margotLoyaltyReached.turnSpiceGains[ladyMargot.id], 2, "Margot's Loyalty spice should count as a turn spice gain");
+  assert.match(margotLoyaltyReached.log[1], /Loyalty/, "Margot's Loyalty should log after the triggering action");
+  const margotLoyaltyNoRepeatBase = {
+    ...margotLoyaltyBase,
+    turnSpiceGains: {},
+    players: margotLoyaltyBase.players.map((player) =>
+      player.id === ladyMargot.id
+        ? {
+            ...player,
+            resources: { ...player.resources, spice: 0 },
+            influence: { ...player.influence, bene: 2 },
+          }
+        : player,
+    ),
+  };
+  const margotLoyaltyNoRepeat = state.resolveLeaderInfluenceThresholdRewards(
+    {
+      ...margotLoyaltyNoRepeatBase,
+      players: margotLoyaltyNoRepeatBase.players.map((player) =>
+        player.id === ladyMargot.id ? state.adjustInfluence(player, "bene", 1) : player,
+      ),
+    },
+    margotLoyaltyNoRepeatBase.players,
+  );
+  assert.equal(playerById(margotLoyaltyNoRepeat, ladyMargot.id).resources.spice, 0, "Margot's Loyalty should not repeat at 2 -> 3 Influence");
+  const margotLoyaltyDropped = state.resolveLeaderInfluenceThresholdRewards(
+    {
+      ...margotLoyaltyNoRepeatBase,
+      players: margotLoyaltyNoRepeatBase.players.map((player) =>
+        player.id === ladyMargot.id ? state.adjustInfluence(player, "bene", -1) : player,
+      ),
+    },
+    margotLoyaltyNoRepeatBase.players,
+  );
+  assert.equal(playerById(margotLoyaltyDropped, ladyMargot.id).resources.spice, 0, "Margot's Loyalty should not trigger while dropping below 2 Influence");
+  const margotLoyaltyRegained = state.resolveLeaderInfluenceThresholdRewards(
+    {
+      ...margotLoyaltyDropped,
+      turnSpiceGains: {},
+      players: margotLoyaltyDropped.players.map((player) =>
+        player.id === ladyMargot.id
+          ? {
+              ...state.adjustInfluence(player, "bene", 1),
+              resources: { ...player.resources, spice: 0 },
+            }
+          : player,
+      ),
+    },
+    margotLoyaltyDropped.players,
+  );
+  assert.equal(playerById(margotLoyaltyRegained, ladyMargot.id).resources.spice, 2, "Margot's Loyalty should trigger again after dropping below 2 and regaining it");
+  const margotWrongInfluence = state.resolveLeaderInfluenceThresholdRewards(
+    {
+      ...margotLoyaltyBase,
+      players: margotLoyaltyBase.players.map((player) =>
+        player.id === ladyMargot.id ? state.adjustInfluence(player, "greatHouses", 2) : player,
+      ),
+    },
+    margotLoyaltyBase.players,
+  );
+  assert.equal(playerById(margotWrongInfluence, ladyMargot.id).resources.spice, 0, "Margot's Loyalty should require Bene Gesserit Influence");
+  const margotSietchRitualBase = {
+    ...game,
+    activeSeat: game.players.findIndex((player) => player.id === ladyMargot.id),
+    pendingAction: undefined,
+    pendingQueue: [],
+    turnSpiceGains: {},
+    players: game.players.map((player) =>
+      player.id === ladyMargot.id
+        ? {
+            ...ladyMargot,
+            resources: { ...ladyMargot.resources, spice: 0 },
+            influence: { ...ladyMargot.influence, bene: 1 },
+            hand: [leadTheWayDraw],
+            intrigues: [sietchRitual],
+          }
+        : player,
+    ),
+  };
+  const margotSietchRitual = state.playSietchRitualPlotIntrigue(
+    margotSietchRitualBase,
+    ladyMargot.id,
+    sietchRitual.id,
+    leadTheWayDraw.id,
+    "bene",
+  );
+  assert.equal(playerById(margotSietchRitual, ladyMargot.id).influence.bene, 2, "Sietch Ritual should move Margot to Bene Gesserit 2 Influence");
+  assert.equal(playerById(margotSietchRitual, ladyMargot.id).resources.spice, 2, "Sietch Ritual should trigger Margot Loyalty");
+  assert.equal(margotSietchRitual.turnSpiceGains[ladyMargot.id], 2, "Sietch Ritual Loyalty spice should be tracked");
+  const demandAttentionPending = {
+    kind: "demand-attention",
+    commanderId: muadDib.id,
+    recipientId: ladyMargot.id,
+    faction: "bene",
+    cardId: demandAttention.id,
+    source: "Demand Attention",
+  };
+  const margotDemandAttentionBase = {
+    ...game,
+    pendingAction: demandAttentionPending,
+    pendingQueue: [],
+    turnSpiceGains: {},
+    players: game.players.map((player) => {
+      if (player.id === muadDib.id) {
+        return {
+          ...player,
+          resources: { ...player.resources, solari: 4 },
+          playArea: [demandAttention],
+        };
+      }
+      if (player.id === ladyMargot.id) {
+        return {
+          ...ladyMargot,
+          team: muadDib.team,
+          resources: { ...ladyMargot.resources, spice: 0 },
+          influence: { ...ladyMargot.influence, bene: 1 },
+        };
+      }
+      return player;
+    }),
+  };
+  const margotDemandAttention = state.resolveDemandAttentionChoice(
+    margotDemandAttentionBase,
+    demandAttentionPending,
+  );
+  assert.equal(playerById(margotDemandAttention, ladyMargot.id).influence.bene, 2, "Demand Attention should move Margot to Bene Gesserit 2 Influence");
+  assert.equal(playerById(margotDemandAttention, ladyMargot.id).resources.spice, 2, "Demand Attention should trigger Margot Loyalty");
+  assert.equal(margotDemandAttention.turnSpiceGains[ladyMargot.id], 2, "Demand Attention Loyalty spice should be tracked");
+  const margotChangeAllegiancesBase = {
+    ...game,
+    activeSeat: game.players.findIndex((player) => player.id === ladyMargot.id),
+    pendingAction: undefined,
+    pendingQueue: [],
+    turnSpiceGains: {},
+    intrigueDiscard: [],
+    players: game.players.map((player) =>
+      player.id === ladyMargot.id
+        ? {
+            ...ladyMargot,
+            resources: { ...ladyMargot.resources, spice: 0 },
+            influence: { ...ladyMargot.influence, bene: 2 },
+            intrigues: [changeAllegiances],
+          }
+        : player,
+    ),
+  };
+  const margotChangeSameFaction = state.playChangeAllegiancesPlotIntrigue(
+    margotChangeAllegiancesBase,
+    ladyMargot.id,
+    changeAllegiances.id,
+    { kind: "shift", loseFaction: "bene", gainFaction: "bene" },
+  );
+  assert.equal(playerById(margotChangeSameFaction, ladyMargot.id).influence.bene, 2, "Change Allegiances should keep same-Faction Bene Gesserit net-zero");
+  assert.equal(playerById(margotChangeSameFaction, ladyMargot.id).resources.spice, 2, "Margot should gain Loyalty spice when Change Allegiances drops and regains Bene Gesserit 2 Influence");
+  assert.equal(margotChangeSameFaction.turnSpiceGains[ladyMargot.id], 2, "Change Allegiances Loyalty spice should be tracked");
+  assert.match(margotChangeSameFaction.log[1], /Loyalty/, "Margot's same-Faction Change Allegiances reward should log after the played Intrigue");
 
   const gurneyRevealBase = {
     ...game,

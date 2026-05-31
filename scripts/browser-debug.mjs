@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
-import { lstat, mkdir, mkdtemp, readdir, realpath, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { chromium } from "playwright";
 import { createServer } from "vite";
+import { createBrowserDebugArtifactStore } from "./browser-debug-artifact-store.mjs";
 import { artifactStem, generatedArtifactNames, scenarios } from "./browser-debug-artifacts.mjs";
 import { runConflictVpSmoke } from "./browser-debug-conflict-vp.mjs";
+import { createBrowserDebugPageTools } from "./browser-debug-page-tools.mjs";
 import { runPendingChoicesSmoke } from "./browser-debug-pending-choices.mjs";
 import { runSignetChoicesSmoke } from "./browser-debug-signet-choices.mjs";
 import { runSpaceChoicesSmoke } from "./browser-debug-space-choices.mjs";
@@ -142,143 +143,6 @@ function withSeededRandom(seed, action) {
   }
 }
 
-function isPathInside(parent, candidate) {
-  const relativePath = path.relative(parent, candidate);
-  return Boolean(relativePath) && !relativePath.startsWith("..") && !path.isAbsolute(relativePath);
-}
-
-function isLexicallyOwnedArtifactOutDir(targetDir = outDir) {
-  const resolvedOutDir = path.resolve(targetDir);
-  const relativeOutDir = path.relative(process.cwd(), resolvedOutDir);
-  if (!relativeOutDir || relativeOutDir.startsWith("..") || path.isAbsolute(relativeOutDir)) return false;
-  const parts = relativeOutDir.split(path.sep);
-  return parts[0] === "artifacts" &&
-    parts[1] === "qa" &&
-    (parts[2] === "browser-debug" || parts[2]?.startsWith("browser-debug-"));
-}
-
-async function hasSymlinkInRepoPath(targetPath) {
-  const repoRoot = path.resolve(process.cwd());
-  let current = path.resolve(targetPath);
-  while (current !== repoRoot) {
-    if (!isPathInside(repoRoot, current)) return true;
-    const stats = await lstat(current).catch((error) => {
-      if (error.code === "ENOENT") return undefined;
-      throw error;
-    });
-    if (stats?.isSymbolicLink()) return true;
-    const parent = path.dirname(current);
-    if (parent === current) return true;
-    current = parent;
-  }
-  const rootStats = await lstat(repoRoot);
-  return rootStats.isSymbolicLink();
-}
-
-async function isRepoOwnedArtifactOutDir(targetDir = outDir) {
-  if (!isLexicallyOwnedArtifactOutDir(targetDir)) return false;
-  return !(await hasSymlinkInRepoPath(path.resolve(targetDir)));
-}
-
-async function assertWritableOutDir() {
-  const stats = await lstat(path.resolve(outDir)).catch(() => undefined);
-  assert.ok(!stats?.isSymbolicLink(), `Refusing to write browser debug artifacts through symlink "${outDir}"`);
-  assert.ok(!stats || stats.isDirectory(), `Browser debug output path must be a directory: "${outDir}"`);
-  assert.ok(
-    !isLexicallyOwnedArtifactOutDir() || (await isRepoOwnedArtifactOutDir()),
-    `Refusing to treat browser debug output as repo-owned through symlinked path "${outDir}"`,
-  );
-}
-
-async function canCreateOwnedSummaryDir() {
-  if (!(await isRepoOwnedArtifactOutDir())) return false;
-  const stats = await lstat(path.resolve(outDir)).catch(() => undefined);
-  return !stats || (stats.isDirectory() && !stats.isSymbolicLink());
-}
-
-async function canCleanOutDir() {
-  if (hasFlag("--preserve-out") || !(await isRepoOwnedArtifactOutDir())) return false;
-  const root = path.resolve("artifacts", "qa");
-  const resolvedOutDir = path.resolve(outDir);
-  const stats = await lstat(resolvedOutDir).catch(() => undefined);
-  if (!stats?.isDirectory() || stats.isSymbolicLink()) return false;
-  const [realRoot, realOutDir] = await Promise.all([
-    realpath(root),
-    realpath(resolvedOutDir),
-  ]).catch(() => []);
-  return Boolean(
-    realRoot &&
-      realOutDir &&
-      (realOutDir === path.join(realRoot, "browser-debug") ||
-        realOutDir.startsWith(path.join(realRoot, "browser-debug-"))),
-  );
-}
-
-async function cleanOutDir() {
-  if (!(await canCleanOutDir())) return;
-
-  const entries = await readdir(outDir, { withFileTypes: true }).catch(() => []);
-  await Promise.all(
-    entries
-      .filter((entry) => (entry.isFile() || entry.isSymbolicLink()) && generatedArtifactNames.has(entry.name))
-      .map((entry) => rm(path.join(outDir, entry.name), { force: true })),
-  );
-}
-
-async function assertNoGeneratedArtifactSymlinks() {
-  const entries = await readdir(outDir, { withFileTypes: true }).catch(() => []);
-  const symlink = entries.find((entry) => entry.isSymbolicLink() && generatedArtifactNames.has(entry.name));
-  assert.ok(!symlink, `Refusing to write browser debug artifact through symlink "${path.join(outDir, symlink?.name ?? "")}"`);
-}
-
-async function artifactPath(fileName) {
-  assert.equal(path.basename(fileName), fileName, `Browser debug artifact names must not include directories: "${fileName}"`);
-  assert.ok(generatedArtifactNames.has(fileName), `Unexpected browser debug artifact name "${fileName}"`);
-  return path.join(path.resolve(outDir), fileName);
-}
-
-async function assertArtifactTargetIsSafe(filePath) {
-  const stats = await lstat(filePath).catch((error) => {
-    if (error.code === "ENOENT") return undefined;
-    throw error;
-  });
-  assert.ok(!stats?.isSymbolicLink(), `Refusing to write browser debug artifact through symlink "${filePath}"`);
-}
-
-async function writeArtifact(fileName, value) {
-  const filePath = await artifactPath(fileName);
-  await assertArtifactTargetIsSafe(filePath);
-  const tempDir = await mkdtemp(path.join(path.resolve(outDir), ".browser-debug-write-"));
-  try {
-    const tempPath = path.join(tempDir, fileName);
-    await writeFile(tempPath, value);
-    await assertArtifactTargetIsSafe(filePath);
-    await rename(tempPath, filePath);
-  } finally {
-    await rm(tempDir, { recursive: true, force: true });
-  }
-  return filePath;
-}
-
-async function writeJson(fileName, value) {
-  return writeArtifact(fileName, JSON.stringify(value, null, 2));
-}
-
-async function writeTrace(context, fileName) {
-  const filePath = await artifactPath(fileName);
-  await assertArtifactTargetIsSafe(filePath);
-  const tempDir = await mkdtemp(path.join(path.resolve(outDir), ".browser-debug-trace-"));
-  try {
-    const tempPath = path.join(tempDir, fileName);
-    await context.tracing.stop({ path: tempPath });
-    await assertArtifactTargetIsSafe(filePath);
-    await rename(tempPath, filePath);
-  } finally {
-    await rm(tempDir, { recursive: true, force: true });
-  }
-  return filePath;
-}
-
 function resolveSetupPendingActions(state, game) {
   let current = game;
   let resolved = 0;
@@ -382,120 +246,6 @@ async function createAgentPlacementPlan(server) {
   }
 
   assert.fail(`Expected at least one legal Agent placement for ${player.leader}`);
-}
-
-async function currentGame(page) {
-  return page.evaluate(() => window.__DUNE_DEBUG__?.getGame?.() ?? null).catch(() => null);
-}
-
-async function waitForCaptureReady(page) {
-  const readiness = await page.evaluate(async (timeoutMs) => {
-    const images = Array.from(document.images);
-    images.forEach((image) => {
-      image.loading = "eager";
-    });
-
-    const pendingSources = () =>
-      Array.from(document.images)
-        .filter((image) => !image.complete)
-        .map((image) => image.currentSrc || image.src || image.alt || "(unnamed image)")
-        .slice(0, 12);
-
-    const ready = Promise.all([
-      document.fonts?.ready.catch(() => undefined),
-      Promise.all(
-        images.map((image) => {
-          if (image.complete) return undefined;
-          return new Promise((resolve) => {
-            image.addEventListener("load", resolve, { once: true });
-            image.addEventListener("error", resolve, { once: true });
-          });
-        }),
-      ),
-      Promise.all(images.map((image) => image.decode?.().catch(() => undefined))),
-    ]).then(() => ({ timedOut: false, pendingImages: [] }));
-
-    const timeout = new Promise((resolve) => {
-      window.setTimeout(() => resolve({ timedOut: true, pendingImages: pendingSources() }), timeoutMs);
-    });
-
-    return Promise.race([ready, timeout]);
-  }, 5000);
-  if (readiness.timedOut) {
-    consoleMessages.push({
-      type: "warning",
-      text: `Capture readiness timed out with pending images: ${readiness.pendingImages.join(", ") || "none"}`,
-    });
-  }
-  await page.waitForTimeout(50);
-}
-
-async function screenshot(page, captures, name) {
-  await waitForCaptureReady(page);
-  const filePath = await writeArtifact(name, await page.screenshot({ fullPage: true }));
-
-  const capture = { screenshot: filePath };
-  const game = await currentGame(page);
-  if (game) {
-    capture.state = await writeJson(`${artifactStem(name)}.state.json`, game);
-  }
-  captures.push(capture);
-  return capture;
-}
-
-async function setDebugGame(page, game) {
-  await page.evaluate((nextGame) => window.__DUNE_DEBUG__?.setGame(nextGame), game);
-}
-
-async function setDebugGameAndWait(page, game) {
-  await setDebugGame(page, game);
-  await page.waitForFunction(
-    ({ activeSeat, activePlayerId, firstHandCardId, pendingKind, throneRowIds }) => {
-      const current = window.__DUNE_DEBUG__?.getGame();
-      const activePlayer = current?.players[current.activeSeat];
-      return Boolean(
-        current &&
-          current.activeSeat === activeSeat &&
-          activePlayer?.id === activePlayerId &&
-          activePlayer.hand[0]?.id === firstHandCardId &&
-          (current.pendingAction?.kind ?? null) === pendingKind &&
-          JSON.stringify(current.throneRow.map((card) => card.id)) === JSON.stringify(throneRowIds),
-      );
-    },
-    {
-      activeSeat: game.activeSeat,
-      activePlayerId: game.players[game.activeSeat].id,
-      firstHandCardId: game.players[game.activeSeat].hand[0]?.id,
-      pendingKind: game.pendingAction?.kind ?? null,
-      throneRowIds: game.throneRow.map((card) => card.id),
-    },
-  );
-}
-
-async function setControlDefenseGame(page, game) {
-  await setDebugGame(page, game);
-  await page.waitForFunction(
-    () => {
-      const pending = window.__DUNE_DEBUG__?.getGame().pendingAction;
-      return pending?.kind === "control-defense" &&
-        pending.ownerId === "p2" &&
-        pending.location === "imperial-basin";
-    },
-  );
-}
-
-async function waitForNoPending(page) {
-  await page.waitForFunction(() => {
-    const game = window.__DUNE_DEBUG__?.getGame();
-    return Boolean(game && !game.pendingAction);
-  });
-}
-
-async function openApp(page, url, width = 1440, height = 1100) {
-  await page.setViewportSize({ width, height });
-  await page.goto(url, { waitUntil: "networkidle" });
-  await page.waitForFunction(() => Boolean(window.__DUNE_DEBUG__));
-  await page.locator(".app-shell").waitFor({ state: "visible" });
 }
 
 async function runHomeSmoke(page, url, server, captures) {
@@ -750,6 +500,35 @@ const startedAt = Date.now();
 const captures = [];
 const consoleMessages = [];
 const requestFailures = [];
+const artifactStore = createBrowserDebugArtifactStore({
+  cwd: process.cwd(),
+  generatedArtifactNames,
+  outDir,
+  preserveOut: hasFlag("--preserve-out"),
+});
+const {
+  artifactPath,
+  assertNoGeneratedArtifactSymlinks,
+  assertWritableOutDir,
+  canCreateOwnedSummaryDir,
+  cleanOutDir,
+  ensureOutDir,
+  writeJson,
+  writeTrace,
+} = artifactStore;
+const {
+  currentGame,
+  openApp,
+  screenshot,
+  setControlDefenseGame,
+  setDebugGameAndWait,
+  waitForNoPending,
+} = createBrowserDebugPageTools({
+  artifactStem,
+  consoleMessages,
+  writeArtifact: artifactStore.writeArtifact,
+  writeJson,
+});
 
 try {
   if (optionError) throw optionError;
@@ -764,7 +543,7 @@ try {
   assert.ok(slowMo >= 0, `Invalid browser debug slow-mo "${slowMo}". Expected a non-negative number.`);
   cliValidated = true;
   await interruptible(assertWritableOutDir());
-  await interruptible(mkdir(outDir, { recursive: true }));
+  await interruptible(ensureOutDir());
   outDirReady = true;
   await interruptible(cleanOutDir());
   await interruptible(assertNoGeneratedArtifactSymlinks());
@@ -936,7 +715,7 @@ try {
   }
   try {
     if (cliValidated && !outDirReady && (await canCreateOwnedSummaryDir())) {
-      await mkdir(outDir, { recursive: true });
+      await ensureOutDir();
       outDirReady = true;
     }
     if (cliValidated && outDirReady && outDirWritable) {

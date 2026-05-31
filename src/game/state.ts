@@ -55,6 +55,7 @@ const departForArrakisSourceId = 132;
 const unexpectedAlliesSourceId = 137;
 const mercenariesSourceId = 128;
 const cunningSourceId = 133;
+const imperiumPoliticsSourceId = 140;
 const callToArmsSourceId = 138;
 const shaddamsFavorSourceId = 141;
 const intelligenceReportSourceId = 142;
@@ -103,6 +104,7 @@ export type TacticalOptionChoice = "add-strength" | { kind: "retreat-troops"; co
 export type CombatIntrigueChoice = SpiceIsPowerChoice | TacticalOptionChoice;
 export type DepartForArrakisChoice = "draw" | "spend-spice";
 export type CunningPlotChoice = "draw" | "paid-trash";
+export type ImperiumPoliticsChoice = "greatHouses" | "emperor" | "spacing";
 export type StrategicStockpilingChoice = "spice" | "water" | "both";
 export type MarketOpportunityChoice = "spice-to-solari" | "solari-to-spice";
 export type ShaddamSignetRingChoice = "skip" | "troop" | { kind: "influence"; faction: FactionId };
@@ -180,6 +182,10 @@ export function isMercenariesIntrigue(intrigue: IntrigueCard) {
 
 export function isCunningIntrigue(intrigue: IntrigueCard) {
   return intrigue.sourceId === cunningSourceId;
+}
+
+export function isImperiumPoliticsIntrigue(intrigue: IntrigueCard) {
+  return intrigue.sourceId === imperiumPoliticsSourceId;
 }
 
 export function isCallToArmsIntrigue(intrigue: IntrigueCard) {
@@ -1862,6 +1868,13 @@ export function influenceLossChoices(player: Player) {
   return factionIds.filter((faction) => player.influence[faction] > 0);
 }
 
+export function imperiumPoliticsFactionChoices(player: Player): ImperiumPoliticsChoice[] {
+  if (player.role === "Commander" && player.team === "shaddam") {
+    return ["emperor", "greatHouses", "spacing"];
+  }
+  return ["greatHouses", "spacing"];
+}
+
 function allowedInfluenceLossChoices(player: Player) {
   const personalFaction = commanderPersonalFaction(player);
   if (personalFaction) {
@@ -2212,6 +2225,55 @@ export function playCunningPlotIntrigue(
     intrigueDiscard: [...state.intrigueDiscard, intrigue],
     pendingAction: trashPending,
     log: [log, ...state.log],
+  };
+}
+
+export function playImperiumPoliticsPlotIntrigue(
+  state: GameState,
+  playerId: string,
+  intrigueId: string,
+  faction: ImperiumPoliticsChoice,
+  influenceOwnerId?: string,
+): GameState {
+  if (state.phase !== "playing" || state.pendingAction || state.pendingQueue.length > 0) return state;
+  const player = state.players[state.activeSeat];
+  if (!player || player.id !== playerId) return state;
+  const intrigue = player.intrigues.find((card) => card.id === intrigueId);
+  if (!intrigue || !isImperiumPoliticsIntrigue(intrigue)) return state;
+  if (!imperiumPoliticsFactionChoices(player).includes(faction)) return state;
+  if (player.resources.solari < 1) return state;
+
+  const influenceOwnerResult = player.role === "Commander" && faction !== "emperor"
+    ? activatedAllyEffectOwner(state, player, influenceOwnerId)
+    : { valid: true, owner: player };
+  if (!influenceOwnerResult.valid || !influenceOwnerResult.owner) return state;
+  const influenceOwner = influenceOwnerResult.owner;
+
+  const players = state.players.map((candidate) => {
+    let next = candidate;
+    if (candidate.id === player.id) {
+      next = {
+        ...next,
+        resources: { ...next.resources, solari: next.resources.solari - 1 },
+        intrigues: next.intrigues.filter((card) => card.id !== intrigue.id),
+      };
+    }
+    if (candidate.id === influenceOwner.id) {
+      next = adjustInfluence(next, faction, 1);
+    }
+    return next;
+  });
+  const influenceText = influenceOwner.id === player.id
+    ? "gains"
+    : `${influenceOwner.leader} gains`;
+  return {
+    ...state,
+    players,
+    intrigueDiscard: [...state.intrigueDiscard, intrigue],
+    log: [
+      `${player.leader} plays Imperium Politics, spends 1 Solari, and ${influenceText} 1 ${factionLabels[faction]} Influence.`,
+      ...state.log,
+    ],
   };
 }
 

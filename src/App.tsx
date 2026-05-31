@@ -63,6 +63,7 @@ import {
   isDetonationIntrigue,
   isFindWeaknessIntrigue,
   isGoToGroundIntrigue,
+  isImperiumPoliticsIntrigue,
   isIntelligenceReportIntrigue,
   isMarketOpportunityIntrigue,
   isMercenariesIntrigue,
@@ -109,6 +110,7 @@ import {
   playCouncilorsAmbitionPlotIntrigue,
   playDepartForArrakisPlotIntrigue,
   playDetonationIntrigue,
+  playImperiumPoliticsPlotIntrigue,
   playIntelligenceReportPlotIntrigue,
   playMarketOpportunityPlotIntrigue,
   playMercenariesPlotIntrigue,
@@ -127,6 +129,7 @@ import {
   resolveShaddamSignetRingChoice,
   scoreGurneyAlwaysSmiling,
   resolveThreatenSpiceProductionChoice,
+  imperiumPoliticsFactionChoices,
   skipCommandRespect,
   skipDemandAttention,
   skipCorrinoMight,
@@ -145,7 +148,7 @@ import {
   updateTradeSelection,
 } from "./game/state";
 import type { BoardSpace, Card, FactionId, GameState, PendingAction, Player, ResourceId, Resources, TeamId, TradeGoodId, TrashCardZone } from "./game/types";
-import type { CombatIntrigueChoice, ShaddamSignetRingChoice } from "./game/state";
+import type { CombatIntrigueChoice, ImperiumPoliticsChoice, ShaddamSignetRingChoice } from "./game/state";
 
 const resources: Array<{ id: ResourceId; label: string; Icon: LucideIcon }> = [
   { id: "solari", label: "Solari", Icon: CircleDollarSign },
@@ -879,6 +882,16 @@ export default function App() {
     setGame((current) => playCunningPlotIntrigue(current, current.players[current.activeSeat].id, intrigueId, choice));
   }
 
+  function playImperiumPoliticsPlot(intrigueId: string, faction: ImperiumPoliticsChoice) {
+    setGame((current) => {
+      const player = current.players[current.activeSeat];
+      const influenceOwnerId = player.role === "Commander" && faction !== "emperor"
+        ? activatedAllyIdFor(player, current.players)
+        : undefined;
+      return playImperiumPoliticsPlotIntrigue(current, player.id, intrigueId, faction, influenceOwnerId);
+    });
+  }
+
   function playDepartForArrakisPlot(intrigueId: string, choice: "draw" | "spend-spice") {
     setGame((current) => {
       const player = current.players[current.activeSeat];
@@ -1165,6 +1178,7 @@ export default function App() {
   const shaddamsFavorOwner = activePlayer.role === "Commander" ? activatedAlly : activePlayer;
   const mercenariesOwner = activePlayer.role === "Commander" ? activatedAlly : activePlayer;
   const departForArrakisOwner = activePlayer.role === "Commander" ? activatedAlly : activePlayer;
+  const imperiumPoliticsOwner = activePlayer.role === "Commander" ? activatedAlly : activePlayer;
   const currentConflictProtected = conflictProtectedByShieldWall(game.conflict);
   const unexpectedAlliesCanPay = activePlayer.resources.water >= 2;
   const unexpectedAlliesBlockedByShieldWall = Boolean(game.conflict && game.shieldWall && currentConflictProtected);
@@ -2394,6 +2408,10 @@ export default function App() {
                   const marketOpportunityCanBuySpice = activePlayer.resources.solari >= 5;
                   const mercenariesCanPay = activePlayer.resources.solari >= 3;
                   const cunningCanPay = activePlayer.resources.spice >= 1;
+                  const imperiumPoliticsCanPay = activePlayer.resources.solari >= 1;
+                  const imperiumPoliticsChoices = isImperiumPoliticsIntrigue(card)
+                    ? imperiumPoliticsFactionChoices(activePlayer)
+                    : [];
                   const departForArrakisCanDraw = effectiveFremenIconInfluence(activePlayer, game.players) >= 3;
                   const departForArrakisCanPay = activePlayer.resources.spice >= 2;
                   return (
@@ -2408,6 +2426,8 @@ export default function App() {
                             ? `Plot / draw ${intelligenceReportDrawCount}`
                           : isCunningIntrigue(card)
                             ? "Plot / draw or pay to trash"
+                          : isImperiumPoliticsIntrigue(card)
+                            ? "Plot / buy Influence"
                           : isDepartForArrakisIntrigue(card)
                             ? `Plot / ${departForArrakisCanDraw ? "draw / " : ""}spend spice for troops`
                           : isCouncilorsAmbitionIntrigue(card)
@@ -2510,6 +2530,28 @@ export default function App() {
                             <X size={14} />
                             1 Spice -&gt; Draw + Trash
                           </button>
+                        </div>
+                      )}
+                      {isImperiumPoliticsIntrigue(card) && (
+                        <div className="intrigue-actions">
+                          {imperiumPoliticsChoices.map((faction) => {
+                            const ownerLabel =
+                              activePlayer.role === "Commander" && faction !== "emperor"
+                                ? `: ${imperiumPoliticsOwner.leader}`
+                                : "";
+                            return (
+                              <button
+                                type="button"
+                                key={faction}
+                                onClick={() => playImperiumPoliticsPlot(card.id, faction)}
+                                disabled={plotIntrigueLocked || !imperiumPoliticsCanPay}
+                                title={`Spend 1 Solari to gain 1 ${factionLabels[faction]} Influence${ownerLabel ? ` for ${imperiumPoliticsOwner.leader}` : ""}`}
+                              >
+                                <HandCoins size={14} />
+                                1 Solari -&gt; {factionShortLabels[faction]}{ownerLabel}
+                              </button>
+                            );
+                          })}
                         </div>
                       )}
                       {isDepartForArrakisIntrigue(card) && (

@@ -46,6 +46,7 @@ Private web-table implementation for a six-player `Dune: Imperium - Uprising` te
 - Reaching or dropping below 2 Influence automatically adds or removes the faction-track VP.
 - Active players can play the Plot side of battle-icon Intrigues for 1 spice during normal play.
 - Contingency Plan can be played as a Plot Intrigue for 2 Solari or as a Combat Intrigue for 3 strength.
+- Inspire Awe can be played as a Plot Intrigue to acquire a card that costs 3 or less, placing it in hand when the player has a sandworm in the Conflict.
 - Intelligence Report can be played as a Plot Intrigue to draw 1 card, or 2 cards with two or more own spies on the board.
 - Cunning can be played as a Plot Intrigue to draw 1 card, or spend 1 spice to draw 1 card and trash 1 card.
 - Sietch Ritual can be played as a Plot Intrigue to discard a hand card for Bene Gesserit or Fremen/Fringe Influence.

@@ -98,6 +98,7 @@ try {
   const councilorsAmbition = data.intrigueCards.find((card) => card.sourceId === 129);
   const marketOpportunity = data.intrigueCards.find((card) => card.sourceId === 145);
   const contingencyPlan = data.intrigueCards.find((card) => card.sourceId === 147);
+  const inspireAwe = data.intrigueCards.find((card) => card.sourceId === 148);
   const findWeakness = data.intrigueCards.find((card) => card.sourceId === 149);
   const goToGround = data.intrigueCards.find((card) => card.sourceId === 146);
   const questionableMethods = data.intrigueCards.find((card) => card.sourceId === 156);
@@ -124,6 +125,7 @@ try {
   assert.ok(councilorsAmbition, "Councilor's Ambition Intrigue should be available");
   assert.ok(marketOpportunity, "Market Opportunity Intrigue should be available");
   assert.ok(contingencyPlan, "Contingency Plan Intrigue should be available");
+  assert.ok(inspireAwe, "Inspire Awe Intrigue should be available");
   assert.ok(findWeakness, "Find Weakness Intrigue should be available");
   assert.ok(goToGround, "Go To Ground Intrigue should be available");
   assert.ok(questionableMethods, "Questionable Methods Intrigue should be available");
@@ -216,6 +218,11 @@ try {
     contingencyPlan.summary,
     "Gain 2 Solari as a Plot Intrigue OR add 3 strength as a Combat Intrigue.",
     "Contingency Plan should expose both printed timing branches",
+  );
+  assert.equal(
+    inspireAwe.summary,
+    "Acquire a card that costs 3 or less; put it in your hand if you have a sandworm in the Conflict.",
+    "Inspire Awe should expose its acquisition and sandworm destination effect",
   );
   assert.equal(
     findWeakness.summary,
@@ -352,6 +359,162 @@ try {
     state.playContingencyPlanPlotIntrigue(contingencyFixture, "p3", contingencyPlan.id),
     contingencyFixture,
     "Only the active player should play Contingency Plan as a Plot Intrigue",
+  );
+
+  const inspireAweAcquireCard = data.imperiumDeck.find((card) => (card.cost ?? 0) <= 3);
+  const inspireAweReplacement = data.imperiumDeck.find((card) => card.id !== inspireAweAcquireCard?.id);
+  assert.ok(inspireAweAcquireCard, "Expected a low-cost Imperium Row card for Inspire Awe");
+  assert.ok(inspireAweReplacement, "Expected an Imperium Row replacement card for Inspire Awe");
+  const inspireAweFixture = {
+    ...game,
+    activeSeat: game.players.findIndex((candidate) => candidate.id === "p2"),
+    imperiumRow: [inspireAweAcquireCard],
+    marketDeck: [inspireAweReplacement],
+    pendingAction: undefined,
+    pendingQueue: [],
+    intrigueDiscard: [],
+    players: game.players.map((candidate) =>
+      candidate.id === "p2"
+        ? { ...candidate, hand: [], discard: [], deployedSandworms: 0, intrigues: [inspireAwe] }
+        : { ...candidate, intrigues: [] },
+    ),
+  };
+  assert.equal(
+    state.isInspireAweIntrigue(inspireAwe),
+    true,
+    "Inspire Awe should be recognized as a structured Plot Intrigue",
+  );
+  const inspireAwePlotted = state.playInspireAwePlotIntrigue(inspireAweFixture, "p2", inspireAwe.id);
+  assert.deepEqual(playerById(inspireAwePlotted, "p2").intrigues, []);
+  assert.equal(inspireAwePlotted.intrigueDiscard.at(-1).id, inspireAwe.id);
+  assert.deepEqual(
+    inspireAwePlotted.pendingAction,
+    { kind: "acquire-card", ownerId: "p2", source: "Inspire Awe", maxCost: 3, destination: "discard" },
+    "Inspire Awe without a sandworm should acquire to discard",
+  );
+  assert.equal(
+    state.finishPendingAction(inspireAwePlotted),
+    inspireAwePlotted,
+    "Inspire Awe acquisition should not be skippable",
+  );
+  const inspireAweAcquired = state.acquireCardForPending(
+    inspireAwePlotted,
+    inspireAwePlotted.pendingAction,
+    inspireAweAcquireCard.id,
+  );
+  assert.equal(playerById(inspireAweAcquired, "p2").discard.at(-1).id, inspireAweAcquireCard.id);
+  assert.equal(playerById(inspireAweAcquired, "p2").hand.length, 0);
+  assert.deepEqual(inspireAweAcquired.imperiumRow.map((card) => card.id), [inspireAweReplacement.id]);
+  const inspireAweWormFixture = {
+    ...inspireAweFixture,
+    imperiumRow: [inspireAweAcquireCard],
+    marketDeck: [inspireAweReplacement],
+    players: inspireAweFixture.players.map((candidate) =>
+      candidate.id === "p2" ? { ...candidate, deployedSandworms: 1, intrigues: [inspireAwe] } : candidate,
+    ),
+  };
+  const inspireAweToHand = state.playInspireAwePlotIntrigue(inspireAweWormFixture, "p2", inspireAwe.id);
+  assert.deepEqual(
+    inspireAweToHand.pendingAction,
+    { kind: "acquire-card", ownerId: "p2", source: "Inspire Awe", maxCost: 3, destination: "hand" },
+    "Inspire Awe with a sandworm should acquire to hand",
+  );
+  const inspireAweHandAcquired = state.acquireCardForPending(
+    inspireAweToHand,
+    inspireAweToHand.pendingAction,
+    inspireAweAcquireCard.id,
+  );
+  assert.equal(playerById(inspireAweHandAcquired, "p2").hand.at(-1).id, inspireAweAcquireCard.id);
+  assert.equal(playerById(inspireAweHandAcquired, "p2").discard.length, 0);
+  const noCardInspireAwe = state.playInspireAwePlotIntrigue(
+    { ...inspireAweFixture, imperiumRow: [], marketDeck: [] },
+    "p2",
+    inspireAwe.id,
+  );
+  assert.equal(noCardInspireAwe.pendingAction, undefined, "Inspire Awe should resolve without a pending action if no card is eligible");
+  assert.match(noCardInspireAwe.log[0], /no eligible card is available/);
+  const commanderInspireAweFixture = {
+    ...game,
+    activeSeat: game.players.findIndex((candidate) => candidate.id === "p4"),
+    imperiumRow: [inspireAweAcquireCard],
+    marketDeck: [inspireAweReplacement],
+    pendingAction: undefined,
+    pendingQueue: [],
+    intrigueDiscard: [],
+    players: game.players.map((candidate) => {
+      if (candidate.id === "p4") {
+        return {
+          ...candidate,
+          revealed: true,
+          revealActivatedAllyId: "p6",
+          callToArmsActive: true,
+          hand: [],
+          discard: [],
+          intrigues: [inspireAwe],
+        };
+      }
+      if (candidate.id === "p6") return { ...candidate, deployedSandworms: 1, garrison: 2, hand: [], discard: [], intrigues: [] };
+      return { ...candidate, intrigues: [] };
+    }),
+  };
+  const commanderInspireAwe = state.playInspireAwePlotIntrigue(
+    commanderInspireAweFixture,
+    "p4",
+    inspireAwe.id,
+    "p6",
+  );
+  assert.deepEqual(
+    commanderInspireAwe.pendingAction,
+    { kind: "acquire-card", ownerId: "p4", source: "Inspire Awe", maxCost: 3, destination: "hand" },
+    "Commander Inspire Awe should use the activated Ally's sandworm but acquire for the Commander",
+  );
+  const commanderInspireAweAcquired = state.acquireCardForPending(
+    commanderInspireAwe,
+    commanderInspireAwe.pendingAction,
+    inspireAweAcquireCard.id,
+    "p6",
+  );
+  assert.equal(playerById(commanderInspireAweAcquired, "p4").hand.at(-1).id, inspireAweAcquireCard.id);
+  assert.equal(playerById(commanderInspireAweAcquired, "p6").garrison, 3, "Commander Call to Arms should recruit for the Reveal Ally");
+  assert.equal(playerById(commanderInspireAweAcquired, "p6").hand.length, 0, "The activated Ally should not receive the acquired card");
+  assert.equal(
+    state.playInspireAwePlotIntrigue(commanderInspireAweFixture, "p4", inspireAwe.id, "p2"),
+    commanderInspireAweFixture,
+    "Revealed Commander Inspire Awe should reject a same-team Ally who was not activated for Reveal",
+  );
+  const pendingInspireAwe = {
+    ...inspireAweFixture,
+    pendingAction: { kind: "spy", ownerId: "p2", remaining: 1, source: "Test" },
+  };
+  assert.equal(
+    state.playInspireAwePlotIntrigue(pendingInspireAwe, "p2", inspireAwe.id),
+    pendingInspireAwe,
+    "Inspire Awe should wait for pending actions to resolve",
+  );
+  const queuedInspireAwe = {
+    ...inspireAweFixture,
+    pendingQueue: [{ kind: "spy", ownerId: "p2", remaining: 1, source: "Test" }],
+  };
+  assert.equal(
+    state.playInspireAwePlotIntrigue(queuedInspireAwe, "p2", inspireAwe.id),
+    queuedInspireAwe,
+    "Inspire Awe should wait for queued pending actions to resolve",
+  );
+  assert.equal(
+    state.playInspireAwePlotIntrigue(inspireAweFixture, "p3", inspireAwe.id),
+    inspireAweFixture,
+    "Only the active player should play Inspire Awe",
+  );
+  assert.equal(
+    state.playInspireAwePlotIntrigue(inspireAweFixture, "p2", mercenaries.id),
+    inspireAweFixture,
+    "Inspire Awe should reject other Intrigue cards",
+  );
+  const combatInspireAwe = { ...inspireAweFixture, phase: "combat" };
+  assert.equal(
+    state.playInspireAwePlotIntrigue(combatInspireAwe, "p2", inspireAwe.id),
+    combatInspireAwe,
+    "Inspire Awe should only resolve during normal play",
   );
 
   const [firstSpySpace, secondSpySpace, opposingSpySpace] = data.boardSpaces.map((space) => space.id);

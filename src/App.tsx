@@ -73,6 +73,7 @@ import {
   isGoToGroundIntrigue,
   isImperiumPoliticsIntrigue,
   isImpressIntrigue,
+  isInspireAweIntrigue,
   isIntelligenceReportIntrigue,
   isMarketOpportunityIntrigue,
   isMercenariesIntrigue,
@@ -128,6 +129,7 @@ import {
   playDepartForArrakisPlotIntrigue,
   playDetonationIntrigue,
   playImperiumPoliticsPlotIntrigue,
+  playInspireAwePlotIntrigue,
   playIntelligenceReportPlotIntrigue,
   playMarketOpportunityPlotIntrigue,
   playMercenariesPlotIntrigue,
@@ -851,7 +853,9 @@ export default function App() {
     setGame((current) => {
       const pending = current.pendingAction;
       if (!pending || pending.kind !== "acquire-card") return current;
-      return maybeStartCombatPhase(acquireCardForPending(current, pending, cardId));
+      const owner = current.players.find((player) => player.id === pending.ownerId);
+      const recruitOwnerId = owner?.role === "Commander" ? activatedAllyIdFor(owner, current.players) : undefined;
+      return maybeStartCombatPhase(acquireCardForPending(current, pending, cardId, recruitOwnerId));
     });
   }
 
@@ -929,6 +933,14 @@ export default function App() {
 
   function playIntelligenceReportPlot(intrigueId: string) {
     setGame((current) => playIntelligenceReportPlotIntrigue(current, current.players[current.activeSeat].id, intrigueId));
+  }
+
+  function playInspireAwePlot(intrigueId: string) {
+    setGame((current) => {
+      const player = current.players[current.activeSeat];
+      const sandwormOwnerId = player.role === "Commander" ? activatedAllyIdFor(player, current.players) : undefined;
+      return playInspireAwePlotIntrigue(current, player.id, intrigueId, sandwormOwnerId);
+    });
   }
 
   function playCunningPlot(intrigueId: string, choice: "draw" | "paid-trash") {
@@ -2559,6 +2571,9 @@ export default function App() {
                   const intelligenceReportDrawCount = boardSpaces.filter((space) =>
                     game.spyPosts[space.id] === activePlayer.id
                   ).length >= 2 ? 2 : 1;
+                  const inspireAweToHand =
+                    activePlayer.deployedSandworms > 0 ||
+                    (activePlayer.role === "Commander" && activatedAlly.deployedSandworms > 0);
                   const councilorsAmbitionCanPlay = activePlayer.highCouncilSeat;
                   const strategicStockpilingCanSpice = activePlayer.resources.spice >= 5;
                   const strategicStockpilingCanWater =
@@ -2629,6 +2644,8 @@ export default function App() {
                             ? "Plot / reveal acquisitions recruit"
                           : isIntelligenceReportIntrigue(card)
                             ? `Plot / draw ${intelligenceReportDrawCount}`
+                          : isInspireAweIntrigue(card)
+                            ? `Plot / acquire <=3${inspireAweToHand ? " to hand" : ""}`
                           : isCunningIntrigue(card)
                             ? "Plot / draw or pay to trash"
                           : isSietchRitualIntrigue(card)
@@ -2724,6 +2741,21 @@ export default function App() {
                         >
                           <BookOpen size={14} />
                           Draw {intelligenceReportDrawCount}
+                        </button>
+                      )}
+                      {isInspireAweIntrigue(card) && (
+                        <button
+                          type="button"
+                          onClick={() => playInspireAwePlot(card.id)}
+                          disabled={plotIntrigueLocked}
+                          title={
+                            inspireAweToHand
+                              ? "Acquire a card that costs 3 or less to your hand"
+                              : "Acquire a card that costs 3 or less to your discard pile"
+                          }
+                        >
+                          <BookOpen size={14} />
+                          Acquire &lt;=3{inspireAweToHand ? " to Hand" : ""}
                         </button>
                       )}
                       {isCunningIntrigue(card) && (

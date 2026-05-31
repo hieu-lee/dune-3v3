@@ -67,6 +67,7 @@ const intelligenceReportSourceId = 142;
 const councilorsAmbitionSourceId = 129;
 const marketOpportunitySourceId = 145;
 const contingencyPlanSourceId = 147;
+const inspireAweSourceId = 148;
 const goToGroundSourceId = 146;
 const findWeaknessSourceId = 149;
 const spiceIsPowerSourceId = 150;
@@ -238,6 +239,10 @@ export function isContingencyPlanIntrigue(intrigue: IntrigueCard) {
 
 export function isIntelligenceReportIntrigue(intrigue: IntrigueCard) {
   return intrigue.sourceId === intelligenceReportSourceId;
+}
+
+export function isInspireAweIntrigue(intrigue: IntrigueCard) {
+  return intrigue.sourceId === inspireAweSourceId;
 }
 
 export function isDevourIntrigue(intrigue: IntrigueCard) {
@@ -1486,6 +1491,7 @@ export function acquireCardForPending(
   state: GameState,
   pending: AcquireCardPendingAction,
   cardId: string,
+  callToArmsRecruitOwnerId?: string,
 ): GameState {
   const owner = state.players.find((player) => player.id === pending.ownerId);
   if (!owner) return state;
@@ -1506,12 +1512,27 @@ export function acquireCardForPending(
       })
     : state.imperiumRow;
   const throneRow = throneCard ? state.throneRow.filter((candidate) => candidate.id !== card.id) : state.throneRow;
-  const players = state.players.map((player) =>
-    player.id === owner.id
-      ? addAcquiredCard(player, card, Boolean(reserveCard), pending.destination)
-      : player,
-  );
+  const callToArmsRecruit = state.phase === "playing" && owner.revealed
+    ? callToArmsRecruitOwner(state, owner, callToArmsRecruitOwnerId)
+    : { valid: true, owner: undefined };
+  if (!callToArmsRecruit.valid) return state;
+  const recruitOwner = callToArmsRecruit.owner;
+  const players = state.players.map((player) => {
+    let next = player;
+    if (player.id === owner.id) {
+      next = addAcquiredCard(player, card, Boolean(reserveCard), pending.destination);
+    }
+    if (recruitOwner && player.id === recruitOwner.id) {
+      next = { ...next, garrison: next.garrison + 1 };
+    }
+    return next;
+  });
   const destinationText = pending.destination === "hand" ? "hand" : "discard pile";
+  const recruitText = recruitOwner
+    ? recruitOwner.id === owner.id
+      ? " and recruits 1 troop"
+      : ` and ${recruitOwner.leader} recruits 1 troop`
+    : "";
   return finishCombatIfNoActors({
     ...state,
     players,
@@ -1520,7 +1541,7 @@ export function acquireCardForPending(
     throneRow,
     ...advancePendingAction(state),
     log: [
-      `${owner.leader} acquires ${card.name} to their ${destinationText} from ${pending.source}.`,
+      `${owner.leader} acquires ${card.name} to their ${destinationText} from ${pending.source}${recruitText}.`,
       ...state.log,
     ],
   });
@@ -2450,6 +2471,58 @@ export function playContingencyPlanPlotIntrigue(
     players,
     intrigueDiscard: [...state.intrigueDiscard, intrigue],
     log: [`${player.leader} plays Contingency Plan as a Plot Intrigue for 2 Solari.`, ...state.log],
+  };
+}
+
+export function playInspireAwePlotIntrigue(
+  state: GameState,
+  playerId: string,
+  intrigueId: string,
+  sandwormOwnerId?: string,
+): GameState {
+  if (state.phase !== "playing" || state.pendingAction || state.pendingQueue.length > 0) return state;
+  const player = state.players[state.activeSeat];
+  if (!player || player.id !== playerId) return state;
+  const intrigue = player.intrigues.find((card) => card.id === intrigueId);
+  if (!intrigue || !isInspireAweIntrigue(intrigue)) return state;
+
+  const sandwormOwnerResult =
+    player.role === "Commander"
+      ? activatedAllyEffectOwner(state, player, sandwormOwnerId)
+      : { valid: true, owner: player };
+  if (!sandwormOwnerResult.valid || !sandwormOwnerResult.owner) return state;
+  const sandwormOwner = sandwormOwnerResult.owner;
+  const hasSharedSandworm =
+    player.deployedSandworms > 0 ||
+    (player.role === "Commander" && sandwormOwner.deployedSandworms > 0);
+  const acquirePending: AcquireCardPendingAction = {
+    kind: "acquire-card",
+    ownerId: player.id,
+    source: "Inspire Awe",
+    maxCost: 3,
+    destination: hasSharedSandworm ? "hand" : "discard",
+  };
+  const canAcquire = acquirableCardsForPending(state, acquirePending).length > 0;
+  const players = state.players.map((candidate) =>
+    candidate.id === player.id
+      ? { ...candidate, intrigues: candidate.intrigues.filter((card) => card.id !== intrigue.id) }
+      : candidate,
+  );
+  const destinationText = hasSharedSandworm ? "hand" : "discard pile";
+  const acquireText = canAcquire
+    ? ` and must acquire a card that costs 3 or less to their ${destinationText}`
+    : ", but no eligible card is available";
+  const sandwormText =
+    player.role === "Commander" && sandwormOwner.id !== player.id && sandwormOwner.deployedSandworms > 0
+      ? ` through ${sandwormOwner.leader}'s sandworm`
+      : "";
+
+  return {
+    ...state,
+    players,
+    pendingAction: canAcquire ? acquirePending : undefined,
+    intrigueDiscard: [...state.intrigueDiscard, intrigue],
+    log: [`${player.leader} plays Inspire Awe${sandwormText}${acquireText}.`, ...state.log],
   };
 }
 

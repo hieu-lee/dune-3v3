@@ -23,7 +23,10 @@ import { EndgamePanel } from "./components/EndgamePanel";
 import { LeaderReferenceModal } from "./components/LeaderReferenceModal";
 import { MarketPanel } from "./components/MarketPanel";
 import { PendingInfluenceLossPanel } from "./components/PendingInfluenceLossPanel";
+import { PendingMakerChoicePanel } from "./components/PendingMakerChoicePanel";
 import { PendingRecallSpyPanel } from "./components/PendingRecallSpyPanel";
+import { PendingResourceSplitPanel } from "./components/PendingResourceSplitPanel";
+import { PendingSietchTabrPanel } from "./components/PendingSietchTabrPanel";
 import { PendingSpyPanel } from "./components/PendingSpyPanel";
 import { PendingTrashPanel } from "./components/PendingTrashPanel";
 import { PlayerColumn } from "./components/PlayerColumn";
@@ -36,8 +39,6 @@ import {
   factionShortLabels,
   memoryCountLabel,
   pendingLocksTableState,
-  resourceChoiceLabel,
-  resources,
   revealGainLabel,
   revealPersuasionFor,
   selectedFactionChoice,
@@ -1296,8 +1297,6 @@ export default function App() {
     pendingAction?.kind === "maker-choice" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingMakerSpiceOwner =
     pendingAction?.kind === "maker-choice" ? game.players.find((player) => player.id === pendingAction.spiceOwnerId) : undefined;
-  const pendingMakerCanSummon =
-    pendingAction?.kind === "maker-choice" ? pendingAction.canSummonSandworms : false;
   const pendingMakerSplit =
     pendingAction?.kind === "maker-choice" &&
     pendingMakerOwner &&
@@ -1931,46 +1930,30 @@ export default function App() {
             )}
 
             {pendingAction.kind === "maker-choice" && pendingMakerOwner && (
-              <div className="pending-controls">
-                <span>{pendingMakerLabel}</span>
-                <button type="button" onClick={() => chooseMakerReward("spice")}>
-                  +{pendingAction.spice} spice{pendingMakerSplit ? `: ${pendingMakerSpiceOwner.leader}` : ""}
-                </button>
-                <button type="button" onClick={() => chooseMakerReward("sandworms")} disabled={!pendingMakerCanSummon}>
-                  Summon {pendingAction.sandworms}{pendingMakerSplit ? `: ${pendingMakerOwner.leader}` : ""}
-                </button>
-              </div>
+              <PendingMakerChoicePanel
+                label={pendingMakerLabel}
+                owner={pendingMakerOwner}
+                pending={pendingAction}
+                spiceOwner={pendingMakerSpiceOwner}
+                onChoose={chooseMakerReward}
+              />
             )}
 
             {pendingAction.kind === "sietch-tabr" && pendingSietchOwner && pendingSietchWaterOwner && (
-              <div className="pending-controls">
-                <span>{pendingSietchLabel}</span>
-                <button type="button" onClick={() => chooseSietchTabr("hooks")}>
-                  {pendingAction.canTakeMakerHooks ? "Hooks + " : ""}Troop + water
-                </button>
-                <button type="button" onClick={() => chooseSietchTabr("shield-wall")}>
-                  Water{pendingAction.canRemoveShieldWall ? " + remove Shield Wall" : ""}
-                </button>
-              </div>
+              <PendingSietchTabrPanel
+                label={pendingSietchLabel}
+                pending={pendingAction}
+                onChoose={chooseSietchTabr}
+              />
             )}
 
             {pendingAction.kind === "commander-resource-split" && pendingResourceSplitCommander && pendingResourceSplitAlly && (
-              <div className="pending-controls">
-                <span>{pendingResourceSplitCommander.leader} / {pendingResourceSplitAlly.leader}</span>
-                {pendingAction.options.map((option, index) => {
-                  const Icon = resources.find((resource) => resource.id === option.commanderResource)?.Icon ?? Sparkles;
-                  return (
-                    <button
-                      type="button"
-                      key={`${option.commanderResource}-${option.allyResource}`}
-                      onClick={() => chooseCommanderResourceSplit(index)}
-                    >
-                      <Icon size={15} />
-                      Commander {resourceChoiceLabel(option.commanderAmount, option.commanderResource)} / Ally {resourceChoiceLabel(option.allyAmount, option.allyResource)}
-                    </button>
-                  );
-                })}
-              </div>
+              <PendingResourceSplitPanel
+                ally={pendingResourceSplitAlly}
+                commander={pendingResourceSplitCommander}
+                pending={pendingAction}
+                onChoose={chooseCommanderResourceSplit}
+              />
             )}
 
             {pendingAction.kind === "shaddam-signet-ring" && (

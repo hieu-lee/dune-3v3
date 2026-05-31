@@ -5,6 +5,7 @@ import path from "node:path";
 import { chromium } from "playwright";
 import { createServer } from "vite";
 import { runPendingChoicesSmoke } from "./browser-debug-pending-choices.mjs";
+import { runSpaceChoicesSmoke } from "./browser-debug-space-choices.mjs";
 
 let optionError;
 
@@ -106,7 +107,7 @@ const scenario = optionValue("--scenario", "all");
 const outDir = optionValue("--out", "artifacts/qa/browser-debug");
 const port = optionNumber("--port", 5178);
 const slowMo = optionNumber("--slow-mo", 0);
-const scenarios = new Set(["home", "agent-placement", "control-defense", "pending-choices", "leader-modal", "manual", "all"]);
+const scenarios = new Set(["home", "agent-placement", "control-defense", "pending-choices", "space-choices", "leader-modal", "manual", "all"]);
 const generatedScreenshotNames = [
   "home-desktop.png",
   "home-mobile.png",
@@ -118,6 +119,9 @@ const generatedScreenshotNames = [
   "control-defense-pending-mobile.png",
   "pending-recall-spy.png",
   "pending-lose-influence.png",
+  "pending-maker-choice.png",
+  "pending-sietch-tabr.png",
+  "pending-resource-split.png",
   "leader-modal-open.png",
   "leader-modal-closed.png",
   "manual-ready.png",
@@ -129,6 +133,7 @@ const generatedArtifactNames = new Set([
   "console.json",
   "control-defense-state.json",
   "pending-choice-states.json",
+  "pending-space-choice-states.json",
   "request-failures.json",
   "summary.json",
   ...generatedScreenshotNames,
@@ -860,6 +865,21 @@ try {
     }
     if (scenario === "pending-choices" || scenario === "all") {
       await interruptible(runPendingChoicesSmoke({
+        captures,
+        currentGame,
+        initialPlayableGame,
+        openApp,
+        page,
+        screenshot,
+        server,
+        setDebugGameAndWait,
+        url,
+        waitForNoPending,
+        writeJson,
+      }));
+    }
+    if (scenario === "space-choices" || scenario === "all") {
+      await interruptible(runSpaceChoicesSmoke({
         captures,
         currentGame,
         initialPlayableGame,

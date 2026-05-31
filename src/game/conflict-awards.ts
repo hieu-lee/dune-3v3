@@ -50,6 +50,7 @@ type FirstPlaceBattleReward = {
   intrigues?: number;
   resources?: Partial<Record<ResourceId, number>>;
   influenceChoices?: number;
+  influenceChoiceOptions?: FactionId[];
   spies?: number;
   troops?: number;
   conversion?:
@@ -61,6 +62,7 @@ type ConflictInfluencePendingAction = Extract<PendingAction, { kind: "conflict-i
 type SpyPendingAction = Extract<PendingAction, { kind: "spy" }>;
 
 const resourceIds: ResourceId[] = ["solari", "spice", "water"];
+const propagandaInfluenceChoices: FactionId[] = ["emperor", "spacing", "bene", "fremen"];
 
 const firstPlaceBattleRewardsBySourceId: Record<number, FirstPlaceBattleReward> = {
   451: {
@@ -113,6 +115,11 @@ const firstPlaceBattleRewardsBySourceId: Record<number, FirstPlaceBattleReward> 
     resources: { water: 1 },
     troops: 1,
   },
+  463: {
+    fixedVp: 0,
+    influenceChoices: 2,
+    influenceChoiceOptions: propagandaInfluenceChoices,
+  },
   464: {
     fixedVp: 1,
     conversion: { kind: "resource", resource: "spice", amount: 4, vp: 1 },
@@ -137,21 +144,29 @@ function canPayConflictConversion(
   return boardSpaces.filter((space) => playerHasSpyPost(state, space.id, owner.id)).length >= conversion.count;
 }
 
-function pendingActionForConflictInfluence(
+function pendingActionsForConflictInfluence(
   owner: Player,
   conflict: ConflictCard,
   reward: FirstPlaceBattleReward | undefined,
   multiplier: number,
-): ConflictInfluencePendingAction | undefined {
-  const remaining = (reward?.influenceChoices ?? 0) * multiplier;
-  return remaining > 0
-    ? {
-        kind: "conflict-influence",
-        ownerId: owner.id,
-        source: conflict.name,
-        remaining,
-      }
-    : undefined;
+): ConflictInfluencePendingAction[] {
+  const choices = reward?.influenceChoices ?? 0;
+  if (choices <= 0) return [];
+  if (reward?.influenceChoiceOptions) {
+    return Array.from({ length: multiplier }, () => ({
+      kind: "conflict-influence",
+      ownerId: owner.id,
+      source: conflict.name,
+      remaining: choices,
+      choices: reward.influenceChoiceOptions,
+    }));
+  }
+  return [{
+    kind: "conflict-influence",
+    ownerId: owner.id,
+    source: conflict.name,
+    remaining: choices * multiplier,
+  }];
 }
 
 function pendingActionForConflictConversion(
@@ -355,10 +370,10 @@ function awardConflictToWinner(
     firstPlaceReward,
     multiplier,
   );
-  const influencePending = pendingActionForConflictInfluence(winner, conflict, firstPlaceReward, multiplier);
+  const influencePendingActions = pendingActionsForConflictInfluence(winner, conflict, firstPlaceReward, multiplier);
   const spyPending = pendingActionForSpyReward(state, winner, conflict, firstPlaceReward, multiplier);
   const rewardPendingActions: PendingAction[] = [];
-  if (influencePending) rewardPendingActions.push(influencePending);
+  rewardPendingActions.push(...influencePendingActions);
   if (conversionPending) rewardPendingActions.push(conversionPending);
   if (spyPending) rewardPendingActions.push(spyPending);
   const [rewardPendingAction, ...queuedRewardActions] = rewardPendingActions;
@@ -395,8 +410,8 @@ function awardConflictToWinner(
       conversionPending
         ? `${winner.leader} may pay ${conflictConversionDescription(conversionPending)} from ${conflict.name}${conversionPending.remaining > 1 ? ` up to ${conversionPending.remaining} times` : ""}.`
         : undefined,
-      influencePending
-        ? `${winner.leader} may gain ${influencePending.remaining} Influence from ${conflict.name}${multiplier > 1 ? " with sandworm doubling" : ""}.`
+      influencePendingActions.length > 0
+        ? `${winner.leader} may gain ${influencePendingActions.reduce((sum, action) => sum + action.remaining, 0)} Influence from ${conflict.name}${multiplier > 1 ? " with sandworm doubling" : ""}.`
         : undefined,
       spyPending
         ? `${winner.leader} may place ${spyPending.remaining} ${spyPending.remaining === 1 ? "spy" : "spies"} from ${conflict.name}${multiplier > 1 ? " with sandworm doubling" : ""}.`
@@ -424,27 +439,35 @@ function awardConflictToWinner(
     : awardedState;
 }
 
+function conflictInfluenceChoices(pending: ConflictInfluencePendingAction) {
+  return pending.choices ?? mainBoardInfluenceChoices;
+}
+
+function matchingConflictInfluencePending(first: ConflictInfluencePendingAction, second: ConflictInfluencePendingAction) {
+  return (
+    first.ownerId === second.ownerId &&
+    first.source === second.source &&
+    first.remaining === second.remaining &&
+    JSON.stringify(first.choices ?? null) === JSON.stringify(second.choices ?? null)
+  );
+}
+
 export function gainConflictInfluenceForPending(
   state: GameState,
   pending: ConflictInfluencePendingAction,
   faction: FactionId,
 ): GameState {
-  if (
-    state.pendingAction?.kind !== "conflict-influence" ||
-    state.pendingAction.ownerId !== pending.ownerId ||
-    state.pendingAction.source !== pending.source ||
-    state.pendingAction.remaining !== pending.remaining
-  ) {
-    return state;
-  }
+  if (state.pendingAction?.kind !== "conflict-influence") return state;
+  if (!matchingConflictInfluencePending(state.pendingAction, pending)) return state;
   const owner = state.players.find((player) => player.id === pending.ownerId);
-  if (!owner || !mainBoardInfluenceChoices.includes(faction)) return state;
+  if (!owner || !conflictInfluenceChoices(pending).includes(faction)) return state;
 
   const previousPlayers = state.players;
   const remaining = pending.remaining - 1;
+  const choices = pending.choices?.filter((choice) => choice !== faction);
   const nextPending =
     remaining > 0
-      ? { pendingAction: { ...pending, remaining }, pendingQueue: state.pendingQueue }
+      ? { pendingAction: { ...pending, remaining, choices }, pendingQueue: state.pendingQueue }
       : advancePendingAction(state);
   const influencedState: GameState = {
     ...state,

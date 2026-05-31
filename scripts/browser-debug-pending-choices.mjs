@@ -70,6 +70,26 @@ export async function runPendingChoicesSmoke({
     conflictInfluenceOwnerBefore.influence.bene + 1,
     "Conflict Influence choice should gain the selected Influence",
   );
+
+  await setDebugGameAndWait(page, pendingChoiceStates.fixedConflictInfluence);
+  pendingText = await page.locator(".pending-panel").innerText();
+  assert.match(pendingText, /Propaganda/i);
+  assert.match(pendingText, /Emperor/i);
+  assert.match(pendingText, /Fremen/i);
+  assert.doesNotMatch(pendingText, /Great Houses/i);
+  await screenshot(page, captures, "pending-conflict-influence-fixed.png");
+
+  await page.locator(".pending-panel").getByRole("button", { name: /Emperor/ }).click();
+  const fixedOnce = await currentGame(page);
+  assert.equal(fixedOnce.pendingAction?.kind, "conflict-influence");
+  assert.equal(fixedOnce.pendingAction?.remaining, 1);
+  assert.deepEqual(fixedOnce.pendingAction?.choices, ["spacing", "bene", "fremen"]);
+  await page.locator(".pending-panel").getByRole("button", { name: /Fremen/ }).click();
+  await waitForNoPending(page);
+  const fixedAfter = await currentGame(page);
+  const fixedOwnerAfter = fixedAfter.players.find((player) => player.id === "p2");
+  assert.equal(fixedOwnerAfter.influence.emperor, 2);
+  assert.equal(fixedOwnerAfter.influence.fremen, 1);
 }
 
 async function createPendingChoiceStates(server, initialPlayableGame) {
@@ -127,6 +147,18 @@ async function createPendingChoiceStates(server, initialPlayableGame) {
         ownerId,
         remaining: 1,
         source: "Skirmish (Crysknife)",
+      },
+    },
+    fixedConflictInfluence: {
+      ...base,
+      phase: "playing",
+      conflict: null,
+      pendingAction: {
+        kind: "conflict-influence",
+        ownerId,
+        remaining: 2,
+        source: "Propaganda",
+        choices: ["emperor", "spacing", "bene", "fremen"],
       },
     },
   };

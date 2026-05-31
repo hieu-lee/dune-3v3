@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { createServer } from "vite";
+import { verifyPropagandaConflictAwards } from "./verify-conflict-awards-propaganda.mjs";
 import { verifySeizeSpiceRefineryConflictAwards } from "./verify-conflict-awards-seize.mjs";
 import { verifySpiceFreightersConflictAwards } from "./verify-conflict-awards-spice-freighters.mjs";
 import { verifySkirmishConflictAwards } from "./verify-conflict-awards-skirmish.mjs";
@@ -353,6 +354,14 @@ try {
     data,
     fixture,
     conflictBySourceId,
+    playerById,
+  });
+  verifyPropagandaConflictAwards({
+    state,
+    data,
+    fixture,
+    conflictBySourceId,
+    objectiveById,
     playerById,
   });
   verifyTestOfLoyaltyConflictAwards({
@@ -859,19 +868,6 @@ try {
   const commanderResult = state.startNextRound(commanderIgnored);
   assert.equal(playerById(commanderResult, "p2").wonConflicts.length, 1, "Only Allies should win Conflicts");
   assert.equal(playerById(commanderResult, "p4").wonConflicts.length, 0);
-
-  const propaganda = fixture(state, data, (players) =>
-    players.map((player) =>
-      player.id === "p2"
-        ? { ...player, conflict: 9, deployedTroops: 1, objectives: [crysknifeObjective] }
-        : player,
-    ), 463);
-  const propagandaResult = state.startNextRound(propaganda);
-  const propagandaWinner = playerById(propagandaResult, "p2");
-  assert.equal(propagandaWinner.vp, playerById(propaganda, "p2").vp, "Wild Propaganda should not score before Endgame");
-  assert.equal(propagandaWinner.objectives[0].scored, undefined);
-  assert.equal(propagandaWinner.wonConflicts[0].battleIcon, "wild");
-  assert.equal(propagandaWinner.wonConflicts[0].scored, false);
 
   console.log("conflict award verification passed");
 } finally {

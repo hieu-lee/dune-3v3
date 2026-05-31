@@ -253,6 +253,7 @@ export type PendingAction =
       ownerId: string;
       remaining: number;
       source: string;
+      choices?: FactionId[];
     }
   | {
       kind: "trash-card";

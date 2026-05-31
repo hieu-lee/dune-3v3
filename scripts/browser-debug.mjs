@@ -5,6 +5,7 @@ import path from "node:path";
 import { chromium } from "playwright";
 import { createServer } from "vite";
 import { runPendingChoicesSmoke } from "./browser-debug-pending-choices.mjs";
+import { runSignetChoicesSmoke } from "./browser-debug-signet-choices.mjs";
 import { runSpaceChoicesSmoke } from "./browser-debug-space-choices.mjs";
 
 let optionError;
@@ -107,7 +108,7 @@ const scenario = optionValue("--scenario", "all");
 const outDir = optionValue("--out", "artifacts/qa/browser-debug");
 const port = optionNumber("--port", 5178);
 const slowMo = optionNumber("--slow-mo", 0);
-const scenarios = new Set(["home", "agent-placement", "control-defense", "pending-choices", "space-choices", "leader-modal", "manual", "all"]);
+const scenarios = new Set(["home", "agent-placement", "control-defense", "pending-choices", "space-choices", "signet-choices", "leader-modal", "manual", "all"]);
 const generatedScreenshotNames = [
   "home-desktop.png",
   "home-mobile.png",
@@ -122,6 +123,8 @@ const generatedScreenshotNames = [
   "pending-maker-choice.png",
   "pending-sietch-tabr.png",
   "pending-resource-split.png",
+  "pending-shaddam-signet.png",
+  "pending-irulan-signet.png",
   "leader-modal-open.png",
   "leader-modal-closed.png",
   "manual-ready.png",
@@ -134,6 +137,7 @@ const generatedArtifactNames = new Set([
   "control-defense-state.json",
   "pending-choice-states.json",
   "pending-space-choice-states.json",
+  "pending-signet-choice-states.json",
   "request-failures.json",
   "summary.json",
   ...generatedScreenshotNames,
@@ -880,6 +884,21 @@ try {
     }
     if (scenario === "space-choices" || scenario === "all") {
       await interruptible(runSpaceChoicesSmoke({
+        captures,
+        currentGame,
+        initialPlayableGame,
+        openApp,
+        page,
+        screenshot,
+        server,
+        setDebugGameAndWait,
+        url,
+        waitForNoPending,
+        writeJson,
+      }));
+    }
+    if (scenario === "signet-choices" || scenario === "all") {
+      await interruptible(runSignetChoicesSmoke({
         captures,
         currentGame,
         initialPlayableGame,

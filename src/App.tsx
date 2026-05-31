@@ -23,9 +23,11 @@ import { EndgamePanel } from "./components/EndgamePanel";
 import { LeaderReferenceModal } from "./components/LeaderReferenceModal";
 import { MarketPanel } from "./components/MarketPanel";
 import { PendingInfluenceLossPanel } from "./components/PendingInfluenceLossPanel";
+import { PendingIrulanSignetPanel } from "./components/PendingIrulanSignetPanel";
 import { PendingMakerChoicePanel } from "./components/PendingMakerChoicePanel";
 import { PendingRecallSpyPanel } from "./components/PendingRecallSpyPanel";
 import { PendingResourceSplitPanel } from "./components/PendingResourceSplitPanel";
+import { PendingShaddamSignetPanel } from "./components/PendingShaddamSignetPanel";
 import { PendingSietchTabrPanel } from "./components/PendingSietchTabrPanel";
 import { PendingSpyPanel } from "./components/PendingSpyPanel";
 import { PendingTrashPanel } from "./components/PendingTrashPanel";
@@ -42,7 +44,6 @@ import {
   revealGainLabel,
   revealPersuasionFor,
   selectedFactionChoice,
-  shaddamSignetInfluenceFactions,
   tableStateLockedByPendingActions,
   tradeGoods,
   troopSupplyLabel,
@@ -1957,66 +1958,20 @@ export default function App() {
             )}
 
             {pendingAction.kind === "shaddam-signet-ring" && (
-              <div className="pending-controls influence-buttons">
-                {pendingShaddamSignetCommander && pendingShaddamSignetAlly ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => chooseShaddamSignet("troop")}
-                      disabled={pendingShaddamSignetCommander.resources.solari < 1}
-                    >
-                      <CircleDollarSign size={15} />
-                      Spend 1: {pendingShaddamSignetAlly.leader} recruits 1 troop
-                    </button>
-                    {shaddamSignetInfluenceFactions.map((faction) => {
-                      const owner =
-                        faction === "emperor" ? pendingShaddamSignetCommander : pendingShaddamSignetAlly;
-                      return (
-                        <button
-                          type="button"
-                          key={faction}
-                          onClick={() => chooseShaddamSignet({ kind: "influence", faction })}
-                          disabled={pendingShaddamSignetCommander.resources.solari < 3}
-                        >
-                          <CircleDollarSign size={15} />
-                          Spend 3: {owner.leader} +1 {factionLabels[faction]}
-                        </button>
-                      );
-                    })}
-                  </>
-                ) : (
-                  <span>Emperor of the Known Universe can no longer resolve with the current table state.</span>
-                )}
-                <button type="button" onClick={() => chooseShaddamSignet("skip")}>Skip</button>
-              </div>
+              <PendingShaddamSignetPanel
+                ally={pendingShaddamSignetAlly}
+                commander={pendingShaddamSignetCommander}
+                onChoose={chooseShaddamSignet}
+              />
             )}
 
             {pendingAction.kind === "irulan-signet-ring" && (
-              <div className="pending-controls">
-                {pendingIrulanSignetOwner ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => chooseIrulanSignet("acquire")}
-                      disabled={pendingIrulanSignetAcquireCards.length === 0}
-                    >
-                      <BookOpen size={15} />
-                      Acquire cost-1 card to hand
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => chooseIrulanSignet("trash")}
-                      disabled={pendingIrulanSignetTrashChoices.length === 0}
-                    >
-                      <X size={15} />
-                      Trash hand card
-                    </button>
-                  </>
-                ) : (
-                  <span>Chronicler's Insight can no longer resolve with the current table state.</span>
-                )}
-                <button type="button" onClick={() => chooseIrulanSignet("skip")}>Skip</button>
-              </div>
+              <PendingIrulanSignetPanel
+                acquireCount={pendingIrulanSignetAcquireCards.length}
+                owner={pendingIrulanSignetOwner}
+                trashCount={pendingIrulanSignetTrashChoices.length}
+                onChoose={chooseIrulanSignet}
+              />
             )}
 
             {pendingAction.kind === "staban-unseen-network" && (

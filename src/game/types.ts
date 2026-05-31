@@ -18,6 +18,7 @@ export type FactionId =
   | "greatHouses"
   | "fringeWorlds";
 export type ResourceId = "solari" | "spice" | "water";
+export type CriticalLocationId = "arrakeen" | "spice-refinery" | "imperial-basin";
 export type BattleIconId = "crysknife" | "desertMouse" | "ornithopter";
 export type ConflictBattleIconId = BattleIconId | "wild";
 
@@ -406,6 +407,16 @@ export type PendingAction =
       spaceId: string;
     }
   | {
+      kind: "conflict-vp-conversion";
+      ownerId: string;
+      source: string;
+      remaining: number;
+      vp: number;
+      cost:
+        | { kind: "resource"; resource: ResourceId; amount: number }
+        | { kind: "recall-spies"; count: number; recalled: number };
+    }
+  | {
       kind: "conflict-tie";
       team: TeamId;
       tiedPlayerIds: string[];
@@ -434,6 +445,7 @@ export type GameState = {
   spyPosts: Record<string, string>;
   sharedSpyPosts: Record<string, string[]>;
   alliances: AllianceOwners;
+  locationControl: Partial<Record<CriticalLocationId, string>>;
   combatPasses: string[];
   turnUnitDeployments: Record<string, number>;
   makerSpice: Record<string, number>;

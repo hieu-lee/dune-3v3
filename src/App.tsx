@@ -125,8 +125,12 @@ import {
   scoreEndgameBattleIconIntrigue,
   scoreEndgameConditionalIntrigue,
   canHaveMakerHooks,
+  canPayConflictVpConversion,
   adjustThreatenSpiceProductionContribution,
+  conflictVpConversionSpyChoices,
   playerHasConflictUnits,
+  locationControlOwnerId,
+  payConflictVpConversion,
   setMakerHooks,
   setShieldWall,
   setAllianceOwner,
@@ -167,7 +171,9 @@ import {
   resolveJessicaSpiceAgonyChoice,
   resolveJessicaWaterOfLifeChoice,
   resolveLadyAmberDesertScoutsChoice,
+  recallSpyForConflictVpConversion,
   resolveMakerChoice,
+  resolveLocationControlIncome,
   resolveLeaderInfluenceThresholdRewards,
   resolveSietchTabrChoice,
   resolveShaddamSignetRingChoice,
@@ -186,6 +192,7 @@ import {
   skipCorrinoMight,
   skipDemandResults,
   skipDesertCall,
+  skipConflictVpConversion,
   skipThreatenSpiceProduction,
   skipLoseInfluence,
   skipRecallSpy,
@@ -389,16 +396,24 @@ export default function App() {
       );
       source = cardAgentEffect.source;
       effectedTarget = cardAgentEffect.target;
-      const players = current.players.map((candidate, index) => {
+      let players = current.players.map((candidate, index) => {
         if (index === current.activeSeat) return source;
         if (candidate.id === effectedTarget.id) return effectedTarget;
         return candidate;
       });
-      const deploymentOwner = player.role === "Commander" ? effectedTarget : source;
+      let deploymentOwner = player.role === "Commander" ? effectedTarget : source;
       const conflictDeploymentBlock = cardAgentEffect.blocksDeploymentsThisTurn
         ? { actorId: source.id, ownerId: deploymentOwner.id, source: selectedCard.name }
         : undefined;
-      const postEffectState = { ...current, players, conflictDeploymentBlock };
+      const controlledPostEffectState = resolveLocationControlIncome(
+        { ...current, players, conflictDeploymentBlock },
+        selectedSpace,
+      );
+      players = controlledPostEffectState.players;
+      source = players.find((candidate) => candidate.id === source.id) ?? source;
+      effectedTarget = players.find((candidate) => candidate.id === effectedTarget.id) ?? effectedTarget;
+      deploymentOwner = player.role === "Commander" ? effectedTarget : source;
+      const postEffectState = { ...controlledPostEffectState, players, conflictDeploymentBlock };
       const spacePending = sietchTabrPending
         ? undefined
         : pendingActionForSpace(
@@ -446,11 +461,11 @@ export default function App() {
       }
       if (makerChoicePending) pendingActions.unshift(makerChoicePending);
       const pending = queuePendingActions(
-        current,
+        controlledPostEffectState,
         pendingActions,
       );
       const nextState: GameState = {
-        ...current,
+        ...controlledPostEffectState,
         agentTurnComplete: true,
         players,
         spaces: { ...current.spaces, [selectedSpace.id]: target.id },
@@ -469,7 +484,7 @@ export default function App() {
           player.role === "Commander"
             ? `${player.leader} activates ${target.leader} at ${selectedSpace.name} with ${selectedCard.name}.`
             : `${player.leader} sends an Agent to ${selectedSpace.name} with ${selectedCard.name}.`,
-          ...current.log,
+          ...controlledPostEffectState.log,
         ].filter((entry): entry is string => Boolean(entry)),
       };
       const intrigueGain = boardSpaceIntrigueGainFor(selectedSpace, player);
@@ -1052,6 +1067,33 @@ export default function App() {
     });
   }
 
+  function payConflictVpReward() {
+    if (game.pendingAction?.kind !== "conflict-vp-conversion") return;
+    setGame((current) => {
+      const pending = current.pendingAction;
+      if (!pending || pending.kind !== "conflict-vp-conversion") return current;
+      return startNextRound(payConflictVpConversion(current, pending));
+    });
+  }
+
+  function recallConflictRewardSpy(spaceId: string) {
+    if (game.pendingAction?.kind !== "conflict-vp-conversion") return;
+    setGame((current) => {
+      const pending = current.pendingAction;
+      if (!pending || pending.kind !== "conflict-vp-conversion") return current;
+      return startNextRound(recallSpyForConflictVpConversion(current, pending, spaceId));
+    });
+  }
+
+  function skipConflictVpReward() {
+    if (game.pendingAction?.kind !== "conflict-vp-conversion") return;
+    setGame((current) => {
+      const pending = current.pendingAction;
+      if (!pending || pending.kind !== "conflict-vp-conversion") return current;
+      return startNextRound(skipConflictVpConversion(current, pending));
+    });
+  }
+
   function playCombatCard(intrigueId: string, targetId?: string, combatChoice?: CombatIntrigueChoice) {
     if (game.phase !== "combat") return;
     setGame((current) =>
@@ -1408,6 +1450,12 @@ export default function App() {
     pendingAction?.kind === "jessica-reverend-mother" ? boardSpaces.find((space) => space.id === pendingAction.spaceId) : undefined;
   const pendingJessicaOtherMemoriesOwner =
     pendingAction?.kind === "jessica-other-memories" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
+  const pendingConflictVpOwner =
+    pendingAction?.kind === "conflict-vp-conversion" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
+  const pendingConflictVpCanPay =
+    pendingAction?.kind === "conflict-vp-conversion" ? canPayConflictVpConversion(game, pendingAction) : false;
+  const pendingConflictVpSpyChoices =
+    pendingAction?.kind === "conflict-vp-conversion" ? conflictVpConversionSpyChoices(game, pendingAction) : [];
   const pendingRecallSpyOwner =
     pendingAction?.kind === "recall-spy" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingRecallSpyRecipient =
@@ -1675,6 +1723,8 @@ export default function App() {
               const spyOwners = spyPostOwnerIds(game, space.id)
                 .map((ownerId) => game.players.find((player) => player.id === ownerId))
                 .filter((player): player is Player => Boolean(player));
+              const controlOwnerId = locationControlOwnerId(game, space.id);
+              const controlOwner = controlOwnerId ? game.players.find((player) => player.id === controlOwnerId) : undefined;
               const unavailable = space.id === "swordmaster" && game.swordmasterClaimed;
               const legal = legalSpaces.has(space.id);
               const selected = playingPhase && selectedSpaceId === space.id;
@@ -1695,6 +1745,12 @@ export default function App() {
                   {spyOwners.length > 0 && (
                     <span className="spy-marker">
                       {spyOwners.map((owner) => owner.leader).join(" + ")} spy{spyOwners.length === 1 ? "" : "s"}
+                    </span>
+                  )}
+                  {controlOwner && (
+                    <span className="control-marker">
+                      <Crown size={12} />
+                      {controlOwner.leader}
                     </span>
                   )}
                   {space.maker && (
@@ -2173,6 +2229,7 @@ export default function App() {
                 {pendingAction.kind === "jessica-water-of-life" && `${pendingJessicaWaterOfLifeOwner?.leader ?? "Reverend Mother Jessica"} Water of Life`}
                 {pendingAction.kind === "jessica-reverend-mother" && `${pendingJessicaReverendMotherOwner?.leader ?? "Reverend Mother Jessica"} Reverend Mother`}
                 {pendingAction.kind === "jessica-other-memories" && `${pendingJessicaOtherMemoriesOwner?.leader ?? "Lady Jessica"} Other Memories`}
+                {pendingAction.kind === "conflict-vp-conversion" && `${pendingConflictVpOwner?.leader ?? "Player"} Conflict reward`}
                 {pendingAction.kind === "command-respect" && `${pendingCommandRespectCommander?.leader ?? "Muad'Dib"} Command Respect`}
                 {pendingAction.kind === "demand-results" && `${pendingDemandResultsCommander?.leader ?? "Shaddam"} Demand Results`}
                 {pendingAction.kind === "corrino-might" && `${pendingCorrinoMightCommander?.leader ?? "Shaddam"} Corrino Might`}
@@ -2554,6 +2611,55 @@ export default function App() {
                   <span>Other Memories can no longer resolve with the current table state.</span>
                 )}
                 <button type="button" onClick={() => chooseJessicaOtherMemories("skip")}>Skip</button>
+              </div>
+            )}
+
+            {pendingAction.kind === "conflict-vp-conversion" && (
+              <div className="pending-controls spy-grid">
+                {pendingConflictVpOwner ? (
+                  <>
+                    <span>
+                      {pendingAction.remaining} available conversion{pendingAction.remaining === 1 ? "" : "s"} from {pendingAction.source}
+                    </span>
+                    {pendingAction.cost.kind === "resource" ? (
+                      <button
+                        type="button"
+                        onClick={payConflictVpReward}
+                        disabled={!pendingConflictVpCanPay}
+                      >
+                        {pendingAction.cost.resource === "spice" ? <Sparkles size={15} /> : <CircleDollarSign size={15} />}
+                        Spend {pendingAction.cost.amount} {pendingAction.cost.resource}: +{pendingAction.vp} VP
+                      </button>
+                    ) : (
+                      <>
+                        <span>
+                          Recall {pendingAction.cost.count - pendingAction.cost.recalled} more {pendingAction.cost.count - pendingAction.cost.recalled === 1 ? "spy" : "spies"}.
+                        </span>
+                        {pendingConflictVpSpyChoices.map((space) => (
+                          <button
+                            type="button"
+                            key={space.id}
+                            onClick={() => recallConflictRewardSpy(space.id)}
+                            title={`Recall spy from ${space.name}`}
+                          >
+                            <RotateCcw size={14} />
+                            {space.name}
+                          </button>
+                        ))}
+                        {pendingConflictVpSpyChoices.length === 0 && <span>No spy posts to recall</span>}
+                      </>
+                    )}
+                    <button
+                      type="button"
+                      onClick={skipConflictVpReward}
+                      disabled={pendingAction.cost.kind === "recall-spies" && pendingAction.cost.recalled > 0}
+                    >
+                      Skip
+                    </button>
+                  </>
+                ) : (
+                  <span>Conflict reward can no longer resolve with the current table state.</span>
+                )}
               </div>
             )}
 

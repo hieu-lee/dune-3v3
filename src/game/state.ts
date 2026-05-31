@@ -21,6 +21,7 @@ import type {
   CommanderResourceSplitOption,
   ConflictCard,
   ContractCard,
+  CriticalLocationId,
   FactionId,
   GameState,
   IconId,
@@ -557,6 +558,7 @@ export function initialGame(): GameState {
     spyPosts: {},
     sharedSpyPosts: {},
     alliances: {},
+    locationControl: {},
     combatPasses: [],
     makerSpice: emptyMakerSpice(),
     imperiumRow: market.slice(0, 5),
@@ -659,6 +661,65 @@ export function conflictProtectedByShieldWall(conflict: ConflictCard | null) {
   return ["Arrakeen", "Spice Refinery", "Imperial Basin"].some((location) =>
     conflict.name.includes(location),
   );
+}
+
+const criticalLocationNames: Record<CriticalLocationId, string> = {
+  arrakeen: "Arrakeen",
+  "spice-refinery": "Spice Refinery",
+  "imperial-basin": "Imperial Basin",
+};
+
+const criticalLocationIncome: Record<CriticalLocationId, { resource: ResourceId; amount: number }> = {
+  arrakeen: { resource: "solari", amount: 1 },
+  "spice-refinery": { resource: "solari", amount: 1 },
+  "imperial-basin": { resource: "spice", amount: 1 },
+};
+
+function criticalLocationForConflict(conflict: ConflictCard): CriticalLocationId | undefined {
+  if (conflict.name.includes("Arrakeen")) return "arrakeen";
+  if (conflict.name.includes("Spice Refinery")) return "spice-refinery";
+  if (conflict.name.includes("Imperial Basin")) return "imperial-basin";
+  return undefined;
+}
+
+function criticalLocationForSpace(spaceId: string): CriticalLocationId | undefined {
+  if (spaceId === "arrakeen") return "arrakeen";
+  if (spaceId === "spice-refinery") return "spice-refinery";
+  if (spaceId === "imperial-basin") return "imperial-basin";
+  return undefined;
+}
+
+export function locationControlOwnerId(state: Pick<GameState, "locationControl">, spaceId: string) {
+  const location = criticalLocationForSpace(spaceId);
+  return location ? state.locationControl[location] : undefined;
+}
+
+export function resolveLocationControlIncome(state: GameState, space: BoardSpace): GameState {
+  const location = criticalLocationForSpace(space.id);
+  const ownerId = location ? state.locationControl[location] : undefined;
+  const owner = ownerId ? state.players.find((player) => player.id === ownerId) : undefined;
+  if (!location || !owner) return state;
+
+  const income = criticalLocationIncome[location];
+  const nextState = {
+    ...state,
+    players: state.players.map((player) =>
+      player.id === owner.id
+        ? {
+            ...player,
+            resources: {
+              ...player.resources,
+              [income.resource]: player.resources[income.resource] + income.amount,
+            },
+          }
+        : player,
+    ),
+    log: [
+      `${owner.leader} gains ${income.amount} ${income.resource} from controlling ${criticalLocationNames[location]}.`,
+      ...state.log,
+    ],
+  };
+  return income.resource === "spice" ? recordTurnSpiceGain(nextState, owner.id, income.amount) : nextState;
 }
 
 export function playerHasConflictUnits(player: Player) {
@@ -5824,6 +5885,83 @@ export function reinforceTroop(
     : reinforcedState;
 }
 
+type FirstPlaceBattleReward = {
+  fixedVp: number;
+  conversion?:
+    | { kind: "resource"; resource: ResourceId; amount: number; vp: number }
+    | { kind: "recall-spies"; count: number; vp: number };
+};
+type ConflictVpConversionPendingAction = Extract<PendingAction, { kind: "conflict-vp-conversion" }>;
+
+const firstPlaceBattleRewardsBySourceId: Record<number, FirstPlaceBattleReward> = {
+  464: {
+    fixedVp: 1,
+    conversion: { kind: "resource", resource: "spice", amount: 4, vp: 1 },
+  },
+  465: {
+    fixedVp: 1,
+    conversion: { kind: "recall-spies", count: 2, vp: 1 },
+  },
+  466: {
+    fixedVp: 1,
+    conversion: { kind: "resource", resource: "solari", amount: 6, vp: 1 },
+  },
+};
+
+function canPayConflictConversion(
+  state: GameState,
+  owner: Player,
+  conversion: FirstPlaceBattleReward["conversion"],
+) {
+  if (!conversion) return false;
+  if (conversion.kind === "resource") return owner.resources[conversion.resource] >= conversion.amount;
+  return boardSpaces.filter((space) => playerHasSpyPost(state, space.id, owner.id)).length >= conversion.count;
+}
+
+function pendingActionForConflictConversion(
+  state: GameState,
+  owner: Player,
+  conflict: ConflictCard,
+  reward: FirstPlaceBattleReward | undefined,
+  multiplier: number,
+): ConflictVpConversionPendingAction | undefined {
+  const conversion = reward?.conversion;
+  if (!conversion || !canPayConflictConversion(state, owner, conversion)) return undefined;
+  if (conversion.kind === "resource") {
+    return {
+      kind: "conflict-vp-conversion",
+      ownerId: owner.id,
+      source: conflict.name,
+      remaining: multiplier,
+      vp: conversion.vp,
+      cost: {
+        kind: "resource",
+        resource: conversion.resource,
+        amount: conversion.amount,
+      },
+    };
+  }
+  return {
+    kind: "conflict-vp-conversion",
+    ownerId: owner.id,
+    source: conflict.name,
+    remaining: multiplier,
+    vp: conversion.vp,
+    cost: {
+      kind: "recall-spies",
+      count: conversion.count,
+      recalled: 0,
+    },
+  };
+}
+
+function conflictConversionDescription(pending: ConflictVpConversionPendingAction) {
+  if (pending.cost.kind === "resource") {
+    return `${pending.cost.amount} ${pending.cost.resource} for ${pending.vp} VP`;
+  }
+  return `recall ${pending.cost.count} spies for ${pending.vp} VP`;
+}
+
 function scoreBattleIconMatch(player: Player, conflict: ConflictCard) {
   const wonConflict: ConflictCard = { ...conflict, rewards: [...conflict.rewards], scored: false };
   if (!isStandardBattleIcon(conflict.battleIcon)) {
@@ -5884,20 +6022,163 @@ function awardConflictToWinner(
   conflict: ConflictCard,
   rewardReminderEntries: string[] = [],
 ): GameState {
-  const scored = scoreBattleIconMatch(winner, conflict);
+  const firstPlaceReward = conflict.sourceId ? firstPlaceBattleRewardsBySourceId[conflict.sourceId] : undefined;
+  const multiplier = playerDoublesConflictRewards(winner) ? 2 : 1;
+  const printedVp = (firstPlaceReward?.fixedVp ?? 0) * multiplier;
+  const conversionPending = pendingActionForConflictConversion(
+    state,
+    winner,
+    conflict,
+    firstPlaceReward,
+    multiplier,
+  );
+  const location = criticalLocationForConflict(conflict);
+  const winnerWithPrintedRewards = printedVp > 0 ? { ...winner, vp: winner.vp + printedVp } : winner;
+  const scored = scoreBattleIconMatch(winnerWithPrintedRewards, conflict);
   const players = state.players.map((player) => (player.id === winner.id ? scored.player : player));
   return {
     ...state,
     players,
+    locationControl: location
+      ? { ...state.locationControl, [location]: winner.id }
+      : state.locationControl,
     conflict: null,
+    pendingAction: conversionPending ?? state.pendingAction,
     log: [
       scored.matched && isStandardBattleIcon(scored.icon)
         ? `${winner.leader} matches ${battleIconLabels[scored.icon]} battle icons and gains 1 VP.`
+        : undefined,
+      conversionPending
+        ? `${winner.leader} may pay ${conflictConversionDescription(conversionPending)} from ${conflict.name}${conversionPending.remaining > 1 ? ` up to ${conversionPending.remaining} times` : ""}.`
+        : undefined,
+      location
+        ? `${winner.leader} takes control of ${criticalLocationNames[location]}.`
+        : undefined,
+      printedVp > 0
+        ? `${winner.leader} gains ${printedVp} printed VP from ${conflict.name}${multiplier > 1 ? " with sandworm doubling" : ""}.`
         : undefined,
       `${winner.leader} wins ${conflict.name} and takes the Conflict card.`,
       ...rewardReminderEntries,
       ...state.log,
     ].filter((entry): entry is string => Boolean(entry)),
+  };
+}
+
+export function conflictVpConversionSpyChoices(
+  state: GameState,
+  pending: ConflictVpConversionPendingAction,
+) {
+  if (pending.cost.kind !== "recall-spies") return [];
+  const choices = boardSpaces.filter((space) => playerHasSpyPost(state, space.id, pending.ownerId));
+  const needed = pending.cost.count - pending.cost.recalled;
+  return choices.length >= needed ? choices : [];
+}
+
+export function canPayConflictVpConversion(
+  state: GameState,
+  pending: ConflictVpConversionPendingAction,
+) {
+  const owner = state.players.find((player) => player.id === pending.ownerId);
+  if (!owner) return false;
+  if (pending.cost.kind === "resource") {
+    return owner.resources[pending.cost.resource] >= pending.cost.amount;
+  }
+  return conflictVpConversionSpyChoices(state, pending).length >= pending.cost.count - pending.cost.recalled;
+}
+
+export function payConflictVpConversion(
+  state: GameState,
+  pending: ConflictVpConversionPendingAction,
+): GameState {
+  const owner = state.players.find((player) => player.id === pending.ownerId);
+  if (!owner || pending.cost.kind !== "resource" || !canPayConflictVpConversion(state, pending)) return state;
+
+  const cost = pending.cost;
+  const remaining = pending.remaining - 1;
+  return {
+    ...state,
+    players: state.players.map((player) =>
+      player.id === owner.id
+        ? {
+            ...player,
+            vp: player.vp + pending.vp,
+            resources: {
+              ...player.resources,
+              [cost.resource]: player.resources[cost.resource] - cost.amount,
+            },
+          }
+        : player,
+    ),
+    ...(remaining > 0
+      ? { pendingAction: { ...pending, remaining } }
+      : advancePendingAction(state)),
+    log: [
+      `${owner.leader} spends ${cost.amount} ${cost.resource} from ${pending.source} for ${pending.vp} VP.`,
+      ...state.log,
+    ],
+  };
+}
+
+export function recallSpyForConflictVpConversion(
+  state: GameState,
+  pending: ConflictVpConversionPendingAction,
+  spaceId: string,
+): GameState {
+  const owner = state.players.find((player) => player.id === pending.ownerId);
+  if (!owner || pending.cost.kind !== "recall-spies") return state;
+  const space = boardSpaces.find((candidate) => candidate.id === spaceId);
+  const choices = conflictVpConversionSpyChoices(state, pending);
+  if (!space || !choices.some((choice) => choice.id === space.id)) return state;
+
+  const { spyPosts, sharedSpyPosts } = removeSpyPostOwner(state, space.id, owner.id);
+  const recalled = pending.cost.recalled + 1;
+  const conversionComplete = recalled >= pending.cost.count;
+  const remaining = conversionComplete ? pending.remaining - 1 : pending.remaining;
+  const nextPending: ConflictVpConversionPendingAction = {
+    ...pending,
+    remaining,
+    cost: {
+      ...pending.cost,
+      recalled: conversionComplete ? 0 : recalled,
+    },
+  };
+
+  return {
+    ...state,
+    players: state.players.map((player) => {
+      if (player.id !== owner.id) return player;
+      return {
+        ...player,
+        spies: player.spies + 1,
+        vp: conversionComplete ? player.vp + pending.vp : player.vp,
+      };
+    }),
+    spyPosts,
+    sharedSpyPosts,
+    ...(conversionComplete
+      ? remaining > 0
+        ? { pendingAction: nextPending }
+        : advancePendingAction(state)
+      : { pendingAction: nextPending }),
+    log: [
+      conversionComplete
+        ? `${owner.leader} recalls a spy from ${space.name} and completes ${pending.source} for ${pending.vp} VP.`
+        : `${owner.leader} recalls a spy from ${space.name} for ${pending.source} (${recalled}/${pending.cost.count}).`,
+      ...state.log,
+    ],
+  };
+}
+
+export function skipConflictVpConversion(
+  state: GameState,
+  pending: ConflictVpConversionPendingAction,
+): GameState {
+  if (pending.cost.kind === "recall-spies" && pending.cost.recalled > 0) return state;
+  const owner = state.players.find((player) => player.id === pending.ownerId);
+  return {
+    ...state,
+    ...advancePendingAction(state),
+    log: [`${owner?.leader ?? "Player"} declines the remaining VP conversion from ${pending.source}.`, ...state.log],
   };
 }
 
@@ -5980,15 +6261,15 @@ export function resolveConflictTie(
     player.role === "Ally"
   );
   if (!winner) return state;
+  const clearedTieState = { ...state, ...advancePendingAction(state) };
   const awarded = awardConflictToWinner(
-    state,
+    clearedTieState,
     winner,
     state.conflict,
     rewardReminderEntries,
   );
   return {
     ...awarded,
-    ...advancePendingAction(state),
     log: [
       `${winner.leader} takes first place after a same-team tie concession.`,
       ...awarded.log,
@@ -6055,7 +6336,7 @@ export function finishEndgame(state: GameState): GameState {
 
 export function startNextRound(state: GameState): GameState {
   const resolvedState = resolveCurrentConflict(clearRevealTurnEffects(state));
-  if (resolvedState.pendingAction?.kind === "conflict-tie") return resolvedState;
+  if (resolvedState.pendingAction || resolvedState.pendingQueue.length > 0) return resolvedState;
 
   const endgameReason = endgameTriggerReason(resolvedState);
   if (endgameReason) {

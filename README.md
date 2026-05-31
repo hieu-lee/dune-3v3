@@ -42,7 +42,8 @@ Private web-table implementation for a six-player `Dune: Imperium - Uprising` te
 - Sietch Tabr supports the Maker Hooks/troop/water branch, water plus Shield Wall removal, and Commander/activated Ally ownership.
 - Six-player Objective setup deals only to Allies and balances Desert Mouse/Crysknife icons across teams.
 - Conflict winners keep won Conflict cards and score immediate non-wild battle-icon pairs with Objectives or prior Conflicts.
-- Sandworm players are flagged for doubled printed Conflict-card rewards, with battle icons and location control kept outside that doubling.
+- Critical-location Conflict wins set control of Arrakeen, Spice Refinery, or Imperial Basin, and controlled spaces pay their visit income.
+- Level III Battle conflicts pay first-place printed VP and queue optional paid VP conversions, including sandworm-doubled repeats while battle icons and location control stay undoubled.
 - High Council seats persist and add 2 persuasion on Reveal turns; later High Council visits take the printed repeat rewards.
 - Combat phase opens before Conflict resolution and sequences Combat Intrigue pass/play timing.
 - Endgame phase triggers at 10 VP or an empty Conflict deck and scores battle-icon Endgame Intrigues against matching or wild Conflict cards.

@@ -501,6 +501,21 @@ h2 {
   padding: 3px 7px;
 }
 
+.control-marker {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  gap: 4px;
+  border: 1px solid rgba(239, 180, 71, 0.38);
+  border-radius: 999px;
+  background: rgba(239, 180, 71, 0.13);
+  color: #ffe1a8;
+  font-size: 0.72rem;
+  font-weight: 900;
+  margin-top: 8px;
+  padding: 3px 7px;
+}
+
 .space-footer {
   justify-content: space-between;
   gap: 6px;

@@ -813,6 +813,47 @@ try {
     "threaten-spice-production",
     "Threaten Spice Production should count spice gained from the visited spice space",
   );
+  const controlIncomeThreatenSource = {
+    ...baseThreatenCommander,
+    resources: { solari: 0, spice: 2, water: 1 },
+  };
+  const controlIncomeThreatenAllyA = {
+    ...baseThreatenAllyA,
+    resources: { solari: 0, spice: 2, water: 0 },
+  };
+  const controlIncomeThreatenAllyB = {
+    ...baseThreatenAllyB,
+    resources: { solari: 0, spice: 1, water: 0 },
+  };
+  const controlIncomeBoardEffect = state.applyBoardEffect(
+    controlIncomeThreatenSource,
+    controlIncomeThreatenAllyA,
+    imperialBasinForDesertCall,
+  );
+  const controlIncomePostEffect = state.resolveLocationControlIncome(
+    {
+      ...baseThreatenGame,
+      locationControl: { "imperial-basin": controlIncomeThreatenAllyB.id },
+      players: baseThreatenGame.players.map((player) => {
+        if (player.id === muadDib.id) return controlIncomeBoardEffect.source;
+        if (player.id === muadDibAllyA.id) return controlIncomeBoardEffect.target;
+        if (player.id === muadDibAllyB.id) return controlIncomeThreatenAllyB;
+        return player;
+      }),
+    },
+    imperialBasinForDesertCall,
+  );
+  assert.equal(
+    state.pendingActionForCard(
+      threatenSpiceProduction,
+      playerById(controlIncomePostEffect, muadDib.id),
+      controlIncomePostEffect,
+      playerById(controlIncomePostEffect, muadDibAllyA.id),
+      imperialBasinForDesertCall,
+    )?.kind,
+    "threaten-spice-production",
+    "Threaten Spice Production should count critical-location control income before pending-card eligibility is checked",
+  );
 
   let threatenContributionState = {
     ...baseThreatenGame,

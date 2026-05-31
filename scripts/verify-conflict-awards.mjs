@@ -163,6 +163,152 @@ try {
   assert.equal(unmatchedWinner.objectives[0].scored, undefined);
   assert.equal(unmatchedWinner.wonConflicts[0].scored, false);
 
+  const imperialBasinBattle = fixture(state, data, (players) =>
+    players.map((player) =>
+      player.id === "p2"
+        ? { ...player, conflict: 9, deployedTroops: 1, resources: { ...player.resources, spice: 4 }, vp: 0 }
+        : player,
+    ), 464);
+  const imperialBasinPending = state.startNextRound(imperialBasinBattle);
+  assert.equal(playerById(imperialBasinPending, "p2").vp, 1, "Battle For Imperial Basin should award its printed first-place VP");
+  assert.equal(imperialBasinPending.locationControl["imperial-basin"], "p2", "Battle For Imperial Basin should set control");
+  assert.deepEqual(imperialBasinPending.pendingAction, {
+    kind: "conflict-vp-conversion",
+    ownerId: "p2",
+    source: "Battle For Imperial Basin",
+    remaining: 1,
+    vp: 1,
+    cost: { kind: "resource", resource: "spice", amount: 4 },
+  });
+  const imperialBasinPaid = state.startNextRound(
+    state.payConflictVpConversion(imperialBasinPending, imperialBasinPending.pendingAction),
+  );
+  assert.equal(playerById(imperialBasinPaid, "p2").vp, 2, "Imperial Basin conversion should spend spice for 1 VP");
+  assert.equal(playerById(imperialBasinPaid, "p2").resources.spice, 0);
+  assert.equal(imperialBasinPaid.pendingAction, undefined);
+  const imperialBasinEndgamePending = state.startNextRound({
+    ...imperialBasinBattle,
+    players: imperialBasinBattle.players.map((player) =>
+      player.id === "p2" ? { ...player, vp: 9 } : player,
+    ),
+  });
+  assert.equal(
+    imperialBasinEndgamePending.phase,
+    "playing",
+    "Payable printed Conflict conversion should pause before endgame checks",
+  );
+  assert.equal(imperialBasinEndgamePending.pendingAction?.kind, "conflict-vp-conversion");
+  assert.equal(playerById(imperialBasinEndgamePending, "p2").vp, 10);
+  const imperialBasinEndgame = state.startNextRound(
+    state.payConflictVpConversion(imperialBasinEndgamePending, imperialBasinEndgamePending.pendingAction),
+  );
+  assert.equal(imperialBasinEndgame.phase, "endgame", "Endgame should trigger after the pending conversion resolves");
+  assert.equal(playerById(imperialBasinEndgame, "p2").vp, 11);
+  const imperialBasinSpace = data.boardSpaces.find((space) => space.id === "imperial-basin");
+  assert.ok(imperialBasinSpace, "Imperial Basin space should exist");
+  const imperialControlIncome = state.resolveLocationControlIncome(imperialBasinPaid, imperialBasinSpace);
+  assert.equal(
+    playerById(imperialControlIncome, "p2").resources.spice,
+    playerById(imperialBasinPaid, "p2").resources.spice + 1,
+    "Imperial Basin controller should gain spice when the space is visited",
+  );
+
+  const sandwormImperialBasin = fixture(state, data, (players) =>
+    players.map((player) =>
+      player.id === "p3"
+        ? { ...player, conflict: 9, deployedSandworms: 1, resources: { ...player.resources, spice: 8 }, vp: 0 }
+        : player,
+    ), 464);
+  const sandwormImperialPending = state.startNextRound(sandwormImperialBasin);
+  assert.equal(playerById(sandwormImperialPending, "p3").vp, 2, "Sandworms should double the printed VP reward");
+  assert.equal(sandwormImperialPending.pendingAction.remaining, 2, "Sandworms should allow paying the printed conversion twice");
+  const sandwormImperialPaidOnce = state.startNextRound(
+    state.payConflictVpConversion(sandwormImperialPending, sandwormImperialPending.pendingAction),
+  );
+  assert.equal(sandwormImperialPaidOnce.pendingAction.remaining, 1);
+  const sandwormImperialPaidTwice = state.startNextRound(
+    state.payConflictVpConversion(sandwormImperialPaidOnce, sandwormImperialPaidOnce.pendingAction),
+  );
+  assert.equal(playerById(sandwormImperialPaidTwice, "p3").vp, 4);
+  assert.equal(playerById(sandwormImperialPaidTwice, "p3").resources.spice, 0);
+
+  const spiceRefineryBattle = fixture(state, data, (players) =>
+    players.map((player) =>
+      player.id === "p2"
+        ? { ...player, conflict: 9, deployedTroops: 1, resources: { ...player.resources, solari: 6 }, vp: 0 }
+        : player,
+    ), 466);
+  const spiceRefineryPending = state.startNextRound(spiceRefineryBattle);
+  assert.equal(spiceRefineryPending.locationControl["spice-refinery"], "p2");
+  assert.deepEqual(spiceRefineryPending.pendingAction?.cost, { kind: "resource", resource: "solari", amount: 6 });
+  const spiceRefineryPaid = state.startNextRound(
+    state.payConflictVpConversion(spiceRefineryPending, spiceRefineryPending.pendingAction),
+  );
+  assert.equal(playerById(spiceRefineryPaid, "p2").vp, 2, "Battle For Spice Refinery conversion should spend Solari for 1 VP");
+  assert.equal(playerById(spiceRefineryPaid, "p2").resources.solari, 0);
+
+  const arrakeenBattle = {
+    ...fixture(state, data, (players) =>
+      players.map((player) =>
+        player.id === "p2"
+          ? { ...player, conflict: 9, deployedTroops: 1, spies: 1, vp: 0 }
+          : player,
+      ), 465),
+    spyPosts: { arrakeen: "p2", carthag: "p2" },
+    sharedSpyPosts: {},
+  };
+  const arrakeenPending = state.startNextRound(arrakeenBattle);
+  assert.equal(arrakeenPending.locationControl.arrakeen, "p2");
+  assert.equal(playerById(arrakeenPending, "p2").vp, 1, "Battle For Arrakeen should award its printed first-place VP");
+  assert.deepEqual(arrakeenPending.pendingAction?.cost, { kind: "recall-spies", count: 2, recalled: 0 });
+  const arrakeenRecalledOnce = state.startNextRound(
+    state.recallSpyForConflictVpConversion(arrakeenPending, arrakeenPending.pendingAction, "arrakeen"),
+  );
+  assert.equal(arrakeenRecalledOnce.pendingAction.cost.recalled, 1);
+  assert.equal(playerById(arrakeenRecalledOnce, "p2").vp, 1, "Arrakeen conversion should score only after two recalls");
+  const arrakeenRecalledTwice = state.startNextRound(
+    state.recallSpyForConflictVpConversion(arrakeenRecalledOnce, arrakeenRecalledOnce.pendingAction, "carthag"),
+  );
+  assert.equal(playerById(arrakeenRecalledTwice, "p2").vp, 2);
+  assert.equal(playerById(arrakeenRecalledTwice, "p2").spies, 3);
+  assert.equal(arrakeenRecalledTwice.pendingAction, undefined);
+
+  const doubledArrakeenWithPartialSecondConversion = {
+    ...fixture(state, data, (players) =>
+      players.map((player) =>
+        player.id === "p3"
+          ? { ...player, conflict: 9, deployedSandworms: 1, spies: 0, vp: 0 }
+          : player,
+      ), 465),
+    spyPosts: { arrakeen: "p3", carthag: "p3", "imperial-basin": "p3" },
+    sharedSpyPosts: {},
+  };
+  const doubledArrakeenPending = state.startNextRound(doubledArrakeenWithPartialSecondConversion);
+  assert.equal(doubledArrakeenPending.pendingAction?.remaining, 2);
+  const doubledArrakeenFirstRecall = state.startNextRound(
+    state.recallSpyForConflictVpConversion(doubledArrakeenPending, doubledArrakeenPending.pendingAction, "arrakeen"),
+  );
+  const doubledArrakeenFirstConversion = state.startNextRound(
+    state.recallSpyForConflictVpConversion(doubledArrakeenFirstRecall, doubledArrakeenFirstRecall.pendingAction, "carthag"),
+  );
+  assert.equal(doubledArrakeenFirstConversion.pendingAction?.remaining, 1);
+  assert.equal(state.conflictVpConversionSpyChoices(doubledArrakeenFirstConversion, doubledArrakeenFirstConversion.pendingAction).length, 0);
+  const blockedPartialSecondRecall = state.recallSpyForConflictVpConversion(
+    doubledArrakeenFirstConversion,
+    doubledArrakeenFirstConversion.pendingAction,
+    "imperial-basin",
+  );
+  assert.equal(
+    blockedPartialSecondRecall.pendingAction.cost.recalled,
+    0,
+    "Doubled Arrakeen should not start a spy conversion the player cannot finish",
+  );
+  const skippedPartialSecond = state.startNextRound(
+    state.skipConflictVpConversion(blockedPartialSecondRecall, blockedPartialSecondRecall.pendingAction),
+  );
+  assert.equal(skippedPartialSecond.pendingAction, undefined);
+  assert.equal(playerById(skippedPartialSecond, "p3").vp, 3, "First doubled printed VP plus one completed spy conversion should remain");
+
   const previousCrysknife = { ...conflictBySourceId(data, 455), scored: false };
   const conflictMatch = fixture(state, data, (players) =>
     players.map((player) =>
@@ -248,6 +394,23 @@ try {
   const noConcession = state.startNextRound(state.resolveConflictTie(sameTeamPending, sameTeamPending.pendingAction));
   assert.equal(noConcession.conflictDiscard.some((conflict) => conflict.sourceId === 454), true);
   assert.equal(noConcession.players.every((player) => player.wonConflicts.length === 0), true);
+
+  const sameTeamBattleTie = fixture(state, data, (players) =>
+    players.map((player) => {
+      if (player.id === "p2") return { ...player, conflict: 5, deployedTroops: 1, resources: { ...player.resources, spice: 4 }, vp: 0 };
+      if (player.id === "p6") return { ...player, conflict: 5, deployedTroops: 1, vp: 0 };
+      return player;
+    }), 464);
+  const sameTeamBattlePending = state.startNextRound(sameTeamBattleTie);
+  const sameTeamBattleConceded = state.resolveConflictTie(sameTeamBattlePending, sameTeamBattlePending.pendingAction, "p2");
+  assert.equal(sameTeamBattleConceded.locationControl["imperial-basin"], "p2", "Same-team Battle concession should set location control");
+  assert.equal(playerById(sameTeamBattleConceded, "p2").vp, 1, "Same-team Battle concession should award printed VP");
+  assert.equal(sameTeamBattleConceded.pendingAction?.kind, "conflict-vp-conversion");
+  assert.equal(sameTeamBattleConceded.pendingQueue.length, 0, "Same-team Battle concession should clear conflict-tie before queuing conversion");
+  const sameTeamBattlePaid = state.startNextRound(
+    state.payConflictVpConversion(sameTeamBattleConceded, sameTeamBattleConceded.pendingAction),
+  );
+  assert.equal(playerById(sameTeamBattlePaid, "p2").vp, 2);
 
   const commanderIgnored = fixture(state, data, (players) =>
     players.map((player) => {

@@ -29,8 +29,6 @@ import { commanderPersonalFaction } from "./commander-rules";
 import {
   conflictProtectedByShieldWall,
   criticalLocationForConflict,
-  criticalLocationForSpace,
-  criticalLocationIncome,
   criticalLocationNames,
 } from "./critical-locations";
 import {
@@ -65,8 +63,8 @@ import {
   drawCards,
   playerTroopSupply,
   shuffleCards,
-  shuffleItems,
 } from "./deck-utils";
+import { drawIntrigueCards } from "./intrigue-deck";
 import { balanceSixPlayerObjectives, dealSixPlayerObjectives } from "./objectives";
 import {
   advancePendingAction,
@@ -74,6 +72,10 @@ import {
   prependPendingAction,
   queuePendingActions,
 } from "./pending-actions";
+import {
+  pendingActionForControlDefense,
+  resolveLocationControlIncome,
+} from "./location-control";
 import {
   buildChoamContractDeck,
   buildIntrigueDeck,
@@ -178,7 +180,6 @@ import type {
   FactionId,
   GameState,
   IconId,
-  IntrigueCard,
   PendingAction,
   Player,
   BattleIconId,
@@ -247,6 +248,10 @@ export {
 } from "./deck-utils";
 
 export {
+  drawIntrigueCards,
+} from "./intrigue-deck";
+
+export {
   balanceSixPlayerObjectives,
   dealSixPlayerObjectives,
 } from "./objectives";
@@ -256,6 +261,10 @@ export {
   pendingActionsFor,
   queuePendingActions,
 } from "./pending-actions";
+
+export {
+  resolveLocationControlIncome,
+} from "./location-control";
 
 export {
   makerSpaceIds,
@@ -485,52 +494,6 @@ export function initialGame(): GameState {
 }
 
 type ControlDefensePendingAction = Extract<PendingAction, { kind: "control-defense" }>;
-
-function pendingActionForControlDefense(
-  state: Pick<GameState, "locationControl">,
-  conflict: ConflictCard | null | undefined,
-  players: Player[],
-): ControlDefensePendingAction | undefined {
-  if (!conflict) return undefined;
-  const location = criticalLocationForConflict(conflict);
-  const ownerId = location ? state.locationControl[location] : undefined;
-  const owner = ownerId ? players.find((player) => player.id === ownerId) : undefined;
-  if (!location || !owner || owner.role !== "Ally" || playerTroopSupply(owner) <= 0) return undefined;
-  return {
-    kind: "control-defense",
-    ownerId: owner.id,
-    location,
-    source: conflict.name,
-  };
-}
-
-export function resolveLocationControlIncome(state: GameState, space: BoardSpace): GameState {
-  const location = criticalLocationForSpace(space.id);
-  const ownerId = location ? state.locationControl[location] : undefined;
-  const owner = ownerId ? state.players.find((player) => player.id === ownerId) : undefined;
-  if (!location || !owner) return state;
-
-  const income = criticalLocationIncome[location];
-  const nextState = {
-    ...state,
-    players: state.players.map((player) =>
-      player.id === owner.id
-        ? {
-            ...player,
-            resources: {
-              ...player.resources,
-              [income.resource]: player.resources[income.resource] + income.amount,
-            },
-          }
-        : player,
-    ),
-    log: [
-      `${owner.leader} gains ${income.amount} ${income.resource} from controlling ${criticalLocationNames[location]}.`,
-      ...state.log,
-    ],
-  };
-  return income.resource === "spice" ? recordTurnSpiceGain(nextState, owner.id, income.amount) : nextState;
-}
 
 export function scoreGurneyAlwaysSmiling(state: GameState, playerId: string): GameState {
   const player = state.players.find((candidate) => candidate.id === playerId);
@@ -1797,39 +1760,6 @@ export function applyCardAgentEffect(
   }
 
   return { source: sourcePlayer, target: targetPlayer };
-}
-
-export function drawIntrigueCards(state: GameState, ownerId: string, count: number, source: string): GameState {
-  const owner = state.players.find((player) => player.id === ownerId);
-  if (!owner || count <= 0) return state;
-
-  let deck = [...state.intrigueDeck];
-  let discard = [...state.intrigueDiscard];
-  const drawn: IntrigueCard[] = [];
-
-  while (drawn.length < count && (deck.length > 0 || discard.length > 0)) {
-    if (deck.length === 0) {
-      deck = shuffleItems(discard);
-      discard = [];
-    }
-    const card = deck.shift();
-    if (card) drawn.push(card);
-  }
-
-  if (drawn.length === 0) return state;
-
-  const players = state.players.map((player) =>
-    player.id === ownerId ? { ...player, intrigues: [...player.intrigues, ...drawn] } : player,
-  );
-  const cardText = drawn.length === 1 ? "an Intrigue card" : `${drawn.length} Intrigue cards`;
-
-  return {
-    ...state,
-    players,
-    intrigueDeck: deck,
-    intrigueDiscard: discard,
-    log: [`${owner.leader} draws ${cardText} from ${source}.`, ...state.log],
-  };
 }
 
 function stabanUnseenNetworkRewardForSpace(space: BoardSpace) {

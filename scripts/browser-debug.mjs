@@ -5,6 +5,7 @@ import { chromium } from "playwright";
 import { createServer } from "vite";
 import { createBrowserDebugArtifactStore } from "./browser-debug-artifact-store.mjs";
 import { artifactStem, generatedArtifactNames, scenarios } from "./browser-debug-artifacts.mjs";
+import { runCardChoicesSmoke } from "./browser-debug-card-choices.mjs";
 import { runConflictVpSmoke } from "./browser-debug-conflict-vp.mjs";
 import { createBrowserDebugPageTools } from "./browser-debug-page-tools.mjs";
 import { runPendingChoicesSmoke } from "./browser-debug-pending-choices.mjs";
@@ -604,6 +605,21 @@ try {
     if (scenario === "home" || scenario === "all") await interruptible(runHomeSmoke(page, url, server, captures));
     if (scenario === "agent-placement" || scenario === "all") {
       await interruptible(runAgentPlacementSmoke(page, url, server, captures));
+    }
+    if (scenario === "card-choices" || scenario === "all") {
+      await interruptible(runCardChoicesSmoke({
+        captures,
+        currentGame,
+        initialPlayableGame,
+        openApp,
+        page,
+        screenshot,
+        server,
+        setDebugGameAndWait,
+        url,
+        waitForNoPending,
+        writeJson,
+      }));
     }
     if (scenario === "control-defense" || scenario === "all") {
       await interruptible(runControlDefenseSmoke(page, url, server, captures));

@@ -22,6 +22,7 @@ import { CommandBar } from "./components/CommandBar";
 import { EndgamePanel } from "./components/EndgamePanel";
 import { LeaderReferenceModal } from "./components/LeaderReferenceModal";
 import { MarketPanel } from "./components/MarketPanel";
+import { PendingAcquireCardPanel, PendingContractPanel } from "./components/PendingCardChoicePanels";
 import { PendingConflictVpPanel } from "./components/PendingConflictVpPanel";
 import { PendingInfluenceLossPanel } from "./components/PendingInfluenceLossPanel";
 import { PendingIrulanSignetPanel } from "./components/PendingIrulanSignetPanel";
@@ -2332,47 +2333,22 @@ export default function App() {
             )}
 
             {pendingAction.kind === "contract" && pendingContractOwner && (
-              <div className="pending-controls contract-choice">
-                {game.contractOffer.length > 0 && <span className="choice-divider">Public</span>}
-                {game.contractOffer.map((contract) => (
-                  <button type="button" key={contract.id} onClick={() => takeContract(contract.id)}>
-                    {contract.thumbnailPath && <img src={contract.thumbnailPath} alt="" />}
-                    <span>{contract.name}</span>
-                  </button>
-                ))}
-                {reservedContractChoices.length > 0 && <span className="choice-divider">Reserved</span>}
-                {reservedContractChoices.map((contract) => (
-                  <button type="button" key={contract.id} onClick={() => takeContract(contract.id)}>
-                    {contract.thumbnailPath && <img src={contract.thumbnailPath} alt="" />}
-                    <span>{contract.name}</span>
-                  </button>
-                ))}
-                {game.contractOffer.length === 0 && reservedContractChoices.length === 0 && !pendingAction.publicOnly && (
-                  <button type="button" onClick={collectContractFallback}>
-                    <CircleDollarSign size={15} />
-                    Collect 2 Solari
-                  </button>
-                )}
-              </div>
+              <PendingContractPanel
+                contractOffer={game.contractOffer}
+                publicOnly={pendingAction.publicOnly}
+                reservedContracts={reservedContractChoices}
+                onCollectFallback={collectContractFallback}
+                onTakeContract={takeContract}
+              />
             )}
 
             {pendingAction.kind === "acquire-card" && pendingAcquireOwner && (
-              <div className="pending-controls contract-choice">
-                {pendingAcquireCards.map((card) => (
-                  <button
-                    type="button"
-                    key={card.id}
-                    onClick={() => acquirePendingCard(card.id)}
-                    title={`Acquire ${card.name} for ${pendingAcquireOwner.leader}`}
-                  >
-                    {card.thumbnailPath && <img src={card.thumbnailPath} alt="" />}
-                    <span>{card.name}</span>
-                  </button>
-                ))}
-                {pendingAcquireCards.length === 0 && (
-                  <span>No eligible cards cost {pendingAction.maxCost} or less.</span>
-                )}
-              </div>
+              <PendingAcquireCardPanel
+                cards={pendingAcquireCards}
+                maxCost={pendingAction.maxCost}
+                owner={pendingAcquireOwner}
+                onAcquireCard={acquirePendingCard}
+              />
             )}
 
             {pendingAction.kind === "throne-row" && pendingThroneOwner && (

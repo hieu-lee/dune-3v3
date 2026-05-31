@@ -79,6 +79,7 @@ try {
   }
 
   const [muadDib, shaddamAlly, muadDibAllyA, emperor] = game.players;
+  const feyd = shaddamAlly;
   const irulan = playerById(game, "p6");
   const gurneySeat = game.players.findIndex((player) => player.id === muadDibAllyA.id);
   assert.notEqual(gurneySeat, -1, "Expected Gurney's active seat");
@@ -609,6 +610,86 @@ try {
     playerById(gurneyAfterUnexpectedAllies, muadDibAllyA.id).vp,
     2,
     "Always Smiling should score after Reveal-turn Unexpected Allies brings Gurney to 10 strength",
+  );
+
+  const feydDeviousStrengthBase = {
+    ...game,
+    activeSeat: game.players.findIndex((player) => player.id === feyd.id),
+    spyPosts: { secrets: feyd.id },
+    sharedSpyPosts: {},
+    players: game.players.map((player) =>
+      player.id === feyd.id
+        ? { ...player, spies: 2, deployedTroops: 1, conflict: 2 }
+        : player,
+    ),
+  };
+  const feydDeviousStrengthPending = state.pendingActionsForReveal(
+    playerById(feydDeviousStrengthBase, feyd.id),
+    feydDeviousStrengthBase,
+    [],
+    feyd.id,
+  );
+  assert.deepEqual(
+    feydDeviousStrengthPending,
+    [{
+      kind: "recall-spy",
+      ownerId: feyd.id,
+      combatRecipientId: feyd.id,
+      remaining: 1,
+      strength: 2,
+      source: "Devious Strength",
+      optional: true,
+    }],
+    "Feyd should be able to recall one spy for Devious Strength on his Reveal turn",
+  );
+  const feydDeviousStrengthResolved = state.recallSpyForPending(
+    { ...feydDeviousStrengthBase, pendingAction: feydDeviousStrengthPending[0], pendingQueue: [] },
+    feydDeviousStrengthPending[0],
+    "secrets",
+  );
+  assert.equal(
+    playerById(feydDeviousStrengthResolved, feyd.id).conflict,
+    4,
+    "Devious Strength should add 2 Reveal strength after recalling a spy",
+  );
+  assert.equal(
+    playerById(feydDeviousStrengthResolved, feyd.id).spies,
+    3,
+    "Devious Strength should return the recalled spy to Feyd's supply",
+  );
+  assert.equal(feydDeviousStrengthResolved.spyPosts.secrets, undefined, "Devious Strength should remove the recalled spy post");
+  assert.equal(
+    state.pendingActionsForReveal(
+      playerById({ ...feydDeviousStrengthBase, spyPosts: {} }, feyd.id),
+      { ...feydDeviousStrengthBase, spyPosts: {} },
+      [],
+      feyd.id,
+    ).length,
+    0,
+    "Devious Strength should require one of Feyd's spies on the board",
+  );
+  const feydNoConflictUnits = {
+    ...feydDeviousStrengthBase,
+    players: feydDeviousStrengthBase.players.map((player) =>
+      player.id === feyd.id ? { ...player, deployedTroops: 0, deployedSandworms: 0 } : player,
+    ),
+  };
+  assert.equal(
+    state.pendingActionsForReveal(playerById(feydNoConflictUnits, feyd.id), feydNoConflictUnits, [], feyd.id).length,
+    0,
+    "Devious Strength should not queue when Feyd has no units in the Conflict",
+  );
+  const irulanWithSpy = {
+    ...feydDeviousStrengthBase,
+    spyPosts: { secrets: irulan.id },
+    players: feydDeviousStrengthBase.players.map((player) =>
+      player.id === irulan.id ? { ...player, deployedTroops: 1, conflict: 2 } : player,
+    ),
+  };
+  assert.equal(
+    state.pendingActionsForReveal(playerById(irulanWithSpy, irulan.id), irulanWithSpy, [], irulan.id).length,
+    0,
+    "Devious Strength should not trigger for non-Feyd leaders",
   );
 
   const shaddamSignetSource = {

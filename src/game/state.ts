@@ -106,6 +106,7 @@ const shadowAllianceFactions: FactionId[] = [
 const influenceVictoryPointThreshold = 2;
 const gurneyHalleckLeaderName = "Gurney Halleck";
 const gurneyAlwaysSmilingThreshold = 10;
+const feydRauthaLeaderName = "Feyd-Rautha Harkonnen";
 const princessIrulanLeaderName = "Princess Irulan";
 const irulanBirthrightFaction: FactionId = "greatHouses";
 const irulanBirthrightThreshold = 2;
@@ -1323,8 +1324,29 @@ export function pendingActionsForReveal(
   const corrinoMightPending = revealedCards
     .map((card) => pendingActionForCorrinoMightReveal(card, source, state))
     .find((pending): pending is PendingAction => Boolean(pending));
+  const feydDeviousStrengthPending = pendingActionForFeydDeviousStrength(source, state, combatRecipientId);
 
-  return [revealAdjustPending, corrinoMightPending].filter((action): action is PendingAction => Boolean(action));
+  return [revealAdjustPending, corrinoMightPending, feydDeviousStrengthPending].filter((action): action is PendingAction => Boolean(action));
+}
+
+function pendingActionForFeydDeviousStrength(
+  source: Player,
+  state: GameState,
+  combatRecipientId: string,
+): PendingAction | undefined {
+  if (source.leader !== feydRauthaLeaderName || source.role !== "Ally") return undefined;
+  const recipient = state.players.find((player) => player.id === combatRecipientId);
+  if (!recipient || !playerHasConflictUnits(recipient)) return undefined;
+  const pending: Extract<PendingAction, { kind: "recall-spy" }> = {
+    kind: "recall-spy",
+    ownerId: source.id,
+    combatRecipientId,
+    remaining: 1,
+    strength: 2,
+    source: "Devious Strength",
+    optional: true,
+  };
+  return recallableSpySpaces(state, pending).length > 0 ? pending : undefined;
 }
 
 export function pendingActionsFor(

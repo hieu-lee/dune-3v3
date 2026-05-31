@@ -4,6 +4,7 @@ import { lstat, mkdir, mkdtemp, readdir, realpath, rename, rm, writeFile } from 
 import path from "node:path";
 import { chromium } from "playwright";
 import { createServer } from "vite";
+import { artifactStem, generatedArtifactNames, scenarios } from "./browser-debug-artifacts.mjs";
 import { runPendingChoicesSmoke } from "./browser-debug-pending-choices.mjs";
 import { runSignetChoicesSmoke } from "./browser-debug-signet-choices.mjs";
 import { runSpaceChoicesSmoke } from "./browser-debug-space-choices.mjs";
@@ -108,42 +109,6 @@ const scenario = optionValue("--scenario", "all");
 const outDir = optionValue("--out", "artifacts/qa/browser-debug");
 const port = optionNumber("--port", 5178);
 const slowMo = optionNumber("--slow-mo", 0);
-const scenarios = new Set(["home", "agent-placement", "control-defense", "pending-choices", "space-choices", "signet-choices", "leader-modal", "manual", "all"]);
-const generatedScreenshotNames = [
-  "home-desktop.png",
-  "home-mobile.png",
-  "agent-placement-ready.png",
-  "agent-placement-selected.png",
-  "agent-placement-after.png",
-  "control-defense-pending-desktop.png",
-  "control-defense-after-deploy.png",
-  "control-defense-pending-mobile.png",
-  "pending-recall-spy.png",
-  "pending-lose-influence.png",
-  "pending-maker-choice.png",
-  "pending-sietch-tabr.png",
-  "pending-resource-split.png",
-  "pending-shaddam-signet.png",
-  "pending-irulan-signet.png",
-  "leader-modal-open.png",
-  "leader-modal-closed.png",
-  "manual-ready.png",
-  "failure.png",
-  ...[...scenarios].map((name) => `${name}-final.png`),
-];
-const generatedArtifactNames = new Set([
-  "agent-placement-plan.json",
-  "console.json",
-  "control-defense-state.json",
-  "pending-choice-states.json",
-  "pending-space-choice-states.json",
-  "pending-signet-choice-states.json",
-  "request-failures.json",
-  "summary.json",
-  ...generatedScreenshotNames,
-  ...generatedScreenshotNames.map((name) => `${artifactStem(name)}.state.json`),
-  ...[...scenarios].map((name) => `${name}-trace.zip`),
-]);
 
 function cloneConflict(conflict) {
   return { ...conflict, rewards: [...conflict.rewards] };
@@ -153,10 +118,6 @@ function conflictBySourceId(data, sourceId) {
   const conflict = data.conflictCards.find((candidate) => candidate.sourceId === sourceId);
   assert.ok(conflict, `Expected Conflict source ${sourceId}`);
   return cloneConflict(conflict);
-}
-
-function artifactStem(name) {
-  return name.replace(/\.[^.]+$/, "");
 }
 
 function seededRandom(seed) {

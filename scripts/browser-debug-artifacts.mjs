@@ -1,0 +1,54 @@
+export const scenarioNames = [
+  "home",
+  "agent-placement",
+  "control-defense",
+  "pending-choices",
+  "space-choices",
+  "signet-choices",
+  "leader-modal",
+  "manual",
+  "all",
+];
+
+export const scenarios = new Set(scenarioNames);
+
+export function artifactStem(name) {
+  return name.replace(/\.[^.]+$/, "");
+}
+
+const generatedScreenshotNames = [
+  "home-desktop.png",
+  "home-mobile.png",
+  "agent-placement-ready.png",
+  "agent-placement-selected.png",
+  "agent-placement-after.png",
+  "control-defense-pending-desktop.png",
+  "control-defense-after-deploy.png",
+  "control-defense-pending-mobile.png",
+  "pending-recall-spy.png",
+  "pending-lose-influence.png",
+  "pending-maker-choice.png",
+  "pending-sietch-tabr.png",
+  "pending-resource-split.png",
+  "pending-shaddam-signet.png",
+  "pending-irulan-signet.png",
+  "leader-modal-open.png",
+  "leader-modal-closed.png",
+  "manual-ready.png",
+  "failure.png",
+  ...scenarioNames.map((name) => `${name}-final.png`),
+];
+
+export const generatedArtifactNames = new Set([
+  "agent-placement-plan.json",
+  "console.json",
+  "control-defense-state.json",
+  "pending-choice-states.json",
+  "pending-space-choice-states.json",
+  "pending-signet-choice-states.json",
+  "request-failures.json",
+  "summary.json",
+  ...generatedScreenshotNames,
+  ...generatedScreenshotNames.map((name) => `${artifactStem(name)}.state.json`),
+  ...scenarioNames.map((name) => `${name}-trace.zip`),
+]);

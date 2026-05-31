@@ -61,6 +61,12 @@ import {
 } from "./deck-utils";
 import { balanceSixPlayerObjectives, dealSixPlayerObjectives } from "./objectives";
 import {
+  advancePendingAction,
+  pendingActionsFor,
+  prependPendingAction,
+  queuePendingActions,
+} from "./pending-actions";
+import {
   buildChoamContractDeck,
   buildIntrigueDeck,
   buildSixPlayerConflictDeck,
@@ -208,6 +214,12 @@ export {
   balanceSixPlayerObjectives,
   dealSixPlayerObjectives,
 } from "./objectives";
+
+export {
+  advancePendingAction,
+  pendingActionsFor,
+  queuePendingActions,
+} from "./pending-actions";
 
 export {
   makerSpaceIds,
@@ -1161,78 +1173,6 @@ function pendingActionForLadyAmberDesertScouts(source: Player): PendingAction | 
     kind: "amber-desert-scouts",
     ownerId: source.id,
     source: "Desert Scouts",
-  };
-}
-
-export function pendingActionsFor(
-  spacePending: PendingAction | undefined,
-  cardPending: PendingAction | undefined,
-  spySupply: number,
-): PendingAction[] {
-  if (
-    spacePending?.kind === "spy" &&
-    cardPending?.kind === "spy" &&
-    spacePending.ownerId === cardPending.ownerId &&
-    spacePending.placementIcon === cardPending.placementIcon &&
-    spacePending.recallForSupply === cardPending.recallForSupply &&
-    spacePending.mustPlaceSpy === cardPending.mustPlaceSpy &&
-    spacePending.allowSharedPost === cardPending.allowSharedPost &&
-    spacePending.postPlacementAction === cardPending.postPlacementAction
-  ) {
-    return [{
-      ...spacePending,
-      remaining: Math.min(spySupply, spacePending.remaining + cardPending.remaining),
-      source: `${spacePending.source} / ${cardPending.source}`,
-    }];
-  }
-  return [spacePending, cardPending].filter((action): action is PendingAction => Boolean(action));
-}
-
-export function queuePendingActions(state: GameState, actions: PendingAction[]) {
-  if (actions.length === 0) {
-    return { pendingAction: state.pendingAction, pendingQueue: state.pendingQueue };
-  }
-  if (state.pendingAction) {
-    return { pendingAction: state.pendingAction, pendingQueue: [...state.pendingQueue, ...actions] };
-  }
-  return { pendingAction: actions[0], pendingQueue: [...state.pendingQueue, ...actions.slice(1)] };
-}
-
-export function advancePendingAction(state: GameState) {
-  const [pendingAction, ...pendingQueue] = state.pendingQueue;
-  return {
-    pendingAction,
-    pendingQueue,
-    ...(!pendingAction ? { conflictDeploymentBlock: undefined } : {}),
-  };
-}
-
-function prependPendingAction(state: GameState, action: PendingAction | undefined) {
-  if (!action) return state;
-  if (
-    action.kind === "spy" &&
-    state.pendingAction?.kind === "spy" &&
-    action.ownerId === state.pendingAction.ownerId &&
-    action.placementIcon === state.pendingAction.placementIcon &&
-    action.recallForSupply === state.pendingAction.recallForSupply &&
-    action.mustPlaceSpy === state.pendingAction.mustPlaceSpy &&
-    action.allowSharedPost === state.pendingAction.allowSharedPost &&
-    action.postPlacementAction === state.pendingAction.postPlacementAction
-  ) {
-    const owner = state.players.find((player) => player.id === action.ownerId);
-    return {
-      ...state,
-      pendingAction: {
-        ...state.pendingAction,
-        remaining: Math.min(owner?.spies ?? 0, state.pendingAction.remaining + action.remaining),
-        source: `${state.pendingAction.source} / ${action.source}`,
-      },
-    };
-  }
-  return {
-    ...state,
-    pendingAction: action,
-    pendingQueue: state.pendingAction ? [state.pendingAction, ...state.pendingQueue] : state.pendingQueue,
   };
 }
 

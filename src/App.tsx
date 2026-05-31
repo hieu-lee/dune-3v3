@@ -22,6 +22,8 @@ import { CommandBar } from "./components/CommandBar";
 import { EndgamePanel } from "./components/EndgamePanel";
 import { LeaderReferenceModal } from "./components/LeaderReferenceModal";
 import { MarketPanel } from "./components/MarketPanel";
+import { PendingSpyPanel } from "./components/PendingSpyPanel";
+import { PendingTrashPanel } from "./components/PendingTrashPanel";
 import { PlayerColumn } from "./components/PlayerColumn";
 import { RecentLogPanel } from "./components/RecentLogPanel";
 import { TableSidebar } from "./components/TableSidebar";
@@ -1857,58 +1859,25 @@ export default function App() {
             )}
 
             {pendingAction.kind === "spy" && pendingSpyOwner && (
-              <div className="pending-controls spy-grid">
-                <span>{pendingSpyOwner.leader}: {pendingSpyOwner.spies} spies ready</span>
-                {pendingSpyOwner.spies <= 0 && pendingSpySupplyRecallSpaces.length > 0 && (
-                  <span>Recall one spy for supply, then place.</span>
-                )}
-                {pendingSpySupplyRecallSpaces.map((space) => (
-                  <button
-                    type="button"
-                    key={`recall-${space.id}`}
-                    onClick={() => recallSpyForSupply(space.id)}
-                    title={`Recall spy from ${space.name} for no effect`}
-                  >
-                    <RotateCcw size={14} />
-                    {space.name}
-                  </button>
-                ))}
-                {spyPlacementSpaces.map((space) => (
-                  <button type="button" key={space.id} onClick={() => placeSpy(space.id)}>
-                    {space.name}
-                  </button>
-                ))}
-                {spyPlacementSpaces.length === 0 && pendingSpyOwner.spies > 0 && <span>No legal spy posts</span>}
-                <button
-                  type="button"
-                  onClick={clearPendingAction}
-                  disabled={pendingAction.mustPlaceSpy}
-                  title={pendingAction.mustPlaceSpy ? "Place the spy to finish this effect" : undefined}
-                >
-                  Done
-                </button>
-              </div>
+              <PendingSpyPanel
+                owner={pendingSpyOwner}
+                pending={pendingAction}
+                placementSpaces={spyPlacementSpaces}
+                supplyRecallSpaces={pendingSpySupplyRecallSpaces}
+                onDone={clearPendingAction}
+                onPlaceSpy={placeSpy}
+                onRecallSupplySpy={recallSpyForSupply}
+              />
             )}
 
             {pendingAction.kind === "trash-card" && pendingTrashOwner && (
-              <div className="pending-controls trade-intrigue-grid">
-                <div className="trade-intrigue-column">
-                  <strong>{pendingTrashOwner.leader}</strong>
-                  {pendingTrashChoices.length === 0 && <span>No trashable cards</span>}
-                  {pendingTrashChoices.map(({ zone, card }) => (
-                    <button
-                      type="button"
-                      key={`${zone}-${card.id}`}
-                      onClick={() => trashCard(zone, card.id)}
-                      title={`Trash ${card.name}`}
-                    >
-                      {card.thumbnailPath && <img src={card.thumbnailPath} alt="" />}
-                      <span>{card.name} ({zone === "playArea" ? "in play" : zone})</span>
-                    </button>
-                  ))}
-                </div>
-                {pendingAction.optional && <button type="button" onClick={skipTrash}>Skip</button>}
-              </div>
+              <PendingTrashPanel
+                choices={pendingTrashChoices}
+                owner={pendingTrashOwner}
+                pending={pendingAction}
+                onSkip={skipTrash}
+                onTrash={trashCard}
+              />
             )}
 
             {pendingAction.kind === "recall-spy" && pendingRecallSpyOwner && (

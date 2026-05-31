@@ -163,6 +163,7 @@ import {
   resolveIrulanSignetRingChoice,
   resolveJessicaOtherMemoriesChoice,
   resolveJessicaSpiceAgonyChoice,
+  resolveJessicaWaterOfLifeChoice,
   resolveMakerChoice,
   resolvePrincessIrulanBirthright,
   resolveSietchTabrChoice,
@@ -194,7 +195,7 @@ import {
   buyAccessPairChoices,
 } from "./game/state";
 import type { BoardSpace, Card, FactionId, GameState, PendingAction, Player, ResourceId, Resources, TeamId, TradeGoodId, TrashCardZone } from "./game/types";
-import type { BuyAccessChoice, ChangeAllegiancesChoice, CombatIntrigueChoice, ImperiumPoliticsChoice, InfluenceLossPair, IrulanSignetRingChoice, JessicaOtherMemoriesChoice, JessicaSpiceAgonyChoice, ShaddamSignetRingChoice, SietchRitualChoice, SpecialMissionChoice } from "./game/state";
+import type { BuyAccessChoice, ChangeAllegiancesChoice, CombatIntrigueChoice, ImperiumPoliticsChoice, InfluenceLossPair, IrulanSignetRingChoice, JessicaOtherMemoriesChoice, JessicaSpiceAgonyChoice, JessicaWaterOfLifeChoice, ShaddamSignetRingChoice, SietchRitualChoice, SpecialMissionChoice } from "./game/state";
 
 const resources: Array<{ id: ResourceId; label: string; Icon: LucideIcon }> = [
   { id: "solari", label: "Solari", Icon: CircleDollarSign },
@@ -767,6 +768,15 @@ export default function App() {
     });
   }
 
+  function chooseJessicaWaterOfLife(choice: JessicaWaterOfLifeChoice) {
+    if (game.pendingAction?.kind !== "jessica-water-of-life") return;
+    setGame((current) => {
+      const pending = current.pendingAction;
+      if (!pending || pending.kind !== "jessica-water-of-life") return current;
+      return maybeStartCombatPhase(resolveJessicaWaterOfLifeChoice(current, pending, choice));
+    });
+  }
+
   function chooseJessicaOtherMemories(choice: JessicaOtherMemoriesChoice) {
     if (game.pendingAction?.kind !== "jessica-other-memories") return;
     setGame((current) => {
@@ -1332,6 +1342,8 @@ export default function App() {
     pendingAction?.kind === "irulan-signet-ring" ? irulanSignetTrashableCards(game, pendingAction) : [];
   const pendingJessicaSpiceAgonyOwner =
     pendingAction?.kind === "jessica-spice-agony" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
+  const pendingJessicaWaterOfLifeOwner =
+    pendingAction?.kind === "jessica-water-of-life" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingJessicaOtherMemoriesOwner =
     pendingAction?.kind === "jessica-other-memories" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingRecallSpyOwner =
@@ -2094,6 +2106,7 @@ export default function App() {
                 {pendingAction.kind === "shaddam-signet-ring" && `${pendingShaddamSignetCommander?.leader ?? "Shaddam"} Emperor of the Known Universe`}
                 {pendingAction.kind === "irulan-signet-ring" && `${pendingIrulanSignetOwner?.leader ?? "Princess Irulan"} Chronicler's Insight`}
                 {pendingAction.kind === "jessica-spice-agony" && `${pendingJessicaSpiceAgonyOwner?.leader ?? "Lady Jessica"} Spice Agony`}
+                {pendingAction.kind === "jessica-water-of-life" && `${pendingJessicaWaterOfLifeOwner?.leader ?? "Reverend Mother Jessica"} Water of Life`}
                 {pendingAction.kind === "jessica-other-memories" && `${pendingJessicaOtherMemoriesOwner?.leader ?? "Lady Jessica"} Other Memories`}
                 {pendingAction.kind === "command-respect" && `${pendingCommandRespectCommander?.leader ?? "Muad'Dib"} Command Respect`}
                 {pendingAction.kind === "demand-results" && `${pendingDemandResultsCommander?.leader ?? "Shaddam"} Demand Results`}
@@ -2376,6 +2389,24 @@ export default function App() {
                   <span>Spice Agony can no longer resolve with the current table state.</span>
                 )}
                 <button type="button" onClick={() => chooseJessicaSpiceAgony("skip")}>Skip</button>
+              </div>
+            )}
+
+            {pendingAction.kind === "jessica-water-of-life" && (
+              <div className="pending-controls">
+                {pendingJessicaWaterOfLifeOwner ? (
+                  <button
+                    type="button"
+                    onClick={() => chooseJessicaWaterOfLife("pay")}
+                    disabled={pendingJessicaWaterOfLifeOwner.resources.spice < 1}
+                  >
+                    <Droplets size={15} />
+                    Spend 1 spice: +1 water
+                  </button>
+                ) : (
+                  <span>Water of Life can no longer resolve with the current table state.</span>
+                )}
+                <button type="button" onClick={() => chooseJessicaWaterOfLife("skip")}>Skip</button>
               </div>
             )}
 

@@ -530,6 +530,144 @@ try {
   assert.equal(playerById(skippedOtherMemories, ladyJessica.id).leader, "Lady Jessica", "Skipping Other Memories should not flip");
   assert.equal(playerById(skippedOtherMemories, ladyJessica.id).jessicaMemories, 2, "Skipping Other Memories should keep memories");
 
+  const reverendJessicaOwner = {
+    ...ladyJessica,
+    leader: "Reverend Mother Jessica",
+    leaderCard: data.leaderCardByName("Reverend Mother Jessica"),
+    resources: { ...ladyJessica.resources, spice: 1, water: 0 },
+    playArea: [allySignet],
+    jessicaMemories: 0,
+  };
+  const reverendJessicaGame = {
+    ...game,
+    players: game.players.map((player) => (player.id === ladyJessica.id ? reverendJessicaOwner : player)),
+  };
+  const waterOfLifePending = state.pendingActionForCard(
+    allySignet,
+    reverendJessicaOwner,
+    reverendJessicaGame,
+    reverendJessicaOwner,
+    secrets,
+  );
+  assert.deepEqual(
+    waterOfLifePending,
+    {
+      kind: "jessica-water-of-life",
+      ownerId: ladyJessica.id,
+      cardId: allySignet.id,
+      source: "Water of Life",
+    },
+    "Reverend Mother Jessica's Signet Ring should queue Water of Life when she can pay 1 spice",
+  );
+  const waterOfLifeResolved = state.resolveJessicaWaterOfLifeChoice(
+    { ...reverendJessicaGame, pendingAction: waterOfLifePending, pendingQueue: [] },
+    waterOfLifePending,
+    "pay",
+  );
+  assert.equal(playerById(waterOfLifeResolved, ladyJessica.id).resources.spice, 0, "Water of Life should spend 1 spice");
+  assert.equal(playerById(waterOfLifeResolved, ladyJessica.id).resources.water, 1, "Water of Life should gain 1 water");
+  assert.equal(waterOfLifeResolved.pendingAction, undefined, "Resolved Water of Life should advance pending actions");
+  assert.equal(
+    state.pendingActionForCard(
+      allySignet,
+      { ...reverendJessicaOwner, resources: { ...reverendJessicaOwner.resources, spice: 0 } },
+      reverendJessicaGame,
+      reverendJessicaOwner,
+      secrets,
+    ),
+    undefined,
+    "Water of Life should require 1 payable spice",
+  );
+  assert.equal(
+    state.pendingActionForCard(emperorSignet, reverendJessicaOwner, reverendJessicaGame, reverendJessicaOwner, secrets),
+    undefined,
+    "Water of Life should not trigger from Shaddam's Commander Signet Ring",
+  );
+  assert.equal(
+    state.pendingActionForCard(allySignet, { ...reverendJessicaOwner, playArea: [] }, reverendJessicaGame, reverendJessicaOwner, secrets),
+    undefined,
+    "Water of Life should require the Signet Ring in play",
+  );
+  const skippedWaterOfLife = state.resolveJessicaWaterOfLifeChoice(
+    { ...reverendJessicaGame, pendingAction: waterOfLifePending, pendingQueue: [] },
+    waterOfLifePending,
+    "skip",
+  );
+  assert.equal(playerById(skippedWaterOfLife, ladyJessica.id).resources.spice, 1, "Skipping Water of Life should not spend spice");
+  assert.equal(playerById(skippedWaterOfLife, ladyJessica.id).resources.water, 0, "Skipping Water of Life should not gain water");
+  const deferredWaterOwner = {
+    ...reverendJessicaOwner,
+    resources: { ...reverendJessicaOwner.resources, spice: 0, water: 1 },
+    makerHooks: true,
+  };
+  const deferredWaterGame = {
+    ...reverendJessicaGame,
+    shieldWall: false,
+    players: reverendJessicaGame.players.map((player) =>
+      player.id === ladyJessica.id ? deferredWaterOwner : player,
+    ),
+  };
+  const deferredWaterPending = state.pendingActionForCard(
+    allySignet,
+    deferredWaterOwner,
+    deferredWaterGame,
+    deferredWaterOwner,
+    haggaBasin,
+  );
+  assert.deepEqual(
+    deferredWaterPending,
+    {
+      kind: "jessica-water-of-life",
+      ownerId: ladyJessica.id,
+      cardId: allySignet.id,
+      source: "Water of Life",
+    },
+    "Water of Life should queue when a pending Maker choice can supply the 1 spice payment",
+  );
+  const deferredWaterMakerPending = state.pendingActionForMakerChoice(
+    deferredWaterGame,
+    haggaBasin,
+    deferredWaterOwner,
+    deferredWaterOwner,
+  );
+  assert.ok(deferredWaterMakerPending, "Deferred Water of Life regression needs a Maker choice pending action");
+  const afterWaterMakerSpice = state.resolveMakerChoice(
+    {
+      ...deferredWaterGame,
+      pendingAction: deferredWaterMakerPending,
+      pendingQueue: [deferredWaterPending],
+    },
+    deferredWaterMakerPending,
+    "spice",
+  );
+  const afterDeferredWaterOfLife = state.resolveJessicaWaterOfLifeChoice(
+    afterWaterMakerSpice,
+    deferredWaterPending,
+    "pay",
+  );
+  assert.equal(playerById(afterDeferredWaterOfLife, ladyJessica.id).resources.spice, 1, "Deferred Water of Life should spend 1 of the Maker spice");
+  assert.equal(playerById(afterDeferredWaterOfLife, ladyJessica.id).resources.water, 2, "Deferred Water of Life should gain 1 water");
+  const afterWaterMakerWorms = state.resolveMakerChoice(
+    {
+      ...deferredWaterGame,
+      pendingAction: deferredWaterMakerPending,
+      pendingQueue: [deferredWaterPending],
+    },
+    deferredWaterMakerPending,
+    "sandworms",
+  );
+  assert.deepEqual(afterWaterMakerWorms.pendingAction, deferredWaterPending, "Choosing Maker worms should still advance to the queued optional Water of Life");
+  assert.equal(
+    state.resolveJessicaWaterOfLifeChoice(afterWaterMakerWorms, deferredWaterPending, "pay"),
+    afterWaterMakerWorms,
+    "Deferred Water of Life should not resolve if the Maker choice did not provide spice",
+  );
+  assert.equal(
+    state.resolveJessicaWaterOfLifeChoice(afterWaterMakerWorms, deferredWaterPending, "skip").pendingAction,
+    undefined,
+    "Deferred Water of Life should remain skippable after choosing Maker worms",
+  );
+
   const freeImperiumCard = {
     ...costOneImperiumCard,
     id: `${costOneImperiumCard.id}-free-regression`,

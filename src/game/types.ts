@@ -375,6 +375,12 @@ export type PendingAction =
       source: string;
     }
   | {
+      kind: "jessica-water-of-life";
+      ownerId: string;
+      cardId: string;
+      source: string;
+    }
+  | {
       kind: "jessica-other-memories";
       ownerId: string;
       source: string;

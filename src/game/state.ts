@@ -140,6 +140,7 @@ export type MarketOpportunityChoice = "spice-to-solari" | "solari-to-spice";
 export type ShaddamSignetRingChoice = "skip" | "troop" | { kind: "influence"; faction: FactionId };
 export type IrulanSignetRingChoice = "skip" | "acquire" | "trash";
 export type JessicaSpiceAgonyChoice = "pay" | "skip";
+export type JessicaWaterOfLifeChoice = "pay" | "skip";
 export type JessicaOtherMemoriesChoice = "flip" | "skip";
 
 const shaddamSignetRingTroopCost = 1;
@@ -1188,6 +1189,20 @@ export function pendingActionForCard(
     };
   }
   if (
+    isGenericSignetRingCard(card) &&
+    source.leader === reverendMotherJessicaLeaderName &&
+    source.role === "Ally" &&
+    source.resources.spice + (state && space ? potentialDeferredMakerChoiceSpice(state, source, target, space) : 0) >= 1 &&
+    source.playArea.some((candidate) => candidate.id === card.id && isGenericSignetRingCard(candidate))
+  ) {
+    return {
+      kind: "jessica-water-of-life",
+      ownerId: source.id,
+      cardId: card.id,
+      source: "Water of Life",
+    };
+  }
+  if (
     isDesertCallCommanderCard(card) &&
     source.team === "muaddib" &&
     source.role === "Commander" &&
@@ -1451,6 +1466,7 @@ type ThreatenSpiceProductionPendingAction = Extract<PendingAction, { kind: "thre
 type ShaddamSignetRingPendingAction = Extract<PendingAction, { kind: "shaddam-signet-ring" }>;
 type IrulanSignetRingPendingAction = Extract<PendingAction, { kind: "irulan-signet-ring" }>;
 type JessicaSpiceAgonyPendingAction = Extract<PendingAction, { kind: "jessica-spice-agony" }>;
+type JessicaWaterOfLifePendingAction = Extract<PendingAction, { kind: "jessica-water-of-life" }>;
 type JessicaOtherMemoriesPendingAction = Extract<PendingAction, { kind: "jessica-other-memories" }>;
 
 export function manipulateAcquisitionCost(card: Card) {
@@ -4626,6 +4642,49 @@ export function resolveJessicaSpiceAgonyChoice(
     log: [`${owner.leader} spends 1 spice for ${pending.source} and moves a supply troop as 1 memory.`, ...state.log],
   };
   return drawIntrigueCards(paidState, owner.id, 1, pending.source);
+}
+
+export function resolveJessicaWaterOfLifeChoice(
+  state: GameState,
+  pending: JessicaWaterOfLifePendingAction,
+  choice: JessicaWaterOfLifeChoice,
+): GameState {
+  const owner = state.players.find((player) => player.id === pending.ownerId);
+  if (
+    !owner ||
+    owner.leader !== reverendMotherJessicaLeaderName ||
+    owner.role !== "Ally" ||
+    !owner.playArea.some((card) => card.id === pending.cardId && isGenericSignetRingCard(card))
+  ) {
+    return state;
+  }
+
+  if (choice === "skip") {
+    return {
+      ...state,
+      ...advancePendingAction(state),
+      log: [`${owner.leader} declines ${pending.source}.`, ...state.log],
+    };
+  }
+
+  if (owner.resources.spice < 1) return state;
+  return {
+    ...state,
+    players: state.players.map((player) =>
+      player.id === owner.id
+        ? {
+            ...player,
+            resources: {
+              ...player.resources,
+              spice: player.resources.spice - 1,
+              water: player.resources.water + 1,
+            },
+          }
+        : player,
+    ),
+    ...advancePendingAction(state),
+    log: [`${owner.leader} spends 1 spice for ${pending.source} and gains 1 water.`, ...state.log],
+  };
 }
 
 export function resolveJessicaOtherMemoriesChoice(

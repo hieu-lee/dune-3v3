@@ -369,6 +369,11 @@ export type PendingAction =
       source: string;
     }
   | {
+      kind: "amber-desert-scouts";
+      ownerId: string;
+      source: string;
+    }
+  | {
       kind: "jessica-spice-agony";
       ownerId: string;
       cardId: string;

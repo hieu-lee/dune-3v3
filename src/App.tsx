@@ -166,6 +166,7 @@ import {
   resolveJessicaReverendMotherChoice,
   resolveJessicaSpiceAgonyChoice,
   resolveJessicaWaterOfLifeChoice,
+  resolveLadyAmberDesertScoutsChoice,
   resolveMakerChoice,
   resolvePrincessIrulanBirthright,
   resolveSietchTabrChoice,
@@ -197,7 +198,7 @@ import {
   buyAccessPairChoices,
 } from "./game/state";
 import type { BoardSpace, Card, FactionId, GameState, PendingAction, Player, ResourceId, Resources, TeamId, TradeGoodId, TrashCardZone } from "./game/types";
-import type { BuyAccessChoice, ChangeAllegiancesChoice, CombatIntrigueChoice, ImperiumPoliticsChoice, InfluenceLossPair, IrulanSignetRingChoice, JessicaOtherMemoriesChoice, JessicaReverendMotherChoice, JessicaSpiceAgonyChoice, JessicaWaterOfLifeChoice, ShaddamSignetRingChoice, SietchRitualChoice, SpecialMissionChoice } from "./game/state";
+import type { BuyAccessChoice, ChangeAllegiancesChoice, CombatIntrigueChoice, ImperiumPoliticsChoice, InfluenceLossPair, IrulanSignetRingChoice, JessicaOtherMemoriesChoice, JessicaReverendMotherChoice, JessicaSpiceAgonyChoice, JessicaWaterOfLifeChoice, LadyAmberDesertScoutsChoice, ShaddamSignetRingChoice, SietchRitualChoice, SpecialMissionChoice } from "./game/state";
 
 const resources: Array<{ id: ResourceId; label: string; Icon: LucideIcon }> = [
   { id: "solari", label: "Solari", Icon: CircleDollarSign },
@@ -382,6 +383,7 @@ export default function App() {
         selectedCard,
         source,
         player.role === "Commander" ? effectedTarget : source,
+        current,
       );
       source = cardAgentEffect.source;
       effectedTarget = cardAgentEffect.target;
@@ -473,7 +475,8 @@ export default function App() {
       const resolvedState = intrigueGain > 0
         ? drawIntrigueCards(birthrightState, source.id, intrigueGain, selectedSpace.name)
         : birthrightState;
-      return spiceGain > 0 ? recordTurnSpiceGain(resolvedState, source.id, spiceGain) : resolvedState;
+      const totalSpiceGain = spiceGain + (cardAgentEffect.sourceSpiceGained ?? 0);
+      return totalSpiceGain > 0 ? recordTurnSpiceGain(resolvedState, source.id, totalSpiceGain) : resolvedState;
     });
     setSelectedCardId(null);
     setSelectedSpaceId(null);
@@ -774,6 +777,15 @@ export default function App() {
       const pending = current.pendingAction;
       if (!pending || pending.kind !== "irulan-signet-ring") return current;
       return maybeStartCombatPhase(resolveIrulanSignetRingChoice(current, pending, choice));
+    });
+  }
+
+  function chooseLadyAmberDesertScouts(choice: LadyAmberDesertScoutsChoice) {
+    if (game.pendingAction?.kind !== "amber-desert-scouts") return;
+    setGame((current) => {
+      const pending = current.pendingAction;
+      if (!pending || pending.kind !== "amber-desert-scouts") return current;
+      return maybeStartCombatPhase(resolveLadyAmberDesertScoutsChoice(current, pending, choice));
     });
   }
 
@@ -1367,6 +1379,8 @@ export default function App() {
     pendingAction?.kind === "irulan-signet-ring" ? irulanSignetAcquireCards(game, pendingAction) : [];
   const pendingIrulanSignetTrashChoices =
     pendingAction?.kind === "irulan-signet-ring" ? irulanSignetTrashableCards(game, pendingAction) : [];
+  const pendingLadyAmberDesertScoutsOwner =
+    pendingAction?.kind === "amber-desert-scouts" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingJessicaSpiceAgonyOwner =
     pendingAction?.kind === "jessica-spice-agony" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingJessicaWaterOfLifeOwner =
@@ -2136,6 +2150,7 @@ export default function App() {
                 {pendingAction.kind === "commander-resource-split" && `${pendingResourceSplitCommander?.leader ?? "Commander"} ${pendingAction.source}`}
                 {pendingAction.kind === "shaddam-signet-ring" && `${pendingShaddamSignetCommander?.leader ?? "Shaddam"} Emperor of the Known Universe`}
                 {pendingAction.kind === "irulan-signet-ring" && `${pendingIrulanSignetOwner?.leader ?? "Princess Irulan"} Chronicler's Insight`}
+                {pendingAction.kind === "amber-desert-scouts" && `${pendingLadyAmberDesertScoutsOwner?.leader ?? "Lady Amber"} Desert Scouts`}
                 {pendingAction.kind === "jessica-spice-agony" && `${pendingJessicaSpiceAgonyOwner?.leader ?? "Lady Jessica"} Spice Agony`}
                 {pendingAction.kind === "jessica-water-of-life" && `${pendingJessicaWaterOfLifeOwner?.leader ?? "Reverend Mother Jessica"} Water of Life`}
                 {pendingAction.kind === "jessica-reverend-mother" && `${pendingJessicaReverendMotherOwner?.leader ?? "Reverend Mother Jessica"} Reverend Mother`}
@@ -2400,6 +2415,24 @@ export default function App() {
                   <span>Chronicler's Insight can no longer resolve with the current table state.</span>
                 )}
                 <button type="button" onClick={() => chooseIrulanSignet("skip")}>Skip</button>
+              </div>
+            )}
+
+            {pendingAction.kind === "amber-desert-scouts" && (
+              <div className="pending-controls">
+                {pendingLadyAmberDesertScoutsOwner ? (
+                  <button
+                    type="button"
+                    onClick={() => chooseLadyAmberDesertScouts("retreat")}
+                    disabled={pendingLadyAmberDesertScoutsOwner.deployedTroops <= 0}
+                  >
+                    <RotateCcw size={15} />
+                    Retreat 1 troop
+                  </button>
+                ) : (
+                  <span>Desert Scouts can no longer resolve with the current table state.</span>
+                )}
+                <button type="button" onClick={() => chooseLadyAmberDesertScouts("skip")}>Skip</button>
               </div>
             )}
 

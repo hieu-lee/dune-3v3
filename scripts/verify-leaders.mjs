@@ -254,6 +254,39 @@ try {
   const jessicaSignet = state.applyCardAgentEffect(allySignet, game.players[4], game.players[4]);
   assert.equal(jessicaSignet.source.garrison, game.players[4].garrison, "Generic Signet should not recruit for a non-Gurney Ally");
 
+  const ladyAmber = {
+    ...muadDibAllyA,
+    leader: "Lady Amber Metulli",
+    leaderCard: data.leaderCardByName("Lady Amber Metulli"),
+    resources: { ...muadDibAllyA.resources, solari: 2, spice: 0 },
+    playArea: [allySignet],
+  };
+  const amberAllianceGame = {
+    ...game,
+    alliances: { bene: ladyAmber.id },
+    players: game.players.map((player) => (player.id === ladyAmber.id ? ladyAmber : player)),
+  };
+  const amberSignet = state.applyCardAgentEffect(allySignet, ladyAmber, ladyAmber, amberAllianceGame);
+  assert.equal(amberSignet.source.resources.solari, 3, "Amber's Fill Coffers should gain 1 Solari with any Alliance");
+  assert.equal(amberSignet.source.resources.spice, 1, "Amber's Fill Coffers should gain 1 spice with any Alliance");
+  assert.equal(amberSignet.sourceSpiceGained, 1, "Amber's Fill Coffers spice should count as a spice gain this turn");
+  assert.match(amberSignet.log ?? "", /Fill Coffers/, "Amber's Fill Coffers should log the Signet reward");
+  const amberNoAllianceSignet = state.applyCardAgentEffect(
+    allySignet,
+    ladyAmber,
+    ladyAmber,
+    { ...amberAllianceGame, alliances: {} },
+  );
+  assert.equal(amberNoAllianceSignet.source.resources.solari, 2, "Amber's Fill Coffers should require an Alliance");
+  assert.equal(amberNoAllianceSignet.source.resources.spice, 0, "Amber's Fill Coffers should not gain spice without an Alliance");
+  const amberWrongLeaderSignet = state.applyCardAgentEffect(
+    allySignet,
+    { ...muadDibAllyA, resources: { ...muadDibAllyA.resources, solari: 2, spice: 0 } },
+    muadDibAllyA,
+    { ...amberAllianceGame, alliances: { bene: muadDibAllyA.id } },
+  );
+  assert.equal(amberWrongLeaderSignet.source.resources.spice, 0, "Fill Coffers should not trigger for other Ally leaders");
+
   const ladyJessica = playerById(game, "p5");
   assert.equal(ladyJessica.jessicaMemories, 0, "Lady Jessica should start with no memories");
   const secrets = data.boardSpaces.find((space) => space.id === "secrets");
@@ -1322,6 +1355,61 @@ try {
     state.pendingActionsForReveal(playerById(irulanWithSpy, irulan.id), irulanWithSpy, [], irulan.id).length,
     0,
     "Devious Strength should not trigger for non-Feyd leaders",
+  );
+
+  const amberRevealBase = {
+    ...game,
+    pendingAction: undefined,
+    pendingQueue: [],
+    players: game.players.map((player) =>
+      player.id === ladyAmber.id
+        ? { ...ladyAmber, garrison: 1, conflict: 6, deployedTroops: 2 }
+        : player,
+    ),
+  };
+  const amberRevealPlayer = playerById(amberRevealBase, ladyAmber.id);
+  const amberDesertScoutsPending = state.pendingActionsForReveal(
+    amberRevealPlayer,
+    amberRevealBase,
+    [],
+    ladyAmber.id,
+  );
+  assert.deepEqual(
+    amberDesertScoutsPending,
+    [{
+      kind: "amber-desert-scouts",
+      ownerId: ladyAmber.id,
+      source: "Desert Scouts",
+    }],
+    "Amber should be able to retreat one deployed troop on her Reveal turn",
+  );
+  const amberDesertScoutsResolved = state.resolveLadyAmberDesertScoutsChoice(
+    { ...amberRevealBase, pendingAction: amberDesertScoutsPending[0], pendingQueue: [] },
+    amberDesertScoutsPending[0],
+    "retreat",
+  );
+  assert.equal(playerById(amberDesertScoutsResolved, ladyAmber.id).deployedTroops, 1, "Desert Scouts should retreat one troop");
+  assert.equal(playerById(amberDesertScoutsResolved, ladyAmber.id).garrison, 2, "Desert Scouts should return the troop to garrison");
+  assert.equal(playerById(amberDesertScoutsResolved, ladyAmber.id).conflict, 4, "Desert Scouts should remove the retreated troop strength");
+  assert.equal(amberDesertScoutsResolved.pendingAction, undefined, "Desert Scouts should advance the pending action");
+  assert.match(amberDesertScoutsResolved.log[0], /retreats 1 troop/, "Desert Scouts should log the retreat");
+  const amberDesertScoutsSkipped = state.resolveLadyAmberDesertScoutsChoice(
+    { ...amberRevealBase, pendingAction: amberDesertScoutsPending[0], pendingQueue: [] },
+    amberDesertScoutsPending[0],
+    "skip",
+  );
+  assert.equal(playerById(amberDesertScoutsSkipped, ladyAmber.id).deployedTroops, 2, "Skipping Desert Scouts should keep troops deployed");
+  assert.equal(playerById(amberDesertScoutsSkipped, ladyAmber.id).conflict, 6, "Skipping Desert Scouts should preserve strength");
+  const amberNoTroopsReveal = {
+    ...amberRevealBase,
+    players: amberRevealBase.players.map((player) =>
+      player.id === ladyAmber.id ? { ...player, conflict: 3, deployedTroops: 0 } : player,
+    ),
+  };
+  assert.equal(
+    state.pendingActionsForReveal(playerById(amberNoTroopsReveal, ladyAmber.id), amberNoTroopsReveal, [], ladyAmber.id).length,
+    0,
+    "Desert Scouts should require one of Amber's troops in the Conflict",
   );
 
   const shaddamSignetSource = {

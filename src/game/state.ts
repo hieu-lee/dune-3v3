@@ -107,6 +107,7 @@ const influenceVictoryPointThreshold = 2;
 const gurneyHalleckLeaderName = "Gurney Halleck";
 const gurneyAlwaysSmilingThreshold = 10;
 const feydRauthaLeaderName = "Feyd-Rautha Harkonnen";
+const ladyAmberMetulliLeaderName = "Lady Amber Metulli";
 const ladyJessicaLeaderName = "Lady Jessica";
 const reverendMotherJessicaLeaderName = "Reverend Mother Jessica";
 const princessIrulanLeaderName = "Princess Irulan";
@@ -139,6 +140,7 @@ export type StrategicStockpilingChoice = "spice" | "water" | "both";
 export type MarketOpportunityChoice = "spice-to-solari" | "solari-to-spice";
 export type ShaddamSignetRingChoice = "skip" | "troop" | { kind: "influence"; faction: FactionId };
 export type IrulanSignetRingChoice = "skip" | "acquire" | "trash";
+export type LadyAmberDesertScoutsChoice = "retreat" | "skip";
 export type JessicaSpiceAgonyChoice = "pay" | "skip";
 export type JessicaWaterOfLifeChoice = "pay" | "skip";
 export type JessicaReverendMotherChoice = "repeat" | "skip";
@@ -1423,8 +1425,9 @@ export function pendingActionsForReveal(
     .map((card) => pendingActionForCorrinoMightReveal(card, source, state))
     .find((pending): pending is PendingAction => Boolean(pending));
   const feydDeviousStrengthPending = pendingActionForFeydDeviousStrength(source, state, combatRecipientId);
+  const amberDesertScoutsPending = pendingActionForLadyAmberDesertScouts(source);
 
-  return [revealAdjustPending, corrinoMightPending, feydDeviousStrengthPending].filter((action): action is PendingAction => Boolean(action));
+  return [revealAdjustPending, corrinoMightPending, feydDeviousStrengthPending, amberDesertScoutsPending].filter((action): action is PendingAction => Boolean(action));
 }
 
 function pendingActionForFeydDeviousStrength(
@@ -1445,6 +1448,21 @@ function pendingActionForFeydDeviousStrength(
     optional: true,
   };
   return recallableSpySpaces(state, pending).length > 0 ? pending : undefined;
+}
+
+function pendingActionForLadyAmberDesertScouts(source: Player): PendingAction | undefined {
+  if (
+    source.leader !== ladyAmberMetulliLeaderName ||
+    source.role !== "Ally" ||
+    source.deployedTroops <= 0
+  ) {
+    return undefined;
+  }
+  return {
+    kind: "amber-desert-scouts",
+    ownerId: source.id,
+    source: "Desert Scouts",
+  };
 }
 
 export function pendingActionsFor(
@@ -1533,6 +1551,7 @@ type DesertCallPendingAction = Extract<PendingAction, { kind: "desert-call" }>;
 type ThreatenSpiceProductionPendingAction = Extract<PendingAction, { kind: "threaten-spice-production" }>;
 type ShaddamSignetRingPendingAction = Extract<PendingAction, { kind: "shaddam-signet-ring" }>;
 type IrulanSignetRingPendingAction = Extract<PendingAction, { kind: "irulan-signet-ring" }>;
+type LadyAmberDesertScoutsPendingAction = Extract<PendingAction, { kind: "amber-desert-scouts" }>;
 type JessicaSpiceAgonyPendingAction = Extract<PendingAction, { kind: "jessica-spice-agony" }>;
 type JessicaWaterOfLifePendingAction = Extract<PendingAction, { kind: "jessica-water-of-life" }>;
 type JessicaReverendMotherPendingAction = Extract<PendingAction, { kind: "jessica-reverend-mother" }>;
@@ -1972,6 +1991,10 @@ export function setAllianceOwner(state: GameState, faction: FactionId, ownerId?:
   };
 }
 
+function playerHasAnyAlliance(state: Pick<GameState, "alliances">, playerId: string) {
+  return Object.values(state.alliances).includes(playerId);
+}
+
 export function transferTradeGood(
   state: GameState,
   pending: TradePendingAction,
@@ -2094,7 +2117,15 @@ export function applyCardAgentEffect(
   card: Card,
   sourcePlayer: Player,
   targetPlayer: Player,
-): { source: Player; target: Player; log?: string; recruitedTroops?: number; blocksDeploymentsThisTurn?: boolean } {
+  state?: Pick<GameState, "alliances">,
+): {
+  source: Player;
+  target: Player;
+  log?: string;
+  recruitedTroops?: number;
+  blocksDeploymentsThisTurn?: boolean;
+  sourceSpiceGained?: number;
+} {
   if (
     isMuadDibSignetRingCard(card) &&
     sourcePlayer.team === "muaddib" &&
@@ -2137,6 +2168,28 @@ export function applyCardAgentEffect(
       target: targetPlayer,
       log: `${sourcePlayer.leader} resolves Warmaster: recruits 1 troop.`,
       recruitedTroops: 1,
+    };
+  }
+
+  if (
+    state &&
+    isGenericSignetRingCard(card) &&
+    sourcePlayer.leader === ladyAmberMetulliLeaderName &&
+    sourcePlayer.role === "Ally" &&
+    playerHasAnyAlliance(state, sourcePlayer.id)
+  ) {
+    return {
+      source: {
+        ...sourcePlayer,
+        resources: {
+          ...sourcePlayer.resources,
+          solari: sourcePlayer.resources.solari + 1,
+          spice: sourcePlayer.resources.spice + 1,
+        },
+      },
+      target: targetPlayer,
+      log: `${sourcePlayer.leader} resolves Fill Coffers: gains 1 Solari and 1 spice.`,
+      sourceSpiceGained: 1,
     };
   }
 
@@ -4478,6 +4531,40 @@ export function finishRevealAdjustment(state: GameState, pending: RevealAdjustPe
     ],
   };
   return scoreGurneyAlwaysSmiling(resolvedState, pending.ownerId);
+}
+
+export function resolveLadyAmberDesertScoutsChoice(
+  state: GameState,
+  pending: LadyAmberDesertScoutsPendingAction,
+  choice: LadyAmberDesertScoutsChoice,
+): GameState {
+  const owner = state.players.find((player) => player.id === pending.ownerId);
+  if (!owner || owner.leader !== ladyAmberMetulliLeaderName || owner.role !== "Ally") return state;
+
+  if (choice === "skip") {
+    return {
+      ...state,
+      ...advancePendingAction(state),
+      log: [`${owner.leader} keeps her deployed troops for ${pending.source}.`, ...state.log],
+    };
+  }
+
+  if (owner.deployedTroops <= 0) return state;
+  return {
+    ...state,
+    players: state.players.map((player) =>
+      player.id === owner.id
+        ? {
+            ...player,
+            garrison: player.garrison + 1,
+            deployedTroops: player.deployedTroops - 1,
+            conflict: Math.max(0, player.conflict - 2),
+          }
+        : player,
+    ),
+    ...advancePendingAction(state),
+    log: [`${owner.leader} resolves ${pending.source}: retreats 1 troop.`, ...state.log],
+  };
 }
 
 function resourceLogLabel(resource: ResourceId) {

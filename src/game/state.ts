@@ -1,7 +1,6 @@
 import {
   battleIconLabels,
   boardSpaces,
-  factionIds,
   factionLabels,
   imperiumDeck,
   leaderCardByName,
@@ -34,6 +33,24 @@ import {
   playerHasConflictUnits,
   sandwormRewardReminderEntries,
 } from "./conflict-rules";
+import {
+  buyAccessPairChoices,
+  changeAllegiancesGainChoices,
+  imperiumPoliticsFactionChoices,
+  influenceLossChoices,
+  influenceLossPairChoices,
+  mainBoardInfluenceChoices,
+  sietchRitualFactionChoices,
+  validBuyAccessChoice,
+  validInfluenceLossPair,
+  validSietchRitualChoice,
+} from "./influence-choices";
+import type {
+  BuyAccessChoice,
+  ImperiumPoliticsChoice,
+  InfluenceLossPair,
+  SietchRitualChoice,
+} from "./influence-choices";
 import {
   cloneCards,
   drawCards,
@@ -161,6 +178,22 @@ export {
 } from "./conflict-rules";
 
 export {
+  buyAccessPairChoices,
+  changeAllegiancesGainChoices,
+  imperiumPoliticsFactionChoices,
+  influenceLossChoices,
+  influenceLossPairChoices,
+  sietchRitualFactionChoices,
+} from "./influence-choices";
+
+export type {
+  BuyAccessChoice,
+  ImperiumPoliticsChoice,
+  InfluenceLossPair,
+  SietchRitualChoice,
+} from "./influence-choices";
+
+export {
   cloneCards,
   drawCards,
   playerTroopSupply,
@@ -269,9 +302,6 @@ export type TacticalOptionChoice = "add-strength" | { kind: "retreat-troops"; co
 export type CombatIntrigueChoice = SpiceIsPowerChoice | TacticalOptionChoice;
 export type DepartForArrakisChoice = "draw" | "spend-spice";
 export type CunningPlotChoice = "draw" | "paid-trash";
-export type InfluenceLossPair = [FactionId, FactionId];
-export type BuyAccessChoice = [FactionId, FactionId];
-export type SietchRitualChoice = "bene" | "fremen" | "fringeWorlds";
 export type ChangeAllegiancesChoice =
   | { kind: "shift"; loseFaction: FactionId; gainFaction: FactionId }
   | { kind: "spend-spice"; gainFaction: FactionId }
@@ -279,7 +309,6 @@ export type ChangeAllegiancesChoice =
 export type SpecialMissionChoice =
   | { kind: "place-spy" }
   | { kind: "recall-spy"; spaceId: string };
-export type ImperiumPoliticsChoice = "greatHouses" | "emperor" | "spacing";
 export type StrategicStockpilingChoice = "spice" | "water" | "both";
 export type MarketOpportunityChoice = "spice-to-solari" | "solari-to-spice";
 export type ShaddamSignetRingChoice = "skip" | "troop" | { kind: "influence"; faction: FactionId };
@@ -2298,33 +2327,6 @@ export function skipRecallSpy(state: GameState, pending: RecallSpyPendingAction)
   };
 }
 
-export function influenceLossChoices(player: Player) {
-  return factionIds.filter((faction) => player.influence[faction] > 0);
-}
-
-export function sietchRitualFactionChoices(player: Player): SietchRitualChoice[] {
-  if (player.role === "Commander" && player.team === "muaddib") {
-    return ["bene", "fremen", "fringeWorlds"];
-  }
-  return ["bene", "fringeWorlds"];
-}
-
-function validSietchRitualChoice(player: Player, faction: SietchRitualChoice) {
-  return sietchRitualFactionChoices(player).includes(faction);
-}
-
-const mainBoardInfluenceChoices: FactionId[] = ["greatHouses", "spacing", "bene", "fringeWorlds"];
-
-export function changeAllegiancesGainChoices(player: Player): FactionId[] {
-  if (player.role === "Commander" && player.team === "shaddam") {
-    return ["emperor", ...mainBoardInfluenceChoices];
-  }
-  if (player.role === "Commander" && player.team === "muaddib") {
-    return ["greatHouses", "spacing", "bene", "fremen", "fringeWorlds"];
-  }
-  return mainBoardInfluenceChoices;
-}
-
 function influenceEffectOwnerForChoice(
   state: GameState,
   player: Player,
@@ -2383,76 +2385,6 @@ export function canPlaySpecialMissionPlaceSpy(state: GameState, player: Player) 
   const pending = specialMissionSpyPending(player);
   if (player.spies > 0) return placeableSpySpaces(state, pending).length > 0;
   return recallableSpySupplySpaces(state, pending).length > 0;
-}
-
-export function influenceLossPairChoices(player: Player): InfluenceLossPair[] {
-  const pairs: InfluenceLossPair[] = [];
-  factionIds.forEach((first, firstIndex) => {
-    factionIds.slice(firstIndex).forEach((second) => {
-      const requiredFirst = first === second ? 2 : 1;
-      const requiredSecond = first === second ? 0 : 1;
-      if (player.influence[first] >= requiredFirst && player.influence[second] >= requiredSecond) {
-        pairs.push([first, second]);
-      }
-    });
-  });
-  return pairs;
-}
-
-function validInfluenceLossPair(player: Player, choice: InfluenceLossPair) {
-  if (!Array.isArray(choice) || choice.length !== 2) return false;
-  const [first, second] = choice;
-  if (!factionIds.includes(first) || !factionIds.includes(second)) return false;
-  if (first === second) return player.influence[first] >= 2;
-  return player.influence[first] > 0 && player.influence[second] > 0;
-}
-
-export function imperiumPoliticsFactionChoices(player: Player): ImperiumPoliticsChoice[] {
-  if (player.role === "Commander" && player.team === "shaddam") {
-    return ["emperor", "greatHouses", "spacing"];
-  }
-  return ["greatHouses", "spacing"];
-}
-
-function buyAccessFactionChoices(player: Player): FactionId[] {
-  if (player.role === "Commander" && player.team === "shaddam") {
-    return ["emperor", "greatHouses", "fringeWorlds", "bene", "spacing"];
-  }
-  if (player.role === "Commander" && player.team === "muaddib") {
-    return ["greatHouses", "fremen", "fringeWorlds", "bene", "spacing"];
-  }
-  return ["greatHouses", "fringeWorlds", "bene", "spacing"];
-}
-
-function buyAccessPrintedIcon(faction: FactionId) {
-  if (faction === "emperor" || faction === "greatHouses") return "emperor";
-  if (faction === "fremen" || faction === "fringeWorlds") return "fremen";
-  return faction;
-}
-
-export function buyAccessPairChoices(player: Player): BuyAccessChoice[] {
-  const choices = buyAccessFactionChoices(player);
-  const pairs: BuyAccessChoice[] = [];
-  choices.forEach((first, firstIndex) => {
-    choices.slice(firstIndex + 1).forEach((second) => {
-      if (buyAccessPrintedIcon(first) !== buyAccessPrintedIcon(second)) {
-        pairs.push([first, second]);
-      }
-    });
-  });
-  return pairs;
-}
-
-function validBuyAccessChoice(player: Player, choice: BuyAccessChoice) {
-  if (!Array.isArray(choice) || choice.length !== 2) return false;
-  const [first, second] = choice;
-  const choices = buyAccessFactionChoices(player);
-  return (
-    first !== second &&
-    choices.includes(first) &&
-    choices.includes(second) &&
-    buyAccessPrintedIcon(first) !== buyAccessPrintedIcon(second)
-  );
 }
 
 function allowedInfluenceLossChoices(player: Player) {

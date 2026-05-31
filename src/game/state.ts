@@ -65,6 +65,7 @@ const callToArmsSourceId = 138;
 const shaddamsFavorSourceId = 141;
 const intelligenceReportSourceId = 142;
 const manipulateSourceId = 143;
+const distractionSourceId = 144;
 const leverageSourceId = 447;
 const councilorsAmbitionSourceId = 129;
 const marketOpportunitySourceId = 145;
@@ -245,6 +246,10 @@ export function isIntelligenceReportIntrigue(intrigue: IntrigueCard) {
 
 export function isManipulateIntrigue(intrigue: IntrigueCard) {
   return intrigue.sourceId === manipulateSourceId;
+}
+
+export function isDistractionIntrigue(intrigue: IntrigueCard) {
+  return intrigue.sourceId === distractionSourceId;
 }
 
 export function isLeverageIntrigue(intrigue: IntrigueCard) {
@@ -505,9 +510,11 @@ export function initialGame(): GameState {
     firstSeat,
     agentTurnComplete: false,
     turnSpiceGains: {},
+    turnUnitDeployments: {},
     players,
     spaces: {},
     spyPosts: {},
+    sharedSpyPosts: {},
     alliances: {},
     combatPasses: [],
     makerSpice: emptyMakerSpice(),
@@ -636,6 +643,55 @@ export function recordTurnSpiceGain(state: GameState, playerId: string, amount: 
   };
 }
 
+export function hasDeployedThreeOrMoreUnitsThisTurn(state: Pick<GameState, "turnUnitDeployments">, playerId: string) {
+  return (state.turnUnitDeployments[playerId] ?? 0) >= 3;
+}
+
+export function recordTurnUnitDeployment(state: GameState, playerId: string, amount: number): GameState {
+  if (state.phase !== "playing" || amount <= 0) return state;
+  return {
+    ...state,
+    turnUnitDeployments: {
+      ...state.turnUnitDeployments,
+      [playerId]: (state.turnUnitDeployments[playerId] ?? 0) + amount,
+    },
+  };
+}
+
+export function spyPostOwnerIds(
+  state: Pick<GameState, "spyPosts" | "sharedSpyPosts">,
+  spaceId: string,
+) {
+  return Array.from(new Set([
+    state.spyPosts[spaceId],
+    ...(state.sharedSpyPosts[spaceId] ?? []),
+  ].filter((ownerId): ownerId is string => Boolean(ownerId))));
+}
+
+function spyPostOccupied(state: Pick<GameState, "spyPosts" | "sharedSpyPosts">, spaceId: string) {
+  return spyPostOwnerIds(state, spaceId).length > 0;
+}
+
+function playerHasSpyPost(state: Pick<GameState, "spyPosts" | "sharedSpyPosts">, spaceId: string, playerId: string) {
+  return spyPostOwnerIds(state, spaceId).includes(playerId);
+}
+
+function removeSpyPostOwner(
+  state: Pick<GameState, "spyPosts" | "sharedSpyPosts">,
+  spaceId: string,
+  ownerId: string,
+) {
+  const spyPosts = { ...state.spyPosts };
+  const sharedSpyPosts = { ...state.sharedSpyPosts };
+  if (spyPosts[spaceId] === ownerId) delete spyPosts[spaceId];
+  if (sharedSpyPosts[spaceId]?.includes(ownerId)) {
+    const remainingOwners = sharedSpyPosts[spaceId].filter((candidate) => candidate !== ownerId);
+    if (remainingOwners.length > 0) sharedSpyPosts[spaceId] = remainingOwners;
+    else delete sharedSpyPosts[spaceId];
+  }
+  return { spyPosts, sharedSpyPosts };
+}
+
 function sandwormRewardReminderEntries(players: Player[]) {
   const doublers = players.filter(playerDoublesConflictRewards);
   if (doublers.length === 0) return [];
@@ -750,11 +806,12 @@ export function iconCanReach(
   swordmasterClaimed = false,
   spyPosts: Record<string, string> = {},
   players: Player[] = [player],
+  sharedSpyPosts: Record<string, string[]> = {},
 ) {
   if (!canEnterSpace(space, player, swordmasterClaimed, players)) return false;
   if (!canMeetInfluenceRequirement(space, player, players)) return false;
   if (card.icons.includes(space.icon)) return true;
-  if (card.icons.includes("spy") && spyPosts[space.id] === player.id) return true;
+  if (card.icons.includes("spy") && playerHasSpyPost({ spyPosts, sharedSpyPosts }, space.id, player.id)) return true;
   if (player.role === "Commander" && player.team === "muaddib" && space.icon === "fremen") {
     return card.icons.includes("fremen");
   }
@@ -765,7 +822,11 @@ export function iconCanReach(
 }
 
 export function canPlaceSpyPost(state: GameState, space: BoardSpace, owner: Player) {
-  if (state.spyPosts[space.id]) return false;
+  if (spyPostOccupied(state, space.id)) return false;
+  return canUseSpyPost(state, space, owner);
+}
+
+function canUseSpyPost(state: GameState, space: BoardSpace, owner: Player) {
   if (space.id === "swordmaster" && state.swordmasterClaimed) return false;
   if (!space.personal) return true;
   return owner.role === "Commander" && owner.team === space.personal;
@@ -1954,14 +2015,20 @@ export function skipTrashCard(state: GameState, pending: TrashCardPendingAction)
 }
 
 export function recallableSpySpaces(state: GameState, pending: RecallSpyPendingAction) {
-  return boardSpaces.filter((space) => state.spyPosts[space.id] === pending.ownerId);
+  return boardSpaces.filter((space) => playerHasSpyPost(state, space.id, pending.ownerId));
+}
+
+function canPlaceSharedSpyPost(state: GameState, space: BoardSpace, owner: Player) {
+  if (!canUseSpyPost(state, space, owner)) return false;
+  const owners = spyPostOwnerIds(state, space.id);
+  return owners.length > 0 && owners.some((ownerId) => ownerId !== owner.id) && !owners.includes(owner.id);
 }
 
 export function placeableSpySpaces(state: GameState, pending: SpyPendingAction) {
   const owner = state.players.find((player) => player.id === pending.ownerId);
   if (!owner || owner.spies <= 0) return [];
   return boardSpaces.filter((space) =>
-    canPlaceSpyPost(state, space, owner) &&
+    (pending.allowSharedPost ? canPlaceSharedSpyPost(state, space, owner) : canPlaceSpyPost(state, space, owner)) &&
     (!pending.placementIcon || space.icon === pending.placementIcon)
   );
 }
@@ -1970,17 +2037,39 @@ export function recallableSpySupplySpaces(state: GameState, pending: SpyPendingA
   if (!pending.recallForSupply) return [];
   const owner = state.players.find((player) => player.id === pending.ownerId);
   if (!owner || owner.spies > 0) return [];
-  const allOwnSpies = boardSpaces.filter((space) => state.spyPosts[space.id] === owner.id);
+  const allOwnSpies = boardSpaces.filter((space) => playerHasSpyPost(state, space.id, owner.id));
   if (placeableSpySpaces({ ...state, players: state.players.map((player) =>
     player.id === owner.id ? { ...player, spies: 1 } : player,
   ) }, pending).length > 0) {
     return allOwnSpies;
   }
-  return pending.placementIcon ? allOwnSpies.filter((space) => space.icon === pending.placementIcon) : allOwnSpies;
+  if (pending.allowSharedPost) {
+    return allOwnSpies.filter((space) => {
+      const recalledSpyState = removeSpyPostOwner(state, space.id, owner.id);
+      return placeableSpySpaces({
+        ...state,
+        ...recalledSpyState,
+        players: state.players.map((player) =>
+          player.id === owner.id ? { ...player, spies: 1 } : player,
+        ),
+      }, pending).length > 0;
+    });
+  }
+  return allOwnSpies.filter((space) => {
+    if (pending.placementIcon && space.icon !== pending.placementIcon) return false;
+    const recalledSpyState = removeSpyPostOwner(state, space.id, owner.id);
+    return placeableSpySpaces({
+      ...state,
+      ...recalledSpyState,
+      players: state.players.map((player) =>
+        player.id === owner.id ? { ...player, spies: 1 } : player,
+      ),
+    }, pending).length > 0;
+  });
 }
 
-function spyPostCount(state: GameState, ownerId: string) {
-  return boardSpaces.filter((space) => state.spyPosts[space.id] === ownerId).length;
+export function spyPostCount(state: GameState, ownerId: string) {
+  return boardSpaces.filter((space) => playerHasSpyPost(state, space.id, ownerId)).length;
 }
 
 export function placeSpyForPending(
@@ -1995,7 +2084,7 @@ export function placeSpyForPending(
     !space ||
     owner.spies <= 0 ||
     pending.remaining <= 0 ||
-    !canPlaceSpyPost(state, space, owner) ||
+    !(pending.allowSharedPost ? canPlaceSharedSpyPost(state, space, owner) : canPlaceSpyPost(state, space, owner)) ||
     (pending.placementIcon && space.icon !== pending.placementIcon)
   ) {
     return state;
@@ -2006,10 +2095,18 @@ export function placeSpyForPending(
     player.id === owner.id ? { ...player, spies: nextSpies } : player,
   );
   const remaining = Math.min(pending.remaining - 1, nextSpies);
+  const sharedOwners = state.sharedSpyPosts[space.id] ?? [];
+  const spyPosts = pending.allowSharedPost
+    ? state.spyPosts
+    : { ...state.spyPosts, [space.id]: owner.id };
+  const sharedSpyPosts = pending.allowSharedPost
+    ? { ...state.sharedSpyPosts, [space.id]: [...sharedOwners, owner.id] }
+    : state.sharedSpyPosts;
   return finishCombatIfNoActors({
     ...state,
     players,
-    spyPosts: { ...state.spyPosts, [space.id]: owner.id },
+    spyPosts,
+    sharedSpyPosts,
     ...(remaining > 0 ? { pendingAction: { ...pending, remaining } } : advancePendingAction(state)),
     log: [`${owner.leader} places a spy near ${space.name} from ${pending.source}.`, ...state.log],
   });
@@ -2024,17 +2121,17 @@ export function recallSpyForSupplyForPending(
   const owner = state.players.find((player) => player.id === pending.ownerId);
   if (!owner || owner.spies > 0 || pending.remaining <= 0) return state;
   const space = boardSpaces.find((candidate) => candidate.id === spaceId);
-  if (!space || state.spyPosts[space.id] !== owner.id) return state;
+  if (!space || !playerHasSpyPost(state, space.id, owner.id)) return state;
   if (!recallableSpySupplySpaces(state, pending).some((candidate) => candidate.id === space.id)) return state;
 
-  const spyPosts = { ...state.spyPosts };
-  delete spyPosts[space.id];
+  const { spyPosts, sharedSpyPosts } = removeSpyPostOwner(state, space.id, owner.id);
   return {
     ...state,
     players: state.players.map((player) =>
       player.id === owner.id ? { ...player, spies: player.spies + 1 } : player,
     ),
     spyPosts,
+    sharedSpyPosts,
     pendingAction: { ...pending, recallForSupply: false, mustPlaceSpy: true },
     log: [`${owner.leader} recalls a spy from ${space.name} for ${pending.source}.`, ...state.log],
   };
@@ -2048,10 +2145,9 @@ export function recallSpyForPending(
   const owner = state.players.find((player) => player.id === pending.ownerId);
   if (!owner) return { ...state, ...advancePendingAction(state) };
   const space = boardSpaces.find((candidate) => candidate.id === spaceId);
-  if (!space || state.spyPosts[space.id] !== owner.id || pending.remaining <= 0) return state;
+  if (!space || !playerHasSpyPost(state, space.id, owner.id) || pending.remaining <= 0) return state;
 
-  const spyPosts = { ...state.spyPosts };
-  delete spyPosts[space.id];
+  const { spyPosts, sharedSpyPosts } = removeSpyPostOwner(state, space.id, owner.id);
   const remaining = pending.remaining - 1;
   const finalRecall = remaining <= 0;
   const recipient = state.players.find((player) => player.id === pending.combatRecipientId);
@@ -2071,6 +2167,7 @@ export function recallSpyForPending(
     ...state,
     players,
     spyPosts,
+    sharedSpyPosts,
     ...(finalRecall ? advancePendingAction(state) : { pendingAction: { ...pending, remaining } }),
     log: [`${owner.leader} recalls a spy from ${space.name} for ${pending.source}${strengthText}.`, ...state.log],
   };
@@ -2164,14 +2261,13 @@ export function specialMissionCitySpySpaces(state: GameState, player: Player) {
 }
 
 export function specialMissionRecallSpySpaces(state: GameState, player: Player) {
-  return boardSpaces.filter((space) => state.spyPosts[space.id] === player.id);
+  return boardSpaces.filter((space) => playerHasSpyPost(state, space.id, player.id));
 }
 
 export function canPlaySpecialMissionPlaceSpy(state: GameState, player: Player) {
-  if (specialMissionCitySpySpaces(state, player).length > 0) {
-    return player.spies > 0 || specialMissionRecallSpySpaces(state, player).length > 0;
-  }
-  return player.spies <= 0 && specialMissionRecallSpySpaces(state, player).some((space) => space.icon === "city");
+  const pending = specialMissionSpyPending(player);
+  if (player.spies > 0) return placeableSpySpaces(state, pending).length > 0;
+  return recallableSpySupplySpaces(state, pending).length > 0;
 }
 
 export function influenceLossPairChoices(player: Player): InfluenceLossPair[] {
@@ -2596,6 +2692,54 @@ export function playLeveragePlotIntrigue(
   };
 }
 
+function distractionSpyPending(player: Player): SpyPendingAction {
+  return {
+    kind: "spy",
+    ownerId: player.id,
+    remaining: 1,
+    source: "Distraction",
+    recallForSupply: true,
+    allowSharedPost: true,
+  };
+}
+
+export function distractionSpySpaces(state: GameState, player: Player) {
+  return boardSpaces.filter((space) => canPlaceSharedSpyPost(state, space, player));
+}
+
+export function canPlayDistractionPlotIntrigue(state: GameState, player: Player) {
+  if (!hasDeployedThreeOrMoreUnitsThisTurn(state, player.id)) return false;
+  const pending = distractionSpyPending(player);
+  return placeableSpySpaces(state, pending).length > 0 || recallableSpySupplySpaces(state, pending).length > 0;
+}
+
+export function playDistractionPlotIntrigue(
+  state: GameState,
+  playerId: string,
+  intrigueId: string,
+): GameState {
+  if (state.phase !== "playing" || state.pendingAction || state.pendingQueue.length > 0) return state;
+  const player = state.players[state.activeSeat];
+  if (!player || player.id !== playerId || !canPlayDistractionPlotIntrigue(state, player)) return state;
+  const intrigue = player.intrigues.find((card) => card.id === intrigueId);
+  if (!intrigue || !isDistractionIntrigue(intrigue)) return state;
+
+  return {
+    ...state,
+    players: state.players.map((candidate) =>
+      candidate.id === player.id
+        ? { ...candidate, intrigues: candidate.intrigues.filter((card) => card.id !== intrigue.id) }
+        : candidate,
+    ),
+    pendingAction: distractionSpyPending(player),
+    intrigueDiscard: [...state.intrigueDiscard, intrigue],
+    log: [
+      `${player.leader} plays Distraction and may place a spy on another player's observation post.`,
+      ...state.log,
+    ],
+  };
+}
+
 export function playInspireAwePlotIntrigue(
   state: GameState,
   playerId: string,
@@ -2939,13 +3083,13 @@ export function playSpecialMissionPlotIntrigue(
   if (choice.kind === "recall-spy") {
     const space = specialMissionRecallSpySpaces(state, player).find((candidate) => candidate.id === choice.spaceId);
     if (!space) return state;
-    const spyPosts = { ...state.spyPosts };
-    delete spyPosts[space.id];
+    const { spyPosts, sharedSpyPosts } = removeSpyPostOwner(state, space.id, player.id);
     const shieldWallText = state.shieldWall ? ", removes the Shield Wall," : "";
     return recordTurnSpiceGain({
       ...state,
       shieldWall: false,
       spyPosts,
+      sharedSpyPosts,
       players: state.players.map((candidate) =>
         candidate.id === player.id
           ? {
@@ -3549,7 +3693,7 @@ export function playUnexpectedAlliesIntrigue(
     return next;
   });
 
-  return {
+  const nextState = {
     ...state,
     shieldWall: removedShieldWall ? false : state.shieldWall,
     players,
@@ -3559,6 +3703,7 @@ export function playUnexpectedAlliesIntrigue(
       ...state.log,
     ],
   };
+  return recordTurnUnitDeployment(nextState, player.id, 1);
 }
 
 export function playCallToArmsPlotIntrigue(
@@ -3693,6 +3838,7 @@ export function startCombatPhase(state: GameState): GameState {
     phase: "combat",
     agentTurnComplete: false,
     turnSpiceGains: {},
+    turnUnitDeployments: {},
     activeSeat,
     combatPasses: [],
     pendingAction: undefined,
@@ -3729,6 +3875,7 @@ export function finishRevealTurn(state: GameState, playerId: string): GameState 
     ...state,
     agentTurnComplete: false,
     turnSpiceGains: {},
+    turnUnitDeployments: {},
     conflictDeploymentBlock: undefined,
     players: state.players.map((candidate) =>
       candidate.id === player.id
@@ -4535,7 +4682,7 @@ export function resolveDesertCallChoice(
     return next;
   });
 
-  return {
+  const nextState = {
     ...state,
     players,
     ...advancePendingAction(state),
@@ -4544,6 +4691,7 @@ export function resolveDesertCallChoice(
       ...state.log,
     ],
   };
+  return recordTurnUnitDeployment(nextState, commander.id, 1);
 }
 
 export function skipDesertCall(state: GameState, pending: DesertCallPendingAction): GameState {
@@ -4739,7 +4887,11 @@ export function resolveMakerChoice(
       ...state.log,
     ],
   };
-  return summon ? nextState : recordTurnSpiceGain(nextState, spiceRecipient.id, pending.spice);
+  if (summon) {
+    const actor = state.players[state.activeSeat];
+    return actor ? recordTurnUnitDeployment(nextState, actor.id, pending.sandworms) : nextState;
+  }
+  return recordTurnSpiceGain(nextState, spiceRecipient.id, pending.spice);
 }
 
 export function resolveSietchTabrChoice(
@@ -4806,12 +4958,14 @@ export function deployTroopToConflict(state: GameState, pending: DeployPendingAc
       : player,
   );
   const remaining = pending.remaining - 1;
-  return {
+  const deployedState = {
     ...state,
     players,
     ...(remaining > 0 ? { pendingAction: { ...pending, remaining } } : advancePendingAction(state)),
     log: [`${owner.leader} deploys 1 troop from ${pending.source}.`, ...state.log],
   };
+  const actor = state.players[state.activeSeat];
+  return actor ? recordTurnUnitDeployment(deployedState, actor.id, 1) : deployedState;
 }
 
 export function reinforceTroop(
@@ -4836,12 +4990,16 @@ export function reinforceTroop(
       : player,
   );
   const remaining = pending.remaining - 1;
-  return {
+  const reinforcedState = {
     ...state,
     players,
     ...(remaining > 0 ? { pendingAction: { ...pending, remaining } } : advancePendingAction(state)),
     log: [`${recipient.leader} receives Military Support into ${destination}.`, ...state.log],
   };
+  const actor = state.players[state.activeSeat];
+  return destination === "conflict" && actor
+    ? recordTurnUnitDeployment(reinforcedState, actor.id, 1)
+    : reinforcedState;
 }
 
 function scoreBattleIconMatch(player: Player, conflict: ConflictCard) {
@@ -5123,6 +5281,7 @@ export function startNextRound(state: GameState): GameState {
     round: resolvedState.round + 1,
     agentTurnComplete: false,
     turnSpiceGains: {},
+    turnUnitDeployments: {},
     firstSeat,
     activeSeat: firstSeat,
     players,

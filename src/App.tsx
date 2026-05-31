@@ -29,6 +29,7 @@ import {
   applyCardAgentEffect,
   boardSpaceRewardApplies,
   canPlaceSpyPost,
+  canPlayDistractionPlotIntrigue,
   canMoveCardToThroneRow,
   canPay,
   canPlaySpecialMissionPlaceSpy,
@@ -54,6 +55,7 @@ import {
   finishRevealTurn,
   finishRevealAdjustment as resolveRevealAdjustment,
   hasGainedSpiceThisTurn,
+  hasDeployedThreeOrMoreUnitsThisTurn,
   iconCanReach,
   initialGame,
   influenceLossChoices,
@@ -69,6 +71,7 @@ import {
   isDevourIntrigue,
   isDepartForArrakisIntrigue,
   isDetonationIntrigue,
+  isDistractionIntrigue,
   isFindWeaknessIntrigue,
   isGoToGroundIntrigue,
   isImperiumPoliticsIntrigue,
@@ -132,6 +135,7 @@ import {
   playCouncilorsAmbitionPlotIntrigue,
   playDepartForArrakisPlotIntrigue,
   playDetonationIntrigue,
+  playDistractionPlotIntrigue,
   playImperiumPoliticsPlotIntrigue,
   playInspireAwePlotIntrigue,
   playIntelligenceReportPlotIntrigue,
@@ -161,6 +165,8 @@ import {
   sietchRitualFactionChoices,
   specialMissionCitySpySpaces,
   specialMissionRecallSpySpaces,
+  spyPostCount,
+  spyPostOwnerIds,
   skipCommandRespect,
   skipDemandAttention,
   skipCorrinoMight,
@@ -315,11 +321,11 @@ export default function App() {
     return new Set(
       boardSpaces
         .filter((space) => !game.spaces[space.id])
-        .filter((space) => iconCanReach(selectedCard, space, activePlayer, game.swordmasterClaimed, game.spyPosts, game.players))
+        .filter((space) => iconCanReach(selectedCard, space, activePlayer, game.swordmasterClaimed, game.spyPosts, game.players, game.sharedSpyPosts))
         .filter((space) => canPay(activePlayer, effectiveCost(space, game.players)))
         .map((space) => space.id),
     );
-  }, [activePlayer, game.agentTurnComplete, game.pendingAction, game.phase, game.players, game.spaces, game.spyPosts, game.swordmasterClaimed, selectedCard]);
+  }, [activePlayer, game.agentTurnComplete, game.pendingAction, game.phase, game.players, game.sharedSpyPosts, game.spaces, game.spyPosts, game.swordmasterClaimed, selectedCard]);
 
   const canPlayAgent = Boolean(game.phase === "playing" && !game.agentTurnComplete && selectedCard && selectedSpace && legalSpaces.has(selectedSpace.id) && !game.pendingAction);
 
@@ -446,6 +452,7 @@ export default function App() {
         ...current,
         agentTurnComplete: false,
         turnSpiceGains: {},
+        turnUnitDeployments: {},
         activeSeat: advanceSeat(current),
       };
       return maybeStartCombatPhase(advancedState);
@@ -989,6 +996,10 @@ export default function App() {
     setGame((current) => playLeveragePlotIntrigue(current, current.players[current.activeSeat].id, intrigueId));
   }
 
+  function playDistractionPlot(intrigueId: string) {
+    setGame((current) => playDistractionPlotIntrigue(current, current.players[current.activeSeat].id, intrigueId));
+  }
+
   function playCunningPlot(intrigueId: string, choice: "draw" | "paid-trash") {
     setGame((current) => playCunningPlotIntrigue(current, current.players[current.activeSeat].id, intrigueId, choice));
   }
@@ -1528,7 +1539,9 @@ export default function App() {
           <div className="space-grid">
             {boardSpaces.map((space) => {
               const occupant = game.players.find((player) => player.id === game.spaces[space.id]);
-              const spyOwner = game.players.find((player) => player.id === game.spyPosts[space.id]);
+              const spyOwners = spyPostOwnerIds(game, space.id)
+                .map((ownerId) => game.players.find((player) => player.id === ownerId))
+                .filter((player): player is Player => Boolean(player));
               const unavailable = space.id === "swordmaster" && game.swordmasterClaimed;
               const legal = legalSpaces.has(space.id);
               const selected = playingPhase && selectedSpaceId === space.id;
@@ -1546,7 +1559,11 @@ export default function App() {
                   <strong>{space.name}</strong>
                   <small>{iconLabels[space.icon]}</small>
                   <span className="space-detail">{space.detail}</span>
-                  {spyOwner && <span className="spy-marker">{spyOwner.leader} spy</span>}
+                  {spyOwners.length > 0 && (
+                    <span className="spy-marker">
+                      {spyOwners.map((owner) => owner.leader).join(" + ")} spy{spyOwners.length === 1 ? "" : "s"}
+                    </span>
+                  )}
                   {space.maker && (
                     <span className="maker-marker">
                       <Sparkles size={12} />
@@ -2623,14 +2640,16 @@ export default function App() {
                 {activePlayer.intrigues.map((card) => {
                   const activeCombatStrength = combatIntrigueStrength(game, activePlayer, card);
                   const backedByChoamPlotChoices = isBackedByChoamIntrigue(card) ? influenceLossChoices(activePlayer) : [];
-                  const intelligenceReportDrawCount = boardSpaces.filter((space) =>
-                    game.spyPosts[space.id] === activePlayer.id
-                  ).length >= 2 ? 2 : 1;
+                  const intelligenceReportDrawCount = spyPostCount(game, activePlayer.id) >= 2 ? 2 : 1;
                   const inspireAweToHand =
                     activePlayer.deployedSandworms > 0 ||
                     (activePlayer.role === "Commander" && activatedAlly.deployedSandworms > 0);
                   const manipulateChoices = isManipulateIntrigue(card) ? game.imperiumRow : [];
                   const leverageCanPlay = hasGainedSpiceThisTurn(game, activePlayer.id);
+                  const distractionTriggerMet = hasDeployedThreeOrMoreUnitsThisTurn(game, activePlayer.id);
+                  const distractionCanPlay = isDistractionIntrigue(card)
+                    ? canPlayDistractionPlotIntrigue(game, activePlayer)
+                    : false;
                   const councilorsAmbitionCanPlay = activePlayer.highCouncilSeat;
                   const strategicStockpilingCanSpice = activePlayer.resources.spice >= 5;
                   const strategicStockpilingCanWater =
@@ -2707,6 +2726,8 @@ export default function App() {
                             ? "Plot / row replace + discount"
                           : isLeverageIntrigue(card)
                             ? "Plot / spice turn contract"
+                          : isDistractionIntrigue(card)
+                            ? "Plot / 3-unit shared spy"
                           : isCunningIntrigue(card)
                             ? "Plot / draw or pay to trash"
                           : isSietchRitualIntrigue(card)
@@ -2845,6 +2866,17 @@ export default function App() {
                         >
                           <FileText size={14} />
                           Leverage Contract
+                        </button>
+                      )}
+                      {isDistractionIntrigue(card) && (
+                        <button
+                          type="button"
+                          onClick={() => playDistractionPlot(card.id)}
+                          disabled={plotIntrigueLocked || !distractionCanPlay}
+                          title={distractionTriggerMet ? "Requires another player's spy post and a spy to place" : "Requires deploying three or more units this turn"}
+                        >
+                          <Eye size={14} />
+                          Share Spy Post
                         </button>
                       )}
                       {isCunningIntrigue(card) && (

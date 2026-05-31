@@ -219,6 +219,7 @@ export type PendingAction =
       placementIcon?: IconId;
       recallForSupply?: boolean;
       mustPlaceSpy?: boolean;
+      allowSharedPost?: boolean;
     }
   | {
       kind: "recall-spy";
@@ -382,8 +383,10 @@ export type GameState = {
   players: Player[];
   spaces: Record<string, string>;
   spyPosts: Record<string, string>;
+  sharedSpyPosts: Record<string, string[]>;
   alliances: AllianceOwners;
   combatPasses: string[];
+  turnUnitDeployments: Record<string, number>;
   makerSpice: Record<string, number>;
   imperiumRow: Card[];
   marketDeck: Card[];

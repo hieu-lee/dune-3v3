@@ -566,6 +566,7 @@ try {
   const resolvedDesertCall = state.resolveDesertCallChoice(
     {
       ...baseDesertCallGame,
+      activeSeat: game.players.findIndex((player) => player.id === muadDib.id),
       pendingAction: desertCallPending,
       pendingQueue: [],
       log: [],
@@ -597,6 +598,7 @@ try {
     0,
     "Desert Call should not deploy sandworms to Muad'Dib's Commander",
   );
+  assert.equal(resolvedDesertCall.turnUnitDeployments[muadDib.id], 1, "Desert Call should count as a Commander unit deployment turn");
   assert.equal(resolvedDesertCall.pendingAction, undefined, "Desert Call resolution should advance pending action");
   assert.match(resolvedDesertCall.log[0], /spends 1 water for Desert Call/, "Desert Call should log resolution");
 

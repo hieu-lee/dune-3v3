@@ -79,10 +79,15 @@ try {
   const immediate = state.applyBoardEffect(hookedGurney, hookedGurney, hagga, hagga.cost, 2).source;
   assert.equal(immediate.resources.spice, 4, "Non-deferred maker spaces should still pay base plus bonus spice");
 
-  const summoned = state.resolveMakerChoice({ ...wormReady, pendingAction: haggaPending, pendingQueue: [] }, haggaPending, "sandworms");
+  const summoned = state.resolveMakerChoice(
+    { ...wormReady, activeSeat: game.players.findIndex((player) => player.id === "p3"), pendingAction: haggaPending, pendingQueue: [] },
+    haggaPending,
+    "sandworms",
+  );
   const summonedGurney = playerById(summoned, "p3");
   assert.equal(summonedGurney.deployedSandworms, 1, "Resolving the worm choice should deploy a sandworm");
   assert.equal(summonedGurney.conflict, 3, "Each deployed sandworm should add 3 combat strength");
+  assert.equal(summoned.turnUnitDeployments.p3, 1, "Maker sandworms should count as units deployed this turn");
   assert.equal(summoned.pendingAction, undefined, "Resolving the maker choice should advance pending actions");
 
   const hooksRemovedAfterPending = state.setMakerHooks(wormReady, "p3", false);
@@ -122,7 +127,7 @@ try {
     "Activated Allies should not receive Commander Maker spice",
   );
   const commanderWormChoice = state.resolveMakerChoice(
-    { ...wormReady, pendingAction: commanderPending, pendingQueue: [] },
+    { ...wormReady, activeSeat: game.players.findIndex((player) => player.id === "p1"), pendingAction: commanderPending, pendingQueue: [] },
     commanderPending,
     "sandworms",
   );
@@ -136,6 +141,7 @@ try {
     muadDib.deployedSandworms,
     "Commander Maker worm choices should not deploy sandworms to the Commander",
   );
+  assert.equal(commanderWormChoice.turnUnitDeployments.p1, 1, "Commander Maker sandworms should count for the Commander turn");
 
   const protectedConflict = conflictByName(data, "Battle For Arrakeen");
   const shielded = { ...wormReady, conflict: protectedConflict, shieldWall: true };

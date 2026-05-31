@@ -33,6 +33,7 @@ import { PendingResourceSplitPanel } from "./components/PendingResourceSplitPane
 import { PendingShaddamSignetPanel } from "./components/PendingShaddamSignetPanel";
 import { PendingSietchTabrPanel } from "./components/PendingSietchTabrPanel";
 import { PendingSpyPanel } from "./components/PendingSpyPanel";
+import { PendingTradePanel } from "./components/PendingTradePanel";
 import { PendingTrashPanel } from "./components/PendingTrashPanel";
 import { PlayerColumn } from "./components/PlayerColumn";
 import { RecentLogPanel } from "./components/RecentLogPanel";
@@ -48,7 +49,6 @@ import {
   revealPersuasionFor,
   selectedFactionChoice,
   tableStateLockedByPendingActions,
-  tradeGoods,
   troopSupplyLabel,
   type ChangeAllegiancesSelection,
 } from "./app-helpers";
@@ -2237,70 +2237,16 @@ export default function App() {
             )}
 
             {pendingAction.kind === "trade" && pendingActor && pendingPartner && (
-              <div className="pending-controls trade-controls">
-                <div className="resource-picker">
-                  {tradeGoods.map(({ id, label, Icon }) => (
-                    <button
-                      type="button"
-                      className={pendingAction.resource === id ? "selected" : ""}
-                      key={id}
-                      onClick={() => updateTrade(id)}
-                      disabled={tradeLocked && pendingAction.resource !== id}
-                      title={label}
-                    >
-                      <Icon size={14} />
-                      {label}
-                    </button>
-                  ))}
-                </div>
-                <div className="resource-picker">
-                  {tradePartners.map((partner) => (
-                    <button
-                      type="button"
-                      className={pendingPartner.id === partner.id ? "selected" : ""}
-                      key={partner.id}
-                      onClick={() => updateTrade(pendingAction.resource, partner.id)}
-                      disabled={tradeLocked && pendingPartner.id !== partner.id}
-                    >
-                      {partner.leader}
-                    </button>
-                  ))}
-                </div>
-                {pendingAction.resource === "intrigue" ? (
-                  <div className="trade-intrigue-grid">
-                    {[pendingActor, pendingPartner].map((owner) => {
-                      const recipient = owner.id === pendingActor.id ? pendingPartner : pendingActor;
-                      return (
-                        <div className="trade-intrigue-column" key={owner.id}>
-                          <strong>{owner.leader}</strong>
-                          {owner.intrigues.length === 0 && <span>No Intrigues</span>}
-                          {owner.intrigues.map((card) => (
-                            <button
-                              type="button"
-                              key={card.id}
-                              onClick={() => transferTrade(owner.id, recipient.id, card.id)}
-                              title={`Trade ${card.name} to ${recipient.leader}`}
-                            >
-                              {card.thumbnailPath && <img src={card.thumbnailPath} alt="" />}
-                              <span>{card.name}</span>
-                            </button>
-                          ))}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <>
-                    <button type="button" onClick={() => transferTrade(pendingActor.id, pendingPartner.id)}>
-                      {pendingActor.leader} gives 1 ({pendingAction.actorGiven})
-                    </button>
-                    <button type="button" onClick={() => transferTrade(pendingPartner.id, pendingActor.id)}>
-                      {pendingPartner.leader} gives 1 ({pendingAction.partnerGiven})
-                    </button>
-                  </>
-                )}
-                <button type="button" onClick={clearPendingAction}>Done</button>
-              </div>
+              <PendingTradePanel
+                actor={pendingActor}
+                partner={pendingPartner}
+                partners={tradePartners}
+                pending={pendingAction}
+                tradeLocked={tradeLocked}
+                onDone={clearPendingAction}
+                onTransfer={transferTrade}
+                onUpdateTrade={updateTrade}
+              />
             )}
 
             {pendingAction.kind === "contract" && pendingContractOwner && (

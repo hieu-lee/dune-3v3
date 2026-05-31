@@ -12,6 +12,7 @@ import { runMilitaryChoicesSmoke } from "./browser-debug-military-choices.mjs";
 import { runPendingChoicesSmoke } from "./browser-debug-pending-choices.mjs";
 import { runSignetChoicesSmoke } from "./browser-debug-signet-choices.mjs";
 import { runSpaceChoicesSmoke } from "./browser-debug-space-choices.mjs";
+import { runTradeChoicesSmoke } from "./browser-debug-trade-choices.mjs";
 
 let optionError;
 
@@ -687,6 +688,21 @@ try {
     }
     if (scenario === "signet-choices" || scenario === "all") {
       await interruptible(runSignetChoicesSmoke({
+        captures,
+        currentGame,
+        initialPlayableGame,
+        openApp,
+        page,
+        screenshot,
+        server,
+        setDebugGameAndWait,
+        url,
+        waitForNoPending,
+        writeJson,
+      }));
+    }
+    if (scenario === "trade-choices" || scenario === "all") {
+      await interruptible(runTradeChoicesSmoke({
         captures,
         currentGame,
         initialPlayableGame,

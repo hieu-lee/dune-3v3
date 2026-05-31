@@ -15,10 +15,11 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ActiveHandPanel } from "./components/ActiveHandPanel";
 import { BoardPanel } from "./components/BoardPanel";
 import { CommandBar } from "./components/CommandBar";
+import { CombatIntriguePanel } from "./components/CombatIntriguePanel";
 import { EndgamePanel } from "./components/EndgamePanel";
 import { LeaderReferenceModal } from "./components/LeaderReferenceModal";
 import { MarketPanel } from "./components/MarketPanel";
@@ -83,7 +84,6 @@ import {
   isFindWeaknessIntrigue,
   isGoToGroundIntrigue,
   isImperiumPoliticsIntrigue,
-  isImpressIntrigue,
   isInspireAweIntrigue,
   isIntelligenceReportIntrigue,
   isLeverageIntrigue,
@@ -112,7 +112,6 @@ import {
   acquireMarketCard,
   applyBoardEffect,
   applyCardAgentEffect,
-  canPlaceSpyPost,
   canPlayDistractionPlotIntrigue,
   canPay,
   canPlaySpecialMissionPlaceSpy,
@@ -121,7 +120,6 @@ import {
   collectChoamContractFallback,
   collectMakerSpice,
   combatIntrigueStrength,
-  combatIntrigueTargets,
   conflictDeploymentBlockedFor,
   defaultActivatedAllyId,
   deployControlDefenseTroop,
@@ -1500,19 +1498,6 @@ export default function App() {
       ? game.players.find((player) => player.id === pendingAction.combatRecipientId)
       : undefined;
   const combatActor = game.phase === "combat" ? game.players[game.activeSeat] : undefined;
-  const combatTargets = combatActor
-    ? combatIntrigueTargets(game, combatActor.id)
-        .map((playerId) => game.players.find((player) => player.id === playerId))
-        .filter((player): player is Player => Boolean(player))
-    : [];
-  const combatCards =
-    combatActor?.intrigues.filter((card) =>
-      card.combatSwords ||
-      combatIntrigueStrength(game, combatActor, card) ||
-      isDevourIntrigue(card) ||
-      isGoToGroundIntrigue(card) ||
-      isReachAgreementIntrigue(card)
-    ) ?? [];
   const tradePartners =
     pendingActor && pendingAction?.kind === "trade"
       ? game.players.filter((player) =>
@@ -1587,220 +1572,12 @@ export default function App() {
 
       <section className="action-dock">
         {game.phase === "combat" && combatActor && !pendingAction && (
-          <div className="pending-panel combat-panel">
-            <div>
-              <p className="eyebrow">Combat Intrigues</p>
-              <h2>{combatActor.leader}</h2>
-            </div>
-            <div className="pending-controls support-grid combat-grid">
-              {combatCards.map((card) => {
-                const devourCard = isDevourIntrigue(card);
-                const findWeaknessCard = isFindWeaknessIntrigue(card);
-                const goToGroundCard = isGoToGroundIntrigue(card);
-                const impressCard = isImpressIntrigue(card);
-                const questionableMethodsCard = isQuestionableMethodsIntrigue(card);
-                const reachAgreementCard = isReachAgreementIntrigue(card);
-                const spiceIsPowerCard = isSpiceIsPowerIntrigue(card);
-                const springTheTrapCard = isSpringTheTrapIntrigue(card);
-                const tacticalOptionCard = isTacticalOptionIntrigue(card);
-                const automatedStrength = combatIntrigueStrength(game, combatActor, card);
-                const hasSpiceIsPowerBranch = combatTargets.some(
-                  (target) => target.resources.spice >= 3 || target.deployedTroops >= 3,
-                );
-                const canAutoResolve = Boolean(
-                  automatedStrength || devourCard || findWeaknessCard || (spiceIsPowerCard && hasSpiceIsPowerBranch),
-                );
-                return (
-                  <div className="support-target combat-target" key={card.id}>
-                    <strong>{card.name}</strong>
-                    <span
-                      title={
-                        questionableMethodsCard
-                          ? "Add 1 strength; the recipient may lose Influence, or a Commander may lose personal Influence, for 4 more strength."
-                        : goToGroundCard
-                          ? "Retreat 1 or 2 troops from the chosen recipient, then optionally place a spy for that recipient."
-                        : reachAgreementCard
-                          ? "Retreat 1 or 2 troops from the chosen recipient, then take a CHOAM contract for that recipient."
-                        : impressCard
-                          ? "Add 2 strength to the chosen recipient; that recipient acquires a card that costs 3 or less."
-                        : spiceIsPowerCard
-                            ? "Choose one branch: retreat 3 of the recipient's troops for 3 spice, or spend 3 spice for 6 strength."
-                          : tacticalOptionCard
-                            ? "Choose either 2 strength or a troop count to retreat from the chosen recipient."
-                          : undefined
-                      }
-                    >
-                      <Swords size={14} />
-                      {findWeaknessCard
-                        ? "+2 / recall spy for +3"
-                        : questionableMethodsCard
-                          ? "+1 / lose Ally/Cmdr personal Inf. for +4"
-                        : goToGroundCard
-                          ? "Retreat 1-2 troops / optional spy"
-                        : reachAgreementCard
-                          ? "Retreat 1-2 troops / take contract"
-                        : impressCard
-                          ? "+2 strength / acquire <=3"
-                        : spiceIsPowerCard
-                          ? "Retreat 3 for +3 spice / spend 3 for +6"
-                        : springTheTrapCard
-                          ? "Recall 2 spies for +7"
-                        : tacticalOptionCard
-                          ? "+2 strength OR retreat troops"
-                        : devourCard && !automatedStrength
-                        ? "+2 / +4 with worm"
-                        : isBackedByChoamIntrigue(card) && !automatedStrength
-                        ? "2+ completed contracts"
-                        : `+${automatedStrength ?? card.combatSwords} strength`}
-                    </span>
-                    {impressCard
-                      ? combatTargets.map((target) => (
-                          <button
-                            type="button"
-                            key={target.id}
-                            onClick={() => playCombatCard(card.id, target.id)}
-                            title={`Add 2 strength to ${target.leader}; ${target.leader} acquires a card that costs 3 or less`}
-                          >
-                            {combatActor.role === "Commander" ? `${target.leader}: +2 + acquire` : "+2 + acquire"}
-                          </button>
-                        ))
-                    : goToGroundCard
-                      ? combatTargets.length > 0
-                        ? combatTargets.map((target) => (
-                            <Fragment key={target.id}>
-                              {target.deployedTroops > 0
-                                ? Array.from({ length: Math.min(2, target.deployedTroops) }, (_, index) => index + 1).map((count) => {
-                                    const targetCanPlaceSpy = target.spies > 0 && boardSpaces.some((space) => canPlaceSpyPost(game, space, target));
-                                    return (
-                                      <button
-                                        type="button"
-                                        key={`${target.id}-ground-retreat-${count}`}
-                                        onClick={() => playCombatCard(card.id, target.id, { kind: "retreat-troops", count })}
-                                        title={`Retreat ${count} ${count === 1 ? "troop" : "troops"} from ${target.leader}${targetCanPlaceSpy ? ", then optionally place a spy" : ""}`}
-                                      >
-                                        {combatActor.role === "Commander"
-                                          ? `${target.leader}: retreat ${count}${targetCanPlaceSpy ? " + spy" : ""}`
-                                          : `Retreat ${count}${targetCanPlaceSpy ? " + spy" : ""}`}
-                                      </button>
-                                    );
-                                  })
-                                : (
-                                    <span>
-                                      {combatActor.role === "Commander"
-                                        ? `${target.leader}: requires deployed troops.`
-                                        : "Requires 1 or 2 deployed troops."}
-                                    </span>
-                                  )}
-                            </Fragment>
-                          ))
-                        : <span>Requires 1 or 2 deployed troops.</span>
-                    : reachAgreementCard
-                      ? combatTargets.length > 0
-                        ? combatTargets.map((target) => (
-                            <Fragment key={target.id}>
-                              {target.deployedTroops > 0
-                                ? Array.from({ length: Math.min(2, target.deployedTroops) }, (_, index) => index + 1).map((count) => (
-                                    <button
-                                      type="button"
-                                      key={`${target.id}-contract-retreat-${count}`}
-                                      onClick={() => playCombatCard(card.id, target.id, { kind: "retreat-troops", count })}
-                                      title={`Retreat ${count} ${count === 1 ? "troop" : "troops"} from ${target.leader}, then take a CHOAM contract`}
-                                    >
-                                      {combatActor.role === "Commander"
-                                        ? `${target.leader}: retreat ${count} + contract`
-                                        : `Retreat ${count} + contract`}
-                                    </button>
-                                  ))
-                                : (
-                                    <span>
-                                      {combatActor.role === "Commander"
-                                        ? `${target.leader}: requires deployed troops.`
-                                        : "Requires 1 or 2 deployed troops."}
-                                    </span>
-                                  )}
-                            </Fragment>
-                          ))
-                        : <span>Requires 1 or 2 deployed troops.</span>
-                    : tacticalOptionCard
-                      ? combatTargets.map((target) => (
-                          <Fragment key={target.id}>
-                            <button
-                              type="button"
-                              onClick={() => playCombatCard(card.id, target.id, "add-strength")}
-                              title={`Play ${card.name} for ${target.leader}`}
-                            >
-                              {combatActor.role === "Commander" ? `${target.leader}: +2` : "Add +2"}
-                            </button>
-                            {Array.from({ length: target.deployedTroops }, (_, index) => index + 1).map((count) => (
-                              <button
-                                type="button"
-                                key={`${target.id}-retreat-${count}`}
-                                onClick={() => playCombatCard(card.id, target.id, { kind: "retreat-troops", count })}
-                                title={`Retreat ${count} ${count === 1 ? "troop" : "troops"} from ${target.leader}`}
-                              >
-                                {combatActor.role === "Commander" ? `${target.leader}: retreat ${count}` : `Retreat ${count}`}
-                              </button>
-                            ))}
-                          </Fragment>
-                        ))
-                    : spiceIsPowerCard
-                      ? hasSpiceIsPowerBranch
-                        ? combatTargets.map((target) => (
-                            <Fragment key={target.id}>
-                              {target.resources.spice >= 3 && (
-                                <button
-                                  type="button"
-                                  onClick={() => playCombatCard(card.id, target.id, "spend-spice")}
-                                  title={`Spend 3 spice from ${target.leader} for 6 strength`}
-                                >
-                                  {combatActor.role === "Commander" ? `${target.leader}: spend 3 (+6)` : "Spend 3 spice (+6)"}
-                                </button>
-                              )}
-                              {target.deployedTroops >= 3 && (
-                                <button
-                                  type="button"
-                                  onClick={() => playCombatCard(card.id, target.id, "retreat-troops")}
-                                  title={`Retreat 3 troops from ${target.leader} to gain 3 spice`}
-                                >
-                                  {combatActor.role === "Commander" ? `${target.leader}: retreat 3` : "Retreat 3 troops (+3 spice)"}
-                                </button>
-                              )}
-                            </Fragment>
-                          ))
-                        : <span>Requires 3 spice or 3 deployed troops.</span>
-                    : canAutoResolve
-                      ? combatTargets.map((target) => {
-                          const targetStrength = combatIntrigueStrength(game, combatActor, card, target);
-                          if (!targetStrength) return null;
-                          return (
-                            <button
-                              type="button"
-                              key={target.id}
-                              onClick={() => playCombatCard(card.id, target.id)}
-                              title={`Play ${card.name} for ${target.leader}`}
-                            >
-                              {combatActor.role === "Commander"
-                                ? `${target.leader}${devourCard || findWeaknessCard || questionableMethodsCard || springTheTrapCard ? ` (+${targetStrength})` : ""}`
-                                : "Play"}
-                            </button>
-                          );
-                        })
-                      : <span>
-                          {isBackedByChoamIntrigue(card)
-                            ? "Requires 2 completed contracts."
-                            : springTheTrapCard
-                              ? "Requires 2 own spy posts."
-                              : "Resolve printed card text."}
-                        </span>}
-                  </div>
-                );
-              })}
-              {combatCards.length === 0 && <span>No structured Combat Intrigues.</span>}
-              <button className="combat-pass" type="button" onClick={passCombatCard}>
-                Pass
-              </button>
-            </div>
-          </div>
+          <CombatIntriguePanel
+            actor={combatActor}
+            game={game}
+            onPass={passCombatCard}
+            onPlay={playCombatCard}
+          />
         )}
 
         {(game.phase === "endgame" || game.phase === "finished") && (

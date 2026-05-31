@@ -19,6 +19,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Fragment, type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
+import { conflictProtectedByShieldWall, criticalLocationNames, locationControlOwnerId } from "./game/critical-locations";
 import { battleIconLabels, boardSpaces, factionIds, factionLabels, iconLabels, teams } from "./game/data";
 import {
   acquirableCardsForPending,
@@ -40,8 +41,6 @@ import {
   combatIntrigueStrength,
   combatIntrigueTargets,
   conflictDeploymentBlockedFor,
-  conflictProtectedByShieldWall,
-  criticalLocationNames,
   defaultActivatedAllyId,
   deployControlDefenseTroop,
   deployTroopToConflict,
@@ -131,7 +130,6 @@ import {
   adjustThreatenSpiceProductionContribution,
   conflictVpConversionSpyChoices,
   playerHasConflictUnits,
-  locationControlOwnerId,
   payConflictVpConversion,
   setMakerHooks,
   setShieldWall,

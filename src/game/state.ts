@@ -15,13 +15,19 @@ import {
   standardContracts,
   teams,
 } from "./data";
+import {
+  conflictProtectedByShieldWall,
+  criticalLocationForConflict,
+  criticalLocationForSpace,
+  criticalLocationIncome,
+  criticalLocationNames,
+} from "./critical-locations";
 import type {
   BoardSpace,
   Card,
   CommanderResourceSplitOption,
   ConflictCard,
   ContractCard,
-  CriticalLocationId,
   FactionId,
   GameState,
   IconId,
@@ -656,32 +662,6 @@ export function canMeetInfluenceRequirement(space: BoardSpace, player: Player, p
   return effectiveRequirementInfluence(player, space.requirement.faction, players) >= space.requirement.amount;
 }
 
-export function conflictProtectedByShieldWall(conflict: ConflictCard | null) {
-  if (!conflict) return false;
-  return ["Arrakeen", "Spice Refinery", "Imperial Basin"].some((location) =>
-    conflict.name.includes(location),
-  );
-}
-
-export const criticalLocationNames: Record<CriticalLocationId, string> = {
-  arrakeen: "Arrakeen",
-  "spice-refinery": "Spice Refinery",
-  "imperial-basin": "Imperial Basin",
-};
-
-const criticalLocationIncome: Record<CriticalLocationId, { resource: ResourceId; amount: number }> = {
-  arrakeen: { resource: "solari", amount: 1 },
-  "spice-refinery": { resource: "solari", amount: 1 },
-  "imperial-basin": { resource: "spice", amount: 1 },
-};
-
-function criticalLocationForConflict(conflict: ConflictCard): CriticalLocationId | undefined {
-  if (conflict.name.includes("Arrakeen")) return "arrakeen";
-  if (conflict.name.includes("Spice Refinery")) return "spice-refinery";
-  if (conflict.name.includes("Imperial Basin")) return "imperial-basin";
-  return undefined;
-}
-
 type ControlDefensePendingAction = Extract<PendingAction, { kind: "control-defense" }>;
 
 function pendingActionForControlDefense(
@@ -700,18 +680,6 @@ function pendingActionForControlDefense(
     location,
     source: conflict.name,
   };
-}
-
-function criticalLocationForSpace(spaceId: string): CriticalLocationId | undefined {
-  if (spaceId === "arrakeen") return "arrakeen";
-  if (spaceId === "spice-refinery") return "spice-refinery";
-  if (spaceId === "imperial-basin") return "imperial-basin";
-  return undefined;
-}
-
-export function locationControlOwnerId(state: Pick<GameState, "locationControl">, spaceId: string) {
-  const location = criticalLocationForSpace(spaceId);
-  return location ? state.locationControl[location] : undefined;
 }
 
 export function resolveLocationControlIncome(state: GameState, space: BoardSpace): GameState {

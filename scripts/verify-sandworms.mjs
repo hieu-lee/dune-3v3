@@ -28,6 +28,7 @@ function conflictByName(data, name) {
 try {
   const data = await server.ssrLoadModule("/src/game/data.ts");
   const state = await server.ssrLoadModule("/src/game/state.ts");
+  const criticalLocations = await server.ssrLoadModule("/src/game/critical-locations.ts");
 
   const game = state.initialGame();
   const hagga = spaceById(data, "hagga-basin");
@@ -149,7 +150,7 @@ try {
   assert.equal(unshielded.shieldWall, false, "Shield Wall state should be manually removable");
   assert.equal(state.setShieldWall(unshielded, true).shieldWall, true, "Shield Wall state should be manually restorable");
   assert.equal(
-    state.conflictProtectedByShieldWall(protectedConflict),
+    criticalLocations.conflictProtectedByShieldWall(protectedConflict),
     true,
     "Arrakeen Conflicts should be protected by the Shield Wall",
   );

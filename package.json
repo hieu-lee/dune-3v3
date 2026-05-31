@@ -17,6 +17,7 @@
     "verify:app-high-council": "node scripts/verify-app-high-council.mjs",
     "verify:battle-icons": "node scripts/verify-battle-icons.mjs",
     "verify:board-requirements": "node scripts/verify-board-requirements.mjs",
+    "verify:board-rules": "node scripts/verify-board-rules.mjs",
     "verify:board-spaces": "node scripts/verify-board-spaces.mjs",
     "verify:combat-intrigues": "node scripts/verify-combat-intrigues.mjs",
     "verify:conflict-awards": "node scripts/verify-conflict-awards.mjs",

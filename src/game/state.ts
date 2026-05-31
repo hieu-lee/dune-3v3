@@ -26,6 +26,15 @@ import {
   criticalLocationNames,
 } from "./critical-locations";
 import {
+  canHaveMakerHooks,
+  canSummonSandworms,
+  conflictDeploymentBlockedFor,
+  conflictDeploymentBlockedForOwner,
+  playerDoublesConflictRewards,
+  playerHasConflictUnits,
+  sandwormRewardReminderEntries,
+} from "./conflict-rules";
+import {
   cloneCards,
   drawCards,
   playerTroopSupply,
@@ -142,6 +151,14 @@ export {
   effectiveRequirementInfluence,
   highCouncilSeatsTaken,
 } from "./board-rules";
+
+export {
+  canHaveMakerHooks,
+  canSummonSandworms,
+  conflictDeploymentBlockedFor,
+  playerDoublesConflictRewards,
+  playerHasConflictUnits,
+} from "./conflict-rules";
 
 export {
   cloneCards,
@@ -405,33 +422,6 @@ export function resolveLocationControlIncome(state: GameState, space: BoardSpace
   return income.resource === "spice" ? recordTurnSpiceGain(nextState, owner.id, income.amount) : nextState;
 }
 
-export function playerHasConflictUnits(player: Player) {
-  return player.deployedTroops + player.deployedSandworms > 0;
-}
-
-export function playerDoublesConflictRewards(player: Player) {
-  return player.deployedSandworms > 0;
-}
-
-function sandwormRewardReminderEntries(players: Player[]) {
-  const doublers = players.filter(playerDoublesConflictRewards);
-  if (doublers.length === 0) return [];
-
-  const names = doublers.map((player) => player.leader).join(", ");
-  return [
-    `${names} ${doublers.length === 1 ? "has" : "have"} sandworms: double printed Conflict-card rewards they take; battle icons and location control are not doubled.`,
-  ];
-}
-
-export function canHaveMakerHooks(player: Player) {
-  return player.team === "muaddib" && player.role === "Ally";
-}
-
-export function canSummonSandworms(state: GameState, owner: Player, count: number) {
-  if (!canHaveMakerHooks(owner) || !owner.makerHooks || count <= 0 || !state.conflict) return false;
-  return !state.shieldWall || !conflictProtectedByShieldWall(state.conflict);
-}
-
 export function scoreGurneyAlwaysSmiling(state: GameState, playerId: string): GameState {
   const player = state.players.find((candidate) => candidate.id === playerId);
   if (
@@ -460,19 +450,6 @@ export function scoreGurneyAlwaysSmiling(state: GameState, playerId: string): Ga
       ...state.log,
     ],
   };
-}
-
-export function conflictDeploymentBlockedFor(
-  state: Pick<GameState, "conflictDeploymentBlock">,
-  actorId: string,
-  ownerId: string,
-) {
-  const block = state.conflictDeploymentBlock;
-  return Boolean(block && block.actorId === actorId && block.ownerId === ownerId);
-}
-
-function conflictDeploymentBlockedForOwner(state: Pick<GameState, "conflictDeploymentBlock">, ownerId: string) {
-  return state.conflictDeploymentBlock?.ownerId === ownerId;
 }
 
 export function setShieldWall(state: GameState, standing: boolean) {

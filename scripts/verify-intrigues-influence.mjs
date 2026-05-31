@@ -210,3 +210,316 @@ export function verifySietchRitualPlotIntrigue({ cards, data, game, state }) {
     "Shaddam should not choose personal Fremen Influence from Sietch Ritual",
   );
 }
+
+export function verifyChangeAllegiancesPlotIntrigue({ cards, game, state }) {
+  const { changeAllegiances, mercenaries } = cards;
+
+  const changeAllegiancesFixture = {
+    ...game,
+    activeSeat: game.players.findIndex((candidate) => candidate.id === "p2"),
+    pendingAction: undefined,
+    pendingQueue: [],
+    intrigueDiscard: [],
+    players: game.players.map((candidate) =>
+      candidate.id === "p2"
+        ? {
+            ...candidate,
+            resources: { ...candidate.resources, spice: 3 },
+            influence: {
+              emperor: 0,
+              spacing: 1,
+              bene: 1,
+              fremen: 0,
+              greatHouses: 1,
+              fringeWorlds: 0,
+            },
+            intrigues: [changeAllegiances],
+          }
+        : { ...candidate, intrigues: [] },
+    ),
+  };
+  assert.equal(
+    state.isChangeAllegiancesIntrigue(changeAllegiances),
+    true,
+    "Change Allegiances should be recognized as a structured Plot Intrigue",
+  );
+  assert.deepEqual(
+    state.changeAllegiancesGainChoices(playerById(changeAllegiancesFixture, "p2")),
+    ["greatHouses", "spacing", "bene", "fringeWorlds"],
+    "Allies should choose among game-board Influence tracks for Change Allegiances",
+  );
+  assert.deepEqual(
+    state.changeAllegiancesLossChoices(changeAllegiancesFixture, playerById(changeAllegiancesFixture, "p2")),
+    ["greatHouses", "spacing", "bene"],
+    "Change Allegiances should offer only payable Influence losses",
+  );
+  const changeShift = state.playChangeAllegiancesPlotIntrigue(
+    changeAllegiancesFixture,
+    "p2",
+    changeAllegiances.id,
+    { kind: "shift", loseFaction: "greatHouses", gainFaction: "bene" },
+  );
+  assert.equal(playerById(changeShift, "p2").influence.greatHouses, 0, "Change Allegiances should lose the chosen Influence");
+  assert.equal(playerById(changeShift, "p2").influence.bene, 2, "Change Allegiances should gain shifted Influence");
+  assert.equal(playerById(changeShift, "p2").resources.spice, 3, "The shift row should not spend spice");
+  assert.equal(playerById(changeShift, "p2").vp, playerById(changeAllegiancesFixture, "p2").vp + 1);
+  assert.deepEqual(playerById(changeShift, "p2").intrigues, []);
+  assert.equal(changeShift.intrigueDiscard.at(-1).id, changeAllegiances.id);
+  assert.match(changeShift.log[0], /plays Change Allegiances; .* loses 1 Great Houses Influence and gains 1 Bene Gesserit Influence/);
+  const changeSameFaction = state.playChangeAllegiancesPlotIntrigue(
+    changeAllegiancesFixture,
+    "p2",
+    changeAllegiances.id,
+    { kind: "shift", loseFaction: "spacing", gainFaction: "spacing" },
+  );
+  assert.equal(playerById(changeSameFaction, "p2").influence.spacing, 1, "Change Allegiances should allow a same-Faction net-zero shift");
+  assert.equal(playerById(changeSameFaction, "p2").vp, playerById(changeAllegiancesFixture, "p2").vp);
+  const changeSpice = state.playChangeAllegiancesPlotIntrigue(
+    changeAllegiancesFixture,
+    "p2",
+    changeAllegiances.id,
+    { kind: "spend-spice", gainFaction: "spacing" },
+  );
+  assert.equal(playerById(changeSpice, "p2").resources.spice, 0, "Change Allegiances should spend 3 spice for the bottom row");
+  assert.equal(playerById(changeSpice, "p2").influence.spacing, 2, "Change Allegiances should gain the bought Influence");
+  assert.equal(playerById(changeSpice, "p2").vp, playerById(changeAllegiancesFixture, "p2").vp + 1);
+  assert.match(changeSpice.log[0], /plays Change Allegiances, spends 3 spice, and gains 1 Spacing Guild Influence/);
+  const changeBoth = state.playChangeAllegiancesPlotIntrigue(
+    changeAllegiancesFixture,
+    "p2",
+    changeAllegiances.id,
+    { kind: "both", loseFaction: "greatHouses", shiftGainFaction: "bene", spiceGainFaction: "spacing" },
+  );
+  assert.equal(playerById(changeBoth, "p2").resources.spice, 0, "Change Allegiances should spend spice once when both rows resolve");
+  assert.equal(playerById(changeBoth, "p2").influence.greatHouses, 0);
+  assert.equal(playerById(changeBoth, "p2").influence.bene, 2);
+  assert.equal(playerById(changeBoth, "p2").influence.spacing, 2);
+  assert.equal(playerById(changeBoth, "p2").vp, playerById(changeAllegiancesFixture, "p2").vp + 2);
+  assert.equal(changeBoth.intrigueDiscard.filter((card) => card.id === changeAllegiances.id).length, 1);
+  assert.match(changeBoth.log[0], /plays Change Allegiances; .* loses 1 Great Houses Influence, .* spends 3 spice, and gains 1 Bene Gesserit Influence and gains 1 Spacing Guild Influence/);
+  const poorChangeAllegiances = {
+    ...changeAllegiancesFixture,
+    players: changeAllegiancesFixture.players.map((candidate) =>
+      candidate.id === "p2"
+        ? { ...candidate, resources: { ...candidate.resources, spice: 2 }, intrigues: [changeAllegiances] }
+        : candidate,
+    ),
+  };
+  assert.equal(
+    state.playChangeAllegiancesPlotIntrigue(poorChangeAllegiances, "p2", changeAllegiances.id, { kind: "spend-spice", gainFaction: "bene" }),
+    poorChangeAllegiances,
+    "Change Allegiances should require 3 spice for the bottom row",
+  );
+  assert.equal(
+    state.playChangeAllegiancesPlotIntrigue(
+      poorChangeAllegiances,
+      "p2",
+      changeAllegiances.id,
+      { kind: "both", loseFaction: "greatHouses", shiftGainFaction: "bene", spiceGainFaction: "spacing" },
+    ),
+    poorChangeAllegiances,
+    "Change Allegiances should require 3 spice when both rows resolve",
+  );
+  const noLossChangeAllegiances = {
+    ...changeAllegiancesFixture,
+    players: changeAllegiancesFixture.players.map((candidate) =>
+      candidate.id === "p2"
+        ? {
+            ...candidate,
+            influence: {
+              emperor: 0,
+              spacing: 0,
+              bene: 0,
+              fremen: 0,
+              greatHouses: 0,
+              fringeWorlds: 0,
+            },
+            intrigues: [changeAllegiances],
+          }
+        : candidate,
+    ),
+  };
+  assert.deepEqual(
+    state.changeAllegiancesLossChoices(noLossChangeAllegiances, playerById(noLossChangeAllegiances, "p2")),
+    [],
+    "Change Allegiances should not offer the top row without payable Influence",
+  );
+  assert.equal(
+    state.playChangeAllegiancesPlotIntrigue(noLossChangeAllegiances, "p2", changeAllegiances.id, { kind: "shift", loseFaction: "bene", gainFaction: "spacing" }),
+    noLossChangeAllegiances,
+    "Change Allegiances should require a payable Influence loss for the top row",
+  );
+  assert.equal(
+    state.playChangeAllegiancesPlotIntrigue(changeAllegiancesFixture, "p2", mercenaries.id, { kind: "shift", loseFaction: "spacing", gainFaction: "bene" }),
+    changeAllegiancesFixture,
+    "Change Allegiances should reject other Intrigue cards",
+  );
+  assert.equal(
+    state.playChangeAllegiancesPlotIntrigue(changeAllegiancesFixture, "p2", changeAllegiances.id, { kind: "shift", loseFaction: "emperor", gainFaction: "bene" }),
+    changeAllegiancesFixture,
+    "Allies should not lose personal Emperor Influence for Change Allegiances",
+  );
+  assert.equal(
+    state.playChangeAllegiancesPlotIntrigue(changeAllegiancesFixture, "p2", changeAllegiances.id, { kind: "unknown", gainFaction: "bene" }),
+    changeAllegiancesFixture,
+    "Change Allegiances should reject unknown choice kinds",
+  );
+  const pendingChangeAllegiances = {
+    ...changeAllegiancesFixture,
+    pendingAction: { kind: "spy", ownerId: "p2", remaining: 1, source: "Test" },
+  };
+  assert.equal(
+    state.playChangeAllegiancesPlotIntrigue(pendingChangeAllegiances, "p2", changeAllegiances.id, { kind: "shift", loseFaction: "spacing", gainFaction: "bene" }),
+    pendingChangeAllegiances,
+    "Change Allegiances should wait for pending actions to resolve",
+  );
+  const queuedChangeAllegiances = {
+    ...changeAllegiancesFixture,
+    pendingQueue: [{ kind: "spy", ownerId: "p2", remaining: 1, source: "Test" }],
+  };
+  assert.equal(
+    state.playChangeAllegiancesPlotIntrigue(queuedChangeAllegiances, "p2", changeAllegiances.id, { kind: "shift", loseFaction: "spacing", gainFaction: "bene" }),
+    queuedChangeAllegiances,
+    "Change Allegiances should wait for queued pending actions to resolve",
+  );
+  assert.equal(
+    state.playChangeAllegiancesPlotIntrigue(changeAllegiancesFixture, "p3", changeAllegiances.id, { kind: "shift", loseFaction: "spacing", gainFaction: "bene" }),
+    changeAllegiancesFixture,
+    "Only the active player should play Change Allegiances",
+  );
+  const combatChangeAllegiances = { ...changeAllegiancesFixture, phase: "combat" };
+  assert.equal(
+    state.playChangeAllegiancesPlotIntrigue(combatChangeAllegiances, "p2", changeAllegiances.id, { kind: "shift", loseFaction: "spacing", gainFaction: "bene" }),
+    combatChangeAllegiances,
+    "Change Allegiances should only resolve during normal play",
+  );
+
+  const shaddamChangeAllegiancesFixture = {
+    ...changeAllegiancesFixture,
+    activeSeat: game.players.findIndex((candidate) => candidate.id === "p4"),
+    players: game.players.map((candidate) => {
+      if (candidate.id === "p4") {
+        return {
+          ...candidate,
+          resources: { ...candidate.resources, spice: 3 },
+          influence: { ...candidate.influence, emperor: 1 },
+          revealed: true,
+          revealActivatedAllyId: "p6",
+          intrigues: [changeAllegiances],
+        };
+      }
+      if (candidate.id === "p6") {
+        return { ...candidate, influence: { ...candidate.influence, greatHouses: 1, bene: 1 }, intrigues: [] };
+      }
+      return { ...candidate, intrigues: [] };
+    }),
+  };
+  assert.deepEqual(
+    state.changeAllegiancesGainChoices(playerById(shaddamChangeAllegiancesFixture, "p4")),
+    ["emperor", "greatHouses", "spacing", "bene", "fringeWorlds"],
+    "Shaddam should choose personal Emperor or activated-Ally main-board Influence for Change Allegiances",
+  );
+  assert.deepEqual(
+    state.changeAllegiancesLossChoices(
+      shaddamChangeAllegiancesFixture,
+      playerById(shaddamChangeAllegiancesFixture, "p4"),
+      "p6",
+    ),
+    ["emperor", "greatHouses", "bene"],
+    "Commander Change Allegiances should list personal losses plus activated-Ally main-board losses",
+  );
+  const shaddamChangeShift = state.playChangeAllegiancesPlotIntrigue(
+    shaddamChangeAllegiancesFixture,
+    "p4",
+    changeAllegiances.id,
+    { kind: "shift", loseFaction: "bene", gainFaction: "emperor" },
+    "p6",
+  );
+  assert.equal(playerById(shaddamChangeShift, "p6").influence.bene, 0, "Commander Change Allegiances should make the activated Ally pay main-board losses");
+  assert.equal(playerById(shaddamChangeShift, "p4").influence.emperor, 2, "Shaddam should keep personal Emperor gains");
+  assert.match(shaddamChangeShift.log[0], /Princess Irulan loses 1 Bene Gesserit Influence and gains 1 Emperor Influence/);
+  const shaddamChangeSpice = state.playChangeAllegiancesPlotIntrigue(
+    shaddamChangeAllegiancesFixture,
+    "p4",
+    changeAllegiances.id,
+    { kind: "spend-spice", gainFaction: "greatHouses" },
+    "p6",
+  );
+  assert.equal(playerById(shaddamChangeSpice, "p4").resources.spice, 0, "Commander Change Allegiances should spend Commander spice");
+  assert.equal(playerById(shaddamChangeSpice, "p4").influence.greatHouses, 0, "Commander Change Allegiances should not give main-board Influence to the Commander");
+  assert.equal(playerById(shaddamChangeSpice, "p6").influence.greatHouses, 2, "Commander Change Allegiances should route main-board gains to the activated Ally");
+  const shaddamChangeBoth = state.playChangeAllegiancesPlotIntrigue(
+    shaddamChangeAllegiancesFixture,
+    "p4",
+    changeAllegiances.id,
+    { kind: "both", loseFaction: "emperor", shiftGainFaction: "bene", spiceGainFaction: "emperor" },
+    "p6",
+  );
+  assert.equal(playerById(shaddamChangeBoth, "p4").resources.spice, 0);
+  assert.equal(playerById(shaddamChangeBoth, "p4").influence.emperor, 1, "Commander personal loss and personal gain should net correctly");
+  assert.equal(playerById(shaddamChangeBoth, "p6").influence.bene, 2, "Both rows should still route main-board gains to the activated Ally");
+  assert.equal(
+    state.playChangeAllegiancesPlotIntrigue(
+      shaddamChangeAllegiancesFixture,
+      "p4",
+      changeAllegiances.id,
+      { kind: "spend-spice", gainFaction: "greatHouses" },
+      "p2",
+    ),
+    shaddamChangeAllegiancesFixture,
+    "Revealed Commander Change Allegiances should reject a same-team Ally who was not activated for Reveal",
+  );
+
+  const muadDibChangeAllegiancesFixture = {
+    ...changeAllegiancesFixture,
+    activeSeat: game.players.findIndex((candidate) => candidate.id === "p1"),
+    players: game.players.map((candidate) => {
+      if (candidate.id === "p1") {
+        return {
+          ...candidate,
+          resources: { ...candidate.resources, spice: 3 },
+          influence: { ...candidate.influence, fremen: 1 },
+          revealed: true,
+          revealActivatedAllyId: "p5",
+          intrigues: [changeAllegiances],
+        };
+      }
+      if (candidate.id === "p5") {
+        return { ...candidate, influence: { ...candidate.influence, fringeWorlds: 1 }, intrigues: [] };
+      }
+      return { ...candidate, intrigues: [] };
+    }),
+  };
+  assert.deepEqual(
+    state.changeAllegiancesGainChoices(playerById(muadDibChangeAllegiancesFixture, "p1")),
+    ["greatHouses", "spacing", "bene", "fremen", "fringeWorlds"],
+    "Muad'Dib should choose personal Fremen or activated-Ally main-board Influence for Change Allegiances",
+  );
+  assert.deepEqual(
+    state.changeAllegiancesLossChoices(
+      muadDibChangeAllegiancesFixture,
+      playerById(muadDibChangeAllegiancesFixture, "p1"),
+      "p5",
+    ),
+    ["fremen", "fringeWorlds"],
+    "Muad'Dib Change Allegiances should list personal Fremen plus activated-Ally main-board losses",
+  );
+  const muadDibChangeShift = state.playChangeAllegiancesPlotIntrigue(
+    muadDibChangeAllegiancesFixture,
+    "p1",
+    changeAllegiances.id,
+    { kind: "shift", loseFaction: "fremen", gainFaction: "fringeWorlds" },
+    "p5",
+  );
+  assert.equal(playerById(muadDibChangeShift, "p1").influence.fremen, 0, "Muad'Dib should pay personal Fremen losses personally");
+  assert.equal(playerById(muadDibChangeShift, "p5").influence.fringeWorlds, 2, "Muad'Dib should route main-board Fremen-icon gains to Fringe Worlds");
+  const muadDibChangeSpice = state.playChangeAllegiancesPlotIntrigue(
+    muadDibChangeAllegiancesFixture,
+    "p1",
+    changeAllegiances.id,
+    { kind: "spend-spice", gainFaction: "fremen" },
+    "p5",
+  );
+  assert.equal(playerById(muadDibChangeSpice, "p1").resources.spice, 0);
+  assert.equal(playerById(muadDibChangeSpice, "p1").influence.fremen, 2, "Muad'Dib should keep personal Fremen gains");
+}

@@ -75,6 +75,7 @@ import {
   maybeStartCombatPhase,
   passCombatIntrigue,
   pendingActionForCard,
+  pendingActionsForReveal,
   pendingActionForMakerChoice,
   pendingActionForSietchTabr,
   pendingActionsFor,
@@ -109,6 +110,7 @@ import {
   playShaddamsFavorPlotIntrigue,
   playStrategicStockpilingPlotIntrigue,
   playUnexpectedAlliesIntrigue,
+  resolveCorrinoMightChoice,
   resolveCommanderResourceSplitChoice,
   resolveDemandAttentionChoice,
   resolveDemandResultsChoice,
@@ -117,6 +119,7 @@ import {
   resolveSietchTabrChoice,
   resolveThreatenSpiceProductionChoice,
   skipDemandAttention,
+  skipCorrinoMight,
   skipDemandResults,
   skipDesertCall,
   skipThreatenSpiceProduction,
@@ -395,21 +398,21 @@ export default function App() {
         }
         return candidate;
       });
+      const postRevealState = { ...current, players };
+      const revealedPlayer = players[current.activeSeat];
+      const pending = queuePendingActions(
+        current,
+        pendingActionsForReveal(
+          revealedPlayer,
+          postRevealState,
+          player.hand,
+          player.role === "Commander" ? targetId : player.id,
+        ),
+      );
       return {
         ...current,
         players,
-        pendingAction:
-          printedRevealCards.length > 0
-            ? {
-                kind: "reveal-adjust",
-                ownerId: player.id,
-                combatRecipientId: player.role === "Commander" ? targetId : player.id,
-                cards: printedRevealCards,
-                persuasionAdjustment: 0,
-                strengthAdjustment: 0,
-                source: "Printed reveal",
-              }
-            : current.pendingAction,
+        ...pending,
         log: [
           ...(
             printedRevealCards.length > 0
@@ -610,6 +613,24 @@ export default function App() {
       const pending = current.pendingAction;
       if (!pending || pending.kind !== "demand-results") return current;
       return maybeStartCombatPhase(skipDemandResults(current, pending));
+    });
+  }
+
+  function chooseCorrinoMight() {
+    if (game.pendingAction?.kind !== "corrino-might") return;
+    setGame((current) => {
+      const pending = current.pendingAction;
+      if (!pending || pending.kind !== "corrino-might") return current;
+      return maybeStartCombatPhase(resolveCorrinoMightChoice(current, pending));
+    });
+  }
+
+  function skipCorrinoMightChoice() {
+    if (game.pendingAction?.kind !== "corrino-might") return;
+    setGame((current) => {
+      const pending = current.pendingAction;
+      if (!pending || pending.kind !== "corrino-might") return current;
+      return maybeStartCombatPhase(skipCorrinoMight(current, pending));
     });
   }
 
@@ -929,6 +950,14 @@ export default function App() {
   const pendingDemandResultsContracts =
     pendingAction?.kind === "demand-results"
       ? pendingAction.contractIds.map((contractId) => game.contractOffer.find((contract) => contract.id === contractId))
+      : [];
+  const pendingCorrinoMightCommander =
+    pendingAction?.kind === "corrino-might"
+      ? game.players.find((player) => player.id === pendingAction.commanderId)
+      : undefined;
+  const pendingCorrinoMightAllies =
+    pendingAction?.kind === "corrino-might"
+      ? pendingAction.allyIds.map((allyId) => game.players.find((player) => player.id === allyId))
       : [];
   const pendingDemandAttentionCommander =
     pendingAction?.kind === "demand-attention"
@@ -1691,6 +1720,7 @@ export default function App() {
                 {pendingAction.kind === "sietch-tabr" && `${pendingSietchLabel ?? "Player"} Sietch Tabr`}
                 {pendingAction.kind === "commander-resource-split" && `${pendingResourceSplitCommander?.leader ?? "Commander"} ${pendingAction.source}`}
                 {pendingAction.kind === "demand-results" && `${pendingDemandResultsCommander?.leader ?? "Shaddam"} Demand Results`}
+                {pendingAction.kind === "corrino-might" && `${pendingCorrinoMightCommander?.leader ?? "Shaddam"} Corrino Might`}
                 {pendingAction.kind === "demand-attention" && `${pendingDemandAttentionCommander?.leader ?? "Muad'Dib"} Demand Attention`}
                 {pendingAction.kind === "desert-call" && `${pendingDesertCallCommander?.leader ?? "Muad'Dib"} Desert Call`}
                 {pendingAction.kind === "threaten-spice-production" && `${pendingThreatenSpiceCommander?.leader ?? "Muad'Dib"} Threaten Spice Production`}
@@ -1884,6 +1914,24 @@ export default function App() {
                   <span>Demand Results can no longer resolve with the current table state.</span>
                 )}
                 <button type="button" onClick={skipDemandResultsChoice}>Skip</button>
+              </div>
+            )}
+
+            {pendingAction.kind === "corrino-might" && (
+              <div className="pending-controls">
+                {pendingCorrinoMightAllies[0] && pendingCorrinoMightAllies[1] ? (
+                  <button
+                    type="button"
+                    onClick={chooseCorrinoMight}
+                    disabled={!pendingCorrinoMightCommander || pendingCorrinoMightCommander.resources.spice < pendingAction.cost}
+                  >
+                    <Sparkles size={15} />
+                    Spend {pendingAction.cost}: both Allies +2 troops, trash
+                  </button>
+                ) : (
+                  <span>Corrino Might can no longer resolve with the current table state.</span>
+                )}
+                <button type="button" onClick={skipCorrinoMightChoice}>Skip</button>
               </div>
             )}
 

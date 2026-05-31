@@ -292,6 +292,14 @@ export type PendingAction =
       source: string;
     }
   | {
+      kind: "corrino-might";
+      commanderId: string;
+      allyIds: [string, string];
+      cost: number;
+      cardId: string;
+      source: string;
+    }
+  | {
       kind: "demand-attention";
       commanderId: string;
       recipientId: string;

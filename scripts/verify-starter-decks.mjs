@@ -98,8 +98,13 @@ try {
     "Seek Allies": 1,
     "Signet Ring": 1,
   });
-  assert.equal(data.emperorCommanderCards.find((card) => card.name === "Corrino Might")?.swords, 0);
-  assert.equal(data.emperorCommanderCards.find((card) => card.name === "Corrino Might")?.conditionalSwords, true);
+  assert.equal(data.emperorCommanderCards.find((card) => card.name === "Corrino Might")?.swords, 1);
+  assert.equal(data.emperorCommanderCards.find((card) => card.name === "Corrino Might")?.conditionalSwords, undefined);
+  assert.match(
+    data.emperorCommanderCards.find((card) => card.name === "Corrino Might")?.reveal ?? "",
+    /Spend 3 spice/,
+    "Corrino Might should expose its automated reveal payment",
+  );
   assert.equal(data.emperorCommanderCards.find((card) => card.name === "Demand Results")?.swords, 1);
   assert.deepEqual(
     data.emperorCommanderCards.filter((card) => card.name === "Imperial Ornithopter").map((card) => ({
@@ -1651,6 +1656,281 @@ try {
     state.resolveDemandResultsChoice(baseDemandResultsResolution, demandResultsPending, 2),
     baseDemandResultsResolution,
     "Demand Results should ignore invalid assignment choices",
+  );
+
+  const corrinoMight = data.emperorCommanderCards.find((card) => card.name === "Corrino Might");
+  assert.ok(corrinoMight, "Emperor Commander deck should include Corrino Might");
+  assert.equal(corrinoMight.sourceId, 556, "Corrino Might should use the catalog source id");
+  assert.deepEqual(corrinoMight.icons, ["landsraad"], "Corrino Might should send Agents to Landsraad spaces");
+  assert.equal(corrinoMight.persuasion, 0, "Corrino Might should not add reveal persuasion");
+  assert.equal(corrinoMight.swords, 1, "Corrino Might should add its printed reveal sword");
+  assert.equal(corrinoMight.conditionalSwords, undefined, "Corrino Might should not use manual reveal sword adjustment");
+  assert.equal(
+    state.isCorrinoMightCommanderCard(corrinoMight),
+    true,
+    "Corrino Might should be recognized as its Commander starter card",
+  );
+  const revealAdjustmentCard = {
+    ...corrinoMight,
+    id: "corrino-reveal-adjust-regression",
+    name: "Corrino Reveal Adjust Regression",
+    sourceId: undefined,
+    conditionalSwords: true,
+  };
+  const baseCorrinoMightCommander = {
+    ...emperor,
+    resources: { solari: 0, spice: 3, water: 0 },
+    playArea: [corrinoMight],
+  };
+  const baseCorrinoMightAllyA = {
+    ...shaddamAlly,
+    garrison: 1,
+    conflict: 2,
+    deployedTroops: 1,
+  };
+  const baseCorrinoMightAllyB = {
+    ...shaddamAllyB,
+    garrison: 2,
+  };
+  const baseCorrinoMightGame = {
+    ...game,
+    pendingQueue: [],
+    players: game.players.map((player) => {
+      if (player.id === emperor.id) return baseCorrinoMightCommander;
+      if (player.id === shaddamAlly.id) return baseCorrinoMightAllyA;
+      if (player.id === shaddamAllyB.id) return baseCorrinoMightAllyB;
+      return player;
+    }),
+  };
+  const corrinoMightPending = state.pendingActionForCorrinoMightReveal(
+    corrinoMight,
+    baseCorrinoMightCommander,
+    baseCorrinoMightGame,
+  );
+  assert.deepEqual(corrinoMightPending, {
+    kind: "corrino-might",
+    commanderId: emperor.id,
+    allyIds: [shaddamAlly.id, shaddamAllyB.id],
+    cost: 3,
+    cardId: corrinoMight.id,
+    source: "Corrino Might",
+  });
+  const revealCorrinoMightCommander = {
+    ...baseCorrinoMightCommander,
+    playArea: [revealAdjustmentCard, corrinoMight],
+    hand: [],
+  };
+  const revealCorrinoMightGame = {
+    ...baseCorrinoMightGame,
+    players: baseCorrinoMightGame.players.map((player) =>
+      player.id === emperor.id ? revealCorrinoMightCommander : player,
+    ),
+  };
+  assert.deepEqual(
+    state.pendingActionsForReveal(
+      revealCorrinoMightCommander,
+      revealCorrinoMightGame,
+      [revealAdjustmentCard, corrinoMight],
+      shaddamAlly.id,
+    ),
+    [
+      {
+        kind: "reveal-adjust",
+        ownerId: emperor.id,
+        combatRecipientId: shaddamAlly.id,
+        cards: ["Corrino Reveal Adjust Regression"],
+        persuasionAdjustment: 0,
+        strengthAdjustment: 0,
+        source: "Printed reveal",
+      },
+      corrinoMightPending,
+    ],
+    "Reveal pending actions should queue manual printed reveals before Corrino Might",
+  );
+  const afterCorrinoRevealAdjust = {
+    ...revealCorrinoMightGame,
+    pendingAction: state.pendingActionsForReveal(
+      revealCorrinoMightCommander,
+      revealCorrinoMightGame,
+      [revealAdjustmentCard, corrinoMight],
+      shaddamAlly.id,
+    )[0],
+    pendingQueue: [corrinoMightPending],
+  };
+  assert.deepEqual(
+    state.finishRevealAdjustment(afterCorrinoRevealAdjust, afterCorrinoRevealAdjust.pendingAction).pendingAction,
+    corrinoMightPending,
+    "Finishing printed reveal adjustment should expose queued Corrino Might",
+  );
+  assert.equal(
+    state.pendingActionForCorrinoMightReveal(
+      corrinoMight,
+      { ...baseCorrinoMightCommander, resources: { solari: 0, spice: 2, water: 0 } },
+      {
+        ...baseCorrinoMightGame,
+        players: baseCorrinoMightGame.players.map((player) =>
+          player.id === emperor.id
+            ? { ...baseCorrinoMightCommander, resources: { solari: 0, spice: 2, water: 0 } }
+            : player,
+        ),
+      },
+    ),
+    undefined,
+    "Corrino Might should not queue when Shaddam cannot pay 3 spice",
+  );
+  assert.equal(
+    state.pendingActionForCorrinoMightReveal(
+      corrinoMight,
+      { ...baseCorrinoMightCommander, playArea: [] },
+      {
+        ...baseCorrinoMightGame,
+        players: baseCorrinoMightGame.players.map((player) =>
+          player.id === emperor.id ? { ...player, playArea: [] } : player,
+        ),
+      },
+    ),
+    undefined,
+    "Corrino Might should not queue before the revealed card enters play",
+  );
+  assert.equal(
+    state.pendingActionForCorrinoMightReveal(corrinoMight, shaddamAlly, baseCorrinoMightGame),
+    undefined,
+    "Corrino Might should not trigger from an Ally starter deck owner",
+  );
+  assert.equal(
+    state.pendingActionForCorrinoMightReveal(corrinoMight, muadDib, baseCorrinoMightGame),
+    undefined,
+    "Corrino Might should not trigger for the opposing Commander",
+  );
+  assert.equal(
+    state.pendingActionForCorrinoMightReveal(
+      corrinoMight,
+      baseCorrinoMightCommander,
+      {
+        ...baseCorrinoMightGame,
+        players: baseCorrinoMightGame.players.filter((player) => player.id !== shaddamAllyB.id),
+      },
+    ),
+    undefined,
+    "Corrino Might should need both Shaddam Allies",
+  );
+
+  const resolvedCorrinoMight = state.resolveCorrinoMightChoice(
+    {
+      ...baseCorrinoMightGame,
+      pendingAction: corrinoMightPending,
+      pendingQueue: [],
+      log: [],
+    },
+    corrinoMightPending,
+  );
+  assert.equal(
+    playerById(resolvedCorrinoMight, emperor.id).resources.spice,
+    0,
+    "Corrino Might resolution should spend 3 Shaddam spice",
+  );
+  assert.deepEqual(
+    playerById(resolvedCorrinoMight, emperor.id).playArea,
+    [],
+    "Corrino Might resolution should trash Corrino Might from play",
+  );
+  assert.equal(
+    playerById(resolvedCorrinoMight, shaddamAlly.id).garrison,
+    3,
+    "Corrino Might should recruit 2 troops for the first Shaddam Ally",
+  );
+  assert.equal(
+    playerById(resolvedCorrinoMight, shaddamAlly.id).conflict,
+    2,
+    "Corrino Might's optional payment should not add extra reveal strength",
+  );
+  assert.equal(
+    playerById(resolvedCorrinoMight, shaddamAllyB.id).garrison,
+    4,
+    "Corrino Might should recruit 2 troops for the second Shaddam Ally",
+  );
+  assert.equal(
+    playerById(resolvedCorrinoMight, emperor.id).garrison,
+    baseCorrinoMightCommander.garrison,
+    "Corrino Might should not recruit troops for Shaddam's Commander",
+  );
+  assert.equal(resolvedCorrinoMight.pendingAction, undefined, "Corrino Might resolution should advance pending action");
+  assert.match(resolvedCorrinoMight.log[0], /spends 3 spice for Corrino Might/, "Corrino Might should log resolution");
+
+  const skippedCorrinoMight = state.skipCorrinoMight(
+    {
+      ...baseCorrinoMightGame,
+      pendingAction: corrinoMightPending,
+      pendingQueue: [],
+      log: [],
+    },
+    corrinoMightPending,
+  );
+  assert.equal(
+    playerById(skippedCorrinoMight, emperor.id).resources.spice,
+    3,
+    "Skipping Corrino Might should not spend Shaddam spice",
+  );
+  assert.deepEqual(
+    playerById(skippedCorrinoMight, emperor.id).playArea,
+    [corrinoMight],
+    "Skipping Corrino Might should keep Corrino Might in play",
+  );
+  assert.equal(
+    playerById(skippedCorrinoMight, shaddamAlly.id).garrison,
+    1,
+    "Skipping Corrino Might should not recruit troops",
+  );
+  assert.equal(skippedCorrinoMight.pendingAction, undefined, "Skipping Corrino Might should advance pending action");
+  const staleCorrinoMightState = {
+    ...baseCorrinoMightGame,
+    pendingAction: undefined,
+    pendingQueue: [],
+  };
+  assert.equal(
+    state.resolveCorrinoMightChoice(staleCorrinoMightState, corrinoMightPending),
+    staleCorrinoMightState,
+    "Stale Corrino Might should return the original state",
+  );
+  const noCardCorrinoMightState = {
+    ...baseCorrinoMightGame,
+    pendingAction: corrinoMightPending,
+    pendingQueue: [],
+    players: baseCorrinoMightGame.players.map((player) =>
+      player.id === emperor.id ? { ...player, playArea: [] } : player,
+    ),
+  };
+  assert.equal(
+    state.resolveCorrinoMightChoice(noCardCorrinoMightState, corrinoMightPending),
+    noCardCorrinoMightState,
+    "Corrino Might should not resolve if the card is no longer in play",
+  );
+  const duplicateAllyCorrinoMightPending = {
+    ...corrinoMightPending,
+    allyIds: [shaddamAlly.id, shaddamAlly.id],
+  };
+  const duplicateAllyCorrinoMightState = {
+    ...baseCorrinoMightGame,
+    pendingAction: duplicateAllyCorrinoMightPending,
+    pendingQueue: [],
+  };
+  assert.equal(
+    state.resolveCorrinoMightChoice(duplicateAllyCorrinoMightState, duplicateAllyCorrinoMightPending),
+    duplicateAllyCorrinoMightState,
+    "Corrino Might should reject duplicate Ally IDs",
+  );
+  const poorCorrinoMightState = {
+    ...baseCorrinoMightGame,
+    pendingAction: corrinoMightPending,
+    pendingQueue: [],
+    players: baseCorrinoMightGame.players.map((player) =>
+      player.id === emperor.id ? { ...player, resources: { solari: 0, spice: 2, water: 0 } } : player,
+    ),
+  };
+  assert.equal(
+    state.resolveCorrinoMightChoice(poorCorrinoMightState, corrinoMightPending),
+    poorCorrinoMightState,
+    "Corrino Might should not resolve if Shaddam no longer has 3 spice",
   );
 
   const devastatingAssault = data.emperorCommanderCards.find((card) => card.name === "Devastating Assault");

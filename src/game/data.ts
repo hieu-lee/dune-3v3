@@ -454,10 +454,9 @@ const emperorCommanderSpecs: Array<StarterCardSpec & { sourceId: number }> = [
     name: "Corrino Might",
     icons: ["landsraad"],
     persuasion: 0,
-    swords: 0,
-    conditionalSwords: true,
+    swords: 1,
     play: "No printed agent reward.",
-    reveal: "Resolve printed reveal text.",
+    reveal: "+1 strength. Spend 3 spice: each Ally gains 2 troops, then trash this card.",
   },
   {
     id: "starter-emperor-critical-shipments",

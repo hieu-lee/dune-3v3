@@ -73,6 +73,7 @@ const shadowAllianceSourceId = 160;
 const demandAttentionSourceId = 548;
 const desertCallSourceId = 549;
 const threatenSpiceProductionSourceId = 553;
+const corrinoMightSourceId = 556;
 const usulSourceId = 552;
 const criticalShipmentsSourceId = 557;
 const demandResultsSourceId = 558;
@@ -87,6 +88,7 @@ const shadowAllianceFactions: FactionId[] = [
 ];
 const influenceVictoryPointThreshold = 2;
 export const threatenSpiceProductionCost = 7;
+export const corrinoMightCost = 3;
 
 export type SpiceIsPowerChoice = "spend-spice" | "retreat-troops";
 export type TacticalOptionChoice = "add-strength" | { kind: "retreat-troops"; count: number };
@@ -729,6 +731,10 @@ export function isThreatenSpiceProductionCommanderCard(card: Card) {
   return card.sourceId === threatenSpiceProductionSourceId || card.name === "Threaten Spice Production";
 }
 
+export function isCorrinoMightCommanderCard(card: Card) {
+  return card.sourceId === corrinoMightSourceId || card.name === "Corrino Might";
+}
+
 export function isCriticalShipmentsCommanderCard(card: Card) {
   return card.sourceId === criticalShipmentsSourceId || card.name === "Critical Shipments";
 }
@@ -928,6 +934,60 @@ export function pendingActionForCard(
   return undefined;
 }
 
+export function pendingActionForCorrinoMightReveal(
+  card: Card,
+  source: Player,
+  state: GameState,
+): PendingAction | undefined {
+  if (
+    !isCorrinoMightCommanderCard(card) ||
+    source.team !== "shaddam" ||
+    source.role !== "Commander" ||
+    source.resources.spice < corrinoMightCost ||
+    !source.playArea.some((candidate) => candidate.id === card.id && isCorrinoMightCommanderCard(candidate))
+  ) {
+    return undefined;
+  }
+
+  const allies = sameTeamAllies(state.players, source);
+  if (!allies) return undefined;
+  return {
+    kind: "corrino-might",
+    commanderId: source.id,
+    allyIds: [allies[0].id, allies[1].id],
+    cost: corrinoMightCost,
+    cardId: card.id,
+    source: card.name,
+  };
+}
+
+export function pendingActionsForReveal(
+  source: Player,
+  state: GameState,
+  revealedCards: Card[],
+  combatRecipientId: string,
+): PendingAction[] {
+  const printedRevealCards = revealedCards
+    .filter((card) => card.conditionalPersuasion || card.conditionalSwords)
+    .map((card) => card.name);
+  const revealAdjustPending: PendingAction | undefined = printedRevealCards.length > 0
+    ? {
+        kind: "reveal-adjust",
+        ownerId: source.id,
+        combatRecipientId,
+        cards: printedRevealCards,
+        persuasionAdjustment: 0,
+        strengthAdjustment: 0,
+        source: "Printed reveal",
+      }
+    : undefined;
+  const corrinoMightPending = revealedCards
+    .map((card) => pendingActionForCorrinoMightReveal(card, source, state))
+    .find((pending): pending is PendingAction => Boolean(pending));
+
+  return [revealAdjustPending, corrinoMightPending].filter((action): action is PendingAction => Boolean(action));
+}
+
 export function pendingActionsFor(
   spacePending: PendingAction | undefined,
   cardPending: PendingAction | undefined,
@@ -976,6 +1036,7 @@ type LoseInfluencePendingAction = Extract<PendingAction, { kind: "lose-influence
 type RevealAdjustPendingAction = Extract<PendingAction, { kind: "reveal-adjust" }>;
 type CommanderResourceSplitPendingAction = Extract<PendingAction, { kind: "commander-resource-split" }>;
 type DemandResultsPendingAction = Extract<PendingAction, { kind: "demand-results" }>;
+type CorrinoMightPendingAction = Extract<PendingAction, { kind: "corrino-might" }>;
 type DemandAttentionPendingAction = Extract<PendingAction, { kind: "demand-attention" }>;
 type DesertCallPendingAction = Extract<PendingAction, { kind: "desert-call" }>;
 type ThreatenSpiceProductionPendingAction = Extract<PendingAction, { kind: "threaten-spice-production" }>;
@@ -2891,6 +2952,68 @@ export function skipDemandResults(state: GameState, pending: DemandResultsPendin
     ...state,
     ...advancePendingAction(state),
     log: [`${commander?.leader ?? "Shaddam"} declines to pay 2 Solari for ${pending.source}.`, ...state.log],
+  };
+}
+
+export function resolveCorrinoMightChoice(
+  state: GameState,
+  pending: CorrinoMightPendingAction,
+): GameState {
+  if (state.pendingAction !== pending) return state;
+  const commander = state.players.find((player) => player.id === pending.commanderId);
+  const allyA = state.players.find((player) => player.id === pending.allyIds[0]);
+  const allyB = state.players.find((player) => player.id === pending.allyIds[1]);
+  if (
+    !commander ||
+    commander.team !== "shaddam" ||
+    commander.role !== "Commander" ||
+    commander.resources.spice < pending.cost ||
+    pending.cost !== corrinoMightCost ||
+    !commander.playArea.some((card) => card.id === pending.cardId && isCorrinoMightCommanderCard(card)) ||
+    !allyA ||
+    allyA.team !== commander.team ||
+    allyA.role !== "Ally" ||
+    !allyB ||
+    allyB.team !== commander.team ||
+    allyB.role !== "Ally" ||
+    allyA.id === allyB.id
+  ) {
+    return state;
+  }
+
+  const players = state.players.map((player) => {
+    let next = player;
+    if (player.id === commander.id) {
+      next = {
+        ...player,
+        resources: { ...player.resources, spice: player.resources.spice - pending.cost },
+        playArea: player.playArea.filter((card) => card.id !== pending.cardId),
+      };
+    }
+    if (player.id === allyA.id || player.id === allyB.id) {
+      next = { ...next, garrison: next.garrison + 2 };
+    }
+    return next;
+  });
+
+  return {
+    ...state,
+    players,
+    ...advancePendingAction(state),
+    log: [
+      `${commander.leader} spends 3 spice for ${pending.source}; ${allyA.leader} and ${allyB.leader} each gain 2 troops.`,
+      ...state.log,
+    ],
+  };
+}
+
+export function skipCorrinoMight(state: GameState, pending: CorrinoMightPendingAction): GameState {
+  if (state.pendingAction !== pending) return state;
+  const commander = state.players.find((player) => player.id === pending.commanderId);
+  return {
+    ...state,
+    ...advancePendingAction(state),
+    log: [`${commander?.leader ?? "Shaddam"} declines to pay 3 spice for ${pending.source}.`, ...state.log],
   };
 }
 

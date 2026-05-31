@@ -23,6 +23,7 @@ Private web-table implementation for a six-player `Dune: Imperium - Uprising` te
 - Threaten Spice Production lets Muad'Dib and both Allies commit 7 total spice for Muad'Dib to gain 1 VP, then trash the card.
 - Usul queues Muad'Dib's Commander/activated-Ally water-or-spice split when played.
 - Critical Shipments queues Shaddam's Commander/activated-Ally water-or-2-Solari split when played.
+- Corrino Might reveals for 1 strength and lets Shaddam spend 3 spice for 2 troops to each Shaddam Ally, then self-trash.
 - Devastating Assault gives Shaddam 1 Solari and recruits 1 troop for the activated Ally before deployment choices.
 - Demand Results lets Shaddam spend 2 Solari to assign the two face-up public contracts one to each Shaddam Ally.
 - Maker-space bonus spice tracks and pays out on the four six-player Maker desert spaces.

@@ -159,9 +159,11 @@ export {
 declare global {
   interface Window {
     __DUNE_DEBUG__?: {
+      capture: (label?: string) => Promise<unknown>;
       getGame: () => GameState;
       setGame: (game: GameState) => void;
     };
+    __DUNE_DEBUG_CAPTURE__?: (request: { label?: string; game: GameState }) => Promise<unknown>;
   }
 }
 
@@ -182,11 +184,27 @@ export default function App() {
       delete window.__DUNE_DEBUG__;
       return;
     }
+    async function capture(label?: string) {
+      const captureHandler = window.__DUNE_DEBUG_CAPTURE__;
+      if (!captureHandler) {
+        console.warn("Dune debug capture requested, but no browser capture handler is attached.");
+        return undefined;
+      }
+      return captureHandler({ label, game });
+    }
+    function handleDebugCaptureKeydown(event: KeyboardEvent) {
+      if (!(event.shiftKey && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s")) return;
+      event.preventDefault();
+      void window.__DUNE_DEBUG__?.capture("hotkey");
+    }
     window.__DUNE_DEBUG__ = {
+      capture,
       getGame: () => game,
       setGame: (nextGame) => setGame(nextGame),
     };
+    window.addEventListener("keydown", handleDebugCaptureKeydown);
     return () => {
+      window.removeEventListener("keydown", handleDebugCaptureKeydown);
       delete window.__DUNE_DEBUG__;
     };
   }, [game]);

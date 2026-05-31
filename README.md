@@ -109,7 +109,9 @@ pnpm run debug:browser:headed -- --scenario all
 pnpm run debug:browser:manual
 ```
 
-The default debug run starts a local Vite server, drives scripted Playwright scenarios, and writes screenshots, per-capture game state, console logs, request failures, a Playwright trace, and `summary.json` under `artifacts/qa/browser-debug`. Use the headed command to watch the scripted scenarios, or the manual command to keep Chromium open for table-level debugging while retaining the same capture/artifact setup.
+The default debug run starts a local Vite server, drives scripted Playwright scenarios, and writes screenshots, per-capture game state, console logs, request failures, a Playwright trace, and `summary.json` under `artifacts/qa/browser-debug`. Use the headed command to watch the scripted scenarios.
+
+Use `pnpm run debug:browser:manual` when you need to play the table in a browser. It keeps Chromium open with the same artifact pipeline; while it is running, press `Ctrl+Shift+S` or `Cmd+Shift+S` to capture the current full-page screenshot and game state, or run `window.__DUNE_DEBUG__.capture("descriptive-label")` from the browser console. Stop it with `Ctrl+C`; the harness writes the final screenshot, console log, request failures, trace, and `summary.json` before shutting down.
 
 ## Asset Policy
 

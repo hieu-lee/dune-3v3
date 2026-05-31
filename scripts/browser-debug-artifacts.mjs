@@ -95,3 +95,9 @@ export const generatedArtifactNames = new Set([
   ...generatedScreenshotNames.map((name) => `${artifactStem(name)}.state.json`),
   ...scenarioNames.map((name) => `${name}-trace.zip`),
 ]);
+
+const manualCaptureArtifactPattern = /^manual-capture-\d{3,}(?:-[a-z0-9]+(?:-[a-z0-9]+)*)?\.(?:png|state\.json)$/;
+
+export function isGeneratedArtifactName(name) {
+  return generatedArtifactNames.has(name) || manualCaptureArtifactPattern.test(name);
+}

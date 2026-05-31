@@ -4,7 +4,12 @@ import path from "node:path";
 import { chromium } from "playwright";
 import { createServer } from "vite";
 import { createBrowserDebugArtifactStore } from "./browser-debug-artifact-store.mjs";
-import { artifactStem, generatedArtifactNames, scenarios } from "./browser-debug-artifacts.mjs";
+import {
+  artifactStem,
+  generatedArtifactNames,
+  isGeneratedArtifactName,
+  scenarios,
+} from "./browser-debug-artifacts.mjs";
 import { runCardChoicesSmoke } from "./browser-debug-card-choices.mjs";
 import { runCombatIntriguesSmoke } from "./browser-debug-combat-intrigues.mjs";
 import { runConflictVpSmoke } from "./browser-debug-conflict-vp.mjs";
@@ -74,6 +79,7 @@ function optionIsMissingValue(argv, index, arg) {
 const booleanOptions = new Set([
   "--allow-console-errors",
   "--allow-request-failures",
+  "--capture-smoke",
   "--headed",
   "--keep-open",
   "--no-trace",
@@ -111,6 +117,7 @@ validateKnownOptions(process.argv);
 const headed = hasFlag("--headed");
 const keepOpen = hasFlag("--keep-open");
 const traceEnabled = !hasFlag("--no-trace");
+const captureSmoke = hasFlag("--capture-smoke");
 const failOnConsoleErrors = !hasFlag("--allow-console-errors");
 const failOnRequestFailures = !hasFlag("--allow-request-failures");
 const scenario = optionValue("--scenario", "all");
@@ -398,6 +405,15 @@ function consoleFailures(messages) {
   return messages.filter((message) => message.type === "error" || message.type === "pageerror");
 }
 
+function sanitizeManualCaptureLabel(label) {
+  return String(label ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .slice(0, 48)
+    .replace(/^-+|-+$/g, "");
+}
+
 function assertNoConsoleFailures(messages) {
   const failures = consoleFailures(messages);
   assert.deepEqual(failures, [], `Browser console failures:\n${JSON.stringify(failures, null, 2)}`);
@@ -475,6 +491,7 @@ async function writeRunSummary({ captures, consoleMessages, requestFailures, err
     headed,
     keepOpen,
     traceEnabled,
+    captureSmoke,
     failOnConsoleErrors,
     failOnRequestFailures,
     url,
@@ -504,11 +521,14 @@ let outDirWritable = false;
 let cliValidated = false;
 const startedAt = Date.now();
 const captures = [];
+let manualCaptureCount = 0;
+let manualCaptureQueue = Promise.resolve();
 const consoleMessages = [];
 const requestFailures = [];
 const artifactStore = createBrowserDebugArtifactStore({
   cwd: process.cwd(),
   generatedArtifactNames,
+  isGeneratedArtifactName,
   outDir,
   preserveOut: hasFlag("--preserve-out"),
 });
@@ -535,6 +555,23 @@ const {
   writeArtifact: artifactStore.writeArtifact,
   writeJson,
 });
+
+function nextManualCaptureName(label) {
+  manualCaptureCount += 1;
+  const suffix = sanitizeManualCaptureLabel(label);
+  return `manual-capture-${String(manualCaptureCount).padStart(3, "0")}${suffix ? `-${suffix}` : ""}.png`;
+}
+
+function captureFromDebugBridge(request = {}) {
+  manualCaptureQueue = manualCaptureQueue
+    .catch(() => undefined)
+    .then(async () => {
+      const capture = await screenshot(page, captures, nextManualCaptureName(request.label));
+      console.log(`manual capture: ${capture.screenshot}`);
+      return capture;
+    });
+  return manualCaptureQueue;
+}
 
 try {
   if (optionError) throw optionError;
@@ -577,6 +614,7 @@ try {
     traceStarted = true;
   }
   page = await interruptible(context.newPage());
+  await interruptible(page.exposeFunction("__DUNE_DEBUG_CAPTURE__", captureFromDebugBridge));
   page.on("console", (message) => {
     consoleMessages.push({
       type: message.type(),
@@ -766,14 +804,23 @@ try {
         writeJson,
       }));
     }
-    if (scenario === "manual") await interruptible(runManual(page, url, server, captures));
+    if (scenario === "manual") {
+      await interruptible(runManual(page, url, server, captures));
+      if (captureSmoke) {
+        await interruptible(page.evaluate(() => window.__DUNE_DEBUG__?.capture(
+          "smoke label with punctuation and enough length to trim safely",
+        )));
+      }
+    }
 
     if (keepOpen) {
       console.log(`browser debug ready (${scenario})`);
       console.log(`url: ${url}`);
+      console.log("capture while playing with Ctrl/Cmd+Shift+S or window.__DUNE_DEBUG__.capture(\"label\")");
       console.log("press Ctrl+C to close and write final artifacts");
       await waitForShutdownSignal();
       if (shutdownSignal !== "SIGINT") throw shutdownError();
+      await manualCaptureQueue;
       await screenshot(page, captures, `${scenario}-final.png`);
     }
 

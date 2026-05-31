@@ -2,7 +2,13 @@ import assert from "node:assert/strict";
 import { lstat, mkdir, mkdtemp, readdir, realpath, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-export function createBrowserDebugArtifactStore({ cwd = process.cwd(), generatedArtifactNames, outDir, preserveOut }) {
+export function createBrowserDebugArtifactStore({
+  cwd = process.cwd(),
+  generatedArtifactNames,
+  isGeneratedArtifactName = (name) => generatedArtifactNames.has(name),
+  outDir,
+  preserveOut,
+}) {
   function isPathInside(parent, candidate) {
     const relativePath = path.relative(parent, candidate);
     return Boolean(relativePath) && !relativePath.startsWith("..") && !path.isAbsolute(relativePath);
@@ -85,20 +91,20 @@ export function createBrowserDebugArtifactStore({ cwd = process.cwd(), generated
     const entries = await readdir(path.resolve(cwd, outDir), { withFileTypes: true }).catch(() => []);
     await Promise.all(
       entries
-        .filter((entry) => (entry.isFile() || entry.isSymbolicLink()) && generatedArtifactNames.has(entry.name))
+        .filter((entry) => (entry.isFile() || entry.isSymbolicLink()) && isGeneratedArtifactName(entry.name))
         .map((entry) => rm(path.join(path.resolve(cwd, outDir), entry.name), { force: true })),
     );
   }
 
   async function assertNoGeneratedArtifactSymlinks() {
     const entries = await readdir(path.resolve(cwd, outDir), { withFileTypes: true }).catch(() => []);
-    const symlink = entries.find((entry) => entry.isSymbolicLink() && generatedArtifactNames.has(entry.name));
+    const symlink = entries.find((entry) => entry.isSymbolicLink() && isGeneratedArtifactName(entry.name));
     assert.ok(!symlink, `Refusing to write browser debug artifact through symlink "${path.join(outDir, symlink?.name ?? "")}"`);
   }
 
   async function artifactPath(fileName) {
     assert.equal(path.basename(fileName), fileName, `Browser debug artifact names must not include directories: "${fileName}"`);
-    assert.ok(generatedArtifactNames.has(fileName), `Unexpected browser debug artifact name "${fileName}"`);
+    assert.ok(isGeneratedArtifactName(fileName), `Unexpected browser debug artifact name "${fileName}"`);
     return path.join(path.resolve(cwd, outDir), fileName);
   }
 

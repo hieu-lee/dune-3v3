@@ -1756,6 +1756,9 @@ export default function App() {
                   key={space.id}
                   className={`space-tile ${legal ? "legal" : ""} ${selected ? "selected" : ""} ${occupant || unavailable ? "occupied" : ""}`}
                   type="button"
+                  data-testid={`space-${space.id}`}
+                  data-space-id={space.id}
+                  aria-pressed={selected}
                   onClick={() => playingPhase && setSelectedSpaceId(space.id)}
                   disabled={!playingPhase}
                   title={space.detail}
@@ -3016,19 +3019,19 @@ export default function App() {
               <h2>{activePlayer.leader}</h2>
             </div>
             <div className="turn-actions">
-              <button type="button" className="primary-action" onClick={playAgent} disabled={!canPlayAgent}>
+              <button type="button" className="primary-action" data-testid="place-agent" onClick={playAgent} disabled={!canPlayAgent}>
                 <HandCoins size={17} />
                 Place Agent
               </button>
-              <button type="button" onClick={endAgentTurn} disabled={!playingPhase || !game.agentTurnComplete || pendingLocked}>
+              <button type="button" data-testid="end-agent" onClick={endAgentTurn} disabled={!playingPhase || !game.agentTurnComplete || pendingLocked}>
                 <SkipForward size={17} />
                 End Agent
               </button>
-              <button type="button" onClick={revealTurn} disabled={!playingPhase || game.agentTurnComplete || activePlayer.revealed || Boolean(game.pendingAction)}>
+              <button type="button" data-testid="reveal-turn" onClick={revealTurn} disabled={!playingPhase || game.agentTurnComplete || activePlayer.revealed || Boolean(game.pendingAction)}>
                 <BookOpen size={17} />
                 Reveal
               </button>
-              <button type="button" onClick={endReveal} disabled={!playingPhase || !activePlayer.revealed || Boolean(game.pendingAction)}>
+              <button type="button" data-testid="end-reveal" onClick={endReveal} disabled={!playingPhase || !activePlayer.revealed || Boolean(game.pendingAction)}>
                 <SkipForward size={17} />
                 End
               </button>
@@ -3061,6 +3064,9 @@ export default function App() {
                 type="button"
                 className={`hand-card ${playingPhase && selectedCardId === card.id ? "selected" : ""}`}
                 key={card.id}
+                data-testid={`hand-card-${card.id}`}
+                data-card-id={card.id}
+                aria-pressed={playingPhase && selectedCardId === card.id}
                 onClick={() => playingPhase && setSelectedCardId(card.id)}
                 disabled={!playingPhase}
               >

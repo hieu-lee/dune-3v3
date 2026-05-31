@@ -13,7 +13,7 @@ These notes are implementation scaffolding, not a replacement for the rulebook. 
 
 ## Implementation Requirements
 
-- Browser debugging should use `pnpm run debug:browser -- --scenario control-defense` for deterministic headless screenshots, or `pnpm run debug:browser:headed -- --scenario control-defense` for an interactive Chromium session when the Codex in-app browser is unavailable.
+- Browser debugging should use `pnpm run debug:browser` for scripted headless screenshots, per-capture game-state snapshots, console/request logs, and a Playwright trace under `artifacts/qa/browser-debug`. Use `pnpm run debug:browser:headed -- --scenario all` to watch scripted browser play, or `pnpm run debug:browser:manual` for an interactive Chromium session when the Codex in-app browser is unavailable.
 - Six players sit as two teams of three.
 - Each team has one Commander and two Allies.
 - Allies use the standard 10-card starting deck.

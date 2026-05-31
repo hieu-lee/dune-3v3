@@ -5,7 +5,7 @@ Private web-table implementation for a six-player `Dune: Imperium - Uprising` te
 ## Current Slice
 
 - Vite + React + TypeScript client.
-- Repo-local Playwright browser debug harness captures deterministic gameplay screenshots under `artifacts/qa/browser-debug`.
+- Repo-local Playwright browser debug harness captures scripted gameplay screenshots under `artifacts/qa/browser-debug`.
 - Six seats split into Muad'Dib and Shaddam teams.
 - Hotseat turn flow for agent turns and reveal turns.
 - Board space model for the 6-player surface.
@@ -99,6 +99,17 @@ pnpm dev
 ```
 
 Open the URL printed by Vite.
+
+## Browser Debugging
+
+```bash
+pnpm run debug:browser
+pnpm run debug:browser -- --scenario control-defense
+pnpm run debug:browser:headed -- --scenario all
+pnpm run debug:browser:manual
+```
+
+The default debug run starts a local Vite server, drives scripted Playwright scenarios, and writes screenshots, per-capture game state, console logs, request failures, a Playwright trace, and `summary.json` under `artifacts/qa/browser-debug`. Use the headed command to watch the scripted scenarios, or the manual command to keep Chromium open for table-level debugging while retaining the same capture/artifact setup.
 
 ## Asset Policy
 

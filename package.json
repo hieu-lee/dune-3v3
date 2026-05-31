@@ -10,6 +10,7 @@
     "preview": "vite preview --host 0.0.0.0",
     "debug:browser": "node scripts/browser-debug.mjs",
     "debug:browser:headed": "node scripts/browser-debug.mjs --headed --keep-open",
+    "debug:browser:manual": "node scripts/browser-debug.mjs --headed --keep-open --scenario manual",
     "sync:cards": "node scripts/sync-dune-catalog.mjs",
     "sync:card-images": "node scripts/sync-dune-catalog.mjs --download-images",
     "verify:alliances": "node scripts/verify-alliances.mjs",

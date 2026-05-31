@@ -1,0 +1,499 @@
+.action-dock {
+  grid-template-columns: minmax(0, 1.25fr) minmax(240px, 0.75fr) minmax(240px, 320px);
+  margin-bottom: 16px;
+}
+
+.hand-panel,
+.market-panel,
+.log-panel,
+.pending-panel {
+  min-width: 0;
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.pending-panel {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border: 1px solid rgba(91, 192, 190, 0.45);
+  background: rgba(29, 56, 54, 0.72);
+}
+
+.turn-actions {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.activation-strip {
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -2px 0 14px;
+}
+
+.activation-strip span {
+  color: #baa98e;
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.activation-strip button {
+  min-height: 34px;
+  border: 1px solid rgba(255, 246, 230, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 246, 230, 0.08);
+  color: #fff3df;
+  cursor: pointer;
+  padding: 0 10px;
+}
+
+.activation-strip button.selected {
+  border-color: #5bc0be;
+  background: rgba(91, 192, 190, 0.2);
+}
+
+.turn-actions button {
+  flex: 1 1 112px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid rgba(255, 246, 230, 0.14);
+  background: rgba(255, 246, 230, 0.08);
+  padding: 0 12px;
+}
+
+.pending-controls,
+.resource-picker {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pending-controls span,
+.support-target strong {
+  color: #f7e7c8;
+  font-size: 0.8rem;
+  font-weight: 900;
+}
+
+.pending-controls button,
+.resource-picker button {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid rgba(255, 246, 230, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 246, 230, 0.09);
+  color: #fff3df;
+  cursor: pointer;
+  padding: 0 10px;
+}
+
+.contract-choice button {
+  width: 112px;
+  min-height: 0;
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  text-align: center;
+}
+
+.contract-choice .choice-divider {
+  width: 100%;
+  padding: 0;
+  background: transparent;
+  color: #b8ab98;
+}
+
+.contract-choice button span {
+  overflow-wrap: anywhere;
+}
+
+.throne-choice button {
+  border-color: rgba(239, 180, 71, 0.34);
+}
+
+.trade-intrigue-grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.trade-intrigue-column {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+
+.trade-intrigue-column > span {
+  color: #b8ab98;
+}
+
+.trade-intrigue-column button {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  justify-content: start;
+  text-align: left;
+  padding: 7px;
+}
+
+.trade-intrigue-column img {
+  width: 46px;
+  aspect-ratio: 63 / 88;
+  object-fit: contain;
+  border-radius: 4px;
+  background: rgba(8, 7, 6, 0.64);
+}
+
+.trade-intrigue-column button span {
+  overflow-wrap: anywhere;
+}
+
+.resource-picker button.selected {
+  border-color: #f2b84b;
+  background: rgba(242, 184, 75, 0.18);
+}
+
+.support-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
+}
+
+.spy-grid {
+  max-width: 100%;
+}
+
+.spy-grid button {
+  max-width: 190px;
+  overflow-wrap: anywhere;
+}
+
+.reveal-adjust {
+  align-items: center;
+}
+
+.reveal-adjust button {
+  min-width: 42px;
+}
+
+.support-target {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.threaten-spice-choice {
+  align-items: stretch;
+}
+
+.threaten-spice-grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(160px, 1fr));
+  gap: 8px;
+}
+
+.threaten-spice-contributor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 34px 34px;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(255, 246, 230, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 246, 230, 0.06);
+  padding: 8px;
+}
+
+.threaten-spice-contributor strong,
+.threaten-spice-contributor span {
+  overflow-wrap: anywhere;
+}
+
+.threaten-spice-contributor button {
+  width: 34px;
+  padding: 0;
+}
+
+.combat-target span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.combat-target button {
+  white-space: normal;
+}
+
+.combat-pass {
+  border-color: rgba(242, 184, 75, 0.34);
+  background: rgba(242, 184, 75, 0.16);
+}
+
+.turn-actions .primary-action {
+  background: #d9a441;
+  color: #18110c;
+}
+
+.turn-actions button:disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.8);
+  opacity: 0.44;
+}
+
+.pending-controls button:disabled,
+.resource-picker button:disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.8);
+  opacity: 0.44;
+}
+
+.market-card:disabled {
+  cursor: not-allowed;
+}
+
+.card-row,
+.market-row {
+  display: grid;
+  gap: 10px;
+}
+
+.card-row {
+  grid-template-columns: repeat(auto-fit, minmax(124px, 1fr));
+}
+
+.market-row {
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+}
+
+.hand-card,
+.market-card {
+  min-height: 160px;
+  border-radius: 8px;
+  color: #fff3df;
+  padding: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.card-art {
+  width: 100%;
+  max-height: 220px;
+  aspect-ratio: 63 / 88;
+  object-fit: contain;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  background: rgba(8, 7, 6, 0.64);
+}
+
+.hand-card {
+  background:
+    linear-gradient(160deg, rgba(53, 41, 31, 0.94), rgba(25, 20, 18, 0.94)),
+    linear-gradient(45deg, rgba(91, 192, 190, 0.18), transparent);
+}
+
+.hand-card.selected {
+  border-color: #5bc0be;
+  box-shadow: 0 0 0 2px rgba(91, 192, 190, 0.24);
+}
+
+.intrigue-hand {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 246, 230, 0.11);
+}
+
+.intrigue-heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  color: #f3d89d;
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.intrigue-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: 10px;
+}
+
+.intrigue-card {
+  min-height: 148px;
+  border: 1px solid rgba(255, 246, 230, 0.13);
+  border-radius: 8px;
+  background:
+    linear-gradient(160deg, rgba(41, 36, 54, 0.92), rgba(23, 20, 24, 0.94)),
+    linear-gradient(45deg, rgba(242, 184, 75, 0.12), transparent);
+  color: #fff3df;
+  padding: 10px;
+}
+
+.intrigue-card span {
+  color: #baa98e;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.intrigue-card strong {
+  display: block;
+  margin-top: 5px;
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+.intrigue-card p,
+.hand-card p,
+.market-card p {
+  min-height: 42px;
+  margin-top: 10px;
+}
+
+.intrigue-card button {
+  width: 100%;
+  margin-top: 10px;
+}
+
+.intrigue-actions {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.intrigue-choice-row {
+  display: grid;
+  gap: 6px;
+}
+
+.intrigue-choice-row label {
+  display: grid;
+  gap: 4px;
+  color: #f3d89d;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.intrigue-select {
+  width: 100%;
+  min-height: 34px;
+  border: 1px solid rgba(255, 246, 230, 0.18);
+  border-radius: 6px;
+  background: rgba(255, 246, 230, 0.08);
+  color: #f6efe1;
+  font: inherit;
+  font-weight: 800;
+  padding: 6px 8px;
+}
+
+.intrigue-select option {
+  background: #1f1711;
+  color: #f6efe1;
+}
+
+.intrigue-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  margin-top: 0;
+  overflow-wrap: anywhere;
+}
+
+.hand-card footer {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.hand-card footer span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #f3d89d;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.market-card {
+  min-height: 128px;
+  background: linear-gradient(160deg, rgba(51, 47, 35, 0.94), rgba(25, 22, 18, 0.94));
+}
+
+.throne-market {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(239, 180, 71, 0.22);
+}
+
+.throne-market .panel-heading {
+  margin-bottom: 10px;
+}
+
+.throne-market .panel-heading > span {
+  color: #f3d89d;
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.throne-card {
+  border-color: rgba(239, 180, 71, 0.28);
+  background:
+    linear-gradient(160deg, rgba(58, 45, 26, 0.94), rgba(25, 22, 18, 0.94)),
+    linear-gradient(45deg, rgba(239, 180, 71, 0.18), transparent);
+}
+
+.persuasion {
+  padding: 8px 10px;
+}
+
+.log-panel ol {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+@media (max-width: 1280px) {
+  .action-dock {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 760px) {
+  .pending-panel {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .card-row,
+  .market-row,
+  .trade-intrigue-grid,
+  .support-grid,
+  .threaten-spice-grid,
+  .support-target {
+    grid-template-columns: 1fr;
+  }
+  .turn-actions {
+    width: 100%;
+  }
+  .turn-actions button {
+    flex-basis: 100%;
+    min-width: 0;
+  }
+  .hand-card span,
+  .market-card span {
+    display: block;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+}

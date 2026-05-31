@@ -178,6 +178,7 @@ export type Player = {
   revealActivatedAllyId?: string;
   callToArmsActive: boolean;
   gurneyAlwaysSmilingScored?: boolean;
+  jessicaMemories: number;
   purchaseSequence: number;
   swordmasterBonus: boolean;
   contracts: PlayerContract[];
@@ -366,6 +367,18 @@ export type PendingAction =
       ownerId: string;
       cardId: string;
       source: string;
+    }
+  | {
+      kind: "jessica-spice-agony";
+      ownerId: string;
+      cardId: string;
+      source: string;
+    }
+  | {
+      kind: "jessica-other-memories";
+      ownerId: string;
+      source: string;
+      spaceId: string;
     }
   | {
       kind: "conflict-tie";

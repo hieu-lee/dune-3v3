@@ -102,11 +102,13 @@ import {
   passCombatIntrigue,
   pendingActionForCard,
   pendingActionsForReveal,
+  pendingActionForJessicaOtherMemories,
   pendingActionForMakerChoice,
   pendingActionForSietchTabr,
   pendingActionsFor,
   pendingActionForSpace,
   playerDoublesConflictRewards,
+  playerTroopSupply,
   playCombatIntrigue,
   placeSpyForPending,
   placeableSpySpaces,
@@ -159,6 +161,8 @@ import {
   resolveDemandResultsChoice,
   resolveDesertCallChoice,
   resolveIrulanSignetRingChoice,
+  resolveJessicaOtherMemoriesChoice,
+  resolveJessicaSpiceAgonyChoice,
   resolveMakerChoice,
   resolvePrincessIrulanBirthright,
   resolveSietchTabrChoice,
@@ -190,7 +194,7 @@ import {
   buyAccessPairChoices,
 } from "./game/state";
 import type { BoardSpace, Card, FactionId, GameState, PendingAction, Player, ResourceId, Resources, TeamId, TradeGoodId, TrashCardZone } from "./game/types";
-import type { BuyAccessChoice, ChangeAllegiancesChoice, CombatIntrigueChoice, ImperiumPoliticsChoice, InfluenceLossPair, IrulanSignetRingChoice, ShaddamSignetRingChoice, SietchRitualChoice, SpecialMissionChoice } from "./game/state";
+import type { BuyAccessChoice, ChangeAllegiancesChoice, CombatIntrigueChoice, ImperiumPoliticsChoice, InfluenceLossPair, IrulanSignetRingChoice, JessicaOtherMemoriesChoice, JessicaSpiceAgonyChoice, ShaddamSignetRingChoice, SietchRitualChoice, SpecialMissionChoice } from "./game/state";
 
 const resources: Array<{ id: ResourceId; label: string; Icon: LucideIcon }> = [
   { id: "solari", label: "Solari", Icon: CircleDollarSign },
@@ -219,6 +223,14 @@ type ChangeAllegiancesSelection = Partial<{
   shiftGainFaction: FactionId;
   spiceGainFaction: FactionId;
 }>;
+
+function memoryCountLabel(count: number) {
+  return `${count} ${count === 1 ? "memory" : "memories"}`;
+}
+
+function troopSupplyLabel(count: number) {
+  return `${count} supply ${count === 1 ? "troop" : "troops"}`;
+}
 
 function selectedFactionChoice(selected: FactionId | undefined, choices: FactionId[]) {
   return selected && choices.includes(selected) ? selected : choices[0];
@@ -397,7 +409,9 @@ export default function App() {
         deploymentOwner,
         selectedSpace,
       );
+      const jessicaOtherMemoriesPending = pendingActionForJessicaOtherMemories(source, selectedSpace);
       const pendingActions = pendingActionsFor(spacePending, cardPending, source.spies);
+      if (jessicaOtherMemoriesPending) pendingActions.push(jessicaOtherMemoriesPending);
       if (sietchTabrPending) {
         const sietchAction = {
           ...sietchTabrPending,
@@ -741,6 +755,24 @@ export default function App() {
       const pending = current.pendingAction;
       if (!pending || pending.kind !== "irulan-signet-ring") return current;
       return maybeStartCombatPhase(resolveIrulanSignetRingChoice(current, pending, choice));
+    });
+  }
+
+  function chooseJessicaSpiceAgony(choice: JessicaSpiceAgonyChoice) {
+    if (game.pendingAction?.kind !== "jessica-spice-agony") return;
+    setGame((current) => {
+      const pending = current.pendingAction;
+      if (!pending || pending.kind !== "jessica-spice-agony") return current;
+      return maybeStartCombatPhase(resolveJessicaSpiceAgonyChoice(current, pending, choice));
+    });
+  }
+
+  function chooseJessicaOtherMemories(choice: JessicaOtherMemoriesChoice) {
+    if (game.pendingAction?.kind !== "jessica-other-memories") return;
+    setGame((current) => {
+      const pending = current.pendingAction;
+      if (!pending || pending.kind !== "jessica-other-memories") return current;
+      return maybeStartCombatPhase(resolveJessicaOtherMemoriesChoice(current, pending, choice));
     });
   }
 
@@ -1298,6 +1330,10 @@ export default function App() {
     pendingAction?.kind === "irulan-signet-ring" ? irulanSignetAcquireCards(game, pendingAction) : [];
   const pendingIrulanSignetTrashChoices =
     pendingAction?.kind === "irulan-signet-ring" ? irulanSignetTrashableCards(game, pendingAction) : [];
+  const pendingJessicaSpiceAgonyOwner =
+    pendingAction?.kind === "jessica-spice-agony" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
+  const pendingJessicaOtherMemoriesOwner =
+    pendingAction?.kind === "jessica-other-memories" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingRecallSpyOwner =
     pendingAction?.kind === "recall-spy" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingRecallSpyRecipient =
@@ -1656,6 +1692,7 @@ export default function App() {
                 <span>{player.conflict} strength</span>
                 {player.highCouncilSeat && <span>High Council</span>}
                 {player.makerHooks && <span>Maker Hooks</span>}
+                {player.jessicaMemories > 0 && <span>{memoryCountLabel(player.jessicaMemories)}</span>}
                 <span>{player.spies} spies</span>
                 <span>{player.intrigues.length} intrigue</span>
                 <span>{player.contracts.length} contracts</span>
@@ -2056,6 +2093,8 @@ export default function App() {
                 {pendingAction.kind === "commander-resource-split" && `${pendingResourceSplitCommander?.leader ?? "Commander"} ${pendingAction.source}`}
                 {pendingAction.kind === "shaddam-signet-ring" && `${pendingShaddamSignetCommander?.leader ?? "Shaddam"} Emperor of the Known Universe`}
                 {pendingAction.kind === "irulan-signet-ring" && `${pendingIrulanSignetOwner?.leader ?? "Princess Irulan"} Chronicler's Insight`}
+                {pendingAction.kind === "jessica-spice-agony" && `${pendingJessicaSpiceAgonyOwner?.leader ?? "Lady Jessica"} Spice Agony`}
+                {pendingAction.kind === "jessica-other-memories" && `${pendingJessicaOtherMemoriesOwner?.leader ?? "Lady Jessica"} Other Memories`}
                 {pendingAction.kind === "command-respect" && `${pendingCommandRespectCommander?.leader ?? "Muad'Dib"} Command Respect`}
                 {pendingAction.kind === "demand-results" && `${pendingDemandResultsCommander?.leader ?? "Shaddam"} Demand Results`}
                 {pendingAction.kind === "corrino-might" && `${pendingCorrinoMightCommander?.leader ?? "Shaddam"} Corrino Might`}
@@ -2316,6 +2355,44 @@ export default function App() {
                   <span>Chronicler's Insight can no longer resolve with the current table state.</span>
                 )}
                 <button type="button" onClick={() => chooseIrulanSignet("skip")}>Skip</button>
+              </div>
+            )}
+
+            {pendingAction.kind === "jessica-spice-agony" && (
+              <div className="pending-controls">
+                {pendingJessicaSpiceAgonyOwner ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => chooseJessicaSpiceAgony("pay")}
+                      disabled={pendingJessicaSpiceAgonyOwner.resources.spice < 1 || playerTroopSupply(pendingJessicaSpiceAgonyOwner) <= 0}
+                    >
+                      <Sparkles size={15} />
+                      Spend 1 spice + supply troop
+                    </button>
+                    <span>{memoryCountLabel(pendingJessicaSpiceAgonyOwner.jessicaMemories)} / {troopSupplyLabel(playerTroopSupply(pendingJessicaSpiceAgonyOwner))}</span>
+                  </>
+                ) : (
+                  <span>Spice Agony can no longer resolve with the current table state.</span>
+                )}
+                <button type="button" onClick={() => chooseJessicaSpiceAgony("skip")}>Skip</button>
+              </div>
+            )}
+
+            {pendingAction.kind === "jessica-other-memories" && (
+              <div className="pending-controls">
+                {pendingJessicaOtherMemoriesOwner ? (
+                  <>
+                    <button type="button" onClick={() => chooseJessicaOtherMemories("flip")}>
+                      <BookOpen size={15} />
+                      Return {memoryCountLabel(pendingJessicaOtherMemoriesOwner.jessicaMemories)}: draw and flip
+                    </button>
+                    <span>Reverend Mother side becomes active.</span>
+                  </>
+                ) : (
+                  <span>Other Memories can no longer resolve with the current table state.</span>
+                )}
+                <button type="button" onClick={() => chooseJessicaOtherMemories("skip")}>Skip</button>
               </div>
             )}
 

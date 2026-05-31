@@ -107,12 +107,15 @@ const influenceVictoryPointThreshold = 2;
 const gurneyHalleckLeaderName = "Gurney Halleck";
 const gurneyAlwaysSmilingThreshold = 10;
 const feydRauthaLeaderName = "Feyd-Rautha Harkonnen";
+const ladyJessicaLeaderName = "Lady Jessica";
+const reverendMotherJessicaLeaderName = "Reverend Mother Jessica";
 const princessIrulanLeaderName = "Princess Irulan";
 const irulanBirthrightFaction: FactionId = "greatHouses";
 const irulanBirthrightThreshold = 2;
 const irulanSignetAcquireCost = 1;
 const irulanSignetTrashRewardCost = 1;
 const irulanSignetTrashRewardSpice = 2;
+const playerTroopPieceCount = 12;
 export const threatenSpiceProductionCost = 7;
 export const corrinoMightCost = 3;
 
@@ -136,6 +139,8 @@ export type StrategicStockpilingChoice = "spice" | "water" | "both";
 export type MarketOpportunityChoice = "spice-to-solari" | "solari-to-spice";
 export type ShaddamSignetRingChoice = "skip" | "troop" | { kind: "influence"; faction: FactionId };
 export type IrulanSignetRingChoice = "skip" | "acquire" | "trash";
+export type JessicaSpiceAgonyChoice = "pay" | "skip";
+export type JessicaOtherMemoriesChoice = "flip" | "skip";
 
 const shaddamSignetRingTroopCost = 1;
 const shaddamSignetRingInfluenceCost = 3;
@@ -154,6 +159,11 @@ export function cloneCards(cards: Card[]) {
     revealGain: card.revealGain ? { ...card.revealGain } : undefined,
     traits: card.traits ? [...card.traits] : undefined,
   }));
+}
+
+export function playerTroopSupply(player: Player) {
+  if (player.role === "Commander") return 0;
+  return Math.max(0, playerTroopPieceCount - player.garrison - player.deployedTroops - player.jessicaMemories);
 }
 
 function shuffleCards(cards: Card[]) {
@@ -484,6 +494,7 @@ function makePlayer(
     highCouncilSeat: false,
     callToArmsActive: false,
     gurneyAlwaysSmilingScored: false,
+    jessicaMemories: 0,
     purchaseSequence: 0,
     swordmasterBonus: false,
     contracts: [],
@@ -1162,6 +1173,21 @@ export function pendingActionForCard(
     return canAcquire || canTrash ? pending : undefined;
   }
   if (
+    isGenericSignetRingCard(card) &&
+    source.leader === ladyJessicaLeaderName &&
+    source.role === "Ally" &&
+    source.resources.spice + (state && space ? potentialDeferredMakerChoiceSpice(state, source, target, space) : 0) >= 1 &&
+    playerTroopSupply(source) > 0 &&
+    source.playArea.some((candidate) => candidate.id === card.id && isGenericSignetRingCard(candidate))
+  ) {
+    return {
+      kind: "jessica-spice-agony",
+      ownerId: source.id,
+      cardId: card.id,
+      source: "Spice Agony",
+    };
+  }
+  if (
     isDesertCallCommanderCard(card) &&
     source.team === "muaddib" &&
     source.role === "Commander" &&
@@ -1272,6 +1298,19 @@ export function pendingActionForCard(
     };
   }
   return undefined;
+}
+
+export function pendingActionForJessicaOtherMemories(
+  source: Player,
+  space: BoardSpace,
+): PendingAction | undefined {
+  if (source.leader !== ladyJessicaLeaderName || source.role !== "Ally" || source.jessicaMemories <= 0 || space.icon !== "bene") return undefined;
+  return {
+    kind: "jessica-other-memories",
+    ownerId: source.id,
+    source: "Other Memories",
+    spaceId: space.id,
+  };
 }
 
 export function pendingActionForCorrinoMightReveal(
@@ -1411,6 +1450,8 @@ type DesertCallPendingAction = Extract<PendingAction, { kind: "desert-call" }>;
 type ThreatenSpiceProductionPendingAction = Extract<PendingAction, { kind: "threaten-spice-production" }>;
 type ShaddamSignetRingPendingAction = Extract<PendingAction, { kind: "shaddam-signet-ring" }>;
 type IrulanSignetRingPendingAction = Extract<PendingAction, { kind: "irulan-signet-ring" }>;
+type JessicaSpiceAgonyPendingAction = Extract<PendingAction, { kind: "jessica-spice-agony" }>;
+type JessicaOtherMemoriesPendingAction = Extract<PendingAction, { kind: "jessica-other-memories" }>;
 
 export function manipulateAcquisitionCost(card: Card) {
   return Math.max(0, (card.cost ?? 0) - 1);
@@ -4543,6 +4584,85 @@ export function resolveIrulanSignetRingChoice(
     ...state,
     pendingAction: irulanSignetTrashPending(owner.id),
     log: [`${owner.leader} chooses the trash branch for ${pending.source}.`, ...state.log],
+  };
+}
+
+export function resolveJessicaSpiceAgonyChoice(
+  state: GameState,
+  pending: JessicaSpiceAgonyPendingAction,
+  choice: JessicaSpiceAgonyChoice,
+): GameState {
+  const owner = state.players.find((player) => player.id === pending.ownerId);
+  if (
+    !owner ||
+    owner.leader !== ladyJessicaLeaderName ||
+    owner.role !== "Ally" ||
+    !owner.playArea.some((card) => card.id === pending.cardId && isGenericSignetRingCard(card))
+  ) {
+    return state;
+  }
+
+  if (choice === "skip") {
+    return {
+      ...state,
+      ...advancePendingAction(state),
+      log: [`${owner.leader} declines ${pending.source}.`, ...state.log],
+    };
+  }
+
+  if (owner.resources.spice < 1 || playerTroopSupply(owner) <= 0) return state;
+  const paidState: GameState = {
+    ...state,
+    players: state.players.map((player) =>
+      player.id === owner.id
+        ? {
+            ...player,
+            resources: { ...player.resources, spice: player.resources.spice - 1 },
+            jessicaMemories: player.jessicaMemories + 1,
+          }
+        : player,
+    ),
+    ...advancePendingAction(state),
+    log: [`${owner.leader} spends 1 spice for ${pending.source} and moves a supply troop as 1 memory.`, ...state.log],
+  };
+  return paidState;
+}
+
+export function resolveJessicaOtherMemoriesChoice(
+  state: GameState,
+  pending: JessicaOtherMemoriesPendingAction,
+  choice: JessicaOtherMemoriesChoice,
+): GameState {
+  const owner = state.players.find((player) => player.id === pending.ownerId);
+  const space = boardSpaces.find((candidate) => candidate.id === pending.spaceId);
+  if (!owner || owner.leader !== ladyJessicaLeaderName || owner.role !== "Ally" || owner.jessicaMemories <= 0 || space?.icon !== "bene") return state;
+
+  if (choice === "skip") {
+    return {
+      ...state,
+      ...advancePendingAction(state),
+      log: [`${owner.leader} keeps her memories and remains Lady Jessica.`, ...state.log],
+    };
+  }
+
+  const memories = owner.jessicaMemories;
+  const drawnOwner = drawCards(
+    {
+      ...owner,
+      leader: reverendMotherJessicaLeaderName,
+      leaderCard: leaderCardByName(reverendMotherJessicaLeaderName),
+      jessicaMemories: 0,
+    },
+    owner.hand.length + memories,
+  );
+  const drawn = drawnOwner.hand.length - owner.hand.length;
+  const memoryText = `${memories} ${memories === 1 ? "memory" : "memories"}`;
+  const cardText = `${drawn} ${drawn === 1 ? "card" : "cards"}`;
+  return {
+    ...state,
+    players: state.players.map((player) => (player.id === owner.id ? drawnOwner : player)),
+    ...advancePendingAction(state),
+    log: [`${owner.leader} returns ${memoryText} for ${cardText} and becomes Reverend Mother Jessica.`, ...state.log],
   };
 }
 

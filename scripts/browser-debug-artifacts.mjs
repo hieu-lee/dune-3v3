@@ -2,6 +2,7 @@ export const scenarioNames = [
   "home",
   "agent-placement",
   "card-choices",
+  "combat-intrigues",
   "control-defense",
   "conflict-vp",
   "military-choices",
@@ -28,6 +29,9 @@ const generatedScreenshotNames = [
   "agent-placement-ready.png",
   "agent-placement-selected.png",
   "agent-placement-after.png",
+  "combat-intrigues-commander.png",
+  "combat-intrigues-mobile.png",
+  "combat-intrigues-after-play.png",
   "pending-contract-public.png",
   "pending-contract-fallback.png",
   "pending-acquire-card.png",
@@ -73,6 +77,7 @@ const generatedScreenshotNames = [
 
 export const generatedArtifactNames = new Set([
   "agent-placement-plan.json",
+  "combat-intrigue-states.json",
   "console.json",
   "control-defense-state.json",
   "pending-military-choice-states.json",

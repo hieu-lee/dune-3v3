@@ -27,6 +27,7 @@ import { PendingConflictVpPanel } from "./components/PendingConflictVpPanel";
 import { PendingInfluenceLossPanel } from "./components/PendingInfluenceLossPanel";
 import { PendingIrulanSignetPanel } from "./components/PendingIrulanSignetPanel";
 import { PendingMakerChoicePanel } from "./components/PendingMakerChoicePanel";
+import { PendingControlDefensePanel, PendingDeployPanel, PendingReinforcePanel } from "./components/PendingMilitaryPanels";
 import { PendingRecallSpyPanel } from "./components/PendingRecallSpyPanel";
 import { PendingResourceSplitPanel } from "./components/PendingResourceSplitPanel";
 import { PendingShaddamSignetPanel } from "./components/PendingShaddamSignetPanel";
@@ -1826,40 +1827,22 @@ export default function App() {
             </div>
 
             {pendingAction.kind === "deploy" && (
-              <div className="pending-controls">
-                <span>{pendingAction.remaining} deployable</span>
-                <button type="button" onClick={deployOne} disabled={!pendingOwner || pendingOwner.garrison <= 0}>
-                  <Swords size={15} />
-                  Deploy 1
-                </button>
-                <button type="button" onClick={clearPendingAction}>Done</button>
-              </div>
+              <PendingDeployPanel
+                owner={pendingOwner}
+                pending={pendingAction}
+                onDeploy={deployOne}
+                onDone={clearPendingAction}
+              />
             )}
 
             {pendingAction.kind === "control-defense" && (
-              <div className="pending-controls">
-                {pendingControlDefenseOwner ? (
-                  <>
-                    <span>
-                      {criticalLocationNames[pendingAction.location]} control: {pendingControlDefenseSupply} in supply
-                    </span>
-                    <button
-                      type="button"
-                      onClick={deployControlDefense}
-                      disabled={pendingControlDefenseSupply <= 0}
-                    >
-                      <Swords size={15} />
-                      Deploy 1
-                    </button>
-                    <button type="button" onClick={skipControlDefense}>Skip</button>
-                  </>
-                ) : (
-                  <>
-                    <span>Control marker owner can no longer resolve this deployment.</span>
-                    <button type="button" onClick={skipControlDefense}>Skip</button>
-                  </>
-                )}
-              </div>
+              <PendingControlDefensePanel
+                locationName={criticalLocationNames[pendingAction.location]}
+                owner={pendingControlDefenseOwner}
+                supply={pendingControlDefenseSupply}
+                onDeploy={deployControlDefense}
+                onSkip={skipControlDefense}
+              />
             )}
 
             {pendingAction.kind === "spy" && pendingSpyOwner && (
@@ -2246,23 +2229,11 @@ export default function App() {
             )}
 
             {pendingAction.kind === "reinforce" && (
-              <div className="pending-controls support-grid">
-                {reinforceAllies.map((ally) => (
-                  <div className="support-target" key={ally.id}>
-                    <strong>{ally.leader}</strong>
-                    <button type="button" onClick={() => reinforceOne(ally.id, "garrison")}>Garrison</button>
-                    <button
-                      type="button"
-                      onClick={() => reinforceOne(ally.id, "conflict")}
-                      disabled={pendingAction.conflictBlocked}
-                      title={pendingAction.conflictBlocked ? "Conflict deployment is blocked this turn." : undefined}
-                    >
-                      Conflict
-                    </button>
-                  </div>
-                ))}
-                {pendingAction.conflictBlocked && <span>Conflict deployment is blocked this turn.</span>}
-              </div>
+              <PendingReinforcePanel
+                allies={reinforceAllies}
+                pending={pendingAction}
+                onReinforce={reinforceOne}
+              />
             )}
 
             {pendingAction.kind === "trade" && pendingActor && pendingPartner && (

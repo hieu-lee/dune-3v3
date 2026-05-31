@@ -8,6 +8,7 @@ import { artifactStem, generatedArtifactNames, scenarios } from "./browser-debug
 import { runCardChoicesSmoke } from "./browser-debug-card-choices.mjs";
 import { runConflictVpSmoke } from "./browser-debug-conflict-vp.mjs";
 import { createBrowserDebugPageTools } from "./browser-debug-page-tools.mjs";
+import { runMilitaryChoicesSmoke } from "./browser-debug-military-choices.mjs";
 import { runPendingChoicesSmoke } from "./browser-debug-pending-choices.mjs";
 import { runSignetChoicesSmoke } from "./browser-debug-signet-choices.mjs";
 import { runSpaceChoicesSmoke } from "./browser-debug-space-choices.mjs";
@@ -626,6 +627,21 @@ try {
     }
     if (scenario === "conflict-vp" || scenario === "all") {
       await interruptible(runConflictVpSmoke({
+        captures,
+        currentGame,
+        initialPlayableGame,
+        openApp,
+        page,
+        screenshot,
+        server,
+        setDebugGameAndWait,
+        url,
+        waitForNoPending,
+        writeJson,
+      }));
+    }
+    if (scenario === "military-choices" || scenario === "all") {
+      await interruptible(runMilitaryChoicesSmoke({
         captures,
         currentGame,
         initialPlayableGame,

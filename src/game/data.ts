@@ -344,7 +344,7 @@ const muadDibCommanderSpecs: Array<StarterCardSpec & { sourceId: number }> = [
     icons: ["city"],
     persuasion: 1,
     swords: 0,
-    play: "Resolve the printed Swordmaster-bonus trash reward.",
+    play: "If you have a Swordmaster Bonus token, you may trash this card to trade.",
     reveal: starterRevealText(1, 0),
   },
   {

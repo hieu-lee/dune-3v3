@@ -73,6 +73,7 @@ const shadowAllianceSourceId = 160;
 const demandAttentionSourceId = 548;
 const desertCallSourceId = 549;
 const threatenSpiceProductionSourceId = 553;
+const commandRespectSourceId = 546;
 const corrinoMightSourceId = 556;
 const usulSourceId = 552;
 const criticalShipmentsSourceId = 557;
@@ -731,6 +732,10 @@ export function isThreatenSpiceProductionCommanderCard(card: Card) {
   return card.sourceId === threatenSpiceProductionSourceId || card.name === "Threaten Spice Production";
 }
 
+export function isCommandRespectCommanderCard(card: Card) {
+  return card.sourceId === commandRespectSourceId || card.name === "Command Respect";
+}
+
 export function isCorrinoMightCommanderCard(card: Card) {
   return card.sourceId === corrinoMightSourceId || card.name === "Corrino Might";
 }
@@ -887,6 +892,24 @@ export function pendingActionForCard(
     };
   }
   if (
+    isCommandRespectCommanderCard(card) &&
+    source.team === "muaddib" &&
+    source.role === "Commander" &&
+    source.swordmasterBonus &&
+    state &&
+    source.playArea.some((candidate) => candidate.id === card.id && isCommandRespectCommanderCard(candidate))
+  ) {
+    const partners = sameTeamAllies(state.players, source);
+    if (!partners) return undefined;
+    return {
+      kind: "command-respect",
+      commanderId: source.id,
+      partnerIds: [partners[0].id, partners[1].id],
+      cardId: card.id,
+      source: card.name,
+    };
+  }
+  if (
     isDemandResultsCommanderCard(card) &&
     source.team === "shaddam" &&
     source.role === "Commander" &&
@@ -1035,6 +1058,7 @@ type RecallSpyPendingAction = Extract<PendingAction, { kind: "recall-spy" }>;
 type LoseInfluencePendingAction = Extract<PendingAction, { kind: "lose-influence" }>;
 type RevealAdjustPendingAction = Extract<PendingAction, { kind: "reveal-adjust" }>;
 type CommanderResourceSplitPendingAction = Extract<PendingAction, { kind: "commander-resource-split" }>;
+type CommandRespectPendingAction = Extract<PendingAction, { kind: "command-respect" }>;
 type DemandResultsPendingAction = Extract<PendingAction, { kind: "demand-results" }>;
 type CorrinoMightPendingAction = Extract<PendingAction, { kind: "corrino-might" }>;
 type DemandAttentionPendingAction = Extract<PendingAction, { kind: "demand-attention" }>;
@@ -1171,6 +1195,7 @@ export function updateTradeSelection(
   const actor = state.players.find((player) => player.id === pending.actorId);
   const partner = state.players.find((player) => player.id === nextPartnerId);
   if (!actor || !partner || actor.id === partner.id || actor.team !== partner.team) return state;
+  if (pending.partnerLocked && nextPartnerId !== pending.partnerId) return state;
 
   const transfersStarted = pending.actorGiven + pending.partnerGiven > 0;
   const selectionChanged = resource !== pending.resource || nextPartnerId !== pending.partnerId;
@@ -2854,6 +2879,65 @@ export function resolveCommanderResourceSplitChoice(
       `${commander.leader} resolves ${pending.source}: gains ${resourceGainLog(option.commanderAmount, option.commanderResource)}; ${ally.leader} gains ${resourceGainLog(option.allyAmount, option.allyResource)}.`,
       ...state.log,
     ],
+  };
+}
+
+export function resolveCommandRespectTrade(
+  state: GameState,
+  pending: CommandRespectPendingAction,
+  partnerId: string,
+): GameState {
+  if (state.pendingAction !== pending) return state;
+  const commander = state.players.find((player) => player.id === pending.commanderId);
+  const partner = state.players.find((player) => player.id === partnerId);
+  if (
+    !commander ||
+    commander.team !== "muaddib" ||
+    commander.role !== "Commander" ||
+    !commander.swordmasterBonus ||
+    !commander.playArea.some((card) => card.id === pending.cardId && isCommandRespectCommanderCard(card)) ||
+    !partner ||
+    partner.team !== commander.team ||
+    partner.role !== "Ally" ||
+    !pending.partnerIds.includes(partner.id)
+  ) {
+    return state;
+  }
+
+  const players = state.players.map((player) =>
+    player.id === commander.id
+      ? { ...player, playArea: player.playArea.filter((card) => card.id !== pending.cardId) }
+      : player,
+  );
+  const tradePending: PendingAction = {
+    kind: "trade",
+    actorId: commander.id,
+    partnerId: partner.id,
+    resource: "intrigue",
+    actorGiven: 0,
+    partnerGiven: 0,
+    partnerLocked: true,
+    source: pending.source,
+  };
+
+  return {
+    ...state,
+    players,
+    pendingAction: tradePending,
+    log: [
+      `${commander.leader} trashes ${pending.source} to trade with ${partner.leader}.`,
+      ...state.log,
+    ],
+  };
+}
+
+export function skipCommandRespect(state: GameState, pending: CommandRespectPendingAction): GameState {
+  if (state.pendingAction !== pending) return state;
+  const commander = state.players.find((player) => player.id === pending.commanderId);
+  return {
+    ...state,
+    ...advancePendingAction(state),
+    log: [`${commander?.leader ?? "Muad'Dib"} keeps ${pending.source} and declines to trade.`, ...state.log],
   };
 }
 

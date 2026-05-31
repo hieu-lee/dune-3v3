@@ -110,6 +110,7 @@ import {
   playShaddamsFavorPlotIntrigue,
   playStrategicStockpilingPlotIntrigue,
   playUnexpectedAlliesIntrigue,
+  resolveCommandRespectTrade,
   resolveCorrinoMightChoice,
   resolveCommanderResourceSplitChoice,
   resolveDemandAttentionChoice,
@@ -118,6 +119,7 @@ import {
   resolveMakerChoice,
   resolveSietchTabrChoice,
   resolveThreatenSpiceProductionChoice,
+  skipCommandRespect,
   skipDemandAttention,
   skipCorrinoMight,
   skipDemandResults,
@@ -598,6 +600,24 @@ export default function App() {
     });
   }
 
+  function chooseCommandRespectTrade(partnerId: string) {
+    if (game.pendingAction?.kind !== "command-respect") return;
+    setGame((current) => {
+      const pending = current.pendingAction;
+      if (!pending || pending.kind !== "command-respect") return current;
+      return resolveCommandRespectTrade(current, pending, partnerId);
+    });
+  }
+
+  function skipCommandRespectChoice() {
+    if (game.pendingAction?.kind !== "command-respect") return;
+    setGame((current) => {
+      const pending = current.pendingAction;
+      if (!pending || pending.kind !== "command-respect") return current;
+      return maybeStartCombatPhase(skipCommandRespect(current, pending));
+    });
+  }
+
   function chooseDemandResults(optionIndex: number) {
     if (game.pendingAction?.kind !== "demand-results") return;
     setGame((current) => {
@@ -939,6 +959,16 @@ export default function App() {
     pendingAction?.kind === "commander-resource-split"
       ? game.players.find((player) => player.id === pendingAction.allyId)
       : undefined;
+  const pendingCommandRespectCommander =
+    pendingAction?.kind === "command-respect"
+      ? game.players.find((player) => player.id === pendingAction.commanderId)
+      : undefined;
+  const pendingCommandRespectPartners =
+    pendingAction?.kind === "command-respect"
+      ? pendingAction.partnerIds
+          .map((partnerId) => game.players.find((player) => player.id === partnerId))
+          .filter((player): player is Player => Boolean(player))
+      : [];
   const pendingDemandResultsCommander =
     pendingAction?.kind === "demand-results"
       ? game.players.find((player) => player.id === pendingAction.commanderId)
@@ -1047,7 +1077,11 @@ export default function App() {
     ) ?? [];
   const tradePartners =
     pendingActor && pendingAction?.kind === "trade"
-      ? game.players.filter((player) => player.team === pendingActor.team && player.id !== pendingActor.id)
+      ? game.players.filter((player) =>
+          player.team === pendingActor.team &&
+          player.id !== pendingActor.id &&
+          (!pendingAction.partnerLocked || player.id === pendingAction.partnerId)
+        )
       : [];
   const tradeLocked = pendingAction?.kind === "trade" && pendingAction.actorGiven + pendingAction.partnerGiven > 0;
   const reinforceAllies =
@@ -1719,6 +1753,7 @@ export default function App() {
                 {pendingAction.kind === "maker-choice" && `${pendingMakerLabel ?? "Player"} Maker space`}
                 {pendingAction.kind === "sietch-tabr" && `${pendingSietchLabel ?? "Player"} Sietch Tabr`}
                 {pendingAction.kind === "commander-resource-split" && `${pendingResourceSplitCommander?.leader ?? "Commander"} ${pendingAction.source}`}
+                {pendingAction.kind === "command-respect" && `${pendingCommandRespectCommander?.leader ?? "Muad'Dib"} Command Respect`}
                 {pendingAction.kind === "demand-results" && `${pendingDemandResultsCommander?.leader ?? "Shaddam"} Demand Results`}
                 {pendingAction.kind === "corrino-might" && `${pendingCorrinoMightCommander?.leader ?? "Shaddam"} Corrino Might`}
                 {pendingAction.kind === "demand-attention" && `${pendingDemandAttentionCommander?.leader ?? "Muad'Dib"} Demand Attention`}
@@ -1893,6 +1928,29 @@ export default function App() {
                     </button>
                   );
                 })}
+              </div>
+            )}
+
+            {pendingAction.kind === "command-respect" && (
+              <div className="pending-controls">
+                {pendingCommandRespectCommander && pendingCommandRespectPartners.length > 0 ? (
+                  <>
+                    <span>Trash Command Respect to trade with one teammate.</span>
+                    {pendingCommandRespectPartners.map((partner) => (
+                      <button
+                        type="button"
+                        key={partner.id}
+                        onClick={() => chooseCommandRespectTrade(partner.id)}
+                      >
+                        <HandCoins size={15} />
+                        Trade with {partner.leader}
+                      </button>
+                    ))}
+                  </>
+                ) : (
+                  <span>Command Respect can no longer resolve with the current table state.</span>
+                )}
+                <button type="button" onClick={skipCommandRespectChoice}>Skip</button>
               </div>
             )}
 

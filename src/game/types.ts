@@ -204,6 +204,7 @@ export type PendingAction =
       resource: TradeGoodId;
       actorGiven: number;
       partnerGiven: number;
+      partnerLocked?: boolean;
       source: string;
     }
   | {
@@ -282,6 +283,13 @@ export type PendingAction =
       team: TeamId;
       source: string;
       options: CommanderResourceSplitOption[];
+    }
+  | {
+      kind: "command-respect";
+      commanderId: string;
+      partnerIds: [string, string];
+      cardId: string;
+      source: string;
     }
   | {
       kind: "demand-results";

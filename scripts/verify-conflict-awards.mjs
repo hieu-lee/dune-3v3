@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { createServer } from "vite";
 import { verifySeizeSpiceRefineryConflictAwards } from "./verify-conflict-awards-seize.mjs";
+import { verifySkirmishConflictAwards } from "./verify-conflict-awards-skirmish.mjs";
 import { verifyTestOfLoyaltyConflictAwards } from "./verify-conflict-awards-test-of-loyalty.mjs";
 
 const server = await createServer({
@@ -266,6 +267,13 @@ try {
   assert.equal(unmatchedWinner.vp, playerById(unmatched, "p2").vp, "Unmatched Conflict should not score VP");
   assert.equal(unmatchedWinner.objectives[0].scored, undefined);
   assert.equal(unmatchedWinner.wonConflicts[0].scored, false);
+
+  verifySkirmishConflictAwards({
+    state,
+    data,
+    fixture,
+    playerById,
+  });
 
   const siegeArrakeenReward = {
     ...fixture(state, data, (players) =>

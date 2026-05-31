@@ -60,6 +60,15 @@ type SpyPendingAction = Extract<PendingAction, { kind: "spy" }>;
 const resourceIds: ResourceId[] = ["solari", "spice", "water"];
 
 const firstPlaceBattleRewardsBySourceId: Record<number, FirstPlaceBattleReward> = {
+  452: {
+    fixedVp: 0,
+    intrigues: 1,
+    resources: { solari: 1 },
+  },
+  453: {
+    fixedVp: 0,
+    resources: { solari: 2 },
+  },
   456: {
     fixedVp: 0,
     resources: { solari: 2 },

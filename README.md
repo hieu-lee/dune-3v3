@@ -20,6 +20,7 @@ Private web-table implementation for a six-player `Dune: Imperium - Uprising` te
 - Shaddam Throne Row support for Emperor-board setup, Imperial Tent movement, and Shaddam-team acquisition.
 - Demand Attention lets Muad'Dib spend 4 Solari to upgrade a faction visit to two Influence for the board-effect recipient.
 - Desert Call lets Muad'Dib spend 1 water to summon a sandworm for the activated hooked Ally, then trash the card.
+- Threaten Spice Production lets Muad'Dib and both Allies commit 7 total spice for Muad'Dib to gain 1 VP, then trash the card.
 - Usul queues Muad'Dib's Commander/activated-Ally water-or-spice split when played.
 - Critical Shipments queues Shaddam's Commander/activated-Ally water-or-2-Solari split when played.
 - Devastating Assault gives Shaddam 1 Solari and recruits 1 troop for the activated Ally before deployment choices.

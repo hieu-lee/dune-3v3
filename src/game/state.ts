@@ -72,6 +72,7 @@ const spiceMustFlowSourceId = 538;
 const shadowAllianceSourceId = 160;
 const demandAttentionSourceId = 548;
 const desertCallSourceId = 549;
+const threatenSpiceProductionSourceId = 553;
 const usulSourceId = 552;
 const criticalShipmentsSourceId = 557;
 const demandResultsSourceId = 558;
@@ -85,6 +86,7 @@ const shadowAllianceFactions: FactionId[] = [
   "fringeWorlds",
 ];
 const influenceVictoryPointThreshold = 2;
+export const threatenSpiceProductionCost = 7;
 
 export type SpiceIsPowerChoice = "spend-spice" | "retreat-troops";
 export type TacticalOptionChoice = "add-strength" | { kind: "retreat-troops"; count: number };
@@ -723,6 +725,10 @@ export function isDesertCallCommanderCard(card: Card) {
   return card.sourceId === desertCallSourceId || card.name === "Desert Call";
 }
 
+export function isThreatenSpiceProductionCommanderCard(card: Card) {
+  return card.sourceId === threatenSpiceProductionSourceId || card.name === "Threaten Spice Production";
+}
+
 export function isCriticalShipmentsCommanderCard(card: Card) {
   return card.sourceId === criticalShipmentsSourceId || card.name === "Critical Shipments";
 }
@@ -735,10 +741,33 @@ export function isDevastatingAssaultCommanderCard(card: Card) {
   return card.sourceId === devastatingAssaultSourceId || card.name === "Devastating Assault";
 }
 
-function shaddamAllyIds(state: GameState, source: Player): [string, string] | undefined {
-  const allies = state.players.filter((player) => player.team === source.team && player.role === "Ally");
+function sameTeamAllies(players: Player[], source: Player): [Player, Player] | undefined {
+  const allies = players.filter((player) => player.team === source.team && player.role === "Ally");
   if (allies.length < 2) return undefined;
+  return [allies[0], allies[1]];
+}
+
+function shaddamAllyIds(state: GameState, source: Player): [string, string] | undefined {
+  const allies = sameTeamAllies(state.players, source);
+  if (!allies) return undefined;
   return [allies[0].id, allies[1].id];
+}
+
+function playersWithPendingCardEffect(state: GameState, source: Player, target?: Player) {
+  return state.players.map((player) => {
+    if (player.id === source.id) return source;
+    if (target && player.id === target.id) return target;
+    return player;
+  });
+}
+
+function potentialDeferredMakerChoiceSpice(state: GameState, source: Player, target: Player | undefined, space: BoardSpace) {
+  const spice = space.gain?.spice ?? 0;
+  const owner = source.role === "Commander" ? target : source;
+  if (!space.makerWorms || spice <= 0 || !owner || !canSummonSandworms(state, owner, space.makerWorms)) {
+    return 0;
+  }
+  return spice;
 }
 
 function demandAttentionRecipient(source: Player, target: Player | undefined, space: BoardSpace) {
@@ -819,6 +848,34 @@ export function pendingActionForCard(
       kind: "desert-call",
       commanderId: source.id,
       allyId: target.id,
+      cardId: card.id,
+      source: card.name,
+    };
+  }
+  if (
+    isThreatenSpiceProductionCommanderCard(card) &&
+    source.team === "muaddib" &&
+    source.role === "Commander" &&
+    state &&
+    space?.icon === "spice"
+  ) {
+    const players = playersWithPendingCardEffect(state, source, target);
+    const allies = sameTeamAllies(players, source);
+    if (!allies) return undefined;
+    const contributors = [
+      players.find((player) => player.id === source.id) ?? source,
+      ...allies,
+    ];
+    const totalSpice =
+      contributors.reduce((sum, contributor) => sum + contributor.resources.spice, 0) +
+      potentialDeferredMakerChoiceSpice(state, source, target, space);
+    if (totalSpice < threatenSpiceProductionCost) return undefined;
+    return {
+      kind: "threaten-spice-production",
+      commanderId: source.id,
+      contributorIds: contributors.map((contributor) => contributor.id),
+      contributions: Object.fromEntries(contributors.map((contributor) => [contributor.id, 0])),
+      cost: threatenSpiceProductionCost,
       cardId: card.id,
       source: card.name,
     };
@@ -921,6 +978,7 @@ type CommanderResourceSplitPendingAction = Extract<PendingAction, { kind: "comma
 type DemandResultsPendingAction = Extract<PendingAction, { kind: "demand-results" }>;
 type DemandAttentionPendingAction = Extract<PendingAction, { kind: "demand-attention" }>;
 type DesertCallPendingAction = Extract<PendingAction, { kind: "desert-call" }>;
+type ThreatenSpiceProductionPendingAction = Extract<PendingAction, { kind: "threaten-spice-production" }>;
 
 function addPurchasedCard(player: Player, card: Card, fromReserve: boolean): Player {
   const purchaseSequence = player.purchaseSequence + 1;
@@ -2946,6 +3004,151 @@ export function skipDesertCall(state: GameState, pending: DesertCallPendingActio
     ...state,
     ...advancePendingAction(state),
     log: [`${commander?.leader ?? "Muad'Dib"} declines to pay 1 water for ${pending.source}.`, ...state.log],
+  };
+}
+
+export function threatenSpiceProductionContributionTotal(pending: ThreatenSpiceProductionPendingAction) {
+  return Object.values(pending.contributions).reduce((sum, amount) => sum + amount, 0);
+}
+
+function threatenSpiceProductionContributors(
+  state: GameState,
+  pending: ThreatenSpiceProductionPendingAction,
+  commander: Player,
+) {
+  if (new Set(pending.contributorIds).size !== pending.contributorIds.length) return undefined;
+  const contributors = pending.contributorIds.map((contributorId) =>
+    state.players.find((player) => player.id === contributorId),
+  );
+  if (contributors.some((contributor) => !contributor)) return undefined;
+  const resolved = contributors as Player[];
+  if (resolved[0]?.id !== commander.id) return undefined;
+  const allies = resolved.slice(1);
+  if (allies.length < 2) return undefined;
+  if (allies.some((ally) => ally.team !== commander.team || ally.role !== "Ally")) return undefined;
+  return resolved;
+}
+
+function validThreatenSpiceProductionContributionTotal(
+  pending: ThreatenSpiceProductionPendingAction,
+  contributors: Player[],
+) {
+  const contributorIds = new Set(pending.contributorIds);
+  for (const [contributorId, amount] of Object.entries(pending.contributions)) {
+    if (!contributorIds.has(contributorId) && amount !== 0) return undefined;
+  }
+
+  let total = 0;
+  for (const contributor of contributors) {
+    const amount = pending.contributions[contributor.id] ?? 0;
+    if (!Number.isInteger(amount) || amount < 0 || amount > contributor.resources.spice) return undefined;
+    total += amount;
+  }
+  return total;
+}
+
+export function adjustThreatenSpiceProductionContribution(
+  state: GameState,
+  pending: ThreatenSpiceProductionPendingAction,
+  contributorId: string,
+  delta: number,
+): GameState {
+  if (state.pendingAction !== pending || !Number.isInteger(delta) || delta === 0) return state;
+  const commander = state.players.find((player) => player.id === pending.commanderId);
+  if (
+    !commander ||
+    commander.team !== "muaddib" ||
+    commander.role !== "Commander" ||
+    !commander.playArea.some((card) => card.id === pending.cardId && isThreatenSpiceProductionCommanderCard(card)) ||
+    !pending.contributorIds.includes(contributorId)
+  ) {
+    return state;
+  }
+
+  const contributors = threatenSpiceProductionContributors(state, pending, commander);
+  if (!contributors) return state;
+  const contributor = contributors.find((player) => player.id === contributorId);
+  if (!contributor) return state;
+
+  const currentTotal = validThreatenSpiceProductionContributionTotal(pending, contributors);
+  if (currentTotal === undefined) return state;
+  const currentAmount = pending.contributions[contributorId] ?? 0;
+  const nextAmount = currentAmount + delta;
+  const nextTotal = currentTotal + delta;
+  if (nextAmount < 0 || nextAmount > contributor.resources.spice || nextTotal < 0 || nextTotal > pending.cost) {
+    return state;
+  }
+
+  return {
+    ...state,
+    pendingAction: {
+      ...pending,
+      contributions: { ...pending.contributions, [contributorId]: nextAmount },
+    },
+  };
+}
+
+export function resolveThreatenSpiceProductionChoice(
+  state: GameState,
+  pending: ThreatenSpiceProductionPendingAction,
+): GameState {
+  if (state.pendingAction !== pending) return state;
+  const commander = state.players.find((player) => player.id === pending.commanderId);
+  if (
+    !commander ||
+    commander.team !== "muaddib" ||
+    commander.role !== "Commander" ||
+    pending.cost !== threatenSpiceProductionCost ||
+    !commander.playArea.some((card) => card.id === pending.cardId && isThreatenSpiceProductionCommanderCard(card))
+  ) {
+    return state;
+  }
+
+  const contributors = threatenSpiceProductionContributors(state, pending, commander);
+  if (!contributors) return state;
+  const total = validThreatenSpiceProductionContributionTotal(pending, contributors);
+  if (total !== pending.cost) return state;
+
+  const players = state.players.map((player) => {
+    const contribution = pending.contributions[player.id] ?? 0;
+    let next = contribution > 0
+      ? {
+          ...player,
+          resources: { ...player.resources, spice: player.resources.spice - contribution },
+        }
+      : player;
+    if (player.id === commander.id) {
+      next = {
+        ...next,
+        vp: next.vp + 1,
+        playArea: next.playArea.filter((card) => card.id !== pending.cardId),
+      };
+    }
+    return next;
+  });
+  const contributionSummary = contributors
+    .filter((contributor) => (pending.contributions[contributor.id] ?? 0) > 0)
+    .map((contributor) => `${contributor.leader} ${pending.contributions[contributor.id]} spice`)
+    .join(", ");
+
+  return {
+    ...state,
+    players,
+    ...advancePendingAction(state),
+    log: [
+      `${commander.leader} resolves ${pending.source}: pays ${pending.cost} spice (${contributionSummary}), gains 1 VP, and trashes the card.`,
+      ...state.log,
+    ],
+  };
+}
+
+export function skipThreatenSpiceProduction(state: GameState, pending: ThreatenSpiceProductionPendingAction): GameState {
+  if (state.pendingAction !== pending) return state;
+  const commander = state.players.find((player) => player.id === pending.commanderId);
+  return {
+    ...state,
+    ...advancePendingAction(state),
+    log: [`${commander?.leader ?? "Muad'Dib"} declines to pay 7 spice for ${pending.source}.`, ...state.log],
   };
 }
 

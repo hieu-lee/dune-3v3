@@ -307,6 +307,15 @@ export type PendingAction =
       source: string;
     }
   | {
+      kind: "threaten-spice-production";
+      commanderId: string;
+      contributorIds: string[];
+      contributions: Record<string, number>;
+      cost: number;
+      cardId: string;
+      source: string;
+    }
+  | {
       kind: "conflict-tie";
       team: TeamId;
       tiedPlayerIds: string[];

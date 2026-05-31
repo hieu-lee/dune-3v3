@@ -7,6 +7,8 @@ import {
   FileText,
   HandCoins,
   Hexagon,
+  Minus,
+  Plus,
   RotateCcw,
   Shield,
   SkipForward,
@@ -89,6 +91,7 @@ import {
   scoreEndgameBattleIconIntrigue,
   scoreEndgameConditionalIntrigue,
   canHaveMakerHooks,
+  adjustThreatenSpiceProductionContribution,
   playerHasConflictUnits,
   setMakerHooks,
   setShieldWall,
@@ -112,9 +115,11 @@ import {
   resolveDesertCallChoice,
   resolveMakerChoice,
   resolveSietchTabrChoice,
+  resolveThreatenSpiceProductionChoice,
   skipDemandAttention,
   skipDemandResults,
   skipDesertCall,
+  skipThreatenSpiceProduction,
   skipLoseInfluence,
   skipRecallSpy,
   skipTrashCard,
@@ -123,6 +128,7 @@ import {
   trashableCards,
   trashPlayerCard,
   transferTradeGood,
+  threatenSpiceProductionContributionTotal,
   updateTradeSelection,
 } from "./game/state";
 import type { BoardSpace, Card, FactionId, GameState, PendingAction, Player, ResourceId, Resources, TeamId, TradeGoodId, TrashCardZone } from "./game/types";
@@ -290,6 +296,7 @@ export default function App() {
         if (candidate.id === effectedTarget.id) return effectedTarget;
         return candidate;
       });
+      const postEffectState = { ...current, players };
       const spacePending = sietchTabrPending
         ? undefined
         : pendingActionForSpace(
@@ -302,7 +309,7 @@ export default function App() {
       const cardPending = pendingActionForCard(
         selectedCard,
         source,
-        current,
+        postEffectState,
         player.role === "Commander" ? effectedTarget : source,
         selectedSpace,
       );
@@ -642,6 +649,33 @@ export default function App() {
     });
   }
 
+  function adjustThreatenSpiceProduction(contributorId: string, delta: number) {
+    if (game.pendingAction?.kind !== "threaten-spice-production") return;
+    setGame((current) => {
+      const pending = current.pendingAction;
+      if (!pending || pending.kind !== "threaten-spice-production") return current;
+      return adjustThreatenSpiceProductionContribution(current, pending, contributorId, delta);
+    });
+  }
+
+  function chooseThreatenSpiceProduction() {
+    if (game.pendingAction?.kind !== "threaten-spice-production") return;
+    setGame((current) => {
+      const pending = current.pendingAction;
+      if (!pending || pending.kind !== "threaten-spice-production") return current;
+      return maybeStartCombatPhase(resolveThreatenSpiceProductionChoice(current, pending));
+    });
+  }
+
+  function skipThreatenSpiceProductionChoice() {
+    if (game.pendingAction?.kind !== "threaten-spice-production") return;
+    setGame((current) => {
+      const pending = current.pendingAction;
+      if (!pending || pending.kind !== "threaten-spice-production") return current;
+      return maybeStartCombatPhase(skipThreatenSpiceProduction(current, pending));
+    });
+  }
+
   function deployOne() {
     if (game.pendingAction?.kind !== "deploy") return;
     setGame((current) => {
@@ -912,6 +946,27 @@ export default function App() {
     pendingAction?.kind === "desert-call"
       ? game.players.find((player) => player.id === pendingAction.allyId)
       : undefined;
+  const pendingThreatenSpiceCommander =
+    pendingAction?.kind === "threaten-spice-production"
+      ? game.players.find((player) => player.id === pendingAction.commanderId)
+      : undefined;
+  const pendingThreatenSpiceContributors =
+    pendingAction?.kind === "threaten-spice-production"
+      ? pendingAction.contributorIds
+          .map((contributorId) => game.players.find((player) => player.id === contributorId))
+          .filter((player): player is Player => Boolean(player))
+      : [];
+  const pendingThreatenSpiceTotal =
+    pendingAction?.kind === "threaten-spice-production"
+      ? threatenSpiceProductionContributionTotal(pendingAction)
+      : 0;
+  const pendingThreatenSpiceCanPay =
+    pendingAction?.kind === "threaten-spice-production" &&
+    pendingThreatenSpiceContributors.length === pendingAction.contributorIds.length &&
+    pendingThreatenSpiceTotal === pendingAction.cost &&
+    pendingThreatenSpiceContributors.every(
+      (contributor) => (pendingAction.contributions[contributor.id] ?? 0) <= contributor.resources.spice,
+    );
   const pendingThroneOwner =
     pendingAction?.kind === "throne-row" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingTrashOwner =
@@ -1638,6 +1693,7 @@ export default function App() {
                 {pendingAction.kind === "demand-results" && `${pendingDemandResultsCommander?.leader ?? "Shaddam"} Demand Results`}
                 {pendingAction.kind === "demand-attention" && `${pendingDemandAttentionCommander?.leader ?? "Muad'Dib"} Demand Attention`}
                 {pendingAction.kind === "desert-call" && `${pendingDesertCallCommander?.leader ?? "Muad'Dib"} Desert Call`}
+                {pendingAction.kind === "threaten-spice-production" && `${pendingThreatenSpiceCommander?.leader ?? "Muad'Dib"} Threaten Spice Production`}
                 {pendingAction.kind === "throne-row" && `${pendingThroneOwner?.leader ?? "Shaddam"} Throne Row`}
                 {pendingAction.kind === "trash-card" && `${pendingTrashOwner?.leader ?? "Player"} optional trash`}
                 {pendingAction.kind === "recall-spy" && `${pendingRecallSpyOwner?.leader ?? "Player"} recall spy`}
@@ -1856,6 +1912,52 @@ export default function App() {
                   <span>Desert Call can no longer resolve with the current table state.</span>
                 )}
                 <button type="button" onClick={skipDesertCallChoice}>Skip</button>
+              </div>
+            )}
+
+            {pendingAction.kind === "threaten-spice-production" && (
+              <div className="pending-controls threaten-spice-choice">
+                {pendingThreatenSpiceCommander && pendingThreatenSpiceContributors.length === pendingAction.contributorIds.length ? (
+                  <>
+                    <span>{pendingThreatenSpiceTotal}/{pendingAction.cost} spice committed</span>
+                    <div className="threaten-spice-grid">
+                      {pendingThreatenSpiceContributors.map((contributor) => {
+                        const contribution = pendingAction.contributions[contributor.id] ?? 0;
+                        return (
+                          <div className="threaten-spice-contributor" key={contributor.id}>
+                            <strong>{contributor.leader}</strong>
+                            <span>{contribution}/{contributor.resources.spice}</span>
+                            <button
+                              type="button"
+                              onClick={() => adjustThreatenSpiceProduction(contributor.id, -1)}
+                              disabled={contribution <= 0}
+                              title={`Remove 1 spice from ${contributor.leader}`}
+                              aria-label={`Remove 1 spice from ${contributor.leader}`}
+                            >
+                              <Minus size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => adjustThreatenSpiceProduction(contributor.id, 1)}
+                              disabled={contribution >= contributor.resources.spice || pendingThreatenSpiceTotal >= pendingAction.cost}
+                              title={`Add 1 spice from ${contributor.leader}`}
+                              aria-label={`Add 1 spice from ${contributor.leader}`}
+                            >
+                              <Plus size={14} />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <button type="button" onClick={chooseThreatenSpiceProduction} disabled={!pendingThreatenSpiceCanPay}>
+                      <Sparkles size={15} />
+                      Pay {pendingAction.cost}: +1 VP
+                    </button>
+                  </>
+                ) : (
+                  <span>Threaten Spice Production can no longer resolve with the current table state.</span>
+                )}
+                <button type="button" onClick={skipThreatenSpiceProductionChoice}>Skip</button>
               </div>
             )}
 

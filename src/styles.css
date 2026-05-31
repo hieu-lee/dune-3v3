@@ -913,6 +913,38 @@ h2 {
   gap: 8px;
 }
 
+.threaten-spice-choice {
+  align-items: stretch;
+}
+
+.threaten-spice-grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(160px, 1fr));
+  gap: 8px;
+}
+
+.threaten-spice-contributor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 34px 34px;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(255, 246, 230, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 246, 230, 0.06);
+  padding: 8px;
+}
+
+.threaten-spice-contributor strong,
+.threaten-spice-contributor span {
+  overflow-wrap: anywhere;
+}
+
+.threaten-spice-contributor button {
+  width: 34px;
+  padding: 0;
+}
+
 .combat-target span {
   display: inline-flex;
   align-items: center;
@@ -1167,7 +1199,8 @@ h2 {
   .card-row,
   .market-row,
   .trade-intrigue-grid,
-  .support-grid {
+  .support-grid,
+  .threaten-spice-grid {
     grid-template-columns: 1fr;
   }
 

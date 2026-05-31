@@ -53,6 +53,7 @@ const strategicStockpilingSourceId = 130;
 const detonationSourceId = 131;
 const unexpectedAlliesSourceId = 137;
 const mercenariesSourceId = 128;
+const cunningSourceId = 133;
 const callToArmsSourceId = 138;
 const shaddamsFavorSourceId = 141;
 const intelligenceReportSourceId = 142;
@@ -99,6 +100,7 @@ export const corrinoMightCost = 3;
 export type SpiceIsPowerChoice = "spend-spice" | "retreat-troops";
 export type TacticalOptionChoice = "add-strength" | { kind: "retreat-troops"; count: number };
 export type CombatIntrigueChoice = SpiceIsPowerChoice | TacticalOptionChoice;
+export type CunningPlotChoice = "draw" | "paid-trash";
 export type StrategicStockpilingChoice = "spice" | "water" | "both";
 export type MarketOpportunityChoice = "spice-to-solari" | "solari-to-spice";
 export type ShaddamSignetRingChoice = "skip" | "troop" | { kind: "influence"; faction: FactionId };
@@ -168,6 +170,10 @@ export function isUnexpectedAlliesIntrigue(intrigue: IntrigueCard) {
 
 export function isMercenariesIntrigue(intrigue: IntrigueCard) {
   return intrigue.sourceId === mercenariesSourceId;
+}
+
+export function isCunningIntrigue(intrigue: IntrigueCard) {
+  return intrigue.sourceId === cunningSourceId;
 }
 
 export function isCallToArmsIntrigue(intrigue: IntrigueCard) {
@@ -2143,6 +2149,55 @@ export function playIntelligenceReportPlotIntrigue(
     players,
     intrigueDiscard: [...state.intrigueDiscard, intrigue],
     log: [`${player.leader} plays Intelligence Report as a Plot Intrigue and draws ${cardText}.`, ...state.log],
+  };
+}
+
+export function playCunningPlotIntrigue(
+  state: GameState,
+  playerId: string,
+  intrigueId: string,
+  choice: CunningPlotChoice,
+): GameState {
+  if (state.phase !== "playing" || state.pendingAction || state.pendingQueue.length > 0) return state;
+  const player = state.players[state.activeSeat];
+  if (!player || player.id !== playerId) return state;
+  const intrigue = player.intrigues.find((card) => card.id === intrigueId);
+  if (!intrigue || !isCunningIntrigue(intrigue)) return state;
+  if (choice !== "draw" && choice !== "paid-trash") return state;
+  if (choice === "paid-trash" && player.resources.spice < 1) return state;
+
+  let cardsDrawn = 0;
+  let canTrashAfterDraw = false;
+  const players = state.players.map((candidate) => {
+    if (candidate.id !== player.id) return candidate;
+    const withoutIntrigue = {
+      ...candidate,
+      resources: {
+        ...candidate.resources,
+        spice: candidate.resources.spice - (choice === "paid-trash" ? 1 : 0),
+      },
+      intrigues: candidate.intrigues.filter((card) => card.id !== intrigue.id),
+    };
+    const drawn = drawCards(withoutIntrigue, withoutIntrigue.hand.length + 1);
+    cardsDrawn = drawn.hand.length - withoutIntrigue.hand.length;
+    canTrashAfterDraw = trashableCards(drawn).length > 0;
+    return drawn;
+  });
+  if (choice === "paid-trash" && !canTrashAfterDraw) return state;
+
+  const trashPending: PendingAction | undefined = choice === "paid-trash"
+    ? { kind: "trash-card", ownerId: player.id, source: "Cunning", optional: false }
+    : undefined;
+  const cardText = cardsDrawn === 1 ? "1 card" : `${cardsDrawn} cards`;
+  const log = choice === "paid-trash"
+    ? `${player.leader} plays Cunning, spends 1 spice, draws ${cardText}, and must trash 1 card.`
+    : `${player.leader} plays Cunning and draws ${cardText}.`;
+  return {
+    ...state,
+    players,
+    intrigueDiscard: [...state.intrigueDiscard, intrigue],
+    pendingAction: trashPending,
+    log: [log, ...state.log],
   };
 }
 

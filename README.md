@@ -47,6 +47,7 @@ Private web-table implementation for a six-player `Dune: Imperium - Uprising` te
 - Active players can play the Plot side of battle-icon Intrigues for 1 spice during normal play.
 - Contingency Plan can be played as a Plot Intrigue for 2 Solari or as a Combat Intrigue for 3 strength.
 - Intelligence Report can be played as a Plot Intrigue to draw 1 card, or 2 cards with two or more own spies on the board.
+- Cunning can be played as a Plot Intrigue to draw 1 card, or spend 1 spice to draw 1 card and trash 1 card.
 - Councilor's Ambition can be played as a Plot Intrigue for 2 water once the player has a High Council seat.
 - Mercenaries can be played as a Plot Intrigue to spend 3 Solari, draw 1 Intrigue, and recruit 2 troops.
 - Call to Arms can be played as a Plot Intrigue so each card acquired during that Reveal turn recruits 1 troop.

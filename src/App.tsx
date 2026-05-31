@@ -55,6 +55,7 @@ import {
   isBackedByChoamIntrigue,
   isCallToArmsIntrigue,
   isContingencyPlanIntrigue,
+  isCunningIntrigue,
   isCouncilorsAmbitionIntrigue,
   isDevourIntrigue,
   isDetonationIntrigue,
@@ -102,6 +103,7 @@ import {
   playBackedByChoamPlotIntrigue,
   playCallToArmsPlotIntrigue,
   playContingencyPlanPlotIntrigue,
+  playCunningPlotIntrigue,
   playCouncilorsAmbitionPlotIntrigue,
   playDetonationIntrigue,
   playIntelligenceReportPlotIntrigue,
@@ -868,6 +870,10 @@ export default function App() {
 
   function playIntelligenceReportPlot(intrigueId: string) {
     setGame((current) => playIntelligenceReportPlotIntrigue(current, current.players[current.activeSeat].id, intrigueId));
+  }
+
+  function playCunningPlot(intrigueId: string, choice: "draw" | "paid-trash") {
+    setGame((current) => playCunningPlotIntrigue(current, current.players[current.activeSeat].id, intrigueId, choice));
   }
 
   function playCouncilorsAmbitionPlot(intrigueId: string) {
@@ -1805,7 +1811,7 @@ export default function App() {
                 {pendingAction.kind === "desert-call" && `${pendingDesertCallCommander?.leader ?? "Muad'Dib"} Desert Call`}
                 {pendingAction.kind === "threaten-spice-production" && `${pendingThreatenSpiceCommander?.leader ?? "Muad'Dib"} Threaten Spice Production`}
                 {pendingAction.kind === "throne-row" && `${pendingThroneOwner?.leader ?? "Shaddam"} Throne Row`}
-                {pendingAction.kind === "trash-card" && `${pendingTrashOwner?.leader ?? "Player"} optional trash`}
+                {pendingAction.kind === "trash-card" && `${pendingTrashOwner?.leader ?? "Player"} ${pendingAction.optional ? "optional " : ""}trash`}
                 {pendingAction.kind === "recall-spy" && `${pendingRecallSpyOwner?.leader ?? "Player"} recall spy`}
                 {pendingAction.kind === "lose-influence" && `${pendingInfluencePayerLabel ?? "Player"} influence choice`}
                 {pendingAction.kind === "conflict-tie" && `${teams[pendingAction.team].name} conflict tie`}
@@ -1852,7 +1858,7 @@ export default function App() {
                     </button>
                   ))}
                 </div>
-                <button type="button" onClick={skipTrash}>Skip</button>
+                {pendingAction.optional && <button type="button" onClick={skipTrash}>Skip</button>}
               </div>
             )}
 
@@ -2373,6 +2379,7 @@ export default function App() {
                   const marketOpportunityCanSellSpice = activePlayer.resources.spice >= 2;
                   const marketOpportunityCanBuySpice = activePlayer.resources.solari >= 5;
                   const mercenariesCanPay = activePlayer.resources.solari >= 3;
+                  const cunningCanPay = activePlayer.resources.spice >= 1;
                   return (
                     <article className="intrigue-card" key={card.id}>
                       {card.thumbnailPath && <img className="card-art" src={card.thumbnailPath} alt="" loading="lazy" />}
@@ -2383,6 +2390,8 @@ export default function App() {
                             ? "Plot / reveal acquisitions recruit"
                           : isIntelligenceReportIntrigue(card)
                             ? `Plot / draw ${intelligenceReportDrawCount}`
+                          : isCunningIntrigue(card)
+                            ? "Plot / draw or pay to trash"
                           : isCouncilorsAmbitionIntrigue(card)
                             ? "Plot / High Council water"
                           : isStrategicStockpilingIntrigue(card)
@@ -2463,6 +2472,27 @@ export default function App() {
                           <BookOpen size={14} />
                           Draw {intelligenceReportDrawCount}
                         </button>
+                      )}
+                      {isCunningIntrigue(card) && (
+                        <div className="intrigue-actions">
+                          <button
+                            type="button"
+                            onClick={() => playCunningPlot(card.id, "draw")}
+                            disabled={plotIntrigueLocked}
+                          >
+                            <BookOpen size={14} />
+                            Draw 1
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => playCunningPlot(card.id, "paid-trash")}
+                            disabled={plotIntrigueLocked || !cunningCanPay}
+                            title="Spend 1 spice to draw 1 card, then trash 1 card"
+                          >
+                            <X size={14} />
+                            1 Spice -&gt; Draw + Trash
+                          </button>
+                        </div>
                       )}
                       {isCouncilorsAmbitionIntrigue(card) && (
                         <button

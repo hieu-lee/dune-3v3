@@ -12,28 +12,25 @@ import { PlayerColumn } from "./components/PlayerColumn";
 import { RecentLogPanel } from "./components/RecentLogPanel";
 import { TableSidebar } from "./components/TableSidebar";
 import {
-  addResources,
-  boardSpaceIntrigueGainFor,
-  boardSpaceSpiceGainFor,
-  revealGainLabel,
-  revealPersuasionFor,
   tableStateLockedByPendingActions,
   type ChangeAllegiancesSelection,
 } from "./app-helpers";
+import { createPlotActionHandlers } from "./app-plot-actions";
+import {
+  activatedAllyIdFor,
+  placeAgentAction,
+  revealTurnAction,
+  revealTurnPlan,
+} from "./app-turn-actions";
 import { boardSpaces } from "./game/data";
 import {
   acquireCardForPending,
   advanceSeat,
   acquireMarketCard,
-  applyBoardEffect,
-  applyCardAgentEffect,
   canPay,
   collectChoamContractFallback,
-  collectMakerSpice,
-  defaultActivatedAllyId,
   deployControlDefenseTroop,
   deployTroopToConflict,
-  drawIntrigueCards,
   endgameBattleIconChoices,
   endgameConditionalIntrigueChoices,
   effectiveCost,
@@ -47,18 +44,9 @@ import {
   manipulateAcquisitionCost,
   maybeStartCombatPhase,
   passCombatIntrigue,
-  pendingActionForCard,
-  pendingActionsForReveal,
-  pendingActionForJessicaOtherMemories,
-  pendingActionForReverendMotherJessicaRepeat,
-  pendingActionForMakerChoice,
-  pendingActionForSietchTabr,
-  pendingActionsFor,
-  pendingActionForSpace,
   playCombatIntrigue,
+  playerHasConflictUnits,
   placeSpyForPending,
-  queuePendingActions,
-  recordTurnSpiceGain,
   recallSpyForSupplyForPending,
   recallSpyForPending,
   reinforceTroop,
@@ -67,36 +55,11 @@ import {
   scoreEndgameBattleIconIntrigue,
   scoreEndgameConditionalIntrigue,
   adjustThreatenSpiceProductionContribution,
-  playerHasConflictUnits,
   payConflictVpConversion,
   setMakerHooks,
   setShieldWall,
   setAllianceOwner,
   setChoamContractCompleted,
-  playBackedByChoamPlotIntrigue,
-  playBuyAccessPlotIntrigue,
-  playCallToArmsPlotIntrigue,
-  playChangeAllegiancesPlotIntrigue,
-  playContingencyPlanPlotIntrigue,
-  playCunningPlotIntrigue,
-  playCouncilorsAmbitionPlotIntrigue,
-  playDepartForArrakisPlotIntrigue,
-  playDetonationIntrigue,
-  playDistractionPlotIntrigue,
-  playImperiumPoliticsPlotIntrigue,
-  playInspireAwePlotIntrigue,
-  playIntelligenceReportPlotIntrigue,
-  playLeveragePlotIntrigue,
-  playManipulatePlotIntrigue,
-  playMarketOpportunityPlotIntrigue,
-  playMercenariesPlotIntrigue,
-  playOpportunismPlotIntrigue,
-  playPlotBattleIconIntrigue,
-  playShaddamsFavorPlotIntrigue,
-  playSietchRitualPlotIntrigue,
-  playSpecialMissionPlotIntrigue,
-  playStrategicStockpilingPlotIntrigue,
-  playUnexpectedAlliesIntrigue,
   resolveCommandRespectTrade,
   resolveCorrinoMightChoice,
   resolveCommanderResourceSplitChoice,
@@ -111,11 +74,8 @@ import {
   resolveLadyAmberDesertScoutsChoice,
   recallSpyForConflictVpConversion,
   resolveMakerChoice,
-  resolveLocationControlIncome,
-  resolveLeaderInfluenceThresholdRewards,
   resolveSietchTabrChoice,
   resolveShaddamSignetRingChoice,
-  resolveStabanSmuggleSpice,
   resolveStabanUnseenNetworkChoice,
   scoreGurneyAlwaysSmiling,
   resolveThreatenSpiceProductionChoice,
@@ -140,14 +100,10 @@ import type {
   Card,
   FactionId,
   GameState,
-  PendingAction,
-  Player,
-  ResourceId,
-  Resources,
   TradeGoodId,
   TrashCardZone,
 } from "./game/types";
-import type { BuyAccessChoice, ChangeAllegiancesChoice, CombatIntrigueChoice, ImperiumPoliticsChoice, InfluenceLossPair, IrulanSignetRingChoice, JessicaOtherMemoriesChoice, JessicaReverendMotherChoice, JessicaSpiceAgonyChoice, JessicaWaterOfLifeChoice, LadyAmberDesertScoutsChoice, ShaddamSignetRingChoice, SietchRitualChoice, SpecialMissionChoice, StabanUnseenNetworkChoice } from "./game/state";
+import type { CombatIntrigueChoice, IrulanSignetRingChoice, JessicaOtherMemoriesChoice, JessicaReverendMotherChoice, JessicaSpiceAgonyChoice, JessicaWaterOfLifeChoice, LadyAmberDesertScoutsChoice, ShaddamSignetRingChoice, StabanUnseenNetworkChoice } from "./game/state";
 
 export {
   boardSpaceIntrigueGainFor,
@@ -211,14 +167,9 @@ export default function App() {
 
   const activePlayer = game.players[game.activeSeat];
   const activeAllies = game.players.filter((player) => player.team === activePlayer.team && player.role === "Ally");
-  function activatedAllyIdFor(player: Player, players: Player[]) {
-    if (player.role !== "Commander") return player.id;
-    if (player.revealed && player.revealActivatedAllyId) return player.revealActivatedAllyId;
-    return commanderTargets[player.id] ?? defaultActivatedAllyId(player, players);
-  }
   const activatedAlly =
     activePlayer.role === "Commander"
-      ? activeAllies.find((player) => player.id === activatedAllyIdFor(activePlayer, game.players)) ?? activeAllies[0]
+      ? activeAllies.find((player) => player.id === activatedAllyIdFor(activePlayer, game.players, commanderTargets)) ?? activeAllies[0]
       : activePlayer;
   const selectedCard = activePlayer.hand.find((card) => card.id === selectedCardId) ?? null;
   const selectedSpace = boardSpaces.find((space) => space.id === selectedSpaceId) ?? null;
@@ -249,143 +200,7 @@ export default function App() {
 
   function playAgent() {
     if (game.phase !== "playing" || !canPlayAgent || !selectedCard || !selectedSpace) return;
-    setGame((current) => {
-      const player = current.players[current.activeSeat];
-      const targetId =
-        player.role === "Commander"
-          ? activatedAllyIdFor(player, current.players)
-          : player.id;
-      const target = current.players.find((candidate) => candidate.id === targetId) ?? player;
-      const hand = player.hand.filter((card) => card.id !== selectedCard.id);
-      const playArea = selectedCard.trashOnPlay ? player.playArea : [...player.playArea, selectedCard];
-      const cost = effectiveCost(selectedSpace, current.players);
-      const makerBonus = selectedSpace.maker ? current.makerSpice[selectedSpace.id] ?? 0 : 0;
-      const makerChoiceOwner = player.role === "Commander" ? target : player;
-      const makerChoicePending = pendingActionForMakerChoice(current, selectedSpace, makerChoiceOwner, player);
-      const spiceGain = boardSpaceSpiceGainFor(selectedSpace, player, makerBonus, Boolean(makerChoicePending));
-      const sietchTabrPending = pendingActionForSietchTabr(current, selectedSpace, makerChoiceOwner, player);
-      let { source, target: effectedTarget } = applyBoardEffect(
-        {
-          ...player,
-          hand,
-          playArea,
-          agentsReady: player.agentsReady - 1,
-        },
-        target,
-        selectedSpace,
-        cost,
-        makerBonus,
-        Boolean(makerChoicePending),
-      );
-      const cardAgentEffect = applyCardAgentEffect(
-        selectedCard,
-        source,
-        player.role === "Commander" ? effectedTarget : source,
-        current,
-      );
-      source = cardAgentEffect.source;
-      effectedTarget = cardAgentEffect.target;
-      let players = current.players.map((candidate, index) => {
-        if (index === current.activeSeat) return source;
-        if (candidate.id === effectedTarget.id) return effectedTarget;
-        return candidate;
-      });
-      let deploymentOwner = player.role === "Commander" ? effectedTarget : source;
-      const conflictDeploymentBlock = cardAgentEffect.blocksDeploymentsThisTurn
-        ? { actorId: source.id, ownerId: deploymentOwner.id, source: selectedCard.name }
-        : undefined;
-      const controlledPostEffectState = resolveLocationControlIncome(
-        { ...current, players, conflictDeploymentBlock },
-        selectedSpace,
-      );
-      players = controlledPostEffectState.players;
-      source = players.find((candidate) => candidate.id === source.id) ?? source;
-      effectedTarget = players.find((candidate) => candidate.id === effectedTarget.id) ?? effectedTarget;
-      deploymentOwner = player.role === "Commander" ? effectedTarget : source;
-      const postEffectState = { ...controlledPostEffectState, players, conflictDeploymentBlock };
-      const spacePending = sietchTabrPending
-        ? undefined
-        : pendingActionForSpace(
-          selectedSpace,
-          source,
-          deploymentOwner,
-          players,
-          cardAgentEffect.recruitedTroops,
-          Boolean(cardAgentEffect.blocksDeploymentsThisTurn),
-        );
-      const cardPending = pendingActionForCard(
-        selectedCard,
-        source,
-        postEffectState,
-        deploymentOwner,
-        selectedSpace,
-      );
-      const jessicaOtherMemoriesPending = pendingActionForJessicaOtherMemories(source, selectedSpace);
-      const jessicaRepeatDeferredWater = cardPending?.kind === "jessica-water-of-life" ? 1 : 0;
-      const jessicaReverendMotherPending = pendingActionForReverendMotherJessicaRepeat(
-        current,
-        source,
-        selectedSpace,
-        jessicaRepeatDeferredWater,
-      );
-      const prioritizedCardPending =
-        cardPending?.kind === "jessica-spice-agony" || cardPending?.kind === "jessica-water-of-life"
-          ? cardPending
-          : undefined;
-      const pendingActions = prioritizedCardPending || jessicaOtherMemoriesPending || jessicaReverendMotherPending
-        ? [
-            ...[prioritizedCardPending, jessicaOtherMemoriesPending, jessicaReverendMotherPending].filter((action): action is PendingAction => Boolean(action)),
-            ...pendingActionsFor(spacePending, prioritizedCardPending ? undefined : cardPending, source.spies),
-          ]
-        : pendingActionsFor(spacePending, cardPending, source.spies);
-      if (sietchTabrPending) {
-        const sietchAction = {
-          ...sietchTabrPending,
-          ...(cardAgentEffect.recruitedTroops ? { extraRecruitedTroops: cardAgentEffect.recruitedTroops } : {}),
-          ...(cardAgentEffect.blocksDeploymentsThisTurn ? { conflictBlocked: true } : {}),
-        };
-        pendingActions.unshift(
-          sietchAction,
-        );
-      }
-      if (makerChoicePending) pendingActions.unshift(makerChoicePending);
-      const pending = queuePendingActions(
-        controlledPostEffectState,
-        pendingActions,
-      );
-      const nextState: GameState = {
-        ...controlledPostEffectState,
-        agentTurnComplete: true,
-        players,
-        spaces: { ...current.spaces, [selectedSpace.id]: target.id },
-        makerSpice: collectMakerSpice(current, selectedSpace),
-        swordmasterClaimed: current.swordmasterClaimed || selectedSpace.id === "swordmaster",
-        conflictDeploymentBlock,
-        ...pending,
-        log: [
-          selectedCard.trashOnPlay
-            ? `${player.leader} trashes ${selectedCard.name}.`
-            : undefined,
-          makerBonus > 0
-            ? `${player.leader} collects ${makerBonus} bonus spice from ${selectedSpace.name}.`
-            : undefined,
-          cardAgentEffect.log,
-          player.role === "Commander"
-            ? `${player.leader} activates ${target.leader} at ${selectedSpace.name} with ${selectedCard.name}.`
-            : `${player.leader} sends an Agent to ${selectedSpace.name} with ${selectedCard.name}.`,
-          ...controlledPostEffectState.log,
-        ].filter((entry): entry is string => Boolean(entry)),
-      };
-      const intrigueGain = boardSpaceIntrigueGainFor(selectedSpace, player);
-      const influenceThresholdState = resolveLeaderInfluenceThresholdRewards(nextState, current.players);
-      const intrigueState = intrigueGain > 0
-        ? drawIntrigueCards(influenceThresholdState, source.id, intrigueGain, selectedSpace.name)
-        : influenceThresholdState;
-      // Commanders send the Agent; activated Allies only receive routed board effects.
-      const resolvedState = resolveStabanSmuggleSpice(intrigueState, player.id, selectedSpace.id);
-      const totalSpiceGain = spiceGain + (cardAgentEffect.sourceSpiceGained ?? 0);
-      return totalSpiceGain > 0 ? recordTurnSpiceGain(resolvedState, source.id, totalSpiceGain) : resolvedState;
-    });
+    setGame((current) => placeAgentAction(current, { commanderTargets, selectedCard, selectedSpace }));
     setSelectedCardId(null);
     setSelectedSpaceId(null);
   }
@@ -415,78 +230,8 @@ export default function App() {
     if (game.pendingAction) return;
     if (game.agentTurnComplete) return;
     if (activePlayer.revealed) return;
-    const persuasion = revealPersuasionFor(activePlayer);
-    const swords = activePlayer.hand.reduce((sum, card) => sum + card.swords, 0) + (activePlayer.swordmasterBonus ? 2 : 0);
-    const revealGain = activePlayer.hand.reduce<Partial<Resources>>((gain, card) => {
-      Object.entries(card.revealGain ?? {}).forEach(([resource, amount]) => {
-        gain[resource as ResourceId] = (gain[resource as ResourceId] ?? 0) + (amount ?? 0);
-      });
-      return gain;
-    }, {});
-    const printedRevealCards = activePlayer.hand
-      .filter((card) => card.conditionalPersuasion || card.conditionalSwords)
-      .map((card) => card.name);
-    setGame((current) => {
-      const player = current.players[current.activeSeat];
-      const targetId =
-        player.role === "Commander"
-          ? activatedAllyIdFor(player, current.players)
-          : player.id;
-      const target = current.players.find((candidate) => candidate.id === targetId);
-      const combatRecipient = player.role === "Commander" ? target : player;
-      const combatSwords = combatRecipient && playerHasConflictUnits(combatRecipient) ? swords : 0;
-      const players = current.players.map((candidate, index) => {
-        if (index === current.activeSeat) {
-          return {
-            ...candidate,
-            revealed: true,
-            agentsReady: 0,
-            resources: addResources(candidate.resources, revealGain),
-            persuasion,
-            revealActivatedAllyId: candidate.role === "Commander" ? target?.id : undefined,
-            conflict: candidate.role === "Commander" ? candidate.conflict : candidate.conflict + combatSwords,
-            playArea: [...candidate.playArea, ...candidate.hand],
-            hand: [],
-          };
-        }
-        if (candidate.id === targetId && player.role === "Commander") {
-          return { ...candidate, conflict: candidate.conflict + combatSwords };
-        }
-        return candidate;
-      });
-      const postRevealState = { ...current, players };
-      const revealedPlayer = players[current.activeSeat];
-      const pending = queuePendingActions(
-        current,
-        pendingActionsForReveal(
-          revealedPlayer,
-          postRevealState,
-          player.hand,
-          player.role === "Commander" ? targetId : player.id,
-        ),
-      );
-      const revealedState: GameState = {
-        ...current,
-        conflictDeploymentBlock: undefined,
-        players,
-        ...pending,
-        log: [
-          ...(
-            printedRevealCards.length > 0
-              ? [`Resolve printed reveal text for ${printedRevealCards.join(", ")} before finalizing rewards.`]
-              : []
-          ),
-          player.role === "Commander"
-            ? `${player.leader} reveals for ${persuasion} persuasion${revealGainLabel(revealGain)} and gives ${combatSwords} strength to ${target?.leader ?? "an Ally"}.`
-            : `${player.leader} reveals for ${persuasion} persuasion, ${combatSwords} strength${revealGainLabel(revealGain)}.`,
-          ...current.log,
-        ],
-      };
-      const spiceTrackedState = (revealGain.spice ?? 0) > 0
-        ? recordTurnSpiceGain(revealedState, player.id, revealGain.spice ?? 0)
-        : revealedState;
-      return scoreGurneyAlwaysSmiling(spiceTrackedState, player.id);
-    });
+    const revealPlan = revealTurnPlan(activePlayer);
+    setGame((current) => revealTurnAction(current, { commanderTargets, revealPlan }));
   }
 
   function buyCard(card: Card) {
@@ -499,7 +244,7 @@ export default function App() {
       const buyer = current.players[current.activeSeat];
       const callToArmsRecruitOwnerId =
         buyer.callToArmsActive && buyer.role === "Commander"
-          ? activatedAllyIdFor(buyer, current.players)
+          ? activatedAllyIdFor(buyer, current.players, commanderTargets)
           : undefined;
       return acquireMarketCard(current, buyer.id, card.id, callToArmsRecruitOwnerId);
     });
@@ -929,7 +674,7 @@ export default function App() {
       const pending = current.pendingAction;
       if (!pending || pending.kind !== "acquire-card") return current;
       const owner = current.players.find((player) => player.id === pending.ownerId);
-      const recruitOwnerId = owner?.role === "Commander" ? activatedAllyIdFor(owner, current.players) : undefined;
+      const recruitOwnerId = owner?.role === "Commander" ? activatedAllyIdFor(owner, current.players, commanderTargets) : undefined;
       return maybeStartCombatPhase(acquireCardForPending(current, pending, cardId, recruitOwnerId));
     });
   }
@@ -1021,171 +766,6 @@ export default function App() {
     setGame((current) => scoreEndgameConditionalIntrigue(current, playerId, intrigueId));
   }
 
-  function scorePlotIntrigue(intrigueId: string) {
-    setGame((current) => playPlotBattleIconIntrigue(current, current.players[current.activeSeat].id, intrigueId));
-  }
-
-  function playContingencyPlanPlot(intrigueId: string) {
-    setGame((current) => playContingencyPlanPlotIntrigue(current, current.players[current.activeSeat].id, intrigueId));
-  }
-
-  function playCallToArmsPlot(intrigueId: string) {
-    setGame((current) => playCallToArmsPlotIntrigue(current, current.players[current.activeSeat].id, intrigueId));
-  }
-
-  function playIntelligenceReportPlot(intrigueId: string) {
-    setGame((current) => playIntelligenceReportPlotIntrigue(current, current.players[current.activeSeat].id, intrigueId));
-  }
-
-  function playInspireAwePlot(intrigueId: string) {
-    setGame((current) => {
-      const player = current.players[current.activeSeat];
-      const sandwormOwnerId = player.role === "Commander" ? activatedAllyIdFor(player, current.players) : undefined;
-      return playInspireAwePlotIntrigue(current, player.id, intrigueId, sandwormOwnerId);
-    });
-  }
-
-  function playManipulatePlot(intrigueId: string, cardId: string) {
-    setGame((current) => playManipulatePlotIntrigue(current, current.players[current.activeSeat].id, intrigueId, cardId));
-  }
-
-  function playLeveragePlot(intrigueId: string) {
-    setGame((current) => playLeveragePlotIntrigue(current, current.players[current.activeSeat].id, intrigueId));
-  }
-
-  function playDistractionPlot(intrigueId: string) {
-    setGame((current) => playDistractionPlotIntrigue(current, current.players[current.activeSeat].id, intrigueId));
-  }
-
-  function playCunningPlot(intrigueId: string, choice: "draw" | "paid-trash") {
-    setGame((current) => playCunningPlotIntrigue(current, current.players[current.activeSeat].id, intrigueId, choice));
-  }
-
-  function playSietchRitualPlot(intrigueId: string, discardCardId: string, faction: SietchRitualChoice) {
-    setGame((current) => {
-      const player = current.players[current.activeSeat];
-      const personalFaction = player.role === "Commander" && player.team === "muaddib" ? "fremen" : undefined;
-      const influenceOwnerId = player.role === "Commander" && faction !== personalFaction
-        ? activatedAllyIdFor(player, current.players)
-        : undefined;
-      return playSietchRitualPlotIntrigue(current, player.id, intrigueId, discardCardId, faction, influenceOwnerId);
-    });
-  }
-
-  function updateChangeAllegiancesSelection(intrigueId: string, selection: ChangeAllegiancesSelection) {
-    setChangeAllegiancesSelections((current) => ({
-      ...current,
-      [intrigueId]: { ...current[intrigueId], ...selection },
-    }));
-  }
-
-  function playChangeAllegiancesPlot(intrigueId: string, choice: ChangeAllegiancesChoice) {
-    setGame((current) => {
-      const player = current.players[current.activeSeat];
-      const influenceOwnerId = player.role === "Commander"
-        ? activatedAllyIdFor(player, current.players)
-        : undefined;
-      return playChangeAllegiancesPlotIntrigue(current, player.id, intrigueId, choice, influenceOwnerId);
-    });
-  }
-
-  function playSpecialMissionPlot(intrigueId: string, choice: SpecialMissionChoice) {
-    setGame((current) => playSpecialMissionPlotIntrigue(current, current.players[current.activeSeat].id, intrigueId, choice));
-  }
-
-  function playOpportunismPlot(intrigueId: string, choice: InfluenceLossPair) {
-    setGame((current) => playOpportunismPlotIntrigue(current, current.players[current.activeSeat].id, intrigueId, choice));
-  }
-
-  function playImperiumPoliticsPlot(intrigueId: string, faction: ImperiumPoliticsChoice) {
-    setGame((current) => {
-      const player = current.players[current.activeSeat];
-      const influenceOwnerId = player.role === "Commander" && faction !== "emperor"
-        ? activatedAllyIdFor(player, current.players)
-        : undefined;
-      return playImperiumPoliticsPlotIntrigue(current, player.id, intrigueId, faction, influenceOwnerId);
-    });
-  }
-
-  function playBuyAccessPlot(intrigueId: string, choice: BuyAccessChoice) {
-    setGame((current) => {
-      const player = current.players[current.activeSeat];
-      const influenceOwnerId = player.role === "Commander"
-        ? activatedAllyIdFor(player, current.players)
-        : undefined;
-      return playBuyAccessPlotIntrigue(current, player.id, intrigueId, choice, influenceOwnerId);
-    });
-  }
-
-  function playDepartForArrakisPlot(intrigueId: string, choice: "draw" | "spend-spice") {
-    setGame((current) => {
-      const player = current.players[current.activeSeat];
-      const troopOwnerId = player.role === "Commander"
-        ? activatedAllyIdFor(player, current.players)
-        : undefined;
-      return playDepartForArrakisPlotIntrigue(current, player.id, intrigueId, choice, troopOwnerId);
-    });
-  }
-
-  function playCouncilorsAmbitionPlot(intrigueId: string) {
-    setGame((current) => playCouncilorsAmbitionPlotIntrigue(current, current.players[current.activeSeat].id, intrigueId));
-  }
-
-  function playStrategicStockpilingPlot(intrigueId: string, choice: "spice" | "water" | "both") {
-    setGame((current) =>
-      playStrategicStockpilingPlotIntrigue(current, current.players[current.activeSeat].id, intrigueId, choice),
-    );
-  }
-
-  function playShaddamsFavorPlot(intrigueId: string) {
-    setGame((current) => {
-      const player = current.players[current.activeSeat];
-      const troopOwnerId = player.role === "Commander"
-        ? activatedAllyIdFor(player, current.players)
-        : undefined;
-      return playShaddamsFavorPlotIntrigue(current, player.id, intrigueId, troopOwnerId);
-    });
-  }
-
-  function playMarketOpportunityPlot(intrigueId: string, choice: "spice-to-solari" | "solari-to-spice") {
-    setGame((current) => playMarketOpportunityPlotIntrigue(current, current.players[current.activeSeat].id, intrigueId, choice));
-  }
-
-  function playMercenariesPlot(intrigueId: string) {
-    setGame((current) => {
-      const player = current.players[current.activeSeat];
-      const troopOwnerId = player.role === "Commander"
-        ? activatedAllyIdFor(player, current.players)
-        : undefined;
-      return playMercenariesPlotIntrigue(current, player.id, intrigueId, troopOwnerId);
-    });
-  }
-
-  function playBackedByChoamPlot(intrigueId: string, faction: FactionId) {
-    setGame((current) => playBackedByChoamPlotIntrigue(current, current.players[current.activeSeat].id, intrigueId, faction));
-  }
-
-  function playDetonation(intrigueId: string, choice: "shield-wall" | "deploy") {
-    setGame((current) => {
-      const player = current.players[current.activeSeat];
-      const deployOwnerId = player.role === "Commander"
-        ? activatedAllyIdFor(player, current.players)
-        : undefined;
-      return playDetonationIntrigue(current, player.id, intrigueId, choice, deployOwnerId);
-    });
-  }
-
-  function playUnexpectedAllies(intrigueId: string, removeShieldWall: boolean) {
-    setGame((current) => {
-      const player = current.players[current.activeSeat];
-      const sandwormOwnerId = player.role === "Commander"
-        ? activatedAllyIdFor(player, current.players)
-        : undefined;
-      const resolved = playUnexpectedAlliesIntrigue(current, player.id, intrigueId, removeShieldWall, sandwormOwnerId);
-      return scoreGurneyAlwaysSmiling(resolved, player.id);
-    });
-  }
-
   function finalizeEndgame() {
     setGame((current) => finishEndgame(current));
   }
@@ -1206,6 +786,11 @@ export default function App() {
   const playingPhase = game.phase === "playing";
   const pendingLocked = Boolean(game.pendingAction) || game.pendingQueue.length > 0;
   const plotIntrigueLocked = !playingPhase || pendingLocked;
+  const plotActionHandlers = createPlotActionHandlers({
+    commanderTargets,
+    setChangeAllegiancesSelections,
+    setGame,
+  });
 
   return (
     <main className="app-shell">
@@ -1343,31 +928,7 @@ export default function App() {
             changeAllegiancesSelections={changeAllegiancesSelections}
             game={game}
             plotIntrigueLocked={plotIntrigueLocked}
-            playBackedByChoamPlot={playBackedByChoamPlot}
-            playBuyAccessPlot={playBuyAccessPlot}
-            playCallToArmsPlot={playCallToArmsPlot}
-            playChangeAllegiancesPlot={playChangeAllegiancesPlot}
-            playContingencyPlanPlot={playContingencyPlanPlot}
-            playCouncilorsAmbitionPlot={playCouncilorsAmbitionPlot}
-            playCunningPlot={playCunningPlot}
-            playDepartForArrakisPlot={playDepartForArrakisPlot}
-            playDetonation={playDetonation}
-            playDistractionPlot={playDistractionPlot}
-            playImperiumPoliticsPlot={playImperiumPoliticsPlot}
-            playInspireAwePlot={playInspireAwePlot}
-            playIntelligenceReportPlot={playIntelligenceReportPlot}
-            playLeveragePlot={playLeveragePlot}
-            playManipulatePlot={playManipulatePlot}
-            playMarketOpportunityPlot={playMarketOpportunityPlot}
-            playMercenariesPlot={playMercenariesPlot}
-            playOpportunismPlot={playOpportunismPlot}
-            playShaddamsFavorPlot={playShaddamsFavorPlot}
-            playSietchRitualPlot={playSietchRitualPlot}
-            playSpecialMissionPlot={playSpecialMissionPlot}
-            playStrategicStockpilingPlot={playStrategicStockpilingPlot}
-            playUnexpectedAllies={playUnexpectedAllies}
-            scorePlotIntrigue={scorePlotIntrigue}
-            updateChangeAllegiancesSelection={updateChangeAllegiancesSelection}
+            {...plotActionHandlers}
           />
         </ActiveHandPanel>
 

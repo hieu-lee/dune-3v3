@@ -10,13 +10,13 @@ import {
   Plus,
   RotateCcw,
   Shield,
-  SkipForward,
   Sparkles,
   Swords,
   Users,
   X,
 } from "lucide-react";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { ActiveHandPanel } from "./components/ActiveHandPanel";
 import { BoardPanel } from "./components/BoardPanel";
 import { CommandBar } from "./components/CommandBar";
 import { LeaderReferenceModal } from "./components/LeaderReferenceModal";
@@ -2594,76 +2594,28 @@ export default function App() {
           </div>
         )}
 
-        <div className="hand-panel">
-          <div className="panel-heading">
-            <div>
-              <p className="eyebrow">Active hand</p>
-              <h2>{activePlayer.leader}</h2>
-            </div>
-            <div className="turn-actions">
-              <button type="button" className="primary-action" data-testid="place-agent" onClick={playAgent} disabled={!canPlayAgent}>
-                <HandCoins size={17} />
-                Place Agent
-              </button>
-              <button type="button" data-testid="end-agent" onClick={endAgentTurn} disabled={!playingPhase || !game.agentTurnComplete || pendingLocked}>
-                <SkipForward size={17} />
-                End Agent
-              </button>
-              <button type="button" data-testid="reveal-turn" onClick={revealTurn} disabled={!playingPhase || game.agentTurnComplete || activePlayer.revealed || Boolean(game.pendingAction)}>
-                <BookOpen size={17} />
-                Reveal
-              </button>
-              <button type="button" data-testid="end-reveal" onClick={endReveal} disabled={!playingPhase || !activePlayer.revealed || Boolean(game.pendingAction)}>
-                <SkipForward size={17} />
-                End
-              </button>
-            </div>
-          </div>
-          {activePlayer.role === "Commander" && (
-            <div className="activation-strip">
-              <span>Activating</span>
-              {activeAllies.map((ally) => (
-                <button
-                  type="button"
-                  key={ally.id}
-                  className={activatedAlly.id === ally.id ? "selected" : ""}
-                  disabled={!playingPhase || activePlayer.revealed}
-                  onClick={() =>
-                    setCommanderTargets((current) => ({
-                      ...current,
-                      [activePlayer.id]: ally.id,
-                    }))
-                  }
-                >
-                  {ally.leader}
-                </button>
-              ))}
-            </div>
-          )}
-          <div className="card-row">
-            {activePlayer.hand.map((card) => (
-              <button
-                type="button"
-                className={`hand-card ${playingPhase && selectedCardId === card.id ? "selected" : ""}`}
-                key={card.id}
-                data-testid={`hand-card-${card.id}`}
-                data-card-id={card.id}
-                aria-pressed={playingPhase && selectedCardId === card.id}
-                onClick={() => playingPhase && setSelectedCardId(card.id)}
-                disabled={!playingPhase}
-              >
-                {card.thumbnailPath && <img className="card-art" src={card.thumbnailPath} alt="" loading="lazy" />}
-                <span>{card.icons.map((icon) => iconLabels[icon]).join(" / ") || "Reveal"}</span>
-                <strong>{card.name}</strong>
-                <p>{card.play}</p>
-                <footer>
-                  <span><BookOpen size={13} /> {card.persuasion}</span>
-                  <span><Swords size={13} /> {card.swords}</span>
-                  {(card.conditionalPersuasion || card.conditionalSwords) && <span>Printed</span>}
-                </footer>
-              </button>
-            ))}
-          </div>
+        <ActiveHandPanel
+          activeAllies={activeAllies}
+          activePlayer={activePlayer}
+          activatedAlly={activatedAlly}
+          agentTurnComplete={game.agentTurnComplete}
+          canPlayAgent={canPlayAgent}
+          pendingActionActive={Boolean(game.pendingAction)}
+          pendingLocked={pendingLocked}
+          playingPhase={playingPhase}
+          selectedCardId={selectedCardId}
+          onEndAgentTurn={endAgentTurn}
+          onEndReveal={endReveal}
+          onPlaceAgent={playAgent}
+          onRevealTurn={revealTurn}
+          onSelectCard={setSelectedCardId}
+          onSelectCommanderTarget={(commanderId, allyId) =>
+            setCommanderTargets((current) => ({
+              ...current,
+              [commanderId]: allyId,
+            }))
+          }
+        >
           {activePlayer.intrigues.length > 0 && (
             <section className="intrigue-hand" aria-label={`${activePlayer.leader} Intrigue cards`}>
               <div className="intrigue-heading">
@@ -3383,7 +3335,7 @@ export default function App() {
               </div>
             </section>
           )}
-        </div>
+        </ActiveHandPanel>
 
         <MarketPanel
           activePlayer={activePlayer}

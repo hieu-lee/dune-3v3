@@ -249,6 +249,12 @@ export type PendingAction =
       optional: boolean;
     }
   | {
+      kind: "conflict-influence";
+      ownerId: string;
+      remaining: number;
+      source: string;
+    }
+  | {
       kind: "trash-card";
       ownerId: string;
       source: string;

@@ -52,6 +52,24 @@ export async function runPendingChoicesSmoke({
     "Influence choice should spend the selected Influence",
   );
   assert.equal(influenceOwnerAfter.conflict, influenceOwnerBefore.conflict + 2, "Influence choice should add pending strength");
+
+  await setDebugGameAndWait(page, pendingChoiceStates.conflictInfluence);
+  pendingText = await page.locator(".pending-panel").innerText();
+  assert.match(pendingText, /Conflict Influence/i);
+  assert.match(pendingText, /Skirmish \(Crysknife\)/i);
+  await screenshot(page, captures, "pending-conflict-influence.png");
+
+  const conflictInfluenceBefore = await currentGame(page);
+  const conflictInfluenceOwnerBefore = conflictInfluenceBefore.players.find((player) => player.id === "p2");
+  await page.locator(".pending-panel").getByRole("button", { name: /Bene Gesserit/ }).click();
+  await waitForNoPending(page);
+  const conflictInfluenceAfter = await currentGame(page);
+  const conflictInfluenceOwnerAfter = conflictInfluenceAfter.players.find((player) => player.id === "p2");
+  assert.equal(
+    conflictInfluenceOwnerAfter.influence.bene,
+    conflictInfluenceOwnerBefore.influence.bene + 1,
+    "Conflict Influence choice should gain the selected Influence",
+  );
 }
 
 async function createPendingChoiceStates(server, initialPlayableGame) {
@@ -98,6 +116,17 @@ async function createPendingChoiceStates(server, initialPlayableGame) {
         strength: 2,
         source: "Browser debug",
         optional: true,
+      },
+    },
+    conflictInfluence: {
+      ...base,
+      phase: "playing",
+      conflict: null,
+      pendingAction: {
+        kind: "conflict-influence",
+        ownerId,
+        remaining: 1,
+        source: "Skirmish (Crysknife)",
       },
     },
   };

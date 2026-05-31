@@ -29,6 +29,7 @@ import {
   adjustInfluence,
   resolveLeaderInfluenceThresholdRewards,
 } from "./leader-rewards";
+import { mainBoardInfluenceChoices } from "./influence-choices";
 import type {
   BattleIconId,
   ConflictCard,
@@ -48,6 +49,7 @@ type FirstPlaceBattleReward = {
   influence?: Partial<Record<FactionId, number>>;
   intrigues?: number;
   resources?: Partial<Record<ResourceId, number>>;
+  influenceChoices?: number;
   spies?: number;
   troops?: number;
   conversion?:
@@ -55,11 +57,16 @@ type FirstPlaceBattleReward = {
     | { kind: "recall-spies"; count: number; vp: number };
 };
 type ConflictVpConversionPendingAction = Extract<PendingAction, { kind: "conflict-vp-conversion" }>;
+type ConflictInfluencePendingAction = Extract<PendingAction, { kind: "conflict-influence" }>;
 type SpyPendingAction = Extract<PendingAction, { kind: "spy" }>;
 
 const resourceIds: ResourceId[] = ["solari", "spice", "water"];
 
 const firstPlaceBattleRewardsBySourceId: Record<number, FirstPlaceBattleReward> = {
+  451: {
+    fixedVp: 0,
+    influenceChoices: 1,
+  },
   452: {
     fixedVp: 0,
     intrigues: 1,
@@ -123,6 +130,23 @@ function canPayConflictConversion(
   if (!conversion) return false;
   if (conversion.kind === "resource") return owner.resources[conversion.resource] >= conversion.amount;
   return boardSpaces.filter((space) => playerHasSpyPost(state, space.id, owner.id)).length >= conversion.count;
+}
+
+function pendingActionForConflictInfluence(
+  owner: Player,
+  conflict: ConflictCard,
+  reward: FirstPlaceBattleReward | undefined,
+  multiplier: number,
+): ConflictInfluencePendingAction | undefined {
+  const remaining = (reward?.influenceChoices ?? 0) * multiplier;
+  return remaining > 0
+    ? {
+        kind: "conflict-influence",
+        ownerId: owner.id,
+        source: conflict.name,
+        remaining,
+      }
+    : undefined;
 }
 
 function pendingActionForConflictConversion(
@@ -323,8 +347,10 @@ function awardConflictToWinner(
     firstPlaceReward,
     multiplier,
   );
+  const influencePending = pendingActionForConflictInfluence(winner, conflict, firstPlaceReward, multiplier);
   const spyPending = pendingActionForSpyReward(state, winner, conflict, firstPlaceReward, multiplier);
   const rewardPendingActions: PendingAction[] = [];
+  if (influencePending) rewardPendingActions.push(influencePending);
   if (conversionPending) rewardPendingActions.push(conversionPending);
   if (spyPending) rewardPendingActions.push(spyPending);
   const [rewardPendingAction, ...queuedRewardActions] = rewardPendingActions;
@@ -361,6 +387,9 @@ function awardConflictToWinner(
       conversionPending
         ? `${winner.leader} may pay ${conflictConversionDescription(conversionPending)} from ${conflict.name}${conversionPending.remaining > 1 ? ` up to ${conversionPending.remaining} times` : ""}.`
         : undefined,
+      influencePending
+        ? `${winner.leader} may gain ${influencePending.remaining} Influence from ${conflict.name}${multiplier > 1 ? " with sandworm doubling" : ""}.`
+        : undefined,
       spyPending
         ? `${winner.leader} may place ${spyPending.remaining} ${spyPending.remaining === 1 ? "spy" : "spies"} from ${conflict.name}${multiplier > 1 ? " with sandworm doubling" : ""}.`
         : undefined,
@@ -385,6 +414,42 @@ function awardConflictToWinner(
   return gainedInfluence
     ? resolveLeaderInfluenceThresholdRewards(awardedState, state.players)
     : awardedState;
+}
+
+export function gainConflictInfluenceForPending(
+  state: GameState,
+  pending: ConflictInfluencePendingAction,
+  faction: FactionId,
+): GameState {
+  if (
+    state.pendingAction?.kind !== "conflict-influence" ||
+    state.pendingAction.ownerId !== pending.ownerId ||
+    state.pendingAction.source !== pending.source ||
+    state.pendingAction.remaining !== pending.remaining
+  ) {
+    return state;
+  }
+  const owner = state.players.find((player) => player.id === pending.ownerId);
+  if (!owner || !mainBoardInfluenceChoices.includes(faction)) return state;
+
+  const previousPlayers = state.players;
+  const remaining = pending.remaining - 1;
+  const nextPending =
+    remaining > 0
+      ? { pendingAction: { ...pending, remaining }, pendingQueue: state.pendingQueue }
+      : advancePendingAction(state);
+  const influencedState: GameState = {
+    ...state,
+    ...nextPending,
+    players: state.players.map((player) =>
+      player.id === owner.id ? adjustInfluence(player, faction, 1) : player,
+    ),
+    log: [
+      `${owner.leader} gains 1 ${factionLabels[faction]} Influence from ${pending.source}.`,
+      ...state.log,
+    ],
+  };
+  return resolveLeaderInfluenceThresholdRewards(influencedState, previousPlayers);
 }
 
 export function conflictVpConversionSpyChoices(

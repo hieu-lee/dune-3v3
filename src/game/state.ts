@@ -133,6 +133,7 @@ export {
 export {
   canPayConflictVpConversion,
   conflictVpConversionSpyChoices,
+  gainConflictInfluenceForPending,
   payConflictVpConversion,
   recallSpyForConflictVpConversion,
   resolveConflictTie,

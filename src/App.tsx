@@ -38,6 +38,7 @@ import {
   finishPendingAction,
   finishRevealTurn,
   finishRevealAdjustment as resolveRevealAdjustment,
+  gainConflictInfluenceForPending,
   iconCanReach,
   initialGame,
   loseInfluenceForPending,
@@ -750,6 +751,15 @@ export default function App() {
     });
   }
 
+  function chooseConflictInfluence(faction: FactionId) {
+    if (game.pendingAction?.kind !== "conflict-influence") return;
+    setGame((current) => {
+      const pending = current.pendingAction;
+      if (!pending || pending.kind !== "conflict-influence") return current;
+      return startNextRound(gainConflictInfluenceForPending(current, pending, faction));
+    });
+  }
+
   function playCombatCard(intrigueId: string, targetId?: string, combatChoice?: CombatIntrigueChoice) {
     if (game.phase !== "combat") return;
     setGame((current) =>
@@ -857,6 +867,7 @@ export default function App() {
             adjustThreatenSpiceProduction={adjustThreatenSpiceProduction}
             chooseCommandRespectTrade={chooseCommandRespectTrade}
             chooseCommanderResourceSplit={chooseCommanderResourceSplit}
+            chooseConflictInfluence={chooseConflictInfluence}
             chooseConflictTieWinner={chooseConflictTieWinner}
             chooseCorrinoMight={chooseCorrinoMight}
             chooseDemandAttention={chooseDemandAttention}

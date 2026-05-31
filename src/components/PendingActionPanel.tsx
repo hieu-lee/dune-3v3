@@ -28,6 +28,7 @@ import type {
 } from "../game/state";
 import type { FactionId, GameState, PendingAction, Player, TradeGoodId, TrashCardZone } from "../game/types";
 import { PendingAcquireCardPanel, PendingContractPanel } from "./PendingCardChoicePanels";
+import { PendingConflictInfluencePanel } from "./PendingConflictInfluencePanel";
 import { PendingConflictVpPanel } from "./PendingConflictVpPanel";
 import { PendingInfluenceLossPanel } from "./PendingInfluenceLossPanel";
 import { PendingIrulanSignetPanel } from "./PendingIrulanSignetPanel";
@@ -64,6 +65,7 @@ type PendingActionPanelProps = {
   adjustThreatenSpiceProduction: (contributorId: string, delta: number) => void;
   chooseCommandRespectTrade: (partnerId: string) => void;
   chooseCommanderResourceSplit: (optionIndex: number) => void;
+  chooseConflictInfluence: (faction: FactionId) => void;
   chooseConflictTieWinner: (winnerId?: string) => void;
   chooseCorrinoMight: () => void;
   chooseDemandAttention: () => void;
@@ -118,6 +120,7 @@ export function PendingActionPanel({
   adjustThreatenSpiceProduction,
   chooseCommandRespectTrade,
   chooseCommanderResourceSplit,
+  chooseConflictInfluence,
   chooseConflictTieWinner,
   chooseCorrinoMight,
   chooseDemandAttention,
@@ -326,6 +329,8 @@ export function PendingActionPanel({
     pendingAction.kind === "jessica-other-memories" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingConflictVpOwner =
     pendingAction.kind === "conflict-vp-conversion" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
+  const pendingConflictInfluenceOwner =
+    pendingAction.kind === "conflict-influence" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingConflictVpCanPay =
     pendingAction.kind === "conflict-vp-conversion" ? canPayConflictVpConversion(game, pendingAction) : false;
   const pendingConflictVpSpyChoices =
@@ -408,6 +413,7 @@ export function PendingActionPanel({
           {pendingAction.kind === "jessica-water-of-life" && `${pendingJessicaWaterOfLifeOwner?.leader ?? "Reverend Mother Jessica"} Water of Life`}
           {pendingAction.kind === "jessica-reverend-mother" && `${pendingJessicaReverendMotherOwner?.leader ?? "Reverend Mother Jessica"} Reverend Mother`}
           {pendingAction.kind === "jessica-other-memories" && `${pendingJessicaOtherMemoriesOwner?.leader ?? "Lady Jessica"} Other Memories`}
+          {pendingAction.kind === "conflict-influence" && `${pendingConflictInfluenceOwner?.leader ?? "Player"} Conflict Influence`}
           {pendingAction.kind === "conflict-vp-conversion" && `${pendingConflictVpOwner?.leader ?? "Player"} Conflict reward`}
           {pendingAction.kind === "command-respect" && `${pendingCommandRespectCommander?.leader ?? "Muad'Dib"} Command Respect`}
           {pendingAction.kind === "demand-results" && `${pendingDemandResultsCommander?.leader ?? "Shaddam"} Demand Results`}
@@ -599,6 +605,14 @@ export function PendingActionPanel({
           onPay={payConflictVpReward}
           onRecallSpy={recallConflictRewardSpy}
           onSkip={skipConflictVpReward}
+        />
+      )}
+
+      {pendingAction.kind === "conflict-influence" && (
+        <PendingConflictInfluencePanel
+          owner={pendingConflictInfluenceOwner}
+          pending={pendingAction}
+          onChoose={chooseConflictInfluence}
         />
       )}
 

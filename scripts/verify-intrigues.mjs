@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { createServer } from "vite";
+import { collectIntrigueVerifierCards } from "./verify-intrigues-cards.mjs";
 
 const projectRoot = new URL("..", import.meta.url);
 const resourceKeys = ["solari", "spice", "water"];
@@ -80,211 +81,38 @@ try {
   assert.equal(drawn.intrigueDiscard.length, 0, "Drawing should not create a discard");
   assert.match(drawn.log[0], /draws 2 Intrigue cards from Test/);
 
-  const crysknife = data.intrigueCards.find((card) => card.sourceId === 159);
-  const strategicStockpiling = data.intrigueCards.find((card) => card.sourceId === 130);
-  const detonation = data.intrigueCards.find((card) => card.sourceId === 131);
-  const departForArrakis = data.intrigueCards.find((card) => card.sourceId === 132);
-  const unexpectedAllies = data.intrigueCards.find((card) => card.sourceId === 137);
-  const callToArms = data.intrigueCards.find((card) => card.sourceId === 138);
-  const shaddamsFavor = data.intrigueCards.find((card) => card.sourceId === 141);
-  const intelligenceReport = data.intrigueCards.find((card) => card.sourceId === 142);
-  const manipulate = data.intrigueCards.find((card) => card.sourceId === 143);
-  const distraction = data.intrigueCards.find((card) => card.sourceId === 144);
-  const leverage = data.intrigueCards.find((card) => card.sourceId === 447);
-  const cunning = data.intrigueCards.find((card) => card.sourceId === 133);
-  const sietchRitual = data.intrigueCards.find((card) => card.sourceId === 127);
-  const opportunism = data.intrigueCards.find((card) => card.sourceId === 134);
-  const changeAllegiances = data.intrigueCards.find((card) => card.sourceId === 135);
-  const specialMission = data.intrigueCards.find((card) => card.sourceId === 136);
-  const buyAccess = data.intrigueCards.find((card) => card.sourceId === 139);
-  const imperiumPolitics = data.intrigueCards.find((card) => card.sourceId === 140);
-  const councilorsAmbition = data.intrigueCards.find((card) => card.sourceId === 129);
-  const marketOpportunity = data.intrigueCards.find((card) => card.sourceId === 145);
-  const contingencyPlan = data.intrigueCards.find((card) => card.sourceId === 147);
-  const inspireAwe = data.intrigueCards.find((card) => card.sourceId === 148);
-  const findWeakness = data.intrigueCards.find((card) => card.sourceId === 149);
-  const goToGround = data.intrigueCards.find((card) => card.sourceId === 146);
-  const questionableMethods = data.intrigueCards.find((card) => card.sourceId === 156);
-  const springTheTrap = data.intrigueCards.find((card) => card.sourceId === 153);
-  const devour = data.intrigueCards.find((card) => card.sourceId === 151);
-  const impress = data.intrigueCards.find((card) => card.sourceId === 152);
-  const backedByChoam = data.intrigueCards.find((card) => card.sourceId === 448);
-  const mercenaries = data.intrigueCards.find((card) => card.sourceId === 128);
-  assert.ok(crysknife, "Crysknife Intrigue should be available");
-  assert.ok(strategicStockpiling, "Strategic Stockpiling Intrigue should be available");
-  assert.ok(detonation, "Detonation Intrigue should be available");
-  assert.ok(departForArrakis, "Depart For Arrakis Intrigue should be available");
-  assert.ok(unexpectedAllies, "Unexpected Allies Intrigue should be available");
-  assert.ok(callToArms, "Call to Arms Intrigue should be available");
-  assert.ok(shaddamsFavor, "Shaddam's Favor Intrigue should be available");
-  assert.ok(intelligenceReport, "Intelligence Report Intrigue should be available");
-  assert.ok(manipulate, "Manipulate Intrigue should be available");
-  assert.ok(distraction, "Distraction Intrigue should be available");
-  assert.ok(leverage, "Leverage Intrigue should be available");
-  assert.ok(cunning, "Cunning Intrigue should be available");
-  assert.ok(sietchRitual, "Sietch Ritual Intrigue should be available");
-  assert.ok(opportunism, "Opportunism Intrigue should be available");
-  assert.ok(changeAllegiances, "Change Allegiances Intrigue should be available");
-  assert.ok(specialMission, "Special Mission Intrigue should be available");
-  assert.ok(buyAccess, "Buy Access Intrigue should be available");
-  assert.ok(imperiumPolitics, "Imperium Politics Intrigue should be available");
-  assert.ok(councilorsAmbition, "Councilor's Ambition Intrigue should be available");
-  assert.ok(marketOpportunity, "Market Opportunity Intrigue should be available");
-  assert.ok(contingencyPlan, "Contingency Plan Intrigue should be available");
-  assert.ok(inspireAwe, "Inspire Awe Intrigue should be available");
-  assert.ok(findWeakness, "Find Weakness Intrigue should be available");
-  assert.ok(goToGround, "Go To Ground Intrigue should be available");
-  assert.ok(questionableMethods, "Questionable Methods Intrigue should be available");
-  assert.ok(springTheTrap, "Spring The Trap Intrigue should be available");
-  assert.ok(devour, "Devour Intrigue should be available");
-  assert.ok(impress, "Impress Intrigue should be available");
-  assert.ok(backedByChoam, "Backed by CHOAM Intrigue should be available");
-  assert.ok(mercenaries, "Mercenaries Intrigue should be available");
-  assert.equal(
-    strategicStockpiling.summary,
-    "Spend 5 spice to gain 1 VP; with 3+ Spacing Guild Influence, you may also spend 3 water to gain 1 VP.",
-    "Strategic Stockpiling should expose both VP conversion branches",
-  );
-  assert.equal(
-    detonation.summary,
-    "Remove the Shield Wall OR deploy up to four troops from your garrison to the Conflict.",
-    "Detonation should expose its printed Plot choice instead of a generic imported-image summary",
-  );
-  assert.equal(
-    departForArrakis.summary,
-    "Spend 2 spice to recruit 3 troops; with 3+ Fremen/Fringe Influence, draw 1 card.",
-    "Depart For Arrakis should expose its spice troop cost and conditional card draw",
-  );
-  assert.equal(
-    unexpectedAllies.summary,
-    "Pay 2 water to deploy a sandworm to the Conflict; may remove the Shield Wall.",
-    "Unexpected Allies should expose its water, detonation, and sandworm effect",
-  );
-  assert.equal(
-    callToArms.summary,
-    "During your Reveal turn this round, whenever you acquire a card, recruit 1 troop.",
-    "Call to Arms should expose its reveal-turn acquisition trigger",
-  );
-  assert.equal(
-    councilorsAmbition.summary,
-    "If you have a seat on the High Council, gain 2 water.",
-    "Councilor's Ambition should expose its High Council requirement",
-  );
-  assert.equal(
-    shaddamsFavor.summary,
-    "Recruit 1 troop; with 3+ Emperor/Great Houses Influence, gain 3 Solari.",
-    "Shaddam's Favor should expose its recruit and conditional Solari effects",
-  );
-  assert.equal(
-    intelligenceReport.summary,
-    "Draw 1 card; draw 1 more if you have two or more spies on the board.",
-    "Intelligence Report should expose its conditional card draw",
-  );
-  assert.equal(
-    manipulate.summary,
-    "Remove and replace a card in the Imperium Row; during your Reveal turn this round, you may acquire it for 1 Persuasion less.",
-    "Manipulate should expose its row removal and Reveal discount effect",
-  );
-  assert.equal(
-    distraction.summary,
-    "After you deploy three or more units to the Conflict in a single turn, place a spy on the same observation post as another player's spy.",
-    "Distraction should expose its three-unit shared-spy trigger",
-  );
-  assert.equal(
-    leverage.summary,
-    "If you gained spice this turn, gain 1 Solari and take a face-up CHOAM contract.",
-    "Leverage should expose its spice-gated Solari and contract effect",
-  );
-  assert.equal(
-    cunning.summary,
-    "Draw 1 card OR spend 1 spice to draw 1 card and trash 1 card.",
-    "Cunning should expose both Plot branches",
-  );
-  assert.equal(
-    sietchRitual.summary,
-    "Discard a card to gain 1 Bene Gesserit or Fremen/Fringe Influence.",
-    "Sietch Ritual should expose its discard-for-Influence choice",
-  );
-  assert.equal(
-    opportunism.summary,
-    "Spend 2 Solari and lose 2 Influence to gain 1 VP.",
-    "Opportunism should expose its Solari and Influence costs for 1 VP",
-  );
-  assert.equal(
-    changeAllegiances.summary,
-    "Lose 1 Influence to gain 1 Influence; you may also spend 3 spice to gain 1 Influence.",
-    "Change Allegiances should expose both optional Influence branches",
-  );
-  assert.equal(
-    specialMission.summary,
-    "Place 1 spy on a City observation post OR recall 1 spy to remove the Shield Wall and gain 2 spice.",
-    "Special Mission should expose its City spy and recall-spy branches",
-  );
-  assert.equal(
-    buyAccess.summary,
-    "Spend 5 Solari to gain two different Influence among Emperor/Great Houses, Fremen/Fringe, Bene Gesserit, and Spacing Guild.",
-    "Buy Access should expose its Solari-for-two-Influence choice",
-  );
-  assert.equal(
-    imperiumPolitics.summary,
-    "Spend 1 Solari to gain 1 Emperor/Great Houses or Spacing Guild Influence.",
-    "Imperium Politics should expose its Solari-for-Influence choice",
-  );
-  assert.equal(
-    marketOpportunity.summary,
-    "Spend 2 spice to gain 5 Solari OR spend 5 Solari to gain 5 spice.",
-    "Market Opportunity should expose both resource exchange branches",
-  );
-  assert.equal(
-    contingencyPlan.summary,
-    "Gain 2 Solari as a Plot Intrigue OR add 3 strength as a Combat Intrigue.",
-    "Contingency Plan should expose both printed timing branches",
-  );
-  assert.equal(
-    inspireAwe.summary,
-    "Acquire a card that costs 3 or less; put it in your hand if you have a sandworm in the Conflict.",
-    "Inspire Awe should expose its acquisition and sandworm destination effect",
-  );
-  assert.equal(
-    findWeakness.summary,
-    "Add 2 strength; you may recall 1 spy to add 3 more strength.",
-    "Find Weakness should expose its base strength and optional spy recall",
-  );
-  assert.equal(
-    goToGround.summary,
-    "Retreat 1 or 2 troops, then optionally place a spy.",
-    "Go To Ground should expose its troop retreat and spy placement effect",
-  );
-  assert.equal(
-    questionableMethods.summary,
-    "Add 1 strength; the recipient may lose 1 Influence, or a Commander may lose personal Influence, to add 4 more strength.",
-    "Questionable Methods should expose its base strength and optional Influence loss",
-  );
-  assert.equal(
-    springTheTrap.summary,
-    "Recall 2 spies to add 7 strength.",
-    "Spring The Trap should expose its two-spy cost and Combat strength",
-  );
-  assert.equal(
-    devour.summary,
-    "Add 2 strength; if the recipient has one or more sandworms in the Conflict, add 4 strength instead and they may trash a card.",
-    "Devour should expose its sandworm threshold and optional trash effect",
-  );
-  assert.equal(
-    impress.summary,
-    "Add 2 strength, then acquire a card that costs 3 or less.",
-    "Impress should expose its strength and acquisition effect",
-  );
-  assert.equal(
-    backedByChoam.summary,
-    "Lose 1 Influence to gain 4 Solari as a Plot Intrigue OR add 4 strength in Combat if you have completed at least two contracts.",
-    "Backed by CHOAM should expose its Plot branch and completed-contract Combat threshold",
-  );
-  assert.equal(
-    mercenaries.summary,
-    "Spend 3 Solari to draw 1 Intrigue and recruit 2 troops.",
-    "Mercenaries should expose its Solari cost, Intrigue draw, and troop recruit",
-  );
+  const {
+    backedByChoam,
+    buyAccess,
+    callToArms,
+    changeAllegiances,
+    contingencyPlan,
+    councilorsAmbition,
+    crysknife,
+    cunning,
+    departForArrakis,
+    detonation,
+    devour,
+    distraction,
+    findWeakness,
+    goToGround,
+    imperiumPolitics,
+    impress,
+    inspireAwe,
+    intelligenceReport,
+    leverage,
+    manipulate,
+    marketOpportunity,
+    mercenaries,
+    opportunism,
+    questionableMethods,
+    shaddamsFavor,
+    sietchRitual,
+    specialMission,
+    springTheTrap,
+    strategicStockpiling,
+    unexpectedAllies,
+  } = collectIntrigueVerifierCards(data);
   const plotFixture = {
     ...game,
     activeSeat: game.players.findIndex((candidate) => candidate.id === "p2"),

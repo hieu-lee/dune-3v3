@@ -329,6 +329,67 @@ try {
     "Siege Of Arrakeen troop reward should recruit only available troop supply",
   );
 
+  const protectSietchesReward = fixture(state, data, (players) =>
+    players.map((player) =>
+      player.id === "p2"
+        ? {
+            ...player,
+            conflict: 9,
+            deployedTroops: 1,
+            garrison: 0,
+            influence: { ...player.influence, fremen: 1 },
+            resources: { ...player.resources, water: 0 },
+            vp: 0,
+          }
+        : player,
+    ), 461);
+  const protectSietchesResult = state.startNextRound(protectSietchesReward);
+  const protectSietchesWinner = playerById(protectSietchesResult, "p2");
+  assert.equal(protectSietchesWinner.resources.water, 1, "Protect The Sietches should pay first-place water");
+  assert.equal(protectSietchesWinner.garrison, 1, "Protect The Sietches should recruit a first-place troop");
+  assert.equal(protectSietchesWinner.influence.fremen, 2, "Protect The Sietches should award Fremen Influence");
+  assert.equal(protectSietchesWinner.vp, 1, "Protect The Sietches Influence should score the 2-Influence VP");
+  assert.equal(protectSietchesResult.pendingAction, undefined, "Protect The Sietches reward should not require choices");
+  assert.ok(
+    protectSietchesResult.log.some((entry) =>
+      entry.includes("gains 1 water") &&
+      entry.includes("1 Fremen Influence") &&
+      entry.includes("recruits 1 troop") &&
+      entry.includes("Protect The Sietches")
+    ),
+    "Protect The Sietches should log the paid printed reward",
+  );
+
+  const doubledProtectSietchesReward = fixture(state, data, (players) =>
+    players.map((player) =>
+      player.id === "p3"
+        ? {
+            ...player,
+            conflict: 9,
+            deployedSandworms: 1,
+            garrison: 0,
+            influence: { ...player.influence, fremen: 0 },
+            resources: { ...player.resources, water: 0 },
+            vp: 0,
+          }
+        : player,
+    ), 461);
+  const doubledProtectSietchesResult = state.startNextRound(doubledProtectSietchesReward);
+  const doubledProtectSietchesWinner = playerById(doubledProtectSietchesResult, "p3");
+  assert.equal(doubledProtectSietchesWinner.resources.water, 2, "Sandworms should double Protect The Sietches water");
+  assert.equal(doubledProtectSietchesWinner.garrison, 2, "Sandworms should double Protect The Sietches troop recruitment");
+  assert.equal(doubledProtectSietchesWinner.influence.fremen, 2, "Sandworms should double Protect The Sietches Influence");
+  assert.equal(doubledProtectSietchesWinner.vp, 1, "Doubled Influence should still score the threshold VP once");
+  assert.ok(
+    doubledProtectSietchesResult.log.some((entry) =>
+      entry.includes("gains 2 water") &&
+      entry.includes("2 Fremen Influence") &&
+      entry.includes("recruits 2 troops") &&
+      entry.includes("sandworm doubling")
+    ),
+    "Doubled Protect The Sietches should log the doubled printed reward",
+  );
+
   const secureImperialBasinReward = fixture(state, data, (players) =>
     players.map((player) =>
       player.id === "p2"

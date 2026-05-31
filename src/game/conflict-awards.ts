@@ -1,6 +1,8 @@
 import {
   battleIconLabels,
   boardSpaces,
+  factionIds,
+  factionLabels,
   teams,
 } from "./data";
 import {
@@ -18,9 +20,14 @@ import {
   removeSpyPostOwner,
 } from "./spy-posts";
 import { playerTroopSupply } from "./deck-utils";
+import {
+  adjustInfluence,
+  resolveLeaderInfluenceThresholdRewards,
+} from "./leader-rewards";
 import type {
   BattleIconId,
   ConflictCard,
+  FactionId,
   GameState,
   PendingAction,
   Player,
@@ -33,6 +40,7 @@ function isStandardBattleIcon(icon: ConflictCard["battleIcon"]): icon is BattleI
 
 type FirstPlaceBattleReward = {
   fixedVp: number;
+  influence?: Partial<Record<FactionId, number>>;
   resources?: Partial<Record<ResourceId, number>>;
   troops?: number;
   conversion?:
@@ -52,6 +60,12 @@ const firstPlaceBattleRewardsBySourceId: Record<number, FirstPlaceBattleReward> 
   460: {
     fixedVp: 0,
     resources: { spice: 2 },
+    troops: 1,
+  },
+  461: {
+    fixedVp: 0,
+    influence: { fremen: 1 },
+    resources: { water: 1 },
     troops: 1,
   },
   464: {
@@ -137,17 +151,26 @@ function applyImmediateFirstPlacePrintedReward(
     if (amount > 0) gains[resource] = amount;
     return gains;
   }, {});
+  const influenceGains = factionIds.reduce<Partial<Record<FactionId, number>>>((gains, faction) => {
+    const amount = (reward?.influence?.[faction] ?? 0) * multiplier;
+    if (amount > 0) gains[faction] = amount;
+    return gains;
+  }, {});
   const recruitedTroops = Math.min(playerTroopSupply(player), (reward?.troops ?? 0) * multiplier);
   const resources = { ...player.resources };
   for (const resource of resourceIds) {
     resources[resource] += resourceGains[resource] ?? 0;
   }
-  return {
-    player: {
-      ...player,
-      resources,
-      garrison: player.garrison + recruitedTroops,
+  const rewardedPlayer = factionIds.reduce(
+    (nextPlayer, faction) => {
+      const amount = influenceGains[faction] ?? 0;
+      return amount > 0 ? adjustInfluence(nextPlayer, faction, amount) : nextPlayer;
     },
+    { ...player, resources, garrison: player.garrison + recruitedTroops },
+  );
+  return {
+    player: rewardedPlayer,
+    influenceGains,
     resourceGains,
     recruitedTroops,
   };
@@ -155,12 +178,18 @@ function applyImmediateFirstPlacePrintedReward(
 
 function immediatePrintedRewardDescription(
   resourceGains: Partial<Record<ResourceId, number>>,
+  influenceGains: Partial<Record<FactionId, number>>,
   recruitedTroops: number,
 ) {
-  const gainParts = resourceIds.flatMap((resource) => {
+  const resourceParts = resourceIds.flatMap((resource) => {
     const amount = resourceGains[resource] ?? 0;
     return amount > 0 ? [`${amount} ${resource}`] : [];
   });
+  const influenceParts = factionIds.flatMap((faction) => {
+    const amount = influenceGains[faction] ?? 0;
+    return amount > 0 ? [`${amount} ${factionLabels[faction]} Influence`] : [];
+  });
+  const gainParts = [...resourceParts, ...influenceParts];
   const actions = [
     gainParts.length > 0 ? `gains ${joinRewardParts(gainParts)}` : undefined,
     recruitedTroops > 0 ? `recruits ${recruitedTroops} troop${recruitedTroops === 1 ? "" : "s"}` : undefined,
@@ -242,6 +271,7 @@ function awardConflictToWinner(
   const immediatePrintedReward = applyImmediateFirstPlacePrintedReward(winner, firstPlaceReward, multiplier);
   const immediateRewardText = immediatePrintedRewardDescription(
     immediatePrintedReward.resourceGains,
+    immediatePrintedReward.influenceGains,
     immediatePrintedReward.recruitedTroops,
   );
   const winnerWithPrintedRewards = printedVp > 0
@@ -249,7 +279,7 @@ function awardConflictToWinner(
     : immediatePrintedReward.player;
   const scored = scoreBattleIconMatch(winnerWithPrintedRewards, conflict);
   const players = state.players.map((player) => (player.id === winner.id ? scored.player : player));
-  return {
+  const awardedState = {
     ...state,
     players,
     locationControl: location
@@ -278,6 +308,10 @@ function awardConflictToWinner(
       ...state.log,
     ].filter((entry): entry is string => Boolean(entry)),
   };
+  const gainedInfluence = Object.values(immediatePrintedReward.influenceGains).some((amount) => amount > 0);
+  return gainedInfluence
+    ? resolveLeaderInfluenceThresholdRewards(awardedState, state.players)
+    : awardedState;
 }
 
 export function conflictVpConversionSpyChoices(

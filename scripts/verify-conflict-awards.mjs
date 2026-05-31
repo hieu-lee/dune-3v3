@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { createServer } from "vite";
 import { verifySeizeSpiceRefineryConflictAwards } from "./verify-conflict-awards-seize.mjs";
+import { verifyTestOfLoyaltyConflictAwards } from "./verify-conflict-awards-test-of-loyalty.mjs";
 
 const server = await createServer({
   appType: "custom",
@@ -331,6 +332,13 @@ try {
   );
 
   verifySeizeSpiceRefineryConflictAwards({
+    state,
+    data,
+    fixture,
+    conflictBySourceId,
+    playerById,
+  });
+  verifyTestOfLoyaltyConflictAwards({
     state,
     data,
     fixture,

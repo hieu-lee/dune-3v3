@@ -70,6 +70,12 @@ const firstPlaceBattleRewardsBySourceId: Record<number, FirstPlaceBattleReward> 
     resources: { spice: 2 },
     spies: 1,
   },
+  458: {
+    fixedVp: 0,
+    influence: { emperor: 1 },
+    resources: { solari: 2 },
+    spies: 1,
+  },
   459: {
     fixedVp: 0,
     influence: { bene: 1 },

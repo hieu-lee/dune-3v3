@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { createServer } from "vite";
-import { verifyBasicCardEffectIntrigues, verifyBasicPlotIntrigues } from "./verify-intrigues-basic.mjs";
+import {
+  verifyBasicCardEffectIntrigues,
+  verifyBasicPlotIntrigues,
+  verifyCunningPlotIntrigue,
+} from "./verify-intrigues-basic.mjs";
 import { collectIntrigueVerifierCards } from "./verify-intrigues-cards.mjs";
 import { verifyDistractionPlotIntrigue } from "./verify-intrigues-spy.mjs";
 
@@ -358,131 +362,11 @@ try {
   );
   assert.equal(playerById(muadDibDepartDraw, "p1").hand.length, 1, "Muad'Dib should use personal Fremen Influence for Depart For Arrakis");
 
-  const cunningFixture = {
-    ...game,
-    activeSeat: game.players.findIndex((candidate) => candidate.id === "p2"),
-    pendingAction: undefined,
-    pendingQueue: [],
-    intrigueDiscard: [],
-    players: game.players.map((candidate) =>
-      candidate.id === "p2"
-        ? {
-            ...candidate,
-            resources: { ...candidate.resources, spice: 2 },
-            hand: [],
-            deck: candidate.deck.slice(0, 3),
-            discard: [],
-            playArea: [],
-            intrigues: [cunning],
-          }
-        : { ...candidate, intrigues: [] },
-    ),
-  };
-  assert.equal(
-    state.isCunningIntrigue(cunning),
-    true,
-    "Cunning should be recognized as a structured Plot Intrigue",
-  );
-  const cunningDrawn = state.playCunningPlotIntrigue(cunningFixture, "p2", cunning.id, "draw");
-  assert.equal(playerById(cunningDrawn, "p2").hand.length, 1, "Cunning free branch should draw 1 card");
-  assert.equal(playerById(cunningDrawn, "p2").resources.spice, 2, "Cunning free branch should not spend spice");
-  assert.deepEqual(playerById(cunningDrawn, "p2").intrigues, []);
-  assert.equal(cunningDrawn.pendingAction, undefined, "Cunning free branch should not queue a trash choice");
-  assert.equal(cunningDrawn.intrigueDiscard.at(-1).id, cunning.id);
-  assert.match(cunningDrawn.log[0], /plays Cunning and draws 1 card/);
-  const cunningPaid = state.playCunningPlotIntrigue(cunningFixture, "p2", cunning.id, "paid-trash");
-  assert.equal(playerById(cunningPaid, "p2").hand.length, 1, "Cunning paid branch should draw before trashing");
-  assert.equal(playerById(cunningPaid, "p2").resources.spice, 1, "Cunning paid branch should spend 1 spice");
-  assert.deepEqual(cunningPaid.pendingAction, {
-    kind: "trash-card",
-    ownerId: "p2",
-    source: "Cunning",
-    optional: false,
+  verifyCunningPlotIntrigue({
+    cards: { cunning, mercenaries },
+    game,
+    state,
   });
-  assert.equal(cunningPaid.intrigueDiscard.at(-1).id, cunning.id);
-  assert.match(cunningPaid.log[0], /spends 1 spice, draws 1 card, and must trash 1 card/);
-  assert.equal(
-    state.skipTrashCard(cunningPaid, cunningPaid.pendingAction),
-    cunningPaid,
-    "Cunning's paid branch should require the trash",
-  );
-  const cunningTrashChoice = playerById(cunningPaid, "p2").hand[0];
-  const cunningTrashed = state.trashPlayerCard(cunningPaid, cunningPaid.pendingAction, "hand", cunningTrashChoice.id);
-  assert.equal(playerById(cunningTrashed, "p2").hand.length, 0, "Cunning trash should remove the selected card");
-  assert.equal(cunningTrashed.pendingAction, undefined, "Cunning trash should clear the pending action");
-  assert.match(cunningTrashed.log[0], /trashes .* from Cunning/);
-  const poorCunning = {
-    ...cunningFixture,
-    players: cunningFixture.players.map((candidate) =>
-      candidate.id === "p2"
-        ? { ...candidate, resources: { ...candidate.resources, spice: 0 }, intrigues: [cunning] }
-        : candidate,
-    ),
-  };
-  assert.equal(
-    state.playCunningPlotIntrigue(poorCunning, "p2", cunning.id, "paid-trash"),
-    poorCunning,
-    "Cunning paid branch should require 1 spice",
-  );
-  const pendingCunning = {
-    ...cunningFixture,
-    pendingAction: { kind: "spy", ownerId: "p2", remaining: 1, source: "Test" },
-  };
-  assert.equal(
-    state.playCunningPlotIntrigue(pendingCunning, "p2", cunning.id, "draw"),
-    pendingCunning,
-    "Cunning should wait for pending actions to resolve",
-  );
-  const queuedCunning = {
-    ...cunningFixture,
-    pendingQueue: [{ kind: "spy", ownerId: "p2", remaining: 1, source: "Test" }],
-  };
-  assert.equal(
-    state.playCunningPlotIntrigue(queuedCunning, "p2", cunning.id, "draw"),
-    queuedCunning,
-    "Cunning should wait for queued pending actions to resolve",
-  );
-  assert.equal(
-    state.playCunningPlotIntrigue(cunningFixture, "p3", cunning.id, "draw"),
-    cunningFixture,
-    "Only the active player should play Cunning as a Plot Intrigue",
-  );
-  assert.equal(
-    state.playCunningPlotIntrigue(cunningFixture, "p2", mercenaries.id, "draw"),
-    cunningFixture,
-    "Cunning should reject other Intrigue cards",
-  );
-  const commanderCunningFixture = {
-    ...cunningFixture,
-    activeSeat: game.players.findIndex((candidate) => candidate.id === "p4"),
-    players: game.players.map((candidate) => {
-      if (candidate.id === "p4") {
-        return {
-          ...candidate,
-          resources: { ...candidate.resources, spice: 1 },
-          hand: [],
-          deck: candidate.deck.slice(0, 2),
-          discard: [],
-          playArea: [],
-          revealed: true,
-          revealActivatedAllyId: "p6",
-          intrigues: [cunning],
-        };
-      }
-      if (candidate.id === "p6") return { ...candidate, hand: [], deck: candidate.deck.slice(0, 2), intrigues: [] };
-      return { ...candidate, intrigues: [] };
-    }),
-  };
-  const commanderCunning = state.playCunningPlotIntrigue(
-    commanderCunningFixture,
-    "p4",
-    cunning.id,
-    "paid-trash",
-  );
-  assert.equal(playerById(commanderCunning, "p4").resources.spice, 0, "Commander Cunning should spend Commander spice");
-  assert.equal(playerById(commanderCunning, "p4").hand.length, 1, "Commander Cunning should draw for the Commander");
-  assert.equal(playerById(commanderCunning, "p6").hand.length, 0, "Commander Cunning should not target the activated Ally");
-  assert.equal(commanderCunning.pendingAction?.ownerId, "p4", "Commander Cunning should require the Commander to trash");
 
   const sietchDiscardCard = { ...data.allyStarterCards[0], id: "sietch-discard-card" };
   const sietchRitualFixture = {

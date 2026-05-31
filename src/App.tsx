@@ -116,8 +116,10 @@ declare global {
   interface Window {
     __DUNE_DEBUG__?: {
       capture: (label?: string) => Promise<unknown>;
+      getCommanderTargets: () => Record<string, string>;
       getGame: () => GameState;
       setGame: (game: GameState) => void;
+      setCommanderTarget: (commanderId: string, allyId: string) => void;
     };
     __DUNE_DEBUG_CAPTURE__?: (request: { label?: string; game: GameState }) => Promise<unknown>;
   }
@@ -155,7 +157,9 @@ export default function App() {
     }
     window.__DUNE_DEBUG__ = {
       capture,
+      getCommanderTargets: () => commanderTargets,
       getGame: () => game,
+      setCommanderTarget: (commanderId, allyId) => setCommanderTargets((current) => ({ ...current, [commanderId]: allyId })),
       setGame: (nextGame) => setGame(nextGame),
     };
     window.addEventListener("keydown", handleDebugCaptureKeydown);
@@ -163,7 +167,7 @@ export default function App() {
       window.removeEventListener("keydown", handleDebugCaptureKeydown);
       delete window.__DUNE_DEBUG__;
     };
-  }, [game]);
+  }, [commanderTargets, game]);
 
   const activePlayer = game.players[game.activeSeat];
   const activeAllies = game.players.filter((player) => player.team === activePlayer.team && player.role === "Ally");

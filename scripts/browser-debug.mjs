@@ -12,6 +12,7 @@ import {
 } from "./browser-debug-artifacts.mjs";
 import { runCardChoicesSmoke } from "./browser-debug-card-choices.mjs";
 import { runCombatIntriguesSmoke } from "./browser-debug-combat-intrigues.mjs";
+import { runCommanderRevealSmoke } from "./browser-debug-commander-reveal.mjs";
 import { runConflictVpSmoke } from "./browser-debug-conflict-vp.mjs";
 import { runLeaderCharacterChoicesSmoke } from "./browser-debug-leader-character-choices.mjs";
 import { createBrowserDebugPageTools } from "./browser-debug-page-tools.mjs";
@@ -666,6 +667,20 @@ try {
     }
     if (scenario === "combat-intrigues" || scenario === "all") {
       await interruptible(runCombatIntriguesSmoke({
+        captures,
+        currentGame,
+        initialPlayableGame,
+        openApp,
+        page,
+        screenshot,
+        server,
+        setDebugGameAndWait,
+        url,
+        writeJson,
+      }));
+    }
+    if (scenario === "commander-reveal" || scenario === "all") {
+      await interruptible(runCommanderRevealSmoke({
         captures,
         currentGame,
         initialPlayableGame,

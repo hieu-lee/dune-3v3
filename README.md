@@ -105,6 +105,7 @@ Open the URL printed by Vite.
 ```bash
 pnpm run debug:browser
 pnpm run debug:browser -- --scenario control-defense
+pnpm run debug:browser -- --scenario commander-reveal
 pnpm run debug:browser:headed -- --scenario all
 pnpm run debug:browser:manual
 pnpm run debug:game

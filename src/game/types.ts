@@ -258,6 +258,7 @@ export type PendingAction =
       ownerId: string;
       source: string;
       spaceId?: string;
+      publicOnly?: boolean;
     }
   | {
       kind: "acquire-card";
@@ -376,6 +377,8 @@ export type GameState = {
   round: number;
   activeSeat: number;
   firstSeat: number;
+  agentTurnComplete: boolean;
+  turnSpiceGains: Record<string, number>;
   players: Player[];
   spaces: Record<string, string>;
   spyPosts: Record<string, string>;

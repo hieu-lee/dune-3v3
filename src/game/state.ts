@@ -65,6 +65,7 @@ const callToArmsSourceId = 138;
 const shaddamsFavorSourceId = 141;
 const intelligenceReportSourceId = 142;
 const manipulateSourceId = 143;
+const leverageSourceId = 447;
 const councilorsAmbitionSourceId = 129;
 const marketOpportunitySourceId = 145;
 const contingencyPlanSourceId = 147;
@@ -244,6 +245,10 @@ export function isIntelligenceReportIntrigue(intrigue: IntrigueCard) {
 
 export function isManipulateIntrigue(intrigue: IntrigueCard) {
   return intrigue.sourceId === manipulateSourceId;
+}
+
+export function isLeverageIntrigue(intrigue: IntrigueCard) {
+  return intrigue.sourceId === leverageSourceId;
 }
 
 export function isInspireAweIntrigue(intrigue: IntrigueCard) {
@@ -498,6 +503,8 @@ export function initialGame(): GameState {
     round: 1,
     activeSeat: firstSeat,
     firstSeat,
+    agentTurnComplete: false,
+    turnSpiceGains: {},
     players,
     spaces: {},
     spyPosts: {},
@@ -612,6 +619,21 @@ export function playerHasConflictUnits(player: Player) {
 
 export function playerDoublesConflictRewards(player: Player) {
   return player.deployedSandworms > 0;
+}
+
+export function hasGainedSpiceThisTurn(state: Pick<GameState, "turnSpiceGains">, playerId: string) {
+  return (state.turnSpiceGains[playerId] ?? 0) > 0;
+}
+
+export function recordTurnSpiceGain(state: GameState, playerId: string, amount: number): GameState {
+  if (state.phase !== "playing" || amount <= 0) return state;
+  return {
+    ...state,
+    turnSpiceGains: {
+      ...state.turnSpiceGains,
+      [playerId]: (state.turnSpiceGains[playerId] ?? 0) + amount,
+    },
+  };
 }
 
 function sandwormRewardReminderEntries(players: Player[]) {
@@ -1435,6 +1457,7 @@ export function takeChoamContract(state: GameState, pending: ContractPendingActi
   const reservedIndex = owner.reservedContracts.findIndex((reserved) => reserved.id === contractId);
 
   if (!contract) {
+    if (pending.publicOnly) return state;
     const reservedContract = owner.reservedContracts[reservedIndex];
     if (!reservedContract) return state;
     const players = state.players.map((player) =>
@@ -1565,6 +1588,7 @@ export function acquireCardForPending(
 }
 
 export function collectChoamContractFallback(state: GameState, pending: ContractPendingAction): GameState {
+  if (pending.publicOnly) return state;
   if (state.contractOffer.length > 0) return state;
   const owner = state.players.find((player) => player.id === pending.ownerId);
   if (!owner || owner.reservedContracts.length > 0) return state;
@@ -1704,12 +1728,13 @@ export function transferTradeGood(
     }
     return player;
   });
-  return {
+  const nextState = {
     ...state,
     players,
     pendingAction,
     log: [`${from.leader} trades 1 ${resource} to ${to.leader}.`, ...state.log],
   };
+  return resource === "spice" ? recordTurnSpiceGain(nextState, toId, 1) : nextState;
 }
 
 export function applyBoardEffect(
@@ -2455,12 +2480,12 @@ export function playPlotBattleIconIntrigue(
         }
       : candidate,
   );
-  return {
+  return recordTurnSpiceGain({
     ...state,
     players,
     intrigueDiscard: [...state.intrigueDiscard, intrigue],
     log: [`${player.leader} plays ${intrigue.name} as a Plot Intrigue for 1 spice.`, ...state.log],
-  };
+  }, player.id, 1);
 }
 
 export function playContingencyPlanPlotIntrigue(
@@ -2529,6 +2554,43 @@ export function playManipulatePlotIntrigue(
     intrigueDiscard: [...state.intrigueDiscard, intrigue],
     log: [
       `${player.leader} plays Manipulate, removes ${manipulatedCard.name} from the Imperium Row, and may acquire it for 1 Persuasion less this round.`,
+      ...state.log,
+    ],
+  };
+}
+
+export function playLeveragePlotIntrigue(
+  state: GameState,
+  playerId: string,
+  intrigueId: string,
+): GameState {
+  if (state.phase !== "playing" || state.pendingAction || state.pendingQueue.length > 0) return state;
+  const player = state.players[state.activeSeat];
+  if (!player || player.id !== playerId || !hasGainedSpiceThisTurn(state, player.id)) return state;
+  const intrigue = player.intrigues.find((card) => card.id === intrigueId);
+  if (!intrigue || !isLeverageIntrigue(intrigue)) return state;
+
+  const players = state.players.map((candidate) =>
+    candidate.id === player.id
+      ? {
+          ...candidate,
+          resources: { ...candidate.resources, solari: candidate.resources.solari + 1 },
+          intrigues: candidate.intrigues.filter((card) => card.id !== intrigue.id),
+        }
+      : candidate,
+  );
+  const contractPending: PendingAction | undefined = state.contractOffer.length > 0
+    ? { kind: "contract", ownerId: player.id, source: "Leverage", publicOnly: true }
+    : undefined;
+  const contractText = contractPending ? " and may take a face-up CHOAM contract" : "";
+
+  return {
+    ...state,
+    players,
+    pendingAction: contractPending,
+    intrigueDiscard: [...state.intrigueDiscard, intrigue],
+    log: [
+      `${player.leader} plays Leverage, gains 1 Solari${contractText}.`,
       ...state.log,
     ],
   };
@@ -2880,7 +2942,7 @@ export function playSpecialMissionPlotIntrigue(
     const spyPosts = { ...state.spyPosts };
     delete spyPosts[space.id];
     const shieldWallText = state.shieldWall ? ", removes the Shield Wall," : "";
-    return {
+    return recordTurnSpiceGain({
       ...state,
       shieldWall: false,
       spyPosts,
@@ -2899,7 +2961,7 @@ export function playSpecialMissionPlotIntrigue(
         `${player.leader} plays Special Mission, recalls a spy from ${space.name}${shieldWallText} and gains 2 spice.`,
         ...state.log,
       ],
-    };
+    }, player.id, 2);
   }
 
   return state;
@@ -3340,12 +3402,13 @@ export function playMarketOpportunityPlotIntrigue(
   const logText = choice === "spice-to-solari"
     ? `${player.leader} plays Market Opportunity, spends 2 spice, and gains 5 Solari.`
     : `${player.leader} plays Market Opportunity, spends 5 Solari, and gains 5 spice.`;
-  return {
+  const nextState = {
     ...state,
     players,
     intrigueDiscard: [...state.intrigueDiscard, intrigue],
     log: [logText, ...state.log],
   };
+  return choice === "solari-to-spice" ? recordTurnSpiceGain(nextState, player.id, 5) : nextState;
 }
 
 export function playBackedByChoamPlotIntrigue(
@@ -3628,6 +3691,8 @@ export function startCombatPhase(state: GameState): GameState {
   return {
     ...clearedState,
     phase: "combat",
+    agentTurnComplete: false,
+    turnSpiceGains: {},
     activeSeat,
     combatPasses: [],
     pendingAction: undefined,
@@ -3662,6 +3727,8 @@ export function finishRevealTurn(state: GameState, playerId: string): GameState 
   if (!player || player.id !== playerId || !player.revealed) return state;
   const clearedState = {
     ...state,
+    agentTurnComplete: false,
+    turnSpiceGains: {},
     conflictDeploymentBlock: undefined,
     players: state.players.map((candidate) =>
       candidate.id === player.id
@@ -4052,7 +4119,7 @@ export function resolveCommanderResourceSplitChoice(
     return player;
   });
 
-  return {
+  let nextState: GameState = {
     ...state,
     players,
     ...advancePendingAction(state),
@@ -4061,6 +4128,13 @@ export function resolveCommanderResourceSplitChoice(
       ...state.log,
     ],
   };
+  if (option.commanderResource === "spice") {
+    nextState = recordTurnSpiceGain(nextState, commander.id, option.commanderAmount);
+  }
+  if (option.allyResource === "spice") {
+    nextState = recordTurnSpiceGain(nextState, ally.id, option.allyAmount);
+  }
+  return nextState;
 }
 
 export function resolveShaddamSignetRingChoice(
@@ -4654,7 +4728,7 @@ export function resolveMakerChoice(
     };
   });
 
-  return {
+  const nextState = {
     ...state,
     players,
     ...advancePendingAction(state),
@@ -4665,6 +4739,7 @@ export function resolveMakerChoice(
       ...state.log,
     ],
   };
+  return summon ? nextState : recordTurnSpiceGain(nextState, spiceRecipient.id, pending.spice);
 }
 
 export function resolveSietchTabrChoice(
@@ -5046,6 +5121,8 @@ export function startNextRound(state: GameState): GameState {
     ...resolvedState,
     phase: "playing",
     round: resolvedState.round + 1,
+    agentTurnComplete: false,
+    turnSpiceGains: {},
     firstSeat,
     activeSeat: firstSeat,
     players,

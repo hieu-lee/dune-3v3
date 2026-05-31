@@ -25,7 +25,6 @@ import {
   acquireCardForPending,
   advanceSeat,
   acquireMarketCard,
-  allPlayersDone,
   applyBoardEffect,
   applyCardAgentEffect,
   boardSpaceRewardApplies,
@@ -54,6 +53,7 @@ import {
   finishPendingAction,
   finishRevealTurn,
   finishRevealAdjustment as resolveRevealAdjustment,
+  hasGainedSpiceThisTurn,
   iconCanReach,
   initialGame,
   influenceLossChoices,
@@ -75,6 +75,7 @@ import {
   isImpressIntrigue,
   isInspireAweIntrigue,
   isIntelligenceReportIntrigue,
+  isLeverageIntrigue,
   isManipulateIntrigue,
   isMarketOpportunityIntrigue,
   isMercenariesIntrigue,
@@ -105,6 +106,7 @@ import {
   placeSpyForPending,
   placeableSpySpaces,
   queuePendingActions,
+  recordTurnSpiceGain,
   recallableSpySpaces,
   recallableSpySupplySpaces,
   recallSpyForSupplyForPending,
@@ -133,6 +135,7 @@ import {
   playImperiumPoliticsPlotIntrigue,
   playInspireAwePlotIntrigue,
   playIntelligenceReportPlotIntrigue,
+  playLeveragePlotIntrigue,
   playManipulatePlotIntrigue,
   playMarketOpportunityPlotIntrigue,
   playMercenariesPlotIntrigue,
@@ -220,6 +223,13 @@ export function boardSpaceIntrigueGainFor(space: BoardSpace, player: Player) {
   return boardSpaceRewardApplies(space, player) ? space.gain?.intrigue ?? 0 : 0;
 }
 
+function boardSpaceSpiceGainFor(space: BoardSpace, player: Player, bonusSpice: number, deferMakerChoice: boolean) {
+  const printedSpice = boardSpaceRewardApplies(space, player)
+    ? deferMakerChoice && space.makerWorms ? 0 : space.gain?.spice ?? 0
+    : 0;
+  return printedSpice + bonusSpice;
+}
+
 export function pendingLocksTableState(action: PendingAction | undefined) {
   return action?.kind === "maker-choice" || action?.kind === "sietch-tabr" || action?.kind === "desert-call";
 }
@@ -301,7 +311,7 @@ export default function App() {
   }, [selectedLeaderId]);
 
   const legalSpaces = useMemo(() => {
-    if (game.phase !== "playing" || !selectedCard || activePlayer.agentsReady <= 0 || game.pendingAction) return new Set<string>();
+    if (game.phase !== "playing" || game.agentTurnComplete || !selectedCard || activePlayer.agentsReady <= 0 || game.pendingAction) return new Set<string>();
     return new Set(
       boardSpaces
         .filter((space) => !game.spaces[space.id])
@@ -309,9 +319,9 @@ export default function App() {
         .filter((space) => canPay(activePlayer, effectiveCost(space, game.players)))
         .map((space) => space.id),
     );
-  }, [activePlayer, game.pendingAction, game.phase, game.players, game.spaces, game.spyPosts, game.swordmasterClaimed, selectedCard]);
+  }, [activePlayer, game.agentTurnComplete, game.pendingAction, game.phase, game.players, game.spaces, game.spyPosts, game.swordmasterClaimed, selectedCard]);
 
-  const canPlayAgent = Boolean(game.phase === "playing" && selectedCard && selectedSpace && legalSpaces.has(selectedSpace.id) && !game.pendingAction);
+  const canPlayAgent = Boolean(game.phase === "playing" && !game.agentTurnComplete && selectedCard && selectedSpace && legalSpaces.has(selectedSpace.id) && !game.pendingAction);
 
   function playAgent() {
     if (game.phase !== "playing" || !canPlayAgent || !selectedCard || !selectedSpace) return;
@@ -328,6 +338,7 @@ export default function App() {
       const makerBonus = selectedSpace.maker ? current.makerSpice[selectedSpace.id] ?? 0 : 0;
       const makerChoiceOwner = player.role === "Commander" ? target : player;
       const makerChoicePending = pendingActionForMakerChoice(current, selectedSpace, makerChoiceOwner, player);
+      const spiceGain = boardSpaceSpiceGainFor(selectedSpace, player, makerBonus, Boolean(makerChoicePending));
       const sietchTabrPending = pendingActionForSietchTabr(current, selectedSpace, makerChoiceOwner, player);
       let { source, target: effectedTarget } = applyBoardEffect(
         {
@@ -394,6 +405,7 @@ export default function App() {
       );
       const nextState: GameState = {
         ...current,
+        agentTurnComplete: true,
         players,
         spaces: { ...current.spaces, [selectedSpace.id]: target.id },
         makerSpice: collectMakerSpice(current, selectedSpace),
@@ -418,8 +430,25 @@ export default function App() {
       const resolvedState = intrigueGain > 0
         ? drawIntrigueCards(nextState, source.id, intrigueGain, selectedSpace.name)
         : nextState;
-      if (allPlayersDone(resolvedState.players)) return maybeStartCombatPhase(resolvedState);
-      return { ...resolvedState, activeSeat: advanceSeat(resolvedState) };
+      return spiceGain > 0 ? recordTurnSpiceGain(resolvedState, source.id, spiceGain) : resolvedState;
+    });
+    setSelectedCardId(null);
+    setSelectedSpaceId(null);
+  }
+
+  function endAgentTurn() {
+    if (game.phase !== "playing" || game.pendingAction || game.pendingQueue.length > 0 || !game.agentTurnComplete) return;
+    setGame((current) => {
+      if (current.phase !== "playing" || current.pendingAction || current.pendingQueue.length > 0 || !current.agentTurnComplete) {
+        return current;
+      }
+      const advancedState = {
+        ...current,
+        agentTurnComplete: false,
+        turnSpiceGains: {},
+        activeSeat: advanceSeat(current),
+      };
+      return maybeStartCombatPhase(advancedState);
     });
     setSelectedCardId(null);
     setSelectedSpaceId(null);
@@ -428,6 +457,7 @@ export default function App() {
   function revealTurn() {
     if (game.phase !== "playing") return;
     if (game.pendingAction) return;
+    if (game.agentTurnComplete) return;
     if (activePlayer.revealed) return;
     const persuasion = revealPersuasionFor(activePlayer);
     const swords = activePlayer.hand.reduce((sum, card) => sum + card.swords, 0) + (activePlayer.swordmasterBonus ? 2 : 0);
@@ -496,7 +526,10 @@ export default function App() {
           ...current.log,
         ],
       };
-      return scoreGurneyAlwaysSmiling(revealedState, player.id);
+      const spiceTrackedState = (revealGain.spice ?? 0) > 0
+        ? recordTurnSpiceGain(revealedState, player.id, revealGain.spice ?? 0)
+        : revealedState;
+      return scoreGurneyAlwaysSmiling(spiceTrackedState, player.id);
     });
   }
 
@@ -952,6 +985,10 @@ export default function App() {
     setGame((current) => playManipulatePlotIntrigue(current, current.players[current.activeSeat].id, intrigueId, cardId));
   }
 
+  function playLeveragePlot(intrigueId: string) {
+    setGame((current) => playLeveragePlotIntrigue(current, current.players[current.activeSeat].id, intrigueId));
+  }
+
   function playCunningPlot(intrigueId: string, choice: "draw" | "paid-trash") {
     setGame((current) => playCunningPlotIntrigue(current, current.players[current.activeSeat].id, intrigueId, choice));
   }
@@ -1250,7 +1287,10 @@ export default function App() {
       ? pendingInfluenceChoiceOwners.map((owner) => owner.leader).join(" or ")
       : pendingInfluenceOwner?.leader;
   const shaddamCommander = game.players.find((player) => player.team === "shaddam" && player.role === "Commander");
-  const reservedContractChoices = pendingContractOwner?.reservedContracts ?? [];
+  const reservedContractChoices =
+    pendingContractOwner && pendingAction?.kind === "contract" && !pendingAction.publicOnly
+      ? pendingContractOwner.reservedContracts
+      : [];
   const revealAdjustOwner =
     pendingAction?.kind === "reveal-adjust" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const revealAdjustRecipient =
@@ -1331,7 +1371,9 @@ export default function App() {
           </strong>
           <small>
             {game.phase === "playing"
-              ? activePlayer.agentsReady > 0 ? "Agent turn" : "Reveal turn"
+              ? game.agentTurnComplete
+                ? "Agent turn response"
+                : activePlayer.agentsReady > 0 ? "Agent turn" : "Reveal turn"
               : game.phase === "combat"
                 ? "Combat Intrigues"
                 : game.endgameReason}
@@ -2447,7 +2489,7 @@ export default function App() {
                     <span>{contract.name}</span>
                   </button>
                 ))}
-                {game.contractOffer.length === 0 && reservedContractChoices.length === 0 && (
+                {game.contractOffer.length === 0 && reservedContractChoices.length === 0 && !pendingAction.publicOnly && (
                   <button type="button" onClick={collectContractFallback}>
                     <CircleDollarSign size={15} />
                     Collect 2 Solari
@@ -2515,7 +2557,11 @@ export default function App() {
                 <HandCoins size={17} />
                 Place Agent
               </button>
-              <button type="button" onClick={revealTurn} disabled={!playingPhase || activePlayer.revealed || Boolean(game.pendingAction)}>
+              <button type="button" onClick={endAgentTurn} disabled={!playingPhase || !game.agentTurnComplete || pendingLocked}>
+                <SkipForward size={17} />
+                End Agent
+              </button>
+              <button type="button" onClick={revealTurn} disabled={!playingPhase || game.agentTurnComplete || activePlayer.revealed || Boolean(game.pendingAction)}>
                 <BookOpen size={17} />
                 Reveal
               </button>
@@ -2584,6 +2630,7 @@ export default function App() {
                     activePlayer.deployedSandworms > 0 ||
                     (activePlayer.role === "Commander" && activatedAlly.deployedSandworms > 0);
                   const manipulateChoices = isManipulateIntrigue(card) ? game.imperiumRow : [];
+                  const leverageCanPlay = hasGainedSpiceThisTurn(game, activePlayer.id);
                   const councilorsAmbitionCanPlay = activePlayer.highCouncilSeat;
                   const strategicStockpilingCanSpice = activePlayer.resources.spice >= 5;
                   const strategicStockpilingCanWater =
@@ -2658,6 +2705,8 @@ export default function App() {
                             ? `Plot / acquire <=3${inspireAweToHand ? " to hand" : ""}`
                           : isManipulateIntrigue(card)
                             ? "Plot / row replace + discount"
+                          : isLeverageIntrigue(card)
+                            ? "Plot / spice turn contract"
                           : isCunningIntrigue(card)
                             ? "Plot / draw or pay to trash"
                           : isSietchRitualIntrigue(card)
@@ -2786,6 +2835,17 @@ export default function App() {
                           ))}
                           {manipulateChoices.length === 0 && <span>No Imperium Row cards to remove.</span>}
                         </div>
+                      )}
+                      {isLeverageIntrigue(card) && (
+                        <button
+                          type="button"
+                          onClick={() => playLeveragePlot(card.id)}
+                          disabled={plotIntrigueLocked || !leverageCanPlay}
+                          title="Requires gaining spice during this turn"
+                        >
+                          <FileText size={14} />
+                          Leverage Contract
+                        </button>
                       )}
                       {isCunningIntrigue(card) && (
                         <div className="intrigue-actions">

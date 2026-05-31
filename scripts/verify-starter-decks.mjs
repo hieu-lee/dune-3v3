@@ -1407,6 +1407,7 @@ try {
   assert.equal(playerById(waterSplit, muadDib.id).resources.water, 1, "Usul water choice gives Commander water");
   assert.equal(playerById(waterSplit, muadDib.id).resources.spice, 0, "Usul water choice does not give Commander spice");
   assert.equal(playerById(waterSplit, muadDibAllyA.id).resources.spice, 1, "Usul water choice gives Ally spice");
+  assert.equal(state.hasGainedSpiceThisTurn(waterSplit, muadDibAllyA.id), true, "Usul should track Ally spice gains");
   assert.equal(waterSplit.pendingAction, undefined, "Usul resolution should advance pending action");
   assert.match(waterSplit.log[0], /resolves Usul/, "Usul resolution should log the split");
 
@@ -1414,6 +1415,7 @@ try {
   assert.equal(playerById(spiceSplit, muadDib.id).resources.spice, 1, "Usul spice choice gives Commander spice");
   assert.equal(playerById(spiceSplit, muadDib.id).resources.water, 0, "Usul spice choice does not give Commander water");
   assert.equal(playerById(spiceSplit, muadDibAllyA.id).resources.water, 1, "Usul spice choice gives Ally water");
+  assert.equal(state.hasGainedSpiceThisTurn(spiceSplit, muadDib.id), true, "Usul should track Commander spice gains");
 
   const arrakeen = data.boardSpaces.find((space) => space.id === "arrakeen");
   assert.ok(arrakeen, "Arrakeen should exist for Usul queue regression");

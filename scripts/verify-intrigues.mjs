@@ -89,6 +89,7 @@ try {
   const shaddamsFavor = data.intrigueCards.find((card) => card.sourceId === 141);
   const intelligenceReport = data.intrigueCards.find((card) => card.sourceId === 142);
   const manipulate = data.intrigueCards.find((card) => card.sourceId === 143);
+  const leverage = data.intrigueCards.find((card) => card.sourceId === 447);
   const cunning = data.intrigueCards.find((card) => card.sourceId === 133);
   const sietchRitual = data.intrigueCards.find((card) => card.sourceId === 127);
   const opportunism = data.intrigueCards.find((card) => card.sourceId === 134);
@@ -117,6 +118,7 @@ try {
   assert.ok(shaddamsFavor, "Shaddam's Favor Intrigue should be available");
   assert.ok(intelligenceReport, "Intelligence Report Intrigue should be available");
   assert.ok(manipulate, "Manipulate Intrigue should be available");
+  assert.ok(leverage, "Leverage Intrigue should be available");
   assert.ok(cunning, "Cunning Intrigue should be available");
   assert.ok(sietchRitual, "Sietch Ritual Intrigue should be available");
   assert.ok(opportunism, "Opportunism Intrigue should be available");
@@ -180,6 +182,11 @@ try {
     manipulate.summary,
     "Remove and replace a card in the Imperium Row; during your Reveal turn this round, you may acquire it for 1 Persuasion less.",
     "Manipulate should expose its row removal and Reveal discount effect",
+  );
+  assert.equal(
+    leverage.summary,
+    "If you gained spice this turn, gain 1 Solari and take a face-up CHOAM contract.",
+    "Leverage should expose its spice-gated Solari and contract effect",
   );
   assert.equal(
     cunning.summary,
@@ -423,6 +430,117 @@ try {
     state.playManipulatePlotIntrigue(combatManipulate, "p2", manipulate.id, manipulateRowCard.id),
     combatManipulate,
     "Manipulate should only resolve during normal play",
+  );
+
+  const leverageContract = data.standardContracts[0];
+  const leverageReplacement = data.standardContracts[1];
+  assert.ok(leverageContract, "Expected a face-up contract for Leverage");
+  assert.ok(leverageReplacement, "Expected a contract replacement for Leverage");
+  const leverageFixture = {
+    ...game,
+    activeSeat: game.players.findIndex((candidate) => candidate.id === "p2"),
+    pendingAction: undefined,
+    pendingQueue: [],
+    turnSpiceGains: { p2: 1 },
+    contractOffer: [leverageContract],
+    contractDeck: [leverageReplacement],
+    intrigueDiscard: [],
+    players: game.players.map((candidate) =>
+      candidate.id === "p2"
+        ? { ...candidate, resources: { ...candidate.resources, solari: 0 }, contracts: [], intrigues: [leverage] }
+        : { ...candidate, intrigues: [] },
+    ),
+  };
+  assert.equal(state.isLeverageIntrigue(leverage), true, "Leverage should be recognized as a structured Plot Intrigue");
+  assert.equal(state.hasGainedSpiceThisTurn(leverageFixture, "p2"), true, "Leverage should detect turn spice gains");
+  const leveraged = state.playLeveragePlotIntrigue(leverageFixture, "p2", leverage.id);
+  assert.equal(playerById(leveraged, "p2").resources.solari, 1, "Leverage should gain 1 Solari");
+  assert.deepEqual(playerById(leveraged, "p2").intrigues, []);
+  assert.equal(leveraged.intrigueDiscard.at(-1).id, leverage.id);
+  assert.deepEqual(
+    leveraged.pendingAction,
+    { kind: "contract", ownerId: "p2", source: "Leverage", publicOnly: true },
+    "Leverage should queue a public-only contract choice",
+  );
+  assert.match(leveraged.log[0], /plays Leverage, gains 1 Solari and may take a face-up CHOAM contract/);
+  const leverageContractTaken = state.takeChoamContract(leveraged, leveraged.pendingAction, leverageContract.id);
+  assert.equal(playerById(leverageContractTaken, "p2").contracts.at(-1).card.id, leverageContract.id);
+  assert.deepEqual(leverageContractTaken.contractOffer.map((contract) => contract.id), [leverageReplacement.id]);
+  assert.equal(leverageContractTaken.pendingAction, undefined);
+  const shaddamReserved = playerById(game, "p4").reservedContracts[0];
+  assert.ok(shaddamReserved, "Expected a reserved Shaddam contract");
+  const reservedLeverage = {
+    ...leveraged,
+    players: leveraged.players.map((candidate) =>
+      candidate.id === "p4" ? { ...candidate, reservedContracts: [shaddamReserved] } : candidate,
+    ),
+    pendingAction: { kind: "contract", ownerId: "p4", source: "Leverage", publicOnly: true },
+  };
+  assert.equal(
+    state.takeChoamContract(reservedLeverage, reservedLeverage.pendingAction, shaddamReserved.id),
+    reservedLeverage,
+    "Leverage should not allow reserved contracts",
+  );
+  const noContractLeverage = state.playLeveragePlotIntrigue(
+    { ...leverageFixture, contractOffer: [], contractDeck: [] },
+    "p2",
+    leverage.id,
+  );
+  assert.equal(noContractLeverage.pendingAction, undefined, "Leverage should still resolve without a contract offer");
+  assert.equal(playerById(noContractLeverage, "p2").resources.solari, 1);
+  const noSpiceLeverage = { ...leverageFixture, turnSpiceGains: {} };
+  assert.equal(
+    state.playLeveragePlotIntrigue(noSpiceLeverage, "p2", leverage.id),
+    noSpiceLeverage,
+    "Leverage should require gaining spice this turn",
+  );
+  const leverageSpiceTracked = state.playPlotBattleIconIntrigue(
+    {
+      ...game,
+      activeSeat: game.players.findIndex((candidate) => candidate.id === "p2"),
+      pendingAction: undefined,
+      pendingQueue: [],
+      turnSpiceGains: {},
+      intrigueDiscard: [],
+      players: game.players.map((candidate) =>
+        candidate.id === "p2" ? { ...candidate, intrigues: [crysknife] } : { ...candidate, intrigues: [] },
+      ),
+    },
+    "p2",
+    crysknife.id,
+  );
+  assert.equal(
+    state.hasGainedSpiceThisTurn(leverageSpiceTracked, "p2"),
+    true,
+    "Plot spice gains should qualify the player for Leverage later in the same turn",
+  );
+  const pendingLeverage = {
+    ...leverageFixture,
+    pendingAction: { kind: "spy", ownerId: "p2", remaining: 1, source: "Test" },
+  };
+  assert.equal(
+    state.playLeveragePlotIntrigue(pendingLeverage, "p2", leverage.id),
+    pendingLeverage,
+    "Leverage should wait for pending actions to resolve",
+  );
+  const queuedLeverage = {
+    ...leverageFixture,
+    pendingQueue: [{ kind: "spy", ownerId: "p2", remaining: 1, source: "Test" }],
+  };
+  assert.equal(
+    state.playLeveragePlotIntrigue(queuedLeverage, "p2", leverage.id),
+    queuedLeverage,
+    "Leverage should wait for queued pending actions to resolve",
+  );
+  assert.equal(
+    state.playLeveragePlotIntrigue(leverageFixture, "p3", leverage.id),
+    leverageFixture,
+    "Only the active player should play Leverage",
+  );
+  assert.equal(
+    state.playLeveragePlotIntrigue(leverageFixture, "p2", mercenaries.id),
+    leverageFixture,
+    "Leverage should reject other Intrigue cards",
   );
 
   const contingencyFixture = {

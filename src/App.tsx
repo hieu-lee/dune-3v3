@@ -19,6 +19,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { ActiveHandPanel } from "./components/ActiveHandPanel";
 import { BoardPanel } from "./components/BoardPanel";
 import { CommandBar } from "./components/CommandBar";
+import { EndgamePanel } from "./components/EndgamePanel";
 import { LeaderReferenceModal } from "./components/LeaderReferenceModal";
 import { MarketPanel } from "./components/MarketPanel";
 import { PlayerColumn } from "./components/PlayerColumn";
@@ -1497,7 +1498,6 @@ export default function App() {
       : [];
   const endgameChoices = endgameBattleIconChoices(game);
   const conditionalEndgameChoices = endgameConditionalIntrigueChoices(game);
-  const hasEndgameChoices = endgameChoices.length + conditionalEndgameChoices.length > 0;
   const playingPhase = game.phase === "playing";
   const pendingLocked = Boolean(game.pendingAction) || game.pendingQueue.length > 0;
   const plotIntrigueLocked = !playingPhase || pendingLocked;
@@ -1770,48 +1770,14 @@ export default function App() {
         )}
 
         {(game.phase === "endgame" || game.phase === "finished") && (
-          <div className="pending-panel endgame-panel">
-            <div>
-              <p className="eyebrow">{game.phase === "finished" ? "Final result" : "Endgame"}</p>
-              <h2>{game.phase === "finished" ? "Team Scores Locked" : game.endgameReason}</h2>
-            </div>
-            {game.phase === "endgame" && (
-              <div className="pending-controls support-grid">
-                {endgameChoices.map((choice) => {
-                  const owner = game.players.find((player) => player.id === choice.playerId);
-                  const intrigue = owner?.intrigues.find((card) => card.id === choice.intrigueId);
-                  const conflict = owner?.wonConflicts.find((card) => card.id === choice.conflictId);
-                  if (!owner || !intrigue || !conflict) return null;
-                  return (
-                    <div className="support-target" key={`${choice.playerId}-${choice.intrigueId}-${choice.conflictId}`}>
-                      <strong>{owner.leader}</strong>
-                      <span>{intrigue.name} / {conflict.name}</span>
-                      <button type="button" onClick={() => scoreEndgameIntrigue(owner.id, intrigue.id, conflict.id)}>
-                        Score {battleIconLabels[choice.battleIcon]}
-                      </button>
-                    </div>
-                  );
-                })}
-                {conditionalEndgameChoices.map((choice) => {
-                  const owner = game.players.find((player) => player.id === choice.playerId);
-                  const intrigue = owner?.intrigues.find((card) => card.id === choice.intrigueId);
-                  if (!owner || !intrigue) return null;
-                  const rewardText = `${choice.vp} VP${choice.spice ? ` / ${choice.spice} spice` : ""}`;
-                  return (
-                    <div className="support-target" key={`${choice.playerId}-${choice.intrigueId}`}>
-                      <strong>{owner.leader}</strong>
-                      <span>{intrigue.name}</span>
-                      <button type="button" onClick={() => scoreConditionalEndgameIntrigue(owner.id, intrigue.id)}>
-                        Score {rewardText}
-                      </button>
-                    </div>
-                  );
-                })}
-                {!hasEndgameChoices && <span>No Endgame Intrigues are scoreable.</span>}
-                <button type="button" onClick={finalizeEndgame}>Finalize Scores</button>
-              </div>
-            )}
-          </div>
+          <EndgamePanel
+            conditionalChoices={conditionalEndgameChoices}
+            game={game}
+            iconChoices={endgameChoices}
+            onFinalize={finalizeEndgame}
+            onScoreConditional={scoreConditionalEndgameIntrigue}
+            onScoreIcon={scoreEndgameIntrigue}
+          />
         )}
 
         {pendingAction && (

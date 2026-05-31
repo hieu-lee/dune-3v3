@@ -8,6 +8,8 @@
     "dev": "vite --host 0.0.0.0",
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 0.0.0.0",
+    "verify": "node scripts/verify-all.mjs",
+    "verify:all": "node scripts/verify-all.mjs",
     "debug:browser": "node scripts/browser-debug.mjs",
     "debug:browser:headed": "node scripts/browser-debug.mjs --headed --keep-open",
     "debug:browser:manual": "node scripts/browser-debug.mjs --headed --keep-open --scenario manual",

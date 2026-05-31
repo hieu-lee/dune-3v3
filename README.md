@@ -100,6 +100,16 @@ pnpm dev
 
 Open the URL printed by Vite.
 
+## Verification
+
+```bash
+pnpm run verify:all
+pnpm run verify:all -- --list
+pnpm build
+```
+
+`verify:all` runs every package verifier script in order and stops on the first failure.
+
 ## Browser Debugging
 
 ```bash

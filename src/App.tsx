@@ -33,6 +33,7 @@ import { PendingResourceSplitPanel } from "./components/PendingResourceSplitPane
 import { PendingShaddamSignetPanel } from "./components/PendingShaddamSignetPanel";
 import { PendingSietchTabrPanel } from "./components/PendingSietchTabrPanel";
 import { PendingSpyPanel } from "./components/PendingSpyPanel";
+import { PendingConflictTiePanel, PendingRevealAdjustPanel, PendingThroneRowPanel } from "./components/PendingTableChoicePanels";
 import { PendingTradePanel } from "./components/PendingTradePanel";
 import { PendingTrashPanel } from "./components/PendingTrashPanel";
 import { PlayerColumn } from "./components/PlayerColumn";
@@ -1406,6 +1407,10 @@ export default function App() {
     );
   const pendingThroneOwner =
     pendingAction?.kind === "throne-row" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
+  const eligibleThroneRowCards = pendingAction?.kind === "throne-row"
+    ? game.imperiumRow.filter(canMoveCardToThroneRow)
+    : [];
+  const noEligibleThroneRowCard = pendingAction?.kind === "throne-row" && eligibleThroneRowCards.length === 0;
   const pendingTrashOwner =
     pendingAction?.kind === "trash-card" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingTrashChoices =
@@ -1891,28 +1896,13 @@ export default function App() {
             )}
 
             {pendingAction.kind === "reveal-adjust" && revealAdjustOwner && revealAdjustRecipient && (
-              <div className="pending-controls reveal-adjust">
-                <span>{pendingAction.cards.join(", ")}</span>
-                <span>{revealAdjustOwner.persuasion} persuasion</span>
-                <button
-                  type="button"
-                  onClick={() => adjustRevealReward(-1, 0)}
-                  disabled={pendingAction.persuasionAdjustment <= 0}
-                >
-                  -1
-                </button>
-                <button type="button" onClick={() => adjustRevealReward(1, 0)}>+1</button>
-                <span>{revealAdjustRecipient.conflict} strength</span>
-                <button
-                  type="button"
-                  onClick={() => adjustRevealReward(0, -1)}
-                  disabled={pendingAction.strengthAdjustment <= 0}
-                >
-                  -1
-                </button>
-                <button type="button" onClick={() => adjustRevealReward(0, 1)}>+1</button>
-                <button type="button" onClick={finishRevealAdjust}>Done</button>
-              </div>
+              <PendingRevealAdjustPanel
+                owner={revealAdjustOwner}
+                pending={pendingAction}
+                recipient={revealAdjustRecipient}
+                onAdjust={adjustRevealReward}
+                onDone={finishRevealAdjust}
+              />
             )}
 
             {pendingAction.kind === "maker-choice" && pendingMakerOwner && (
@@ -2269,30 +2259,19 @@ export default function App() {
             )}
 
             {pendingAction.kind === "throne-row" && pendingThroneOwner && (
-              <div className="pending-controls contract-choice throne-choice">
-                {game.imperiumRow.filter(canMoveCardToThroneRow).map((card) => (
-                  <button type="button" key={card.id} onClick={() => chooseThroneRowCard(card.id)}>
-                    {card.thumbnailPath && <img src={card.thumbnailPath} alt="" />}
-                    <span>{card.name}</span>
-                  </button>
-                ))}
-                {game.imperiumRow.every((card) => !canMoveCardToThroneRow(card)) && (
-                  <button type="button" onClick={clearPendingAction}>No eligible card</button>
-                )}
-              </div>
+              <PendingThroneRowPanel
+                eligibleCards={eligibleThroneRowCards}
+                noEligible={noEligibleThroneRowCard}
+                onChoose={chooseThroneRowCard}
+                onNoEligible={clearPendingAction}
+              />
             )}
 
             {pendingAction.kind === "conflict-tie" && (
-              <div className="pending-controls support-grid">
-                {conflictTieAllies.map((ally) => (
-                  <div className="support-target" key={ally.id}>
-                    <strong>{ally.leader}</strong>
-                    <span>{ally.conflict} strength</span>
-                    <button type="button" onClick={() => chooseConflictTieWinner(ally.id)}>Takes first</button>
-                  </div>
-                ))}
-                <button type="button" onClick={() => chooseConflictTieWinner()}>No concession</button>
-              </div>
+              <PendingConflictTiePanel
+                allies={conflictTieAllies}
+                onChooseWinner={chooseConflictTieWinner}
+              />
             )}
           </div>
         )}

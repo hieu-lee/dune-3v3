@@ -81,7 +81,9 @@ export function resolvePlaceSpyForPending(
   const players = state.players.map((player) =>
     player.id === owner.id ? { ...player, spies: nextSpies } : player,
   );
-  const remaining = Math.min(pending.remaining - 1, nextSpies);
+  const remaining = pending.recallForSupply
+    ? pending.remaining - 1
+    : Math.min(pending.remaining - 1, nextSpies);
   const sharedOwners = state.sharedSpyPosts[space.id] ?? [];
   const spyPosts = pending.allowSharedPost
     ? state.spyPosts
@@ -109,7 +111,7 @@ export function resolvePlaceSpyForPending(
     spyPosts,
     sharedSpyPosts,
     ...(remaining > 0
-      ? { pendingAction: { ...pending, remaining } }
+      ? { pendingAction: { ...pending, remaining, mustPlaceSpy: false } }
       : stabanPending
         ? {
             pendingAction: stabanPending,
@@ -140,7 +142,7 @@ export function recallSpyForSupplyForPending(
     ),
     spyPosts,
     sharedSpyPosts,
-    pendingAction: { ...pending, recallForSupply: false, mustPlaceSpy: true },
+    pendingAction: { ...pending, recallForSupply: pending.remaining > 1, mustPlaceSpy: true },
     log: [`${owner.leader} recalls a spy from ${space.name} for ${pending.source}.`, ...state.log],
   };
 }

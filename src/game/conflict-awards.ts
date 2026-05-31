@@ -19,6 +19,10 @@ import {
   playerHasSpyPost,
   removeSpyPostOwner,
 } from "./spy-posts";
+import {
+  placeableSpySpaces,
+  recallableSpySupplySpaces,
+} from "./spy-choices";
 import { playerTroopSupply } from "./deck-utils";
 import {
   adjustInfluence,
@@ -42,12 +46,14 @@ type FirstPlaceBattleReward = {
   fixedVp: number;
   influence?: Partial<Record<FactionId, number>>;
   resources?: Partial<Record<ResourceId, number>>;
+  spies?: number;
   troops?: number;
   conversion?:
     | { kind: "resource"; resource: ResourceId; amount: number; vp: number }
     | { kind: "recall-spies"; count: number; vp: number };
 };
 type ConflictVpConversionPendingAction = Extract<PendingAction, { kind: "conflict-vp-conversion" }>;
+type SpyPendingAction = Extract<PendingAction, { kind: "spy" }>;
 
 const resourceIds: ResourceId[] = ["solari", "spice", "water"];
 
@@ -56,6 +62,11 @@ const firstPlaceBattleRewardsBySourceId: Record<number, FirstPlaceBattleReward> 
     fixedVp: 0,
     resources: { solari: 2 },
     troops: 2,
+  },
+  457: {
+    fixedVp: 0,
+    resources: { spice: 2 },
+    spies: 1,
   },
   460: {
     fixedVp: 0,
@@ -134,6 +145,28 @@ function conflictConversionDescription(pending: ConflictVpConversionPendingActio
     return `${pending.cost.amount} ${pending.cost.resource} for ${pending.vp} VP`;
   }
   return `recall ${pending.cost.count} spies for ${pending.vp} VP`;
+}
+
+function pendingActionForSpyReward(
+  state: GameState,
+  owner: Player,
+  conflict: ConflictCard,
+  reward: FirstPlaceBattleReward | undefined,
+  multiplier: number,
+): SpyPendingAction | undefined {
+  const remaining = (reward?.spies ?? 0) * multiplier;
+  if (remaining <= 0) return undefined;
+  const pending: SpyPendingAction = {
+    kind: "spy",
+    ownerId: owner.id,
+    remaining,
+    source: conflict.name,
+    recallForSupply: true,
+  };
+  return placeableSpySpaces(state, pending).length > 0 ||
+    recallableSpySupplySpaces(state, pending).length > 0
+    ? pending
+    : undefined;
 }
 
 function joinRewardParts(parts: string[]) {
@@ -267,6 +300,11 @@ function awardConflictToWinner(
     firstPlaceReward,
     multiplier,
   );
+  const spyPending = pendingActionForSpyReward(state, winner, conflict, firstPlaceReward, multiplier);
+  const rewardPendingActions: PendingAction[] = [];
+  if (conversionPending) rewardPendingActions.push(conversionPending);
+  if (spyPending) rewardPendingActions.push(spyPending);
+  const [rewardPendingAction, ...queuedRewardActions] = rewardPendingActions;
   const location = criticalLocationForConflict(conflict);
   const immediatePrintedReward = applyImmediateFirstPlacePrintedReward(winner, firstPlaceReward, multiplier);
   const immediateRewardText = immediatePrintedRewardDescription(
@@ -286,13 +324,22 @@ function awardConflictToWinner(
       ? { ...state.locationControl, [location]: winner.id }
       : state.locationControl,
     conflict: null,
-    pendingAction: conversionPending ?? state.pendingAction,
+    pendingAction: rewardPendingAction ?? state.pendingAction,
+    pendingQueue: rewardPendingActions.length > 0
+      ? [
+          ...queuedRewardActions,
+          ...(state.pendingAction ? [state.pendingAction, ...state.pendingQueue] : state.pendingQueue),
+        ]
+      : state.pendingQueue,
     log: [
       scored.matched && isStandardBattleIcon(scored.icon)
         ? `${winner.leader} matches ${battleIconLabels[scored.icon]} battle icons and gains 1 VP.`
         : undefined,
       conversionPending
         ? `${winner.leader} may pay ${conflictConversionDescription(conversionPending)} from ${conflict.name}${conversionPending.remaining > 1 ? ` up to ${conversionPending.remaining} times` : ""}.`
+        : undefined,
+      spyPending
+        ? `${winner.leader} may place ${spyPending.remaining} ${spyPending.remaining === 1 ? "spy" : "spies"} from ${conflict.name}${multiplier > 1 ? " with sandworm doubling" : ""}.`
         : undefined,
       location
         ? `${winner.leader} takes control of ${criticalLocationNames[location]}.`

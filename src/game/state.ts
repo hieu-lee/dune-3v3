@@ -442,10 +442,25 @@ export type StabanUnseenNetworkChoice = "pay" | "skip";
 
 type ControlDefensePendingAction = Extract<PendingAction, { kind: "control-defense" }>;
 
+function continueAfterResolvedConflictReward(state: GameState): GameState {
+  if (
+    state.phase === "playing" &&
+    !state.conflict &&
+    !state.pendingAction &&
+    state.pendingQueue.length === 0 &&
+    allPlayersDone(state.players)
+  ) {
+    return startNextRound(state);
+  }
+  return state;
+}
+
 export function finishPendingAction(state: GameState): GameState {
   if (state.pendingAction?.kind === "spy" && state.pendingAction.mustPlaceSpy) return state;
   if (state.pendingAction?.kind === "acquire-card" && !state.pendingAction.optional) return state;
-  return finishCombatIfNoActors({ ...state, ...advancePendingAction(state) });
+  return continueAfterResolvedConflictReward(
+    finishCombatIfNoActors({ ...state, ...advancePendingAction(state) }),
+  );
 }
 
 type ContractPendingAction = Extract<PendingAction, { kind: "contract" }>;
@@ -481,7 +496,9 @@ export function placeSpyForPending(
   pending: SpyPendingAction,
   spaceId: string,
 ): GameState {
-  return resolvePlaceSpyForPending(state, pending, spaceId, finishCombatIfNoActors);
+  return continueAfterResolvedConflictReward(
+    resolvePlaceSpyForPending(state, pending, spaceId, finishCombatIfNoActors),
+  );
 }
 
 export function resolveStabanUnseenNetworkChoice(

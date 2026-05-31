@@ -1,3 +1,4 @@
+import { boardSpaces } from "./data";
 import type { BoardSpace, GameState, Player } from "./types";
 
 export type SpyPostState = Pick<GameState, "spyPosts" | "sharedSpyPosts">;
@@ -18,6 +19,10 @@ export function spyPostOccupied(state: SpyPostState, spaceId: string) {
 
 export function playerHasSpyPost(state: SpyPostState, spaceId: string, playerId: string) {
   return spyPostOwnerIds(state, spaceId).includes(playerId);
+}
+
+export function spyPostCount(state: SpyPostState, ownerId: string) {
+  return boardSpaces.filter((space) => playerHasSpyPost(state, space.id, ownerId)).length;
 }
 
 export function removeSpyPostOwner(

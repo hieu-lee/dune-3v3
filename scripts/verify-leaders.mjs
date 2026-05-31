@@ -267,6 +267,8 @@ try {
   };
   const jessicaSpiceAgonyGame = {
     ...game,
+    intrigueDeck: [intrigueCard],
+    intrigueDiscard: [],
     players: game.players.map((player) => (player.id === ladyJessica.id ? jessicaSpiceAgonyOwner : player)),
   };
   const jessicaSpiceAgonyPending = state.pendingActionForCard(
@@ -294,7 +296,11 @@ try {
   assert.equal(playerById(jessicaSpiceAgonyResolved, ladyJessica.id).resources.spice, 0, "Spice Agony should spend 1 spice");
   assert.equal(playerById(jessicaSpiceAgonyResolved, ladyJessica.id).jessicaMemories, 1, "Spice Agony should add 1 memory");
   assert.equal(state.playerTroopSupply(playerById(jessicaSpiceAgonyResolved, ladyJessica.id)), 8, "Spice Agony memory should consume one supply troop");
-  assert.equal(playerById(jessicaSpiceAgonyResolved, ladyJessica.id).intrigues.length, 0, "Spice Agony should not draw Intrigue cards");
+  assert.deepEqual(
+    playerById(jessicaSpiceAgonyResolved, ladyJessica.id).intrigues.map((card) => card.id),
+    [intrigueCard.id],
+    "Spice Agony should draw 1 Intrigue card",
+  );
   assert.equal(jessicaSpiceAgonyResolved.pendingAction, undefined, "Resolved Spice Agony should advance pending actions");
   assert.equal(
     state.pendingActionForCard(
@@ -331,6 +337,7 @@ try {
     "pay",
   );
   assert.equal(playerById(noSupplySpiceAgony, ladyJessica.id).jessicaMemories, 0, "Spice Agony should not create memories without troop supply");
+  assert.equal(playerById(noSupplySpiceAgony, ladyJessica.id).intrigues.length, 0, "Spice Agony should not draw Intrigues without troop supply");
   const haggaBasin = data.boardSpaces.find((space) => space.id === "hagga-basin");
   assert.ok(haggaBasin, "Hagga Basin should exist for deferred Spice Agony spice");
   const deferredMakerSpiceOwner = {
@@ -380,6 +387,23 @@ try {
   );
   assert.equal(playerById(afterDeferredMakerSpice, ladyJessica.id).resources.spice, 2, "Maker spice branch should pay Jessica before Spice Agony resolves");
   assert.deepEqual(afterDeferredMakerSpice.pendingAction, deferredMakerSpicePending, "Maker choice should advance to the deferred Spice Agony pending action");
+  const afterDeferredMakerWorms = state.resolveMakerChoice(
+    {
+      ...deferredMakerSpiceGame,
+      pendingAction: deferredMakerPending,
+      pendingQueue: [deferredMakerSpicePending],
+    },
+    deferredMakerPending,
+    "sandworms",
+  );
+  assert.deepEqual(afterDeferredMakerWorms.pendingAction, deferredMakerSpicePending, "Choosing Maker worms should still advance to the queued optional Spice Agony");
+  assert.equal(
+    state.resolveJessicaSpiceAgonyChoice(afterDeferredMakerWorms, deferredMakerSpicePending, "pay"),
+    afterDeferredMakerWorms,
+    "Deferred Spice Agony should not resolve if the Maker choice did not provide spice",
+  );
+  const skippedDeferredSpiceAgony = state.resolveJessicaSpiceAgonyChoice(afterDeferredMakerWorms, deferredMakerSpicePending, "skip");
+  assert.equal(skippedDeferredSpiceAgony.pendingAction, undefined, "Deferred Spice Agony should remain skippable after choosing Maker worms");
   const afterDeferredSpiceAgony = state.resolveJessicaSpiceAgonyChoice(
     afterDeferredMakerSpice,
     deferredMakerSpicePending,
@@ -387,6 +411,11 @@ try {
   );
   assert.equal(playerById(afterDeferredSpiceAgony, ladyJessica.id).resources.spice, 1, "Deferred Spice Agony should spend 1 of the Maker spice");
   assert.equal(playerById(afterDeferredSpiceAgony, ladyJessica.id).jessicaMemories, 1, "Deferred Spice Agony should still create a memory");
+  assert.deepEqual(
+    playerById(afterDeferredSpiceAgony, ladyJessica.id).intrigues.map((card) => card.id),
+    [intrigueCard.id],
+    "Deferred Spice Agony should still draw 1 Intrigue card",
+  );
   assert.equal(
     state.pendingActionForCard(
       allySignet,

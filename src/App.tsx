@@ -2368,7 +2368,7 @@ export default function App() {
                       disabled={pendingJessicaSpiceAgonyOwner.resources.spice < 1 || playerTroopSupply(pendingJessicaSpiceAgonyOwner) <= 0}
                     >
                       <Sparkles size={15} />
-                      Spend 1 spice + supply troop
+                      Spend 1 spice: Intrigue + memory
                     </button>
                     <span>{memoryCountLabel(pendingJessicaSpiceAgonyOwner.jessicaMemories)} / {troopSupplyLabel(playerTroopSupply(pendingJessicaSpiceAgonyOwner))}</span>
                   </>

@@ -4625,7 +4625,7 @@ export function resolveJessicaSpiceAgonyChoice(
     ...advancePendingAction(state),
     log: [`${owner.leader} spends 1 spice for ${pending.source} and moves a supply troop as 1 memory.`, ...state.log],
   };
-  return paidState;
+  return drawIntrigueCards(paidState, owner.id, 1, pending.source);
 }
 
 export function resolveJessicaOtherMemoriesChoice(

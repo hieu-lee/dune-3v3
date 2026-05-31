@@ -18,6 +18,8 @@ import {
 } from "lucide-react";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { BoardPanel } from "./components/BoardPanel";
+import { CommandBar } from "./components/CommandBar";
+import { LeaderReferenceModal } from "./components/LeaderReferenceModal";
 import { PlayerColumn } from "./components/PlayerColumn";
 import { TableSidebar } from "./components/TableSidebar";
 import {
@@ -264,8 +266,6 @@ export default function App() {
   const [selectedLeaderId, setSelectedLeaderId] = useState<string | null>(null);
   const [commanderTargets, setCommanderTargets] = useState<Record<string, string>>({});
   const [changeAllegiancesSelections, setChangeAllegiancesSelections] = useState<Record<string, ChangeAllegiancesSelection>>({});
-  const leaderDialogRef = useRef<HTMLElement | null>(null);
-  const leaderCloseButtonRef = useRef<HTMLButtonElement | null>(null);
   const leaderOpenerRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
@@ -306,43 +306,6 @@ export default function App() {
     leaderOpenerRef.current = opener;
     setSelectedLeaderId(playerId);
   }
-
-  useEffect(() => {
-    if (!selectedLeaderId) return;
-    const focusableSelector = [
-      "a[href]",
-      "button:not([disabled])",
-      "input:not([disabled])",
-      "select:not([disabled])",
-      "textarea:not([disabled])",
-      "[tabindex]:not([tabindex='-1'])",
-    ].join(",");
-    window.setTimeout(() => leaderCloseButtonRef.current?.focus(), 0);
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        closeLeaderReference();
-        return;
-      }
-      if (event.key !== "Tab") return;
-      const focusable = Array.from(leaderDialogRef.current?.querySelectorAll<HTMLElement>(focusableSelector) ?? []);
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (!first || !last) {
-        event.preventDefault();
-        leaderDialogRef.current?.focus();
-        return;
-      }
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-    document.addEventListener("keydown", closeOnEscape);
-    return () => document.removeEventListener("keydown", closeOnEscape);
-  }, [selectedLeaderId]);
 
   const legalSpaces = useMemo(() => {
     if (game.phase !== "playing" || game.agentTurnComplete || !selectedCard || activePlayer.agentsReady <= 0 || game.pendingAction) return new Set<string>();
@@ -1557,34 +1520,7 @@ export default function App() {
 
   return (
     <main className="app-shell">
-      <section className="command-bar">
-        <div>
-          <p className="eyebrow">Six-player team table</p>
-          <h1>Dune: Imperium - Uprising 3v3</h1>
-        </div>
-        <div className="round-panel">
-          <span>{game.phase === "playing" ? `Round ${game.round}` : game.phase}</span>
-          <strong>
-            {game.phase === "playing" || game.phase === "combat"
-              ? activePlayer.leader
-              : game.winningTeam
-                ? `${teams[game.winningTeam].name} wins`
-                : "Team scores"}
-          </strong>
-          <small>
-            {game.phase === "playing"
-              ? game.agentTurnComplete
-                ? "Agent turn response"
-                : activePlayer.agentsReady > 0 ? "Agent turn" : "Reveal turn"
-              : game.phase === "combat"
-                ? "Combat Intrigues"
-                : game.endgameReason}
-          </small>
-        </div>
-        <button className="icon-button" type="button" onClick={resetGame} title="Reset table">
-          <RotateCcw size={18} />
-        </button>
-      </section>
+      <CommandBar activePlayer={activePlayer} game={game} onResetGame={resetGame} />
 
       <section className="table-grid">
         <TableSidebar
@@ -1611,44 +1547,7 @@ export default function App() {
         />
       </section>
 
-      {selectedLeader && (
-        <div className="modal-backdrop" role="presentation" onClick={closeLeaderReference}>
-          <article
-            className="leader-modal"
-            ref={leaderDialogRef}
-            role="dialog"
-            aria-modal="true"
-            aria-label={`${selectedLeader.leader} leader card`}
-            tabIndex={-1}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <header>
-              <div>
-                <p className="eyebrow">{selectedLeader.role} - {teams[selectedLeader.team].name}</p>
-                <h2>{selectedLeader.leader}</h2>
-              </div>
-              <button
-                className="icon-button"
-                ref={leaderCloseButtonRef}
-                type="button"
-                onClick={closeLeaderReference}
-                title="Close leader card"
-              >
-                <X size={18} />
-              </button>
-            </header>
-            {selectedLeader.leaderCard.imagePath ? (
-              <img
-                className="leader-reference-art"
-                src={selectedLeader.leaderCard.imagePath}
-                alt={`${selectedLeader.leader} leader card`}
-              />
-            ) : (
-              <p>Leader card art is unavailable.</p>
-            )}
-          </article>
-        </div>
-      )}
+      <LeaderReferenceModal player={selectedLeader} onClose={closeLeaderReference} />
 
       <section className="action-dock">
         {game.phase === "combat" && combatActor && !pendingAction && (

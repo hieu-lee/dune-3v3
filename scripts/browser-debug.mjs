@@ -105,7 +105,7 @@ const scenario = optionValue("--scenario", "all");
 const outDir = optionValue("--out", "artifacts/qa/browser-debug");
 const port = optionNumber("--port", 5178);
 const slowMo = optionNumber("--slow-mo", 0);
-const scenarios = new Set(["home", "agent-placement", "control-defense", "manual", "all"]);
+const scenarios = new Set(["home", "agent-placement", "control-defense", "leader-modal", "manual", "all"]);
 const generatedScreenshotNames = [
   "home-desktop.png",
   "home-mobile.png",
@@ -115,6 +115,8 @@ const generatedScreenshotNames = [
   "control-defense-pending-desktop.png",
   "control-defense-after-deploy.png",
   "control-defense-pending-mobile.png",
+  "leader-modal-open.png",
+  "leader-modal-closed.png",
   "manual-ready.png",
   "failure.png",
   ...[...scenarios].map((name) => `${name}-final.png`),
@@ -628,6 +630,33 @@ async function runControlDefenseSmoke(page, url, server, captures) {
   assert.equal(skippedOwner.conflict, 0, "Skipping should leave conflict strength unchanged");
 }
 
+async function runLeaderModalSmoke(page, url, server, captures) {
+  await openApp(page, url, 1440, 1100);
+  const game = await createInitialDebugState(server);
+  await setDebugGameAndWait(page, game);
+  const player = game.players[0];
+
+  const leaderButton = page.getByRole("button", { name: `View ${player.leader} leader card` });
+  assert.equal(await leaderButton.count(), 1, `Expected one leader art button for ${player.leader}`);
+  await leaderButton.click();
+
+  const dialog = page.getByRole("dialog", { name: `${player.leader} leader card` });
+  await dialog.waitFor({ state: "visible" });
+  assert.match(await dialog.innerText(), new RegExp(player.leader.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  await page.waitForFunction(
+    () => document.activeElement?.closest(".leader-modal")?.classList.contains("leader-modal"),
+  );
+  await screenshot(page, captures, "leader-modal-open.png");
+
+  await page.keyboard.press("Escape");
+  await dialog.waitFor({ state: "hidden" });
+  await page.waitForFunction(
+    (leaderLabel) => document.activeElement?.getAttribute("aria-label") === leaderLabel,
+    `View ${player.leader} leader card`,
+  );
+  await screenshot(page, captures, "leader-modal-closed.png");
+}
+
 async function runManual(page, url, server, captures) {
   await openApp(page, url, 1440, 1100);
   await setDebugGameAndWait(page, await createInitialDebugState(server));
@@ -824,6 +853,9 @@ try {
     }
     if (scenario === "control-defense" || scenario === "all") {
       await interruptible(runControlDefenseSmoke(page, url, server, captures));
+    }
+    if (scenario === "leader-modal" || scenario === "all") {
+      await interruptible(runLeaderModalSmoke(page, url, server, captures));
     }
     if (scenario === "manual") await interruptible(runManual(page, url, server, captures));
 

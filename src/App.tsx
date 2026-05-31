@@ -23,34 +23,7 @@ import { CombatIntriguePanel } from "./components/CombatIntriguePanel";
 import { EndgamePanel } from "./components/EndgamePanel";
 import { LeaderReferenceModal } from "./components/LeaderReferenceModal";
 import { MarketPanel } from "./components/MarketPanel";
-import { PendingAcquireCardPanel, PendingContractPanel } from "./components/PendingCardChoicePanels";
-import { PendingConflictVpPanel } from "./components/PendingConflictVpPanel";
-import { PendingInfluenceLossPanel } from "./components/PendingInfluenceLossPanel";
-import { PendingIrulanSignetPanel } from "./components/PendingIrulanSignetPanel";
-import {
-  PendingCommandRespectPanel,
-  PendingCorrinoMightPanel,
-  PendingDemandAttentionPanel,
-  PendingDemandResultsPanel,
-  PendingDesertCallPanel,
-  PendingJessicaOtherMemoriesPanel,
-  PendingJessicaReverendMotherPanel,
-  PendingJessicaSpiceAgonyPanel,
-  PendingJessicaWaterOfLifePanel,
-  PendingLadyAmberDesertScoutsPanel,
-  PendingStabanUnseenNetworkPanel,
-  PendingThreatenSpiceProductionPanel,
-} from "./components/PendingLeaderChoicePanels";
-import { PendingMakerChoicePanel } from "./components/PendingMakerChoicePanel";
-import { PendingControlDefensePanel, PendingDeployPanel, PendingReinforcePanel } from "./components/PendingMilitaryPanels";
-import { PendingRecallSpyPanel } from "./components/PendingRecallSpyPanel";
-import { PendingResourceSplitPanel } from "./components/PendingResourceSplitPanel";
-import { PendingShaddamSignetPanel } from "./components/PendingShaddamSignetPanel";
-import { PendingSietchTabrPanel } from "./components/PendingSietchTabrPanel";
-import { PendingSpyPanel } from "./components/PendingSpyPanel";
-import { PendingConflictTiePanel, PendingRevealAdjustPanel, PendingThroneRowPanel } from "./components/PendingTableChoicePanels";
-import { PendingTradePanel } from "./components/PendingTradePanel";
-import { PendingTrashPanel } from "./components/PendingTrashPanel";
+import { PendingActionPanel } from "./components/PendingActionPanel";
 import { PlayerColumn } from "./components/PlayerColumn";
 import { RecentLogPanel } from "./components/RecentLogPanel";
 import { TableSidebar } from "./components/TableSidebar";
@@ -59,17 +32,14 @@ import {
   boardSpaceIntrigueGainFor,
   boardSpaceSpiceGainFor,
   factionShortLabels,
-  memoryCountLabel,
   pendingLocksTableState,
   revealGainLabel,
   revealPersuasionFor,
   selectedFactionChoice,
   tableStateLockedByPendingActions,
-  troopSupplyLabel,
   type ChangeAllegiancesSelection,
 } from "./app-helpers";
 import {
-  canMoveCardToThroneRow,
   isBackedByChoamIntrigue,
   isBuyAccessIntrigue,
   isCallToArmsIntrigue,
@@ -103,10 +73,9 @@ import {
   isUnexpectedAlliesIntrigue,
   isWeirdingCombatIntrigue,
 } from "./game/card-identifiers";
-import { conflictProtectedByShieldWall, criticalLocationNames } from "./game/critical-locations";
-import { battleIconLabels, boardSpaces, factionLabels, iconLabels, teams } from "./game/data";
+import { conflictProtectedByShieldWall } from "./game/critical-locations";
+import { battleIconLabels, boardSpaces, factionLabels } from "./game/data";
 import {
-  acquirableCardsForPending,
   acquireCardForPending,
   advanceSeat,
   acquireMarketCard,
@@ -141,9 +110,6 @@ import {
   initialGame,
   influenceLossChoices,
   influenceLossPairChoices,
-  influenceLossOptions,
-  irulanSignetAcquireCards,
-  irulanSignetTrashableCards,
   loseInfluenceForPending,
   manipulateAcquisitionCost,
   maybeStartCombatPhase,
@@ -156,14 +122,10 @@ import {
   pendingActionForSietchTabr,
   pendingActionsFor,
   pendingActionForSpace,
-  playerTroopSupply,
   playCombatIntrigue,
   placeSpyForPending,
-  placeableSpySpaces,
   queuePendingActions,
   recordTurnSpiceGain,
-  recallableSpySpaces,
-  recallableSpySupplySpaces,
   recallSpyForSupplyForPending,
   recallSpyForPending,
   reinforceTroop,
@@ -171,9 +133,7 @@ import {
   resolveConflictTie,
   scoreEndgameBattleIconIntrigue,
   scoreEndgameConditionalIntrigue,
-  canPayConflictVpConversion,
   adjustThreatenSpiceProductionContribution,
-  conflictVpConversionSpyChoices,
   playerHasConflictUnits,
   payConflictVpConversion,
   setMakerHooks,
@@ -244,10 +204,8 @@ import {
   skipTrashCard,
   startNextRound,
   takeChoamContract,
-  trashableCardsForPending,
   trashPlayerCard,
   transferTradeGood,
-  threatenSpiceProductionContributionTotal,
   updateTradeSelection,
   buyAccessPairChoices,
 } from "./game/state";
@@ -1298,223 +1256,7 @@ export default function App() {
 
   const pendingAction = game.pendingAction;
   const tableStateLockedByPending = tableStateLockedByPendingActions(game);
-  const pendingOwner = pendingAction?.kind === "deploy" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
-  const pendingControlDefenseOwner =
-    pendingAction?.kind === "control-defense" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
-  const pendingControlDefenseSupply = pendingControlDefenseOwner ? playerTroopSupply(pendingControlDefenseOwner) : 0;
-  const pendingActor = pendingAction?.kind === "trade" ? game.players.find((player) => player.id === pendingAction.actorId) : undefined;
-  const pendingPartner = pendingAction?.kind === "trade" ? game.players.find((player) => player.id === pendingAction.partnerId) : undefined;
-  const pendingSpyOwner = pendingAction?.kind === "spy" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
-  const pendingContractOwner =
-    pendingAction?.kind === "contract" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
-  const pendingAcquireOwner =
-    pendingAction?.kind === "acquire-card" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
-  const pendingAcquireCards = pendingAction?.kind === "acquire-card" ? acquirableCardsForPending(game, pendingAction) : [];
-  const pendingMakerOwner =
-    pendingAction?.kind === "maker-choice" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
-  const pendingMakerSpiceOwner =
-    pendingAction?.kind === "maker-choice" ? game.players.find((player) => player.id === pendingAction.spiceOwnerId) : undefined;
-  const pendingMakerSplit =
-    pendingAction?.kind === "maker-choice" &&
-    pendingMakerOwner &&
-    pendingMakerSpiceOwner &&
-    pendingMakerOwner.id !== pendingMakerSpiceOwner.id;
-  const pendingMakerLabel = pendingMakerSplit
-    ? `${pendingMakerSpiceOwner.leader} spice / ${pendingMakerOwner.leader} worms`
-    : pendingMakerOwner?.leader;
-  const pendingSietchOwner =
-    pendingAction?.kind === "sietch-tabr" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
-  const pendingSietchWaterOwner =
-    pendingAction?.kind === "sietch-tabr" ? game.players.find((player) => player.id === pendingAction.waterOwnerId) : undefined;
-  const pendingSietchSplit =
-    pendingAction?.kind === "sietch-tabr" &&
-    pendingSietchOwner &&
-    pendingSietchWaterOwner &&
-    pendingSietchOwner.id !== pendingSietchWaterOwner.id;
-  const pendingSietchLabel = pendingSietchSplit
-    ? `${pendingSietchWaterOwner.leader} water / ${pendingSietchOwner.leader} units`
-    : pendingSietchOwner?.leader;
-  const pendingResourceSplitCommander =
-    pendingAction?.kind === "commander-resource-split"
-      ? game.players.find((player) => player.id === pendingAction.commanderId)
-      : undefined;
-  const pendingResourceSplitAlly =
-    pendingAction?.kind === "commander-resource-split"
-      ? game.players.find((player) => player.id === pendingAction.allyId)
-      : undefined;
-  const pendingShaddamSignetCommander =
-    pendingAction?.kind === "shaddam-signet-ring"
-      ? game.players.find((player) => player.id === pendingAction.commanderId)
-      : undefined;
-  const pendingShaddamSignetAlly =
-    pendingAction?.kind === "shaddam-signet-ring"
-      ? game.players.find((player) => player.id === pendingAction.allyId)
-      : undefined;
-  const pendingCommandRespectCommander =
-    pendingAction?.kind === "command-respect"
-      ? game.players.find((player) => player.id === pendingAction.commanderId)
-      : undefined;
-  const pendingCommandRespectPartners =
-    pendingAction?.kind === "command-respect"
-      ? pendingAction.partnerIds
-          .map((partnerId) => game.players.find((player) => player.id === partnerId))
-          .filter((player): player is Player => Boolean(player))
-      : [];
-  const pendingDemandResultsCommander =
-    pendingAction?.kind === "demand-results"
-      ? game.players.find((player) => player.id === pendingAction.commanderId)
-      : undefined;
-  const pendingDemandResultsAllies =
-    pendingAction?.kind === "demand-results"
-      ? pendingAction.allyIds.map((allyId) => game.players.find((player) => player.id === allyId))
-      : [];
-  const pendingDemandResultsContracts =
-    pendingAction?.kind === "demand-results"
-      ? pendingAction.contractIds.map((contractId) => game.contractOffer.find((contract) => contract.id === contractId))
-      : [];
-  const pendingCorrinoMightCommander =
-    pendingAction?.kind === "corrino-might"
-      ? game.players.find((player) => player.id === pendingAction.commanderId)
-      : undefined;
-  const pendingCorrinoMightAllies =
-    pendingAction?.kind === "corrino-might"
-      ? pendingAction.allyIds.map((allyId) => game.players.find((player) => player.id === allyId))
-      : [];
-  const pendingDemandAttentionCommander =
-    pendingAction?.kind === "demand-attention"
-      ? game.players.find((player) => player.id === pendingAction.commanderId)
-      : undefined;
-  const pendingDemandAttentionRecipient =
-    pendingAction?.kind === "demand-attention"
-      ? game.players.find((player) => player.id === pendingAction.recipientId)
-      : undefined;
-  const pendingDesertCallCommander =
-    pendingAction?.kind === "desert-call"
-      ? game.players.find((player) => player.id === pendingAction.commanderId)
-      : undefined;
-  const pendingDesertCallAlly =
-    pendingAction?.kind === "desert-call"
-      ? game.players.find((player) => player.id === pendingAction.allyId)
-      : undefined;
-  const pendingThreatenSpiceCommander =
-    pendingAction?.kind === "threaten-spice-production"
-      ? game.players.find((player) => player.id === pendingAction.commanderId)
-      : undefined;
-  const pendingThreatenSpiceContributors =
-    pendingAction?.kind === "threaten-spice-production"
-      ? pendingAction.contributorIds
-          .map((contributorId) => game.players.find((player) => player.id === contributorId))
-          .filter((player): player is Player => Boolean(player))
-      : [];
-  const pendingThreatenSpiceTotal =
-    pendingAction?.kind === "threaten-spice-production"
-      ? threatenSpiceProductionContributionTotal(pendingAction)
-      : 0;
-  const pendingThreatenSpiceCanPay =
-    pendingAction?.kind === "threaten-spice-production" &&
-    pendingThreatenSpiceContributors.length === pendingAction.contributorIds.length &&
-    pendingThreatenSpiceTotal === pendingAction.cost &&
-    pendingThreatenSpiceContributors.every(
-      (contributor) => (pendingAction.contributions[contributor.id] ?? 0) <= contributor.resources.spice,
-    );
-  const pendingThroneOwner =
-    pendingAction?.kind === "throne-row" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
-  const eligibleThroneRowCards = pendingAction?.kind === "throne-row"
-    ? game.imperiumRow.filter(canMoveCardToThroneRow)
-    : [];
-  const noEligibleThroneRowCard = pendingAction?.kind === "throne-row" && eligibleThroneRowCards.length === 0;
-  const pendingTrashOwner =
-    pendingAction?.kind === "trash-card" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
-  const pendingTrashChoices =
-    pendingAction?.kind === "trash-card" && pendingTrashOwner
-      ? trashableCardsForPending(pendingTrashOwner, pendingAction)
-      : [];
-  const pendingIrulanSignetOwner =
-    pendingAction?.kind === "irulan-signet-ring" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
-  const pendingIrulanSignetAcquireCards =
-    pendingAction?.kind === "irulan-signet-ring" ? irulanSignetAcquireCards(game, pendingAction) : [];
-  const pendingIrulanSignetTrashChoices =
-    pendingAction?.kind === "irulan-signet-ring" ? irulanSignetTrashableCards(game, pendingAction) : [];
-  const pendingStabanUnseenNetworkOwner =
-    pendingAction?.kind === "staban-unseen-network" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
-  const pendingStabanUnseenNetworkSpace =
-    pendingAction?.kind === "staban-unseen-network" ? boardSpaces.find((space) => space.id === pendingAction.spaceId) : undefined;
-  const pendingLadyAmberDesertScoutsOwner =
-    pendingAction?.kind === "amber-desert-scouts" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
-  const pendingJessicaSpiceAgonyOwner =
-    pendingAction?.kind === "jessica-spice-agony" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
-  const pendingJessicaSpiceAgonyTroopSupply = pendingJessicaSpiceAgonyOwner
-    ? playerTroopSupply(pendingJessicaSpiceAgonyOwner)
-    : 0;
-  const pendingJessicaSpiceAgonyCanPay = Boolean(
-    pendingJessicaSpiceAgonyOwner &&
-      pendingJessicaSpiceAgonyOwner.resources.spice >= 1 &&
-      pendingJessicaSpiceAgonyTroopSupply > 0,
-  );
-  const pendingJessicaWaterOfLifeOwner =
-    pendingAction?.kind === "jessica-water-of-life" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
-  const pendingJessicaReverendMotherOwner =
-    pendingAction?.kind === "jessica-reverend-mother" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
-  const pendingJessicaReverendMotherSpace =
-    pendingAction?.kind === "jessica-reverend-mother" ? boardSpaces.find((space) => space.id === pendingAction.spaceId) : undefined;
-  const pendingJessicaOtherMemoriesOwner =
-    pendingAction?.kind === "jessica-other-memories" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
-  const pendingConflictVpOwner =
-    pendingAction?.kind === "conflict-vp-conversion" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
-  const pendingConflictVpCanPay =
-    pendingAction?.kind === "conflict-vp-conversion" ? canPayConflictVpConversion(game, pendingAction) : false;
-  const pendingConflictVpSpyChoices =
-    pendingAction?.kind === "conflict-vp-conversion" ? conflictVpConversionSpyChoices(game, pendingAction) : [];
-  const pendingRecallSpyOwner =
-    pendingAction?.kind === "recall-spy" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
-  const pendingRecallSpyRecipient =
-    pendingAction?.kind === "recall-spy"
-      ? game.players.find((player) => player.id === pendingAction.combatRecipientId)
-      : undefined;
-  const pendingRecallSpyChoices = pendingAction?.kind === "recall-spy" ? recallableSpySpaces(game, pendingAction) : [];
-  const pendingInfluenceOwner =
-    pendingAction?.kind === "lose-influence" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
-  const pendingInfluenceRecipient =
-    pendingAction?.kind === "lose-influence"
-      ? game.players.find((player) => player.id === pendingAction.combatRecipientId)
-      : undefined;
-  const pendingInfluenceChoices = pendingAction?.kind === "lose-influence" ? influenceLossOptions(game, pendingAction) : [];
-  const pendingInfluenceChoiceOwnerIds = [...new Set(pendingInfluenceChoices.map((choice) => choice.ownerId))];
-  const pendingInfluenceChoiceOwners = pendingInfluenceChoiceOwnerIds
-    .map((ownerId) => game.players.find((player) => player.id === ownerId))
-    .filter((player): player is Player => Boolean(player));
-  const pendingInfluencePayerLabel =
-    pendingInfluenceChoiceOwners.length > 0
-      ? pendingInfluenceChoiceOwners.map((owner) => owner.leader).join(" or ")
-      : pendingInfluenceOwner?.leader;
-  const reservedContractChoices =
-    pendingContractOwner && pendingAction?.kind === "contract" && !pendingAction.publicOnly
-      ? pendingContractOwner.reservedContracts
-      : [];
-  const revealAdjustOwner =
-    pendingAction?.kind === "reveal-adjust" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
-  const revealAdjustRecipient =
-    pendingAction?.kind === "reveal-adjust"
-      ? game.players.find((player) => player.id === pendingAction.combatRecipientId)
-      : undefined;
   const combatActor = game.phase === "combat" ? game.players[game.activeSeat] : undefined;
-  const tradePartners =
-    pendingActor && pendingAction?.kind === "trade"
-      ? game.players.filter((player) =>
-          player.team === pendingActor.team &&
-          player.id !== pendingActor.id &&
-          (!pendingAction.partnerLocked || player.id === pendingAction.partnerId)
-        )
-      : [];
-  const tradeLocked = pendingAction?.kind === "trade" && pendingAction.actorGiven + pendingAction.partnerGiven > 0;
-  const reinforceAllies =
-    pendingAction?.kind === "reinforce"
-      ? game.players.filter((player) => player.team === pendingAction.team && player.role === "Ally")
-      : [];
-  const conflictTieAllies =
-    pendingAction?.kind === "conflict-tie"
-      ? game.players.filter((player) => pendingAction.tiedPlayerIds.includes(player.id))
-      : [];
   const endgameChoices = endgameBattleIconChoices(game);
   const conditionalEndgameChoices = endgameConditionalIntrigueChoices(game);
   const playingPhase = game.phase === "playing";
@@ -1534,10 +1276,6 @@ export default function App() {
   const unexpectedAlliesCanSummonWithoutWall = Boolean(game.conflict && (!game.shieldWall || !currentConflictProtected));
   const unexpectedAlliesDisabled =
     plotIntrigueLocked || !game.conflict || !unexpectedAlliesCanPay || unexpectedAlliesDeploymentBlocked;
-  const spyPlacementSpaces = pendingAction?.kind === "spy" ? placeableSpySpaces(game, pendingAction) : [];
-  const pendingSpySupplyRecallSpaces = pendingAction?.kind === "spy"
-    ? recallableSpySupplySpaces(game, pendingAction)
-    : [];
 
   return (
     <main className="app-shell">
@@ -1592,339 +1330,59 @@ export default function App() {
         )}
 
         {pendingAction && (
-          <div className="pending-panel">
-            <div>
-              <p className="eyebrow">Pending table choice</p>
-              <h2>
-                {pendingAction.kind === "deploy" && `${pendingOwner?.leader ?? "Player"} deployment`}
-                {pendingAction.kind === "control-defense" && `${pendingControlDefenseOwner?.leader ?? "Player"} control deployment`}
-                {pendingAction.kind === "reinforce" && `Military Support - ${pendingAction.remaining} troops`}
-                {pendingAction.kind === "trade" && `Trade from ${pendingAction.source}`}
-                {pendingAction.kind === "spy" && `${pendingAction.placementIcon ? `${iconLabels[pendingAction.placementIcon]} ` : ""}Spy placement - ${pendingAction.remaining}`}
-                {pendingAction.kind === "reveal-adjust" && "Printed reveal adjustment"}
-                {pendingAction.kind === "contract" && `${pendingContractOwner?.leader ?? "Player"} CHOAM contract`}
-                {pendingAction.kind === "acquire-card" && `${pendingAcquireOwner?.leader ?? "Player"} acquisition`}
-                {pendingAction.kind === "maker-choice" && `${pendingMakerLabel ?? "Player"} Maker space`}
-                {pendingAction.kind === "sietch-tabr" && `${pendingSietchLabel ?? "Player"} Sietch Tabr`}
-                {pendingAction.kind === "commander-resource-split" && `${pendingResourceSplitCommander?.leader ?? "Commander"} ${pendingAction.source}`}
-                {pendingAction.kind === "shaddam-signet-ring" && `${pendingShaddamSignetCommander?.leader ?? "Shaddam"} Emperor of the Known Universe`}
-                {pendingAction.kind === "irulan-signet-ring" && `${pendingIrulanSignetOwner?.leader ?? "Princess Irulan"} Chronicler's Insight`}
-                {pendingAction.kind === "staban-unseen-network" && `${pendingStabanUnseenNetworkOwner?.leader ?? "Staban Tuek"} Unseen Network`}
-                {pendingAction.kind === "amber-desert-scouts" && `${pendingLadyAmberDesertScoutsOwner?.leader ?? "Lady Amber"} Desert Scouts`}
-                {pendingAction.kind === "jessica-spice-agony" && `${pendingJessicaSpiceAgonyOwner?.leader ?? "Lady Jessica"} Spice Agony`}
-                {pendingAction.kind === "jessica-water-of-life" && `${pendingJessicaWaterOfLifeOwner?.leader ?? "Reverend Mother Jessica"} Water of Life`}
-                {pendingAction.kind === "jessica-reverend-mother" && `${pendingJessicaReverendMotherOwner?.leader ?? "Reverend Mother Jessica"} Reverend Mother`}
-                {pendingAction.kind === "jessica-other-memories" && `${pendingJessicaOtherMemoriesOwner?.leader ?? "Lady Jessica"} Other Memories`}
-                {pendingAction.kind === "conflict-vp-conversion" && `${pendingConflictVpOwner?.leader ?? "Player"} Conflict reward`}
-                {pendingAction.kind === "command-respect" && `${pendingCommandRespectCommander?.leader ?? "Muad'Dib"} Command Respect`}
-                {pendingAction.kind === "demand-results" && `${pendingDemandResultsCommander?.leader ?? "Shaddam"} Demand Results`}
-                {pendingAction.kind === "corrino-might" && `${pendingCorrinoMightCommander?.leader ?? "Shaddam"} Corrino Might`}
-                {pendingAction.kind === "demand-attention" && `${pendingDemandAttentionCommander?.leader ?? "Muad'Dib"} Demand Attention`}
-                {pendingAction.kind === "desert-call" && `${pendingDesertCallCommander?.leader ?? "Muad'Dib"} Desert Call`}
-                {pendingAction.kind === "threaten-spice-production" && `${pendingThreatenSpiceCommander?.leader ?? "Muad'Dib"} Threaten Spice Production`}
-                {pendingAction.kind === "throne-row" && `${pendingThroneOwner?.leader ?? "Shaddam"} Throne Row`}
-                {pendingAction.kind === "trash-card" && `${pendingTrashOwner?.leader ?? "Player"} ${pendingAction.optional ? "optional " : ""}trash`}
-                {pendingAction.kind === "recall-spy" && `${pendingRecallSpyOwner?.leader ?? "Player"} recall spy`}
-                {pendingAction.kind === "lose-influence" && `${pendingInfluencePayerLabel ?? "Player"} influence choice`}
-                {pendingAction.kind === "conflict-tie" && `${teams[pendingAction.team].name} conflict tie`}
-              </h2>
-            </div>
-
-            {pendingAction.kind === "deploy" && (
-              <PendingDeployPanel
-                owner={pendingOwner}
-                pending={pendingAction}
-                onDeploy={deployOne}
-                onDone={clearPendingAction}
-              />
-            )}
-
-            {pendingAction.kind === "control-defense" && (
-              <PendingControlDefensePanel
-                locationName={criticalLocationNames[pendingAction.location]}
-                owner={pendingControlDefenseOwner}
-                supply={pendingControlDefenseSupply}
-                onDeploy={deployControlDefense}
-                onSkip={skipControlDefense}
-              />
-            )}
-
-            {pendingAction.kind === "spy" && pendingSpyOwner && (
-              <PendingSpyPanel
-                owner={pendingSpyOwner}
-                pending={pendingAction}
-                placementSpaces={spyPlacementSpaces}
-                supplyRecallSpaces={pendingSpySupplyRecallSpaces}
-                onDone={clearPendingAction}
-                onPlaceSpy={placeSpy}
-                onRecallSupplySpy={recallSpyForSupply}
-              />
-            )}
-
-            {pendingAction.kind === "trash-card" && pendingTrashOwner && (
-              <PendingTrashPanel
-                choices={pendingTrashChoices}
-                owner={pendingTrashOwner}
-                pending={pendingAction}
-                onSkip={skipTrash}
-                onTrash={trashCard}
-              />
-            )}
-
-            {pendingAction.kind === "recall-spy" && pendingRecallSpyOwner && (
-              <PendingRecallSpyPanel
-                choices={pendingRecallSpyChoices}
-                owner={pendingRecallSpyOwner}
-                pending={pendingAction}
-                recipient={pendingRecallSpyRecipient}
-                onRecall={recallSpy}
-                onSkip={skipRecall}
-              />
-            )}
-
-            {pendingAction.kind === "lose-influence" && pendingInfluencePayerLabel && (
-              <PendingInfluenceLossPanel
-                choices={pendingInfluenceChoices}
-                payerLabel={pendingInfluencePayerLabel}
-                pending={pendingAction}
-                players={game.players}
-                recipient={pendingInfluenceRecipient}
-                onLoseInfluence={loseInfluence}
-                onSkip={skipInfluenceLoss}
-              />
-            )}
-
-            {pendingAction.kind === "reveal-adjust" && revealAdjustOwner && revealAdjustRecipient && (
-              <PendingRevealAdjustPanel
-                owner={revealAdjustOwner}
-                pending={pendingAction}
-                recipient={revealAdjustRecipient}
-                onAdjust={adjustRevealReward}
-                onDone={finishRevealAdjust}
-              />
-            )}
-
-            {pendingAction.kind === "maker-choice" && pendingMakerOwner && (
-              <PendingMakerChoicePanel
-                label={pendingMakerLabel}
-                owner={pendingMakerOwner}
-                pending={pendingAction}
-                spiceOwner={pendingMakerSpiceOwner}
-                onChoose={chooseMakerReward}
-              />
-            )}
-
-            {pendingAction.kind === "sietch-tabr" && pendingSietchOwner && pendingSietchWaterOwner && (
-              <PendingSietchTabrPanel
-                label={pendingSietchLabel}
-                pending={pendingAction}
-                onChoose={chooseSietchTabr}
-              />
-            )}
-
-            {pendingAction.kind === "commander-resource-split" && pendingResourceSplitCommander && pendingResourceSplitAlly && (
-              <PendingResourceSplitPanel
-                ally={pendingResourceSplitAlly}
-                commander={pendingResourceSplitCommander}
-                pending={pendingAction}
-                onChoose={chooseCommanderResourceSplit}
-              />
-            )}
-
-            {pendingAction.kind === "shaddam-signet-ring" && (
-              <PendingShaddamSignetPanel
-                ally={pendingShaddamSignetAlly}
-                commander={pendingShaddamSignetCommander}
-                onChoose={chooseShaddamSignet}
-              />
-            )}
-
-            {pendingAction.kind === "irulan-signet-ring" && (
-              <PendingIrulanSignetPanel
-                acquireCount={pendingIrulanSignetAcquireCards.length}
-                owner={pendingIrulanSignetOwner}
-                trashCount={pendingIrulanSignetTrashChoices.length}
-                onChoose={chooseIrulanSignet}
-              />
-            )}
-
-            {pendingAction.kind === "staban-unseen-network" && (
-              <PendingStabanUnseenNetworkPanel
-                owner={pendingStabanUnseenNetworkOwner}
-                pending={pendingAction}
-                space={pendingStabanUnseenNetworkSpace}
-                onChoose={chooseStabanUnseenNetwork}
-              />
-            )}
-
-            {pendingAction.kind === "amber-desert-scouts" && (
-              <PendingLadyAmberDesertScoutsPanel
-                owner={pendingLadyAmberDesertScoutsOwner}
-                onChoose={chooseLadyAmberDesertScouts}
-              />
-            )}
-
-            {pendingAction.kind === "jessica-spice-agony" && (
-              <PendingJessicaSpiceAgonyPanel
-                canPay={pendingJessicaSpiceAgonyCanPay}
-                memoryLabel={memoryCountLabel(pendingJessicaSpiceAgonyOwner?.jessicaMemories ?? 0)}
-                owner={pendingJessicaSpiceAgonyOwner}
-                troopSupplyLabel={troopSupplyLabel(pendingJessicaSpiceAgonyTroopSupply)}
-                onChoose={chooseJessicaSpiceAgony}
-              />
-            )}
-
-            {pendingAction.kind === "jessica-water-of-life" && (
-              <PendingJessicaWaterOfLifePanel
-                owner={pendingJessicaWaterOfLifeOwner}
-                onChoose={chooseJessicaWaterOfLife}
-              />
-            )}
-
-            {pendingAction.kind === "jessica-reverend-mother" && (
-              <PendingJessicaReverendMotherPanel
-                owner={pendingJessicaReverendMotherOwner}
-                space={pendingJessicaReverendMotherSpace}
-                onChoose={chooseJessicaReverendMother}
-              />
-            )}
-
-            {pendingAction.kind === "jessica-other-memories" && (
-              <PendingJessicaOtherMemoriesPanel
-                memoryLabel={memoryCountLabel(pendingJessicaOtherMemoriesOwner?.jessicaMemories ?? 0)}
-                owner={pendingJessicaOtherMemoriesOwner}
-                onChoose={chooseJessicaOtherMemories}
-              />
-            )}
-
-            {pendingAction.kind === "conflict-vp-conversion" && (
-              <PendingConflictVpPanel
-                canPay={pendingConflictVpCanPay}
-                owner={pendingConflictVpOwner}
-                pending={pendingAction}
-                spyChoices={pendingConflictVpSpyChoices}
-                onPay={payConflictVpReward}
-                onRecallSpy={recallConflictRewardSpy}
-                onSkip={skipConflictVpReward}
-              />
-            )}
-
-            {pendingAction.kind === "command-respect" && (
-              <PendingCommandRespectPanel
-                commander={pendingCommandRespectCommander}
-                partners={pendingCommandRespectPartners}
-                onSkip={skipCommandRespectChoice}
-                onTrade={chooseCommandRespectTrade}
-              />
-            )}
-
-            {pendingAction.kind === "demand-results" && (
-              <PendingDemandResultsPanel
-                allies={pendingDemandResultsAllies}
-                contracts={pendingDemandResultsContracts}
-                onChoose={chooseDemandResults}
-                onSkip={skipDemandResultsChoice}
-              />
-            )}
-
-            {pendingAction.kind === "corrino-might" && (
-              <PendingCorrinoMightPanel
-                allies={pendingCorrinoMightAllies}
-                commander={pendingCorrinoMightCommander}
-                cost={pendingAction.cost}
-                onChoose={chooseCorrinoMight}
-                onSkip={skipCorrinoMightChoice}
-              />
-            )}
-
-            {pendingAction.kind === "demand-attention" && (
-              <PendingDemandAttentionPanel
-                factionLabel={factionLabels[pendingAction.faction]}
-                recipient={pendingDemandAttentionRecipient}
-                onChoose={chooseDemandAttention}
-                onSkip={skipDemandAttentionChoice}
-              />
-            )}
-
-            {pendingAction.kind === "desert-call" && (
-              <PendingDesertCallPanel
-                ally={pendingDesertCallAlly}
-                onChoose={chooseDesertCall}
-                onSkip={skipDesertCallChoice}
-              />
-            )}
-
-            {pendingAction.kind === "threaten-spice-production" && (
-              <PendingThreatenSpiceProductionPanel
-                canPay={pendingThreatenSpiceCanPay}
-                commander={pendingThreatenSpiceCommander}
-                contributorIds={pendingAction.contributorIds}
-                contributions={pendingAction.contributions}
-                contributors={pendingThreatenSpiceContributors}
-                cost={pendingAction.cost}
-                total={pendingThreatenSpiceTotal}
-                onAdjust={adjustThreatenSpiceProduction}
-                onPay={chooseThreatenSpiceProduction}
-                onSkip={skipThreatenSpiceProductionChoice}
-              />
-            )}
-
-            {pendingAction.kind === "reinforce" && (
-              <PendingReinforcePanel
-                allies={reinforceAllies}
-                pending={pendingAction}
-                onReinforce={reinforceOne}
-              />
-            )}
-
-            {pendingAction.kind === "trade" && pendingActor && pendingPartner && (
-              <PendingTradePanel
-                actor={pendingActor}
-                partner={pendingPartner}
-                partners={tradePartners}
-                pending={pendingAction}
-                tradeLocked={tradeLocked}
-                onDone={clearPendingAction}
-                onTransfer={transferTrade}
-                onUpdateTrade={updateTrade}
-              />
-            )}
-
-            {pendingAction.kind === "contract" && pendingContractOwner && (
-              <PendingContractPanel
-                contractOffer={game.contractOffer}
-                publicOnly={pendingAction.publicOnly}
-                reservedContracts={reservedContractChoices}
-                onCollectFallback={collectContractFallback}
-                onTakeContract={takeContract}
-              />
-            )}
-
-            {pendingAction.kind === "acquire-card" && pendingAcquireOwner && (
-              <PendingAcquireCardPanel
-                cards={pendingAcquireCards}
-                maxCost={pendingAction.maxCost}
-                owner={pendingAcquireOwner}
-                onAcquireCard={acquirePendingCard}
-              />
-            )}
-
-            {pendingAction.kind === "throne-row" && pendingThroneOwner && (
-              <PendingThroneRowPanel
-                eligibleCards={eligibleThroneRowCards}
-                noEligible={noEligibleThroneRowCard}
-                onChoose={chooseThroneRowCard}
-                onNoEligible={clearPendingAction}
-              />
-            )}
-
-            {pendingAction.kind === "conflict-tie" && (
-              <PendingConflictTiePanel
-                allies={conflictTieAllies}
-                onChooseWinner={chooseConflictTieWinner}
-              />
-            )}
-          </div>
+          <PendingActionPanel
+            game={game}
+            pendingAction={pendingAction}
+            acquirePendingCard={acquirePendingCard}
+            adjustRevealReward={adjustRevealReward}
+            adjustThreatenSpiceProduction={adjustThreatenSpiceProduction}
+            chooseCommandRespectTrade={chooseCommandRespectTrade}
+            chooseCommanderResourceSplit={chooseCommanderResourceSplit}
+            chooseConflictTieWinner={chooseConflictTieWinner}
+            chooseCorrinoMight={chooseCorrinoMight}
+            chooseDemandAttention={chooseDemandAttention}
+            chooseDemandResults={chooseDemandResults}
+            chooseDesertCall={chooseDesertCall}
+            chooseIrulanSignet={chooseIrulanSignet}
+            chooseJessicaOtherMemories={chooseJessicaOtherMemories}
+            chooseJessicaReverendMother={chooseJessicaReverendMother}
+            chooseJessicaSpiceAgony={chooseJessicaSpiceAgony}
+            chooseJessicaWaterOfLife={chooseJessicaWaterOfLife}
+            chooseLadyAmberDesertScouts={chooseLadyAmberDesertScouts}
+            chooseMakerReward={chooseMakerReward}
+            chooseShaddamSignet={chooseShaddamSignet}
+            chooseSietchTabr={chooseSietchTabr}
+            chooseStabanUnseenNetwork={chooseStabanUnseenNetwork}
+            chooseThreatenSpiceProduction={chooseThreatenSpiceProduction}
+            chooseThroneRowCard={chooseThroneRowCard}
+            clearPendingAction={clearPendingAction}
+            collectContractFallback={collectContractFallback}
+            deployControlDefense={deployControlDefense}
+            deployOne={deployOne}
+            finishRevealAdjust={finishRevealAdjust}
+            loseInfluence={loseInfluence}
+            payConflictVpReward={payConflictVpReward}
+            placeSpy={placeSpy}
+            recallConflictRewardSpy={recallConflictRewardSpy}
+            recallSpy={recallSpy}
+            recallSpyForSupply={recallSpyForSupply}
+            reinforceOne={reinforceOne}
+            skipCommandRespectChoice={skipCommandRespectChoice}
+            skipControlDefense={skipControlDefense}
+            skipConflictVpReward={skipConflictVpReward}
+            skipCorrinoMightChoice={skipCorrinoMightChoice}
+            skipDemandAttentionChoice={skipDemandAttentionChoice}
+            skipDemandResultsChoice={skipDemandResultsChoice}
+            skipDesertCallChoice={skipDesertCallChoice}
+            skipInfluenceLoss={skipInfluenceLoss}
+            skipRecall={skipRecall}
+            skipThreatenSpiceProductionChoice={skipThreatenSpiceProductionChoice}
+            skipTrash={skipTrash}
+            takeContract={takeContract}
+            transferTrade={transferTrade}
+            trashCard={trashCard}
+            updateTrade={updateTrade}
+          />
         )}
 
         <ActiveHandPanel

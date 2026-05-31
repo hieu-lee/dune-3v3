@@ -52,6 +52,7 @@ import {
   iconCanReach,
   initialGame,
   influenceLossChoices,
+  influenceLossPairChoices,
   influenceLossOptions,
   isBackedByChoamIntrigue,
   isBuyAccessIntrigue,
@@ -68,6 +69,7 @@ import {
   isIntelligenceReportIntrigue,
   isMarketOpportunityIntrigue,
   isMercenariesIntrigue,
+  isOpportunismIntrigue,
   isQuestionableMethodsIntrigue,
   isReachAgreementIntrigue,
   isShaddamsFavorIntrigue,
@@ -116,6 +118,7 @@ import {
   playIntelligenceReportPlotIntrigue,
   playMarketOpportunityPlotIntrigue,
   playMercenariesPlotIntrigue,
+  playOpportunismPlotIntrigue,
   playPlotBattleIconIntrigue,
   playShaddamsFavorPlotIntrigue,
   playStrategicStockpilingPlotIntrigue,
@@ -151,7 +154,7 @@ import {
   buyAccessPairChoices,
 } from "./game/state";
 import type { BoardSpace, Card, FactionId, GameState, PendingAction, Player, ResourceId, Resources, TeamId, TradeGoodId, TrashCardZone } from "./game/types";
-import type { BuyAccessChoice, CombatIntrigueChoice, ImperiumPoliticsChoice, ShaddamSignetRingChoice } from "./game/state";
+import type { BuyAccessChoice, CombatIntrigueChoice, ImperiumPoliticsChoice, InfluenceLossPair, ShaddamSignetRingChoice } from "./game/state";
 
 const resources: Array<{ id: ResourceId; label: string; Icon: LucideIcon }> = [
   { id: "solari", label: "Solari", Icon: CircleDollarSign },
@@ -883,6 +886,10 @@ export default function App() {
 
   function playCunningPlot(intrigueId: string, choice: "draw" | "paid-trash") {
     setGame((current) => playCunningPlotIntrigue(current, current.players[current.activeSeat].id, intrigueId, choice));
+  }
+
+  function playOpportunismPlot(intrigueId: string, choice: InfluenceLossPair) {
+    setGame((current) => playOpportunismPlotIntrigue(current, current.players[current.activeSeat].id, intrigueId, choice));
   }
 
   function playImperiumPoliticsPlot(intrigueId: string, faction: ImperiumPoliticsChoice) {
@@ -2421,6 +2428,8 @@ export default function App() {
                   const marketOpportunityCanBuySpice = activePlayer.resources.solari >= 5;
                   const mercenariesCanPay = activePlayer.resources.solari >= 3;
                   const cunningCanPay = activePlayer.resources.spice >= 1;
+                  const opportunismCanPay = activePlayer.resources.solari >= 2;
+                  const opportunismChoices = isOpportunismIntrigue(card) ? influenceLossPairChoices(activePlayer) : [];
                   const buyAccessCanPay = activePlayer.resources.solari >= 5;
                   const buyAccessChoices = isBuyAccessIntrigue(card) ? buyAccessPairChoices(activePlayer) : [];
                   const imperiumPoliticsCanPay = activePlayer.resources.solari >= 1;
@@ -2441,6 +2450,8 @@ export default function App() {
                             ? `Plot / draw ${intelligenceReportDrawCount}`
                           : isCunningIntrigue(card)
                             ? "Plot / draw or pay to trash"
+                          : isOpportunismIntrigue(card)
+                            ? "Plot / cash Influence for VP"
                           : isBuyAccessIntrigue(card)
                             ? "Plot / buy two Influence"
                           : isImperiumPoliticsIntrigue(card)
@@ -2547,6 +2558,31 @@ export default function App() {
                             <X size={14} />
                             1 Spice -&gt; Draw + Trash
                           </button>
+                        </div>
+                      )}
+                      {isOpportunismIntrigue(card) && (
+                        <div className="intrigue-actions">
+                          {opportunismChoices.map(([first, second]) => {
+                            const lossLabel = first === second
+                              ? `2 ${factionShortLabels[first]}`
+                              : `${factionShortLabels[first]} + ${factionShortLabels[second]}`;
+                            const fullLossLabel = first === second
+                              ? `2 ${factionLabels[first]} Influence`
+                              : `1 ${factionLabels[first]} Influence and 1 ${factionLabels[second]} Influence`;
+                            return (
+                              <button
+                                type="button"
+                                key={`${first}-${second}`}
+                                onClick={() => playOpportunismPlot(card.id, [first, second])}
+                                disabled={plotIntrigueLocked || !opportunismCanPay}
+                                title={`Spend 2 Solari and lose ${fullLossLabel} to gain 1 VP`}
+                              >
+                                <Minus size={14} />
+                                2 Solari + {lossLabel} -&gt; VP
+                              </button>
+                            );
+                          })}
+                          {opportunismChoices.length === 0 && <span>Requires two Influence to lose.</span>}
                         </div>
                       )}
                       {isImperiumPoliticsIntrigue(card) && (

@@ -55,6 +55,7 @@ const departForArrakisSourceId = 132;
 const unexpectedAlliesSourceId = 137;
 const mercenariesSourceId = 128;
 const cunningSourceId = 133;
+const opportunismSourceId = 134;
 const buyAccessSourceId = 139;
 const imperiumPoliticsSourceId = 140;
 const callToArmsSourceId = 138;
@@ -105,6 +106,7 @@ export type TacticalOptionChoice = "add-strength" | { kind: "retreat-troops"; co
 export type CombatIntrigueChoice = SpiceIsPowerChoice | TacticalOptionChoice;
 export type DepartForArrakisChoice = "draw" | "spend-spice";
 export type CunningPlotChoice = "draw" | "paid-trash";
+export type InfluenceLossPair = [FactionId, FactionId];
 export type BuyAccessChoice = [FactionId, FactionId];
 export type ImperiumPoliticsChoice = "greatHouses" | "emperor" | "spacing";
 export type StrategicStockpilingChoice = "spice" | "water" | "both";
@@ -184,6 +186,10 @@ export function isMercenariesIntrigue(intrigue: IntrigueCard) {
 
 export function isCunningIntrigue(intrigue: IntrigueCard) {
   return intrigue.sourceId === cunningSourceId;
+}
+
+export function isOpportunismIntrigue(intrigue: IntrigueCard) {
+  return intrigue.sourceId === opportunismSourceId;
 }
 
 export function isBuyAccessIntrigue(intrigue: IntrigueCard) {
@@ -1874,6 +1880,28 @@ export function influenceLossChoices(player: Player) {
   return factionIds.filter((faction) => player.influence[faction] > 0);
 }
 
+export function influenceLossPairChoices(player: Player): InfluenceLossPair[] {
+  const pairs: InfluenceLossPair[] = [];
+  factionIds.forEach((first, firstIndex) => {
+    factionIds.slice(firstIndex).forEach((second) => {
+      const requiredFirst = first === second ? 2 : 1;
+      const requiredSecond = first === second ? 0 : 1;
+      if (player.influence[first] >= requiredFirst && player.influence[second] >= requiredSecond) {
+        pairs.push([first, second]);
+      }
+    });
+  });
+  return pairs;
+}
+
+function validInfluenceLossPair(player: Player, choice: InfluenceLossPair) {
+  if (!Array.isArray(choice) || choice.length !== 2) return false;
+  const [first, second] = choice;
+  if (!factionIds.includes(first) || !factionIds.includes(second)) return false;
+  if (first === second) return player.influence[first] >= 2;
+  return player.influence[first] > 0 && player.influence[second] > 0;
+}
+
 export function imperiumPoliticsFactionChoices(player: Player): ImperiumPoliticsChoice[] {
   if (player.role === "Commander" && player.team === "shaddam") {
     return ["emperor", "greatHouses", "spacing"];
@@ -2272,6 +2300,50 @@ export function playCunningPlotIntrigue(
     intrigueDiscard: [...state.intrigueDiscard, intrigue],
     pendingAction: trashPending,
     log: [log, ...state.log],
+  };
+}
+
+function influenceLossPairLog(choice: InfluenceLossPair) {
+  const [first, second] = choice;
+  if (first === second) return `2 ${factionLabels[first]} Influence`;
+  return `1 ${factionLabels[first]} Influence and 1 ${factionLabels[second]} Influence`;
+}
+
+export function playOpportunismPlotIntrigue(
+  state: GameState,
+  playerId: string,
+  intrigueId: string,
+  choice: InfluenceLossPair,
+): GameState {
+  if (state.phase !== "playing" || state.pendingAction || state.pendingQueue.length > 0) return state;
+  const player = state.players[state.activeSeat];
+  if (!player || player.id !== playerId) return state;
+  const intrigue = player.intrigues.find((card) => card.id === intrigueId);
+  if (!intrigue || !isOpportunismIntrigue(intrigue)) return state;
+  if (!validInfluenceLossPair(player, choice)) return state;
+  if (player.resources.solari < 2) return state;
+  const [first, second] = choice;
+
+  const players = state.players.map((candidate) => {
+    if (candidate.id !== player.id) return candidate;
+    let next = {
+      ...candidate,
+      resources: { ...candidate.resources, solari: candidate.resources.solari - 2 },
+      intrigues: candidate.intrigues.filter((card) => card.id !== intrigue.id),
+    };
+    next = adjustInfluence(next, first, -1);
+    next = adjustInfluence(next, second, -1);
+    return { ...next, vp: next.vp + 1 };
+  });
+
+  return {
+    ...state,
+    players,
+    intrigueDiscard: [...state.intrigueDiscard, intrigue],
+    log: [
+      `${player.leader} plays Opportunism, spends 2 Solari, loses ${influenceLossPairLog(choice)}, and gains 1 VP.`,
+      ...state.log,
+    ],
   };
 }
 

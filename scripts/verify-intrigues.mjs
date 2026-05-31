@@ -89,6 +89,7 @@ try {
   const shaddamsFavor = data.intrigueCards.find((card) => card.sourceId === 141);
   const intelligenceReport = data.intrigueCards.find((card) => card.sourceId === 142);
   const cunning = data.intrigueCards.find((card) => card.sourceId === 133);
+  const opportunism = data.intrigueCards.find((card) => card.sourceId === 134);
   const buyAccess = data.intrigueCards.find((card) => card.sourceId === 139);
   const imperiumPolitics = data.intrigueCards.find((card) => card.sourceId === 140);
   const councilorsAmbition = data.intrigueCards.find((card) => card.sourceId === 129);
@@ -110,6 +111,7 @@ try {
   assert.ok(shaddamsFavor, "Shaddam's Favor Intrigue should be available");
   assert.ok(intelligenceReport, "Intelligence Report Intrigue should be available");
   assert.ok(cunning, "Cunning Intrigue should be available");
+  assert.ok(opportunism, "Opportunism Intrigue should be available");
   assert.ok(buyAccess, "Buy Access Intrigue should be available");
   assert.ok(imperiumPolitics, "Imperium Politics Intrigue should be available");
   assert.ok(councilorsAmbition, "Councilor's Ambition Intrigue should be available");
@@ -166,6 +168,11 @@ try {
     cunning.summary,
     "Draw 1 card OR spend 1 spice to draw 1 card and trash 1 card.",
     "Cunning should expose both Plot branches",
+  );
+  assert.equal(
+    opportunism.summary,
+    "Spend 2 Solari and lose 2 Influence to gain 1 VP.",
+    "Opportunism should expose its Solari and Influence costs for 1 VP",
   );
   assert.equal(
     buyAccess.summary,
@@ -750,6 +757,164 @@ try {
   assert.equal(playerById(commanderCunning, "p4").hand.length, 1, "Commander Cunning should draw for the Commander");
   assert.equal(playerById(commanderCunning, "p6").hand.length, 0, "Commander Cunning should not target the activated Ally");
   assert.equal(commanderCunning.pendingAction?.ownerId, "p4", "Commander Cunning should require the Commander to trash");
+
+  const opportunismFixture = {
+    ...game,
+    activeSeat: game.players.findIndex((candidate) => candidate.id === "p2"),
+    pendingAction: undefined,
+    pendingQueue: [],
+    intrigueDiscard: [],
+    players: game.players.map((candidate) =>
+      candidate.id === "p2"
+        ? {
+            ...candidate,
+            vp: 3,
+            resources: { ...candidate.resources, solari: 3 },
+            influence: {
+              emperor: 0,
+              spacing: 1,
+              bene: 2,
+              fremen: 0,
+              greatHouses: 0,
+              fringeWorlds: 0,
+            },
+            intrigues: [opportunism],
+          }
+        : { ...candidate, intrigues: [] },
+    ),
+  };
+  assert.equal(
+    state.isOpportunismIntrigue(opportunism),
+    true,
+    "Opportunism should be recognized as a structured Plot Intrigue",
+  );
+  assert.deepEqual(
+    state.influenceLossPairChoices(playerById(opportunismFixture, "p2")),
+    [
+      ["spacing", "bene"],
+      ["bene", "bene"],
+    ],
+    "Opportunism should offer any payable two-Influence loss pair, including two of the same Faction",
+  );
+  const opportunismPlayed = state.playOpportunismPlotIntrigue(
+    opportunismFixture,
+    "p2",
+    opportunism.id,
+    ["spacing", "bene"],
+  );
+  assert.equal(playerById(opportunismPlayed, "p2").resources.solari, 1, "Opportunism should spend 2 Solari");
+  assert.equal(playerById(opportunismPlayed, "p2").influence.spacing, 0, "Opportunism should lose chosen Spacing Guild Influence");
+  assert.equal(playerById(opportunismPlayed, "p2").influence.bene, 1, "Opportunism should lose chosen Bene Gesserit Influence");
+  assert.equal(
+    playerById(opportunismPlayed, "p2").vp,
+    playerById(opportunismFixture, "p2").vp,
+    "Opportunism should add 1 VP after losing any threshold Influence VP",
+  );
+  assert.deepEqual(playerById(opportunismPlayed, "p2").intrigues, []);
+  assert.equal(opportunismPlayed.intrigueDiscard.at(-1).id, opportunism.id);
+  assert.match(opportunismPlayed.log[0], /plays Opportunism, spends 2 Solari, loses 1 Spacing Guild Influence and 1 Bene Gesserit Influence, and gains 1 VP/);
+  const opportunismSameFaction = state.playOpportunismPlotIntrigue(
+    opportunismFixture,
+    "p2",
+    opportunism.id,
+    ["bene", "bene"],
+  );
+  assert.equal(playerById(opportunismSameFaction, "p2").influence.bene, 0, "Opportunism should allow losing two Influence from one Faction");
+  assert.match(opportunismSameFaction.log[0], /loses 2 Bene Gesserit Influence/);
+  const opportunismReversed = state.playOpportunismPlotIntrigue(
+    opportunismFixture,
+    "p2",
+    opportunism.id,
+    ["bene", "spacing"],
+  );
+  assert.equal(playerById(opportunismReversed, "p2").influence.spacing, 0, "Opportunism should accept unordered loss pairs");
+  assert.equal(playerById(opportunismReversed, "p2").influence.bene, 1);
+  const poorOpportunism = {
+    ...opportunismFixture,
+    players: opportunismFixture.players.map((candidate) =>
+      candidate.id === "p2"
+        ? { ...candidate, resources: { ...candidate.resources, solari: 1 }, intrigues: [opportunism] }
+        : candidate,
+    ),
+  };
+  assert.equal(
+    state.playOpportunismPlotIntrigue(poorOpportunism, "p2", opportunism.id, ["spacing", "bene"]),
+    poorOpportunism,
+    "Opportunism should require 2 Solari",
+  );
+  const shortInfluenceOpportunism = {
+    ...opportunismFixture,
+    players: opportunismFixture.players.map((candidate) =>
+      candidate.id === "p2"
+        ? {
+            ...candidate,
+            influence: {
+              emperor: 0,
+              spacing: 0,
+              bene: 1,
+              fremen: 0,
+              greatHouses: 0,
+              fringeWorlds: 0,
+            },
+            intrigues: [opportunism],
+          }
+        : candidate,
+    ),
+  };
+  assert.deepEqual(
+    state.influenceLossPairChoices(playerById(shortInfluenceOpportunism, "p2")),
+    [],
+    "Opportunism should not offer choices unless two Influence can be paid",
+  );
+  assert.equal(
+    state.playOpportunismPlotIntrigue(shortInfluenceOpportunism, "p2", opportunism.id, ["bene", "bene"]),
+    shortInfluenceOpportunism,
+    "Opportunism should require actually losing both Influence",
+  );
+  assert.equal(
+    state.playOpportunismPlotIntrigue(opportunismFixture, "p2", mercenaries.id, ["spacing", "bene"]),
+    opportunismFixture,
+    "Opportunism should reject other Intrigue cards",
+  );
+  assert.equal(
+    state.playOpportunismPlotIntrigue(opportunismFixture, "p2", opportunism.id, ["spacing"]),
+    opportunismFixture,
+    "Opportunism should require exactly two Influence choices",
+  );
+  assert.equal(
+    state.playOpportunismPlotIntrigue(opportunismFixture, "p2", opportunism.id, ["spacing", "bene", "bene"]),
+    opportunismFixture,
+    "Opportunism should reject more than two Influence choices",
+  );
+  const pendingOpportunism = {
+    ...opportunismFixture,
+    pendingAction: { kind: "spy", ownerId: "p2", remaining: 1, source: "Test" },
+  };
+  assert.equal(
+    state.playOpportunismPlotIntrigue(pendingOpportunism, "p2", opportunism.id, ["spacing", "bene"]),
+    pendingOpportunism,
+    "Opportunism should wait for pending actions to resolve",
+  );
+  const queuedOpportunism = {
+    ...opportunismFixture,
+    pendingQueue: [{ kind: "spy", ownerId: "p2", remaining: 1, source: "Test" }],
+  };
+  assert.equal(
+    state.playOpportunismPlotIntrigue(queuedOpportunism, "p2", opportunism.id, ["spacing", "bene"]),
+    queuedOpportunism,
+    "Opportunism should wait for queued pending actions to resolve",
+  );
+  assert.equal(
+    state.playOpportunismPlotIntrigue(opportunismFixture, "p3", opportunism.id, ["spacing", "bene"]),
+    opportunismFixture,
+    "Only the active player should play Opportunism as a Plot Intrigue",
+  );
+  const combatOpportunism = { ...opportunismFixture, phase: "combat" };
+  assert.equal(
+    state.playOpportunismPlotIntrigue(combatOpportunism, "p2", opportunism.id, ["spacing", "bene"]),
+    combatOpportunism,
+    "Opportunism should only resolve during normal play",
+  );
 
   const buyAccessFixture = {
     ...game,

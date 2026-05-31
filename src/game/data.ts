@@ -60,6 +60,7 @@ const intrigueSummariesByCatalogId: Partial<Record<number, string>> = {
   128: "Spend 3 Solari to draw 1 Intrigue and recruit 2 troops.",
   132: "Spend 2 spice to recruit 3 troops; with 3+ Fremen/Fringe Influence, draw 1 card.",
   133: "Draw 1 card OR spend 1 spice to draw 1 card and trash 1 card.",
+  134: "Spend 2 Solari and lose 2 Influence to gain 1 VP.",
   131: "Remove the Shield Wall OR deploy up to four troops from your garrison to the Conflict.",
   129: "If you have a seat on the High Council, gain 2 water.",
   130: "Spend 5 spice to gain 1 VP; with 3+ Spacing Guild Influence, you may also spend 3 water to gain 1 VP.",

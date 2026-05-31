@@ -22,6 +22,59 @@ import {
   criticalLocationIncome,
   criticalLocationNames,
 } from "./critical-locations";
+import {
+  canMoveCardToThroneRow,
+  choamProfitsSourceId,
+  isBackedByChoamIntrigue,
+  isBuyAccessIntrigue,
+  isCallToArmsIntrigue,
+  isChangeAllegiancesIntrigue,
+  isCommandRespectCommanderCard,
+  isContingencyPlanIntrigue,
+  isCorrinoMightCommanderCard,
+  isCriticalShipmentsCommanderCard,
+  isCunningIntrigue,
+  isCouncilorsAmbitionIntrigue,
+  isDemandAttentionCommanderCard,
+  isDemandResultsCommanderCard,
+  isDepartForArrakisIntrigue,
+  isDesertCallCommanderCard,
+  isDetonationIntrigue,
+  isDevastatingAssaultCommanderCard,
+  isDevourIntrigue,
+  isDistractionIntrigue,
+  isFindWeaknessIntrigue,
+  isGenericSignetRingCard,
+  isGoToGroundIntrigue,
+  isImperiumPoliticsIntrigue,
+  isImpressIntrigue,
+  isInspireAweIntrigue,
+  isIntelligenceReportIntrigue,
+  isLeverageIntrigue,
+  isManipulateIntrigue,
+  isMarketOpportunityIntrigue,
+  isMercenariesIntrigue,
+  isMuadDibSignetRingCard,
+  isOpportunismIntrigue,
+  isQuestionableMethodsIntrigue,
+  isReachAgreementIntrigue,
+  isShaddamsFavorIntrigue,
+  isShaddamSignetRingCard,
+  isSietchRitualIntrigue,
+  isSpecialMissionIntrigue,
+  isSpiceIsPowerIntrigue,
+  isSpringTheTrapIntrigue,
+  isStrategicStockpilingIntrigue,
+  isTacticalOptionIntrigue,
+  isThreatenSpiceProductionCommanderCard,
+  isUnexpectedAlliesIntrigue,
+  isUsulCommanderCard,
+  isWeirdingCombatIntrigue,
+  secureSpiceTradeSourceId,
+  shadowAllianceFactions,
+  shadowAllianceSourceId,
+  spiceMustFlowSourceId,
+} from "./card-identifiers";
 import type {
   BoardSpace,
   Card,
@@ -45,6 +98,56 @@ import type {
   TeamId,
 } from "./types";
 
+export {
+  canMoveCardToThroneRow,
+  isBackedByChoamIntrigue,
+  isBuyAccessIntrigue,
+  isCallToArmsIntrigue,
+  isChangeAllegiancesIntrigue,
+  isCommandRespectCommanderCard,
+  isContingencyPlanIntrigue,
+  isCorrinoMightCommanderCard,
+  isCriticalShipmentsCommanderCard,
+  isCunningIntrigue,
+  isCouncilorsAmbitionIntrigue,
+  isDemandAttentionCommanderCard,
+  isDemandResultsCommanderCard,
+  isDepartForArrakisIntrigue,
+  isDesertCallCommanderCard,
+  isDetonationIntrigue,
+  isDevastatingAssaultCommanderCard,
+  isDevourIntrigue,
+  isDistractionIntrigue,
+  isFindWeaknessIntrigue,
+  isFremenCard,
+  isGenericSignetRingCard,
+  isGoToGroundIntrigue,
+  isImperiumPoliticsIntrigue,
+  isImpressIntrigue,
+  isInspireAweIntrigue,
+  isIntelligenceReportIntrigue,
+  isLeverageIntrigue,
+  isManipulateIntrigue,
+  isMarketOpportunityIntrigue,
+  isMercenariesIntrigue,
+  isMuadDibSignetRingCard,
+  isOpportunismIntrigue,
+  isQuestionableMethodsIntrigue,
+  isReachAgreementIntrigue,
+  isShaddamsFavorIntrigue,
+  isShaddamSignetRingCard,
+  isSietchRitualIntrigue,
+  isSpecialMissionIntrigue,
+  isSpiceIsPowerIntrigue,
+  isSpringTheTrapIntrigue,
+  isStrategicStockpilingIntrigue,
+  isTacticalOptionIntrigue,
+  isThreatenSpiceProductionCommanderCard,
+  isUnexpectedAlliesIntrigue,
+  isUsulCommanderCard,
+  isWeirdingCombatIntrigue,
+} from "./card-identifiers";
+
 const emptyInfluence = (): Influence => ({
   emperor: 0,
   spacing: 0,
@@ -54,63 +157,6 @@ const emptyInfluence = (): Influence => ({
   fringeWorlds: 0,
 });
 
-const secureSpiceTradeSourceId = 161;
-const choamProfitsSourceId = 450;
-const reachAgreementSourceId = 449;
-const strategicStockpilingSourceId = 130;
-const detonationSourceId = 131;
-const departForArrakisSourceId = 132;
-const sietchRitualSourceId = 127;
-const unexpectedAlliesSourceId = 137;
-const mercenariesSourceId = 128;
-const cunningSourceId = 133;
-const opportunismSourceId = 134;
-const changeAllegiancesSourceId = 135;
-const specialMissionSourceId = 136;
-const buyAccessSourceId = 139;
-const imperiumPoliticsSourceId = 140;
-const callToArmsSourceId = 138;
-const shaddamsFavorSourceId = 141;
-const intelligenceReportSourceId = 142;
-const manipulateSourceId = 143;
-const distractionSourceId = 144;
-const leverageSourceId = 447;
-const councilorsAmbitionSourceId = 129;
-const marketOpportunitySourceId = 145;
-const contingencyPlanSourceId = 147;
-const inspireAweSourceId = 148;
-const goToGroundSourceId = 146;
-const findWeaknessSourceId = 149;
-const spiceIsPowerSourceId = 150;
-const devourSourceId = 151;
-const impressSourceId = 152;
-const springTheTrapSourceId = 153;
-const weirdingCombatSourceId = 154;
-const tacticalOptionSourceId = 155;
-const questionableMethodsSourceId = 156;
-const backedByChoamSourceId = 448;
-const spiceMustFlowSourceId = 538;
-const shadowAllianceSourceId = 160;
-const genericSignetRingSourceId = 531;
-const muadDibSignetRingSourceId = 545;
-const shaddamSignetRingSourceId = 554;
-const demandAttentionSourceId = 548;
-const desertCallSourceId = 549;
-const threatenSpiceProductionSourceId = 553;
-const commandRespectSourceId = 546;
-const corrinoMightSourceId = 556;
-const usulSourceId = 552;
-const criticalShipmentsSourceId = 557;
-const demandResultsSourceId = 558;
-const devastatingAssaultSourceId = 559;
-const shadowAllianceFactions: FactionId[] = [
-  "emperor",
-  "spacing",
-  "bene",
-  "fremen",
-  "greatHouses",
-  "fringeWorlds",
-];
 const influenceVictoryPointThreshold = 2;
 const gurneyHalleckLeaderName = "Gurney Halleck";
 const gurneyAlwaysSmilingThreshold = 10;
@@ -220,138 +266,6 @@ function cloneObjectives(objectives: ObjectiveCard[]) {
 
 function isStandardBattleIcon(icon: ConflictCard["battleIcon"]): icon is BattleIconId {
   return icon !== "wild";
-}
-
-export function isDetonationIntrigue(intrigue: IntrigueCard) {
-  return intrigue.sourceId === detonationSourceId;
-}
-
-export function isUnexpectedAlliesIntrigue(intrigue: IntrigueCard) {
-  return intrigue.sourceId === unexpectedAlliesSourceId;
-}
-
-export function isDepartForArrakisIntrigue(intrigue: IntrigueCard) {
-  return intrigue.sourceId === departForArrakisSourceId;
-}
-
-export function isSietchRitualIntrigue(intrigue: IntrigueCard) {
-  return intrigue.sourceId === sietchRitualSourceId;
-}
-
-export function isMercenariesIntrigue(intrigue: IntrigueCard) {
-  return intrigue.sourceId === mercenariesSourceId;
-}
-
-export function isCunningIntrigue(intrigue: IntrigueCard) {
-  return intrigue.sourceId === cunningSourceId;
-}
-
-export function isOpportunismIntrigue(intrigue: IntrigueCard) {
-  return intrigue.sourceId === opportunismSourceId;
-}
-
-export function isChangeAllegiancesIntrigue(intrigue: IntrigueCard) {
-  return intrigue.sourceId === changeAllegiancesSourceId;
-}
-
-export function isSpecialMissionIntrigue(intrigue: IntrigueCard) {
-  return intrigue.sourceId === specialMissionSourceId;
-}
-
-export function isBuyAccessIntrigue(intrigue: IntrigueCard) {
-  return intrigue.sourceId === buyAccessSourceId;
-}
-
-export function isImperiumPoliticsIntrigue(intrigue: IntrigueCard) {
-  return intrigue.sourceId === imperiumPoliticsSourceId;
-}
-
-export function isCallToArmsIntrigue(intrigue: IntrigueCard) {
-  return intrigue.sourceId === callToArmsSourceId;
-}
-
-export function isCouncilorsAmbitionIntrigue(intrigue: IntrigueCard) {
-  return intrigue.sourceId === councilorsAmbitionSourceId;
-}
-
-export function isContingencyPlanIntrigue(intrigue: IntrigueCard) {
-  return intrigue.sourceId === contingencyPlanSourceId;
-}
-
-export function isIntelligenceReportIntrigue(intrigue: IntrigueCard) {
-  return intrigue.sourceId === intelligenceReportSourceId;
-}
-
-export function isManipulateIntrigue(intrigue: IntrigueCard) {
-  return intrigue.sourceId === manipulateSourceId;
-}
-
-export function isDistractionIntrigue(intrigue: IntrigueCard) {
-  return intrigue.sourceId === distractionSourceId;
-}
-
-export function isLeverageIntrigue(intrigue: IntrigueCard) {
-  return intrigue.sourceId === leverageSourceId;
-}
-
-export function isInspireAweIntrigue(intrigue: IntrigueCard) {
-  return intrigue.sourceId === inspireAweSourceId;
-}
-
-export function isDevourIntrigue(intrigue: IntrigueCard) {
-  return intrigue.sourceId === devourSourceId;
-}
-
-export function isFindWeaknessIntrigue(intrigue: IntrigueCard) {
-  return intrigue.sourceId === findWeaknessSourceId;
-}
-
-export function isGoToGroundIntrigue(intrigue: IntrigueCard) {
-  return intrigue.sourceId === goToGroundSourceId;
-}
-
-export function isSpiceIsPowerIntrigue(intrigue: IntrigueCard) {
-  return intrigue.sourceId === spiceIsPowerSourceId;
-}
-
-export function isImpressIntrigue(intrigue: IntrigueCard) {
-  return intrigue.sourceId === impressSourceId;
-}
-
-export function isSpringTheTrapIntrigue(intrigue: IntrigueCard) {
-  return intrigue.sourceId === springTheTrapSourceId;
-}
-
-export function isWeirdingCombatIntrigue(intrigue: IntrigueCard) {
-  return intrigue.sourceId === weirdingCombatSourceId;
-}
-
-export function isQuestionableMethodsIntrigue(intrigue: IntrigueCard) {
-  return intrigue.sourceId === questionableMethodsSourceId;
-}
-
-export function isReachAgreementIntrigue(intrigue: IntrigueCard) {
-  return intrigue.sourceId === reachAgreementSourceId;
-}
-
-export function isTacticalOptionIntrigue(intrigue: IntrigueCard) {
-  return intrigue.sourceId === tacticalOptionSourceId;
-}
-
-export function isBackedByChoamIntrigue(intrigue: IntrigueCard) {
-  return intrigue.sourceId === backedByChoamSourceId;
-}
-
-export function isStrategicStockpilingIntrigue(intrigue: IntrigueCard) {
-  return intrigue.sourceId === strategicStockpilingSourceId;
-}
-
-export function isShaddamsFavorIntrigue(intrigue: IntrigueCard) {
-  return intrigue.sourceId === shaddamsFavorSourceId;
-}
-
-export function isMarketOpportunityIntrigue(intrigue: IntrigueCard) {
-  return intrigue.sourceId === marketOpportunitySourceId;
 }
 
 function buildSixPlayerConflictDeck() {
@@ -1117,71 +1031,6 @@ export function pendingActionForSietchTabr(
     source: space.name,
     spaceId: space.id,
   };
-}
-
-export function isFremenCard(card: Card) {
-  return card.traits?.includes("Faction: Fremen") ?? false;
-}
-
-export function canMoveCardToThroneRow(card: Card) {
-  return !isFremenCard(card);
-}
-
-export function isUsulCommanderCard(card: Card) {
-  return card.sourceId === usulSourceId || card.name === "Usul";
-}
-
-export function isDemandAttentionCommanderCard(card: Card) {
-  return card.sourceId === demandAttentionSourceId || card.name === "Demand Attention";
-}
-
-export function isDesertCallCommanderCard(card: Card) {
-  return card.sourceId === desertCallSourceId || card.name === "Desert Call";
-}
-
-export function isThreatenSpiceProductionCommanderCard(card: Card) {
-  return card.sourceId === threatenSpiceProductionSourceId || card.name === "Threaten Spice Production";
-}
-
-export function isCommandRespectCommanderCard(card: Card) {
-  return card.sourceId === commandRespectSourceId || card.name === "Command Respect";
-}
-
-export function isMuadDibSignetRingCard(card: Card) {
-  return (
-    card.sourceId === muadDibSignetRingSourceId ||
-    (card.name === "Signet Ring" && card.id.includes("muaddib-signet-ring"))
-  );
-}
-
-export function isShaddamSignetRingCard(card: Card) {
-  return (
-    card.sourceId === shaddamSignetRingSourceId ||
-    (card.name === "Signet Ring" && card.id.includes("emperor-signet-ring"))
-  );
-}
-
-export function isGenericSignetRingCard(card: Card) {
-  return (
-    card.sourceId === genericSignetRingSourceId ||
-    (card.name === "Signet Ring" && card.id.includes("starter-ally-signet-ring"))
-  );
-}
-
-export function isCorrinoMightCommanderCard(card: Card) {
-  return card.sourceId === corrinoMightSourceId || card.name === "Corrino Might";
-}
-
-export function isCriticalShipmentsCommanderCard(card: Card) {
-  return card.sourceId === criticalShipmentsSourceId || card.name === "Critical Shipments";
-}
-
-export function isDemandResultsCommanderCard(card: Card) {
-  return card.sourceId === demandResultsSourceId || card.name === "Demand Results";
-}
-
-export function isDevastatingAssaultCommanderCard(card: Card) {
-  return card.sourceId === devastatingAssaultSourceId || card.name === "Devastating Assault";
 }
 
 function sameTeamAllies(players: Player[], source: Player): [Player, Player] | undefined {

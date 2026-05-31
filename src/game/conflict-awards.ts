@@ -44,6 +44,11 @@ type ConflictVpConversionPendingAction = Extract<PendingAction, { kind: "conflic
 const resourceIds: ResourceId[] = ["solari", "spice", "water"];
 
 const firstPlaceBattleRewardsBySourceId: Record<number, FirstPlaceBattleReward> = {
+  456: {
+    fixedVp: 0,
+    resources: { solari: 2 },
+    troops: 2,
+  },
   460: {
     fixedVp: 0,
     resources: { spice: 2 },

@@ -44,7 +44,7 @@ Private web-table implementation for a six-player `Dune: Imperium - Uprising` te
 - Six-player Objective setup deals only to Allies and balances Desert Mouse/Crysknife icons across teams.
 - Conflict winners keep won Conflict cards and score immediate non-wild battle-icon pairs with Objectives or prior Conflicts.
 - Critical-location Conflict wins set control of Arrakeen, Spice Refinery, or Imperial Basin; controlled spaces pay their visit income, and revealed controlled-location Conflicts queue the optional defensive supply troop.
-- Level III Battle conflicts pay first-place printed VP and queue optional paid VP conversions, including sandworm-doubled repeats while battle icons and location control stay undoubled.
+- Level II location Conflicts pay automated first-place resources/troops for Secure Imperial Basin and Siege Of Arrakeen, and level III Battle conflicts pay first-place printed VP plus optional paid VP conversions, including sandworm-doubled repeats while battle icons and location control stay undoubled.
 - High Council seats persist and add 2 persuasion on Reveal turns; later High Council visits take the printed repeat rewards.
 - Combat phase opens before Conflict resolution and sequences Combat Intrigue pass/play timing.
 - Endgame phase triggers at 10 VP or an empty Conflict deck and scores battle-icon Endgame Intrigues against matching or wild Conflict cards.

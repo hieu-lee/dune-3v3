@@ -265,6 +265,70 @@ try {
   assert.equal(unmatchedWinner.objectives[0].scored, undefined);
   assert.equal(unmatchedWinner.wonConflicts[0].scored, false);
 
+  const siegeArrakeenReward = {
+    ...fixture(state, data, (players) =>
+      players.map((player) =>
+        player.id === "p2"
+          ? { ...player, conflict: 9, deployedTroops: 1, garrison: 0, resources: { ...player.resources, solari: 0 } }
+          : player,
+      ), 456),
+    conflictDeck: [conflictBySourceId(data, 454)],
+  };
+  const siegeArrakeenResult = state.startNextRound(siegeArrakeenReward);
+  const siegeArrakeenWinner = playerById(siegeArrakeenResult, "p2");
+  assert.equal(siegeArrakeenWinner.resources.solari, 2, "Siege Of Arrakeen should pay first-place Solari");
+  assert.equal(siegeArrakeenWinner.garrison, 2, "Siege Of Arrakeen should recruit two first-place troops");
+  assert.equal(siegeArrakeenResult.locationControl.arrakeen, "p2", "Siege Of Arrakeen should set Arrakeen control");
+  assert.equal(siegeArrakeenResult.pendingAction, undefined, "Siege Of Arrakeen reward should not require choices");
+  assert.ok(
+    siegeArrakeenResult.log.some((entry) =>
+      entry.includes("gains 2 solari") &&
+      entry.includes("recruits 2 troops") &&
+      entry.includes("Siege Of Arrakeen")
+    ),
+    "Siege Of Arrakeen should log the paid printed reward",
+  );
+
+  const doubledSiegeArrakeenReward = {
+    ...fixture(state, data, (players) =>
+      players.map((player) =>
+        player.id === "p3"
+          ? { ...player, conflict: 9, deployedSandworms: 1, garrison: 0, resources: { ...player.resources, solari: 0 } }
+          : player,
+      ), 456),
+    conflictDeck: [conflictBySourceId(data, 454)],
+  };
+  const doubledSiegeArrakeenResult = state.startNextRound(doubledSiegeArrakeenReward);
+  const doubledSiegeArrakeenWinner = playerById(doubledSiegeArrakeenResult, "p3");
+  assert.equal(doubledSiegeArrakeenWinner.resources.solari, 4, "Sandworms should double Siege Of Arrakeen Solari");
+  assert.equal(doubledSiegeArrakeenWinner.garrison, 4, "Sandworms should double Siege Of Arrakeen troop recruitment");
+  assert.ok(
+    doubledSiegeArrakeenResult.log.some((entry) =>
+      entry.includes("gains 4 solari") &&
+      entry.includes("recruits 4 troops") &&
+      entry.includes("sandworm doubling")
+    ),
+    "Doubled Siege Of Arrakeen should log the doubled printed reward",
+  );
+
+  const supplyCappedSiegeArrakeenReward = {
+    ...fixture(state, data, (players) =>
+      players.map((player) =>
+        player.id === "p2"
+          ? { ...player, conflict: 9, deployedTroops: 1, garrison: 10, resources: { ...player.resources, solari: 0 } }
+          : player,
+      ), 456),
+    conflictDeck: [conflictBySourceId(data, 454)],
+  };
+  const supplyCappedSiegeArrakeenResult = state.startNextRound(supplyCappedSiegeArrakeenReward);
+  const supplyCappedSiegeArrakeenWinner = playerById(supplyCappedSiegeArrakeenResult, "p2");
+  assert.equal(supplyCappedSiegeArrakeenWinner.resources.solari, 2, "Supply cap should not block Siege Of Arrakeen Solari");
+  assert.equal(
+    supplyCappedSiegeArrakeenWinner.garrison,
+    11,
+    "Siege Of Arrakeen troop reward should recruit only available troop supply",
+  );
+
   const secureImperialBasinReward = fixture(state, data, (players) =>
     players.map((player) =>
       player.id === "p2"

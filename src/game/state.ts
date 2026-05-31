@@ -71,6 +71,7 @@ const backedByChoamSourceId = 448;
 const spiceMustFlowSourceId = 538;
 const shadowAllianceSourceId = 160;
 const muadDibSignetRingSourceId = 545;
+const shaddamSignetRingSourceId = 554;
 const demandAttentionSourceId = 548;
 const desertCallSourceId = 549;
 const threatenSpiceProductionSourceId = 553;
@@ -97,6 +98,17 @@ export type TacticalOptionChoice = "add-strength" | { kind: "retreat-troops"; co
 export type CombatIntrigueChoice = SpiceIsPowerChoice | TacticalOptionChoice;
 export type StrategicStockpilingChoice = "spice" | "water" | "both";
 export type MarketOpportunityChoice = "spice-to-solari" | "solari-to-spice";
+export type ShaddamSignetRingChoice = "skip" | "troop" | { kind: "influence"; faction: FactionId };
+
+const shaddamSignetRingTroopCost = 1;
+const shaddamSignetRingInfluenceCost = 3;
+const shaddamSignetRingInfluenceChoices: FactionId[] = [
+  "emperor",
+  "greatHouses",
+  "spacing",
+  "bene",
+  "fringeWorlds",
+];
 
 export function cloneCards(cards: Card[]) {
   return cards.map((card) => ({
@@ -433,6 +445,7 @@ export function initialGame(): GameState {
     shieldWall: true,
     swordmasterClaimed: false,
     pendingQueue: [],
+    conflictDeploymentBlock: undefined,
     log: [
       `Round 1 begins. ${conflict.name} is revealed. ${players[firstSeat].leader} has first action.`,
       `Only Allies draw Objectives; ${players[firstSeat].leader} has the First Player marker.`,
@@ -539,6 +552,19 @@ export function canSummonSandworms(state: GameState, owner: Player, count: numbe
   return !state.shieldWall || !conflictProtectedByShieldWall(state.conflict);
 }
 
+export function conflictDeploymentBlockedFor(
+  state: Pick<GameState, "conflictDeploymentBlock">,
+  actorId: string,
+  ownerId: string,
+) {
+  const block = state.conflictDeploymentBlock;
+  return Boolean(block && block.actorId === actorId && block.ownerId === ownerId);
+}
+
+function conflictDeploymentBlockedForOwner(state: Pick<GameState, "conflictDeploymentBlock">, ownerId: string) {
+  return state.conflictDeploymentBlock?.ownerId === ownerId;
+}
+
 export function setShieldWall(state: GameState, standing: boolean) {
   if (state.shieldWall === standing) return state;
   return {
@@ -635,13 +661,20 @@ export function pendingActionForSpace(
   target: Player,
   players: Player[],
   extraRecruitedTroops = 0,
+  deploymentsBlocked = false,
 ): PendingAction | undefined {
   if (space.spy && source.spies > 0) {
     return { kind: "spy", ownerId: source.id, remaining: Math.min(space.spy, source.spies), source: space.name };
   }
 
   if (space.team === "reinforce") {
-    return { kind: "reinforce", team: source.team, remaining: space.troops ?? 0, source: space.name };
+    return {
+      kind: "reinforce",
+      team: source.team,
+      remaining: space.troops ?? 0,
+      source: space.name,
+      ...(deploymentsBlocked ? { conflictBlocked: true } : {}),
+    };
   }
 
   if (space.team === "trade") {
@@ -660,7 +693,7 @@ export function pendingActionForSpace(
     return { kind: "contract", ownerId: source.id, source: space.name, spaceId: space.id };
   }
 
-  if (space.combat) {
+  if (space.combat && !deploymentsBlocked) {
     const deployable = Math.min(target.garrison, (space.troops ?? 0) + Math.max(0, extraRecruitedTroops) + 2);
     if (deployable > 0) {
       return { kind: "deploy", ownerId: target.id, remaining: deployable, source: space.name };
@@ -696,7 +729,7 @@ export function pendingActionForSietchTabr(
   space: BoardSpace,
   owner: Player,
   waterOwner: Player = owner,
-): PendingAction | undefined {
+): Extract<PendingAction, { kind: "sietch-tabr" }> | undefined {
   if (!space.sietchTabr) return undefined;
   return {
     kind: "sietch-tabr",
@@ -741,6 +774,13 @@ export function isMuadDibSignetRingCard(card: Card) {
   return (
     card.sourceId === muadDibSignetRingSourceId ||
     (card.name === "Signet Ring" && card.id.includes("muaddib-signet-ring"))
+  );
+}
+
+export function isShaddamSignetRingCard(card: Card) {
+  return (
+    card.sourceId === shaddamSignetRingSourceId ||
+    (card.name === "Signet Ring" && card.id.includes("emperor-signet-ring"))
   );
 }
 
@@ -851,6 +891,22 @@ export function pendingActionForCard(
       { commanderResource: "water", commanderAmount: 1, allyResource: "solari", allyAmount: 2 },
       { commanderResource: "solari", commanderAmount: 2, allyResource: "water", allyAmount: 1 },
     ]);
+  }
+  if (
+    isShaddamSignetRingCard(card) &&
+    source.team === "shaddam" &&
+    source.role === "Commander" &&
+    target?.team === source.team &&
+    target.role === "Ally" &&
+    source.playArea.some((candidate) => candidate.id === card.id && isShaddamSignetRingCard(candidate))
+  ) {
+    return {
+      kind: "shaddam-signet-ring",
+      commanderId: source.id,
+      allyId: target.id,
+      cardId: card.id,
+      source: "Emperor of the Known Universe",
+    };
   }
   if (
     isDesertCallCommanderCard(card) &&
@@ -1046,7 +1102,11 @@ export function queuePendingActions(state: GameState, actions: PendingAction[]) 
 
 export function advancePendingAction(state: GameState) {
   const [pendingAction, ...pendingQueue] = state.pendingQueue;
-  return { pendingAction, pendingQueue };
+  return {
+    pendingAction,
+    pendingQueue,
+    ...(!pendingAction ? { conflictDeploymentBlock: undefined } : {}),
+  };
 }
 
 export function finishPendingAction(state: GameState): GameState {
@@ -1072,6 +1132,7 @@ type CorrinoMightPendingAction = Extract<PendingAction, { kind: "corrino-might" 
 type DemandAttentionPendingAction = Extract<PendingAction, { kind: "demand-attention" }>;
 type DesertCallPendingAction = Extract<PendingAction, { kind: "desert-call" }>;
 type ThreatenSpiceProductionPendingAction = Extract<PendingAction, { kind: "threaten-spice-production" }>;
+type ShaddamSignetRingPendingAction = Extract<PendingAction, { kind: "shaddam-signet-ring" }>;
 
 function addPurchasedCard(player: Player, card: Card, fromReserve: boolean): Player {
   const purchaseSequence = player.purchaseSequence + 1;
@@ -1493,7 +1554,7 @@ export function applyCardAgentEffect(
   card: Card,
   sourcePlayer: Player,
   targetPlayer: Player,
-): { source: Player; target: Player; log?: string; recruitedTroops?: number } {
+): { source: Player; target: Player; log?: string; recruitedTroops?: number; blocksDeploymentsThisTurn?: boolean } {
   if (
     isMuadDibSignetRingCard(card) &&
     sourcePlayer.team === "muaddib" &&
@@ -1507,6 +1568,19 @@ export function applyCardAgentEffect(
       log: drewCard
         ? `${sourcePlayer.leader} resolves Lead the Way: draws 1 card.`
         : `${sourcePlayer.leader} resolves Lead the Way: no card to draw.`,
+    };
+  }
+
+  if (
+    isShaddamSignetRingCard(card) &&
+    sourcePlayer.team === "shaddam" &&
+    sourcePlayer.role === "Commander"
+  ) {
+    return {
+      source: sourcePlayer,
+      target: targetPlayer,
+      blocksDeploymentsThisTurn: true,
+      log: `${sourcePlayer.leader} resolves Emperor of the Known Universe: units can't be deployed to the Conflict this turn.`,
     };
   }
 
@@ -2285,6 +2359,13 @@ export function playDetonationIntrigue(
     ? activatedAllyEffectOwner(state, player, deployOwnerId)
     : { valid: true, owner: undefined };
   if (choice === "deploy" && (!state.conflict || !deployOwnerResult.valid || !deployOwnerResult.owner)) return state;
+  if (
+    choice === "deploy" &&
+    deployOwnerResult.owner &&
+    conflictDeploymentBlockedFor(state, player.id, deployOwnerResult.owner.id)
+  ) {
+    return state;
+  }
 
   const players = state.players.map((candidate) =>
     candidate.id === player.id
@@ -2342,6 +2423,7 @@ export function playUnexpectedAlliesIntrigue(
   const sandwormOwnerResult = activatedAllyEffectOwner(state, player, sandwormOwnerId);
   if (!sandwormOwnerResult.valid || !sandwormOwnerResult.owner) return state;
   const sandwormOwner = sandwormOwnerResult.owner;
+  if (conflictDeploymentBlockedFor(state, player.id, sandwormOwner.id)) return state;
 
   const removedShieldWall = removeShieldWall && state.shieldWall;
   const ownerLabel = sandwormOwner.id !== player.id ? ` for ${sandwormOwner.leader}` : "";
@@ -2527,6 +2609,7 @@ export function maybeStartCombatPhase(state: GameState): GameState {
 function clearRevealTurnEffects(state: GameState): GameState {
   return {
     ...state,
+    conflictDeploymentBlock: undefined,
     players: state.players.map((player) =>
       player.callToArmsActive || player.revealActivatedAllyId
         ? { ...player, callToArmsActive: false, revealActivatedAllyId: undefined }
@@ -2541,6 +2624,7 @@ export function finishRevealTurn(state: GameState, playerId: string): GameState 
   if (!player || player.id !== playerId || !player.revealed) return state;
   const clearedState = {
     ...state,
+    conflictDeploymentBlock: undefined,
     players: state.players.map((candidate) =>
       candidate.id === player.id
         ? { ...candidate, callToArmsActive: false, revealActivatedAllyId: undefined }
@@ -2906,6 +2990,91 @@ export function resolveCommanderResourceSplitChoice(
   };
 }
 
+export function resolveShaddamSignetRingChoice(
+  state: GameState,
+  pending: ShaddamSignetRingPendingAction,
+  choice: ShaddamSignetRingChoice,
+): GameState {
+  const commander = state.players.find((player) => player.id === pending.commanderId);
+  const ally = state.players.find((player) => player.id === pending.allyId);
+  if (
+    !commander ||
+    commander.team !== "shaddam" ||
+    commander.role !== "Commander" ||
+    !commander.playArea.some((card) => card.id === pending.cardId && isShaddamSignetRingCard(card)) ||
+    !ally ||
+    ally.team !== commander.team ||
+    ally.role !== "Ally"
+  ) {
+    return state;
+  }
+
+  if (choice === "skip") {
+    return {
+      ...state,
+      ...advancePendingAction(state),
+      log: [`${commander.leader} declines to pay for ${pending.source}.`, ...state.log],
+    };
+  }
+
+  if (choice === "troop") {
+    if (commander.resources.solari < shaddamSignetRingTroopCost) return state;
+    return {
+      ...state,
+      players: state.players.map((player) => {
+        if (player.id === commander.id) {
+          return {
+            ...player,
+            resources: {
+              ...player.resources,
+              solari: player.resources.solari - shaddamSignetRingTroopCost,
+            },
+          };
+        }
+        if (player.id === ally.id) return { ...player, garrison: player.garrison + 1 };
+        return player;
+      }),
+      ...advancePendingAction(state),
+      log: [
+        `${commander.leader} spends 1 Solari for ${pending.source}: ${ally.leader} recruits 1 troop.`,
+        ...state.log,
+      ],
+    };
+  }
+
+  if (
+    commander.resources.solari < shaddamSignetRingInfluenceCost ||
+    !shaddamSignetRingInfluenceChoices.includes(choice.faction)
+  ) {
+    return state;
+  }
+  const influenceOwnerId = choice.faction === "emperor" ? commander.id : ally.id;
+  const influenceOwner = influenceOwnerId === commander.id ? commander : ally;
+  return {
+    ...state,
+    players: state.players.map((player) => {
+      if (player.id === commander.id) {
+        const paid = {
+          ...player,
+          resources: { ...player.resources, solari: player.resources.solari - shaddamSignetRingInfluenceCost },
+        };
+        return influenceOwnerId === commander.id ? adjustInfluence(paid, choice.faction, 1) : paid;
+      }
+      if (player.id !== influenceOwnerId) return player;
+      return adjustInfluence(
+        player,
+        choice.faction,
+        1,
+      );
+    }),
+    ...advancePendingAction(state),
+    log: [
+      `${commander.leader} spends 3 Solari for ${pending.source}: ${influenceOwner.leader} gains 1 ${factionLabels[choice.faction]} Influence.`,
+      ...state.log,
+    ],
+  };
+}
+
 export function resolveCommandRespectTrade(
   state: GameState,
   pending: CommandRespectPendingAction,
@@ -3194,6 +3363,7 @@ export function resolveDesertCallChoice(
     !ally ||
     ally.team !== commander.team ||
     ally.role !== "Ally" ||
+    conflictDeploymentBlockedFor(state, commander.id, ally.id) ||
     !canSummonSandworms(state, ally, 1)
   ) {
     return state;
@@ -3393,6 +3563,7 @@ export function resolveMakerChoice(
   if (!owner) return { ...state, ...advancePendingAction(state) };
   const spiceRecipient = spiceOwner ?? owner;
 
+  if (choice === "sandworms" && conflictDeploymentBlockedForOwner(state, pending.ownerId)) return state;
   const summon = choice === "sandworms" && pending.canSummonSandworms;
   const players = state.players.map((player) => {
     if (!summon && player.id !== spiceRecipient.id) return player;
@@ -3449,7 +3620,7 @@ export function resolveSietchTabrChoice(
   });
   const ownerAfter = players.find((player) => player.id === owner.id) ?? owner;
   const deployable = Math.min(ownerAfter.garrison, (takeHooks ? 1 : 0) + 2);
-  const deployPending: PendingAction | undefined = deployable > 0
+  const deployPending: PendingAction | undefined = !pending.conflictBlocked && deployable > 0
     ? { kind: "deploy", ownerId: owner.id, remaining: deployable, source: pending.source }
     : undefined;
   const [nextAction, ...nextQueue] = state.pendingQueue;
@@ -3471,6 +3642,9 @@ export function resolveSietchTabrChoice(
 
 export function deployTroopToConflict(state: GameState, pending: DeployPendingAction): GameState {
   const owner = state.players.find((player) => player.id === pending.ownerId);
+  if (pending.conflictBlocked || conflictDeploymentBlockedForOwner(state, pending.ownerId)) {
+    return { ...state, ...advancePendingAction(state) };
+  }
   if (!owner || owner.garrison <= 0 || pending.remaining <= 0) return { ...state, ...advancePendingAction(state) };
 
   const players = state.players.map((player) =>
@@ -3499,6 +3673,7 @@ export function reinforceTroop(
   destination: "garrison" | "conflict",
 ): GameState {
   if (pending.remaining <= 0) return state;
+  if (destination === "conflict" && pending.conflictBlocked) return state;
   const recipient = state.players.find((player) => player.id === playerId);
   if (!recipient || recipient.team !== pending.team || recipient.role !== "Ally") return state;
 
@@ -3803,6 +3978,7 @@ export function startNextRound(state: GameState): GameState {
     makerSpice: advanceMakerSpice(resolvedState),
     pendingAction: undefined,
     pendingQueue: [],
+    conflictDeploymentBlock: undefined,
     combatPasses: [],
     conflict: nextConflict ?? null,
     conflictDeck,

@@ -34,6 +34,7 @@ import {
   collectMakerSpice,
   combatIntrigueStrength,
   combatIntrigueTargets,
+  conflictDeploymentBlockedFor,
   conflictProtectedByShieldWall,
   defaultActivatedAllyId,
   deployTroopToConflict,
@@ -118,6 +119,7 @@ import {
   resolveDesertCallChoice,
   resolveMakerChoice,
   resolveSietchTabrChoice,
+  resolveShaddamSignetRingChoice,
   resolveThreatenSpiceProductionChoice,
   skipCommandRespect,
   skipDemandAttention,
@@ -137,7 +139,7 @@ import {
   updateTradeSelection,
 } from "./game/state";
 import type { BoardSpace, Card, FactionId, GameState, PendingAction, Player, ResourceId, Resources, TeamId, TradeGoodId, TrashCardZone } from "./game/types";
-import type { CombatIntrigueChoice } from "./game/state";
+import type { CombatIntrigueChoice, ShaddamSignetRingChoice } from "./game/state";
 
 const resources: Array<{ id: ResourceId; label: string; Icon: LucideIcon }> = [
   { id: "solari", label: "Solari", Icon: CircleDollarSign },
@@ -158,6 +160,8 @@ const factionShortLabels: Record<FactionId, string> = {
   greatHouses: "GH",
   fringeWorlds: "FW",
 };
+
+const shaddamSignetInfluenceFactions: FactionId[] = ["emperor", "greatHouses", "spacing", "bene", "fringeWorlds"];
 
 export function revealPersuasionFor(player: Player) {
   const highCouncilPersuasion = player.highCouncilSeat ? 2 : 0;
@@ -301,25 +305,36 @@ export default function App() {
         if (candidate.id === effectedTarget.id) return effectedTarget;
         return candidate;
       });
-      const postEffectState = { ...current, players };
+      const deploymentOwner = player.role === "Commander" ? effectedTarget : source;
+      const conflictDeploymentBlock = cardAgentEffect.blocksDeploymentsThisTurn
+        ? { actorId: source.id, ownerId: deploymentOwner.id, source: selectedCard.name }
+        : undefined;
+      const postEffectState = { ...current, players, conflictDeploymentBlock };
       const spacePending = sietchTabrPending
         ? undefined
         : pendingActionForSpace(
           selectedSpace,
           source,
-          player.role === "Commander" ? effectedTarget : source,
+          deploymentOwner,
           players,
           cardAgentEffect.recruitedTroops,
+          Boolean(cardAgentEffect.blocksDeploymentsThisTurn),
         );
       const cardPending = pendingActionForCard(
         selectedCard,
         source,
         postEffectState,
-        player.role === "Commander" ? effectedTarget : source,
+        deploymentOwner,
         selectedSpace,
       );
       const pendingActions = pendingActionsFor(spacePending, cardPending, source.spies);
-      if (sietchTabrPending) pendingActions.unshift(sietchTabrPending);
+      if (sietchTabrPending) {
+        pendingActions.unshift(
+          cardAgentEffect.blocksDeploymentsThisTurn
+            ? { ...sietchTabrPending, conflictBlocked: true }
+            : sietchTabrPending,
+        );
+      }
       if (makerChoicePending) pendingActions.unshift(makerChoicePending);
       const pending = queuePendingActions(
         current,
@@ -331,6 +346,7 @@ export default function App() {
         spaces: { ...current.spaces, [selectedSpace.id]: target.id },
         makerSpice: collectMakerSpice(current, selectedSpace),
         swordmasterClaimed: current.swordmasterClaimed || selectedSpace.id === "swordmaster",
+        conflictDeploymentBlock,
         ...pending,
         log: [
           selectedCard.trashOnPlay
@@ -413,6 +429,7 @@ export default function App() {
       );
       return {
         ...current,
+        conflictDeploymentBlock: undefined,
         players,
         ...pending,
         log: [
@@ -597,6 +614,15 @@ export default function App() {
       const pending = current.pendingAction;
       if (!pending || pending.kind !== "commander-resource-split") return current;
       return maybeStartCombatPhase(resolveCommanderResourceSplitChoice(current, pending, optionIndex));
+    });
+  }
+
+  function chooseShaddamSignet(choice: ShaddamSignetRingChoice) {
+    if (game.pendingAction?.kind !== "shaddam-signet-ring") return;
+    setGame((current) => {
+      const pending = current.pendingAction;
+      if (!pending || pending.kind !== "shaddam-signet-ring") return current;
+      return maybeStartCombatPhase(resolveShaddamSignetRingChoice(current, pending, choice));
     });
   }
 
@@ -959,6 +985,14 @@ export default function App() {
     pendingAction?.kind === "commander-resource-split"
       ? game.players.find((player) => player.id === pendingAction.allyId)
       : undefined;
+  const pendingShaddamSignetCommander =
+    pendingAction?.kind === "shaddam-signet-ring"
+      ? game.players.find((player) => player.id === pendingAction.commanderId)
+      : undefined;
+  const pendingShaddamSignetAlly =
+    pendingAction?.kind === "shaddam-signet-ring"
+      ? game.players.find((player) => player.id === pendingAction.allyId)
+      : undefined;
   const pendingCommandRespectCommander =
     pendingAction?.kind === "command-respect"
       ? game.players.find((player) => player.id === pendingAction.commanderId)
@@ -1100,13 +1134,16 @@ export default function App() {
   const plotIntrigueLocked = !playingPhase || pendingLocked;
   const detonationDeployOwner = activePlayer.role === "Commander" ? activatedAlly : activePlayer;
   const unexpectedAlliesOwner = activePlayer.role === "Commander" ? activatedAlly : activePlayer;
+  const detonationDeploymentBlocked = conflictDeploymentBlockedFor(game, activePlayer.id, detonationDeployOwner.id);
+  const unexpectedAlliesDeploymentBlocked = conflictDeploymentBlockedFor(game, activePlayer.id, unexpectedAlliesOwner.id);
   const shaddamsFavorOwner = activePlayer.role === "Commander" ? activatedAlly : activePlayer;
   const mercenariesOwner = activePlayer.role === "Commander" ? activatedAlly : activePlayer;
   const currentConflictProtected = conflictProtectedByShieldWall(game.conflict);
   const unexpectedAlliesCanPay = activePlayer.resources.water >= 2;
   const unexpectedAlliesBlockedByShieldWall = Boolean(game.conflict && game.shieldWall && currentConflictProtected);
   const unexpectedAlliesCanSummonWithoutWall = Boolean(game.conflict && (!game.shieldWall || !currentConflictProtected));
-  const unexpectedAlliesDisabled = plotIntrigueLocked || !game.conflict || !unexpectedAlliesCanPay;
+  const unexpectedAlliesDisabled =
+    plotIntrigueLocked || !game.conflict || !unexpectedAlliesCanPay || unexpectedAlliesDeploymentBlocked;
   const spyPlacementSpaces = pendingSpyOwner
     ? boardSpaces.filter((space) => canPlaceSpyPost(game, space, pendingSpyOwner))
     : [];
@@ -1753,6 +1790,7 @@ export default function App() {
                 {pendingAction.kind === "maker-choice" && `${pendingMakerLabel ?? "Player"} Maker space`}
                 {pendingAction.kind === "sietch-tabr" && `${pendingSietchLabel ?? "Player"} Sietch Tabr`}
                 {pendingAction.kind === "commander-resource-split" && `${pendingResourceSplitCommander?.leader ?? "Commander"} ${pendingAction.source}`}
+                {pendingAction.kind === "shaddam-signet-ring" && `${pendingShaddamSignetCommander?.leader ?? "Shaddam"} Emperor of the Known Universe`}
                 {pendingAction.kind === "command-respect" && `${pendingCommandRespectCommander?.leader ?? "Muad'Dib"} Command Respect`}
                 {pendingAction.kind === "demand-results" && `${pendingDemandResultsCommander?.leader ?? "Shaddam"} Demand Results`}
                 {pendingAction.kind === "corrino-might" && `${pendingCorrinoMightCommander?.leader ?? "Shaddam"} Corrino Might`}
@@ -1931,6 +1969,41 @@ export default function App() {
               </div>
             )}
 
+            {pendingAction.kind === "shaddam-signet-ring" && (
+              <div className="pending-controls influence-buttons">
+                {pendingShaddamSignetCommander && pendingShaddamSignetAlly ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => chooseShaddamSignet("troop")}
+                      disabled={pendingShaddamSignetCommander.resources.solari < 1}
+                    >
+                      <CircleDollarSign size={15} />
+                      Spend 1: {pendingShaddamSignetAlly.leader} recruits 1 troop
+                    </button>
+                    {shaddamSignetInfluenceFactions.map((faction) => {
+                      const owner =
+                        faction === "emperor" ? pendingShaddamSignetCommander : pendingShaddamSignetAlly;
+                      return (
+                        <button
+                          type="button"
+                          key={faction}
+                          onClick={() => chooseShaddamSignet({ kind: "influence", faction })}
+                          disabled={pendingShaddamSignetCommander.resources.solari < 3}
+                        >
+                          <CircleDollarSign size={15} />
+                          Spend 3: {owner.leader} +1 {factionLabels[faction]}
+                        </button>
+                      );
+                    })}
+                  </>
+                ) : (
+                  <span>Emperor of the Known Universe can no longer resolve with the current table state.</span>
+                )}
+                <button type="button" onClick={() => chooseShaddamSignet("skip")}>Skip</button>
+              </div>
+            )}
+
             {pendingAction.kind === "command-respect" && (
               <div className="pending-controls">
                 {pendingCommandRespectCommander && pendingCommandRespectPartners.length > 0 ? (
@@ -2073,9 +2146,17 @@ export default function App() {
                   <div className="support-target" key={ally.id}>
                     <strong>{ally.leader}</strong>
                     <button type="button" onClick={() => reinforceOne(ally.id, "garrison")}>Garrison</button>
-                    <button type="button" onClick={() => reinforceOne(ally.id, "conflict")}>Conflict</button>
+                    <button
+                      type="button"
+                      onClick={() => reinforceOne(ally.id, "conflict")}
+                      disabled={pendingAction.conflictBlocked}
+                      title={pendingAction.conflictBlocked ? "Conflict deployment is blocked this turn." : undefined}
+                    >
+                      Conflict
+                    </button>
                   </div>
                 ))}
+                {pendingAction.conflictBlocked && <span>Conflict deployment is blocked this turn.</span>}
               </div>
             )}
 
@@ -2500,7 +2581,8 @@ export default function App() {
                           <button
                             type="button"
                             onClick={() => playDetonation(card.id, "deploy")}
-                            disabled={plotIntrigueLocked || !game.conflict}
+                            disabled={plotIntrigueLocked || !game.conflict || detonationDeploymentBlocked}
+                            title={detonationDeploymentBlocked ? "Conflict deployment is blocked this turn" : undefined}
                           >
                             <Swords size={14} />
                             Deploy up to {Math.min(detonationDeployOwner.garrison, 4)}
@@ -2514,6 +2596,7 @@ export default function App() {
                               type="button"
                               onClick={() => playUnexpectedAllies(card.id, false)}
                               disabled={unexpectedAlliesDisabled}
+                              title={unexpectedAlliesDeploymentBlocked ? "Conflict deployment is blocked this turn" : undefined}
                             >
                               <Sparkles size={14} />
                               Worm{unexpectedAlliesOwner.id !== activePlayer.id ? `: ${unexpectedAlliesOwner.leader}` : ""}
@@ -2524,6 +2607,7 @@ export default function App() {
                               type="button"
                               onClick={() => playUnexpectedAllies(card.id, true)}
                               disabled={unexpectedAlliesDisabled}
+                              title={unexpectedAlliesDeploymentBlocked ? "Conflict deployment is blocked this turn" : undefined}
                             >
                               <Shield size={14} />
                               {unexpectedAlliesBlockedByShieldWall ? "Wall + worm" : "Remove wall + worm"}

@@ -190,12 +190,14 @@ export type PendingAction =
       ownerId: string;
       remaining: number;
       source: string;
+      conflictBlocked?: boolean;
     }
   | {
       kind: "reinforce";
       team: TeamId;
       remaining: number;
       source: string;
+      conflictBlocked?: boolean;
     }
   | {
       kind: "trade";
@@ -270,6 +272,7 @@ export type PendingAction =
       canRemoveShieldWall: boolean;
       source: string;
       spaceId: string;
+      conflictBlocked?: boolean;
     }
   | {
       kind: "throne-row";
@@ -332,6 +335,13 @@ export type PendingAction =
       source: string;
     }
   | {
+      kind: "shaddam-signet-ring";
+      commanderId: string;
+      allyId: string;
+      cardId: string;
+      source: string;
+    }
+  | {
       kind: "conflict-tie";
       team: TeamId;
       tiedPlayerIds: string[];
@@ -340,6 +350,12 @@ export type PendingAction =
     };
 
 export type TrashCardZone = "hand" | "discard" | "playArea";
+
+export type ConflictDeploymentBlock = {
+  actorId: string;
+  ownerId: string;
+  source: string;
+};
 
 export type GameState = {
   phase: GamePhase;
@@ -367,6 +383,7 @@ export type GameState = {
   swordmasterClaimed: boolean;
   pendingAction?: PendingAction;
   pendingQueue: PendingAction[];
+  conflictDeploymentBlock?: ConflictDeploymentBlock;
   winningTeam?: TeamId;
   endgameReason?: string;
   log: string[];

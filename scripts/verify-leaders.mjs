@@ -37,6 +37,12 @@ function assertLocalArt(leader) {
   );
 }
 
+function playerById(game, playerId) {
+  const player = game.players.find((candidate) => candidate.id === playerId);
+  assert.ok(player, `Expected player ${playerId}`);
+  return player;
+}
+
 const server = await createServer({
   appType: "custom",
   logLevel: "silent",
@@ -72,13 +78,17 @@ try {
     assertLocalArt(player.leaderCard);
   }
 
-  const [muadDib, , muadDibAllyA, emperor] = game.players;
+  const [muadDib, shaddamAlly, muadDibAllyA, emperor] = game.players;
   const muadDibSignet = data.muadDibCommanderCards.find((card) => card.name === "Signet Ring");
   const allySignet = data.allyStarterCards.find((card) => card.name === "Signet Ring");
   const emperorSignet = data.emperorCommanderCards.find((card) => card.name === "Signet Ring");
+  const detonation = data.intrigueCards.find((card) => card.sourceId === 131);
+  const unexpectedAllies = data.intrigueCards.find((card) => card.sourceId === 137);
   assert.ok(muadDibSignet, "Muad'Dib Commander deck should include Signet Ring");
   assert.ok(allySignet, "Ally starter deck should include Signet Ring");
   assert.ok(emperorSignet, "Emperor Commander deck should include Signet Ring");
+  assert.ok(detonation, "Detonation should exist for Shaddam deployment-block regression");
+  assert.ok(unexpectedAllies, "Unexpected Allies should exist for Shaddam deployment-block regression");
   assert.equal(
     state.isMuadDibSignetRingCard(muadDibSignet),
     true,
@@ -94,7 +104,27 @@ try {
     false,
     "Emperor Signet Ring should not be recognized as Muad'Dib's Signet Ring",
   );
+  assert.equal(
+    state.isShaddamSignetRingCard(emperorSignet),
+    true,
+    "Emperor Signet Ring should be recognized for Emperor of the Known Universe",
+  );
+  assert.equal(
+    state.isShaddamSignetRingCard(allySignet),
+    false,
+    "Generic Ally Signet Ring should not be recognized as Shaddam's Signet Ring",
+  );
+  assert.equal(
+    state.isShaddamSignetRingCard(muadDibSignet),
+    false,
+    "Muad'Dib Signet Ring should not be recognized as Shaddam's Signet Ring",
+  );
   assert.match(muadDibSignet.play, /draw 1 card/i, "Muad'Dib Signet Ring should document Lead the Way");
+  assert.match(
+    emperorSignet.play,
+    /no Conflict deployment.*pay 1 Solari.*3 Solari.*Influence/i,
+    "Emperor Signet Ring should document Emperor of the Known Universe",
+  );
   const leadTheWayDraw = { ...data.allyStarterCards[0], id: "lead-the-way-draw-card" };
   const leadTheWayDiscardDraw = { ...data.allyStarterCards[1], id: "lead-the-way-discard-draw-card" };
   const leadTheWaySource = {
@@ -153,6 +183,264 @@ try {
     muadDibAllyA,
   );
   assert.equal(emperorSignetResult.source.hand.length, 0, "Emperor Signet Ring should not trigger Lead the Way");
+
+  const shaddamSignetSource = {
+    ...emperor,
+    resources: { ...emperor.resources, solari: 3 },
+    playArea: [emperorSignet],
+  };
+  const shaddamSignetEffect = state.applyCardAgentEffect(emperorSignet, shaddamSignetSource, shaddamAlly);
+  assert.equal(
+    shaddamSignetEffect.blocksDeploymentsThisTurn,
+    true,
+    "Emperor of the Known Universe should block same-turn Conflict deployment",
+  );
+  assert.equal(shaddamSignetEffect.target.id, shaddamAlly.id, "Shaddam Signet should keep the activated Ally target");
+  assert.match(shaddamSignetEffect.log ?? "", /can't be deployed/, "Shaddam Signet should log the deployment block");
+  const arrakeen = data.boardSpaces.find((space) => space.id === "arrakeen");
+  assert.ok(arrakeen, "Arrakeen should exist for Shaddam Signet deployment regression");
+  assert.equal(
+    state.pendingActionForSpace(
+      arrakeen,
+      shaddamSignetEffect.source,
+      shaddamSignetEffect.target,
+      game.players,
+      0,
+      shaddamSignetEffect.blocksDeploymentsThisTurn,
+    ),
+    undefined,
+    "Shaddam Signet should suppress the activated Ally's same-turn combat-space deployment",
+  );
+  const militarySupport = data.boardSpaces.find((space) => space.id === "military-support");
+  assert.ok(militarySupport, "Military Support should exist for Shaddam Signet reinforcement regression");
+  const blockedReinforcePending = state.pendingActionForSpace(
+    militarySupport,
+    shaddamSignetEffect.source,
+    shaddamSignetEffect.target,
+    game.players,
+    0,
+    shaddamSignetEffect.blocksDeploymentsThisTurn,
+  );
+  assert.deepEqual(blockedReinforcePending, {
+    kind: "reinforce",
+    team: "shaddam",
+    remaining: 3,
+    source: "Military Support",
+    conflictBlocked: true,
+  });
+  const blockedReinforceGame = {
+    ...game,
+    pendingAction: blockedReinforcePending,
+    pendingQueue: [],
+    players: game.players.map((player) =>
+      player.id === shaddamAlly.id ? { ...player, garrison: 0, conflict: 0, deployedTroops: 0 } : player,
+    ),
+  };
+  const rejectedConflictReinforce = state.reinforceTroop(
+    blockedReinforceGame,
+    blockedReinforcePending,
+    shaddamAlly.id,
+    "conflict",
+  );
+  assert.equal(playerById(rejectedConflictReinforce, shaddamAlly.id).conflict, 0, "Blocked reinforcement should not enter Conflict");
+  assert.equal(
+    rejectedConflictReinforce.pendingAction?.kind,
+    "reinforce",
+    "Blocked reinforcement should keep the pending action for a garrison choice",
+  );
+  const garrisonReinforce = state.reinforceTroop(
+    blockedReinforceGame,
+    blockedReinforcePending,
+    shaddamAlly.id,
+    "garrison",
+  );
+  assert.equal(playerById(garrisonReinforce, shaddamAlly.id).garrison, 1, "Blocked reinforcement should still allow garrison recruitment");
+  assert.equal(garrisonReinforce.pendingAction?.remaining, 2, "Garrison reinforcement should consume one blocked reinforce choice");
+  const blockedSietchPending = {
+    kind: "sietch-tabr",
+    ownerId: shaddamAlly.id,
+    waterOwnerId: emperor.id,
+    canTakeMakerHooks: false,
+    canRemoveShieldWall: true,
+    source: "Sietch Tabr",
+    spaceId: "sietch-tabr",
+    conflictBlocked: true,
+  };
+  const blockedSietchGame = {
+    ...game,
+    pendingAction: blockedSietchPending,
+    pendingQueue: [],
+    players: game.players.map((player) => {
+      if (player.id === shaddamAlly.id) return { ...player, garrison: 2, conflict: 0, deployedTroops: 0 };
+      if (player.id === emperor.id) return { ...player, resources: { ...player.resources, water: 0 } };
+      return player;
+    }),
+  };
+  const blockedSietch = state.resolveSietchTabrChoice(blockedSietchGame, blockedSietchPending, "hooks");
+  assert.equal(playerById(blockedSietch, shaddamAlly.id).garrison, 3, "Blocked Sietch Tabr should still recruit to garrison");
+  assert.equal(playerById(blockedSietch, shaddamAlly.id).conflict, 0, "Blocked Sietch Tabr should not deploy troops");
+  assert.equal(blockedSietch.pendingAction, undefined, "Blocked Sietch Tabr should not queue deployment");
+
+  const signetDeploymentBlock = {
+    actorId: emperor.id,
+    ownerId: shaddamAlly.id,
+    source: "Emperor of the Known Universe",
+  };
+  const blockedPlotDeploymentGame = {
+    ...game,
+    activeSeat: game.players.findIndex((player) => player.id === emperor.id),
+    conflictDeploymentBlock: signetDeploymentBlock,
+    pendingAction: undefined,
+    pendingQueue: [],
+    shieldWall: false,
+    players: game.players.map((player) => {
+      if (player.id === emperor.id) {
+        return { ...player, resources: { ...player.resources, water: 2 }, intrigues: [detonation, unexpectedAllies] };
+      }
+      if (player.id === shaddamAlly.id) {
+        return { ...player, garrison: 3, conflict: 0, deployedTroops: 0, deployedSandworms: 0 };
+      }
+      return { ...player, intrigues: [] };
+    }),
+  };
+  assert.equal(
+    state.conflictDeploymentBlockedFor(blockedPlotDeploymentGame, emperor.id, shaddamAlly.id),
+    true,
+    "Shaddam Signet should register the activated Ally as deployment-blocked for Shaddam's turn",
+  );
+  assert.equal(
+    state.conflictDeploymentBlockedFor(blockedPlotDeploymentGame, emperor.id, "p6"),
+    false,
+    "Shaddam Signet deployment block should not affect an unactivated Ally",
+  );
+  const blockedDetonation = state.playDetonationIntrigue(
+    blockedPlotDeploymentGame,
+    emperor.id,
+    detonation.id,
+    "deploy",
+    shaddamAlly.id,
+  );
+  assert.equal(blockedDetonation, blockedPlotDeploymentGame, "Shaddam Signet should block Detonation troop deployment");
+  const blockedUnexpectedAllies = state.playUnexpectedAlliesIntrigue(
+    blockedPlotDeploymentGame,
+    emperor.id,
+    unexpectedAllies.id,
+    false,
+    shaddamAlly.id,
+  );
+  assert.equal(
+    blockedUnexpectedAllies,
+    blockedPlotDeploymentGame,
+    "Shaddam Signet should block Unexpected Allies sandworm deployment",
+  );
+  const blockedDeployPending = { kind: "deploy", ownerId: shaddamAlly.id, remaining: 1, source: "Blocked regression" };
+  const blockedDeploy = state.deployTroopToConflict(
+    { ...blockedPlotDeploymentGame, pendingAction: blockedDeployPending },
+    blockedDeployPending,
+  );
+  assert.equal(playerById(blockedDeploy, shaddamAlly.id).garrison, 3, "Blocked deployment should not spend a garrison troop");
+  assert.equal(playerById(blockedDeploy, shaddamAlly.id).conflict, 0, "Blocked deployment should not add Conflict strength");
+  assert.equal(blockedDeploy.pendingAction, undefined, "Blocked deployment should advance the stale pending action");
+
+  const shaddamSignetPending = state.pendingActionForCard(
+    emperorSignet,
+    shaddamSignetSource,
+    game,
+    shaddamAlly,
+    arrakeen,
+  );
+  assert.deepEqual(shaddamSignetPending, {
+    kind: "shaddam-signet-ring",
+    commanderId: emperor.id,
+    allyId: shaddamAlly.id,
+    cardId: emperorSignet.id,
+    source: "Emperor of the Known Universe",
+  });
+  assert.equal(
+    state.pendingActionForCard(emperorSignet, { ...shaddamSignetSource, playArea: [] }, game, shaddamAlly, arrakeen),
+    undefined,
+    "Shaddam Signet choice should require the Signet Ring in play",
+  );
+  assert.equal(
+    state.pendingActionForCard(emperorSignet, shaddamAlly, game, shaddamAlly, arrakeen),
+    undefined,
+    "Shaddam Signet choice should not trigger from an Ally owner",
+  );
+  assert.equal(
+    state.pendingActionForCard(emperorSignet, shaddamSignetSource, game, muadDibAllyA, arrakeen),
+    undefined,
+    "Shaddam Signet choice should require an activated Shaddam Ally",
+  );
+
+  const signetResolutionBase = {
+    ...game,
+    pendingAction: shaddamSignetPending,
+    pendingQueue: [],
+    conflictDeploymentBlock: signetDeploymentBlock,
+    players: game.players.map((player) => {
+      if (player.id === emperor.id) {
+        return { ...shaddamSignetSource, influence: { ...player.influence, emperor: 1 } };
+      }
+      if (player.id === shaddamAlly.id) {
+        return {
+          ...player,
+          garrison: 0,
+          influence: { ...player.influence, greatHouses: 1, spacing: 1 },
+        };
+      }
+      return player;
+    }),
+  };
+  const troopChoice = state.resolveShaddamSignetRingChoice(signetResolutionBase, shaddamSignetPending, "troop");
+  assert.equal(playerById(troopChoice, emperor.id).resources.solari, 2, "Shaddam Signet troop branch should cost Shaddam 1 Solari");
+  assert.equal(playerById(troopChoice, shaddamAlly.id).garrison, 1, "Shaddam Signet troop branch should recruit for the activated Ally");
+  assert.equal(playerById(troopChoice, shaddamAlly.id).conflict, 0, "Shaddam Signet troop branch should not deploy the recruited troop");
+  assert.equal(troopChoice.pendingAction, undefined, "Shaddam Signet troop branch should clear the pending action");
+  assert.equal(troopChoice.conflictDeploymentBlock, undefined, "Shaddam Signet block should clear when the Signet pending choice resolves");
+
+  const greatHousesChoice = state.resolveShaddamSignetRingChoice(
+    signetResolutionBase,
+    shaddamSignetPending,
+    { kind: "influence", faction: "greatHouses" },
+  );
+  assert.equal(playerById(greatHousesChoice, emperor.id).resources.solari, 0, "Shaddam Signet Influence branch should cost Shaddam 3 Solari");
+  assert.equal(
+    playerById(greatHousesChoice, shaddamAlly.id).influence.greatHouses,
+    2,
+    "Shaddam Signet main-board Influence branch should move the activated Ally",
+  );
+  assert.equal(playerById(greatHousesChoice, shaddamAlly.id).vp, shaddamAlly.vp + 1, "Shaddam Signet Ally Influence can score the 2-Influence VP");
+  assert.equal(playerById(greatHousesChoice, emperor.id).influence.greatHouses, 0, "Shaddam should not take main-board Great Houses Influence");
+
+  const personalEmperorChoice = state.resolveShaddamSignetRingChoice(
+    signetResolutionBase,
+    shaddamSignetPending,
+    { kind: "influence", faction: "emperor" },
+  );
+  assert.equal(
+    playerById(personalEmperorChoice, emperor.id).influence.emperor,
+    2,
+    "Shaddam Signet personal Emperor choice should move Shaddam's personal track",
+  );
+  assert.equal(playerById(personalEmperorChoice, emperor.id).vp, emperor.vp + 1, "Shaddam personal Influence can score the 2-Influence VP");
+  assert.equal(playerById(personalEmperorChoice, shaddamAlly.id).influence.emperor, 0, "Activated Ally should not take personal Emperor Influence");
+  const skippedSignet = state.resolveShaddamSignetRingChoice(signetResolutionBase, shaddamSignetPending, "skip");
+  assert.equal(playerById(skippedSignet, emperor.id).resources.solari, 3, "Skipping Shaddam Signet should not spend Solari");
+  assert.equal(playerById(skippedSignet, shaddamAlly.id).garrison, 0, "Skipping Shaddam Signet should not recruit troops");
+  assert.equal(skippedSignet.conflictDeploymentBlock, undefined, "Skipping Shaddam Signet should clear the one-turn deployment block");
+  const laterDeployPending = { kind: "deploy", ownerId: shaddamAlly.id, remaining: 1, source: "Later turn" };
+  const laterDeploy = state.deployTroopToConflict(
+    {
+      ...skippedSignet,
+      pendingAction: laterDeployPending,
+      players: skippedSignet.players.map((player) =>
+        player.id === shaddamAlly.id ? { ...player, garrison: 3, conflict: 0, deployedTroops: 0 } : player,
+      ),
+    },
+    laterDeployPending,
+  );
+  assert.equal(playerById(laterDeploy, shaddamAlly.id).garrison, 2, "Later turns should allow the Ally to deploy after Shaddam Signet clears");
+  assert.equal(playerById(laterDeploy, shaddamAlly.id).conflict, 2, "Later deployment should add Conflict strength after Shaddam Signet clears");
 
   console.log("leader verification passed");
 } finally {

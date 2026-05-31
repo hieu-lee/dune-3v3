@@ -529,7 +529,7 @@ const emperorCommanderSpecs: Array<StarterCardSpec & { sourceId: number }> = [
     icons: ["landsraad", "city", "spice"],
     persuasion: 1,
     swords: 0,
-    play: "Trigger the leader signet ability.",
+    play: "Emperor of the Known Universe: no Conflict deployment this turn; pay 1 Solari for 1 Ally troop or 3 Solari for 1 Influence.",
     reveal: starterRevealText(1, 0),
   },
 ];

@@ -3,15 +3,11 @@ import {
   battleIconLabels,
   boardSpaces,
   commanderStarterDecks,
-  conflictCards,
   factionIds,
   factionLabels,
   imperiumDeck,
-  intrigueCards,
   leaderCardByName,
   reserveMarket,
-  shaddamReservedContracts,
-  standardContracts,
   teams,
 } from "./data";
 import {
@@ -23,15 +19,20 @@ import {
 } from "./critical-locations";
 import {
   cloneCards,
-  cloneConflicts,
-  cloneContracts,
-  cloneIntrigues,
   drawCards,
   playerTroopSupply,
   shuffleCards,
   shuffleItems,
 } from "./deck-utils";
 import { balanceSixPlayerObjectives, dealSixPlayerObjectives } from "./objectives";
+import {
+  buildChoamContractDeck,
+  buildIntrigueDeck,
+  buildShaddamContractReserve,
+  buildSixPlayerConflictDeck,
+  emptyMakerSpice,
+  makerSpaceIds,
+} from "./setup-utils";
 import {
   canMoveCardToThroneRow,
   choamProfitsSourceId,
@@ -117,6 +118,10 @@ export {
   balanceSixPlayerObjectives,
   dealSixPlayerObjectives,
 } from "./objectives";
+
+export {
+  makerSpaceIds,
+} from "./setup-utils";
 
 export {
   canMoveCardToThroneRow,
@@ -241,39 +246,7 @@ function isStandardBattleIcon(icon: ConflictCard["battleIcon"]): icon is BattleI
   return icon !== "wild";
 }
 
-function buildSixPlayerConflictDeck() {
-  const levelTwo = shuffleItems(conflictCards.filter((conflict) => conflict.level === 2)).slice(0, 5);
-  const levelThree = shuffleItems(conflictCards.filter((conflict) => conflict.level === 3));
-  return cloneConflicts([...levelTwo, ...levelThree]);
-}
-
-function buildChoamContractDeck() {
-  if (standardContracts.length !== 18) {
-    throw new Error(`Expected 18 public CHOAM contracts, found ${standardContracts.length}.`);
-  }
-  return cloneContracts(shuffleItems(standardContracts));
-}
-
-function buildShaddamContractReserve() {
-  if (shaddamReservedContracts.length !== 2) {
-    throw new Error(`Expected 2 Shaddam reserved contracts, found ${shaddamReservedContracts.length}.`);
-  }
-  return cloneContracts(shaddamReservedContracts);
-}
-
-function buildIntrigueDeck() {
-  if (intrigueCards.length !== 39) {
-    throw new Error(`Expected 39 Uprising Intrigue cards, found ${intrigueCards.length}.`);
-  }
-  return shuffleItems(cloneIntrigues(intrigueCards));
-}
-
 const shaddamPersonalBoardThroneSource = "Emperor personal board";
-export const makerSpaceIds = boardSpaces.filter((space) => space.maker).map((space) => space.id);
-
-function emptyMakerSpice(): Record<string, number> {
-  return Object.fromEntries(makerSpaceIds.map((spaceId) => [spaceId, 0]));
-}
 
 export function leaderStarterDeckCards(leader: string, team: TeamId, role: Role) {
   const starterDeck = role === "Commander" ? commanderStarterDecks[team] : allyStarterCards;

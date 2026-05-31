@@ -17,6 +17,7 @@ import {
   playerHasSpyPost,
   removeSpyPostOwner,
 } from "./spy-posts";
+import { playerTroopSupply } from "./deck-utils";
 import type {
   BattleIconId,
   ConflictCard,
@@ -32,13 +33,22 @@ function isStandardBattleIcon(icon: ConflictCard["battleIcon"]): icon is BattleI
 
 type FirstPlaceBattleReward = {
   fixedVp: number;
+  resources?: Partial<Record<ResourceId, number>>;
+  troops?: number;
   conversion?:
     | { kind: "resource"; resource: ResourceId; amount: number; vp: number }
     | { kind: "recall-spies"; count: number; vp: number };
 };
 type ConflictVpConversionPendingAction = Extract<PendingAction, { kind: "conflict-vp-conversion" }>;
 
+const resourceIds: ResourceId[] = ["solari", "spice", "water"];
+
 const firstPlaceBattleRewardsBySourceId: Record<number, FirstPlaceBattleReward> = {
+  460: {
+    fixedVp: 0,
+    resources: { spice: 2 },
+    troops: 1,
+  },
   464: {
     fixedVp: 1,
     conversion: { kind: "resource", resource: "spice", amount: 4, vp: 1 },
@@ -105,6 +115,52 @@ function conflictConversionDescription(pending: ConflictVpConversionPendingActio
     return `${pending.cost.amount} ${pending.cost.resource} for ${pending.vp} VP`;
   }
   return `recall ${pending.cost.count} spies for ${pending.vp} VP`;
+}
+
+function joinRewardParts(parts: string[]) {
+  if (parts.length <= 1) return parts[0] ?? "";
+  return `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}`;
+}
+
+function applyImmediateFirstPlacePrintedReward(
+  player: Player,
+  reward: FirstPlaceBattleReward | undefined,
+  multiplier: number,
+) {
+  const resourceGains = resourceIds.reduce<Partial<Record<ResourceId, number>>>((gains, resource) => {
+    const amount = (reward?.resources?.[resource] ?? 0) * multiplier;
+    if (amount > 0) gains[resource] = amount;
+    return gains;
+  }, {});
+  const recruitedTroops = Math.min(playerTroopSupply(player), (reward?.troops ?? 0) * multiplier);
+  const resources = { ...player.resources };
+  for (const resource of resourceIds) {
+    resources[resource] += resourceGains[resource] ?? 0;
+  }
+  return {
+    player: {
+      ...player,
+      resources,
+      garrison: player.garrison + recruitedTroops,
+    },
+    resourceGains,
+    recruitedTroops,
+  };
+}
+
+function immediatePrintedRewardDescription(
+  resourceGains: Partial<Record<ResourceId, number>>,
+  recruitedTroops: number,
+) {
+  const gainParts = resourceIds.flatMap((resource) => {
+    const amount = resourceGains[resource] ?? 0;
+    return amount > 0 ? [`${amount} ${resource}`] : [];
+  });
+  const actions = [
+    gainParts.length > 0 ? `gains ${joinRewardParts(gainParts)}` : undefined,
+    recruitedTroops > 0 ? `recruits ${recruitedTroops} troop${recruitedTroops === 1 ? "" : "s"}` : undefined,
+  ].filter((action): action is string => Boolean(action));
+  return joinRewardParts(actions);
 }
 
 function scoreBattleIconMatch(player: Player, conflict: ConflictCard) {
@@ -178,7 +234,14 @@ function awardConflictToWinner(
     multiplier,
   );
   const location = criticalLocationForConflict(conflict);
-  const winnerWithPrintedRewards = printedVp > 0 ? { ...winner, vp: winner.vp + printedVp } : winner;
+  const immediatePrintedReward = applyImmediateFirstPlacePrintedReward(winner, firstPlaceReward, multiplier);
+  const immediateRewardText = immediatePrintedRewardDescription(
+    immediatePrintedReward.resourceGains,
+    immediatePrintedReward.recruitedTroops,
+  );
+  const winnerWithPrintedRewards = printedVp > 0
+    ? { ...immediatePrintedReward.player, vp: immediatePrintedReward.player.vp + printedVp }
+    : immediatePrintedReward.player;
   const scored = scoreBattleIconMatch(winnerWithPrintedRewards, conflict);
   const players = state.players.map((player) => (player.id === winner.id ? scored.player : player));
   return {
@@ -198,6 +261,9 @@ function awardConflictToWinner(
         : undefined,
       location
         ? `${winner.leader} takes control of ${criticalLocationNames[location]}.`
+        : undefined,
+      immediateRewardText
+        ? `${winner.leader} ${immediateRewardText} from ${conflict.name}${multiplier > 1 ? " with sandworm doubling" : ""}.`
         : undefined,
       printedVp > 0
         ? `${winner.leader} gains ${printedVp} printed VP from ${conflict.name}${multiplier > 1 ? " with sandworm doubling" : ""}.`

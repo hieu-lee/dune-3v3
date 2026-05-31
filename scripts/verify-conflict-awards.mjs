@@ -265,6 +265,61 @@ try {
   assert.equal(unmatchedWinner.objectives[0].scored, undefined);
   assert.equal(unmatchedWinner.wonConflicts[0].scored, false);
 
+  const secureImperialBasinReward = fixture(state, data, (players) =>
+    players.map((player) =>
+      player.id === "p2"
+        ? { ...player, conflict: 9, deployedTroops: 1, garrison: 0, resources: { ...player.resources, spice: 0 } }
+        : player,
+    ), 460);
+  const secureImperialBasinResult = state.startNextRound(secureImperialBasinReward);
+  const secureImperialBasinWinner = playerById(secureImperialBasinResult, "p2");
+  assert.equal(secureImperialBasinWinner.resources.spice, 2, "Secure Imperial Basin should pay first-place spice");
+  assert.equal(secureImperialBasinWinner.garrison, 1, "Secure Imperial Basin should recruit a first-place troop");
+  assert.equal(secureImperialBasinResult.locationControl["imperial-basin"], "p2", "Secure Imperial Basin should set control");
+  assert.equal(secureImperialBasinResult.pendingAction, undefined, "Secure Imperial Basin reward should not require choices");
+  assert.ok(
+    secureImperialBasinResult.log.some((entry) =>
+      entry.includes("gains 2 spice") &&
+      entry.includes("recruits 1 troop") &&
+      entry.includes("Secure Imperial Basin")
+    ),
+    "Secure Imperial Basin should log the paid printed reward",
+  );
+
+  const doubledSecureImperialBasinReward = fixture(state, data, (players) =>
+    players.map((player) =>
+      player.id === "p3"
+        ? { ...player, conflict: 9, deployedSandworms: 1, garrison: 0, resources: { ...player.resources, spice: 0 } }
+        : player,
+    ), 460);
+  const doubledSecureImperialBasinResult = state.startNextRound(doubledSecureImperialBasinReward);
+  const doubledSecureImperialBasinWinner = playerById(doubledSecureImperialBasinResult, "p3");
+  assert.equal(doubledSecureImperialBasinWinner.resources.spice, 4, "Sandworms should double Secure Imperial Basin spice");
+  assert.equal(doubledSecureImperialBasinWinner.garrison, 2, "Sandworms should double Secure Imperial Basin troop recruitment");
+  assert.ok(
+    doubledSecureImperialBasinResult.log.some((entry) =>
+      entry.includes("gains 4 spice") &&
+      entry.includes("recruits 2 troops") &&
+      entry.includes("sandworm doubling")
+    ),
+    "Doubled Secure Imperial Basin should log the doubled printed reward",
+  );
+
+  const supplyCappedSecureImperialBasinReward = fixture(state, data, (players) =>
+    players.map((player) =>
+      player.id === "p2"
+        ? { ...player, conflict: 9, deployedTroops: 1, garrison: 11, resources: { ...player.resources, spice: 0 } }
+        : player,
+    ), 460);
+  const supplyCappedSecureImperialBasinResult = state.startNextRound(supplyCappedSecureImperialBasinReward);
+  const supplyCappedSecureImperialBasinWinner = playerById(supplyCappedSecureImperialBasinResult, "p2");
+  assert.equal(supplyCappedSecureImperialBasinWinner.resources.spice, 2, "Supply cap should not block Secure Imperial Basin spice");
+  assert.equal(
+    supplyCappedSecureImperialBasinWinner.garrison,
+    11,
+    "Secure Imperial Basin troop reward should respect available troop supply",
+  );
+
   const imperialBasinBattle = fixture(state, data, (players) =>
     players.map((player) =>
       player.id === "p2"

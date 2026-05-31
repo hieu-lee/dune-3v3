@@ -24,6 +24,7 @@ import {
   recallableSpySupplySpaces,
 } from "./spy-choices";
 import { playerTroopSupply } from "./deck-utils";
+import { drawIntrigueCards } from "./intrigue-deck";
 import {
   adjustInfluence,
   resolveLeaderInfluenceThresholdRewards,
@@ -45,6 +46,7 @@ function isStandardBattleIcon(icon: ConflictCard["battleIcon"]): icon is BattleI
 type FirstPlaceBattleReward = {
   fixedVp: number;
   influence?: Partial<Record<FactionId, number>>;
+  intrigues?: number;
   resources?: Partial<Record<ResourceId, number>>;
   spies?: number;
   troops?: number;
@@ -67,6 +69,11 @@ const firstPlaceBattleRewardsBySourceId: Record<number, FirstPlaceBattleReward> 
     fixedVp: 0,
     resources: { spice: 2 },
     spies: 1,
+  },
+  459: {
+    fixedVp: 0,
+    influence: { bene: 1 },
+    intrigues: 1,
   },
   460: {
     fixedVp: 0,
@@ -293,6 +300,7 @@ function awardConflictToWinner(
   const firstPlaceReward = conflict.sourceId ? firstPlaceBattleRewardsBySourceId[conflict.sourceId] : undefined;
   const multiplier = playerDoublesConflictRewards(winner) ? 2 : 1;
   const printedVp = (firstPlaceReward?.fixedVp ?? 0) * multiplier;
+  const intrigueDraws = (firstPlaceReward?.intrigues ?? 0) * multiplier;
   const conversionPending = pendingActionForConflictConversion(
     state,
     winner,
@@ -317,7 +325,7 @@ function awardConflictToWinner(
     : immediatePrintedReward.player;
   const scored = scoreBattleIconMatch(winnerWithPrintedRewards, conflict);
   const players = state.players.map((player) => (player.id === winner.id ? scored.player : player));
-  const awardedState = {
+  let awardedState: GameState = {
     ...state,
     players,
     locationControl: location
@@ -355,6 +363,9 @@ function awardConflictToWinner(
       ...state.log,
     ].filter((entry): entry is string => Boolean(entry)),
   };
+  if (intrigueDraws > 0) {
+    awardedState = drawIntrigueCards(awardedState, winner.id, intrigueDraws, conflict.name);
+  }
   const gainedInfluence = Object.values(immediatePrintedReward.influenceGains).some((amount) => amount > 0);
   return gainedInfluence
     ? resolveLeaderInfluenceThresholdRewards(awardedState, state.players)

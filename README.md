@@ -48,6 +48,7 @@ Private web-table implementation for a six-player `Dune: Imperium - Uprising` te
 - Contingency Plan can be played as a Plot Intrigue for 2 Solari or as a Combat Intrigue for 3 strength.
 - Intelligence Report can be played as a Plot Intrigue to draw 1 card, or 2 cards with two or more own spies on the board.
 - Cunning can be played as a Plot Intrigue to draw 1 card, or spend 1 spice to draw 1 card and trash 1 card.
+- Sietch Ritual can be played as a Plot Intrigue to discard a hand card for Bene Gesserit or Fremen/Fringe Influence.
 - Opportunism can be played as a Plot Intrigue to spend 2 Solari and lose 2 Influence for 1 VP.
 - Buy Access can be played as a Plot Intrigue to spend 5 Solari for two different faction-icon Influence bumps with 3v3 Commander mapping.
 - Imperium Politics can be played as a Plot Intrigue to spend 1 Solari for Emperor/Great Houses or Spacing Guild Influence, including Shaddam's personal Emperor option.

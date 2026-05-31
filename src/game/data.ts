@@ -57,6 +57,7 @@ const automatedCombatSwordValues: Partial<Record<number, number>> = {
   147: 3,
 };
 const intrigueSummariesByCatalogId: Partial<Record<number, string>> = {
+  127: "Discard a card to gain 1 Bene Gesserit or Fremen/Fringe Influence.",
   128: "Spend 3 Solari to draw 1 Intrigue and recruit 2 troops.",
   132: "Spend 2 spice to recruit 3 troops; with 3+ Fremen/Fringe Influence, draw 1 card.",
   133: "Draw 1 card OR spend 1 spice to draw 1 card and trash 1 card.",

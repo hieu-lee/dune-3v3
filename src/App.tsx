@@ -73,6 +73,7 @@ import {
   isQuestionableMethodsIntrigue,
   isReachAgreementIntrigue,
   isShaddamsFavorIntrigue,
+  isSietchRitualIntrigue,
   isSpiceIsPowerIntrigue,
   isSpringTheTrapIntrigue,
   isStrategicStockpilingIntrigue,
@@ -121,6 +122,7 @@ import {
   playOpportunismPlotIntrigue,
   playPlotBattleIconIntrigue,
   playShaddamsFavorPlotIntrigue,
+  playSietchRitualPlotIntrigue,
   playStrategicStockpilingPlotIntrigue,
   playUnexpectedAlliesIntrigue,
   resolveCommandRespectTrade,
@@ -135,6 +137,7 @@ import {
   scoreGurneyAlwaysSmiling,
   resolveThreatenSpiceProductionChoice,
   imperiumPoliticsFactionChoices,
+  sietchRitualFactionChoices,
   skipCommandRespect,
   skipDemandAttention,
   skipCorrinoMight,
@@ -154,7 +157,7 @@ import {
   buyAccessPairChoices,
 } from "./game/state";
 import type { BoardSpace, Card, FactionId, GameState, PendingAction, Player, ResourceId, Resources, TeamId, TradeGoodId, TrashCardZone } from "./game/types";
-import type { BuyAccessChoice, CombatIntrigueChoice, ImperiumPoliticsChoice, InfluenceLossPair, ShaddamSignetRingChoice } from "./game/state";
+import type { BuyAccessChoice, CombatIntrigueChoice, ImperiumPoliticsChoice, InfluenceLossPair, ShaddamSignetRingChoice, SietchRitualChoice } from "./game/state";
 
 const resources: Array<{ id: ResourceId; label: string; Icon: LucideIcon }> = [
   { id: "solari", label: "Solari", Icon: CircleDollarSign },
@@ -886,6 +889,17 @@ export default function App() {
 
   function playCunningPlot(intrigueId: string, choice: "draw" | "paid-trash") {
     setGame((current) => playCunningPlotIntrigue(current, current.players[current.activeSeat].id, intrigueId, choice));
+  }
+
+  function playSietchRitualPlot(intrigueId: string, discardCardId: string, faction: SietchRitualChoice) {
+    setGame((current) => {
+      const player = current.players[current.activeSeat];
+      const personalFaction = player.role === "Commander" && player.team === "muaddib" ? "fremen" : undefined;
+      const influenceOwnerId = player.role === "Commander" && faction !== personalFaction
+        ? activatedAllyIdFor(player, current.players)
+        : undefined;
+      return playSietchRitualPlotIntrigue(current, player.id, intrigueId, discardCardId, faction, influenceOwnerId);
+    });
   }
 
   function playOpportunismPlot(intrigueId: string, choice: InfluenceLossPair) {
@@ -2428,6 +2442,9 @@ export default function App() {
                   const marketOpportunityCanBuySpice = activePlayer.resources.solari >= 5;
                   const mercenariesCanPay = activePlayer.resources.solari >= 3;
                   const cunningCanPay = activePlayer.resources.spice >= 1;
+                  const sietchRitualChoices = isSietchRitualIntrigue(card)
+                    ? sietchRitualFactionChoices(activePlayer)
+                    : [];
                   const opportunismCanPay = activePlayer.resources.solari >= 2;
                   const opportunismChoices = isOpportunismIntrigue(card) ? influenceLossPairChoices(activePlayer) : [];
                   const buyAccessCanPay = activePlayer.resources.solari >= 5;
@@ -2450,6 +2467,8 @@ export default function App() {
                             ? `Plot / draw ${intelligenceReportDrawCount}`
                           : isCunningIntrigue(card)
                             ? "Plot / draw or pay to trash"
+                          : isSietchRitualIntrigue(card)
+                            ? "Plot / discard for Influence"
                           : isOpportunismIntrigue(card)
                             ? "Plot / cash Influence for VP"
                           : isBuyAccessIntrigue(card)
@@ -2558,6 +2577,33 @@ export default function App() {
                             <X size={14} />
                             1 Spice -&gt; Draw + Trash
                           </button>
+                        </div>
+                      )}
+                      {isSietchRitualIntrigue(card) && (
+                        <div className="intrigue-actions">
+                          {activePlayer.hand.length === 0 && <span>Requires a card in hand to discard.</span>}
+                          {activePlayer.hand.map((discardCard) =>
+                            sietchRitualChoices.map((faction) => {
+                              const personalFaction = activePlayer.role === "Commander" && activePlayer.team === "muaddib"
+                                ? "fremen"
+                                : undefined;
+                              const ownerLabel = activePlayer.role === "Commander" && faction !== personalFaction
+                                ? `: ${activatedAlly.leader}`
+                                : "";
+                              return (
+                                <button
+                                  type="button"
+                                  key={`${discardCard.id}-${faction}`}
+                                  onClick={() => playSietchRitualPlot(card.id, discardCard.id, faction)}
+                                  disabled={plotIntrigueLocked}
+                                  title={`Discard ${discardCard.name} to gain 1 ${factionLabels[faction]} Influence${ownerLabel ? ` for ${activatedAlly.leader}` : ""}`}
+                                >
+                                  <Minus size={14} />
+                                  Discard {discardCard.name} -&gt; {factionShortLabels[faction]}{ownerLabel}
+                                </button>
+                              );
+                            }),
+                          )}
                         </div>
                       )}
                       {isOpportunismIntrigue(card) && (

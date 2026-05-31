@@ -52,6 +52,7 @@ const reachAgreementSourceId = 449;
 const strategicStockpilingSourceId = 130;
 const detonationSourceId = 131;
 const departForArrakisSourceId = 132;
+const sietchRitualSourceId = 127;
 const unexpectedAlliesSourceId = 137;
 const mercenariesSourceId = 128;
 const cunningSourceId = 133;
@@ -108,6 +109,7 @@ export type DepartForArrakisChoice = "draw" | "spend-spice";
 export type CunningPlotChoice = "draw" | "paid-trash";
 export type InfluenceLossPair = [FactionId, FactionId];
 export type BuyAccessChoice = [FactionId, FactionId];
+export type SietchRitualChoice = "bene" | "fremen" | "fringeWorlds";
 export type ImperiumPoliticsChoice = "greatHouses" | "emperor" | "spacing";
 export type StrategicStockpilingChoice = "spice" | "water" | "both";
 export type MarketOpportunityChoice = "spice-to-solari" | "solari-to-spice";
@@ -178,6 +180,10 @@ export function isUnexpectedAlliesIntrigue(intrigue: IntrigueCard) {
 
 export function isDepartForArrakisIntrigue(intrigue: IntrigueCard) {
   return intrigue.sourceId === departForArrakisSourceId;
+}
+
+export function isSietchRitualIntrigue(intrigue: IntrigueCard) {
+  return intrigue.sourceId === sietchRitualSourceId;
 }
 
 export function isMercenariesIntrigue(intrigue: IntrigueCard) {
@@ -1880,6 +1886,17 @@ export function influenceLossChoices(player: Player) {
   return factionIds.filter((faction) => player.influence[faction] > 0);
 }
 
+export function sietchRitualFactionChoices(player: Player): SietchRitualChoice[] {
+  if (player.role === "Commander" && player.team === "muaddib") {
+    return ["bene", "fremen", "fringeWorlds"];
+  }
+  return ["bene", "fringeWorlds"];
+}
+
+function validSietchRitualChoice(player: Player, faction: SietchRitualChoice) {
+  return sietchRitualFactionChoices(player).includes(faction);
+}
+
 export function influenceLossPairChoices(player: Player): InfluenceLossPair[] {
   const pairs: InfluenceLossPair[] = [];
   factionIds.forEach((first, firstIndex) => {
@@ -2300,6 +2317,59 @@ export function playCunningPlotIntrigue(
     intrigueDiscard: [...state.intrigueDiscard, intrigue],
     pendingAction: trashPending,
     log: [log, ...state.log],
+  };
+}
+
+export function playSietchRitualPlotIntrigue(
+  state: GameState,
+  playerId: string,
+  intrigueId: string,
+  discardCardId: string,
+  faction: SietchRitualChoice,
+  influenceOwnerId?: string,
+): GameState {
+  if (state.phase !== "playing" || state.pendingAction || state.pendingQueue.length > 0) return state;
+  const player = state.players[state.activeSeat];
+  if (!player || player.id !== playerId) return state;
+  const intrigue = player.intrigues.find((card) => card.id === intrigueId);
+  if (!intrigue || !isSietchRitualIntrigue(intrigue)) return state;
+  const discardedCard = player.hand.find((card) => card.id === discardCardId);
+  if (!discardedCard || !validSietchRitualChoice(player, faction)) return state;
+  const personalFaction = commanderPersonalFaction(player);
+  const influenceOwnerResult =
+    player.role === "Commander" && faction !== personalFaction
+      ? activatedAllyEffectOwner(state, player, influenceOwnerId)
+      : { valid: true, owner: player };
+  if (!influenceOwnerResult.valid || !influenceOwnerResult.owner) return state;
+  const influenceOwner = influenceOwnerResult.owner;
+
+  const players = state.players.map((candidate) => {
+    let next = candidate;
+    if (candidate.id === player.id) {
+      next = {
+        ...next,
+        hand: next.hand.filter((card) => card.id !== discardedCard.id),
+        discard: [...next.discard, discardedCard],
+        intrigues: next.intrigues.filter((card) => card.id !== intrigue.id),
+      };
+    }
+    if (candidate.id === influenceOwner.id) {
+      next = adjustInfluence(next, faction, 1);
+    }
+    return next;
+  });
+  const influenceText = influenceOwner.id === player.id
+    ? `gains 1 ${factionLabels[faction]} Influence`
+    : `${influenceOwner.leader} gains 1 ${factionLabels[faction]} Influence`;
+
+  return {
+    ...state,
+    players,
+    intrigueDiscard: [...state.intrigueDiscard, intrigue],
+    log: [
+      `${player.leader} plays Sietch Ritual, discards ${discardedCard.name}, and ${influenceText}.`,
+      ...state.log,
+    ],
   };
 }
 

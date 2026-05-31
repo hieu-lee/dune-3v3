@@ -55,6 +55,7 @@ const departForArrakisSourceId = 132;
 const unexpectedAlliesSourceId = 137;
 const mercenariesSourceId = 128;
 const cunningSourceId = 133;
+const buyAccessSourceId = 139;
 const imperiumPoliticsSourceId = 140;
 const callToArmsSourceId = 138;
 const shaddamsFavorSourceId = 141;
@@ -104,6 +105,7 @@ export type TacticalOptionChoice = "add-strength" | { kind: "retreat-troops"; co
 export type CombatIntrigueChoice = SpiceIsPowerChoice | TacticalOptionChoice;
 export type DepartForArrakisChoice = "draw" | "spend-spice";
 export type CunningPlotChoice = "draw" | "paid-trash";
+export type BuyAccessChoice = [FactionId, FactionId];
 export type ImperiumPoliticsChoice = "greatHouses" | "emperor" | "spacing";
 export type StrategicStockpilingChoice = "spice" | "water" | "both";
 export type MarketOpportunityChoice = "spice-to-solari" | "solari-to-spice";
@@ -182,6 +184,10 @@ export function isMercenariesIntrigue(intrigue: IntrigueCard) {
 
 export function isCunningIntrigue(intrigue: IntrigueCard) {
   return intrigue.sourceId === cunningSourceId;
+}
+
+export function isBuyAccessIntrigue(intrigue: IntrigueCard) {
+  return intrigue.sourceId === buyAccessSourceId;
 }
 
 export function isImperiumPoliticsIntrigue(intrigue: IntrigueCard) {
@@ -1875,6 +1881,47 @@ export function imperiumPoliticsFactionChoices(player: Player): ImperiumPolitics
   return ["greatHouses", "spacing"];
 }
 
+function buyAccessFactionChoices(player: Player): FactionId[] {
+  if (player.role === "Commander" && player.team === "shaddam") {
+    return ["emperor", "greatHouses", "fringeWorlds", "bene", "spacing"];
+  }
+  if (player.role === "Commander" && player.team === "muaddib") {
+    return ["greatHouses", "fremen", "fringeWorlds", "bene", "spacing"];
+  }
+  return ["greatHouses", "fringeWorlds", "bene", "spacing"];
+}
+
+function buyAccessPrintedIcon(faction: FactionId) {
+  if (faction === "emperor" || faction === "greatHouses") return "emperor";
+  if (faction === "fremen" || faction === "fringeWorlds") return "fremen";
+  return faction;
+}
+
+export function buyAccessPairChoices(player: Player): BuyAccessChoice[] {
+  const choices = buyAccessFactionChoices(player);
+  const pairs: BuyAccessChoice[] = [];
+  choices.forEach((first, firstIndex) => {
+    choices.slice(firstIndex + 1).forEach((second) => {
+      if (buyAccessPrintedIcon(first) !== buyAccessPrintedIcon(second)) {
+        pairs.push([first, second]);
+      }
+    });
+  });
+  return pairs;
+}
+
+function validBuyAccessChoice(player: Player, choice: BuyAccessChoice) {
+  if (!Array.isArray(choice) || choice.length !== 2) return false;
+  const [first, second] = choice;
+  const choices = buyAccessFactionChoices(player);
+  return (
+    first !== second &&
+    choices.includes(first) &&
+    choices.includes(second) &&
+    buyAccessPrintedIcon(first) !== buyAccessPrintedIcon(second)
+  );
+}
+
 function allowedInfluenceLossChoices(player: Player) {
   const personalFaction = commanderPersonalFaction(player);
   if (personalFaction) {
@@ -2272,6 +2319,70 @@ export function playImperiumPoliticsPlotIntrigue(
     intrigueDiscard: [...state.intrigueDiscard, intrigue],
     log: [
       `${player.leader} plays Imperium Politics, spends 1 Solari, and ${influenceText} 1 ${factionLabels[faction]} Influence.`,
+      ...state.log,
+    ],
+  };
+}
+
+export function playBuyAccessPlotIntrigue(
+  state: GameState,
+  playerId: string,
+  intrigueId: string,
+  choice: BuyAccessChoice,
+  influenceOwnerId?: string,
+): GameState {
+  if (state.phase !== "playing" || state.pendingAction || state.pendingQueue.length > 0) return state;
+  const player = state.players[state.activeSeat];
+  if (!player || player.id !== playerId) return state;
+  const intrigue = player.intrigues.find((card) => card.id === intrigueId);
+  if (!intrigue || !isBuyAccessIntrigue(intrigue)) return state;
+  if (!validBuyAccessChoice(player, choice)) return state;
+  if (player.resources.solari < 5) return state;
+
+  const personalFaction = commanderPersonalFaction(player);
+  const influenceEffects = choice.map((faction) => {
+    const ownerResult = player.role === "Commander" && faction !== personalFaction
+      ? activatedAllyEffectOwner(state, player, influenceOwnerId)
+      : { valid: true, owner: player };
+    return { faction, ownerResult };
+  });
+  if (influenceEffects.some((effect) => !effect.ownerResult.valid || !effect.ownerResult.owner)) return state;
+
+  const players = state.players.map((candidate) => {
+    let next = candidate;
+    if (candidate.id === player.id) {
+      next = {
+        ...next,
+        resources: { ...next.resources, solari: next.resources.solari - 5 },
+        intrigues: next.intrigues.filter((card) => card.id !== intrigue.id),
+      };
+    }
+    influenceEffects.forEach((effect) => {
+      const owner = effect.ownerResult.owner;
+      if (owner && candidate.id === owner.id) {
+        next = adjustInfluence(next, effect.faction, 1);
+      }
+    });
+    return next;
+  });
+
+  const selfOnly = influenceEffects.every((effect) => effect.ownerResult.owner?.id === player.id);
+  const effectText = selfOnly
+    ? influenceEffects
+      .map((effect) => `1 ${factionLabels[effect.faction]} Influence`)
+      .join(" and ")
+    : influenceEffects
+      .map((effect) => {
+        const owner = effect.ownerResult.owner;
+        return `${owner?.leader ?? "the activated Ally"} gains 1 ${factionLabels[effect.faction]} Influence`;
+      })
+      .join(" and ");
+  return {
+    ...state,
+    players,
+    intrigueDiscard: [...state.intrigueDiscard, intrigue],
+    log: [
+      `${player.leader} plays Buy Access, spends 5 Solari, and ${selfOnly ? `gains ${effectText}` : effectText}.`,
       ...state.log,
     ],
   };

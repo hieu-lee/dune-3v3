@@ -89,6 +89,7 @@ try {
   const shaddamsFavor = data.intrigueCards.find((card) => card.sourceId === 141);
   const intelligenceReport = data.intrigueCards.find((card) => card.sourceId === 142);
   const cunning = data.intrigueCards.find((card) => card.sourceId === 133);
+  const buyAccess = data.intrigueCards.find((card) => card.sourceId === 139);
   const imperiumPolitics = data.intrigueCards.find((card) => card.sourceId === 140);
   const councilorsAmbition = data.intrigueCards.find((card) => card.sourceId === 129);
   const marketOpportunity = data.intrigueCards.find((card) => card.sourceId === 145);
@@ -109,6 +110,7 @@ try {
   assert.ok(shaddamsFavor, "Shaddam's Favor Intrigue should be available");
   assert.ok(intelligenceReport, "Intelligence Report Intrigue should be available");
   assert.ok(cunning, "Cunning Intrigue should be available");
+  assert.ok(buyAccess, "Buy Access Intrigue should be available");
   assert.ok(imperiumPolitics, "Imperium Politics Intrigue should be available");
   assert.ok(councilorsAmbition, "Councilor's Ambition Intrigue should be available");
   assert.ok(marketOpportunity, "Market Opportunity Intrigue should be available");
@@ -164,6 +166,11 @@ try {
     cunning.summary,
     "Draw 1 card OR spend 1 spice to draw 1 card and trash 1 card.",
     "Cunning should expose both Plot branches",
+  );
+  assert.equal(
+    buyAccess.summary,
+    "Spend 5 Solari to gain two different Influence among Emperor/Great Houses, Fremen/Fringe, Bene Gesserit, and Spacing Guild.",
+    "Buy Access should expose its Solari-for-two-Influence choice",
   );
   assert.equal(
     imperiumPolitics.summary,
@@ -743,6 +750,232 @@ try {
   assert.equal(playerById(commanderCunning, "p4").hand.length, 1, "Commander Cunning should draw for the Commander");
   assert.equal(playerById(commanderCunning, "p6").hand.length, 0, "Commander Cunning should not target the activated Ally");
   assert.equal(commanderCunning.pendingAction?.ownerId, "p4", "Commander Cunning should require the Commander to trash");
+
+  const buyAccessFixture = {
+    ...game,
+    activeSeat: game.players.findIndex((candidate) => candidate.id === "p2"),
+    pendingAction: undefined,
+    pendingQueue: [],
+    intrigueDiscard: [],
+    players: game.players.map((candidate) =>
+      candidate.id === "p2"
+        ? {
+            ...candidate,
+            resources: { ...candidate.resources, solari: 5 },
+            influence: { ...candidate.influence, greatHouses: 1, fringeWorlds: 1, bene: 1, spacing: 1 },
+            intrigues: [buyAccess],
+          }
+        : { ...candidate, intrigues: [] },
+    ),
+  };
+  assert.equal(
+    state.isBuyAccessIntrigue(buyAccess),
+    true,
+    "Buy Access should be recognized as a structured Plot Intrigue",
+  );
+  assert.deepEqual(
+    state.buyAccessPairChoices(playerById(buyAccessFixture, "p2")),
+    [
+      ["greatHouses", "fringeWorlds"],
+      ["greatHouses", "bene"],
+      ["greatHouses", "spacing"],
+      ["fringeWorlds", "bene"],
+      ["fringeWorlds", "spacing"],
+      ["bene", "spacing"],
+    ],
+    "Allies should choose two different printed Buy Access icons after six-player mapping",
+  );
+  const buyAccessGreatBene = state.playBuyAccessPlotIntrigue(
+    buyAccessFixture,
+    "p2",
+    buyAccess.id,
+    ["greatHouses", "bene"],
+  );
+  assert.equal(playerById(buyAccessGreatBene, "p2").resources.solari, 0, "Buy Access should spend 5 Solari");
+  assert.equal(playerById(buyAccessGreatBene, "p2").influence.greatHouses, 2, "Buy Access should gain Great Houses Influence");
+  assert.equal(playerById(buyAccessGreatBene, "p2").influence.bene, 2, "Buy Access should gain Bene Gesserit Influence");
+  assert.equal(playerById(buyAccessGreatBene, "p2").vp, playerById(buyAccessFixture, "p2").vp + 2);
+  assert.deepEqual(playerById(buyAccessGreatBene, "p2").intrigues, []);
+  assert.equal(buyAccessGreatBene.intrigueDiscard.at(-1).id, buyAccess.id);
+  assert.match(buyAccessGreatBene.log[0], /Buy Access, spends 5 Solari, and gains 1 Great Houses Influence and 1 Bene Gesserit Influence/);
+  const buyAccessReversed = state.playBuyAccessPlotIntrigue(
+    buyAccessFixture,
+    "p2",
+    buyAccess.id,
+    ["spacing", "greatHouses"],
+  );
+  assert.equal(playerById(buyAccessReversed, "p2").influence.spacing, 2, "Buy Access should accept unordered pairs");
+  assert.equal(playerById(buyAccessReversed, "p2").influence.greatHouses, 2);
+  const poorBuyAccess = {
+    ...buyAccessFixture,
+    players: buyAccessFixture.players.map((candidate) =>
+      candidate.id === "p2"
+        ? { ...candidate, resources: { ...candidate.resources, solari: 4 }, intrigues: [buyAccess] }
+        : candidate,
+    ),
+  };
+  assert.equal(
+    state.playBuyAccessPlotIntrigue(poorBuyAccess, "p2", buyAccess.id, ["greatHouses", "bene"]),
+    poorBuyAccess,
+    "Buy Access should require 5 Solari",
+  );
+  assert.equal(
+    state.playBuyAccessPlotIntrigue(buyAccessFixture, "p2", mercenaries.id, ["greatHouses", "bene"]),
+    buyAccessFixture,
+    "Buy Access should reject other Intrigue cards",
+  );
+  assert.equal(
+    state.playBuyAccessPlotIntrigue(buyAccessFixture, "p2", buyAccess.id, ["greatHouses", "greatHouses"]),
+    buyAccessFixture,
+    "Buy Access should reject duplicate mapped choices",
+  );
+  assert.equal(
+    state.playBuyAccessPlotIntrigue(buyAccessFixture, "p2", buyAccess.id, ["greatHouses"]),
+    buyAccessFixture,
+    "Buy Access should require exactly two choices",
+  );
+  assert.equal(
+    state.playBuyAccessPlotIntrigue(buyAccessFixture, "p2", buyAccess.id, ["greatHouses", "bene", "spacing"]),
+    buyAccessFixture,
+    "Buy Access should reject more than two choices",
+  );
+  assert.equal(
+    state.playBuyAccessPlotIntrigue(buyAccessFixture, "p2", buyAccess.id, ["emperor", "bene"]),
+    buyAccessFixture,
+    "Allies should not choose personal Emperor Influence from Buy Access",
+  );
+  const pendingBuyAccess = {
+    ...buyAccessFixture,
+    pendingAction: { kind: "spy", ownerId: "p2", remaining: 1, source: "Test" },
+  };
+  assert.equal(
+    state.playBuyAccessPlotIntrigue(pendingBuyAccess, "p2", buyAccess.id, ["greatHouses", "bene"]),
+    pendingBuyAccess,
+    "Buy Access should wait for pending actions to resolve",
+  );
+  const queuedBuyAccess = {
+    ...buyAccessFixture,
+    pendingQueue: [{ kind: "spy", ownerId: "p2", remaining: 1, source: "Test" }],
+  };
+  assert.equal(
+    state.playBuyAccessPlotIntrigue(queuedBuyAccess, "p2", buyAccess.id, ["greatHouses", "bene"]),
+    queuedBuyAccess,
+    "Buy Access should wait for queued pending actions to resolve",
+  );
+  assert.equal(
+    state.playBuyAccessPlotIntrigue(buyAccessFixture, "p3", buyAccess.id, ["greatHouses", "bene"]),
+    buyAccessFixture,
+    "Only the active player should play Buy Access",
+  );
+  const combatBuyAccess = { ...buyAccessFixture, phase: "combat" };
+  assert.equal(
+    state.playBuyAccessPlotIntrigue(combatBuyAccess, "p2", buyAccess.id, ["greatHouses", "bene"]),
+    combatBuyAccess,
+    "Buy Access should only resolve during normal play",
+  );
+  const commanderBuyAccessFixture = {
+    ...buyAccessFixture,
+    activeSeat: game.players.findIndex((candidate) => candidate.id === "p4"),
+    players: game.players.map((candidate) => {
+      if (candidate.id === "p4") {
+        return {
+          ...candidate,
+          resources: { ...candidate.resources, solari: 5 },
+          influence: { ...candidate.influence, emperor: 1, greatHouses: 0, bene: 0, spacing: 0 },
+          revealed: true,
+          revealActivatedAllyId: "p6",
+          intrigues: [buyAccess],
+        };
+      }
+      if (candidate.id === "p6") {
+        return { ...candidate, influence: { ...candidate.influence, greatHouses: 1, bene: 1, spacing: 1 }, intrigues: [] };
+      }
+      return { ...candidate, intrigues: [] };
+    }),
+  };
+  assert.deepEqual(
+    state.buyAccessPairChoices(playerById(commanderBuyAccessFixture, "p4")),
+    [
+      ["emperor", "fringeWorlds"],
+      ["emperor", "bene"],
+      ["emperor", "spacing"],
+      ["greatHouses", "fringeWorlds"],
+      ["greatHouses", "bene"],
+      ["greatHouses", "spacing"],
+      ["fringeWorlds", "bene"],
+      ["fringeWorlds", "spacing"],
+      ["bene", "spacing"],
+    ],
+    "Shaddam should choose either personal Emperor or game-board Great Houses, not both",
+  );
+  const shaddamPersonalBuyAccess = state.playBuyAccessPlotIntrigue(
+    commanderBuyAccessFixture,
+    "p4",
+    buyAccess.id,
+    ["emperor", "bene"],
+    "p6",
+  );
+  assert.equal(playerById(shaddamPersonalBuyAccess, "p4").resources.solari, 0, "Commander Buy Access should spend Commander Solari");
+  assert.equal(playerById(shaddamPersonalBuyAccess, "p4").influence.emperor, 2, "Shaddam can use Buy Access for personal Emperor Influence");
+  assert.equal(playerById(shaddamPersonalBuyAccess, "p6").influence.bene, 2, "Shaddam should delegate game-board Buy Access Influence");
+  assert.equal(playerById(shaddamPersonalBuyAccess, "p4").vp, playerById(commanderBuyAccessFixture, "p4").vp + 1);
+  assert.equal(playerById(shaddamPersonalBuyAccess, "p6").vp, playerById(commanderBuyAccessFixture, "p6").vp + 1);
+  assert.match(shaddamPersonalBuyAccess.log[0], /gains 1 Emperor Influence and Princess Irulan gains 1 Bene Gesserit Influence/);
+  const shaddamDelegatedBuyAccess = state.playBuyAccessPlotIntrigue(
+    commanderBuyAccessFixture,
+    "p4",
+    buyAccess.id,
+    ["greatHouses", "spacing"],
+    "p6",
+  );
+  assert.equal(playerById(shaddamDelegatedBuyAccess, "p4").influence.greatHouses, 0, "Shaddam should not take game-board Great Houses Influence");
+  assert.equal(playerById(shaddamDelegatedBuyAccess, "p4").influence.spacing, 0, "Shaddam should not take game-board Spacing Guild Influence");
+  assert.equal(playerById(shaddamDelegatedBuyAccess, "p6").influence.greatHouses, 2);
+  assert.equal(playerById(shaddamDelegatedBuyAccess, "p6").influence.spacing, 2);
+  assert.equal(
+    state.playBuyAccessPlotIntrigue(commanderBuyAccessFixture, "p4", buyAccess.id, ["emperor", "greatHouses"], "p6"),
+    commanderBuyAccessFixture,
+    "Shaddam should not use both mappings of the printed Emperor icon from Buy Access",
+  );
+  assert.equal(
+    state.playBuyAccessPlotIntrigue(commanderBuyAccessFixture, "p4", buyAccess.id, ["greatHouses", "bene"], "p2"),
+    commanderBuyAccessFixture,
+    "Revealed Commander Buy Access should reject a same-team Ally who was not activated for Reveal",
+  );
+  const muadDibBuyAccessFixture = {
+    ...buyAccessFixture,
+    activeSeat: game.players.findIndex((candidate) => candidate.id === "p1"),
+    players: game.players.map((candidate) => {
+      if (candidate.id === "p1") {
+        return {
+          ...candidate,
+          resources: { ...candidate.resources, solari: 5 },
+          influence: { ...candidate.influence, fremen: 1 },
+          revealed: true,
+          revealActivatedAllyId: "p5",
+          intrigues: [buyAccess],
+        };
+      }
+      if (candidate.id === "p5") {
+        return { ...candidate, influence: { ...candidate.influence, greatHouses: 1, fringeWorlds: 1 }, intrigues: [] };
+      }
+      return { ...candidate, intrigues: [] };
+    }),
+  };
+  const muadDibBuyAccess = state.playBuyAccessPlotIntrigue(
+    muadDibBuyAccessFixture,
+    "p1",
+    buyAccess.id,
+    ["fremen", "greatHouses"],
+    "p5",
+  );
+  assert.equal(playerById(muadDibBuyAccess, "p1").influence.fremen, 2, "Muad'Dib can use Buy Access for personal Fremen Influence");
+  assert.equal(playerById(muadDibBuyAccess, "p5").influence.greatHouses, 2, "Muad'Dib should delegate game-board Buy Access Influence");
+  assert.equal(
+    state.playBuyAccessPlotIntrigue(muadDibBuyAccessFixture, "p1", buyAccess.id, ["fremen", "fringeWorlds"], "p5"),
+    muadDibBuyAccessFixture,
+    "Muad'Dib should not use both mappings of the printed Fremen icon from Buy Access",
+  );
 
   const imperiumPoliticsFixture = {
     ...game,

@@ -54,6 +54,7 @@ import {
   influenceLossChoices,
   influenceLossOptions,
   isBackedByChoamIntrigue,
+  isBuyAccessIntrigue,
   isCallToArmsIntrigue,
   isContingencyPlanIntrigue,
   isCunningIntrigue,
@@ -104,6 +105,7 @@ import {
   setAllianceOwner,
   setChoamContractCompleted,
   playBackedByChoamPlotIntrigue,
+  playBuyAccessPlotIntrigue,
   playCallToArmsPlotIntrigue,
   playContingencyPlanPlotIntrigue,
   playCunningPlotIntrigue,
@@ -146,9 +148,10 @@ import {
   transferTradeGood,
   threatenSpiceProductionContributionTotal,
   updateTradeSelection,
+  buyAccessPairChoices,
 } from "./game/state";
 import type { BoardSpace, Card, FactionId, GameState, PendingAction, Player, ResourceId, Resources, TeamId, TradeGoodId, TrashCardZone } from "./game/types";
-import type { CombatIntrigueChoice, ImperiumPoliticsChoice, ShaddamSignetRingChoice } from "./game/state";
+import type { BuyAccessChoice, CombatIntrigueChoice, ImperiumPoliticsChoice, ShaddamSignetRingChoice } from "./game/state";
 
 const resources: Array<{ id: ResourceId; label: string; Icon: LucideIcon }> = [
   { id: "solari", label: "Solari", Icon: CircleDollarSign },
@@ -889,6 +892,16 @@ export default function App() {
         ? activatedAllyIdFor(player, current.players)
         : undefined;
       return playImperiumPoliticsPlotIntrigue(current, player.id, intrigueId, faction, influenceOwnerId);
+    });
+  }
+
+  function playBuyAccessPlot(intrigueId: string, choice: BuyAccessChoice) {
+    setGame((current) => {
+      const player = current.players[current.activeSeat];
+      const influenceOwnerId = player.role === "Commander"
+        ? activatedAllyIdFor(player, current.players)
+        : undefined;
+      return playBuyAccessPlotIntrigue(current, player.id, intrigueId, choice, influenceOwnerId);
     });
   }
 
@@ -2408,6 +2421,8 @@ export default function App() {
                   const marketOpportunityCanBuySpice = activePlayer.resources.solari >= 5;
                   const mercenariesCanPay = activePlayer.resources.solari >= 3;
                   const cunningCanPay = activePlayer.resources.spice >= 1;
+                  const buyAccessCanPay = activePlayer.resources.solari >= 5;
+                  const buyAccessChoices = isBuyAccessIntrigue(card) ? buyAccessPairChoices(activePlayer) : [];
                   const imperiumPoliticsCanPay = activePlayer.resources.solari >= 1;
                   const imperiumPoliticsChoices = isImperiumPoliticsIntrigue(card)
                     ? imperiumPoliticsFactionChoices(activePlayer)
@@ -2426,6 +2441,8 @@ export default function App() {
                             ? `Plot / draw ${intelligenceReportDrawCount}`
                           : isCunningIntrigue(card)
                             ? "Plot / draw or pay to trash"
+                          : isBuyAccessIntrigue(card)
+                            ? "Plot / buy two Influence"
                           : isImperiumPoliticsIntrigue(card)
                             ? "Plot / buy Influence"
                           : isDepartForArrakisIntrigue(card)
@@ -2549,6 +2566,39 @@ export default function App() {
                               >
                                 <HandCoins size={14} />
                                 1 Solari -&gt; {factionShortLabels[faction]}{ownerLabel}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                      {isBuyAccessIntrigue(card) && (
+                        <div className="intrigue-actions">
+                          {buyAccessChoices.map(([first, second]) => {
+                            const personalFaction = activePlayer.role === "Commander"
+                              ? activePlayer.team === "muaddib" ? "fremen" : "emperor"
+                              : undefined;
+                            const buyAccessLabel = activePlayer.role === "Commander"
+                              ? [
+                                  [first, second].filter((faction) => faction === personalFaction),
+                                  [first, second].filter((faction) => faction !== personalFaction),
+                                ]
+                                .flatMap((factions, index) => {
+                                  if (factions.length === 0) return [];
+                                  const label = factions.map((faction) => factionShortLabels[faction]).join(" + ");
+                                  return index === 0 ? [`Self: ${label}`] : [`${activatedAlly.leader}: ${label}`];
+                                })
+                                .join(" / ")
+                              : `${factionShortLabels[first]} + ${factionShortLabels[second]}`;
+                            return (
+                              <button
+                                type="button"
+                                key={`${first}-${second}`}
+                                onClick={() => playBuyAccessPlot(card.id, [first, second])}
+                                disabled={plotIntrigueLocked || !buyAccessCanPay}
+                                title={`Spend 5 Solari to gain 1 ${factionLabels[first]} Influence and 1 ${factionLabels[second]} Influence${activePlayer.role === "Commander" ? `; game-board Influence goes to ${activatedAlly.leader}` : ""}`}
+                              >
+                                <HandCoins size={14} />
+                                5 Solari -&gt; {buyAccessLabel}
                               </button>
                             );
                           })}

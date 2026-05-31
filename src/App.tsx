@@ -171,6 +171,8 @@ import {
   resolveLeaderInfluenceThresholdRewards,
   resolveSietchTabrChoice,
   resolveShaddamSignetRingChoice,
+  resolveStabanSmuggleSpice,
+  resolveStabanUnseenNetworkChoice,
   scoreGurneyAlwaysSmiling,
   resolveThreatenSpiceProductionChoice,
   imperiumPoliticsFactionChoices,
@@ -198,7 +200,7 @@ import {
   buyAccessPairChoices,
 } from "./game/state";
 import type { BoardSpace, Card, FactionId, GameState, PendingAction, Player, ResourceId, Resources, TeamId, TradeGoodId, TrashCardZone } from "./game/types";
-import type { BuyAccessChoice, ChangeAllegiancesChoice, CombatIntrigueChoice, ImperiumPoliticsChoice, InfluenceLossPair, IrulanSignetRingChoice, JessicaOtherMemoriesChoice, JessicaReverendMotherChoice, JessicaSpiceAgonyChoice, JessicaWaterOfLifeChoice, LadyAmberDesertScoutsChoice, ShaddamSignetRingChoice, SietchRitualChoice, SpecialMissionChoice } from "./game/state";
+import type { BuyAccessChoice, ChangeAllegiancesChoice, CombatIntrigueChoice, ImperiumPoliticsChoice, InfluenceLossPair, IrulanSignetRingChoice, JessicaOtherMemoriesChoice, JessicaReverendMotherChoice, JessicaSpiceAgonyChoice, JessicaWaterOfLifeChoice, LadyAmberDesertScoutsChoice, ShaddamSignetRingChoice, SietchRitualChoice, SpecialMissionChoice, StabanUnseenNetworkChoice } from "./game/state";
 
 const resources: Array<{ id: ResourceId; label: string; Icon: LucideIcon }> = [
   { id: "solari", label: "Solari", Icon: CircleDollarSign },
@@ -472,9 +474,11 @@ export default function App() {
       };
       const intrigueGain = boardSpaceIntrigueGainFor(selectedSpace, player);
       const influenceThresholdState = resolveLeaderInfluenceThresholdRewards(nextState, current.players);
-      const resolvedState = intrigueGain > 0
+      const intrigueState = intrigueGain > 0
         ? drawIntrigueCards(influenceThresholdState, source.id, intrigueGain, selectedSpace.name)
         : influenceThresholdState;
+      // Commanders send the Agent; activated Allies only receive routed board effects.
+      const resolvedState = resolveStabanSmuggleSpice(intrigueState, player.id, selectedSpace.id);
       const totalSpiceGain = spiceGain + (cardAgentEffect.sourceSpiceGained ?? 0);
       return totalSpiceGain > 0 ? recordTurnSpiceGain(resolvedState, source.id, totalSpiceGain) : resolvedState;
     });
@@ -777,6 +781,15 @@ export default function App() {
       const pending = current.pendingAction;
       if (!pending || pending.kind !== "irulan-signet-ring") return current;
       return maybeStartCombatPhase(resolveIrulanSignetRingChoice(current, pending, choice));
+    });
+  }
+
+  function chooseStabanUnseenNetwork(choice: StabanUnseenNetworkChoice) {
+    if (game.pendingAction?.kind !== "staban-unseen-network") return;
+    setGame((current) => {
+      const pending = current.pendingAction;
+      if (!pending || pending.kind !== "staban-unseen-network") return current;
+      return maybeStartCombatPhase(resolveStabanUnseenNetworkChoice(current, pending, choice));
     });
   }
 
@@ -1379,6 +1392,10 @@ export default function App() {
     pendingAction?.kind === "irulan-signet-ring" ? irulanSignetAcquireCards(game, pendingAction) : [];
   const pendingIrulanSignetTrashChoices =
     pendingAction?.kind === "irulan-signet-ring" ? irulanSignetTrashableCards(game, pendingAction) : [];
+  const pendingStabanUnseenNetworkOwner =
+    pendingAction?.kind === "staban-unseen-network" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
+  const pendingStabanUnseenNetworkSpace =
+    pendingAction?.kind === "staban-unseen-network" ? boardSpaces.find((space) => space.id === pendingAction.spaceId) : undefined;
   const pendingLadyAmberDesertScoutsOwner =
     pendingAction?.kind === "amber-desert-scouts" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingJessicaSpiceAgonyOwner =
@@ -2150,6 +2167,7 @@ export default function App() {
                 {pendingAction.kind === "commander-resource-split" && `${pendingResourceSplitCommander?.leader ?? "Commander"} ${pendingAction.source}`}
                 {pendingAction.kind === "shaddam-signet-ring" && `${pendingShaddamSignetCommander?.leader ?? "Shaddam"} Emperor of the Known Universe`}
                 {pendingAction.kind === "irulan-signet-ring" && `${pendingIrulanSignetOwner?.leader ?? "Princess Irulan"} Chronicler's Insight`}
+                {pendingAction.kind === "staban-unseen-network" && `${pendingStabanUnseenNetworkOwner?.leader ?? "Staban Tuek"} Unseen Network`}
                 {pendingAction.kind === "amber-desert-scouts" && `${pendingLadyAmberDesertScoutsOwner?.leader ?? "Lady Amber"} Desert Scouts`}
                 {pendingAction.kind === "jessica-spice-agony" && `${pendingJessicaSpiceAgonyOwner?.leader ?? "Lady Jessica"} Spice Agony`}
                 {pendingAction.kind === "jessica-water-of-life" && `${pendingJessicaWaterOfLifeOwner?.leader ?? "Reverend Mother Jessica"} Water of Life`}
@@ -2415,6 +2433,35 @@ export default function App() {
                   <span>Chronicler's Insight can no longer resolve with the current table state.</span>
                 )}
                 <button type="button" onClick={() => chooseIrulanSignet("skip")}>Skip</button>
+              </div>
+            )}
+
+            {pendingAction.kind === "staban-unseen-network" && (
+              <div className="pending-controls">
+                {pendingStabanUnseenNetworkOwner && pendingStabanUnseenNetworkSpace ? (
+                  pendingAction.reward === "landsraad" ? (
+                    <button
+                      type="button"
+                      onClick={() => chooseStabanUnseenNetwork("pay")}
+                      disabled={pendingStabanUnseenNetworkOwner.resources.spice < 1}
+                    >
+                      <Sparkles size={15} />
+                      Spend 1 spice: +3 Solari
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => chooseStabanUnseenNetwork("pay")}
+                      disabled={pendingStabanUnseenNetworkOwner.resources.solari < 2}
+                    >
+                      <Eye size={15} />
+                      Spend 2 Solari: Intrigue
+                    </button>
+                  )
+                ) : (
+                  <span>Unseen Network can no longer resolve with the current table state.</span>
+                )}
+                <button type="button" onClick={() => chooseStabanUnseenNetwork("skip")}>Skip</button>
               </div>
             )}
 

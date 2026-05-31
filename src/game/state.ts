@@ -23,6 +23,7 @@ import type {
   ContractCard,
   FactionId,
   GameState,
+  IconId,
   Influence,
   IntrigueCard,
   ObjectiveCard,
@@ -112,6 +113,9 @@ const ladyMargotFenringLeaderName = "Lady Margot Fenring";
 const ladyJessicaLeaderName = "Lady Jessica";
 const reverendMotherJessicaLeaderName = "Reverend Mother Jessica";
 const princessIrulanLeaderName = "Princess Irulan";
+const stabanTuekLeaderName = "Staban Tuek";
+const stabanUnseenNetworkSource = "Unseen Network";
+const stabanUnseenNetworkFactionIcons: IconId[] = ["emperor", "spacing", "bene", "fremen"];
 const margotLoyaltyFaction: FactionId = "bene";
 const margotLoyaltyThreshold = 2;
 const margotLoyaltySpice = 2;
@@ -144,6 +148,7 @@ export type StrategicStockpilingChoice = "spice" | "water" | "both";
 export type MarketOpportunityChoice = "spice-to-solari" | "solari-to-spice";
 export type ShaddamSignetRingChoice = "skip" | "troop" | { kind: "influence"; faction: FactionId };
 export type IrulanSignetRingChoice = "skip" | "acquire" | "trash";
+export type StabanUnseenNetworkChoice = "pay" | "skip";
 export type LadyAmberDesertScoutsChoice = "retreat" | "skip";
 export type JessicaSpiceAgonyChoice = "pay" | "skip";
 export type JessicaWaterOfLifeChoice = "pay" | "skip";
@@ -438,10 +443,18 @@ function emptyMakerSpice(): Record<string, number> {
   return Object.fromEntries(makerSpaceIds.map((spaceId) => [spaceId, 0]));
 }
 
-function buildStarterDeck(playerId: string, team: TeamId, role: Role) {
+export function leaderStarterDeckCards(leader: string, team: TeamId, role: Role) {
   const starterDeck = role === "Commander" ? commanderStarterDecks[team] : allyStarterCards;
-  if (starterDeck.length !== 10) {
-    throw new Error(`${team} ${role} starter deck must contain 10 cards, found ${starterDeck.length}.`);
+  return leader === stabanTuekLeaderName && role === "Ally"
+    ? starterDeck.filter((card) => card.name !== "Diplomacy")
+    : starterDeck;
+}
+
+function buildStarterDeck(playerId: string, team: TeamId, role: Role, leader: string) {
+  const starterDeck = leaderStarterDeckCards(leader, team, role);
+  const expectedSize = leader === stabanTuekLeaderName && role === "Ally" ? 9 : 10;
+  if (starterDeck.length !== expectedSize) {
+    throw new Error(`${leader} ${team} ${role} starter deck must contain ${expectedSize} cards, found ${starterDeck.length}.`);
   }
   return shuffleCards(
     cloneCards(starterDeck).map((card, index) => ({ ...card, id: `${playerId}-${card.id}-${index + 1}` })),
@@ -483,7 +496,7 @@ function makePlayer(
     vp: role === "Commander" ? 4 : 1,
     resources: { solari: 2, spice: 0, water: 1 },
     influence: emptyInfluence(),
-    deck: buildStarterDeck(id, team, role),
+    deck: buildStarterDeck(id, team, role, leader),
     hand: [],
     discard: [],
     playArea: [],
@@ -1267,6 +1280,25 @@ export function pendingActionForCard(
   }
   if (
     isGenericSignetRingCard(card) &&
+    source.leader === stabanTuekLeaderName &&
+    source.role === "Ally" &&
+    source.playArea.some((candidate) => candidate.id === card.id && isGenericSignetRingCard(candidate))
+  ) {
+    const pending: PendingAction = {
+      kind: "spy",
+      ownerId: source.id,
+      remaining: 1,
+      source: stabanUnseenNetworkSource,
+      recallForSupply: true,
+      postPlacementAction: "staban-unseen-network",
+    };
+    const canPlace = state
+      ? placeableSpySpaces(state, pending).length > 0 || recallableSpySupplySpaces(state, pending).length > 0
+      : source.spies > 0;
+    return canPlace ? pending : undefined;
+  }
+  if (
+    isGenericSignetRingCard(card) &&
     source.leader === ladyJessicaLeaderName &&
     source.role === "Ally" &&
     source.resources.spice + (state && space ? potentialDeferredMakerChoiceSpice(state, source, target, space) : 0) >= 1 &&
@@ -1547,7 +1579,8 @@ export function pendingActionsFor(
     spacePending.placementIcon === cardPending.placementIcon &&
     spacePending.recallForSupply === cardPending.recallForSupply &&
     spacePending.mustPlaceSpy === cardPending.mustPlaceSpy &&
-    spacePending.allowSharedPost === cardPending.allowSharedPost
+    spacePending.allowSharedPost === cardPending.allowSharedPost &&
+    spacePending.postPlacementAction === cardPending.postPlacementAction
   ) {
     return [{
       ...spacePending,
@@ -1582,7 +1615,12 @@ function prependPendingAction(state: GameState, action: PendingAction | undefine
   if (
     action.kind === "spy" &&
     state.pendingAction?.kind === "spy" &&
-    action.ownerId === state.pendingAction.ownerId
+    action.ownerId === state.pendingAction.ownerId &&
+    action.placementIcon === state.pendingAction.placementIcon &&
+    action.recallForSupply === state.pendingAction.recallForSupply &&
+    action.mustPlaceSpy === state.pendingAction.mustPlaceSpy &&
+    action.allowSharedPost === state.pendingAction.allowSharedPost &&
+    action.postPlacementAction === state.pendingAction.postPlacementAction
   ) {
     const owner = state.players.find((player) => player.id === action.ownerId);
     return {
@@ -1614,6 +1652,7 @@ type MakerChoicePendingAction = Extract<PendingAction, { kind: "maker-choice" }>
 type ReinforcePendingAction = Extract<PendingAction, { kind: "reinforce" }>;
 type SietchTabrPendingAction = Extract<PendingAction, { kind: "sietch-tabr" }>;
 type SpyPendingAction = Extract<PendingAction, { kind: "spy" }>;
+type StabanUnseenNetworkPendingAction = Extract<PendingAction, { kind: "staban-unseen-network" }>;
 type TradePendingAction = Extract<PendingAction, { kind: "trade" }>;
 type ThroneRowPendingAction = Extract<PendingAction, { kind: "throne-row" }>;
 type TrashCardPendingAction = Extract<PendingAction, { kind: "trash-card" }>;
@@ -2458,6 +2497,31 @@ export function recallableSpySupplySpaces(state: GameState, pending: SpyPendingA
   });
 }
 
+function stabanUnseenNetworkRewardForSpace(space: BoardSpace) {
+  if (space.icon === "landsraad") return "landsraad" as const;
+  if (stabanUnseenNetworkFactionIcons.includes(space.icon)) return "faction" as const;
+  return undefined;
+}
+
+function pendingActionForStabanUnseenNetwork(
+  state: GameState,
+  owner: Player,
+  space: BoardSpace,
+): StabanUnseenNetworkPendingAction | undefined {
+  if (owner.leader !== stabanTuekLeaderName || owner.role !== "Ally") return undefined;
+  const reward = stabanUnseenNetworkRewardForSpace(space);
+  if (!reward) return undefined;
+  if (reward === "landsraad" && owner.resources.spice < 1) return undefined;
+  if (reward === "faction" && owner.resources.solari < 2) return undefined;
+  return {
+    kind: "staban-unseen-network",
+    ownerId: owner.id,
+    spaceId: space.id,
+    reward,
+    source: stabanUnseenNetworkSource,
+  };
+}
+
 export function spyPostCount(state: GameState, ownerId: string) {
   return boardSpaces.filter((space) => playerHasSpyPost(state, space.id, ownerId)).length;
 }
@@ -2492,12 +2556,33 @@ export function placeSpyForPending(
   const sharedSpyPosts = pending.allowSharedPost
     ? { ...state.sharedSpyPosts, [space.id]: [...sharedOwners, owner.id] }
     : state.sharedSpyPosts;
+  const advanced = advancePendingAction(state);
+  const stabanPending =
+    pending.postPlacementAction === "staban-unseen-network" && remaining === 0
+      ? pendingActionForStabanUnseenNetwork(
+          {
+            ...state,
+            players,
+            spyPosts,
+            sharedSpyPosts,
+          },
+          { ...owner, spies: nextSpies },
+          space,
+        )
+      : undefined;
   return finishCombatIfNoActors({
     ...state,
     players,
     spyPosts,
     sharedSpyPosts,
-    ...(remaining > 0 ? { pendingAction: { ...pending, remaining } } : advancePendingAction(state)),
+    ...(remaining > 0
+      ? { pendingAction: { ...pending, remaining } }
+      : stabanPending
+        ? {
+            pendingAction: stabanPending,
+            pendingQueue: advanced.pendingAction ? [advanced.pendingAction, ...advanced.pendingQueue] : advanced.pendingQueue,
+          }
+        : advanced),
     log: [`${owner.leader} places a spy near ${space.name} from ${pending.source}.`, ...state.log],
   });
 }
@@ -2525,6 +2610,89 @@ export function recallSpyForSupplyForPending(
     pendingAction: { ...pending, recallForSupply: false, mustPlaceSpy: true },
     log: [`${owner.leader} recalls a spy from ${space.name} for ${pending.source}.`, ...state.log],
   };
+}
+
+export function resolveStabanSmuggleSpice(state: GameState, actorId: string, spaceId: string): GameState {
+  const space = boardSpaces.find((candidate) => candidate.id === spaceId);
+  if (!space?.maker) return state;
+  const ownerIds = spyPostOwnerIds(state, space.id).filter((ownerId) => ownerId !== actorId);
+  return ownerIds.reduce((nextState, ownerId) => {
+    const owner = nextState.players.find((player) => player.id === ownerId);
+    if (!owner || owner.leader !== stabanTuekLeaderName || owner.role !== "Ally") return nextState;
+    const rewardedState = {
+      ...nextState,
+      players: nextState.players.map((player) =>
+        player.id === owner.id
+          ? {
+              ...player,
+              resources: {
+                ...player.resources,
+                spice: player.resources.spice + 1,
+              },
+            }
+          : player,
+      ),
+      log: [`${owner.leader} resolves Smuggle Spice from ${space.name}: gains 1 spice.`, ...nextState.log],
+    };
+    return recordTurnSpiceGain(rewardedState, owner.id, 1);
+  }, state);
+}
+
+export function resolveStabanUnseenNetworkChoice(
+  state: GameState,
+  pending: StabanUnseenNetworkPendingAction,
+  choice: StabanUnseenNetworkChoice,
+): GameState {
+  const owner = state.players.find((player) => player.id === pending.ownerId);
+  const space = boardSpaces.find((candidate) => candidate.id === pending.spaceId);
+  if (!owner || !space || owner.leader !== stabanTuekLeaderName || owner.role !== "Ally") return state;
+  if (choice === "skip") {
+    return finishCombatIfNoActors({
+      ...state,
+      ...advancePendingAction(state),
+      log: [`${owner.leader} declines ${pending.source} after placing a spy near ${space.name}.`, ...state.log],
+    });
+  }
+
+  if (pending.reward === "landsraad") {
+    if (owner.resources.spice < 1) return state;
+    return finishCombatIfNoActors({
+      ...state,
+      players: state.players.map((player) =>
+        player.id === owner.id
+          ? {
+              ...player,
+              resources: {
+                ...player.resources,
+                spice: player.resources.spice - 1,
+                solari: player.resources.solari + 3,
+              },
+            }
+          : player,
+      ),
+      ...advancePendingAction(state),
+      log: [`${owner.leader} spends 1 spice for ${pending.source}: gains 3 Solari.`, ...state.log],
+    });
+  }
+
+  if (owner.resources.solari < 2) return state;
+  const paidState = {
+    ...state,
+    players: state.players.map((player) =>
+      player.id === owner.id
+        ? {
+            ...player,
+            resources: {
+              ...player.resources,
+              solari: player.resources.solari - 2,
+            },
+          }
+        : player,
+    ),
+    ...advancePendingAction(state),
+    log: [`${owner.leader} spends 2 Solari for ${pending.source}.`, ...state.log],
+  };
+  return finishCombatIfNoActors(drawIntrigueCards(paidState, owner.id, 1, pending.source));
 }
 
 export function recallSpyForPending(

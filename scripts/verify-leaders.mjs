@@ -712,11 +712,161 @@ try {
   const controversialTech = data.boardSpaces.find((space) => space.id === "controversial-tech");
   const deliverSupplies = data.boardSpaces.find((space) => space.id === "deliver-supplies");
   const hardyWarriors = data.boardSpaces.find((space) => space.id === "hardy-warriors");
+  const swordmaster = data.boardSpaces.find((space) => space.id === "swordmaster");
   assert.ok(espionage, "Espionage should exist for Reverend Mother repeat tests");
   assert.ok(expedition, "Expedition should exist for Reverend Mother repeat tests");
   assert.ok(controversialTech, "Controversial Technology should exist for Reverend Mother repeat tests");
   assert.ok(deliverSupplies, "Deliver Supplies should exist for Reverend Mother repeat negative tests");
   assert.ok(hardyWarriors, "Hardy Warriors should exist for Reverend Mother personal-space negative tests");
+  assert.ok(swordmaster, "Swordmaster should exist for Staban Unseen Network tests");
+  const stabanStarterDeck = state.leaderStarterDeckCards("Staban Tuek", "muaddib", "Ally");
+  assert.equal(stabanStarterDeck.length, 9, "Staban's Limited Allies should start with a nine-card Ally deck");
+  assert.equal(
+    stabanStarterDeck.some((card) => card.name === "Diplomacy"),
+    false,
+    "Staban's Limited Allies should remove Diplomacy from the starting deck",
+  );
+  assert.equal(
+    state.leaderStarterDeckCards("Gurney Halleck", "muaddib", "Ally").filter((card) => card.name === "Diplomacy").length,
+    1,
+    "Other Ally leaders should keep Diplomacy in their starting deck",
+  );
+  const staban = {
+    ...feyd,
+    leader: "Staban Tuek",
+    leaderCard: data.leaderCardByName("Staban Tuek"),
+    resources: { ...feyd.resources, spice: 0, solari: 2 },
+    playArea: [allySignet],
+    intrigues: [],
+  };
+  const stabanSignetState = {
+    ...game,
+    intrigueDeck: [intrigueCard],
+    intrigueDiscard: [],
+    players: game.players.map((player) => (player.id === staban.id ? staban : player)),
+  };
+  const stabanSignetPending = state.pendingActionForCard(
+    allySignet,
+    staban,
+    stabanSignetState,
+    staban,
+    arrakeen,
+  );
+  assert.deepEqual(stabanSignetPending, {
+    kind: "spy",
+    ownerId: staban.id,
+    remaining: 1,
+    source: "Unseen Network",
+    recallForSupply: true,
+    postPlacementAction: "staban-unseen-network",
+  });
+  const stabanSignetSpaces = state.placeableSpySpaces(stabanSignetState, stabanSignetPending).map((space) => space.id);
+  assert.ok(stabanSignetSpaces.includes(swordmaster.id), "Unseen Network should place on Landsraad observation posts");
+  assert.ok(stabanSignetSpaces.includes(secrets.id), "Unseen Network should place on Faction observation posts");
+  assert.ok(stabanSignetSpaces.includes(imperialBasin.id), "Unseen Network should place on Maker observation posts");
+  assert.equal(stabanSignetSpaces.includes(hardyWarriors.id), false, "Unseen Network should not place on another team's personal board");
+  const stabanLandsraadPlacement = state.placeSpyForPending(
+    {
+      ...stabanSignetState,
+      pendingAction: stabanSignetPending,
+      pendingQueue: [],
+      players: stabanSignetState.players.map((player) =>
+        player.id === staban.id ? { ...staban, resources: { ...staban.resources, spice: 1, solari: 2 } } : player,
+      ),
+    },
+    stabanSignetPending,
+    swordmaster.id,
+  );
+  assert.deepEqual(
+    stabanLandsraadPlacement.pendingAction,
+    {
+      kind: "staban-unseen-network",
+      ownerId: staban.id,
+      spaceId: swordmaster.id,
+      reward: "landsraad",
+      source: "Unseen Network",
+    },
+    "Unseen Network should queue the Landsraad spend after placing the spy",
+  );
+  const stabanLandsraadReward = state.resolveStabanUnseenNetworkChoice(
+    stabanLandsraadPlacement,
+    stabanLandsraadPlacement.pendingAction,
+    "pay",
+  );
+  assert.equal(playerById(stabanLandsraadReward, staban.id).resources.spice, 0, "Unseen Network Landsraad reward should spend 1 spice");
+  assert.equal(playerById(stabanLandsraadReward, staban.id).resources.solari, 5, "Unseen Network Landsraad reward should gain 3 Solari");
+  assert.equal(stabanLandsraadReward.pendingAction, undefined, "Unseen Network should clear after resolving the Landsraad reward");
+  const stabanFactionPlacement = state.placeSpyForPending(
+    {
+      ...stabanSignetState,
+      pendingAction: stabanSignetPending,
+      pendingQueue: [],
+    },
+    stabanSignetPending,
+    secrets.id,
+  );
+  assert.equal(stabanFactionPlacement.pendingAction?.kind, "staban-unseen-network", "Unseen Network should queue a Faction spend after placing on a Faction post");
+  const stabanFactionReward = state.resolveStabanUnseenNetworkChoice(
+    stabanFactionPlacement,
+    stabanFactionPlacement.pendingAction,
+    "pay",
+  );
+  assert.equal(playerById(stabanFactionReward, staban.id).resources.solari, 0, "Unseen Network Faction reward should spend 2 Solari");
+  assert.equal(playerById(stabanFactionReward, staban.id).intrigues.length, 1, "Unseen Network Faction reward should draw an Intrigue");
+  assert.equal(playerById(stabanFactionReward, staban.id).intrigues[0].id, intrigueCard.id, "Unseen Network should draw from the Intrigue deck");
+  const stabanMakerPlacement = state.placeSpyForPending(
+    {
+      ...stabanSignetState,
+      pendingAction: stabanSignetPending,
+      pendingQueue: [],
+    },
+    stabanSignetPending,
+    imperialBasin.id,
+  );
+  assert.equal(stabanMakerPlacement.pendingAction, undefined, "Unseen Network should not queue a paid reward on Maker posts");
+  const stabanNoPaymentPlacement = state.placeSpyForPending(
+    {
+      ...stabanSignetState,
+      pendingAction: stabanSignetPending,
+      pendingQueue: [],
+      players: stabanSignetState.players.map((player) =>
+        player.id === staban.id ? { ...staban, resources: { ...staban.resources, spice: 0, solari: 0 } } : player,
+      ),
+    },
+    stabanSignetPending,
+    swordmaster.id,
+  );
+  assert.equal(stabanNoPaymentPlacement.pendingAction, undefined, "Unseen Network should not queue an unaffordable paid reward");
+  const stabanSmuggleBase = {
+    ...game,
+    turnSpiceGains: {},
+    spyPosts: { [haggaBasin.id]: staban.id },
+    players: game.players.map((player) => (player.id === staban.id ? { ...staban, resources: { ...staban.resources, spice: 0 } } : player)),
+  };
+  const stabanSmuggle = state.resolveStabanSmuggleSpice(stabanSmuggleBase, muadDibAllyA.id, haggaBasin.id);
+  assert.equal(playerById(stabanSmuggle, staban.id).resources.spice, 1, "Smuggle Spice should pay Staban when another player visits his spied Maker space");
+  assert.equal(stabanSmuggle.turnSpiceGains[staban.id], 1, "Smuggle Spice should count as Staban's spice gain this turn");
+  assert.equal(
+    playerById(state.resolveStabanSmuggleSpice(stabanSmuggleBase, staban.id, haggaBasin.id), staban.id).resources.spice,
+    0,
+    "Smuggle Spice should not pay when Staban sends the Agent himself",
+  );
+  assert.equal(
+    playerById(state.resolveStabanSmuggleSpice(stabanSmuggleBase, muadDib.id, haggaBasin.id), staban.id).resources.spice,
+    1,
+    "Smuggle Spice should pay when a Commander sends the Agent while activating Staban",
+  );
+  assert.equal(
+    playerById(state.resolveStabanSmuggleSpice(stabanSmuggleBase, muadDibAllyA.id, arrakeen.id), staban.id).resources.spice,
+    0,
+    "Smuggle Spice should require a Maker board space",
+  );
+  const stabanSharedSpySmuggle = state.resolveStabanSmuggleSpice(
+    { ...stabanSmuggleBase, spyPosts: {}, sharedSpyPosts: { [haggaBasin.id]: [staban.id, irulan.id] } },
+    muadDibAllyA.id,
+    haggaBasin.id,
+  );
+  assert.equal(playerById(stabanSharedSpySmuggle, staban.id).resources.spice, 1, "Smuggle Spice should work from shared spy posts");
   const ladyMargot = {
     ...feyd,
     leader: "Lady Margot Fenring",

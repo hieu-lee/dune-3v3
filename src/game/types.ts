@@ -221,6 +221,7 @@ export type PendingAction =
       recallForSupply?: boolean;
       mustPlaceSpy?: boolean;
       allowSharedPost?: boolean;
+      postPlacementAction?: "staban-unseen-network";
     }
   | {
       kind: "recall-spy";
@@ -366,6 +367,13 @@ export type PendingAction =
       kind: "irulan-signet-ring";
       ownerId: string;
       cardId: string;
+      source: string;
+    }
+  | {
+      kind: "staban-unseen-network";
+      ownerId: string;
+      spaceId: string;
+      reward: "landsraad" | "faction";
       source: string;
     }
   | {

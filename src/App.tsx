@@ -22,6 +22,7 @@ import { CommandBar } from "./components/CommandBar";
 import { EndgamePanel } from "./components/EndgamePanel";
 import { LeaderReferenceModal } from "./components/LeaderReferenceModal";
 import { MarketPanel } from "./components/MarketPanel";
+import { PendingConflictVpPanel } from "./components/PendingConflictVpPanel";
 import { PendingInfluenceLossPanel } from "./components/PendingInfluenceLossPanel";
 import { PendingIrulanSignetPanel } from "./components/PendingIrulanSignetPanel";
 import { PendingMakerChoicePanel } from "./components/PendingMakerChoicePanel";
@@ -2096,52 +2097,15 @@ export default function App() {
             )}
 
             {pendingAction.kind === "conflict-vp-conversion" && (
-              <div className="pending-controls spy-grid">
-                {pendingConflictVpOwner ? (
-                  <>
-                    <span>
-                      {pendingAction.remaining} available conversion{pendingAction.remaining === 1 ? "" : "s"} from {pendingAction.source}
-                    </span>
-                    {pendingAction.cost.kind === "resource" ? (
-                      <button
-                        type="button"
-                        onClick={payConflictVpReward}
-                        disabled={!pendingConflictVpCanPay}
-                      >
-                        {pendingAction.cost.resource === "spice" ? <Sparkles size={15} /> : <CircleDollarSign size={15} />}
-                        Spend {pendingAction.cost.amount} {pendingAction.cost.resource}: +{pendingAction.vp} VP
-                      </button>
-                    ) : (
-                      <>
-                        <span>
-                          Recall {pendingAction.cost.count - pendingAction.cost.recalled} more {pendingAction.cost.count - pendingAction.cost.recalled === 1 ? "spy" : "spies"}.
-                        </span>
-                        {pendingConflictVpSpyChoices.map((space) => (
-                          <button
-                            type="button"
-                            key={space.id}
-                            onClick={() => recallConflictRewardSpy(space.id)}
-                            title={`Recall spy from ${space.name}`}
-                          >
-                            <RotateCcw size={14} />
-                            {space.name}
-                          </button>
-                        ))}
-                        {pendingConflictVpSpyChoices.length === 0 && <span>No spy posts to recall</span>}
-                      </>
-                    )}
-                    <button
-                      type="button"
-                      onClick={skipConflictVpReward}
-                      disabled={pendingAction.cost.kind === "recall-spies" && pendingAction.cost.recalled > 0}
-                    >
-                      Skip
-                    </button>
-                  </>
-                ) : (
-                  <span>Conflict reward can no longer resolve with the current table state.</span>
-                )}
-              </div>
+              <PendingConflictVpPanel
+                canPay={pendingConflictVpCanPay}
+                owner={pendingConflictVpOwner}
+                pending={pendingAction}
+                spyChoices={pendingConflictVpSpyChoices}
+                onPay={payConflictVpReward}
+                onRecallSpy={recallConflictRewardSpy}
+                onSkip={skipConflictVpReward}
+              />
             )}
 
             {pendingAction.kind === "command-respect" && (

@@ -5,6 +5,7 @@ import path from "node:path";
 import { chromium } from "playwright";
 import { createServer } from "vite";
 import { artifactStem, generatedArtifactNames, scenarios } from "./browser-debug-artifacts.mjs";
+import { runConflictVpSmoke } from "./browser-debug-conflict-vp.mjs";
 import { runPendingChoicesSmoke } from "./browser-debug-pending-choices.mjs";
 import { runSignetChoicesSmoke } from "./browser-debug-signet-choices.mjs";
 import { runSpaceChoicesSmoke } from "./browser-debug-space-choices.mjs";
@@ -827,6 +828,21 @@ try {
     }
     if (scenario === "control-defense" || scenario === "all") {
       await interruptible(runControlDefenseSmoke(page, url, server, captures));
+    }
+    if (scenario === "conflict-vp" || scenario === "all") {
+      await interruptible(runConflictVpSmoke({
+        captures,
+        currentGame,
+        initialPlayableGame,
+        openApp,
+        page,
+        screenshot,
+        server,
+        setDebugGameAndWait,
+        url,
+        waitForNoPending,
+        writeJson,
+      }));
     }
     if (scenario === "pending-choices" || scenario === "all") {
       await interruptible(runPendingChoicesSmoke({

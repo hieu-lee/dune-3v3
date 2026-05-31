@@ -26,6 +26,20 @@ import { PendingAcquireCardPanel, PendingContractPanel } from "./components/Pend
 import { PendingConflictVpPanel } from "./components/PendingConflictVpPanel";
 import { PendingInfluenceLossPanel } from "./components/PendingInfluenceLossPanel";
 import { PendingIrulanSignetPanel } from "./components/PendingIrulanSignetPanel";
+import {
+  PendingCommandRespectPanel,
+  PendingCorrinoMightPanel,
+  PendingDemandAttentionPanel,
+  PendingDemandResultsPanel,
+  PendingDesertCallPanel,
+  PendingJessicaOtherMemoriesPanel,
+  PendingJessicaReverendMotherPanel,
+  PendingJessicaSpiceAgonyPanel,
+  PendingJessicaWaterOfLifePanel,
+  PendingLadyAmberDesertScoutsPanel,
+  PendingStabanUnseenNetworkPanel,
+  PendingThreatenSpiceProductionPanel,
+} from "./components/PendingLeaderChoicePanels";
 import { PendingMakerChoicePanel } from "./components/PendingMakerChoicePanel";
 import { PendingControlDefensePanel, PendingDeployPanel, PendingReinforcePanel } from "./components/PendingMilitaryPanels";
 import { PendingRecallSpyPanel } from "./components/PendingRecallSpyPanel";
@@ -1431,6 +1445,14 @@ export default function App() {
     pendingAction?.kind === "amber-desert-scouts" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingJessicaSpiceAgonyOwner =
     pendingAction?.kind === "jessica-spice-agony" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
+  const pendingJessicaSpiceAgonyTroopSupply = pendingJessicaSpiceAgonyOwner
+    ? playerTroopSupply(pendingJessicaSpiceAgonyOwner)
+    : 0;
+  const pendingJessicaSpiceAgonyCanPay = Boolean(
+    pendingJessicaSpiceAgonyOwner &&
+      pendingJessicaSpiceAgonyOwner.resources.spice >= 1 &&
+      pendingJessicaSpiceAgonyTroopSupply > 0,
+  );
   const pendingJessicaWaterOfLifeOwner =
     pendingAction?.kind === "jessica-water-of-life" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingJessicaReverendMotherOwner =
@@ -1950,124 +1972,52 @@ export default function App() {
             )}
 
             {pendingAction.kind === "staban-unseen-network" && (
-              <div className="pending-controls">
-                {pendingStabanUnseenNetworkOwner && pendingStabanUnseenNetworkSpace ? (
-                  pendingAction.reward === "landsraad" ? (
-                    <button
-                      type="button"
-                      onClick={() => chooseStabanUnseenNetwork("pay")}
-                      disabled={pendingStabanUnseenNetworkOwner.resources.spice < 1}
-                    >
-                      <Sparkles size={15} />
-                      Spend 1 spice: +3 Solari
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => chooseStabanUnseenNetwork("pay")}
-                      disabled={pendingStabanUnseenNetworkOwner.resources.solari < 2}
-                    >
-                      <Eye size={15} />
-                      Spend 2 Solari: Intrigue
-                    </button>
-                  )
-                ) : (
-                  <span>Unseen Network can no longer resolve with the current table state.</span>
-                )}
-                <button type="button" onClick={() => chooseStabanUnseenNetwork("skip")}>Skip</button>
-              </div>
+              <PendingStabanUnseenNetworkPanel
+                owner={pendingStabanUnseenNetworkOwner}
+                pending={pendingAction}
+                space={pendingStabanUnseenNetworkSpace}
+                onChoose={chooseStabanUnseenNetwork}
+              />
             )}
 
             {pendingAction.kind === "amber-desert-scouts" && (
-              <div className="pending-controls">
-                {pendingLadyAmberDesertScoutsOwner ? (
-                  <button
-                    type="button"
-                    onClick={() => chooseLadyAmberDesertScouts("retreat")}
-                    disabled={pendingLadyAmberDesertScoutsOwner.deployedTroops <= 0}
-                  >
-                    <RotateCcw size={15} />
-                    Retreat 1 troop
-                  </button>
-                ) : (
-                  <span>Desert Scouts can no longer resolve with the current table state.</span>
-                )}
-                <button type="button" onClick={() => chooseLadyAmberDesertScouts("skip")}>Skip</button>
-              </div>
+              <PendingLadyAmberDesertScoutsPanel
+                owner={pendingLadyAmberDesertScoutsOwner}
+                onChoose={chooseLadyAmberDesertScouts}
+              />
             )}
 
             {pendingAction.kind === "jessica-spice-agony" && (
-              <div className="pending-controls">
-                {pendingJessicaSpiceAgonyOwner ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => chooseJessicaSpiceAgony("pay")}
-                      disabled={pendingJessicaSpiceAgonyOwner.resources.spice < 1 || playerTroopSupply(pendingJessicaSpiceAgonyOwner) <= 0}
-                    >
-                      <Sparkles size={15} />
-                      Spend 1 spice: Intrigue + memory
-                    </button>
-                    <span>{memoryCountLabel(pendingJessicaSpiceAgonyOwner.jessicaMemories)} / {troopSupplyLabel(playerTroopSupply(pendingJessicaSpiceAgonyOwner))}</span>
-                  </>
-                ) : (
-                  <span>Spice Agony can no longer resolve with the current table state.</span>
-                )}
-                <button type="button" onClick={() => chooseJessicaSpiceAgony("skip")}>Skip</button>
-              </div>
+              <PendingJessicaSpiceAgonyPanel
+                canPay={pendingJessicaSpiceAgonyCanPay}
+                memoryLabel={memoryCountLabel(pendingJessicaSpiceAgonyOwner?.jessicaMemories ?? 0)}
+                owner={pendingJessicaSpiceAgonyOwner}
+                troopSupplyLabel={troopSupplyLabel(pendingJessicaSpiceAgonyTroopSupply)}
+                onChoose={chooseJessicaSpiceAgony}
+              />
             )}
 
             {pendingAction.kind === "jessica-water-of-life" && (
-              <div className="pending-controls">
-                {pendingJessicaWaterOfLifeOwner ? (
-                  <button
-                    type="button"
-                    onClick={() => chooseJessicaWaterOfLife("pay")}
-                    disabled={pendingJessicaWaterOfLifeOwner.resources.spice < 1}
-                  >
-                    <Droplets size={15} />
-                    Spend 1 spice: +1 water
-                  </button>
-                ) : (
-                  <span>Water of Life can no longer resolve with the current table state.</span>
-                )}
-                <button type="button" onClick={() => chooseJessicaWaterOfLife("skip")}>Skip</button>
-              </div>
+              <PendingJessicaWaterOfLifePanel
+                owner={pendingJessicaWaterOfLifeOwner}
+                onChoose={chooseJessicaWaterOfLife}
+              />
             )}
 
             {pendingAction.kind === "jessica-reverend-mother" && (
-              <div className="pending-controls">
-                {pendingJessicaReverendMotherOwner && pendingJessicaReverendMotherSpace ? (
-                  <button
-                    type="button"
-                    onClick={() => chooseJessicaReverendMother("repeat")}
-                    disabled={pendingJessicaReverendMotherOwner.resources.water < 1}
-                  >
-                    <Droplets size={15} />
-                    Spend 1 water: repeat {pendingJessicaReverendMotherSpace.name}
-                  </button>
-                ) : (
-                  <span>Reverend Mother can no longer resolve with the current table state.</span>
-                )}
-                <button type="button" onClick={() => chooseJessicaReverendMother("skip")}>Skip</button>
-              </div>
+              <PendingJessicaReverendMotherPanel
+                owner={pendingJessicaReverendMotherOwner}
+                space={pendingJessicaReverendMotherSpace}
+                onChoose={chooseJessicaReverendMother}
+              />
             )}
 
             {pendingAction.kind === "jessica-other-memories" && (
-              <div className="pending-controls">
-                {pendingJessicaOtherMemoriesOwner ? (
-                  <>
-                    <button type="button" onClick={() => chooseJessicaOtherMemories("flip")}>
-                      <BookOpen size={15} />
-                      Return {memoryCountLabel(pendingJessicaOtherMemoriesOwner.jessicaMemories)}: draw and flip
-                    </button>
-                    <span>Reverend Mother side becomes active.</span>
-                  </>
-                ) : (
-                  <span>Other Memories can no longer resolve with the current table state.</span>
-                )}
-                <button type="button" onClick={() => chooseJessicaOtherMemories("skip")}>Skip</button>
-              </div>
+              <PendingJessicaOtherMemoriesPanel
+                memoryLabel={memoryCountLabel(pendingJessicaOtherMemoriesOwner?.jessicaMemories ?? 0)}
+                owner={pendingJessicaOtherMemoriesOwner}
+                onChoose={chooseJessicaOtherMemories}
+              />
             )}
 
             {pendingAction.kind === "conflict-vp-conversion" && (
@@ -2083,139 +2033,63 @@ export default function App() {
             )}
 
             {pendingAction.kind === "command-respect" && (
-              <div className="pending-controls">
-                {pendingCommandRespectCommander && pendingCommandRespectPartners.length > 0 ? (
-                  <>
-                    <span>Trash Command Respect to trade with one teammate.</span>
-                    {pendingCommandRespectPartners.map((partner) => (
-                      <button
-                        type="button"
-                        key={partner.id}
-                        onClick={() => chooseCommandRespectTrade(partner.id)}
-                      >
-                        <HandCoins size={15} />
-                        Trade with {partner.leader}
-                      </button>
-                    ))}
-                  </>
-                ) : (
-                  <span>Command Respect can no longer resolve with the current table state.</span>
-                )}
-                <button type="button" onClick={skipCommandRespectChoice}>Skip</button>
-              </div>
+              <PendingCommandRespectPanel
+                commander={pendingCommandRespectCommander}
+                partners={pendingCommandRespectPartners}
+                onSkip={skipCommandRespectChoice}
+                onTrade={chooseCommandRespectTrade}
+              />
             )}
 
             {pendingAction.kind === "demand-results" && (
-              <div className="pending-controls contract-choice">
-                {pendingDemandResultsAllies[0] && pendingDemandResultsAllies[1] && pendingDemandResultsContracts[0] && pendingDemandResultsContracts[1] ? (
-                  <>
-                    <span>Spend 2 Solari, assign both contracts, then trash Demand Results.</span>
-                    <button type="button" onClick={() => chooseDemandResults(0)}>
-                      <span>{pendingDemandResultsContracts[0].name} to {pendingDemandResultsAllies[0].leader}</span>
-                      <span>{pendingDemandResultsContracts[1].name} to {pendingDemandResultsAllies[1].leader}</span>
-                    </button>
-                    <button type="button" onClick={() => chooseDemandResults(1)}>
-                      <span>{pendingDemandResultsContracts[1].name} to {pendingDemandResultsAllies[0].leader}</span>
-                      <span>{pendingDemandResultsContracts[0].name} to {pendingDemandResultsAllies[1].leader}</span>
-                    </button>
-                  </>
-                ) : (
-                  <span>Demand Results can no longer resolve with the current table state.</span>
-                )}
-                <button type="button" onClick={skipDemandResultsChoice}>Skip</button>
-              </div>
+              <PendingDemandResultsPanel
+                allies={pendingDemandResultsAllies}
+                contracts={pendingDemandResultsContracts}
+                onChoose={chooseDemandResults}
+                onSkip={skipDemandResultsChoice}
+              />
             )}
 
             {pendingAction.kind === "corrino-might" && (
-              <div className="pending-controls">
-                {pendingCorrinoMightAllies[0] && pendingCorrinoMightAllies[1] ? (
-                  <button
-                    type="button"
-                    onClick={chooseCorrinoMight}
-                    disabled={!pendingCorrinoMightCommander || pendingCorrinoMightCommander.resources.spice < pendingAction.cost}
-                  >
-                    <Sparkles size={15} />
-                    Spend {pendingAction.cost}: both Allies +2 troops, trash
-                  </button>
-                ) : (
-                  <span>Corrino Might can no longer resolve with the current table state.</span>
-                )}
-                <button type="button" onClick={skipCorrinoMightChoice}>Skip</button>
-              </div>
+              <PendingCorrinoMightPanel
+                allies={pendingCorrinoMightAllies}
+                commander={pendingCorrinoMightCommander}
+                cost={pendingAction.cost}
+                onChoose={chooseCorrinoMight}
+                onSkip={skipCorrinoMightChoice}
+              />
             )}
 
             {pendingAction.kind === "demand-attention" && (
-              <div className="pending-controls">
-                {pendingDemandAttentionRecipient ? (
-                  <button type="button" onClick={chooseDemandAttention}>
-                    <CircleDollarSign size={15} />
-                    Spend 4: {pendingDemandAttentionRecipient.leader} +1 {factionLabels[pendingAction.faction]} Influence
-                  </button>
-                ) : (
-                  <span>Demand Attention can no longer resolve with the current table state.</span>
-                )}
-                <button type="button" onClick={skipDemandAttentionChoice}>Skip</button>
-              </div>
+              <PendingDemandAttentionPanel
+                factionLabel={factionLabels[pendingAction.faction]}
+                recipient={pendingDemandAttentionRecipient}
+                onChoose={chooseDemandAttention}
+                onSkip={skipDemandAttentionChoice}
+              />
             )}
 
             {pendingAction.kind === "desert-call" && (
-              <div className="pending-controls">
-                {pendingDesertCallAlly ? (
-                  <button type="button" onClick={chooseDesertCall}>
-                    <Droplets size={15} />
-                    Spend 1 water: {pendingDesertCallAlly.leader} summons 1 sandworm
-                  </button>
-                ) : (
-                  <span>Desert Call can no longer resolve with the current table state.</span>
-                )}
-                <button type="button" onClick={skipDesertCallChoice}>Skip</button>
-              </div>
+              <PendingDesertCallPanel
+                ally={pendingDesertCallAlly}
+                onChoose={chooseDesertCall}
+                onSkip={skipDesertCallChoice}
+              />
             )}
 
             {pendingAction.kind === "threaten-spice-production" && (
-              <div className="pending-controls threaten-spice-choice">
-                {pendingThreatenSpiceCommander && pendingThreatenSpiceContributors.length === pendingAction.contributorIds.length ? (
-                  <>
-                    <span>{pendingThreatenSpiceTotal}/{pendingAction.cost} spice committed</span>
-                    <div className="threaten-spice-grid">
-                      {pendingThreatenSpiceContributors.map((contributor) => {
-                        const contribution = pendingAction.contributions[contributor.id] ?? 0;
-                        return (
-                          <div className="threaten-spice-contributor" key={contributor.id}>
-                            <strong>{contributor.leader}</strong>
-                            <span>{contribution}/{contributor.resources.spice}</span>
-                            <button
-                              type="button"
-                              onClick={() => adjustThreatenSpiceProduction(contributor.id, -1)}
-                              disabled={contribution <= 0}
-                              title={`Remove 1 spice from ${contributor.leader}`}
-                              aria-label={`Remove 1 spice from ${contributor.leader}`}
-                            >
-                              <Minus size={14} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => adjustThreatenSpiceProduction(contributor.id, 1)}
-                              disabled={contribution >= contributor.resources.spice || pendingThreatenSpiceTotal >= pendingAction.cost}
-                              title={`Add 1 spice from ${contributor.leader}`}
-                              aria-label={`Add 1 spice from ${contributor.leader}`}
-                            >
-                              <Plus size={14} />
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <button type="button" onClick={chooseThreatenSpiceProduction} disabled={!pendingThreatenSpiceCanPay}>
-                      <Sparkles size={15} />
-                      Pay {pendingAction.cost}: +1 VP
-                    </button>
-                  </>
-                ) : (
-                  <span>Threaten Spice Production can no longer resolve with the current table state.</span>
-                )}
-                <button type="button" onClick={skipThreatenSpiceProductionChoice}>Skip</button>
-              </div>
+              <PendingThreatenSpiceProductionPanel
+                canPay={pendingThreatenSpiceCanPay}
+                commander={pendingThreatenSpiceCommander}
+                contributorIds={pendingAction.contributorIds}
+                contributions={pendingAction.contributions}
+                contributors={pendingThreatenSpiceContributors}
+                cost={pendingAction.cost}
+                total={pendingThreatenSpiceTotal}
+                onAdjust={adjustThreatenSpiceProduction}
+                onPay={chooseThreatenSpiceProduction}
+                onSkip={skipThreatenSpiceProductionChoice}
+              />
             )}
 
             {pendingAction.kind === "reinforce" && (

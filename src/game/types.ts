@@ -176,6 +176,7 @@ export type Player = {
   highCouncilSeat: boolean;
   revealActivatedAllyId?: string;
   callToArmsActive: boolean;
+  gurneyAlwaysSmilingScored?: boolean;
   purchaseSequence: number;
   swordmasterBonus: boolean;
   contracts: PlayerContract[];
@@ -272,6 +273,7 @@ export type PendingAction =
       canRemoveShieldWall: boolean;
       source: string;
       spaceId: string;
+      extraRecruitedTroops?: number;
       conflictBlocked?: boolean;
     }
   | {

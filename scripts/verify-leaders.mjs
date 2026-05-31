@@ -79,6 +79,8 @@ try {
   }
 
   const [muadDib, shaddamAlly, muadDibAllyA, emperor] = game.players;
+  const gurneySeat = game.players.findIndex((player) => player.id === muadDibAllyA.id);
+  assert.notEqual(gurneySeat, -1, "Expected Gurney's active seat");
   const muadDibSignet = data.muadDibCommanderCards.find((card) => card.name === "Signet Ring");
   const allySignet = data.allyStarterCards.find((card) => card.name === "Signet Ring");
   const emperorSignet = data.emperorCommanderCards.find((card) => card.name === "Signet Ring");
@@ -118,6 +120,21 @@ try {
     state.isShaddamSignetRingCard(muadDibSignet),
     false,
     "Muad'Dib Signet Ring should not be recognized as Shaddam's Signet Ring",
+  );
+  assert.equal(
+    state.isGenericSignetRingCard(allySignet),
+    true,
+    "Generic Ally Signet Ring should be recognized for Ally leader Signet abilities",
+  );
+  assert.equal(
+    state.isGenericSignetRingCard(muadDibSignet),
+    false,
+    "Muad'Dib Commander Signet Ring should not be recognized as a generic Ally Signet Ring",
+  );
+  assert.equal(
+    state.isGenericSignetRingCard(emperorSignet),
+    false,
+    "Emperor Commander Signet Ring should not be recognized as a generic Ally Signet Ring",
   );
   assert.match(muadDibSignet.play, /draw 1 card/i, "Muad'Dib Signet Ring should document Lead the Way");
   assert.match(
@@ -184,6 +201,196 @@ try {
   );
   assert.equal(emperorSignetResult.source.hand.length, 0, "Emperor Signet Ring should not trigger Lead the Way");
 
+  const arrakeen = data.boardSpaces.find((space) => space.id === "arrakeen");
+  assert.ok(arrakeen, "Arrakeen should exist for Signet deployment regression");
+  const gurneyBoardEffect = state.applyBoardEffect(
+    { ...muadDibAllyA, garrison: 3, conflict: 0, deployedTroops: 0 },
+    { ...muadDibAllyA, garrison: 3, conflict: 0, deployedTroops: 0 },
+    arrakeen,
+  );
+  const gurneyWarmaster = state.applyCardAgentEffect(
+    allySignet,
+    gurneyBoardEffect.source,
+    gurneyBoardEffect.source,
+  );
+  assert.equal(gurneyWarmaster.source.garrison, 5, "Gurney's Warmaster Signet should recruit 1 troop after Arrakeen recruits 1");
+  assert.equal(gurneyWarmaster.recruitedTroops, 1, "Gurney's Warmaster troop should count as recruited this turn");
+  assert.match(gurneyWarmaster.log ?? "", /Warmaster/, "Gurney's Warmaster should log the Signet troop");
+  assert.deepEqual(
+    state.pendingActionForSpace(
+      arrakeen,
+      gurneyWarmaster.source,
+      gurneyWarmaster.source,
+      game.players,
+      gurneyWarmaster.recruitedTroops,
+    ),
+    { kind: "deploy", ownerId: muadDibAllyA.id, remaining: 4, source: "Arrakeen" },
+    "Gurney's Signet troop should be deployable from a Combat board space this turn",
+  );
+  const imperialBasin = data.boardSpaces.find((space) => space.id === "imperial-basin");
+  assert.ok(imperialBasin, "Imperial Basin should exist for Gurney Warmaster deployment regression");
+  const emptyGarrisonWarmaster = state.applyCardAgentEffect(
+    allySignet,
+    { ...muadDibAllyA, garrison: 0, conflict: 0, deployedTroops: 0 },
+    { ...muadDibAllyA, garrison: 0, conflict: 0, deployedTroops: 0 },
+  );
+  assert.deepEqual(
+    state.pendingActionForSpace(
+      imperialBasin,
+      emptyGarrisonWarmaster.source,
+      emptyGarrisonWarmaster.source,
+      game.players,
+      emptyGarrisonWarmaster.recruitedTroops,
+    ),
+    { kind: "deploy", ownerId: muadDibAllyA.id, remaining: 1, source: "Imperial Basin" },
+    "Gurney should be able to deploy only the Warmaster troop when he had no prior garrison",
+  );
+  const jessicaSignet = state.applyCardAgentEffect(allySignet, game.players[4], game.players[4]);
+  assert.equal(jessicaSignet.source.garrison, game.players[4].garrison, "Generic Signet should not recruit for a non-Gurney Ally");
+
+  const gurneyRevealBase = {
+    ...game,
+    activeSeat: gurneySeat,
+    pendingAction: undefined,
+    pendingQueue: [],
+    players: game.players.map((player) =>
+      player.id === muadDibAllyA.id
+        ? {
+            ...player,
+            revealed: true,
+            conflict: 10,
+            deployedTroops: 5,
+            vp: 1,
+            gurneyAlwaysSmilingScored: false,
+          }
+        : player,
+    ),
+  };
+  const gurneyScored = state.scoreGurneyAlwaysSmiling(gurneyRevealBase, muadDibAllyA.id);
+  assert.equal(playerById(gurneyScored, muadDibAllyA.id).vp, 2, "Gurney should gain 1 VP at 10+ strength in six-player mode");
+  assert.equal(
+    playerById(gurneyScored, muadDibAllyA.id).gurneyAlwaysSmilingScored,
+    true,
+    "Gurney should mark Always Smiling as scored for the Reveal turn",
+  );
+  assert.match(gurneyScored.log[0], /Always Smiling/, "Gurney's Reveal ability should log when it scores");
+  const gurneyNoDouble = state.scoreGurneyAlwaysSmiling(gurneyScored, muadDibAllyA.id);
+  assert.equal(playerById(gurneyNoDouble, muadDibAllyA.id).vp, 2, "Always Smiling should score at most once per Reveal turn");
+  const gurneyUnderThreshold = state.scoreGurneyAlwaysSmiling(
+    {
+      ...gurneyRevealBase,
+      players: gurneyRevealBase.players.map((player) =>
+        player.id === muadDibAllyA.id ? { ...player, conflict: 9 } : player,
+      ),
+    },
+    muadDibAllyA.id,
+  );
+  assert.equal(playerById(gurneyUnderThreshold, muadDibAllyA.id).vp, 1, "Gurney should not score below 10 strength in six-player mode");
+  const gurneyInactiveTurn = state.scoreGurneyAlwaysSmiling(
+    { ...gurneyRevealBase, activeSeat: game.players.findIndex((player) => player.id === muadDib.id) },
+    muadDibAllyA.id,
+  );
+  assert.equal(playerById(gurneyInactiveTurn, muadDibAllyA.id).vp, 1, "Always Smiling should only score on Gurney's own active Reveal turn");
+  const gurneyNoUnits = state.scoreGurneyAlwaysSmiling(
+    {
+      ...gurneyRevealBase,
+      players: gurneyRevealBase.players.map((player) =>
+        player.id === muadDibAllyA.id ? { ...player, deployedTroops: 0, deployedSandworms: 0 } : player,
+      ),
+    },
+    muadDibAllyA.id,
+  );
+  assert.equal(playerById(gurneyNoUnits, muadDibAllyA.id).vp, 1, "Gurney should not score from swords alone with no Conflict units");
+  const gurneyNonSixPlayer = state.scoreGurneyAlwaysSmiling(
+    { ...gurneyRevealBase, players: gurneyRevealBase.players.slice(0, 5) },
+    muadDibAllyA.id,
+  );
+  assert.equal(
+    playerById(gurneyNonSixPlayer, muadDibAllyA.id).vp,
+    1,
+    "The automated Gurney threshold should only apply to this six-player implementation",
+  );
+  const gurneyRevealAdjustPending = {
+    kind: "reveal-adjust",
+    ownerId: muadDibAllyA.id,
+    combatRecipientId: muadDibAllyA.id,
+    cards: ["Printed strength"],
+    persuasionAdjustment: 0,
+    strengthAdjustment: 1,
+    source: "Printed reveal",
+  };
+  const gurneyBeforePrintedStrength = {
+    ...gurneyRevealBase,
+    players: gurneyRevealBase.players.map((player) =>
+      player.id === muadDibAllyA.id ? { ...player, conflict: 9 } : player,
+    ),
+  };
+  const gurneyAfterPrintedStrength = state.finishRevealAdjustment(
+    {
+      ...gurneyBeforePrintedStrength,
+      pendingAction: gurneyRevealAdjustPending,
+      pendingQueue: [],
+      players: gurneyBeforePrintedStrength.players.map((player) =>
+        player.id === muadDibAllyA.id ? { ...player, conflict: 10 } : player,
+      ),
+    },
+    gurneyRevealAdjustPending,
+  );
+  assert.equal(
+    playerById(gurneyAfterPrintedStrength, muadDibAllyA.id).vp,
+    2,
+    "Always Smiling should score after printed reveal strength adjustments make Gurney eligible",
+  );
+  const deployCrossingPending = { kind: "deploy", ownerId: muadDibAllyA.id, remaining: 1, source: "Reveal-turn Detonation" };
+  const gurneyAfterRevealDeployment = state.scoreGurneyAlwaysSmiling(
+    state.deployTroopToConflict(
+      {
+        ...gurneyRevealBase,
+        pendingAction: deployCrossingPending,
+        pendingQueue: [],
+        players: gurneyRevealBase.players.map((player) =>
+          player.id === muadDibAllyA.id
+            ? { ...player, conflict: 8, garrison: 1, deployedTroops: 4, vp: 1, gurneyAlwaysSmilingScored: false }
+            : player,
+        ),
+      },
+      deployCrossingPending,
+    ),
+    muadDibAllyA.id,
+  );
+  assert.equal(
+    playerById(gurneyAfterRevealDeployment, muadDibAllyA.id).vp,
+    2,
+    "Always Smiling should score after a Reveal-turn deployment brings Gurney to 10 strength",
+  );
+  const gurneyUnexpectedAlliesState = {
+    ...gurneyRevealBase,
+    shieldWall: false,
+    players: gurneyRevealBase.players.map((player) =>
+      player.id === muadDibAllyA.id
+        ? {
+            ...player,
+            conflict: 7,
+            deployedTroops: 4,
+            deployedSandworms: 0,
+            resources: { ...player.resources, water: 2 },
+            intrigues: [unexpectedAllies],
+            vp: 1,
+            gurneyAlwaysSmilingScored: false,
+          }
+        : { ...player, intrigues: [] },
+    ),
+  };
+  const gurneyAfterUnexpectedAllies = state.scoreGurneyAlwaysSmiling(
+    state.playUnexpectedAlliesIntrigue(gurneyUnexpectedAlliesState, muadDibAllyA.id, unexpectedAllies.id, false),
+    muadDibAllyA.id,
+  );
+  assert.equal(
+    playerById(gurneyAfterUnexpectedAllies, muadDibAllyA.id).vp,
+    2,
+    "Always Smiling should score after Reveal-turn Unexpected Allies brings Gurney to 10 strength",
+  );
+
   const shaddamSignetSource = {
     ...emperor,
     resources: { ...emperor.resources, solari: 3 },
@@ -197,8 +404,6 @@ try {
   );
   assert.equal(shaddamSignetEffect.target.id, shaddamAlly.id, "Shaddam Signet should keep the activated Ally target");
   assert.match(shaddamSignetEffect.log ?? "", /can't be deployed/, "Shaddam Signet should log the deployment block");
-  const arrakeen = data.boardSpaces.find((space) => space.id === "arrakeen");
-  assert.ok(arrakeen, "Arrakeen should exist for Shaddam Signet deployment regression");
   assert.equal(
     state.pendingActionForSpace(
       arrakeen,

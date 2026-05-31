@@ -70,6 +70,7 @@ const questionableMethodsSourceId = 156;
 const backedByChoamSourceId = 448;
 const spiceMustFlowSourceId = 538;
 const shadowAllianceSourceId = 160;
+const genericSignetRingSourceId = 531;
 const muadDibSignetRingSourceId = 545;
 const shaddamSignetRingSourceId = 554;
 const demandAttentionSourceId = 548;
@@ -90,6 +91,8 @@ const shadowAllianceFactions: FactionId[] = [
   "fringeWorlds",
 ];
 const influenceVictoryPointThreshold = 2;
+const gurneyHalleckLeaderName = "Gurney Halleck";
+const gurneyAlwaysSmilingThreshold = 10;
 export const threatenSpiceProductionCost = 7;
 export const corrinoMightCost = 3;
 
@@ -393,6 +396,7 @@ function makePlayer(
     persuasion: 0,
     highCouncilSeat: false,
     callToArmsActive: false,
+    gurneyAlwaysSmilingScored: false,
     purchaseSequence: 0,
     swordmasterBonus: false,
     contracts: [],
@@ -550,6 +554,36 @@ export function canHaveMakerHooks(player: Player) {
 export function canSummonSandworms(state: GameState, owner: Player, count: number) {
   if (!canHaveMakerHooks(owner) || !owner.makerHooks || count <= 0 || !state.conflict) return false;
   return !state.shieldWall || !conflictProtectedByShieldWall(state.conflict);
+}
+
+export function scoreGurneyAlwaysSmiling(state: GameState, playerId: string): GameState {
+  const player = state.players.find((candidate) => candidate.id === playerId);
+  if (
+    !player ||
+    state.phase !== "playing" ||
+    state.players[state.activeSeat]?.id !== player.id ||
+    state.players.length !== 6 ||
+    player.leader !== gurneyHalleckLeaderName ||
+    !player.revealed ||
+    player.gurneyAlwaysSmilingScored ||
+    !playerHasConflictUnits(player) ||
+    player.conflict < gurneyAlwaysSmilingThreshold
+  ) {
+    return state;
+  }
+
+  return {
+    ...state,
+    players: state.players.map((candidate) =>
+      candidate.id === player.id
+        ? { ...candidate, vp: candidate.vp + 1, gurneyAlwaysSmilingScored: true }
+        : candidate,
+    ),
+    log: [
+      `${player.leader} resolves Always Smiling with ${player.conflict} strength in the Conflict and gains 1 VP.`,
+      ...state.log,
+    ],
+  };
 }
 
 export function conflictDeploymentBlockedFor(
@@ -781,6 +815,13 @@ export function isShaddamSignetRingCard(card: Card) {
   return (
     card.sourceId === shaddamSignetRingSourceId ||
     (card.name === "Signet Ring" && card.id.includes("emperor-signet-ring"))
+  );
+}
+
+export function isGenericSignetRingCard(card: Card) {
+  return (
+    card.sourceId === genericSignetRingSourceId ||
+    (card.name === "Signet Ring" && card.id.includes("starter-ally-signet-ring"))
   );
 }
 
@@ -1581,6 +1622,22 @@ export function applyCardAgentEffect(
       target: targetPlayer,
       blocksDeploymentsThisTurn: true,
       log: `${sourcePlayer.leader} resolves Emperor of the Known Universe: units can't be deployed to the Conflict this turn.`,
+    };
+  }
+
+  if (
+    isGenericSignetRingCard(card) &&
+    sourcePlayer.leader === gurneyHalleckLeaderName &&
+    sourcePlayer.role === "Ally"
+  ) {
+    return {
+      source: {
+        ...sourcePlayer,
+        garrison: sourcePlayer.garrison + 1,
+      },
+      target: targetPlayer,
+      log: `${sourcePlayer.leader} resolves Warmaster: recruits 1 troop.`,
+      recruitedTroops: 1,
     };
   }
 
@@ -2919,7 +2976,7 @@ function signedAdjustment(value: number) {
 }
 
 export function finishRevealAdjustment(state: GameState, pending: RevealAdjustPendingAction): GameState {
-  return {
+  const resolvedState = {
     ...state,
     ...advancePendingAction(state),
     log: [
@@ -2927,6 +2984,7 @@ export function finishRevealAdjustment(state: GameState, pending: RevealAdjustPe
       ...state.log,
     ],
   };
+  return scoreGurneyAlwaysSmiling(resolvedState, pending.ownerId);
 }
 
 function resourceLogLabel(resource: ResourceId) {
@@ -3619,7 +3677,7 @@ export function resolveSietchTabrChoice(
     return next;
   });
   const ownerAfter = players.find((player) => player.id === owner.id) ?? owner;
-  const deployable = Math.min(ownerAfter.garrison, (takeHooks ? 1 : 0) + 2);
+  const deployable = Math.min(ownerAfter.garrison, (takeHooks ? 1 : 0) + Math.max(0, pending.extraRecruitedTroops ?? 0) + 2);
   const deployPending: PendingAction | undefined = !pending.conflictBlocked && deployable > 0
     ? { kind: "deploy", ownerId: owner.id, remaining: deployable, source: pending.source }
     : undefined;
@@ -3957,6 +4015,7 @@ export function startNextRound(state: GameState): GameState {
         highCouncilSeat: player.highCouncilSeat,
         revealActivatedAllyId: undefined,
         callToArmsActive: false,
+        gurneyAlwaysSmilingScored: false,
         conflict: 0,
         deployedTroops: 0,
         deployedSandworms: 0,

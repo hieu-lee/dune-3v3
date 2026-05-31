@@ -120,6 +120,7 @@ import {
   resolveMakerChoice,
   resolveSietchTabrChoice,
   resolveShaddamSignetRingChoice,
+  scoreGurneyAlwaysSmiling,
   resolveThreatenSpiceProductionChoice,
   skipCommandRespect,
   skipDemandAttention,
@@ -329,10 +330,13 @@ export default function App() {
       );
       const pendingActions = pendingActionsFor(spacePending, cardPending, source.spies);
       if (sietchTabrPending) {
+        const sietchAction = {
+          ...sietchTabrPending,
+          ...(cardAgentEffect.recruitedTroops ? { extraRecruitedTroops: cardAgentEffect.recruitedTroops } : {}),
+          ...(cardAgentEffect.blocksDeploymentsThisTurn ? { conflictBlocked: true } : {}),
+        };
         pendingActions.unshift(
-          cardAgentEffect.blocksDeploymentsThisTurn
-            ? { ...sietchTabrPending, conflictBlocked: true }
-            : sietchTabrPending,
+          sietchAction,
         );
       }
       if (makerChoicePending) pendingActions.unshift(makerChoicePending);
@@ -427,7 +431,7 @@ export default function App() {
           player.role === "Commander" ? targetId : player.id,
         ),
       );
-      return {
+      const revealedState: GameState = {
         ...current,
         conflictDeploymentBlock: undefined,
         players,
@@ -444,6 +448,7 @@ export default function App() {
           ...current.log,
         ],
       };
+      return scoreGurneyAlwaysSmiling(revealedState, player.id);
     });
   }
 
@@ -748,7 +753,8 @@ export default function App() {
     setGame((current) => {
       const pending = current.pendingAction;
       if (!pending || pending.kind !== "deploy") return current;
-      return maybeStartCombatPhase(deployTroopToConflict(current, pending));
+      const deployed = deployTroopToConflict(current, pending);
+      return maybeStartCombatPhase(scoreGurneyAlwaysSmiling(deployed, current.players[current.activeSeat].id));
     });
   }
 
@@ -918,7 +924,8 @@ export default function App() {
       const sandwormOwnerId = player.role === "Commander"
         ? activatedAllyIdFor(player, current.players)
         : undefined;
-      return playUnexpectedAlliesIntrigue(current, player.id, intrigueId, removeShieldWall, sandwormOwnerId);
+      const resolved = playUnexpectedAlliesIntrigue(current, player.id, intrigueId, removeShieldWall, sandwormOwnerId);
+      return scoreGurneyAlwaysSmiling(resolved, player.id);
     });
   }
 

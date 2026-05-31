@@ -118,6 +118,27 @@ try {
     { kind: "deploy", ownerId: "p3", remaining: 2, source: "Sietch Tabr" },
     "Sietch Shield branch should still allow up to two existing garrison troops to deploy",
   );
+  const extraRecruitPending = { ...commanderPending, extraRecruitedTroops: 1 };
+  const extraHooksChoice = state.resolveSietchTabrChoice(
+    { ...fringeReady, pendingAction: extraRecruitPending, pendingQueue: [] },
+    extraRecruitPending,
+    "hooks",
+  );
+  assert.deepEqual(
+    extraHooksChoice.pendingAction,
+    { kind: "deploy", ownerId: "p3", remaining: 4, source: "Sietch Tabr" },
+    "Sietch Hooks branch should count same-turn card recruits in its deployment cap",
+  );
+  const extraShieldChoice = state.resolveSietchTabrChoice(
+    { ...fringeReady, pendingAction: extraRecruitPending, pendingQueue: [] },
+    extraRecruitPending,
+    "shield-wall",
+  );
+  assert.deepEqual(
+    extraShieldChoice.pendingAction,
+    { kind: "deploy", ownerId: "p3", remaining: 3, source: "Sietch Tabr" },
+    "Sietch Shield branch should count same-turn card recruits in its deployment cap",
+  );
 
   const shaddam = playerById(fringeReady, "p4");
   const feyd = playerById(fringeReady, "p2");

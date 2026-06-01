@@ -527,9 +527,10 @@ async function interruptible(promise) {
 }
 
 async function writeRunSummary({ captures, consoleMessages, requestFailures, error, startedAt, tracePath, url }) {
-  await writeJson("console.json", consoleMessages);
-  await writeJson("request-failures.json", requestFailures);
-  await writeJson("summary.json", {
+  const captureRecords = captures.map((capture) => ({ ...capture }));
+  const consoleRecords = consoleMessages.map((message) => ({ ...message }));
+  const requestFailureRecords = requestFailures.map((failure) => ({ ...failure }));
+  const summary = {
     scenario,
     headed,
     keepOpen,
@@ -542,13 +543,17 @@ async function writeRunSummary({ captures, consoleMessages, requestFailures, err
     startedAt: new Date(startedAt).toISOString(),
     finishedAt: new Date().toISOString(),
     durationMs: Date.now() - startedAt,
-    screenshots: captures.map((capture) => capture.screenshot),
-    stateSnapshots: captures.map((capture) => capture.state).filter(Boolean),
+    screenshots: captureRecords.map((capture) => capture.screenshot),
+    stateSnapshots: captureRecords.map((capture) => capture.state).filter(Boolean),
     trace: tracePath,
-    consoleErrorCount: consoleFailures(consoleMessages).length,
-    requestFailureCount: requestFailures.length,
+    consoleErrorCount: consoleFailures(consoleRecords).length,
+    requestFailureCount: requestFailureRecords.length,
     error: error ? { message: error.message, stack: error.stack } : undefined,
-  });
+  };
+  await writeJson("console.json", consoleRecords);
+  await writeJson("request-failures.json", requestFailureRecords);
+  await writeJson("summary.json", summary);
+  return { captures: captureRecords, summary };
 }
 
 let server;
@@ -559,6 +564,8 @@ let url;
 let tracePath;
 let traceStarted = false;
 let runError;
+let writtenRunSummary;
+let writtenRunCaptures = [];
 let outDirReady = false;
 let outDirWritable = false;
 let cliValidated = false;
@@ -948,7 +955,17 @@ try {
       outDirReady = true;
     }
     if (cliValidated && outDirReady && outDirWritable) {
-      await writeRunSummary({ captures, consoleMessages, requestFailures, error: runError, startedAt, tracePath, url });
+      const writtenRun = await writeRunSummary({
+        captures,
+        consoleMessages,
+        requestFailures,
+        error: runError,
+        startedAt,
+        tracePath,
+        url,
+      });
+      writtenRunSummary = writtenRun.summary;
+      writtenRunCaptures = writtenRun.captures;
     }
   } catch (error) {
     if (!runError) runError = error;
@@ -963,7 +980,18 @@ if (runError) {
   throw runError;
 }
 console.log(`browser debug passed (${scenario})`);
-captures.forEach((capture) => console.log(`screenshot: ${capture.screenshot}`));
+const outputCaptures = writtenRunCaptures.length > 0 ? writtenRunCaptures : captures;
+const outputScreenshotCount = writtenRunSummary?.screenshots?.length ?? outputCaptures.length;
+const outputStateSnapshotCount =
+  writtenRunSummary?.stateSnapshots?.length ?? outputCaptures.filter((capture) => Boolean(capture.state)).length;
+outputCaptures.forEach((capture) => {
+  console.log(`screenshot: ${capture.screenshot}`);
+  if (capture.state) console.log(`state: ${capture.state}`);
+});
+console.log(`screenshot count: ${outputScreenshotCount}`);
+console.log(`state snapshot count: ${outputStateSnapshotCount}`);
+console.log(`console error count: ${writtenRunSummary?.consoleErrorCount ?? consoleFailures(consoleMessages).length}`);
+console.log(`request failure count: ${writtenRunSummary?.requestFailureCount ?? requestFailures.length}`);
 if (tracePath) console.log(`trace: ${tracePath}`);
 console.log(`summary: ${path.join(outDir, "summary.json")}`);
 console.log(`url: ${url}`);

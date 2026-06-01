@@ -61,6 +61,8 @@ Expected files:
 - `*.state.json`: game-state snapshot paired with the screenshot stem.
 - `*-trace.zip`: Playwright trace for scripted/headed debugging unless `--no-trace` was passed.
 
+On success, the CLI prints each screenshot path, its paired state snapshot path when present, screenshot/state counts, console error count, request failure count, the summary path, and the actual app URL.
+
 Inside the recommended `artifacts/qa/browser-debug` or `artifacts/qa/browser-debug-*` tree, the harness refuses unexpected artifact names and symlinked output paths. Reusing the same output directory can still overwrite generated files from the previous run; use a task-specific `--out` directory when you need side-by-side artifacts.
 
 Inspect a summary quickly:

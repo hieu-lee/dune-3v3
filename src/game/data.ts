@@ -25,6 +25,7 @@ import {
   hasSpyPosts,
   revealGainPersuasion,
   revealGainResource,
+  revealRetreatTroopsForStrength,
   visitedMakerSpace,
 } from "./effect-specs";
 import type {
@@ -236,7 +237,10 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
     ];
   }
   if (card.id === chaniCleverTacticianSourceId) {
-    return [agentDrawIntrigues(1, [hasConflictUnits(3)])];
+    return [
+      agentDrawIntrigues(1, [hasConflictUnits(3)]),
+      revealRetreatTroopsForStrength(2, 4),
+    ];
   }
   if (card.id === maulaPistolSourceId) {
     return [agentDrawCards(1)];

@@ -48,6 +48,24 @@ export async function runTableChoicesSmoke({
   await revealButtons.nth(4).click();
   await waitForNoPending(page);
 
+  await setDebugGameAndWait(page, states.retreatTroopsForStrength);
+  pendingText = await page.locator(".pending-panel").innerText();
+  assert.match(pendingText, /Browser debug retreat/i);
+  assert.match(pendingText, /Retreat 2: \+4/i);
+  await screenshot(page, captures, "pending-retreat-troops-strength.png");
+
+  const retreatBefore = await currentGame(page);
+  const retreatOwnerBefore = retreatBefore.players.find((player) => player.id === "p2");
+  assert.ok(retreatOwnerBefore, "Expected Feyd before troop retreat");
+  await page.locator(".pending-panel").getByRole("button", { name: /Retreat 2: \+4/i }).click();
+  await waitForNoPending(page);
+  const retreatAfter = await currentGame(page);
+  const retreatOwnerAfter = retreatAfter.players.find((player) => player.id === "p2");
+  assert.ok(retreatOwnerAfter, "Expected Feyd after troop retreat");
+  assert.equal(retreatOwnerAfter.deployedTroops, retreatOwnerBefore.deployedTroops - 2);
+  assert.equal(retreatOwnerAfter.garrison, retreatOwnerBefore.garrison + 2);
+  assert.equal(retreatOwnerAfter.conflict, retreatOwnerBefore.conflict);
+
   await setDebugGameAndWait(page, states.throneRow);
   pendingText = await page.locator(".pending-panel").innerText();
   assert.match(pendingText, /Throne Row/i);
@@ -126,6 +144,24 @@ async function createTableChoiceStates(server, initialPlayableGame) {
         persuasionAdjustment: 0,
         strengthAdjustment: 0,
         source: "Browser debug reveal",
+      },
+    },
+    retreatTroopsForStrength: {
+      ...base,
+      activeSeat: feydSeat,
+      players: base.players.map((player) =>
+        player.id === "p2"
+          ? { ...player, conflict: 4, deployedTroops: 2, garrison: 0 }
+          : { ...player, conflict: 0, deployedTroops: 0 }
+      ),
+      pendingAction: {
+        kind: "retreat-troops-for-strength",
+        ownerId: "p2",
+        combatRecipientId: "p2",
+        troopCount: 2,
+        strength: 4,
+        optional: true,
+        source: "Browser debug retreat",
       },
     },
     throneRow: {

@@ -95,10 +95,21 @@ try {
   assert.equal(chani.persuasion, 0, "Chani's Fremen Bond persuasion should not be granted automatically");
   assert.equal(chani.swords, 0, "Chani's troop-retreat strength should not be granted automatically");
   assert.equal(chani.conditionalPersuasion, true, "Chani should require manual Fremen Bond reveal handling");
-  assert.equal(chani.conditionalSwords, false, "Chani troop-retreat strength should wait for automated retreat handling");
+  assert.equal(chani.conditionalSwords, false, "Chani troop-retreat strength should use automated retreat handling");
   assert.ok(
     chani.effects?.some((spec) => spec.trigger === "agent-play"),
     "Chani should use a structured Agent Intrigue draw effect",
+  );
+  assert.ok(
+    chani.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.effects.some((effect) =>
+        effect.kind === "retreat-troops-for-strength" &&
+        effect.amount === 2 &&
+        effect.strength === 4
+      )
+    ),
+    "Chani should use a structured Reveal troop-retreat strength effect",
   );
   assert.deepEqual(chani.traits, ["Faction: Fremen"], "Chani should keep her Fremen trait");
   assert.match(chani.play, /three or more units.*draw 1 Intrigue/i);
@@ -176,13 +187,152 @@ try {
     true,
     "Chani reveal adjustment should allow Fremen Bond persuasion",
   );
+	  assert.equal(
+	    chaniRevealed.pendingAction?.kind === "reveal-adjust"
+	      ? chaniRevealed.pendingAction.allowStrengthAdjustment
+	      : undefined,
+	    false,
+	    "Chani reveal adjustment should not allow manual troop-retreat strength",
+	  );
+	  assert.equal(chaniRevealed.pendingQueue.length, 0, "Chani should not queue troop retreat without two deployed troops");
+
+  const chaniOneTroopFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 0,
+    conflict: 2,
+    deployedTroops: 1,
+    discard: [],
+    garrison: 0,
+    hand: [chani],
+    playArea: [],
+    persuasion: 0,
+    resources: { solari: 0, spice: 0, water: 0 },
+  }));
+  const chaniOneTroopPlan = turnActions.revealTurnPlan(playerById(chaniOneTroopFixture, p2.id), chaniOneTroopFixture);
+  const chaniOneTroopRevealed = turnActions.revealTurnAction(chaniOneTroopFixture, {
+    commanderTargets: {},
+    revealPlan: chaniOneTroopPlan,
+  });
+  assert.equal(chaniOneTroopRevealed.pendingQueue.length, 0, "Chani should not queue troop retreat with only one deployed troop");
+
+  const chaniRetreatFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 0,
+    conflict: 4,
+    deployedTroops: 2,
+    discard: [],
+    garrison: 0,
+    hand: [chani],
+    playArea: [],
+    persuasion: 0,
+    resources: { solari: 0, spice: 0, water: 0 },
+  }));
+  const chaniRetreatPlan = turnActions.revealTurnPlan(playerById(chaniRetreatFixture, p2.id), chaniRetreatFixture);
+  const chaniRetreatRevealed = turnActions.revealTurnAction(chaniRetreatFixture, {
+    commanderTargets: {},
+    revealPlan: chaniRetreatPlan,
+  });
+  assert.equal(chaniRetreatRevealed.pendingAction?.kind, "reveal-adjust", "Chani Fremen Bond should still resolve first");
   assert.equal(
-    chaniRevealed.pendingAction?.kind === "reveal-adjust"
-      ? chaniRevealed.pendingAction.allowStrengthAdjustment
-      : undefined,
-    false,
-    "Chani reveal adjustment should not allow troop-retreat strength without automated troop retreat",
+    chaniRetreatRevealed.pendingQueue[0]?.kind,
+    "retreat-troops-for-strength",
+    "Chani should queue automated troop-retreat strength after Fremen Bond adjustment",
   );
+  assert.equal(
+    chaniRetreatRevealed.pendingQueue[0]?.kind === "retreat-troops-for-strength"
+      ? chaniRetreatRevealed.pendingQueue[0].troopCount
+      : undefined,
+    2,
+    "Chani retreat pending action should require two troops",
+  );
+  assert.equal(
+    chaniRetreatRevealed.pendingQueue[0]?.kind === "retreat-troops-for-strength"
+      ? chaniRetreatRevealed.pendingQueue[0].strength
+      : undefined,
+    4,
+    "Chani retreat pending action should add four strength",
+  );
+  const chaniRetreatReady = state.finishRevealAdjustment(chaniRetreatRevealed, chaniRetreatRevealed.pendingAction);
+  assert.equal(
+    chaniRetreatReady.pendingAction?.kind,
+    "retreat-troops-for-strength",
+    "Finishing Fremen Bond adjustment should advance to Chani troop retreat",
+  );
+  const chaniRetreated = state.resolveRetreatTroopsForStrength(chaniRetreatReady, chaniRetreatReady.pendingAction);
+  assert.equal(playerById(chaniRetreated, p2.id).deployedTroops, 0, "Chani should retreat the two selected troops");
+  assert.equal(playerById(chaniRetreated, p2.id).garrison, 2, "Chani should return retreated troops to garrison");
+  assert.equal(playerById(chaniRetreated, p2.id).conflict, 4, "Chani should replace the troops' strength with four Reveal strength");
+  assert.equal(chaniRetreated.pendingAction, undefined, "Chani retreat should clear its pending action");
+
+  const syntheticRetreatState = {
+    ...chaniRetreatFixture,
+    pendingAction: {
+      kind: "retreat-troops-for-strength",
+      ownerId: p2.id,
+      combatRecipientId: p2.id,
+      troopCount: 1,
+      strength: 4,
+      optional: true,
+      source: "Synthetic retreat verifier",
+    },
+  };
+	  const syntheticRetreated = state.resolveRetreatTroopsForStrength(
+	    syntheticRetreatState,
+	    syntheticRetreatState.pendingAction,
+	  );
+	  assert.equal(playerById(syntheticRetreated, p2.id).deployedTroops, 1, "Synthetic retreat should remove the requested troop count");
+	  assert.equal(playerById(syntheticRetreated, p2.id).garrison, 1, "Synthetic retreat should return exactly one troop to garrison");
+	  assert.equal(playerById(syntheticRetreated, p2.id).conflict, 6, "Synthetic retreat should subtract troop strength and add printed strength");
+	  const nonOptionalSkip = state.skipRetreatTroopsForStrength(
+	    { ...syntheticRetreatState, pendingAction: { ...syntheticRetreatState.pendingAction, optional: false } },
+	    { ...syntheticRetreatState.pendingAction, optional: false },
+	  );
+	  assert.equal(
+	    nonOptionalSkip.pendingAction?.kind,
+	    "retreat-troops-for-strength",
+	    "Mandatory retreat-for-strength pending actions should not be skippable",
+	  );
+
+  const chaniCommanderRetreatFixture = withActivePlayer(game, p4.id, () => ({
+    agentsReady: 0,
+    discard: [],
+    hand: [chani],
+    playArea: [],
+    persuasion: 0,
+    resources: { solari: 0, spice: 0, water: 0 },
+  }));
+  const chaniCommanderRetreatState = {
+    ...chaniCommanderRetreatFixture,
+    players: chaniCommanderRetreatFixture.players.map((player) =>
+      player.id === p2.id
+        ? { ...player, conflict: 4, deployedTroops: 2, garrison: 0 }
+        : player,
+    ),
+  };
+  const chaniCommanderRetreatPlan = turnActions.revealTurnPlan(
+    playerById(chaniCommanderRetreatState, p4.id),
+    chaniCommanderRetreatState,
+  );
+  const chaniCommanderRevealed = turnActions.revealTurnAction(chaniCommanderRetreatState, {
+    commanderTargets: { [p4.id]: p2.id },
+    revealPlan: chaniCommanderRetreatPlan,
+  });
+  assert.equal(
+    chaniCommanderRevealed.pendingQueue[0]?.kind === "retreat-troops-for-strength"
+      ? chaniCommanderRevealed.pendingQueue[0].combatRecipientId
+      : undefined,
+    p2.id,
+    "Commander Chani reveal should route troop retreat to the activated Ally",
+  );
+  const chaniCommanderRetreatReady = state.finishRevealAdjustment(
+    chaniCommanderRevealed,
+    chaniCommanderRevealed.pendingAction,
+  );
+  const chaniCommanderRetreated = state.resolveRetreatTroopsForStrength(
+    chaniCommanderRetreatReady,
+    chaniCommanderRetreatReady.pendingAction,
+  );
+  assert.equal(playerById(chaniCommanderRetreated, p2.id).deployedTroops, 0, "Commander Chani should retreat the activated Ally's troops");
+  assert.equal(playerById(chaniCommanderRetreated, p2.id).garrison, 2, "Commander Chani should return activated Ally troops to garrison");
+  assert.equal(playerById(chaniCommanderRetreated, p2.id).conflict, 4, "Commander Chani should add strength to the activated Ally");
 
   const prepareBuyFixture = withActivePlayer(game, p2.id, () => ({
     revealed: true,

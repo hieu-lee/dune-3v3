@@ -47,6 +47,13 @@ export type DeferredAgentIntrigueDraw = {
   minConflictUnits: number;
 };
 
+export type RevealRetreatTroopsForStrength = {
+  selector: PlayerSelector;
+  troopCount: number;
+  strength: number;
+  optional: boolean;
+};
+
 type PlayerEffectResult = {
   cardsToDraw: number;
   intriguesToDraw: number;
@@ -196,6 +203,17 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
   }
   if (effect.kind === "recruit-troops") {
     validateAmount(effect.amount);
+    return;
+  }
+  if (effect.kind === "retreat-troops-for-strength") {
+    if (trigger !== "reveal") {
+      throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
+    }
+    if (effect.selector !== "self") {
+      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
+    validateAmount(effect.amount);
+    validateAmount(effect.strength);
     return;
   }
   if (effect.kind === "place-spies") {
@@ -395,6 +413,9 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
     const amount = amountFor(effect.amount, context.source);
     return addSelectedRecruitedTroops(result, effect.selector, amount);
   }
+  if (effect.kind === "retreat-troops-for-strength") {
+    return result;
+  }
   if (effect.kind === "place-spies") {
     const amount = amountFor(effect.amount, context.source);
     return addSelectedSpyPlacement(result, effect.selector, {
@@ -481,6 +502,25 @@ export function resolveDeferredAgentConflictUnitIntrigueDraws(
       amount: amountFor(effect.amount, context.source),
       minConflictUnits: condition.count,
     }));
+  });
+}
+
+export function resolveRevealRetreatTroopsForStrength(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): RevealRetreatTroopsForStrength[] {
+  specs?.forEach(validateSpec);
+  return (specs ?? []).flatMap((spec) => {
+    if (spec.trigger !== "reveal") return [];
+    if (!specApplies(spec, context)) return [];
+    return spec.effects
+      .filter((effect) => effect.kind === "retreat-troops-for-strength")
+      .map((effect) => ({
+        selector: effect.selector,
+        troopCount: amountFor(effect.amount, context.source),
+        strength: amountFor(effect.strength, context.source),
+        optional: effect.optional ?? true,
+      }));
   });
 }
 

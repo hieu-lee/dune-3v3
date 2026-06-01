@@ -23,6 +23,7 @@ import { capturedMentatRevealInfluenceChoices } from "./captured-mentat-rules";
 import { playerTroopSupply } from "./deck-utils";
 import {
   resolveCardEffects,
+  resolveRevealRetreatTroopsForStrength,
   type SpyPlacementEffectResult,
 } from "./effect-resolver";
 import {
@@ -641,6 +642,9 @@ export function pendingActionsForReveal(
   const capturedMentatRevealPending = revealedCards
     .map((card) => pendingActionForCapturedMentatReveal(card, source))
     .find((pending): pending is PendingAction => Boolean(pending));
+  const retreatTroopStrengthPendings = revealedCards.flatMap((card) =>
+    pendingActionsForRevealRetreatTroopsForStrength(card, source, state, combatRecipientId)
+  );
   const feydDeviousStrengthPending = pendingActionForFeydDeviousStrength(source, state, combatRecipientId);
   const amberDesertScoutsPending = pendingActionForLadyAmberDesertScouts(source);
 
@@ -650,6 +654,7 @@ export function pendingActionsForReveal(
     devastatingAssaultPending,
     corrinoMightPending,
     capturedMentatRevealPending,
+    ...retreatTroopStrengthPendings,
     feydDeviousStrengthPending,
     amberDesertScoutsPending,
   ].filter((action): action is PendingAction => Boolean(action));
@@ -688,4 +693,33 @@ function pendingActionForLadyAmberDesertScouts(source: Player): PendingAction | 
     ownerId: source.id,
     source: "Desert Scouts",
   };
+}
+
+function pendingActionsForRevealRetreatTroopsForStrength(
+  card: Card,
+  source: Player,
+  state: GameState,
+  combatRecipientId: string,
+): PendingAction[] {
+  const recipient = state.players.find((player) => player.id === combatRecipientId);
+  if (!recipient || !playerHasConflictUnits(recipient)) return [];
+
+  return resolveRevealRetreatTroopsForStrength(card.effects, {
+    trigger: "reveal",
+    source,
+    target: recipient,
+    state,
+  }).flatMap((effect) => {
+    if (effect.selector !== "self" || effect.troopCount <= 0 || effect.strength <= 0) return [];
+    if (recipient.deployedTroops < effect.troopCount) return [];
+    return [{
+      kind: "retreat-troops-for-strength",
+      ownerId: source.id,
+      combatRecipientId,
+      troopCount: effect.troopCount,
+      strength: effect.strength,
+      optional: effect.optional,
+      source: card.name,
+    }];
+  });
 }

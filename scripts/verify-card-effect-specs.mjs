@@ -16,6 +16,14 @@ function revealSpec(effects, conditions) {
   };
 }
 
+function agentSpec(effects, conditions) {
+  return {
+    trigger: "agent-play",
+    ...(conditions ? { conditions } : {}),
+    effects,
+  };
+}
+
 function hasRevealSpec(card) {
   return card.effects?.some((spec) => spec.trigger === "reveal") ?? false;
 }
@@ -105,7 +113,7 @@ try {
   );
   assert.ok(prepareTheWay && limitedLandsraadAccess && devastatingAssault && imperialOrnithopter);
   assert.ok(arrakeen && haggaBasin && imperialBasin && secrets && highCouncil);
-  assert.equal(revealSpecCards.length, 31, "Unexpected number of cards with declarative Reveal specs");
+  assert.equal(revealSpecCards.length, 32, "Unexpected number of cards with declarative Reveal specs");
   assert.deepEqual(
     [
       ...data.reserveMarket,
@@ -128,11 +136,12 @@ try {
     dagger,
     prepareTheWay,
     limitedLandsraadAccess,
-    imperialOrnithopter,
-    smuggler,
-    interstellarTrade,
-    beneGesseritOperative,
-  ]) {
+	    imperialOrnithopter,
+	    smuggler,
+	    interstellarTrade,
+	    beneGesseritOperative,
+	    chani,
+	  ]) {
     assert.ok(
       card.effects?.some((spec) => spec.trigger === "reveal"),
       `${card.name} should carry a declarative Reveal effect spec`,
@@ -194,8 +203,20 @@ try {
       spec.conditions?.some((condition) => condition.kind === "has-conflict-units" && condition.count === 3) &&
       spec.effects.some((effect) => effect.kind === "draw-intrigues" && effect.amount === 1)
     ),
-    "Chani should carry a conflict-unit-gated Agent Intrigue draw spec",
-  );
+	    "Chani should carry a conflict-unit-gated Agent Intrigue draw spec",
+	  );
+	  assert.ok(
+	    chani.effects?.some((spec) =>
+	      spec.trigger === "reveal" &&
+	      spec.effects.some((effect) =>
+	        effect.kind === "retreat-troops-for-strength" &&
+	        effect.amount === 2 &&
+	        effect.strength === 4 &&
+	        effect.optional === true
+	      )
+	    ),
+	    "Chani should carry a declarative Reveal troop-retreat strength spec",
+	  );
   assert.ok(
     beneGesseritOperative.effects?.some((spec) =>
       spec.trigger === "agent-play" &&
@@ -451,44 +472,124 @@ try {
     /Invalid effect amount "-1"/,
     "Spy placement effect amounts should require a non-negative integer amount",
   );
-  const revealSpyPlacementCard = {
-    ...convincingArgument,
+	  const revealSpyPlacementCard = {
+	    ...convincingArgument,
     id: "effect-spec-reveal-spy-placement-card",
     name: "Effect Spec Reveal Spy Placement",
     effects: [revealSpec([{ kind: "place-spies", selector: "self", amount: 1 }])],
   };
-  assert.throws(
-    () => turnActions.revealTurnPlan({ ...p2, hand: [revealSpyPlacementCard], highCouncilSeat: false }),
-    /Unsupported effect "place-spies" for reveal/,
-    "Spy placement specs should stay out of Reveal until a pending-action resolver supports them",
-  );
-  const invalidConflictUnitsCountCard = {
-    ...convincingArgument,
-    id: "effect-spec-invalid-conflict-units-count-card",
-    name: "Effect Spec Invalid Conflict Units Count",
-    effects: [{
-      trigger: "agent-play",
-      conditions: [{ kind: "has-conflict-units", count: -1 }],
-      effects: [{ kind: "draw-intrigues", selector: "self", amount: 1 }],
-    }],
-  };
+	  assert.throws(
+	    () => turnActions.revealTurnPlan({ ...p2, hand: [revealSpyPlacementCard], highCouncilSeat: false }),
+	    /Unsupported effect "place-spies" for reveal/,
+	    "Spy placement specs should stay out of Reveal until a pending-action resolver supports them",
+	  );
+	  const conditionalRevealRetreatCard = {
+	    ...convincingArgument,
+	    id: "effect-spec-conditional-reveal-retreat-card",
+	    name: "Effect Spec Conditional Reveal Retreat",
+	    conditionalPersuasion: false,
+	    effects: [revealSpec(
+	      [{ kind: "retreat-troops-for-strength", selector: "self", amount: 1, strength: 3 }],
+	      [{ kind: "has-conflict-units", count: 2 }],
+	    )],
+	  };
+	  const commanderRetreatFixture = withActivePlayer(game, p4.id, () => ({
+	    agentsReady: 0,
+	    conflict: 0,
+	    deployedTroops: 0,
+	    hand: [conditionalRevealRetreatCard],
+	    playArea: [],
+	  }));
+	  const commanderRetreatState = {
+	    ...commanderRetreatFixture,
+	    players: commanderRetreatFixture.players.map((player) =>
+	      player.id === p2.id
+	        ? { ...player, conflict: 4, deployedTroops: 2, garrison: 0 }
+	        : player,
+	    ),
+	  };
+	  const commanderRetreatPlan = turnActions.revealTurnPlan(playerById(commanderRetreatState, p4.id), commanderRetreatState);
+	  const commanderRetreatRevealed = turnActions.revealTurnAction(commanderRetreatState, {
+	    commanderTargets: { [p4.id]: p2.id },
+	    revealPlan: commanderRetreatPlan,
+	  });
+	  assert.equal(
+	    commanderRetreatRevealed.pendingAction?.kind,
+	    "retreat-troops-for-strength",
+	    "Conditional Reveal retreat should evaluate conflict-unit conditions against the activated Ally",
+	  );
+	  const commanderRetreatUnqualifiedState = {
+	    ...commanderRetreatFixture,
+	    players: commanderRetreatFixture.players.map((player) =>
+	      player.id === p2.id
+	        ? { ...player, conflict: 2, deployedTroops: 1, garrison: 0 }
+	        : player,
+	    ),
+	  };
+	  const commanderRetreatUnqualifiedPlan = turnActions.revealTurnPlan(
+	    playerById(commanderRetreatUnqualifiedState, p4.id),
+	    commanderRetreatUnqualifiedState,
+	  );
+	  const commanderRetreatUnqualified = turnActions.revealTurnAction(commanderRetreatUnqualifiedState, {
+	    commanderTargets: { [p4.id]: p2.id },
+	    revealPlan: commanderRetreatUnqualifiedPlan,
+	  });
+	  assert.equal(
+	    commanderRetreatUnqualified.pendingAction,
+	    undefined,
+	    "Conditional Reveal retreat should not use the Commander as the conflict-unit condition owner",
+	  );
+	  const invalidConflictUnitsCountCard = {
+	    ...convincingArgument,
+	    id: "effect-spec-invalid-conflict-units-count-card",
+	    name: "Effect Spec Invalid Conflict Units Count",
+	    effects: [agentSpec(
+	      [{ kind: "draw-intrigues", selector: "self", amount: 1 }],
+	      [{ kind: "has-conflict-units", count: -1 }],
+	    )],
+	  };
   assert.throws(
     () => state.applyCardAgentEffect(invalidConflictUnitsCountCard, p2, p2),
     /Invalid has-conflict-units count "-1"/,
     "Conflict-unit conditions should require a non-negative integer threshold",
   );
-  const revealIntrigueDrawCard = {
-    ...convincingArgument,
-    id: "effect-spec-reveal-intrigue-draw-card",
+	  const revealIntrigueDrawCard = {
+	    ...convincingArgument,
+	    id: "effect-spec-reveal-intrigue-draw-card",
     name: "Effect Spec Reveal Intrigue Draw",
     effects: [revealSpec([{ kind: "draw-intrigues", selector: "self", amount: 1 }])],
   };
   assert.throws(
     () => turnActions.revealTurnPlan({ ...p2, hand: [revealIntrigueDrawCard], highCouncilSeat: false }),
-    /Unsupported effect "draw-intrigues" for reveal/,
-    "Intrigue draw specs should stay out of Reveal until a reveal-time state resolver supports them",
-  );
-  const unsupportedEffectCard = {
+	    /Unsupported effect "draw-intrigues" for reveal/,
+	    "Intrigue draw specs should stay out of Reveal until a reveal-time state resolver supports them",
+	  );
+	  const agentRetreatStrengthCard = {
+	    ...convincingArgument,
+	    id: "effect-spec-agent-retreat-strength-card",
+	    name: "Effect Spec Agent Retreat Strength",
+	    effects: [{
+	      trigger: "agent-play",
+	      effects: [{ kind: "retreat-troops-for-strength", selector: "self", amount: 2, strength: 4 }],
+	    }],
+	  };
+	  assert.throws(
+	    () => state.applyCardAgentEffect(agentRetreatStrengthCard, p2, p2),
+	    /Unsupported effect "retreat-troops-for-strength" for agent-play/,
+	    "Retreat-for-strength specs should stay in Reveal until other trigger resolvers support them",
+	  );
+	  const invalidRetreatStrengthCard = {
+	    ...convincingArgument,
+	    id: "effect-spec-invalid-retreat-strength-card",
+	    name: "Effect Spec Invalid Retreat Strength",
+	    effects: [revealSpec([{ kind: "retreat-troops-for-strength", selector: "self", amount: 2, strength: -4 }])],
+	  };
+	  assert.throws(
+	    () => turnActions.revealTurnPlan({ ...p2, hand: [invalidRetreatStrengthCard], highCouncilSeat: false }),
+	    /Invalid effect amount "-4"/,
+	    "Retreat-for-strength specs should require non-negative strength",
+	  );
+	  const unsupportedEffectCard = {
     ...convincingArgument,
     id: "effect-spec-unsupported-effect-card",
     name: "Effect Spec Unsupported Effect",

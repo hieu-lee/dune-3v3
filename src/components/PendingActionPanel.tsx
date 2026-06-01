@@ -3,6 +3,7 @@ import { criticalLocationNames } from "../game/critical-locations";
 import { boardSpaces, factionLabels, iconLabels, teams } from "../game/data";
 import {
   acquirableCardsForPending,
+  canResolveRetreatTroopsForStrength,
   canMoveCardToThroneRow,
   canPayConflictVpConversion,
   conflictVpConversionSpyChoices,
@@ -53,7 +54,12 @@ import {
   PendingThreatenSpiceProductionPanel,
 } from "./PendingLeaderChoicePanels";
 import { PendingMakerChoicePanel } from "./PendingMakerChoicePanel";
-import { PendingControlDefensePanel, PendingDeployPanel, PendingReinforcePanel } from "./PendingMilitaryPanels";
+import {
+  PendingControlDefensePanel,
+  PendingDeployPanel,
+  PendingReinforcePanel,
+  PendingRetreatTroopsForStrengthPanel,
+} from "./PendingMilitaryPanels";
 import { PendingRecallSpyPanel } from "./PendingRecallSpyPanel";
 import { PendingResourceSplitPanel } from "./PendingResourceSplitPanel";
 import { PendingShaddamSignetPanel } from "./PendingShaddamSignetPanel";
@@ -88,6 +94,7 @@ type PendingActionPanelProps = {
   chooseJessicaWaterOfLife: (choice: JessicaWaterOfLifeChoice) => void;
   chooseLadyAmberDesertScouts: (choice: LadyAmberDesertScoutsChoice) => void;
   chooseMakerReward: (choice: "spice" | "sandworms") => void;
+  chooseRetreatTroopsForStrength: () => void;
   chooseShaddamSignet: (choice: ShaddamSignetRingChoice) => void;
   chooseSietchTabr: (choice: "hooks" | "shield-wall") => void;
   chooseStabanUnseenNetwork: (choice: StabanUnseenNetworkChoice) => void;
@@ -119,6 +126,7 @@ type PendingActionPanelProps = {
   skipInfluenceLoss: () => void;
   skipOptionalSpacePaymentChoice: () => void;
   skipRecall: () => void;
+  skipRetreatTroopsForStrengthChoice: () => void;
   skipThreatenSpiceProductionChoice: () => void;
   skipTrash: () => void;
   takeContract: (contractId: string) => void;
@@ -152,6 +160,7 @@ export function PendingActionPanel({
   chooseJessicaWaterOfLife,
   chooseLadyAmberDesertScouts,
   chooseMakerReward,
+  chooseRetreatTroopsForStrength,
   chooseShaddamSignet,
   chooseSietchTabr,
   chooseStabanUnseenNetwork,
@@ -183,6 +192,7 @@ export function PendingActionPanel({
   skipInfluenceLoss,
   skipOptionalSpacePaymentChoice,
   skipRecall,
+  skipRetreatTroopsForStrengthChoice,
   skipThreatenSpiceProductionChoice,
   skipTrash,
   takeContract,
@@ -417,6 +427,18 @@ export function PendingActionPanel({
     pendingAction.kind === "reveal-adjust"
       ? game.players.find((player) => player.id === pendingAction.combatRecipientId)
       : undefined;
+  const pendingRetreatStrengthOwner =
+    pendingAction.kind === "retreat-troops-for-strength"
+      ? game.players.find((player) => player.id === pendingAction.ownerId)
+      : undefined;
+  const pendingRetreatStrengthRecipient =
+    pendingAction.kind === "retreat-troops-for-strength"
+      ? game.players.find((player) => player.id === pendingAction.combatRecipientId)
+      : undefined;
+  const pendingRetreatStrengthCanResolve =
+    pendingAction.kind === "retreat-troops-for-strength"
+      ? canResolveRetreatTroopsForStrength(game, pendingAction)
+      : false;
   const tradePartners =
     pendingActor && pendingAction.kind === "trade"
       ? game.players.filter((player) =>
@@ -450,6 +472,7 @@ export function PendingActionPanel({
           {pendingAction.kind === "trade" && `Trade from ${pendingAction.source}`}
           {pendingAction.kind === "spy" && `${pendingAction.source}${pendingAction.placementIcon ? ` ${iconLabels[pendingAction.placementIcon]}` : ""} spy placement - ${pendingAction.remaining}`}
           {pendingAction.kind === "reveal-adjust" && "Printed reveal adjustment"}
+          {pendingAction.kind === "retreat-troops-for-strength" && `${pendingRetreatStrengthOwner?.leader ?? "Player"} ${pendingAction.source}`}
           {pendingAction.kind === "contract" && `${pendingContractOwner?.leader ?? "Player"} CHOAM contract`}
           {pendingAction.kind === "acquire-card" && `${pendingAcquireOwner?.leader ?? "Player"} acquisition`}
           {pendingAction.kind === "captured-mentat" && `${pendingCapturedMentatOwner?.leader ?? "Player"} Captured Mentat`}
@@ -555,6 +578,17 @@ export function PendingActionPanel({
           recipient={revealAdjustRecipient}
           onAdjust={adjustRevealReward}
           onDone={finishRevealAdjust}
+        />
+      )}
+
+      {pendingAction.kind === "retreat-troops-for-strength" && (
+        <PendingRetreatTroopsForStrengthPanel
+          canResolve={pendingRetreatStrengthCanResolve}
+          owner={pendingRetreatStrengthOwner}
+          pending={pendingAction}
+          recipient={pendingRetreatStrengthRecipient}
+          onRetreat={chooseRetreatTroopsForStrength}
+          onSkip={skipRetreatTroopsForStrengthChoice}
         />
       )}
 

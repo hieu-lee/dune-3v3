@@ -38,6 +38,7 @@ import {
   resolveLadyAmberDesertScoutsChoice,
   resolveMakerChoice,
   resolveOptionalSpacePayment,
+  resolveRetreatTroopsForStrength,
   resolveShaddamSignetRingChoice,
   resolveSietchTabrChoice,
   resolveStabanUnseenNetworkChoice,
@@ -56,6 +57,7 @@ import {
   skipLoseInfluence,
   skipOptionalSpacePayment,
   skipRecallSpy,
+  skipRetreatTroopsForStrength,
   skipThreatenSpiceProduction,
   skipTrashCard,
   startNextRound,
@@ -154,6 +156,14 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
 
   const finishRevealAdjust = () =>
     runPending("reveal-adjust", (current, pending) => resolveRevealAdjustment(current, pending));
+  const chooseRetreatTroopsForStrength = () =>
+    runPending("retreat-troops-for-strength", (current, pending) =>
+      maybeStartCombatPhase(resolveRetreatTroopsForStrength(current, pending))
+    );
+  const skipRetreatTroopsForStrengthChoice = () =>
+    runPending("retreat-troops-for-strength", (current, pending) =>
+      maybeStartCombatPhase(skipRetreatTroopsForStrength(current, pending))
+    );
   const chooseMakerReward = (choice: "spice" | "sandworms") =>
     runPending("maker-choice", (current, pending) =>
       choice === "sandworms" && !pending.canSummonSandworms
@@ -287,6 +297,7 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     chooseJessicaWaterOfLife,
     chooseLadyAmberDesertScouts,
     chooseMakerReward,
+    chooseRetreatTroopsForStrength,
     chooseShaddamSignet,
     chooseSietchTabr,
     chooseStabanUnseenNetwork,
@@ -318,6 +329,7 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     skipInfluenceLoss,
     skipOptionalSpacePaymentChoice,
     skipRecall,
+    skipRetreatTroopsForStrengthChoice,
     skipThreatenSpiceProductionChoice,
     skipTrash,
     takeContract,

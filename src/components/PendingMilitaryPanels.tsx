@@ -1,10 +1,11 @@
-import { Swords } from "lucide-react";
+import { RotateCcw, Swords } from "lucide-react";
 import type { PendingAction, Player } from "../game/types";
 
 type DeployPendingAction = Extract<PendingAction, { kind: "deploy" }>;
 type ControlDefensePendingAction = Extract<PendingAction, { kind: "control-defense" }>;
 type ReinforceDestination = "garrison" | "conflict";
 type ReinforcePendingAction = Extract<PendingAction, { kind: "reinforce" }>;
+type RetreatTroopsForStrengthPendingAction = Extract<PendingAction, { kind: "retreat-troops-for-strength" }>;
 
 type PendingDeployPanelProps = {
   owner?: Player;
@@ -97,6 +98,43 @@ export function PendingReinforcePanel({
         </div>
       ))}
       {pending.conflictBlocked && <span>Conflict deployment is blocked this turn.</span>}
+    </div>
+  );
+}
+
+type PendingRetreatTroopsForStrengthPanelProps = {
+  canResolve: boolean;
+  owner?: Player;
+  pending: RetreatTroopsForStrengthPendingAction;
+  recipient?: Player;
+  onRetreat: () => void;
+  onSkip: () => void;
+};
+
+export function PendingRetreatTroopsForStrengthPanel({
+  canResolve,
+  owner,
+  pending,
+  recipient,
+  onRetreat,
+  onSkip,
+}: PendingRetreatTroopsForStrengthPanelProps) {
+  return (
+    <div className="pending-controls">
+      {owner && recipient ? (
+        <>
+          <span>
+            {recipient.leader}: {recipient.deployedTroops} deployed
+          </span>
+          <button type="button" onClick={onRetreat} disabled={!canResolve}>
+            <RotateCcw size={15} />
+            Retreat {pending.troopCount}: +{pending.strength}
+          </button>
+        </>
+      ) : (
+        <span>{pending.source} can no longer resolve with the current table state.</span>
+      )}
+      <button type="button" onClick={onSkip}>Skip</button>
     </div>
   );
 }

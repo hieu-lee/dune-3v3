@@ -44,6 +44,22 @@ export function revealGainStrength(amount: EffectAmountSpec, conditions?: GameEf
   return revealEffects([{ kind: "gain-strength", selector: "self", amount }], conditions);
 }
 
+export function revealRetreatTroopsForStrength(
+  troops: EffectAmountSpec,
+  strength: EffectAmountSpec,
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return revealEffects([
+    {
+      kind: "retreat-troops-for-strength",
+      selector: "self",
+      amount: troops,
+      strength,
+      optional: true,
+    },
+  ], conditions);
+}
+
 export function agentDrawCards(amount: EffectAmountSpec, conditions?: GameEffectConditionSpec[]): CardEffectSpec {
   return agentPlayEffects([{ kind: "draw-cards", selector: "self", amount }], conditions);
 }
@@ -112,6 +128,9 @@ export function cloneCardEffects(effects: CardEffectSpec[] | undefined): CardEff
     effects: spec.effects.map((effect) => ({
       ...effect,
       amount: typeof effect.amount === "number" ? effect.amount : { ...effect.amount },
+      ...("strength" in effect
+        ? { strength: typeof effect.strength === "number" ? effect.strength : { ...effect.strength } }
+        : {}),
     })),
   }));
 }

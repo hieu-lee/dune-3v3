@@ -10,7 +10,7 @@ These cards currently use typed reveal effect specs:
 - Muad'Dib Commander reveal cards: Command Respect, Convincing Argument, Demand Attention, Desert Call, Limited Landsraad Access, Signet Ring, Threaten Spice Production, Usul.
 - Emperor Commander reveal cards: Convincing Argument, Corrino Might, Critical Shipments, Demand Results, Devastating Assault, Imperial Ornithopter, Imperial Tent, Signet Ring.
 - Reserve cards: Prepare The Way.
-- Imperium cards: Smuggler's Harvester, Interstellar Trade, Bene Gesserit Operative.
+- Imperium cards: Smuggler's Harvester, Interstellar Trade, Bene Gesserit Operative, Chani, Clever Tactician.
 
 These cards currently use typed Agent effect specs:
 
@@ -36,20 +36,20 @@ These cards are automated but still rely on explicit card or leader branches whi
 ## Manual / Printed Fallback
 
 - `reveal-adjust` remains available for cards with `conditionalPersuasion` or `conditionalSwords`.
-- Chani, Clever Tactician uses a structured Agent Intrigue draw and manual Fremen Bond persuasion; her troop-retreat Reveal strength is not automated yet.
+- Chani, Clever Tactician uses structured Agent Intrigue draw and Reveal troop-retreat strength specs; Fremen Bond persuasion remains manual.
 - Imported Imperium Agent text that is only summarized in `play` remains manual until migrated into Agent effect specs.
 
 ## Missing Primitives
 
 The largest current gaps are Agent and choice primitives:
 
-- Costs: pay resources, discard card, trash card, lose Influence, recall spy, retreat troops.
+- Costs: pay resources, discard card, trash card, lose Influence, recall spy.
 - Conditions: alliance, role/team, combat participation beyond current conflict-unit count checks.
 - Selectors: activated Ally outside routed troop recruitment, teammate, faction, board space, market card, reserve card, contract, hand/discard/play-area card.
-- Effects: deploy/retreat troops, gain/lose Influence, recall spy, acquire card, take/complete contract, trash/discard card, gain VP, remove Shield Wall, summon sandworm.
+- Effects: deploy troops, variable retreat troops, gain/lose Influence, recall spy, acquire card, take/complete contract, trash/discard card, gain VP, remove Shield Wall, summon sandworm.
 - Choices: optional effect, pay-or-skip, choose one, choose N, split Commander/Ally rewards.
 
 ## Verification
 
-- `pnpm run verify:card-effect-specs` verifies reveal specs, Agent card draw/resource/recruit/spy-placement/Intrigue draw specs, legacy fallback, no double-counting, conditional Maker/contract/spy/influence/conflict-unit behavior, shared spy posts, and manual reveal fallback.
+- `pnpm run verify:card-effect-specs` verifies reveal specs, Agent card draw/resource/recruit/spy-placement/Intrigue draw specs, Reveal troop-retreat strength specs, legacy fallback, no double-counting, conditional Maker/contract/spy/influence/conflict-unit behavior, shared spy posts, and manual reveal fallback.
 - `pnpm run verify` includes the effect-spec verifier through `package.json`.

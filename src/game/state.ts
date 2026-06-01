@@ -65,6 +65,10 @@ import {
   transferTradeGood,
   updateTradeSelection,
 } from "./trade-rules";
+import {
+  resolveRetreatTroopsForStrength as resolveRetreatTroopsForStrengthForPending,
+  skipRetreatTroopsForStrength as resolveSkipRetreatTroopsForStrength,
+} from "./troop-retreat-rules";
 import { skipTrashCard as resolveSkipTrashCard, trashPlayerCard as resolveTrashPlayerCard } from "./trash-rules";
 import {
   resolveBoardInfluenceChoice as resolveBoardInfluenceChoiceForPending,
@@ -397,6 +401,10 @@ export {
 } from "./trade-rules";
 
 export {
+  canResolveRetreatTroopsForStrength,
+} from "./troop-retreat-rules";
+
+export {
   adjustThreatenSpiceProductionContribution,
   resolveThreatenSpiceProductionChoice,
   skipThreatenSpiceProduction,
@@ -509,6 +517,7 @@ type SietchTabrPendingAction = Extract<PendingAction, { kind: "sietch-tabr" }>;
 type SpyPendingAction = Extract<PendingAction, { kind: "spy" }>;
 type StabanUnseenNetworkPendingAction = Extract<PendingAction, { kind: "staban-unseen-network" }>;
 type RevealAdjustPendingAction = Extract<PendingAction, { kind: "reveal-adjust" }>;
+type RetreatTroopsForStrengthPendingAction = Extract<PendingAction, { kind: "retreat-troops-for-strength" }>;
 type CommanderResourceSplitPendingAction = Extract<PendingAction, { kind: "commander-resource-split" }>;
 type TrashCardPendingAction = Extract<PendingAction, { kind: "trash-card" }>;
 type CapturedMentatPendingAction = Extract<PendingAction, { kind: "captured-mentat" }>;
@@ -695,6 +704,20 @@ export function finishRevealAdjustment(state: GameState, pending: RevealAdjustPe
     ],
   };
   return scoreGurneyAlwaysSmiling(resolvedState, pending.ownerId);
+}
+
+export function resolveRetreatTroopsForStrength(
+  state: GameState,
+  pending: RetreatTroopsForStrengthPendingAction,
+): GameState {
+  return continueAfterResolvedConflictReward(resolveRetreatTroopsForStrengthForPending(state, pending));
+}
+
+export function skipRetreatTroopsForStrength(
+  state: GameState,
+  pending: RetreatTroopsForStrengthPendingAction,
+): GameState {
+  return continueAfterResolvedConflictReward(resolveSkipRetreatTroopsForStrength(state, pending));
 }
 
 function resourceLogLabel(resource: ResourceId) {

@@ -54,6 +54,13 @@ export type GameEffectSpec =
   | { kind: "draw-intrigues"; selector: PlayerSelector; amount: EffectAmountSpec }
   | { kind: "recruit-troops"; selector: PlayerSelector; amount: EffectAmountSpec }
   | {
+      kind: "retreat-troops-for-strength";
+      selector: PlayerSelector;
+      amount: EffectAmountSpec;
+      strength: EffectAmountSpec;
+      optional?: boolean;
+    }
+  | {
       kind: "place-spies";
       selector: PlayerSelector;
       amount: EffectAmountSpec;
@@ -350,6 +357,15 @@ export type PendingAction =
       allowPersuasionAdjustment?: boolean;
       allowStrengthAdjustment?: boolean;
       source: string;
+    }
+  | {
+      kind: "retreat-troops-for-strength";
+      ownerId: string;
+      combatRecipientId: string;
+      troopCount: number;
+      strength: number;
+      source: string;
+      optional: boolean;
     }
   | {
       kind: "contract";

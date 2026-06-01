@@ -106,7 +106,7 @@ try {
       ...data.reserveMarket,
       ...data.imperiumDeck,
     ].filter(hasAgentPlaySpec).map((card) => card.name).sort(),
-    ["Cargo Runner", "Maker Keeper", "Maula Pistol", "Northern Watermaster", "Paracompass", "Prepare The Way"],
+    ["Bene Gesserit Operative", "Cargo Runner", "Maker Keeper", "Maula Pistol", "Northern Watermaster", "Paracompass", "Prepare The Way"],
     "Unexpected cards with declarative Agent-play specs",
   );
   for (const card of [
@@ -173,6 +173,19 @@ try {
       spec.effects.some((effect) => effect.kind === "draw-cards" && effect.amount === 1)
     ),
     "Maula Pistol should carry an unconditional Agent draw spec",
+  );
+  assert.ok(
+    beneGesseritOperative.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.effects.some((effect) =>
+        effect.kind === "place-spies" &&
+        effect.selector === "self" &&
+        effect.amount === 1 &&
+        effect.recallForSupply === true &&
+        effect.mustPlace === true
+      )
+    ),
+    "Bene Gesserit Operative should carry a mandatory Agent spy-placement spec",
   );
   assert.ok(
     northernWatermaster.effects?.some((spec) =>
@@ -401,6 +414,31 @@ try {
     () => turnActions.revealTurnPlan({ ...p2, hand: [invalidCompletedContractsCountCard], highCouncilSeat: false }),
     /Invalid has-completed-contracts count "-1"/,
     "Completed-contract conditions should require a non-negative integer threshold",
+  );
+  const invalidSpyPlacementAmountCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-spy-placement-amount-card",
+    name: "Effect Spec Invalid Spy Placement Amount",
+    effects: [{
+      trigger: "agent-play",
+      effects: [{ kind: "place-spies", selector: "self", amount: -1 }],
+    }],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [invalidSpyPlacementAmountCard], highCouncilSeat: false }),
+    /Invalid effect amount "-1"/,
+    "Spy placement effect amounts should require a non-negative integer amount",
+  );
+  const revealSpyPlacementCard = {
+    ...convincingArgument,
+    id: "effect-spec-reveal-spy-placement-card",
+    name: "Effect Spec Reveal Spy Placement",
+    effects: [revealSpec([{ kind: "place-spies", selector: "self", amount: 1 }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [revealSpyPlacementCard], highCouncilSeat: false }),
+    /Unsupported effect "place-spies" for reveal/,
+    "Spy placement specs should stay out of Reveal until a pending-action resolver supports them",
   );
   const unsupportedEffectCard = {
     ...convincingArgument,

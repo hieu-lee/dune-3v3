@@ -50,7 +50,16 @@ export type GameEffectSpec =
   | { kind: "gain-persuasion"; selector: PlayerSelector; amount: EffectAmountSpec }
   | { kind: "gain-strength"; selector: PlayerSelector; amount: EffectAmountSpec }
   | { kind: "draw-cards"; selector: PlayerSelector; amount: EffectAmountSpec }
-  | { kind: "recruit-troops"; selector: PlayerSelector; amount: EffectAmountSpec };
+  | { kind: "recruit-troops"; selector: PlayerSelector; amount: EffectAmountSpec }
+  | {
+      kind: "place-spies";
+      selector: PlayerSelector;
+      amount: EffectAmountSpec;
+      recallForSupply?: boolean;
+      mustPlace?: boolean;
+      placementIcon?: IconId;
+      allowSharedPost?: boolean;
+    };
 export type CardEffectSpec = {
   trigger: GameEffectTrigger;
   conditions?: GameEffectConditionSpec[];

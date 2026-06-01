@@ -82,6 +82,10 @@ try {
   assert.equal(beneGesseritOperative.persuasion, 1, "Bene Gesserit Operative should reveal for 1 base persuasion");
   assert.equal(beneGesseritOperative.conditionalPersuasion, false, "Bene Gesserit Operative should use structured spy-count reveal handling");
   assert.deepEqual(beneGesseritOperative.traits, ["Faction: Bene Gesserit"], "Bene Gesserit Operative should normalize its Bene Gesserit trait");
+  assert.ok(
+    beneGesseritOperative.effects?.some((spec) => spec.trigger === "agent-play"),
+    "Bene Gesserit Operative should use a structured Agent spy-placement effect",
+  );
   assert.match(beneGesseritOperative.play, /place 1 spy/i);
   assert.match(beneGesseritOperative.reveal, /two or more spies.*\+2 persuasion/i);
   const prepareTheWay = data.reserveMarket.find((card) => card.sourceId === 537);
@@ -103,7 +107,7 @@ try {
   assert.deepEqual(prepareTheWay.traits, ["Faction: Bene Gesserit"], "Prepare The Way should keep its Bene Gesserit trait");
   assert.match(prepareTheWay.play, /2 or more Bene Gesserit Influence.*draw 1 card/i);
   assert.match(prepareTheWay.reveal, /\+2 persuasion/i);
-  for (const name of ["Cargo Runner", "Maker Keeper", "Maula Pistol", "Northern Watermaster", "Paracompass"]) {
+  for (const name of ["Bene Gesserit Operative", "Cargo Runner", "Maker Keeper", "Maula Pistol", "Northern Watermaster", "Paracompass"]) {
     const card = data.imperiumDeck.find((candidate) => candidate.name === name);
     assert.ok(card?.effects?.some((spec) => spec.trigger === "agent-play"), `${name} should use a structured Agent effect`);
   }

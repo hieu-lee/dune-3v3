@@ -1,7 +1,6 @@
 import { resolveInfluence } from "./agent-effects";
 import {
   canMoveCardToThroneRow,
-  isBeneGesseritOperativeCard,
   isCapturedMentatCard,
   isCommandRespectCommanderCard,
   isCalculusOfPowerCard,
@@ -22,6 +21,10 @@ import {
 } from "./conflict-rules";
 import { capturedMentatRevealInfluenceChoices } from "./captured-mentat-rules";
 import { playerTroopSupply } from "./deck-utils";
+import {
+  resolveCardEffects,
+  type SpyPlacementEffectResult,
+} from "./effect-resolver";
 import {
   feydRauthaLeaderName,
   ladyAmberMetulliLeaderName,
@@ -131,6 +134,77 @@ function commanderResourceSplitPendingAction(
   };
 }
 
+function sameSpyPlacementDetails(first: SpyPlacementEffectResult, second: SpyPlacementEffectResult) {
+  return first.recallForSupply === second.recallForSupply &&
+    first.mustPlace === second.mustPlace &&
+    first.placementIcon === second.placementIcon &&
+    first.allowSharedPost === second.allowSharedPost;
+}
+
+function mergedSpyPlacement(card: Card, placements: SpyPlacementEffectResult[]) {
+  if (placements.length === 0) return undefined;
+  const [first, ...rest] = placements;
+  if (rest.some((placement) => !sameSpyPlacementDetails(first, placement))) {
+    throw new Error(`Unsupported mixed spy placement specs for ${card.name}`);
+  }
+  return {
+    ...first,
+    count: placements.reduce((sum, placement) => sum + placement.count, 0),
+  };
+}
+
+function spyPendingForPlacement(
+  card: Card,
+  owner: Player,
+  placement: SpyPlacementEffectResult,
+  state?: GameState,
+): PendingAction | undefined {
+  if (placement.count <= 0) return undefined;
+  const pending: Extract<PendingAction, { kind: "spy" }> = {
+    kind: "spy",
+    ownerId: owner.id,
+    remaining: placement.count,
+    ...(placement.recallForSupply ? { recallForSupply: true } : {}),
+    ...(placement.mustPlace ? { mustPlaceSpy: true } : {}),
+    ...(placement.placementIcon ? { placementIcon: placement.placementIcon } : {}),
+    ...(placement.allowSharedPost ? { allowSharedPost: true } : {}),
+    source: card.name,
+  };
+  const canPlace = state
+    ? placeableSpySpaces(state, pending).length > 0 || recallableSpySupplySpaces(state, pending).length > 0
+    : owner.spies > 0;
+  return canPlace ? pending : undefined;
+}
+
+function pendingActionForAgentSpyPlacement(
+  card: Card,
+  source: Player,
+  state?: GameState,
+  target?: Player,
+): PendingAction | undefined {
+  if (!card.effects || !source.playArea.some((candidate) => candidate.id === card.id)) return undefined;
+  const players = state ? playersWithPendingCardEffect(state, source, target) : undefined;
+  const effectState = state && players ? { ...state, players } : undefined;
+  const result = resolveCardEffects([card], {
+    trigger: "agent-play",
+    source,
+    target,
+    state: effectState,
+  });
+  const sourcePlacement = mergedSpyPlacement(card, result.spyPlacements);
+  const allyPlacement = mergedSpyPlacement(card, result.activatedAlly.spyPlacements);
+  if (sourcePlacement && allyPlacement) {
+    throw new Error(`Unsupported mixed spy placement owners for ${card.name}`);
+  }
+  if (sourcePlacement) {
+    return spyPendingForPlacement(card, source, sourcePlacement, effectState);
+  }
+  if (allyPlacement && target) {
+    return spyPendingForPlacement(card, target, allyPlacement, effectState);
+  }
+  return undefined;
+}
+
 export function pendingActionForCard(
   card: Card,
   source: Player,
@@ -138,6 +212,8 @@ export function pendingActionForCard(
   target?: Player,
   space?: BoardSpace,
 ): PendingAction | undefined {
+  const agentSpyPlacementPending = pendingActionForAgentSpyPlacement(card, source, state, target);
+  if (agentSpyPlacementPending) return agentSpyPlacementPending;
   if (
     (card.sourceId === 561 || card.name === "Imperial Tent") &&
     source.team === "shaddam" &&
@@ -157,23 +233,6 @@ export function pendingActionForCard(
       ...(source.role === "Commander" && target ? { influenceOwnerId: target.id } : {}),
       source: card.name,
     };
-  }
-  if (
-    isBeneGesseritOperativeCard(card) &&
-    source.playArea.some((candidate) => candidate.id === card.id && isBeneGesseritOperativeCard(candidate))
-  ) {
-    const pending: PendingAction = {
-      kind: "spy",
-      ownerId: source.id,
-      remaining: 1,
-      recallForSupply: true,
-      mustPlaceSpy: true,
-      source: card.name,
-    };
-    const canPlace = state
-      ? placeableSpySpaces(state, pending).length > 0 || recallableSpySupplySpaces(state, pending).length > 0
-      : source.spies > 0;
-    return canPlace ? pending : undefined;
   }
   if (isUsulCommanderCard(card)) {
     return commanderResourceSplitPendingAction(card, source, target, "muaddib", [

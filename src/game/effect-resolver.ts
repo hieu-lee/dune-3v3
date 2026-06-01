@@ -14,11 +14,20 @@ import type {
   GameEffectSpec,
   GameEffectTrigger,
   GameState,
+  IconId,
   Player,
   PlayerSelector,
   ResourceId,
   Resources,
 } from "./types";
+
+export type SpyPlacementEffectResult = {
+  count: number;
+  recallForSupply?: boolean;
+  mustPlace?: boolean;
+  placementIcon?: IconId;
+  allowSharedPost?: boolean;
+};
 
 export type EffectResolverState = Partial<
   Pick<GameState, "players" | "roundMakerSpaceVisits" | "sharedSpyPosts" | "spyPosts">
@@ -35,6 +44,7 @@ type PlayerEffectResult = {
   cardsToDraw: number;
   recruitedTroops: number;
   revealGain: Partial<Resources>;
+  spyPlacements: SpyPlacementEffectResult[];
 };
 
 export type GameEffectResult = PlayerEffectResult & {
@@ -47,6 +57,7 @@ const emptyPlayerEffectResult: PlayerEffectResult = {
   cardsToDraw: 0,
   recruitedTroops: 0,
   revealGain: {},
+  spyPlacements: [],
 };
 
 const emptyEffectResult: GameEffectResult = {
@@ -54,6 +65,7 @@ const emptyEffectResult: GameEffectResult = {
   recruitedTroops: 0,
   persuasion: 0,
   revealGain: {},
+  spyPlacements: [],
   swords: 0,
   activatedAlly: emptyPlayerEffectResult,
 };
@@ -165,6 +177,13 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     validateAmount(effect.amount);
     return;
   }
+  if (effect.kind === "place-spies") {
+    if (trigger !== "agent-play") {
+      throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
+    }
+    validateAmount(effect.amount);
+    return;
+  }
   unsupportedKind("effect", effect);
 }
 
@@ -272,6 +291,27 @@ function addSelectedRecruitedTroops(result: GameEffectResult, selector: PlayerSe
   return unsupportedKind("effect selector", selector);
 }
 
+function addSelectedSpyPlacement(
+  result: GameEffectResult,
+  selector: PlayerSelector,
+  placement: SpyPlacementEffectResult,
+) {
+  if (placement.count === 0) return result;
+  if (selector === "self") {
+    return { ...result, spyPlacements: [...result.spyPlacements, placement] };
+  }
+  if (selector === "activated-ally") {
+    return {
+      ...result,
+      activatedAlly: {
+        ...result.activatedAlly,
+        spyPlacements: [...result.activatedAlly.spyPlacements, placement],
+      },
+    };
+  }
+  return unsupportedKind("effect selector", selector);
+}
+
 function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context: GameEffectContext): GameEffectResult {
   if (!selectorApplies(effect.selector, context)) return result;
   if (effect.kind === "gain-resource") {
@@ -303,6 +343,16 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
     const amount = amountFor(effect.amount, context.source);
     return addSelectedRecruitedTroops(result, effect.selector, amount);
   }
+  if (effect.kind === "place-spies") {
+    const amount = amountFor(effect.amount, context.source);
+    return addSelectedSpyPlacement(result, effect.selector, {
+      count: amount,
+      recallForSupply: effect.recallForSupply,
+      mustPlace: effect.mustPlace,
+      placementIcon: effect.placementIcon,
+      allowSharedPost: effect.allowSharedPost,
+    });
+  }
   return unsupportedKind("effect", effect);
 }
 
@@ -323,6 +373,7 @@ function mergeEffectResult(result: GameEffectResult, next: GameEffectResult): Ga
       (gain, [resource, amount]) => addRevealGain(gain, resource as ResourceId, amount ?? 0),
       result.revealGain,
     ),
+    spyPlacements: [...result.spyPlacements, ...next.spyPlacements],
     swords: result.swords + next.swords,
     activatedAlly: mergePlayerEffectResult(result.activatedAlly, next.activatedAlly),
   };
@@ -336,6 +387,7 @@ function mergePlayerEffectResult(result: PlayerEffectResult, next: PlayerEffectR
       (gain, [resource, amount]) => addRevealGain(gain, resource as ResourceId, amount ?? 0),
       result.revealGain,
     ),
+    spyPlacements: [...result.spyPlacements, ...next.spyPlacements],
   };
 }
 
@@ -349,6 +401,7 @@ function legacyRevealResult(card: Card): GameEffectResult {
     recruitedTroops: 0,
     persuasion: card.persuasion,
     revealGain: card.revealGain ? { ...card.revealGain } : {},
+    spyPlacements: [],
     swords: card.swords,
     activatedAlly: emptyPlayerEffectResult,
   };

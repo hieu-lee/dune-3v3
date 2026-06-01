@@ -4,6 +4,7 @@ import type {
   FactionId,
   GameEffectConditionSpec,
   GameEffectSpec,
+  IconId,
   PlayerSelector,
   ResourceId,
 } from "./types";
@@ -61,6 +62,20 @@ export function agentRecruitTroops(
   conditions?: GameEffectConditionSpec[],
 ): CardEffectSpec {
   return agentPlayEffects([{ kind: "recruit-troops", selector, amount }], conditions);
+}
+
+export function agentPlaceSpies(
+  selector: PlayerSelector,
+  amount: EffectAmountSpec,
+  options: {
+    recallForSupply?: boolean;
+    mustPlace?: boolean;
+    placementIcon?: IconId;
+    allowSharedPost?: boolean;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return agentPlayEffects([{ kind: "place-spies", selector, amount, ...options }], conditions);
 }
 
 export function visitedMakerSpace() {

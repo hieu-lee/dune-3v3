@@ -16,6 +16,7 @@ import {
 import {
   agentDrawCards,
   agentGainResource,
+  agentPlaceSpies,
   hasCompletedContracts,
   hasInfluence,
   hasSpyPosts,
@@ -211,6 +212,7 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
   }
   if (card.id === beneGesseritOperativeSourceId) {
     return [
+      agentPlaceSpies("self", 1, { recallForSupply: true, mustPlace: true }),
       revealGainPersuasion(1),
       revealGainPersuasion(2, [hasSpyPosts(2)]),
     ];

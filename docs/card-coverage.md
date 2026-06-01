@@ -16,13 +16,13 @@ These cards currently use typed Agent effect specs:
 
 - Reserve cards: Prepare The Way.
 - Emperor Commander cards: Devastating Assault.
-- Imperium cards: Cargo Runner, Maker Keeper, Maula Pistol, Northern Watermaster, Paracompass.
+- Imperium cards: Bene Gesserit Operative, Cargo Runner, Maker Keeper, Maula Pistol, Northern Watermaster, Paracompass.
 
 ## Bespoke Automated Cards
 
 These cards are automated but still rely on explicit card or leader branches while the shared primitive library grows:
 
-- Imperium / reserve Agent effects: Captured Mentat, Bene Gesserit Operative.
+- Imperium / reserve Agent effects: Captured Mentat.
 - Imperium / reserve Reveal choices: Captured Mentat, Calculus of Power.
 - Commander starter cards: Command Respect, Critical Shipments, Demand Attention, Demand Results, Desert Call, Devastating Assault Reveal payment, Imperial Tent, Corrino Might, Threaten Spice Production, Usul, Signet Rings.
 - Ally leader Signet Ring effects: Gurney Halleck, Lady Amber Metulli, Lady Jessica, Lady Margot Fenring, Princess Irulan, Reverend Mother Jessica, Staban Tuek.
@@ -45,10 +45,10 @@ The largest current gaps are Agent and choice primitives:
 - Costs: pay resources, discard card, trash card, lose Influence, recall spy, retreat troops.
 - Conditions: alliance, role/team, combat participation.
 - Selectors: activated Ally outside routed troop recruitment, teammate, faction, board space, market card, reserve card, contract, hand/discard/play-area card.
-- Effects: deploy/retreat troops, gain/lose Influence, place/recall spy, acquire card, take/complete contract, trash/discard card, gain VP, remove Shield Wall, summon sandworm.
+- Effects: deploy/retreat troops, gain/lose Influence, recall spy, acquire card, take/complete contract, trash/discard card, gain VP, remove Shield Wall, summon sandworm.
 - Choices: optional effect, pay-or-skip, choose one, choose N, split Commander/Ally rewards.
 
 ## Verification
 
-- `pnpm run verify:card-effect-specs` verifies reveal specs, Agent draw/resource/recruit specs, legacy fallback, no double-counting, conditional Maker/contract/spy/influence behavior, shared spy posts, and manual reveal fallback.
+- `pnpm run verify:card-effect-specs` verifies reveal specs, Agent draw/resource/recruit/spy-placement specs, legacy fallback, no double-counting, conditional Maker/contract/spy/influence behavior, shared spy posts, and manual reveal fallback.
 - `pnpm run verify` includes the effect-spec verifier through `package.json`.

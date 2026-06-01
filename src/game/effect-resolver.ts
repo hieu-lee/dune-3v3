@@ -34,7 +34,7 @@ export type SpyPlacementEffectResult = {
 };
 
 export type EffectResolverState = Partial<
-  Pick<GameState, "players" | "roundMakerSpaceVisits" | "sharedSpyPosts" | "spyPosts">
+  Pick<GameState, "alliances" | "players" | "roundMakerSpaceVisits" | "sharedSpyPosts" | "spyPosts">
 >;
 
 export type GameEffectContext = {
@@ -88,7 +88,9 @@ type PlayerEffectResult = {
   deploymentBlockSource?: string;
   intriguesToDraw: number;
   recruitedTroops: number;
+  recruitedTroopsSource?: string;
   revealGain: Partial<Resources>;
+  revealGainSource?: string;
   spyPlacements: SpyPlacementEffectResult[];
 };
 
@@ -177,6 +179,24 @@ function validateAmount(amount: EffectAmountSpec) {
   unsupportedKind("effect amount", amount);
 }
 
+function validateSourceLabel(label: string, value: unknown) {
+  if (value !== undefined && (typeof value !== "string" || value.trim().length === 0)) {
+    invalidSpecField(label, value);
+  }
+}
+
+function mergeEffectSourceLabel(
+  existingHasEffect: boolean,
+  existingSource: string | undefined,
+  nextHasEffect: boolean,
+  nextSource: string | undefined,
+) {
+  if (!nextHasEffect) return existingSource;
+  if (!existingHasEffect) return nextSource;
+  if (!existingSource || !nextSource) return undefined;
+  return existingSource === nextSource ? existingSource : undefined;
+}
+
 function validateCondition(condition: GameEffectConditionSpec) {
   if (condition.kind === "visited-maker-space") return;
   if (condition.kind === "has-spy-posts") {
@@ -213,6 +233,14 @@ function validateCondition(condition: GameEffectConditionSpec) {
     if (supportedRoles.has(condition.role)) return;
     throw new Error(`Unsupported effect role "${condition.role}"`);
   }
+  if (condition.kind === "has-leader") {
+    if (typeof condition.leader === "string" && condition.leader.trim().length > 0) return;
+    invalidSpecField("has-leader leader", condition.leader);
+  }
+  if (condition.kind === "has-alliance") {
+    if (condition.faction === undefined || supportedFactions.has(condition.faction)) return;
+    throw new Error(`Unsupported effect faction "${condition.faction}"`);
+  }
   unsupportedKind("effect condition", condition);
 }
 
@@ -227,6 +255,7 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     if (!supportedResources.has(effect.resource)) {
       throw new Error(`Unsupported effect resource "${effect.resource}"`);
     }
+    validateSourceLabel("gain-resource source", effect.source);
     validateAmount(effect.amount);
     return;
   }
@@ -241,9 +270,7 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     if (effect.selector !== "self") {
       throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
     }
-    if (effect.source !== undefined && (typeof effect.source !== "string" || effect.source.trim().length === 0)) {
-      invalidSpecField("draw-cards source", effect.source);
-    }
+    validateSourceLabel("draw-cards source", effect.source);
     validateAmount(effect.amount);
     return;
   }
@@ -255,6 +282,7 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     return;
   }
   if (effect.kind === "recruit-troops") {
+    validateSourceLabel("recruit-troops source", effect.source);
     validateAmount(effect.amount);
     return;
   }
@@ -318,9 +346,7 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     if (effect.selector !== "self") {
       throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
     }
-    if (effect.source !== undefined && (typeof effect.source !== "string" || effect.source.trim().length === 0)) {
-      invalidSpecField("block-conflict-deployment source", effect.source);
-    }
+    validateSourceLabel("block-conflict-deployment source", effect.source);
     return;
   }
   if (effect.kind === "place-spies") {
@@ -345,6 +371,10 @@ function addRevealGain(gain: Partial<Resources>, resource: ResourceId, amount: n
     ...gain,
     [resource]: (gain[resource] ?? 0) + amount,
   };
+}
+
+function hasResourceGain(gain: Partial<Resources>) {
+  return Object.values(gain).some((amount) => (amount ?? 0) > 0);
 }
 
 function amountFor(amount: EffectAmountSpec, source: Player) {
@@ -388,6 +418,14 @@ function conditionApplies(condition: GameEffectConditionSpec, context: GameEffec
   if (condition.kind === "has-role") {
     return context.source.role === condition.role;
   }
+  if (condition.kind === "has-leader") {
+    return context.source.leader === condition.leader;
+  }
+  if (condition.kind === "has-alliance") {
+    if (!context.state?.alliances) return false;
+    if (condition.faction) return context.state.alliances[condition.faction] === context.source.id;
+    return Object.values(context.state.alliances).includes(context.source.id);
+  }
   return unsupportedKind("effect condition", condition);
 }
 
@@ -426,9 +464,19 @@ function addSelectedRevealGain(
   selector: PlayerSelector,
   resource: ResourceId,
   amount: number,
+  source?: string,
 ) {
   if (selector === "self") {
-    return { ...result, revealGain: addRevealGain(result.revealGain, resource, amount) };
+    return {
+      ...result,
+      revealGain: addRevealGain(result.revealGain, resource, amount),
+      revealGainSource: mergeEffectSourceLabel(
+        hasResourceGain(result.revealGain),
+        result.revealGainSource,
+        amount > 0,
+        source,
+      ),
+    };
   }
   if (selector === "activated-ally") {
     return {
@@ -436,15 +484,35 @@ function addSelectedRevealGain(
       activatedAlly: {
         ...result.activatedAlly,
         revealGain: addRevealGain(result.activatedAlly.revealGain, resource, amount),
+        revealGainSource: mergeEffectSourceLabel(
+          hasResourceGain(result.activatedAlly.revealGain),
+          result.activatedAlly.revealGainSource,
+          amount > 0,
+          source,
+        ),
       },
     };
   }
   return unsupportedKind("effect selector", selector);
 }
 
-function addSelectedRecruitedTroops(result: GameEffectResult, selector: PlayerSelector, amount: number) {
+function addSelectedRecruitedTroops(
+  result: GameEffectResult,
+  selector: PlayerSelector,
+  amount: number,
+  source?: string,
+) {
   if (selector === "self") {
-    return { ...result, recruitedTroops: result.recruitedTroops + amount };
+    return {
+      ...result,
+      recruitedTroops: result.recruitedTroops + amount,
+      recruitedTroopsSource: mergeEffectSourceLabel(
+        result.recruitedTroops > 0,
+        result.recruitedTroopsSource,
+        amount > 0,
+        source,
+      ),
+    };
   }
   if (selector === "activated-ally") {
     return {
@@ -452,6 +520,12 @@ function addSelectedRecruitedTroops(result: GameEffectResult, selector: PlayerSe
       activatedAlly: {
         ...result.activatedAlly,
         recruitedTroops: result.activatedAlly.recruitedTroops + amount,
+        recruitedTroopsSource: mergeEffectSourceLabel(
+          result.activatedAlly.recruitedTroops > 0,
+          result.activatedAlly.recruitedTroopsSource,
+          amount > 0,
+          source,
+        ),
       },
     };
   }
@@ -499,7 +573,7 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
   if (!selectorApplies(effect.selector, context)) return result;
   if (effect.kind === "gain-resource") {
     const amount = amountFor(effect.amount, context.source);
-    return addSelectedRevealGain(result, effect.selector, effect.resource, amount);
+    return addSelectedRevealGain(result, effect.selector, effect.resource, amount, effect.source);
   }
   if (effect.kind === "gain-persuasion") {
     if (effect.selector !== "self") {
@@ -523,7 +597,12 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
     return {
       ...result,
       cardsToDraw: result.cardsToDraw + amount,
-      drawCardsSource: amount > 0 ? result.drawCardsSource ?? effect.source : result.drawCardsSource,
+      drawCardsSource: mergeEffectSourceLabel(
+        result.cardsToDraw > 0,
+        result.drawCardsSource,
+        amount > 0,
+        effect.source,
+      ),
     };
   }
   if (effect.kind === "draw-intrigues") {
@@ -532,7 +611,7 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
   }
   if (effect.kind === "recruit-troops") {
     const amount = amountFor(effect.amount, context.source);
-    return addSelectedRecruitedTroops(result, effect.selector, amount);
+    return addSelectedRecruitedTroops(result, effect.selector, amount, effect.source);
   }
   if (effect.kind === "retreat-troops-for-strength") {
     return result;
@@ -577,15 +656,32 @@ export function resolveGameEffects(specs: CardEffectSpec[] | undefined, context:
 function mergeEffectResult(result: GameEffectResult, next: GameEffectResult): GameEffectResult {
   return {
     cardsToDraw: result.cardsToDraw + next.cardsToDraw,
-    drawCardsSource: result.drawCardsSource ?? next.drawCardsSource,
+    drawCardsSource: mergeEffectSourceLabel(
+      result.cardsToDraw > 0,
+      result.drawCardsSource,
+      next.cardsToDraw > 0,
+      next.drawCardsSource,
+    ),
     blocksDeploymentsThisTurn: result.blocksDeploymentsThisTurn || next.blocksDeploymentsThisTurn,
     deploymentBlockSource: result.deploymentBlockSource ?? next.deploymentBlockSource,
     intriguesToDraw: result.intriguesToDraw + next.intriguesToDraw,
     recruitedTroops: result.recruitedTroops + next.recruitedTroops,
+    recruitedTroopsSource: mergeEffectSourceLabel(
+      result.recruitedTroops > 0,
+      result.recruitedTroopsSource,
+      next.recruitedTroops > 0,
+      next.recruitedTroopsSource,
+    ),
     persuasion: result.persuasion + next.persuasion,
     revealGain: Object.entries(next.revealGain).reduce(
       (gain, [resource, amount]) => addRevealGain(gain, resource as ResourceId, amount ?? 0),
       result.revealGain,
+    ),
+    revealGainSource: mergeEffectSourceLabel(
+      hasResourceGain(result.revealGain),
+      result.revealGainSource,
+      hasResourceGain(next.revealGain),
+      next.revealGainSource,
     ),
     spyPlacements: [...result.spyPlacements, ...next.spyPlacements],
     swords: result.swords + next.swords,
@@ -596,14 +692,31 @@ function mergeEffectResult(result: GameEffectResult, next: GameEffectResult): Ga
 function mergePlayerEffectResult(result: PlayerEffectResult, next: PlayerEffectResult): PlayerEffectResult {
   return {
     cardsToDraw: result.cardsToDraw + next.cardsToDraw,
-    drawCardsSource: result.drawCardsSource ?? next.drawCardsSource,
+    drawCardsSource: mergeEffectSourceLabel(
+      result.cardsToDraw > 0,
+      result.drawCardsSource,
+      next.cardsToDraw > 0,
+      next.drawCardsSource,
+    ),
     blocksDeploymentsThisTurn: result.blocksDeploymentsThisTurn || next.blocksDeploymentsThisTurn,
     deploymentBlockSource: result.deploymentBlockSource ?? next.deploymentBlockSource,
     intriguesToDraw: result.intriguesToDraw + next.intriguesToDraw,
     recruitedTroops: result.recruitedTroops + next.recruitedTroops,
+    recruitedTroopsSource: mergeEffectSourceLabel(
+      result.recruitedTroops > 0,
+      result.recruitedTroopsSource,
+      next.recruitedTroops > 0,
+      next.recruitedTroopsSource,
+    ),
     revealGain: Object.entries(next.revealGain).reduce(
       (gain, [resource, amount]) => addRevealGain(gain, resource as ResourceId, amount ?? 0),
       result.revealGain,
+    ),
+    revealGainSource: mergeEffectSourceLabel(
+      hasResourceGain(result.revealGain),
+      result.revealGainSource,
+      hasResourceGain(next.revealGain),
+      next.revealGainSource,
     ),
     spyPlacements: [...result.spyPlacements, ...next.spyPlacements],
   };

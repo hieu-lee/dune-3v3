@@ -29,6 +29,23 @@ export async function runSignetChoicesSmoke({
   );
   await screenshot(page, captures, "muaddib-signet-draw.png");
 
+  await setDebugGameAndWait(page, states.gurney);
+  await page.getByText(/Gurney Halleck resolves Warmaster: recruits 1 troop/i).first().waitFor();
+  const gurneyAfter = await currentGame(page);
+  const gurney = gurneyAfter.players.find((player) => player.id === "p3");
+  assert.ok(gurney, "Expected Gurney after Signet recruit");
+  assert.equal(gurney.garrison, 1, "Gurney Signet should recruit the scripted troop");
+  await screenshot(page, captures, "gurney-signet-warmaster.png");
+
+  await setDebugGameAndWait(page, states.amber);
+  await page.getByText(/Lady Amber Metulli resolves Fill Coffers: gains 1 Solari and 1 spice/i).first().waitFor();
+  const amberAfter = await currentGame(page);
+  const amber = amberAfter.players.find((player) => player.id === "p3");
+  assert.ok(amber, "Expected Lady Amber after Signet resource gain");
+  assert.equal(amber.resources.solari, 3, "Amber Signet should gain the scripted Solari");
+  assert.equal(amber.resources.spice, 1, "Amber Signet should gain the scripted spice");
+  await screenshot(page, captures, "amber-signet-fill-coffers.png");
+
   await setDebugGameAndWait(page, states.shaddam);
   let pendingText = await page.locator(".pending-panel").innerText();
   assert.match(pendingText, /Emperor of the Known Universe/i);
@@ -91,6 +108,28 @@ async function createSignetChoiceStates(server, initialPlayableGame) {
     playArea: [muadDibCard],
   };
   const muadDibEffect = state.applyCardAgentEffect(muadDibCard, muadDibSource, muadDibTarget, game);
+  const gurneyCard = { ...allySignet, id: "debug-gurney-signet-ring" };
+  const gurneySource = {
+    ...muadDibTarget,
+    garrison: 0,
+    playArea: [gurneyCard],
+  };
+  const gurneyEffect = state.applyCardAgentEffect(gurneyCard, gurneySource, gurneySource, game);
+
+  const amberCard = { ...allySignet, id: "debug-amber-signet-ring" };
+  const amberSource = {
+    ...muadDibTarget,
+    leader: "Lady Amber Metulli",
+    leaderCard: data.leaderCardByName("Lady Amber Metulli"),
+    resources: { solari: 2, spice: 0, water: 1 },
+    playArea: [amberCard],
+  };
+  const amberBase = {
+    ...game,
+    alliances: { bene: amberSource.id },
+    players: game.players.map((player) => player.id === amberSource.id ? amberSource : player),
+  };
+  const amberEffect = state.applyCardAgentEffect(amberCard, amberSource, amberSource, amberBase);
 
   const muadDib = {
     ...game,
@@ -104,6 +143,26 @@ async function createSignetChoiceStates(server, initialPlayableGame) {
       return player;
     }),
     log: [muadDibEffect.log, ...game.log].filter(Boolean),
+  };
+
+  const gurney = {
+    ...game,
+    activeSeat: 2,
+    phase: "playing",
+    pendingAction: undefined,
+    pendingQueue: [],
+    players: game.players.map((player) => player.id === gurneyEffect.source.id ? gurneyEffect.source : player),
+    log: [gurneyEffect.log, ...game.log].filter(Boolean),
+  };
+
+  const amber = {
+    ...amberBase,
+    activeSeat: 2,
+    phase: "playing",
+    pendingAction: undefined,
+    pendingQueue: [],
+    players: amberBase.players.map((player) => player.id === amberEffect.source.id ? amberEffect.source : player),
+    log: [amberEffect.log, ...game.log].filter(Boolean),
   };
 
   const shaddam = {
@@ -149,5 +208,5 @@ async function createSignetChoiceStates(server, initialPlayableGame) {
     },
   };
 
-  return { muadDib, shaddam, irulan };
+  return { muadDib, gurney, amber, shaddam, irulan };
 }

@@ -2,14 +2,22 @@ import catalogJson from "./uprising-catalog.generated.json";
 import {
   agentBlockConflictDeployment,
   agentDrawCards,
+  agentGainResource,
   agentPlayEffects,
+  agentRecruitTroops,
   cloneCardEffects,
+  hasAlliance,
+  hasLeader,
   revealEffects,
   revealGainPersuasion,
   revealGainStrength,
   hasRole,
   hasTeam,
 } from "./effect-specs";
+import {
+  gurneyHalleckLeaderName,
+  ladyAmberMetulliLeaderName,
+} from "./leader-constants";
 import type { Card, TeamId } from "./types";
 
 type HubAttribute = [string, number | string | null];
@@ -178,7 +186,27 @@ const allyStarterSpecs: StarterCardSpec[] = [
     icons: ["landsraad", "city", "spice"],
     persuasion: 1,
     swords: 0,
-    effects: [revealGainPersuasion(1)],
+    effects: [
+      agentRecruitTroops(
+        "self",
+        1,
+        { source: "Warmaster" },
+        [hasLeader(gurneyHalleckLeaderName), hasRole("Ally")],
+      ),
+      agentGainResource(
+        "solari",
+        1,
+        { source: "Fill Coffers" },
+        [hasLeader(ladyAmberMetulliLeaderName), hasRole("Ally"), hasAlliance()],
+      ),
+      agentGainResource(
+        "spice",
+        1,
+        { source: "Fill Coffers" },
+        [hasLeader(ladyAmberMetulliLeaderName), hasRole("Ally"), hasAlliance()],
+      ),
+      revealGainPersuasion(1),
+    ],
     play: "Trigger the leader signet ability.",
     reveal: starterRevealText(1, 0),
     imagePath: localOtherCard("dune-imperium-other-signet-ring.webp"),

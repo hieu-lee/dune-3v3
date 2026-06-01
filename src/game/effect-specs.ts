@@ -161,16 +161,44 @@ export function agentGainResource(
   resource: ResourceId,
   amount: EffectAmountSpec,
   conditions?: GameEffectConditionSpec[],
+): CardEffectSpec;
+export function agentGainResource(
+  resource: ResourceId,
+  amount: EffectAmountSpec,
+  options: { source?: string },
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec;
+export function agentGainResource(
+  resource: ResourceId,
+  amount: EffectAmountSpec,
+  optionsOrConditions: { source?: string } | GameEffectConditionSpec[] = {},
+  conditions?: GameEffectConditionSpec[],
 ): CardEffectSpec {
-  return agentPlayEffects([{ kind: "gain-resource", selector: "self", resource, amount }], conditions);
+  const options = Array.isArray(optionsOrConditions) ? {} : optionsOrConditions;
+  const resolvedConditions = Array.isArray(optionsOrConditions) ? optionsOrConditions : conditions;
+  return agentPlayEffects([{ kind: "gain-resource", selector: "self", resource, amount, ...options }], resolvedConditions);
 }
 
 export function agentRecruitTroops(
   selector: PlayerSelector,
   amount: EffectAmountSpec,
   conditions?: GameEffectConditionSpec[],
+): CardEffectSpec;
+export function agentRecruitTroops(
+  selector: PlayerSelector,
+  amount: EffectAmountSpec,
+  options: { source?: string },
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec;
+export function agentRecruitTroops(
+  selector: PlayerSelector,
+  amount: EffectAmountSpec,
+  optionsOrConditions: { source?: string } | GameEffectConditionSpec[] = {},
+  conditions?: GameEffectConditionSpec[],
 ): CardEffectSpec {
-  return agentPlayEffects([{ kind: "recruit-troops", selector, amount }], conditions);
+  const options = Array.isArray(optionsOrConditions) ? {} : optionsOrConditions;
+  const resolvedConditions = Array.isArray(optionsOrConditions) ? optionsOrConditions : conditions;
+  return agentPlayEffects([{ kind: "recruit-troops", selector, amount, ...options }], resolvedConditions);
 }
 
 export function agentPlaceSpies(
@@ -217,6 +245,14 @@ export function hasTeam(team: TeamId) {
 
 export function hasRole(role: Role) {
   return { kind: "has-role", role } as const;
+}
+
+export function hasLeader(leader: string) {
+  return { kind: "has-leader", leader } as const;
+}
+
+export function hasAlliance(faction?: FactionId) {
+  return faction ? ({ kind: "has-alliance", faction } as const) : ({ kind: "has-alliance" } as const);
 }
 
 export function cloneCardEffects(effects: CardEffectSpec[] | undefined): CardEffectSpec[] | undefined {

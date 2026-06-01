@@ -1,17 +1,9 @@
-import { playerHasAnyAlliance } from "./alliance-rules";
 import {
   automaticBoardInfluence,
   boardSpaceRewardApplies,
 } from "./board-rules";
-import {
-  isGenericSignetRingCard,
-} from "./card-identifiers";
 import { drawCards } from "./deck-utils";
 import { resolveCardEffects, type GameEffectResult } from "./effect-resolver";
-import {
-  gurneyHalleckLeaderName,
-  ladyAmberMetulliLeaderName,
-} from "./leader-constants";
 import { adjustInfluence } from "./leader-rewards";
 import type { BoardSpace, Card, FactionId, GameState, Player, ResourceId, Resources } from "./types";
 
@@ -95,44 +87,6 @@ export function applyCardAgentEffect(
   const genericEffect = applyGenericCardAgentEffect(card, sourcePlayer, targetPlayer, state);
   if (genericEffect) return genericEffect;
 
-  if (
-    isGenericSignetRingCard(card) &&
-    sourcePlayer.leader === gurneyHalleckLeaderName &&
-    sourcePlayer.role === "Ally"
-  ) {
-    return {
-      source: {
-        ...sourcePlayer,
-        garrison: sourcePlayer.garrison + 1,
-      },
-      target: targetPlayer,
-      log: `${sourcePlayer.leader} resolves Warmaster: recruits 1 troop.`,
-      recruitedTroops: 1,
-    };
-  }
-
-  if (
-    state &&
-    isGenericSignetRingCard(card) &&
-    sourcePlayer.leader === ladyAmberMetulliLeaderName &&
-    sourcePlayer.role === "Ally" &&
-    playerHasAnyAlliance(state, sourcePlayer.id)
-  ) {
-    return {
-      source: {
-        ...sourcePlayer,
-        resources: {
-          ...sourcePlayer.resources,
-          solari: sourcePlayer.resources.solari + 1,
-          spice: sourcePlayer.resources.spice + 1,
-        },
-      },
-      target: targetPlayer,
-      log: `${sourcePlayer.leader} resolves Fill Coffers: gains 1 Solari and 1 spice.`,
-      sourceSpiceGained: 1,
-    };
-  }
-
   return { source: sourcePlayer, target: targetPlayer };
 }
 
@@ -140,7 +94,8 @@ function applyGenericCardAgentEffect(
   card: Card,
   sourcePlayer: Player,
   targetPlayer: Player,
-  state?: Pick<GameState, "players"> & Partial<Pick<GameState, "roundMakerSpaceVisits" | "sharedSpyPosts" | "spyPosts">>,
+  state?: Pick<GameState, "players"> &
+    Partial<Pick<GameState, "alliances" | "roundMakerSpaceVisits" | "sharedSpyPosts" | "spyPosts">>,
 ): {
   source: Player;
   target: Player;
@@ -247,6 +202,10 @@ function agentEffectLog(
 }
 
 function agentEffectSourceLabel(card: Card, result: GameEffectResult, partCount: number) {
+  if (partCount === 1 && result.revealGainSource && hasResourceGain(result.revealGain)) return result.revealGainSource;
+  if (partCount === 1 && result.recruitedTroopsSource && result.recruitedTroops > 0) {
+    return result.recruitedTroopsSource;
+  }
   if (partCount === 1 && result.drawCardsSource && result.cardsToDraw > 0) return result.drawCardsSource;
   if (partCount === 1 && result.blocksDeploymentsThisTurn && result.deploymentBlockSource) {
     return result.deploymentBlockSource;

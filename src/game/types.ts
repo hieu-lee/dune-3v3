@@ -48,14 +48,16 @@ export type GameEffectConditionSpec =
   | { kind: "has-completed-contracts"; count: number }
   | { kind: "has-card-trait-in-play"; trait: string; count?: number }
   | { kind: "has-team"; team: TeamId }
-  | { kind: "has-role"; role: Role };
+  | { kind: "has-role"; role: Role }
+  | { kind: "has-leader"; leader: string }
+  | { kind: "has-alliance"; faction?: FactionId };
 export type GameEffectSpec =
-  | { kind: "gain-resource"; selector: PlayerSelector; resource: ResourceId; amount: EffectAmountSpec }
+  | { kind: "gain-resource"; selector: PlayerSelector; resource: ResourceId; amount: EffectAmountSpec; source?: string }
   | { kind: "gain-persuasion"; selector: PlayerSelector; amount: EffectAmountSpec }
   | { kind: "gain-strength"; selector: PlayerSelector; amount: EffectAmountSpec }
   | { kind: "draw-cards"; selector: PlayerSelector; amount: EffectAmountSpec; source?: string }
   | { kind: "draw-intrigues"; selector: PlayerSelector; amount: EffectAmountSpec }
-  | { kind: "recruit-troops"; selector: PlayerSelector; amount: EffectAmountSpec }
+  | { kind: "recruit-troops"; selector: PlayerSelector; amount: EffectAmountSpec; source?: string }
   | {
       kind: "retreat-troops-for-strength";
       selector: PlayerSelector;

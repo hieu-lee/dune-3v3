@@ -80,6 +80,7 @@ try {
   ].filter(hasRevealSpec);
   const convincingArgument = data.allyStarterCards.find((card) => card.name === "Convincing Argument");
   const dagger = data.allyStarterCards.find((card) => card.name === "Dagger");
+  const allySignet = data.allyStarterCards.find((card) => card.name === "Signet Ring");
   const smuggler = data.imperiumDeck.find((card) => card.name === "Smuggler's Harvester");
   const interstellarTrade = data.imperiumDeck.find((card) => card.name === "Interstellar Trade");
   const calculus = data.imperiumDeck.find((card) => card.name === "Calculus of Power");
@@ -105,6 +106,7 @@ try {
   assert.ok(
     convincingArgument &&
     dagger &&
+    allySignet &&
     smuggler &&
     interstellarTrade &&
     calculus &&
@@ -179,6 +181,48 @@ try {
       )
     ),
     "Muad'Dib Signet Ring should carry a declarative Agent draw spec",
+  );
+  assert.ok(
+    allySignet.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.conditions?.some((condition) => condition.kind === "has-leader" && condition.leader === "Gurney Halleck") &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Ally") &&
+      spec.effects.some((effect) =>
+        effect.kind === "recruit-troops" &&
+        effect.selector === "self" &&
+        effect.amount === 1 &&
+        effect.source === "Warmaster"
+      )
+    ),
+    "Generic Ally Signet Ring should carry a declarative Gurney Warmaster recruit spec",
+  );
+  assert.ok(
+    allySignet.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.conditions?.some((condition) => condition.kind === "has-leader" && condition.leader === "Lady Amber Metulli") &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Ally") &&
+      spec.conditions?.some((condition) => condition.kind === "has-alliance" && condition.faction === undefined) &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-resource" &&
+        effect.selector === "self" &&
+        effect.resource === "solari" &&
+        effect.amount === 1 &&
+        effect.source === "Fill Coffers"
+      )
+    ) &&
+    allySignet.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.conditions?.some((condition) => condition.kind === "has-leader" && condition.leader === "Lady Amber Metulli") &&
+      spec.conditions?.some((condition) => condition.kind === "has-alliance" && condition.faction === undefined) &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-resource" &&
+        effect.selector === "self" &&
+        effect.resource === "spice" &&
+        effect.amount === 1 &&
+        effect.source === "Fill Coffers"
+      )
+    ),
+    "Generic Ally Signet Ring should carry declarative Amber Fill Coffers resource specs",
   );
   assert.ok(
     makerKeeper.effects?.some((spec) =>
@@ -515,12 +559,12 @@ try {
     name: "Effect Spec Unsupported Condition",
     effects: [revealSpec(
       [{ kind: "gain-persuasion", selector: "self", amount: 1 }],
-      [{ kind: "has-alliance" }],
+      [{ kind: "has-troops" }],
     )],
   };
   assert.throws(
     () => turnActions.revealTurnPlan({ ...p2, hand: [unsupportedConditionCard], highCouncilSeat: false }),
-    /Unsupported effect condition "has-alliance"/,
+    /Unsupported effect condition "has-troops"/,
     "Unsupported effect conditions should fail loudly instead of silently becoming false",
   );
   const skippedUnsupportedConditionCard = {
@@ -529,12 +573,12 @@ try {
     name: "Effect Spec Skipped Unsupported Condition",
     effects: [revealSpec(
       [{ kind: "gain-persuasion", selector: "self", amount: 1 }],
-      [{ kind: "visited-maker-space" }, { kind: "has-alliance" }],
+      [{ kind: "visited-maker-space" }, { kind: "has-troops" }],
     )],
   };
   assert.throws(
     () => turnActions.revealTurnPlan({ ...p2, hand: [skippedUnsupportedConditionCard], highCouncilSeat: false }),
-    /Unsupported effect condition "has-alliance"/,
+    /Unsupported effect condition "has-troops"/,
     "Unsupported effect conditions should fail before applicability short-circuiting can hide them",
   );
   const invalidSpyCountCard = {
@@ -649,6 +693,45 @@ try {
     /Unsupported effect role "Captain"/,
     "Role conditions should reject unsupported role ids",
   );
+  const invalidLeaderConditionCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-leader-condition-card",
+    name: "Effect Spec Invalid Leader Condition",
+    effects: [agentSpec(
+      [{ kind: "draw-cards", selector: "self", amount: 1 }],
+      [{ kind: "has-leader", leader: "" }],
+    )],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidLeaderConditionCard, p2, p2),
+    /Invalid has-leader leader ""/,
+    "Leader conditions should require a non-empty leader name",
+  );
+  const invalidAllianceConditionCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-alliance-condition-card",
+    name: "Effect Spec Invalid Alliance Condition",
+    effects: [agentSpec(
+      [{ kind: "draw-cards", selector: "self", amount: 1 }],
+      [{ kind: "has-alliance", faction: "sardaukar" }],
+    )],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidAllianceConditionCard, p2, p2),
+    /Unsupported effect faction "sardaukar"/,
+    "Alliance conditions should reject unsupported factions",
+  );
+  const invalidGainResourceSourceCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-gain-resource-source-card",
+    name: "Effect Spec Invalid Gain Resource Source",
+    effects: [agentSpec([{ kind: "gain-resource", selector: "self", resource: "spice", amount: 1, source: "" }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidGainResourceSourceCard, p2, p2),
+    /Invalid gain-resource source ""/,
+    "Resource gain specs should reject empty source labels",
+  );
   const invalidDrawCardsSourceCard = {
     ...convincingArgument,
     id: "effect-spec-invalid-draw-cards-source-card",
@@ -659,6 +742,17 @@ try {
     () => state.applyCardAgentEffect(invalidDrawCardsSourceCard, p2, p2),
     /Invalid draw-cards source ""/,
     "Draw-card specs should reject empty source labels",
+  );
+  const invalidRecruitTroopsSourceCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-recruit-troops-source-card",
+    name: "Effect Spec Invalid Recruit Troops Source",
+    effects: [agentSpec([{ kind: "recruit-troops", selector: "self", amount: 1, source: "" }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidRecruitTroopsSourceCard, p2, p2),
+    /Invalid recruit-troops source ""/,
+    "Recruit specs should reject empty source labels",
   );
   const invalidSpyPlacementAmountCard = {
     ...convincingArgument,

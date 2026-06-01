@@ -5,7 +5,6 @@ import {
 } from "./board-rules";
 import {
   isGenericSignetRingCard,
-  isMuadDibSignetRingCard,
 } from "./card-identifiers";
 import { drawCards } from "./deck-utils";
 import { resolveCardEffects, type GameEffectResult } from "./effect-resolver";
@@ -95,22 +94,6 @@ export function applyCardAgentEffect(
 } {
   const genericEffect = applyGenericCardAgentEffect(card, sourcePlayer, targetPlayer, state);
   if (genericEffect) return genericEffect;
-
-  if (
-    isMuadDibSignetRingCard(card) &&
-    sourcePlayer.team === "muaddib" &&
-    sourcePlayer.role === "Commander"
-  ) {
-    const source = drawCards(sourcePlayer, sourcePlayer.hand.length + 1);
-    const drewCard = source.hand.length > sourcePlayer.hand.length;
-    return {
-      source,
-      target: targetPlayer,
-      log: drewCard
-        ? `${sourcePlayer.leader} resolves Lead the Way: draws 1 card.`
-        : `${sourcePlayer.leader} resolves Lead the Way: no card to draw.`,
-    };
-  }
 
   if (
     isGenericSignetRingCard(card) &&
@@ -259,11 +242,16 @@ function agentEffectLog(
     recruitText(targetPlayer.leader, result.activatedAlly.recruitedTroops),
   ].filter((part): part is string => Boolean(part));
   if (parts.length === 0) return undefined;
-  const sourceLabel =
-    result.blocksDeploymentsThisTurn && result.deploymentBlockSource && parts.length === 1
-      ? result.deploymentBlockSource
-      : card.name;
+  const sourceLabel = agentEffectSourceLabel(card, result, parts.length);
   return `${sourcePlayer.leader} resolves ${sourceLabel}: ${parts.join("; ")}.`;
+}
+
+function agentEffectSourceLabel(card: Card, result: GameEffectResult, partCount: number) {
+  if (partCount === 1 && result.drawCardsSource && result.cardsToDraw > 0) return result.drawCardsSource;
+  if (partCount === 1 && result.blocksDeploymentsThisTurn && result.deploymentBlockSource) {
+    return result.deploymentBlockSource;
+  }
+  return card.name;
 }
 
 function drawText(cardsToDraw: number, cardsDrawn: number) {

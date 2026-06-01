@@ -17,6 +17,18 @@ export async function runSignetChoicesSmoke({
   const states = await createSignetChoiceStates(server, initialPlayableGame);
   await writeJson("pending-signet-choice-states.json", states);
 
+  await setDebugGameAndWait(page, states.muadDib);
+  await page.getByText(/Muad'Dib resolves Lead the Way: draws 1 card/i).first().waitFor();
+  const muadDibAfter = await currentGame(page);
+  const muadDibCommander = muadDibAfter.players.find((player) => player.id === "p1");
+  assert.ok(muadDibCommander, "Expected Muad'Dib commander after Signet draw");
+  assert.equal(
+    muadDibCommander.hand[0]?.id,
+    "debug-muaddib-signet-draw",
+    "Muad'Dib Signet should draw the scripted card into hand",
+  );
+  await screenshot(page, captures, "muaddib-signet-draw.png");
+
   await setDebugGameAndWait(page, states.shaddam);
   let pendingText = await page.locator(".pending-panel").innerText();
   assert.match(pendingText, /Emperor of the Known Universe/i);
@@ -50,17 +62,49 @@ export async function runSignetChoicesSmoke({
 
 async function createSignetChoiceStates(server, initialPlayableGame) {
   const data = await server.ssrLoadModule("/src/game/data.ts");
-  const game = initialPlayableGame(await server.ssrLoadModule("/src/game/state.ts"));
+  const state = await server.ssrLoadModule("/src/game/state.ts");
+  const game = initialPlayableGame(state);
+  const muadDibSignet = data.commanderStarterDecks.muaddib.find((card) => card.sourceId === 545);
   const shaddamSignet = data.commanderStarterDecks.shaddam.find((card) => card.sourceId === 554);
   const allySignet = data.allyStarterCards.find((card) => card.sourceId === 531);
+  const drawCard = data.allyStarterCards.find((card) => card.name === "Dagger");
   const costOneCard = data.imperiumDeck.find((card) => card.cost === 1);
+  assert.ok(muadDibSignet, "Expected Muad'Dib commander Signet Ring");
   assert.ok(shaddamSignet, "Expected Shaddam commander Signet Ring");
   assert.ok(allySignet, "Expected generic Ally Signet Ring");
+  assert.ok(drawCard, "Expected a starter card for Muad'Dib Signet draw");
   assert.ok(costOneCard, "Expected a cost-1 Imperium card for Irulan");
 
+  const muadDibCard = { ...muadDibSignet, id: "debug-muaddib-signet-ring" };
+  const muadDibDrawCard = { ...drawCard, id: "debug-muaddib-signet-draw" };
   const shaddamCard = { ...shaddamSignet, id: "debug-shaddam-signet-ring" };
   const irulanCard = { ...allySignet, id: "debug-irulan-signet-ring" };
   const acquireCard = { ...costOneCard, id: "debug-irulan-acquire-card" };
+  const muadDibCommander = game.players.find((player) => player.id === "p1");
+  const muadDibTarget = game.players.find((player) => player.id === "p3");
+  assert.ok(muadDibCommander && muadDibTarget, "Expected Muad'Dib commander and activated Ally");
+  const muadDibSource = {
+    ...muadDibCommander,
+    hand: [],
+    deck: [muadDibDrawCard],
+    discard: [],
+    playArea: [muadDibCard],
+  };
+  const muadDibEffect = state.applyCardAgentEffect(muadDibCard, muadDibSource, muadDibTarget, game);
+
+  const muadDib = {
+    ...game,
+    activeSeat: 0,
+    phase: "playing",
+    pendingAction: undefined,
+    pendingQueue: [],
+    players: game.players.map((player) => {
+      if (player.id === muadDibEffect.source.id) return muadDibEffect.source;
+      if (player.id === muadDibEffect.target.id) return muadDibEffect.target;
+      return player;
+    }),
+    log: [muadDibEffect.log, ...game.log].filter(Boolean),
+  };
 
   const shaddam = {
     ...game,
@@ -105,5 +149,5 @@ async function createSignetChoiceStates(server, initialPlayableGame) {
     },
   };
 
-  return { shaddam, irulan };
+  return { muadDib, shaddam, irulan };
 }

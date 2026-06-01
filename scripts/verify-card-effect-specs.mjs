@@ -93,6 +93,7 @@ try {
   const paracompass = data.imperiumDeck.find((card) => card.name === "Paracompass");
   const prepareTheWay = data.reserveMarket.find((card) => card.sourceId === 537);
   const limitedLandsraadAccess = data.muadDibCommanderCards.find((card) => card.name === "Limited Landsraad Access");
+  const muadDibSignet = data.muadDibCommanderCards.find((card) => card.name === "Signet Ring");
   const devastatingAssault = data.emperorCommanderCards.find((card) => card.name === "Devastating Assault");
   const emperorSignet = data.emperorCommanderCards.find((card) => card.name === "Signet Ring");
   const imperialOrnithopter = data.emperorCommanderCards.find((card) => card.name === "Imperial Ornithopter");
@@ -116,7 +117,7 @@ try {
     northernWatermaster &&
     paracompass,
   );
-  assert.ok(prepareTheWay && limitedLandsraadAccess && devastatingAssault && emperorSignet && imperialOrnithopter);
+  assert.ok(prepareTheWay && limitedLandsraadAccess && muadDibSignet && devastatingAssault && emperorSignet && imperialOrnithopter);
   assert.ok(arrakeen && haggaBasin && imperialBasin && secrets && highCouncil);
   assert.equal(revealSpecCards.length, 34, "Unexpected number of cards with declarative Reveal specs");
   assert.deepEqual(
@@ -164,6 +165,20 @@ try {
       spec.effects.some((effect) => effect.kind === "draw-cards" && effect.amount === 1)
     ),
     "Prepare The Way should carry a declarative Agent draw spec gated by Bene Gesserit influence",
+  );
+  assert.ok(
+    muadDibSignet.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.conditions?.some((condition) => condition.kind === "has-team" && condition.team === "muaddib") &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Commander") &&
+      spec.effects.some((effect) =>
+        effect.kind === "draw-cards" &&
+        effect.selector === "self" &&
+        effect.amount === 1 &&
+        effect.source === "Lead the Way"
+      )
+    ),
+    "Muad'Dib Signet Ring should carry a declarative Agent draw spec",
   );
   assert.ok(
     makerKeeper.effects?.some((spec) =>
@@ -633,6 +648,17 @@ try {
     () => state.applyCardAgentEffect(invalidRoleConditionCard, p2, p2),
     /Unsupported effect role "Captain"/,
     "Role conditions should reject unsupported role ids",
+  );
+  const invalidDrawCardsSourceCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-draw-cards-source-card",
+    name: "Effect Spec Invalid Draw Cards Source",
+    effects: [agentSpec([{ kind: "draw-cards", selector: "self", amount: 1, source: "" }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidDrawCardsSourceCard, p2, p2),
+    /Invalid draw-cards source ""/,
+    "Draw-card specs should reject empty source labels",
   );
   const invalidSpyPlacementAmountCard = {
     ...convincingArgument,

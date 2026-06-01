@@ -83,6 +83,7 @@ export type AgentDiscardCardForInfluenceAndDraw = {
 
 type PlayerEffectResult = {
   cardsToDraw: number;
+  drawCardsSource?: string;
   blocksDeploymentsThisTurn: boolean;
   deploymentBlockSource?: string;
   intriguesToDraw: number;
@@ -239,6 +240,9 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
   if (effect.kind === "draw-cards") {
     if (effect.selector !== "self") {
       throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
+    if (effect.source !== undefined && (typeof effect.source !== "string" || effect.source.trim().length === 0)) {
+      invalidSpecField("draw-cards source", effect.source);
     }
     validateAmount(effect.amount);
     return;
@@ -516,7 +520,11 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
       throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
     }
     const amount = amountFor(effect.amount, context.source);
-    return { ...result, cardsToDraw: result.cardsToDraw + amount };
+    return {
+      ...result,
+      cardsToDraw: result.cardsToDraw + amount,
+      drawCardsSource: amount > 0 ? result.drawCardsSource ?? effect.source : result.drawCardsSource,
+    };
   }
   if (effect.kind === "draw-intrigues") {
     const amount = amountFor(effect.amount, context.source);
@@ -569,6 +577,7 @@ export function resolveGameEffects(specs: CardEffectSpec[] | undefined, context:
 function mergeEffectResult(result: GameEffectResult, next: GameEffectResult): GameEffectResult {
   return {
     cardsToDraw: result.cardsToDraw + next.cardsToDraw,
+    drawCardsSource: result.drawCardsSource ?? next.drawCardsSource,
     blocksDeploymentsThisTurn: result.blocksDeploymentsThisTurn || next.blocksDeploymentsThisTurn,
     deploymentBlockSource: result.deploymentBlockSource ?? next.deploymentBlockSource,
     intriguesToDraw: result.intriguesToDraw + next.intriguesToDraw,
@@ -587,6 +596,7 @@ function mergeEffectResult(result: GameEffectResult, next: GameEffectResult): Ga
 function mergePlayerEffectResult(result: PlayerEffectResult, next: PlayerEffectResult): PlayerEffectResult {
   return {
     cardsToDraw: result.cardsToDraw + next.cardsToDraw,
+    drawCardsSource: result.drawCardsSource ?? next.drawCardsSource,
     blocksDeploymentsThisTurn: result.blocksDeploymentsThisTurn || next.blocksDeploymentsThisTurn,
     deploymentBlockSource: result.deploymentBlockSource ?? next.deploymentBlockSource,
     intriguesToDraw: result.intriguesToDraw + next.intriguesToDraw,

@@ -7,7 +7,7 @@ This document records bespoke card behavior that should be replaced by reusable 
 Implemented primitives:
 
 - Triggers: `reveal`, `agent-play`
-- Effects: gain persuasion, gain strength, gain resource, draw cards, draw Intrigues, recruit troops, place spies, block Conflict deployment for the current Agent turn, optional Agent card discard for Influence and card draw, optional Reveal troop retreat for strength, optional Reveal card trash for strength, optional Reveal Influence loss for Intrigue draw
+- Effects: gain persuasion, gain strength, gain resource, draw cards with optional ability source labels, draw Intrigues, recruit troops, place spies, block Conflict deployment for the current Agent turn, optional Agent card discard for Influence and card draw, optional Reveal troop retreat for strength, optional Reveal card trash for strength, optional Reveal Influence loss for Intrigue draw
 - Amounts: fixed non-negative integer, completed contract count with optional non-negative integer multiplier
 - Conditions: visited Maker space this round, has at least N own spy posts, has at least N conflict units, has at least N effective Influence, has at least N completed contracts, has at least N cards with a trait in play, has team, has role
 - Selectors: `self`, `activated-ally` for Agent routed troop recruitment
@@ -18,7 +18,7 @@ Unsupported spec shapes, including triggers, intentionally throw instead of fall
 ## Bespoke Handlers To Retire
 
 - `applyCardAgentEffect`
-  - Muad'Dib Commander and Ally signet immediate rewards
+  - Ally signet immediate rewards
 - `pendingActionForCard`
   - Imperial Tent Throne Row movement
   - Commander starter card choices and payments

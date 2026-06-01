@@ -53,7 +53,7 @@ export type GameEffectSpec =
   | { kind: "gain-resource"; selector: PlayerSelector; resource: ResourceId; amount: EffectAmountSpec }
   | { kind: "gain-persuasion"; selector: PlayerSelector; amount: EffectAmountSpec }
   | { kind: "gain-strength"; selector: PlayerSelector; amount: EffectAmountSpec }
-  | { kind: "draw-cards"; selector: PlayerSelector; amount: EffectAmountSpec }
+  | { kind: "draw-cards"; selector: PlayerSelector; amount: EffectAmountSpec; source?: string }
   | { kind: "draw-intrigues"; selector: PlayerSelector; amount: EffectAmountSpec }
   | { kind: "recruit-troops"; selector: PlayerSelector; amount: EffectAmountSpec }
   | {

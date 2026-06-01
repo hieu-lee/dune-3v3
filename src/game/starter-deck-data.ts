@@ -1,6 +1,7 @@
 import catalogJson from "./uprising-catalog.generated.json";
 import {
   agentBlockConflictDeployment,
+  agentDrawCards,
   agentPlayEffects,
   cloneCardEffects,
   revealEffects,
@@ -267,7 +268,10 @@ const muadDibCommanderSpecs: Array<StarterCardSpec & { sourceId: number }> = [
     icons: ["landsraad", "city", "spice"],
     persuasion: 1,
     swords: 0,
-    effects: [revealGainPersuasion(1)],
+    effects: [
+      agentDrawCards(1, { source: "Lead the Way" }, [hasTeam("muaddib"), hasRole("Commander")]),
+      revealGainPersuasion(1),
+    ],
     play: "Lead the Way: draw 1 card.",
     reveal: starterRevealText(1, 0),
   },

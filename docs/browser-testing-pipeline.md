@@ -115,7 +115,7 @@ Current scenarios:
 | `military-choices` | Deploy, reinforce, and blocked reinforce surfaces. |
 | `pending-choices` | Recall spy, lose Influence, conflict Influence, and fixed-choice conflict Influence surfaces. |
 | `space-choices` | Maker, Sietch Tabr, resource split, optional-space payment, and board Influence choice panels. |
-| `signet-choices` | Shaddam and Irulan Signet pending choices. |
+| `signet-choices` | Muad'Dib Signet draw log/state plus Shaddam and Irulan Signet pending choices. |
 | `table-choices` | Reveal adjust, retreat-for-strength, Chani Fremen Bond, Calculus trash, Throne Row, and conflict tie surfaces. |
 | `trade-choices` | Resource and Intrigue trade surfaces. |
 | `leader-modal` | Leader-card modal focus and close behavior. |

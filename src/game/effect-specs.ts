@@ -131,8 +131,23 @@ export function agentBlockConflictDeployment(
   return agentPlayEffects([{ kind: "block-conflict-deployment", selector: "self", ...options }], conditions);
 }
 
-export function agentDrawCards(amount: EffectAmountSpec, conditions?: GameEffectConditionSpec[]): CardEffectSpec {
-  return agentPlayEffects([{ kind: "draw-cards", selector: "self", amount }], conditions);
+export function agentDrawCards(
+  amount: EffectAmountSpec,
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec;
+export function agentDrawCards(
+  amount: EffectAmountSpec,
+  options: { source?: string },
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec;
+export function agentDrawCards(
+  amount: EffectAmountSpec,
+  optionsOrConditions: { source?: string } | GameEffectConditionSpec[] = {},
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  const options = Array.isArray(optionsOrConditions) ? {} : optionsOrConditions;
+  const resolvedConditions = Array.isArray(optionsOrConditions) ? optionsOrConditions : conditions;
+  return agentPlayEffects([{ kind: "draw-cards", selector: "self", amount, ...options }], resolvedConditions);
 }
 
 export function agentDrawIntrigues(

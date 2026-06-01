@@ -46,6 +46,8 @@ export type SandwormEffectDestination = "conflict";
 export type TradeEffectPartner = "same-team-allies";
 export type ContractEffectRecipient = "same-team-allies";
 export type ContractEffectSourcePool = "public-offer";
+export type TeamResourcePaymentContributor = "self-and-same-team-allies";
+export type TeamResourcePaymentRecipient = "self";
 export type EffectAmountSpec =
   | number
   | { kind: "completed-contracts"; multiplier?: number };
@@ -153,6 +155,18 @@ export type GameEffectSpec =
       contractCount: EffectAmountSpec;
       recipient: ContractEffectRecipient;
       sourcePool: ContractEffectSourcePool;
+      optional?: true;
+      trashSource?: boolean;
+      source?: string;
+    }
+  | {
+      kind: "pay-team-resource-for-vp";
+      selector: PlayerSelector;
+      resource: ResourceId;
+      cost: EffectAmountSpec;
+      vp: EffectAmountSpec;
+      contributors: TeamResourcePaymentContributor;
+      recipient: TeamResourcePaymentRecipient;
       optional?: true;
       trashSource?: boolean;
       source?: string;
@@ -625,12 +639,17 @@ export type PendingAction =
       source: string;
     }
   | {
-      kind: "threaten-spice-production";
-      commanderId: string;
+      kind: "team-resource-payment";
+      ownerId: string;
       contributorIds: string[];
       contributions: Record<string, number>;
+      resource: ResourceId;
       cost: number;
+      vp: number;
+      optional: true;
+      trashSource?: boolean;
       cardId: string;
+      spaceId?: string;
       source: string;
     }
   | {

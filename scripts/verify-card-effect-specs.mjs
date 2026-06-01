@@ -97,6 +97,7 @@ try {
   const limitedLandsraadAccess = data.muadDibCommanderCards.find((card) => card.name === "Limited Landsraad Access");
   const demandAttention = data.muadDibCommanderCards.find((card) => card.name === "Demand Attention");
   const desertCall = data.muadDibCommanderCards.find((card) => card.name === "Desert Call");
+  const threatenSpiceProduction = data.muadDibCommanderCards.find((card) => card.name === "Threaten Spice Production");
   const muadDibSignet = data.muadDibCommanderCards.find((card) => card.name === "Signet Ring");
   const usul = data.muadDibCommanderCards.find((card) => card.name === "Usul");
   const corrinoMight = data.emperorCommanderCards.find((card) => card.name === "Corrino Might");
@@ -127,7 +128,7 @@ try {
     northernWatermaster &&
     paracompass,
   );
-  assert.ok(commandRespect && prepareTheWay && limitedLandsraadAccess && demandAttention && desertCall && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
+  assert.ok(commandRespect && prepareTheWay && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
   assert.ok(arrakeen && haggaBasin && imperialBasin && secrets && highCouncil);
   assert.equal(revealSpecCards.length, 34, "Unexpected number of cards with declarative Reveal specs");
   assert.deepEqual(
@@ -246,6 +247,27 @@ try {
       )
     ),
     "Desert Call should carry a typed Agent sandworm-payment spec",
+  );
+  assert.ok(
+    threatenSpiceProduction.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.conditions?.some((condition) => condition.kind === "has-team" && condition.team === "muaddib") &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Commander") &&
+      spec.conditions?.some((condition) => condition.kind === "visited-space-icon" && condition.icon === "spice") &&
+      spec.effects.some((effect) =>
+        effect.kind === "pay-team-resource-for-vp" &&
+        effect.selector === "self" &&
+        effect.resource === "spice" &&
+        effect.cost === 7 &&
+        effect.vp === 1 &&
+        effect.contributors === "self-and-same-team-allies" &&
+        effect.recipient === "self" &&
+        effect.optional === true &&
+        effect.trashSource === true &&
+        effect.source === "Threaten Spice Production"
+      )
+    ),
+    "Threaten Spice Production should carry a typed Agent team resource-for-VP payment spec",
   );
   assert.ok(
     usul.effects?.some((spec) =>

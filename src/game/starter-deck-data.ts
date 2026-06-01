@@ -8,6 +8,7 @@ import {
   agentPayResourceForInfluence,
   agentPayResourceForContracts,
   agentPayResourceForSandworms,
+  agentPayTeamResourceForVp,
   agentPlaceSpies,
   agentPlayEffects,
   agentRecruitTroops,
@@ -362,8 +363,17 @@ const muadDibCommanderSpecs: Array<StarterCardSpec & { sourceId: number }> = [
     icons: ["spice"],
     persuasion: 1,
     swords: 0,
-    effects: [revealGainPersuasion(1)],
-    play: "Resolve the printed spice-production trash effect.",
+    effects: [
+      agentPayTeamResourceForVp(
+        "spice",
+        7,
+        1,
+        { source: "Threaten Spice Production", trashSource: true },
+        [hasTeam("muaddib"), hasRole("Commander"), visitedSpaceIcon("spice")],
+      ),
+      revealGainPersuasion(1),
+    ],
+    play: "You and your Allies may pay 7 spice total to gain 1 VP, then trash this card.",
     reveal: starterRevealText(1, 0),
   },
   {

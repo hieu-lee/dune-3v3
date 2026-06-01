@@ -5,7 +5,7 @@ export function verifyStarterDeckThreatenSpiceProduction({
   conflicts: { nonProtectedDesertCallConflict },
   data,
   game,
-  players: { muadDib, shaddamAlly, muadDibAllyA, emperor, muadDibAllyB },
+  players: { muadDib, shaddamAlly, muadDibAllyA, emperor, muadDibAllyB, shaddamAllyB },
   spaces: { haggaForDesertCall, imperialBasinForDesertCall, spiceRefineryForDesertCall },
   state,
 }) {
@@ -21,8 +21,8 @@ export function verifyStarterDeckThreatenSpiceProduction({
     let next = gameState;
     for (let count = 0; count < amount; count += 1) {
       const pending = next.pendingAction;
-      assert.equal(pending?.kind, "threaten-spice-production", "Expected Threaten Spice Production pending action");
-      next = state.adjustThreatenSpiceProductionContribution(next, pending, contributorId, 1);
+      assert.equal(pending?.kind, "team-resource-payment", "Expected Threaten Spice Production pending action");
+      next = state.adjustTeamResourcePaymentContribution(next, pending, contributorId, 1);
     }
     return next;
   }
@@ -64,16 +64,21 @@ export function verifyStarterDeckThreatenSpiceProduction({
     imperialBasinForDesertCall,
   );
   assert.deepEqual(threatenPending, {
-    kind: "threaten-spice-production",
-    commanderId: muadDib.id,
+    kind: "team-resource-payment",
+    ownerId: muadDib.id,
     contributorIds: [muadDib.id, muadDibAllyA.id, muadDibAllyB.id],
     contributions: {
       [muadDib.id]: 0,
       [muadDibAllyA.id]: 0,
       [muadDibAllyB.id]: 0,
     },
+    resource: "spice",
     cost: 7,
+    vp: 1,
+    optional: true,
+    trashSource: true,
     cardId: threatenSpiceProduction.id,
+    spaceId: imperialBasinForDesertCall.id,
     source: "Threaten Spice Production",
   });
   assert.equal(
@@ -106,9 +111,34 @@ export function verifyStarterDeckThreatenSpiceProduction({
     "Threaten Spice Production should only queue from a spice-icon board space",
   );
   assert.equal(
-    state.pendingActionForCard(threatenSpiceProduction, emperor, baseThreatenGame, shaddamAlly, imperialBasinForDesertCall),
+    state.pendingActionForCard(
+      threatenSpiceProduction,
+      {
+        ...emperor,
+        resources: { solari: 0, spice: 3, water: 1 },
+        playArea: [threatenSpiceProduction],
+      },
+      {
+        ...baseThreatenGame,
+        players: baseThreatenGame.players.map((player) => {
+          if (player.id === emperor.id) {
+            return {
+              ...emperor,
+              resources: { solari: 0, spice: 3, water: 1 },
+              playArea: [threatenSpiceProduction],
+            };
+          }
+          if (player.id === shaddamAlly.id || player.id === shaddamAllyB.id) {
+            return { ...player, resources: { solari: 0, spice: 2, water: 0 } };
+          }
+          return player;
+        }),
+      },
+      { ...shaddamAlly, resources: { solari: 0, spice: 2, water: 0 } },
+      imperialBasinForDesertCall,
+    ),
     undefined,
-    "Threaten Spice Production should not trigger from Shaddam",
+    "Threaten Spice Production should not trigger from Shaddam even if a forged copy is in play",
   );
   assert.equal(
     state.pendingActionForCard(threatenSpiceProduction, muadDibAllyA, baseThreatenGame, muadDibAllyB, imperialBasinForDesertCall),
@@ -142,7 +172,7 @@ export function verifyStarterDeckThreatenSpiceProduction({
       afterImperialBasinThreaten.target,
       imperialBasinForDesertCall,
     )?.kind,
-    "threaten-spice-production",
+    "team-resource-payment",
     "Threaten Spice Production should count spice gained from the visited spice space",
   );
   const controlIncomeThreatenSource = {
@@ -183,7 +213,7 @@ export function verifyStarterDeckThreatenSpiceProduction({
       playerById(controlIncomePostEffect, muadDibAllyA.id),
       imperialBasinForDesertCall,
     )?.kind,
-    "threaten-spice-production",
+    "team-resource-payment",
     "Threaten Spice Production should count critical-location control income before pending-card eligibility is checked",
   );
 
@@ -194,7 +224,7 @@ export function verifyStarterDeckThreatenSpiceProduction({
     log: [],
   };
   assert.equal(
-    state.adjustThreatenSpiceProductionContribution(
+    state.adjustTeamResourcePaymentContribution(
       threatenContributionState,
       threatenPending,
       muadDibAllyA.id,
@@ -207,12 +237,12 @@ export function verifyStarterDeckThreatenSpiceProduction({
   threatenContributionState = addThreatenSpiceContribution(threatenContributionState, muadDibAllyA.id, 2);
   threatenContributionState = addThreatenSpiceContribution(threatenContributionState, muadDibAllyB.id, 2);
   assert.equal(
-    state.threatenSpiceProductionContributionTotal(threatenContributionState.pendingAction),
+    state.teamResourcePaymentContributionTotal(threatenContributionState.pendingAction),
     7,
     "Threaten Spice Production should track exact team spice contributions",
   );
   assert.equal(
-    state.adjustThreatenSpiceProductionContribution(
+    state.adjustTeamResourcePaymentContribution(
       threatenContributionState,
       threatenContributionState.pendingAction,
       muadDibAllyB.id,
@@ -221,7 +251,7 @@ export function verifyStarterDeckThreatenSpiceProduction({
     threatenContributionState,
     "Threaten Spice Production should reject contributions above the 7-spice cost",
   );
-  const resolvedThreatenSpiceProduction = state.resolveThreatenSpiceProductionChoice(
+  const resolvedThreatenSpiceProduction = state.resolveTeamResourcePaymentChoice(
     threatenContributionState,
     threatenContributionState.pendingAction,
   );
@@ -262,7 +292,7 @@ export function verifyStarterDeckThreatenSpiceProduction({
     "Threaten Spice Production should log the team payment",
   );
 
-  const skippedThreatenSpiceProduction = state.skipThreatenSpiceProduction(
+  const skippedThreatenSpiceProduction = state.skipTeamResourcePayment(
     {
       ...baseThreatenGame,
       pendingAction: threatenPending,
@@ -297,9 +327,41 @@ export function verifyStarterDeckThreatenSpiceProduction({
     ),
   };
   assert.equal(
-    state.resolveThreatenSpiceProductionChoice(noCardThreatenState, threatenPending),
+    state.resolveTeamResourcePaymentChoice(noCardThreatenState, threatenPending),
     noCardThreatenState,
     "Threaten Spice Production should not resolve if the card is no longer in play",
+  );
+  assert.equal(
+    state.skipTeamResourcePayment(noCardThreatenState, threatenPending),
+    noCardThreatenState,
+    "Threaten Spice Production should not skip if the source card is no longer in play",
+  );
+  const forgedThreatenSource = {
+    ...threatenSpiceProduction,
+    id: "forged-threaten-spice-production-source",
+    effects: [],
+  };
+  const forgedThreatenPending = {
+    ...threatenPending,
+    cardId: forgedThreatenSource.id,
+  };
+  const forgedThreatenState = {
+    ...baseThreatenGame,
+    pendingAction: forgedThreatenPending,
+    pendingQueue: [],
+    players: baseThreatenGame.players.map((player) =>
+      player.id === muadDib.id ? { ...baseThreatenCommander, playArea: [forgedThreatenSource] } : player,
+    ),
+  };
+  assert.equal(
+    state.resolveTeamResourcePaymentChoice(forgedThreatenState, forgedThreatenPending),
+    forgedThreatenState,
+    "Threaten Spice Production should not resolve when a forged pending points at a card without the team-payment effect",
+  );
+  assert.equal(
+    state.skipTeamResourcePayment(forgedThreatenState, forgedThreatenPending),
+    forgedThreatenState,
+    "Threaten Spice Production should not skip when a forged pending points at a card without the team-payment effect",
   );
   const offTeamThreatenPending = {
     ...threatenPending,
@@ -316,9 +378,14 @@ export function verifyStarterDeckThreatenSpiceProduction({
     pendingQueue: [],
   };
   assert.equal(
-    state.resolveThreatenSpiceProductionChoice(offTeamThreatenState, offTeamThreatenPending),
+    state.resolveTeamResourcePaymentChoice(offTeamThreatenState, offTeamThreatenPending),
     offTeamThreatenState,
     "Threaten Spice Production should reject off-team contributors",
+  );
+  assert.equal(
+    state.skipTeamResourcePayment(offTeamThreatenState, offTeamThreatenPending),
+    offTeamThreatenState,
+    "Threaten Spice Production should not skip an off-team contributor set",
   );
   const overAvailableThreatenPending = {
     ...threatenPending,
@@ -334,9 +401,37 @@ export function verifyStarterDeckThreatenSpiceProduction({
     pendingQueue: [],
   };
   assert.equal(
-    state.resolveThreatenSpiceProductionChoice(overAvailableThreatenState, overAvailableThreatenPending),
+    state.resolveTeamResourcePaymentChoice(overAvailableThreatenState, overAvailableThreatenPending),
     overAvailableThreatenState,
     "Threaten Spice Production should reject contributions above a player's current spice",
+  );
+  const overCostThreatenPending = {
+    ...threatenPending,
+    contributions: {
+      [muadDib.id]: 4,
+      [muadDibAllyA.id]: 2,
+      [muadDibAllyB.id]: 2,
+    },
+  };
+  const overCostThreatenState = {
+    ...baseThreatenGame,
+    pendingAction: overCostThreatenPending,
+    pendingQueue: [],
+    players: baseThreatenGame.players.map((player) =>
+      player.id === muadDib.id
+        ? { ...baseThreatenCommander, resources: { solari: 0, spice: 4, water: 1 } }
+        : player,
+    ),
+  };
+  assert.equal(
+    state.resolveTeamResourcePaymentChoice(overCostThreatenState, overCostThreatenPending),
+    overCostThreatenState,
+    "Threaten Spice Production should reject contributions above the 7-spice cost",
+  );
+  assert.equal(
+    state.skipTeamResourcePayment(overCostThreatenState, overCostThreatenPending),
+    overCostThreatenState,
+    "Threaten Spice Production should not skip malformed over-cost contributions",
   );
   const underpaidThreatenPending = {
     ...threatenPending,
@@ -352,9 +447,62 @@ export function verifyStarterDeckThreatenSpiceProduction({
     pendingQueue: [],
   };
   assert.equal(
-    state.resolveThreatenSpiceProductionChoice(underpaidThreatenState, underpaidThreatenPending),
+    state.resolveTeamResourcePaymentChoice(underpaidThreatenState, underpaidThreatenPending),
     underpaidThreatenState,
     "Threaten Spice Production should reject payments under 7 spice",
+  );
+  const malformedOptionalThreatenPending = {
+    ...threatenPending,
+    optional: false,
+  };
+  const malformedOptionalThreatenState = {
+    ...baseThreatenGame,
+    pendingAction: malformedOptionalThreatenPending,
+    pendingQueue: [],
+  };
+  assert.equal(
+    state.resolveTeamResourcePaymentChoice(malformedOptionalThreatenState, malformedOptionalThreatenPending),
+    malformedOptionalThreatenState,
+    "Threaten Spice Production should reject malformed non-optional pending actions",
+  );
+  assert.equal(
+    state.skipTeamResourcePayment(malformedOptionalThreatenState, malformedOptionalThreatenPending),
+    malformedOptionalThreatenState,
+    "Threaten Spice Production should not skip malformed non-optional pending actions",
+  );
+  const malformedContributionsThreatenPending = {
+    ...threatenPending,
+    contributions: null,
+  };
+  const malformedContributionsThreatenState = {
+    ...baseThreatenGame,
+    pendingAction: malformedContributionsThreatenPending,
+    pendingQueue: [],
+  };
+  assert.equal(
+    state.teamResourcePaymentContributionTotal(malformedContributionsThreatenPending),
+    0,
+    "Threaten Spice Production should render malformed contributions as 0 committed",
+  );
+  assert.equal(
+    state.adjustTeamResourcePaymentContribution(
+      malformedContributionsThreatenState,
+      malformedContributionsThreatenPending,
+      muadDib.id,
+      1,
+    ),
+    malformedContributionsThreatenState,
+    "Threaten Spice Production should not adjust malformed contributions",
+  );
+  assert.equal(
+    state.resolveTeamResourcePaymentChoice(malformedContributionsThreatenState, malformedContributionsThreatenPending),
+    malformedContributionsThreatenState,
+    "Threaten Spice Production should not resolve malformed contributions",
+  );
+  assert.equal(
+    state.skipTeamResourcePayment(malformedContributionsThreatenState, malformedContributionsThreatenPending),
+    malformedContributionsThreatenState,
+    "Threaten Spice Production should not skip malformed contributions",
   );
 
   const makerThreatenCommander = {
@@ -403,7 +551,7 @@ export function verifyStarterDeckThreatenSpiceProduction({
   );
   assert.equal(
     threatenAfterMakerPending?.kind,
-    "threaten-spice-production",
+    "team-resource-payment",
     "Threaten Spice Production should queue when deferred Maker spice could enable payment",
   );
   const afterThreatenMakerSpice = state.resolveMakerChoice(
@@ -429,7 +577,7 @@ export function verifyStarterDeckThreatenSpiceProduction({
   let payableAfterMakerSpice = addThreatenSpiceContribution(afterThreatenMakerSpice, muadDib.id, 5);
   payableAfterMakerSpice = addThreatenSpiceContribution(payableAfterMakerSpice, muadDibAllyA.id, 1);
   payableAfterMakerSpice = addThreatenSpiceContribution(payableAfterMakerSpice, muadDibAllyB.id, 1);
-  const resolvedAfterMakerSpice = state.resolveThreatenSpiceProductionChoice(
+  const resolvedAfterMakerSpice = state.resolveTeamResourcePaymentChoice(
     payableAfterMakerSpice,
     payableAfterMakerSpice.pendingAction,
   );
@@ -457,14 +605,14 @@ export function verifyStarterDeckThreatenSpiceProduction({
   underfundedAfterMakerWorm = addThreatenSpiceContribution(underfundedAfterMakerWorm, muadDibAllyA.id, 1);
   underfundedAfterMakerWorm = addThreatenSpiceContribution(underfundedAfterMakerWorm, muadDibAllyB.id, 1);
   assert.equal(
-    state.resolveThreatenSpiceProductionChoice(
+    state.resolveTeamResourcePaymentChoice(
       underfundedAfterMakerWorm,
       underfundedAfterMakerWorm.pendingAction,
     ),
     underfundedAfterMakerWorm,
     "Threaten Spice Production should not resolve after choosing worms without enough actual spice",
   );
-  const skippedAfterMakerWorm = state.skipThreatenSpiceProduction(
+  const skippedAfterMakerWorm = state.skipTeamResourcePayment(
     underfundedAfterMakerWorm,
     underfundedAfterMakerWorm.pendingAction,
   );

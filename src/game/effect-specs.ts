@@ -16,6 +16,8 @@ import type {
   SandwormEffectDestination,
   SandwormEffectRecipient,
   TeamId,
+  TeamResourcePaymentContributor,
+  TeamResourcePaymentRecipient,
   TradeEffectPartner,
   TradeGoodId,
   TroopEffectDestination,
@@ -265,6 +267,35 @@ export function agentPayResourceForContracts(
       contractCount,
       recipient: options.recipient ?? "same-team-allies",
       sourcePool: options.sourcePool ?? "public-offer",
+      optional: true,
+      ...(options.trashSource ? { trashSource: true } : {}),
+      ...(options.source ? { source: options.source } : {}),
+    },
+  ], conditions);
+}
+
+export function agentPayTeamResourceForVp(
+  resource: ResourceId,
+  cost: EffectAmountSpec,
+  vp: EffectAmountSpec,
+  options: {
+    contributors?: TeamResourcePaymentContributor;
+    recipient?: TeamResourcePaymentRecipient;
+    optional?: true;
+    trashSource?: boolean;
+    source?: string;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return agentPlayEffects([
+    {
+      kind: "pay-team-resource-for-vp",
+      selector: "self",
+      resource,
+      cost,
+      vp,
+      contributors: options.contributors ?? "self-and-same-team-allies",
+      recipient: options.recipient ?? "self",
       optional: true,
       ...(options.trashSource ? { trashSource: true } : {}),
       ...(options.source ? { source: options.source } : {}),

@@ -467,58 +467,69 @@ export function PendingPayResourceForSandwormsPanel({
   );
 }
 
-type PendingThreatenSpiceProductionPanelProps = {
+type PendingTeamResourcePaymentPanelProps = {
   canPay: boolean;
-  commander?: Player;
   contributorIds: string[];
   contributions: Record<string, number>;
   contributors: Player[];
   cost: number;
+  owner?: Player;
+  resource: ResourceId;
+  source: string;
   total: number;
+  vp: number;
   onAdjust: (contributorId: string, delta: number) => void;
   onPay: () => void;
   onSkip: () => void;
 };
 
-export function PendingThreatenSpiceProductionPanel({
+export function PendingTeamResourcePaymentPanel({
   canPay,
-  commander,
   contributorIds,
   contributions,
   contributors,
   cost,
+  owner,
+  resource,
+  source,
   total,
+  vp,
   onAdjust,
   onPay,
   onSkip,
-}: PendingThreatenSpiceProductionPanelProps) {
+}: PendingTeamResourcePaymentPanelProps) {
+  const resourceLabel = resourceLabels[resource];
+  const canRenderPaymentControls = Boolean(resourceLabel) && owner && contributors.length === contributorIds.length;
   return (
     <div className="pending-controls threaten-spice-choice">
-      {commander && contributors.length === contributorIds.length ? (
+      {canRenderPaymentControls ? (
         <>
-          <span>{total}/{cost} spice committed</span>
+          <span>{total}/{cost} {resourceLabel} committed</span>
           <div className="threaten-spice-grid">
             {contributors.map((contributor) => {
-              const contribution = contributions[contributor.id] ?? 0;
+              const rawContribution = contributions[contributor.id] ?? 0;
+              const contribution =
+                Number.isInteger(rawContribution) && rawContribution >= 0 ? rawContribution : 0;
+              const available = contributor.resources[resource];
               return (
                 <div className="threaten-spice-contributor" key={contributor.id}>
                   <strong>{contributor.leader}</strong>
-                  <span>{contribution}/{contributor.resources.spice}</span>
+                  <span>{contribution}/{available}</span>
                   <button
                     type="button"
                     onClick={() => onAdjust(contributor.id, -1)}
                     disabled={contribution <= 0}
-                    title={`Remove 1 spice from ${contributor.leader}`}
-                    aria-label={`Remove 1 spice from ${contributor.leader}`}
+                    title={`Remove 1 ${resourceLabel} from ${contributor.leader}`}
+                    aria-label={`Remove 1 ${resourceLabel} from ${contributor.leader}`}
                   >
                     <Minus size={14} />
                   </button>
                   <button
                     type="button"
                     onClick={() => onAdjust(contributor.id, 1)}
-                    disabled={contribution >= contributor.resources.spice || total >= cost}
-                    title={`Add 1 spice from ${contributor.leader}`}
-                    aria-label={`Add 1 spice from ${contributor.leader}`}
+                    disabled={contribution >= available || total >= cost}
+                    title={`Add 1 ${resourceLabel} from ${contributor.leader}`}
+                    aria-label={`Add 1 ${resourceLabel} from ${contributor.leader}`}
                   >
                     <Plus size={14} />
                   </button>
@@ -528,11 +539,11 @@ export function PendingThreatenSpiceProductionPanel({
           </div>
           <button type="button" onClick={onPay} disabled={!canPay}>
             <Sparkles size={15} />
-            Pay {cost}: +1 VP
+            Pay {cost}: +{vp} VP
           </button>
         </>
       ) : (
-        <span>Threaten Spice Production can no longer resolve with the current table state.</span>
+        <span>{source} can no longer resolve with the current table state.</span>
       )}
       <button type="button" onClick={onSkip}>Skip</button>
     </div>

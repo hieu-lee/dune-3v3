@@ -1,6 +1,7 @@
 import { memoryCountLabel, troopSupplyLabel } from "../app-helpers";
 import { criticalLocationNames } from "../game/critical-locations";
 import { boardSpaces, factionLabels, iconLabels, teams } from "../game/data";
+import { resolveAgentPayTeamResourceForVps } from "../game/effect-resolver";
 import {
   acquirableCardsForPending,
   canResolveRetreatTroopsForStrength,
@@ -17,7 +18,6 @@ import {
   playerTroopSupply,
   recallableSpySpaces,
   recallableSpySupplySpaces,
-  threatenSpiceProductionContributionTotal,
   trashableCardsForPending,
 } from "../game/state";
 import type {
@@ -30,7 +30,7 @@ import type {
   ShaddamSignetRingChoice,
   StabanUnseenNetworkChoice,
 } from "../game/state";
-import type { FactionId, GameState, PendingAction, Player, TradeGoodId, TrashCardZone } from "../game/types";
+import type { FactionId, GameState, PendingAction, Player, ResourceId, TradeGoodId, TrashCardZone } from "../game/types";
 import { PendingBoardInfluenceChoicePanel, PendingOptionalSpacePaymentPanel } from "./PendingBoardChoicePanels";
 import { PendingAcquireCardPanel, PendingContractPanel } from "./PendingCardChoicePanels";
 import { PendingDiscardInfluenceDrawPanel, PendingInfluenceIntriguePanel } from "./PendingCapturedMentatPanel";
@@ -50,7 +50,7 @@ import {
   PendingPayResourceForStrengthPanel,
   PendingPayResourceForTroopsPanel,
   PendingStabanUnseenNetworkPanel,
-  PendingThreatenSpiceProductionPanel,
+  PendingTeamResourcePaymentPanel,
   PendingTrashSourceForTradePanel,
 } from "./PendingLeaderChoicePanels";
 import { PendingMakerChoicePanel } from "./PendingMakerChoicePanel";
@@ -74,7 +74,7 @@ type PendingActionPanelProps = {
   pendingAction: PendingAction;
   acquirePendingCard: (cardId: string) => void;
   adjustRevealReward: (persuasionDelta: number, strengthDelta: number) => void;
-  adjustThreatenSpiceProduction: (contributorId: string, delta: number) => void;
+  adjustTeamResourcePayment: (contributorId: string, delta: number) => void;
   chooseCommanderResourceSplit: (optionIndex: number) => void;
   chooseConflictInfluence: (faction: FactionId) => void;
   chooseBoardInfluence: (ownerId: string, faction: FactionId) => void;
@@ -97,7 +97,7 @@ type PendingActionPanelProps = {
   chooseShaddamSignet: (choice: ShaddamSignetRingChoice) => void;
   chooseSietchTabr: (choice: "hooks" | "shield-wall") => void;
   chooseStabanUnseenNetwork: (choice: StabanUnseenNetworkChoice) => void;
-  chooseThreatenSpiceProduction: () => void;
+  chooseTeamResourcePayment: () => void;
   chooseThroneRowCard: (cardId: string) => void;
   chooseTrashSourceForTrade: (partnerId: string) => void;
   clearPendingAction: () => void;
@@ -126,7 +126,7 @@ type PendingActionPanelProps = {
   skipPayResourceForTroopsChoice: () => void;
   skipRecall: () => void;
   skipRetreatTroopsForStrengthChoice: () => void;
-  skipThreatenSpiceProductionChoice: () => void;
+  skipTeamResourcePaymentChoice: () => void;
   skipTrash: () => void;
   skipTrashSourceForTradeChoice: () => void;
   takeContract: (contractId: string) => void;
@@ -135,12 +135,145 @@ type PendingActionPanelProps = {
   updateTrade: (resource: TradeGoodId, partnerId?: string) => void;
 };
 
+const teamResourcePaymentResourceIds: ResourceId[] = ["solari", "spice", "water"];
+
+function isTeamResourcePaymentResource(value: unknown): value is ResourceId {
+  return teamResourcePaymentResourceIds.includes(value as ResourceId);
+}
+
+function isPositiveInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value > 0;
+}
+
+function teamResourcePaymentRuntimeShape(pendingAction: PendingAction, game: GameState): {
+  contributorIds: string[];
+  contributions: Record<string, number>;
+  contributors: Player[];
+  cost: number;
+  owner?: Player;
+  resource: ResourceId;
+  source: string;
+  total: number;
+  valid: boolean;
+  vp: number;
+} {
+  const fallback = {
+    contributorIds: [],
+    contributions: {},
+    contributors: [],
+    cost: 0,
+    resource: "spice" as ResourceId,
+    source: "Team resource payment",
+    total: 0,
+    valid: false,
+    vp: 0,
+  };
+  if (pendingAction.kind !== "team-resource-payment") {
+    return fallback;
+  }
+
+  const rawPending = pendingAction as unknown as Record<string, unknown>;
+  let valid = true;
+  const resource = isTeamResourcePaymentResource(rawPending.resource) ? rawPending.resource : fallback.resource;
+  if (!isTeamResourcePaymentResource(rawPending.resource)) valid = false;
+  const cost = isPositiveInteger(rawPending.cost) ? rawPending.cost : 0;
+  if (!isPositiveInteger(rawPending.cost)) valid = false;
+  const vp = isPositiveInteger(rawPending.vp) ? rawPending.vp : 0;
+  if (!isPositiveInteger(rawPending.vp)) valid = false;
+  const source = typeof rawPending.source === "string" && rawPending.source.trim() ? rawPending.source : fallback.source;
+  if (typeof rawPending.source !== "string" || !rawPending.source.trim()) valid = false;
+  if (rawPending.optional !== true) valid = false;
+  if (rawPending.trashSource !== undefined && typeof rawPending.trashSource !== "boolean") valid = false;
+  const cardId = typeof rawPending.cardId === "string" && rawPending.cardId ? rawPending.cardId : undefined;
+  if (!cardId) valid = false;
+  const owner = typeof rawPending.ownerId === "string"
+    ? game.players.find((player) => player.id === rawPending.ownerId)
+    : undefined;
+  if (!owner || owner.role !== "Commander") valid = false;
+  const sourceCard = owner && cardId ? owner.playArea.find((card) => card.id === cardId) : undefined;
+  if (!sourceCard?.effects) valid = false;
+
+  const rawContributorIds = rawPending.contributorIds;
+  const contributorIds = Array.isArray(rawContributorIds)
+    ? rawContributorIds.filter((contributorId): contributorId is string => typeof contributorId === "string")
+    : [];
+  if (
+    !Array.isArray(rawContributorIds) ||
+    contributorIds.length !== rawContributorIds.length ||
+    contributorIds.length !== 3 ||
+    new Set(contributorIds).size !== contributorIds.length ||
+    (owner && contributorIds[0] !== owner.id)
+  ) {
+    valid = false;
+  }
+  const contributors = contributorIds
+    .map((contributorId) => game.players.find((player) => player.id === contributorId))
+    .filter((player): player is Player => Boolean(player));
+  if (contributors.length !== contributorIds.length) valid = false;
+  if (
+    owner &&
+    contributors.slice(1).some((contributor) => contributor.team !== owner.team || contributor.role !== "Ally")
+  ) {
+    valid = false;
+  }
+
+  const rawContributions = rawPending.contributions;
+  if (!rawContributions || typeof rawContributions !== "object" || Array.isArray(rawContributions)) {
+    return { ...fallback, contributorIds, contributors, cost, owner, resource, source, vp };
+  }
+  const contributorIdSet = new Set(contributorIds);
+  const contributions: Record<string, number> = {};
+  for (const [contributorId, amount] of Object.entries(rawContributions)) {
+    if (!contributorIdSet.has(contributorId) && amount !== 0) valid = false;
+    if (typeof amount !== "number" || !Number.isFinite(amount) || !Number.isInteger(amount) || amount < 0) {
+      valid = false;
+      continue;
+    }
+    contributions[contributorId] = amount;
+  }
+  let total = 0;
+  for (const contributorId of contributorIds) {
+    total += contributions[contributorId] ?? 0;
+  }
+  if (cost <= 0 || total > cost) valid = false;
+  for (const contributor of contributors) {
+    if ((contributions[contributor.id] ?? 0) > contributor.resources[resource]) valid = false;
+  }
+  if (owner && sourceCard?.effects) {
+    const space = typeof rawPending.spaceId === "string"
+      ? boardSpaces.find((candidate) => candidate.id === rawPending.spaceId)
+      : undefined;
+    try {
+      const sourceCardSupportsPending = resolveAgentPayTeamResourceForVps(sourceCard.effects, {
+        trigger: "agent-play",
+        source: owner,
+        ...(space ? { space } : {}),
+        state: game,
+      }).some((effect) =>
+        effect.selector === "self" &&
+        effect.resource === resource &&
+        effect.cost === cost &&
+        effect.vp === vp &&
+        effect.contributors === "self-and-same-team-allies" &&
+        effect.recipient === "self" &&
+        effect.optional === true &&
+        effect.trashSource === (rawPending.trashSource === true) &&
+        (effect.source ?? sourceCard.name) === source
+      );
+      if (!sourceCardSupportsPending) valid = false;
+    } catch {
+      valid = false;
+    }
+  }
+  return { contributorIds, contributions, contributors, cost, owner, resource, source, total, valid, vp };
+}
+
 export function PendingActionPanel({
   game,
   pendingAction,
   acquirePendingCard,
   adjustRevealReward,
-  adjustThreatenSpiceProduction,
+  adjustTeamResourcePayment,
   chooseCommanderResourceSplit,
   chooseConflictInfluence,
   chooseBoardInfluence,
@@ -163,7 +296,7 @@ export function PendingActionPanel({
   chooseShaddamSignet,
   chooseSietchTabr,
   chooseStabanUnseenNetwork,
-  chooseThreatenSpiceProduction,
+  chooseTeamResourcePayment,
   chooseThroneRowCard,
   chooseTrashSourceForTrade,
   clearPendingAction,
@@ -192,7 +325,7 @@ export function PendingActionPanel({
   skipPayResourceForTroopsChoice,
   skipRecall,
   skipRetreatTroopsForStrengthChoice,
-  skipThreatenSpiceProductionChoice,
+  skipTeamResourcePaymentChoice,
   skipTrash,
   skipTrashSourceForTradeChoice,
   takeContract,
@@ -323,26 +456,25 @@ export function PendingActionPanel({
     pendingAction.kind === "pay-resource-for-sandworms"
       ? game.players.find((player) => player.id === pendingAction.recipientId)
       : undefined;
-  const pendingThreatenSpiceCommander =
-    pendingAction.kind === "threaten-spice-production"
-      ? game.players.find((player) => player.id === pendingAction.commanderId)
-      : undefined;
-  const pendingThreatenSpiceContributors =
-    pendingAction.kind === "threaten-spice-production"
-      ? pendingAction.contributorIds
-          .map((contributorId) => game.players.find((player) => player.id === contributorId))
-          .filter((player): player is Player => Boolean(player))
+  const pendingTeamResourcePaymentShape = teamResourcePaymentRuntimeShape(pendingAction, game);
+  const pendingTeamResourcePaymentOwner = pendingTeamResourcePaymentShape.owner;
+  const pendingTeamResourcePaymentContributors =
+    pendingAction.kind === "team-resource-payment" && pendingTeamResourcePaymentShape.valid
+      ? pendingTeamResourcePaymentShape.contributors
       : [];
-  const pendingThreatenSpiceTotal =
-    pendingAction.kind === "threaten-spice-production"
-      ? threatenSpiceProductionContributionTotal(pendingAction)
-      : 0;
-  const pendingThreatenSpiceCanPay =
-    pendingAction.kind === "threaten-spice-production" &&
-    pendingThreatenSpiceContributors.length === pendingAction.contributorIds.length &&
-    pendingThreatenSpiceTotal === pendingAction.cost &&
-    pendingThreatenSpiceContributors.every(
-      (contributor) => (pendingAction.contributions[contributor.id] ?? 0) <= contributor.resources.spice,
+  const pendingTeamResourcePaymentTotal = pendingTeamResourcePaymentShape.total;
+  const pendingTeamResourcePaymentCanPay =
+    pendingAction.kind === "team-resource-payment" &&
+    pendingTeamResourcePaymentShape.valid &&
+    pendingTeamResourcePaymentContributors.length === pendingTeamResourcePaymentShape.contributorIds.length &&
+    pendingTeamResourcePaymentTotal === pendingTeamResourcePaymentShape.cost &&
+    Object.entries(pendingTeamResourcePaymentShape.contributions).every(
+      ([contributorId, amount]) => pendingTeamResourcePaymentShape.contributorIds.includes(contributorId) || amount === 0,
+    ) &&
+    pendingTeamResourcePaymentContributors.every(
+      (contributor) =>
+        (pendingTeamResourcePaymentShape.contributions[contributor.id] ?? 0) <=
+          contributor.resources[pendingTeamResourcePaymentShape.resource],
     );
   const pendingThroneOwner =
     pendingAction.kind === "throne-row" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
@@ -499,7 +631,7 @@ export function PendingActionPanel({
           {pendingAction.kind === "pay-resource-for-influence" && `${pendingPayResourceInfluenceOwner?.leader ?? "Player"} ${pendingAction.source}`}
           {pendingAction.kind === "pay-resource-for-troops" && `${pendingPayResourceTroopsOwner?.leader ?? "Player"} ${pendingAction.source}`}
           {pendingAction.kind === "pay-resource-for-sandworms" && `${pendingPayResourceSandwormsOwner?.leader ?? "Player"} ${pendingAction.source}`}
-          {pendingAction.kind === "threaten-spice-production" && `${pendingThreatenSpiceCommander?.leader ?? "Muad'Dib"} Threaten Spice Production`}
+          {pendingAction.kind === "team-resource-payment" && `${pendingTeamResourcePaymentOwner?.leader ?? "Player"} ${pendingAction.source}`}
           {pendingAction.kind === "throne-row" && `${pendingThroneOwner?.leader ?? "Shaddam"} Throne Row`}
           {pendingAction.kind === "trash-card" && `${pendingTrashOwner?.leader ?? "Player"} ${pendingAction.optional ? "optional " : ""}trash from ${pendingAction.source}`}
           {pendingAction.kind === "recall-spy" && `${pendingRecallSpyOwner?.leader ?? "Player"} recall spy`}
@@ -800,18 +932,21 @@ export function PendingActionPanel({
         />
       )}
 
-      {pendingAction.kind === "threaten-spice-production" && (
-        <PendingThreatenSpiceProductionPanel
-          canPay={pendingThreatenSpiceCanPay}
-          commander={pendingThreatenSpiceCommander}
-          contributorIds={pendingAction.contributorIds}
-          contributions={pendingAction.contributions}
-          contributors={pendingThreatenSpiceContributors}
-          cost={pendingAction.cost}
-          total={pendingThreatenSpiceTotal}
-          onAdjust={adjustThreatenSpiceProduction}
-          onPay={chooseThreatenSpiceProduction}
-          onSkip={skipThreatenSpiceProductionChoice}
+      {pendingAction.kind === "team-resource-payment" && (
+        <PendingTeamResourcePaymentPanel
+          canPay={pendingTeamResourcePaymentCanPay}
+          contributorIds={pendingTeamResourcePaymentShape.contributorIds}
+          contributions={pendingTeamResourcePaymentShape.contributions}
+          contributors={pendingTeamResourcePaymentContributors}
+          cost={pendingTeamResourcePaymentShape.cost}
+          owner={pendingTeamResourcePaymentShape.valid ? pendingTeamResourcePaymentOwner : undefined}
+          resource={pendingTeamResourcePaymentShape.resource}
+          source={pendingTeamResourcePaymentShape.source}
+          total={pendingTeamResourcePaymentTotal}
+          vp={pendingTeamResourcePaymentShape.vp}
+          onAdjust={adjustTeamResourcePayment}
+          onPay={chooseTeamResourcePayment}
+          onSkip={skipTeamResourcePaymentChoice}
         />
       )}
 

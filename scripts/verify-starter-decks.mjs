@@ -43,7 +43,7 @@ try {
     conflicts: { nonProtectedDesertCallConflict },
     data,
     game,
-    players: { muadDib, shaddamAlly, muadDibAllyA, emperor, muadDibAllyB },
+    players: { muadDib, shaddamAlly, muadDibAllyA, emperor, muadDibAllyB, shaddamAllyB },
     spaces: { haggaForDesertCall, imperialBasinForDesertCall, spiceRefineryForDesertCall },
     state,
   });

@@ -408,12 +408,11 @@ export {
 } from "./troop-retreat-rules";
 
 export {
-  adjustThreatenSpiceProductionContribution,
-  resolveThreatenSpiceProductionChoice,
-  skipThreatenSpiceProduction,
-  threatenSpiceProductionContributionTotal,
-  threatenSpiceProductionCost,
-} from "./threaten-spice-production";
+  adjustTeamResourcePaymentContribution,
+  resolveTeamResourcePaymentChoice,
+  skipTeamResourcePayment,
+  teamResourcePaymentContributionTotal,
+} from "./team-resource-payment-rules";
 
 export { trashableCards, trashableCardsForPending } from "./trash-rules";
 

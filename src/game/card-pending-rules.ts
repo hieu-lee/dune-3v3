@@ -3,7 +3,6 @@ import {
   canMoveCardToThroneRow,
   isGenericSignetRingCard,
   isShaddamSignetRingCard,
-  isThreatenSpiceProductionCommanderCard,
 } from "./card-identifiers";
 import {
   canSummonSandworms,
@@ -18,6 +17,7 @@ import {
   resolveAgentPayResourceForContracts,
   resolveAgentPayResourceForInfluences,
   resolveAgentPayResourceForSandworms,
+  resolveAgentPayTeamResourceForVps,
   resolveAgentTrashSourceForTrades,
   resolveCardEffects,
   resolveRevealLoseInfluenceForIntrigues,
@@ -45,7 +45,6 @@ import {
   recallableSpySpaces,
   recallableSpySupplySpaces,
 } from "./spy-choices";
-import { threatenSpiceProductionCost } from "./threaten-spice-production";
 import { trashableCardsForPending } from "./trash-rules";
 import { hasUsedReverendMotherJessicaRepeat } from "./turn-trackers";
 import type {
@@ -337,6 +336,60 @@ function pendingActionForAgentPayResourceForContracts(
     .find((pending): pending is PendingAction => Boolean(pending));
 }
 
+function pendingActionForAgentPayTeamResourceForVp(
+  card: Card,
+  source: Player,
+  state?: GameState,
+  target?: Player,
+  space?: BoardSpace,
+): PendingAction | undefined {
+  if (!card.effects || !source.playArea.some((candidate) => candidate.id === card.id)) return undefined;
+  if (!state || source.role !== "Commander") return undefined;
+  const players = playersWithPendingCardEffect(state, source, target);
+  const effectState = { ...state, players };
+  const effects = resolveAgentPayTeamResourceForVps(card.effects, {
+    trigger: "agent-play",
+    source,
+    target,
+    space,
+    state: effectState,
+  });
+  return effects
+    .map((effect): PendingAction | undefined => {
+      if (effect.selector !== "self" || effect.contributors !== "self-and-same-team-allies" || effect.recipient !== "self") {
+        return undefined;
+      }
+      if (effect.cost <= 0 || effect.vp <= 0) return undefined;
+      const allies = sameTeamAllies(effectState.players, source);
+      if (!allies) return undefined;
+      const contributors = [
+        effectState.players.find((player) => player.id === source.id) ?? source,
+        ...allies,
+      ];
+      const deferredResource = effect.resource === "spice" && space
+        ? potentialDeferredMakerChoiceSpice(state, source, target, space)
+        : 0;
+      const totalResource =
+        contributors.reduce((sum, contributor) => sum + contributor.resources[effect.resource], 0) + deferredResource;
+      if (totalResource < effect.cost) return undefined;
+      return {
+        kind: "team-resource-payment",
+        ownerId: source.id,
+        contributorIds: contributors.map((contributor) => contributor.id),
+        contributions: Object.fromEntries(contributors.map((contributor) => [contributor.id, 0])),
+        resource: effect.resource,
+        cost: effect.cost,
+        vp: effect.vp,
+        optional: effect.optional,
+        ...(effect.trashSource ? { trashSource: true } : {}),
+        cardId: card.id,
+        ...(space ? { spaceId: space.id } : {}),
+        source: effect.source ?? card.name,
+      };
+    })
+    .find((pending): pending is PendingAction => Boolean(pending));
+}
+
 function pendingActionForAgentThroneRowMove(
   card: Card,
   source: Player,
@@ -449,6 +502,8 @@ export function pendingActionForCard(
   if (agentPayResourceSandwormsPending) return agentPayResourceSandwormsPending;
   const agentPayResourceContractsPending = pendingActionForAgentPayResourceForContracts(card, source, state, target);
   if (agentPayResourceContractsPending) return agentPayResourceContractsPending;
+  const agentPayTeamResourceVpPending = pendingActionForAgentPayTeamResourceForVp(card, source, state, target, space);
+  if (agentPayTeamResourceVpPending) return agentPayTeamResourceVpPending;
   const agentThroneRowPending = pendingActionForAgentThroneRowMove(card, source, state, target);
   if (agentThroneRowPending) return agentThroneRowPending;
   const agentCommanderResourceSplitPending = pendingActionForAgentCommanderResourceSplit(card, source, state, target);
@@ -514,34 +569,6 @@ export function pendingActionForCard(
       ownerId: source.id,
       cardId: card.id,
       source: "Water of Life",
-    };
-  }
-  if (
-    isThreatenSpiceProductionCommanderCard(card) &&
-    source.team === "muaddib" &&
-    source.role === "Commander" &&
-    state &&
-    space?.icon === "spice"
-  ) {
-    const players = playersWithPendingCardEffect(state, source, target);
-    const allies = sameTeamAllies(players, source);
-    if (!allies) return undefined;
-    const contributors = [
-      players.find((player) => player.id === source.id) ?? source,
-      ...allies,
-    ];
-    const totalSpice =
-      contributors.reduce((sum, contributor) => sum + contributor.resources.spice, 0) +
-      potentialDeferredMakerChoiceSpice(state, source, target, space);
-    if (totalSpice < threatenSpiceProductionCost) return undefined;
-    return {
-      kind: "threaten-spice-production",
-      commanderId: source.id,
-      contributorIds: contributors.map((contributor) => contributor.id),
-      contributions: Object.fromEntries(contributors.map((contributor) => [contributor.id, 0])),
-      cost: threatenSpiceProductionCost,
-      cardId: card.id,
-      source: card.name,
     };
   }
   return undefined;

@@ -317,6 +317,16 @@ export async function runLeaderCharacterChoicesSmoke({
     false,
     "Threaten Spice Production should trash the card",
   );
+
+  await setDebugGameAndWait(page, states.malformedTeamResourcePayment);
+  pendingText = await page.locator(".pending-panel").innerText();
+  assert.match(pendingText, /Threaten Spice Production can no longer resolve/i);
+  assert.equal(
+    await page.locator(".pending-panel").getByRole("button", { name: /Pay 7: \+1 VP/ }).count(),
+    0,
+    "Malformed team resource payment should not render active payment controls",
+  );
+  await screenshot(page, captures, "pending-team-resource-payment-malformed.png");
 }
 
 async function createLeaderCharacterChoiceStates(server, initialPlayableGame) {
@@ -470,6 +480,32 @@ async function createLeaderCharacterChoiceStates(server, initialPlayableGame) {
     arrakeen,
   );
   assert.ok(commandRespectPending, "Expected a derived Command Respect trash-source trade pending action");
+  const debugThreatenSpice = { ...threatenSpice, id: "debug-team-resource-payment" };
+  const threatenSpiceProductionState = {
+    ...base,
+    activeSeat: p1Seat,
+    players: base.players.map((player) => {
+      if (player.id === "p1") {
+        return {
+          ...player,
+          resources: { ...player.resources, spice: 3 },
+          playArea: [debugThreatenSpice, ...player.playArea],
+        };
+      }
+      if (player.id === "p3" || player.id === "p5") {
+        return { ...player, resources: { ...player.resources, spice: 3 } };
+      }
+      return player;
+    }),
+  };
+  const threatenSpiceProductionPending = state.pendingActionForCard(
+    debugThreatenSpice,
+    threatenSpiceProductionState.players.find((player) => player.id === "p1"),
+    threatenSpiceProductionState,
+    threatenSpiceProductionState.players.find((player) => player.id === "p3"),
+    imperialBasin,
+  );
+  assert.ok(threatenSpiceProductionPending, "Expected a derived Threaten Spice Production team payment pending action");
   const debugDemandResults = { ...demandResults, id: "debug-demand-results" };
   const demandResultsState = {
     ...base,
@@ -627,29 +663,16 @@ async function createLeaderCharacterChoiceStates(server, initialPlayableGame) {
       pendingAction: desertCallPending,
     },
     threatenSpiceProduction: {
-      ...base,
-      activeSeat: p1Seat,
-      players: base.players.map((player) => {
-        if (player.id === "p1") {
-          return {
-            ...player,
-            resources: { ...player.resources, spice: 3 },
-            playArea: [{ ...threatenSpice, id: "debug-threaten-spice-production" }, ...player.playArea],
-          };
-        }
-        if (player.id === "p3" || player.id === "p5") {
-          return { ...player, resources: { ...player.resources, spice: 3 } };
-        }
-        return player;
-      }),
+      ...threatenSpiceProductionState,
+      pendingAction: threatenSpiceProductionPending,
+    },
+    malformedTeamResourcePayment: {
+      ...threatenSpiceProductionState,
       pendingAction: {
-        kind: "threaten-spice-production",
-        commanderId: "p1",
-        contributorIds: ["p1", "p3", "p5"],
-        contributions: {},
-        cost: 7,
-        cardId: "debug-threaten-spice-production",
-        source: "Threaten Spice Production",
+        ...threatenSpiceProductionPending,
+        contributorIds: ["p1", "p1"],
+        contributions: null,
+        cost: { value: 7 },
       },
     },
   };
@@ -686,7 +709,7 @@ async function addThreatenSpice(page, leaderName, expectedTotal) {
   await page.waitForFunction(
     (total) => {
       const pending = window.__DUNE_DEBUG__?.getGame().pendingAction;
-      if (pending?.kind !== "threaten-spice-production") return false;
+      if (pending?.kind !== "team-resource-payment") return false;
       return Object.values(pending.contributions).reduce((sum, amount) => sum + amount, 0) === total;
     },
     expectedTotal,

@@ -2,7 +2,7 @@ import type { Dispatch, SetStateAction } from "react";
 import { activatedAllyIdFor } from "./app-turn-actions";
 import {
   acquireCardForPending,
-  adjustThreatenSpiceProductionContribution,
+  adjustTeamResourcePaymentContribution,
   collectChoamContractFallback,
   deployControlDefenseTroop,
   deployTroopToConflict,
@@ -41,7 +41,7 @@ import {
   resolveShaddamSignetRingChoice,
   resolveSietchTabrChoice,
   resolveStabanUnseenNetworkChoice,
-  resolveThreatenSpiceProductionChoice,
+  resolveTeamResourcePaymentChoice,
   resolveTrashSourceForTradeChoice,
   scoreGurneyAlwaysSmiling,
   skipConflictVpConversion,
@@ -57,7 +57,7 @@ import {
   skipPayResourceForTroops,
   skipRecallSpy,
   skipRetreatTroopsForStrength,
-  skipThreatenSpiceProduction,
+  skipTeamResourcePayment,
   skipTrashCard,
   skipTrashSourceForTrade,
   startNextRound,
@@ -216,12 +216,12 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     runPending("pay-resource-for-sandworms", (current, pending) => maybeStartCombatPhase(resolvePayResourceForSandwormsChoice(current, pending)));
   const skipPayResourceForSandwormsChoice = () =>
     runPending("pay-resource-for-sandworms", (current, pending) => maybeStartCombatPhase(skipPayResourceForSandworms(current, pending)));
-  const adjustThreatenSpiceProduction = (contributorId: string, delta: number) =>
-    runPending("threaten-spice-production", (current, pending) => adjustThreatenSpiceProductionContribution(current, pending, contributorId, delta));
-  const chooseThreatenSpiceProduction = () =>
-    runPending("threaten-spice-production", (current, pending) => maybeStartCombatPhase(resolveThreatenSpiceProductionChoice(current, pending)));
-  const skipThreatenSpiceProductionChoice = () =>
-    runPending("threaten-spice-production", (current, pending) => maybeStartCombatPhase(skipThreatenSpiceProduction(current, pending)));
+  const adjustTeamResourcePayment = (contributorId: string, delta: number) =>
+    runPending("team-resource-payment", (current, pending) => adjustTeamResourcePaymentContribution(current, pending, contributorId, delta));
+  const chooseTeamResourcePayment = () =>
+    runPending("team-resource-payment", (current, pending) => maybeStartCombatPhase(resolveTeamResourcePaymentChoice(current, pending)));
+  const skipTeamResourcePaymentChoice = () =>
+    runPending("team-resource-payment", (current, pending) => maybeStartCombatPhase(skipTeamResourcePayment(current, pending)));
   const deployOne = () =>
     runPending("deploy", (current, pending) => {
       const deployed = deployTroopToConflict(current, pending);
@@ -281,7 +281,7 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
   return {
     acquirePendingCard,
     adjustRevealReward,
-    adjustThreatenSpiceProduction,
+    adjustTeamResourcePayment,
     chooseCommanderResourceSplit,
     chooseConflictInfluence,
     chooseBoardInfluence,
@@ -304,7 +304,7 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     chooseShaddamSignet,
     chooseSietchTabr,
     chooseStabanUnseenNetwork,
-    chooseThreatenSpiceProduction,
+    chooseTeamResourcePayment,
     chooseTrashSourceForTrade,
     chooseThroneRowCard,
     clearPendingAction,
@@ -333,7 +333,7 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     skipPayResourceForTroopsChoice,
     skipRecall,
     skipRetreatTroopsForStrengthChoice,
-    skipThreatenSpiceProductionChoice,
+    skipTeamResourcePaymentChoice,
     skipTrash,
     skipTrashSourceForTradeChoice,
     takeContract,

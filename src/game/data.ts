@@ -1,5 +1,6 @@
 import catalogJson from "./uprising-catalog.generated.json";
 import {
+  beneGesseritOperativeSourceId,
   calculusOfPowerSourceId,
   capturedMentatSourceId,
   interstellarTradeSourceId,
@@ -176,6 +177,9 @@ function imperiumRevealText(card: HubCard, persuasion: number, swords: number, p
   if (card.id === capturedMentatSourceId) {
     return "+1 persuasion. You may lose 1 Influence to draw 1 Intrigue.";
   }
+  if (card.id === beneGesseritOperativeSourceId) {
+    return "+1 persuasion. If you have two or more spies on the board, +2 persuasion.";
+  }
   return printedReveal ? "Resolve printed reveal text." : revealText(persuasion, swords);
 }
 
@@ -218,6 +222,26 @@ function toImperiumCard(card: HubCard): Card {
       sourceSlug: card.slug,
       sourceType: card.type,
       traits: card.attributes.map(([name]) => name),
+    };
+  }
+  if (card.id === beneGesseritOperativeSourceId) {
+    return {
+      id: `hub-${card.id}`,
+      name: card.name,
+      icons: card.attributes.flatMap(([name]) => iconAttributeMap[name] ?? []),
+      persuasion: 1,
+      swords: 0,
+      conditionalPersuasion: false,
+      conditionalSwords: false,
+      play: "Place 1 spy.",
+      reveal: imperiumRevealText(card, 1, 0, false),
+      cost: 3,
+      imagePath: card.localImagePath ?? card.fullImageUrl ?? undefined,
+      thumbnailPath: card.localThumbnailPath ?? card.thumbnailImageUrl ?? undefined,
+      sourceId: card.id,
+      sourceSlug: card.slug,
+      sourceType: card.type,
+      traits: ["Faction: Bene Gesserit"],
     };
   }
   const persuasion = attributeNumber(card, "Persuasion on reveal");

@@ -439,7 +439,7 @@ export function PendingActionPanel({
           {pendingAction.kind === "control-defense" && `${pendingControlDefenseOwner?.leader ?? "Player"} control deployment`}
           {pendingAction.kind === "reinforce" && `Military Support - ${pendingAction.remaining} troops`}
           {pendingAction.kind === "trade" && `Trade from ${pendingAction.source}`}
-          {pendingAction.kind === "spy" && `${pendingAction.placementIcon ? `${iconLabels[pendingAction.placementIcon]} ` : ""}Spy placement - ${pendingAction.remaining}`}
+          {pendingAction.kind === "spy" && `${pendingAction.source}${pendingAction.placementIcon ? ` ${iconLabels[pendingAction.placementIcon]}` : ""} spy placement - ${pendingAction.remaining}`}
           {pendingAction.kind === "reveal-adjust" && "Printed reveal adjustment"}
           {pendingAction.kind === "contract" && `${pendingContractOwner?.leader ?? "Player"} CHOAM contract`}
           {pendingAction.kind === "acquire-card" && `${pendingAcquireOwner?.leader ?? "Player"} acquisition`}

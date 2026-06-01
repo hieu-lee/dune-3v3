@@ -74,6 +74,16 @@ try {
   assert.equal(capturedMentat.conditionalPersuasion, false, "Captured Mentat should not need manual persuasion entry");
   assert.match(capturedMentat.play, /discard 1 card.*gain 1 Influence.*draw 1 card/i);
   assert.match(capturedMentat.reveal, /lose 1 Influence.*draw 1 Intrigue/i);
+  const beneGesseritOperative = data.imperiumDeck.find((card) => card.name === "Bene Gesserit Operative");
+  assert.ok(beneGesseritOperative, "Imperium deck should include Bene Gesserit Operative");
+  assert.equal(state.isBeneGesseritOperativeCard(beneGesseritOperative), true, "Bene Gesserit Operative should be recognized");
+  assert.equal(beneGesseritOperative.cost, 3, "Bene Gesserit Operative should cost 3 persuasion");
+  assert.deepEqual(beneGesseritOperative.icons, ["bene"], "Bene Gesserit Operative should reach Bene Gesserit spaces");
+  assert.equal(beneGesseritOperative.persuasion, 1, "Bene Gesserit Operative should reveal for 1 base persuasion");
+  assert.equal(beneGesseritOperative.conditionalPersuasion, false, "Bene Gesserit Operative should use structured spy-count reveal handling");
+  assert.deepEqual(beneGesseritOperative.traits, ["Faction: Bene Gesserit"], "Bene Gesserit Operative should normalize its Bene Gesserit trait");
+  assert.match(beneGesseritOperative.play, /place 1 spy/i);
+  assert.match(beneGesseritOperative.reveal, /two or more spies.*\+2 persuasion/i);
   const prepareTheWay = data.reserveMarket.find((card) => card.sourceId === 537);
   assert.ok(prepareTheWay, "Reserve market should include Prepare The Way");
   assert.equal(state.isPrepareTheWayCard(prepareTheWay), true, "Prepare The Way should be recognized");
@@ -103,8 +113,11 @@ try {
   assert.ok(carthag, "Carthag should exist for Prepare The Way Agent coverage");
   const highCouncil = data.boardSpaces.find((space) => space.id === "high-council");
   assert.ok(highCouncil, "High Council should exist for Captured Mentat Agent coverage");
+  const secrets = data.boardSpaces.find((space) => space.id === "secrets");
+  assert.ok(secrets, "Secrets should exist for Bene Gesserit Operative Agent coverage");
   const p2 = playerById(game, "p2");
   const p4 = playerById(game, "p4");
+  const p6 = playerById(game, "p6");
   const dune = [...p2.hand, ...p2.deck, ...p2.discard].find((card) => card.name === "Dune, The Desert Planet");
   assert.ok(dune, "Feyd should have Dune, The Desert Planet available for a Spice Trade Agent turn");
 
@@ -167,6 +180,173 @@ try {
     false,
     "Prepare The Way should not log a draw when the threshold is unmet",
   );
+
+  const operativeFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 1,
+    discard: [],
+    hand: [beneGesseritOperative],
+    playArea: [],
+    resources: { solari: 0, spice: 0, water: 0 },
+    spies: 3,
+  }));
+  const operativePlayed = turnActions.placeAgentAction(operativeFixture, {
+    commanderTargets: {},
+    selectedCard: beneGesseritOperative,
+    selectedSpace: secrets,
+  });
+  assert.equal(operativePlayed.pendingAction?.kind, "spy", "Bene Gesserit Operative should queue spy placement");
+  assert.equal(operativePlayed.pendingAction.ownerId, p2.id);
+  assert.equal(operativePlayed.pendingAction.source, "Bene Gesserit Operative");
+  assert.equal(operativePlayed.pendingAction.remaining, 1);
+  assert.equal(operativePlayed.pendingAction.mustPlaceSpy, true);
+  assert.equal(state.finishPendingAction(operativePlayed), operativePlayed, "Bene Gesserit Operative spy placement should be mandatory");
+  const operativeSpyPlaced = state.placeSpyForPending(operativePlayed, operativePlayed.pendingAction, highCouncil.id);
+  assert.equal(operativeSpyPlaced.pendingAction, undefined);
+  assert.equal(playerById(operativeSpyPlaced, p2.id).spies, 2, "Bene Gesserit Operative should spend one spy from supply");
+  assert.equal(operativeSpyPlaced.spyPosts[highCouncil.id], p2.id, "Bene Gesserit Operative should place the selected spy");
+  assert.match(operativeSpyPlaced.log[0], /places a spy near High Council from Bene Gesserit Operative/);
+
+  const operativeNoSupplyBase = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 1,
+    discard: [],
+    hand: [beneGesseritOperative],
+    playArea: [],
+    resources: { solari: 0, spice: 0, water: 0 },
+    spies: 0,
+  }));
+  const operativeNoSupplyPlayed = turnActions.placeAgentAction(
+    {
+      ...operativeNoSupplyBase,
+      spyPosts: { [highCouncil.id]: p2.id },
+    },
+    { commanderTargets: {}, selectedCard: beneGesseritOperative, selectedSpace: secrets },
+  );
+  assert.equal(operativeNoSupplyPlayed.pendingAction?.kind, "spy", "Bene Gesserit Operative should allow recalling for spy supply");
+  assert.equal(operativeNoSupplyPlayed.pendingAction.recallForSupply, true);
+  assert.deepEqual(
+    state.recallableSpySupplySpaces(operativeNoSupplyPlayed, operativeNoSupplyPlayed.pendingAction).map((space) => space.id),
+    [highCouncil.id],
+    "Bene Gesserit Operative should expose owned spies when supply is empty",
+  );
+  const operativeSupplyRecalled = state.recallSpyForSupplyForPending(
+    operativeNoSupplyPlayed,
+    operativeNoSupplyPlayed.pendingAction,
+    highCouncil.id,
+  );
+  assert.equal(playerById(operativeSupplyRecalled, p2.id).spies, 1);
+  assert.equal(operativeSupplyRecalled.spyPosts[highCouncil.id], undefined);
+  assert.equal(operativeSupplyRecalled.pendingAction.mustPlaceSpy, true);
+  const operativeAfterSupplyRecallPlaced = state.placeSpyForPending(
+    operativeSupplyRecalled,
+    operativeSupplyRecalled.pendingAction,
+    secrets.id,
+  );
+  assert.equal(playerById(operativeAfterSupplyRecallPlaced, p2.id).spies, 0);
+  assert.equal(operativeAfterSupplyRecallPlaced.spyPosts[secrets.id], p2.id);
+
+  const operativeNoSpy = turnActions.placeAgentAction(
+    withActivePlayer(game, p2.id, () => ({
+      agentsReady: 1,
+      discard: [],
+      hand: [beneGesseritOperative],
+      playArea: [],
+      resources: { solari: 0, spice: 0, water: 0 },
+      spies: 0,
+    })),
+    { commanderTargets: {}, selectedCard: beneGesseritOperative, selectedSpace: secrets },
+  );
+  assert.equal(operativeNoSpy.pendingAction, undefined, "Bene Gesserit Operative should not pause without supply or an owned spy");
+
+  const commanderOperativeBase = withActivePlayer(game, p4.id, () => ({
+    agentsReady: 1,
+    discard: [],
+    hand: [beneGesseritOperative],
+    playArea: [],
+    resources: { solari: 0, spice: 0, water: 0 },
+    spies: 3,
+  }));
+  const commanderOperativePlayed = turnActions.placeAgentAction(commanderOperativeBase, {
+    commanderTargets: { [p4.id]: p2.id },
+    selectedCard: beneGesseritOperative,
+    selectedSpace: secrets,
+  });
+  assert.equal(commanderOperativePlayed.pendingAction?.kind, "spy", "Commander Bene Gesserit Operative should queue spy placement");
+  assert.equal(commanderOperativePlayed.pendingAction.ownerId, p4.id, "Commander should own the Operative spy placement");
+  assert.equal(commanderOperativePlayed.pendingAction.source, "Bene Gesserit Operative");
+  const commanderOperativeSpyPlaced = state.placeSpyForPending(
+    commanderOperativePlayed,
+    commanderOperativePlayed.pendingAction,
+    highCouncil.id,
+  );
+  assert.equal(playerById(commanderOperativeSpyPlaced, p4.id).spies, 2, "Commander Operative should spend a Commander spy");
+  assert.equal(
+    playerById(commanderOperativeSpyPlaced, p2.id).spies,
+    playerById(commanderOperativePlayed, p2.id).spies,
+    "Commander Operative should not spend the activated Ally's spy",
+  );
+  assert.equal(commanderOperativeSpyPlaced.spyPosts[highCouncil.id], p4.id);
+
+  const operativeRevealFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 0,
+    discard: [],
+    hand: [beneGesseritOperative],
+    playArea: [],
+    persuasion: 0,
+    resources: { solari: 0, spice: 0, water: 0 },
+  }));
+  const operativeRevealPlan = turnActions.revealTurnPlan(playerById(operativeRevealFixture, p2.id), {
+    ...operativeRevealFixture,
+    spyPosts: { [secrets.id]: p2.id, [highCouncil.id]: p2.id },
+  });
+  assert.equal(operativeRevealPlan.persuasion, 3, "Bene Gesserit Operative should reveal for 3 persuasion with two spies");
+  assert.deepEqual(
+    operativeRevealPlan.printedRevealCards,
+    [],
+    "Bene Gesserit Operative should not require a manual printed reveal adjustment",
+  );
+  const operativeRevealed = turnActions.revealTurnAction(
+    {
+      ...operativeRevealFixture,
+      spyPosts: { [secrets.id]: p2.id, [highCouncil.id]: p2.id },
+    },
+    { commanderTargets: {}, revealPlan: operativeRevealPlan },
+  );
+  assert.equal(playerById(operativeRevealed, p2.id).persuasion, 3);
+  assert.equal(operativeRevealed.pendingAction, undefined);
+  const operativeUnboostedPlan = turnActions.revealTurnPlan(playerById(operativeRevealFixture, p2.id), {
+    ...operativeRevealFixture,
+    spyPosts: { [secrets.id]: p2.id },
+  });
+  assert.equal(operativeUnboostedPlan.persuasion, 1, "Bene Gesserit Operative should reveal for 1 persuasion below two spies");
+  const operativeTeamSpyPlan = turnActions.revealTurnPlan(playerById(operativeRevealFixture, p2.id), {
+    ...operativeRevealFixture,
+    spyPosts: { [secrets.id]: p4.id, [highCouncil.id]: p6.id },
+  });
+  assert.equal(operativeTeamSpyPlan.persuasion, 1, "Bene Gesserit Operative should ignore teammate spy posts on Reveal");
+  const operativeSharedSpyPlan = turnActions.revealTurnPlan(playerById(operativeRevealFixture, p2.id), {
+    ...operativeRevealFixture,
+    spyPosts: { [secrets.id]: p4.id, [highCouncil.id]: p2.id },
+    sharedSpyPosts: { [secrets.id]: [p2.id] },
+  });
+  assert.equal(operativeSharedSpyPlan.persuasion, 3, "Bene Gesserit Operative should count shared spy posts owned by the revealer");
+  const commanderOperativeRevealFixture = withActivePlayer(game, p4.id, () => ({
+    agentsReady: 0,
+    discard: [],
+    hand: [beneGesseritOperative],
+    playArea: [],
+    persuasion: 0,
+    resources: { solari: 0, spice: 0, water: 0 },
+  }));
+  const commanderAllySpyPlan = turnActions.revealTurnPlan(playerById(commanderOperativeRevealFixture, p4.id), {
+    ...commanderOperativeRevealFixture,
+    spyPosts: { [secrets.id]: p2.id, [highCouncil.id]: p2.id },
+  });
+  assert.equal(commanderAllySpyPlan.persuasion, 1, "Commander Operative reveal should ignore the activated Ally's spy posts");
+  const commanderOwnSpyPlan = turnActions.revealTurnPlan(playerById(commanderOperativeRevealFixture, p4.id), {
+    ...commanderOperativeRevealFixture,
+    spyPosts: { [secrets.id]: p4.id, [highCouncil.id]: p4.id },
+  });
+  assert.equal(commanderOwnSpyPlan.persuasion, 3, "Commander Operative reveal should count the Commander's own spy posts");
 
   const capturedDiscardCard = { ...dune, id: "captured-mentat-discard-card" };
   const capturedDrawCard = { ...calculusTrashTarget, id: "captured-mentat-draw-card" };

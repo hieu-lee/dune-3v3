@@ -79,6 +79,45 @@ export async function runCardChoicesSmoke({
   assert.equal(ownerAfter.discard.at(-1).sourceId, 537, "Reserve acquire should take Prepare The Way");
   assert.ok(after.reserveMarket.some((card) => card.sourceId === 537), "Prepare The Way reserve should remain available");
 
+  await setDebugGameAndWait(page, states.beneGesseritOperativeSpy);
+  pendingText = await page.locator(".pending-panel").innerText();
+  assert.match(pendingText, /Bene Gesserit Operative/i);
+  assert.match(pendingText, /spies ready/i);
+  assert.equal(await page.locator(".pending-panel").getByRole("button", { name: "Done" }).isDisabled(), true);
+  await screenshot(page, captures, "pending-bene-gesserit-operative-spy.png");
+
+  before = await currentGame(page);
+  ownerBefore = before.players.find((player) => player.id === "p2");
+  await page.locator(".pending-panel").getByRole("button", { name: states.beneGesseritOperativeSpy.spySpaceName }).click();
+  await waitForNoPending(page);
+  after = await currentGame(page);
+  ownerAfter = after.players.find((player) => player.id === "p2");
+  assert.equal(ownerAfter.spies, ownerBefore.spies - 1, "Bene Gesserit Operative should spend one spy");
+  assert.equal(after.spyPosts[states.beneGesseritOperativeSpy.spySpaceId], "p2", "Bene Gesserit Operative should place the chosen spy");
+
+  await setDebugGameAndWait(page, states.beneGesseritOperativeRecallSpy);
+  pendingText = await page.locator(".pending-panel").innerText();
+  assert.match(pendingText, /Bene Gesserit Operative/i);
+  assert.match(pendingText, /0 spies ready/i);
+  assert.match(pendingText, /Recall one spy for supply/i);
+  await screenshot(page, captures, "pending-bene-gesserit-operative-recall-spy.png");
+
+  await page.locator(".pending-panel").getByRole("button", { name: states.beneGesseritOperativeRecallSpy.spyRecallSpaceName }).click();
+  pendingText = await page.locator(".pending-panel").innerText();
+  assert.match(pendingText, /1 spies ready/i);
+  assert.match(pendingText, new RegExp(escapeRegExp(states.beneGesseritOperativeRecallSpy.spyPlaceAfterRecallSpaceName)));
+  await page.locator(".pending-panel").getByRole("button", { name: states.beneGesseritOperativeRecallSpy.spyPlaceAfterRecallSpaceName }).click();
+  await waitForNoPending(page);
+  after = await currentGame(page);
+  ownerAfter = after.players.find((player) => player.id === "p2");
+  assert.equal(ownerAfter.spies, 0, "Bene Gesserit Operative recall path should spend the recalled spy");
+  assert.equal(after.spyPosts[states.beneGesseritOperativeRecallSpy.spyRecallSpaceId], undefined, "Bene Gesserit Operative should remove the recalled spy");
+  assert.equal(
+    after.spyPosts[states.beneGesseritOperativeRecallSpy.spyPlaceAfterRecallSpaceId],
+    "p2",
+    "Bene Gesserit Operative should place the recalled spy on the chosen space",
+  );
+
   await setDebugGameAndWait(page, states.capturedMentat);
   pendingText = await page.locator(".pending-panel").innerText();
   const capturedMentatDiscardName = states.capturedMentat.capturedMentatDiscardName;
@@ -126,6 +165,7 @@ export async function runCardChoicesSmoke({
 async function createCardChoiceStates(server, initialPlayableGame) {
   const data = await server.ssrLoadModule("/src/game/data.ts");
   const state = await server.ssrLoadModule("/src/game/state.ts");
+  const turnActions = await server.ssrLoadModule("/src/app-turn-actions.ts");
   const game = initialPlayableGame(state);
   const ownerId = "p2";
   const activeSeat = game.players.findIndex((player) => player.id === ownerId);
@@ -134,6 +174,12 @@ async function createCardChoiceStates(server, initialPlayableGame) {
   assert.ok(game.imperiumRow[0], "Expected at least one Imperium Row card");
   const prepareTheWay = game.reserveMarket.find((card) => card.sourceId === 537);
   assert.ok(prepareTheWay, "Expected Prepare The Way reserve card");
+  const beneGesseritOperative = data.imperiumDeck.find((card) => card.sourceId === 30);
+  assert.ok(beneGesseritOperative, "Expected Bene Gesserit Operative Imperium card");
+  const spySpace = data.boardSpaces.find((space) => space.id === "high-council");
+  assert.ok(spySpace, "Expected High Council spy placement space");
+  const spyPlaceAfterRecallSpace = data.boardSpaces.find((space) => space.id === "secrets");
+  assert.ok(spyPlaceAfterRecallSpace, "Expected Secrets spy placement space");
   const capturedMentat = data.imperiumDeck.find((card) => card.sourceId === 61);
   assert.ok(capturedMentat, "Expected Captured Mentat Imperium card");
   const capturedMentatDiscard = { ...data.allyStarterCards[0], id: "browser-captured-mentat-discard-card" };
@@ -149,6 +195,40 @@ async function createCardChoiceStates(server, initialPlayableGame) {
     pendingAction: undefined,
     pendingQueue: [],
   };
+  const beneGesseritOperativeAgentBase = {
+    ...base,
+    players: base.players.map((player) =>
+      player.id === ownerId
+        ? {
+            ...player,
+            agentsReady: 1,
+            hand: [beneGesseritOperative],
+            playArea: [],
+            resources: { solari: 0, spice: 0, water: 0 },
+            spies: 3,
+          }
+        : player,
+    ),
+  };
+  const beneGesseritOperativeSpyState = turnActions.placeAgentAction(beneGesseritOperativeAgentBase, {
+    commanderTargets: {},
+    selectedCard: beneGesseritOperative,
+    selectedSpace: spyPlaceAfterRecallSpace,
+  });
+  const beneGesseritOperativeRecallSpyState = turnActions.placeAgentAction(
+    {
+      ...beneGesseritOperativeAgentBase,
+      spyPosts: { [spySpace.id]: ownerId },
+      players: beneGesseritOperativeAgentBase.players.map((player) =>
+        player.id === ownerId ? { ...player, spies: 0 } : player,
+      ),
+    },
+    {
+      commanderTargets: {},
+      selectedCard: beneGesseritOperative,
+      selectedSpace: spyPlaceAfterRecallSpace,
+    },
+  );
 
   return {
     contractPublic: {
@@ -193,6 +273,18 @@ async function createCardChoiceStates(server, initialPlayableGame) {
         maxCost: prepareTheWay.cost,
         destination: "discard",
       },
+    },
+    beneGesseritOperativeSpy: {
+      ...beneGesseritOperativeSpyState,
+      spySpaceId: spySpace.id,
+      spySpaceName: spySpace.name,
+    },
+    beneGesseritOperativeRecallSpy: {
+      ...beneGesseritOperativeRecallSpyState,
+      spyRecallSpaceId: spySpace.id,
+      spyRecallSpaceName: spySpace.name,
+      spyPlaceAfterRecallSpaceId: spyPlaceAfterRecallSpace.id,
+      spyPlaceAfterRecallSpaceName: spyPlaceAfterRecallSpace.name,
     },
     capturedMentat: {
       ...base,

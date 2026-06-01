@@ -31,9 +31,11 @@ import {
   scoreGurneyAlwaysSmiling,
 } from "./game/state";
 import {
+  isBeneGesseritOperativeCard,
   isInterstellarTradeCard,
   isSmugglersHarvesterCard,
 } from "./game/card-identifiers";
+import { spyPostCount } from "./game/spy-posts";
 import type {
   BoardSpace,
   Card,
@@ -209,11 +211,17 @@ type RevealTurnPlan = {
   swords: number;
 };
 
-export function revealTurnPlan(activePlayer: Player, state?: Pick<GameState, "roundMakerSpaceVisits">): RevealTurnPlan {
+export function revealTurnPlan(
+  activePlayer: Player,
+  state?: Pick<GameState, "roundMakerSpaceVisits" | "spyPosts" | "sharedSpyPosts">,
+): RevealTurnPlan {
   const interstellarTradePersuasion = activePlayer.hand
     .filter(isInterstellarTradeCard)
     .reduce((sum) => sum + activePlayer.contracts.filter((contract) => contract.completed).length, 0);
-  const persuasion = revealPersuasionFor(activePlayer) + interstellarTradePersuasion;
+  const beneGesseritOperativePersuasion = state && spyPostCount(state, activePlayer.id) >= 2
+    ? activePlayer.hand.filter(isBeneGesseritOperativeCard).length * 2
+    : 0;
+  const persuasion = revealPersuasionFor(activePlayer) + interstellarTradePersuasion + beneGesseritOperativePersuasion;
   const swords = activePlayer.hand.reduce((sum, card) => sum + card.swords, 0) + (activePlayer.swordmasterBonus ? 2 : 0);
   const revealGain = activePlayer.hand.reduce<Partial<Resources>>((gain, card) => {
     Object.entries(card.revealGain ?? {}).forEach(([resource, amount]) => {

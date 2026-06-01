@@ -1,6 +1,7 @@
 import { resolveInfluence } from "./agent-effects";
 import {
   canMoveCardToThroneRow,
+  isBeneGesseritOperativeCard,
   isCapturedMentatCard,
   isCommandRespectCommanderCard,
   isCalculusOfPowerCard,
@@ -156,6 +157,23 @@ export function pendingActionForCard(
       ...(source.role === "Commander" && target ? { influenceOwnerId: target.id } : {}),
       source: card.name,
     };
+  }
+  if (
+    isBeneGesseritOperativeCard(card) &&
+    source.playArea.some((candidate) => candidate.id === card.id && isBeneGesseritOperativeCard(candidate))
+  ) {
+    const pending: PendingAction = {
+      kind: "spy",
+      ownerId: source.id,
+      remaining: 1,
+      recallForSupply: true,
+      mustPlaceSpy: true,
+      source: card.name,
+    };
+    const canPlace = state
+      ? placeableSpySpaces(state, pending).length > 0 || recallableSpySupplySpaces(state, pending).length > 0
+      : source.spies > 0;
+    return canPlace ? pending : undefined;
   }
   if (isUsulCommanderCard(card)) {
     return commanderResourceSplitPendingAction(card, source, target, "muaddib", [

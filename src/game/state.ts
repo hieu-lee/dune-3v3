@@ -401,6 +401,7 @@ export {
 export {
   canMoveCardToThroneRow,
   isBackedByChoamIntrigue,
+  isBeneGesseritOperativeCard,
   isBuyAccessIntrigue,
   isCalculusOfPowerCard,
   isCapturedMentatCard,

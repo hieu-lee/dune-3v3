@@ -156,7 +156,7 @@
   overflow-wrap: anywhere;
 }
 
-.captured-mentat-influence-column button {
+.discard-influence-column button {
   grid-template-columns: minmax(0, 1fr);
 }
 

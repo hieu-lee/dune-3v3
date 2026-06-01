@@ -7,8 +7,8 @@ import {
   canMoveCardToThroneRow,
   canPayConflictVpConversion,
   conflictVpConversionSpyChoices,
-  capturedMentatDiscardChoices,
-  capturedMentatInfluenceChoices,
+  discardCardForInfluenceAndDrawChoices,
+  discardCardForInfluenceAndDrawDiscardChoices,
   influenceLossOptions,
   irulanSignetAcquireCards,
   irulanSignetTrashableCards,
@@ -33,7 +33,7 @@ import type {
 import type { FactionId, GameState, PendingAction, Player, TradeGoodId, TrashCardZone } from "../game/types";
 import { PendingBoardInfluenceChoicePanel, PendingOptionalSpacePaymentPanel } from "./PendingBoardChoicePanels";
 import { PendingAcquireCardPanel, PendingContractPanel } from "./PendingCardChoicePanels";
-import { PendingCapturedMentatPanel, PendingInfluenceIntriguePanel } from "./PendingCapturedMentatPanel";
+import { PendingDiscardInfluenceDrawPanel, PendingInfluenceIntriguePanel } from "./PendingCapturedMentatPanel";
 import { PendingConflictInfluencePanel } from "./PendingConflictInfluencePanel";
 import { PendingConflictVpPanel } from "./PendingConflictVpPanel";
 import { PendingInfluenceLossPanel } from "./PendingInfluenceLossPanel";
@@ -80,7 +80,7 @@ type PendingActionPanelProps = {
   chooseConflictInfluence: (faction: FactionId) => void;
   chooseBoardInfluence: (ownerId: string, faction: FactionId) => void;
   chooseConflictTieWinner: (winnerId?: string) => void;
-  chooseCapturedMentat: (discardCardId: string, faction: FactionId) => void;
+  chooseDiscardCardForInfluenceAndDraw: (discardCardId: string, faction: FactionId) => void;
   chooseLoseInfluenceForIntrigues: (faction: FactionId) => void;
   chooseCorrinoMight: () => void;
   chooseDevastatingAssault: () => void;
@@ -114,7 +114,7 @@ type PendingActionPanelProps = {
   recallSpyForSupply: (spaceId: string) => void;
   reinforceOne: (playerId: string, destination: "garrison" | "conflict") => void;
   skipCommandRespectChoice: () => void;
-  skipCapturedMentatChoice: () => void;
+  skipDiscardCardForInfluenceAndDrawChoice: () => void;
   skipLoseInfluenceForIntriguesChoice: () => void;
   skipControlDefense: () => void;
   skipConflictVpReward: () => void;
@@ -146,7 +146,7 @@ export function PendingActionPanel({
   chooseConflictInfluence,
   chooseBoardInfluence,
   chooseConflictTieWinner,
-  chooseCapturedMentat,
+  chooseDiscardCardForInfluenceAndDraw,
   chooseLoseInfluenceForIntrigues,
   chooseCorrinoMight,
   chooseDevastatingAssault,
@@ -180,7 +180,7 @@ export function PendingActionPanel({
   recallSpyForSupply,
   reinforceOne,
   skipCommandRespectChoice,
-  skipCapturedMentatChoice,
+  skipDiscardCardForInfluenceAndDrawChoice,
   skipLoseInfluenceForIntriguesChoice,
   skipControlDefense,
   skipConflictVpReward,
@@ -212,15 +212,15 @@ export function PendingActionPanel({
   const pendingAcquireOwner =
     pendingAction.kind === "acquire-card" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingAcquireCards = pendingAction.kind === "acquire-card" ? acquirableCardsForPending(game, pendingAction) : [];
-  const pendingCapturedMentatOwner =
-    pendingAction.kind === "captured-mentat" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
-  const pendingCapturedMentatDiscardChoices =
-    pendingAction.kind === "captured-mentat" && pendingCapturedMentatOwner
-      ? capturedMentatDiscardChoices(pendingCapturedMentatOwner, pendingAction)
+  const pendingDiscardInfluenceDrawOwner =
+    pendingAction.kind === "discard-card-for-influence-and-draw" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
+  const pendingDiscardInfluenceDrawDiscardChoices =
+    pendingAction.kind === "discard-card-for-influence-and-draw" && pendingDiscardInfluenceDrawOwner
+      ? discardCardForInfluenceAndDrawDiscardChoices(pendingDiscardInfluenceDrawOwner, pendingAction)
       : [];
-  const pendingCapturedMentatInfluenceChoices =
-    pendingAction.kind === "captured-mentat" && pendingCapturedMentatOwner
-      ? capturedMentatInfluenceChoices(pendingCapturedMentatOwner)
+  const pendingDiscardInfluenceDrawInfluenceChoices =
+    pendingAction.kind === "discard-card-for-influence-and-draw" && pendingDiscardInfluenceDrawOwner
+      ? discardCardForInfluenceAndDrawChoices(pendingDiscardInfluenceDrawOwner)
       : [];
   const pendingInfluenceIntrigueOwner =
     pendingAction.kind === "lose-influence-for-intrigues" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
@@ -475,7 +475,7 @@ export function PendingActionPanel({
           {pendingAction.kind === "retreat-troops-for-strength" && `${pendingRetreatStrengthOwner?.leader ?? "Player"} ${pendingAction.source}`}
           {pendingAction.kind === "contract" && `${pendingContractOwner?.leader ?? "Player"} CHOAM contract`}
           {pendingAction.kind === "acquire-card" && `${pendingAcquireOwner?.leader ?? "Player"} acquisition`}
-          {pendingAction.kind === "captured-mentat" && `${pendingCapturedMentatOwner?.leader ?? "Player"} Captured Mentat`}
+          {pendingAction.kind === "discard-card-for-influence-and-draw" && `${pendingDiscardInfluenceDrawOwner?.leader ?? "Player"} ${pendingAction.source}`}
           {pendingAction.kind === "lose-influence-for-intrigues" && `${pendingInfluenceIntrigueOwner?.leader ?? "Player"} ${pendingAction.source} reveal`}
           {pendingAction.kind === "maker-choice" && `${pendingMakerLabel ?? "Player"} Maker space`}
           {pendingAction.kind === "sietch-tabr" && `${pendingSietchLabel ?? "Player"} Sietch Tabr`}
@@ -831,13 +831,17 @@ export function PendingActionPanel({
         />
       )}
 
-      {pendingAction.kind === "captured-mentat" && (
-        <PendingCapturedMentatPanel
-          discardChoices={pendingCapturedMentatDiscardChoices}
-          influenceChoices={pendingCapturedMentatInfluenceChoices}
-          owner={pendingCapturedMentatOwner}
-          onResolve={chooseCapturedMentat}
-          onSkip={skipCapturedMentatChoice}
+      {pendingAction.kind === "discard-card-for-influence-and-draw" && (
+        <PendingDiscardInfluenceDrawPanel
+          discardChoices={pendingDiscardInfluenceDrawDiscardChoices}
+          drawCards={pendingAction.drawCards}
+          influenceAmount={pendingAction.influenceAmount}
+          influenceChoices={pendingDiscardInfluenceDrawInfluenceChoices}
+          optional={pendingAction.optional}
+          owner={pendingDiscardInfluenceDrawOwner}
+          source={pendingAction.source}
+          onResolve={chooseDiscardCardForInfluenceAndDraw}
+          onSkip={skipDiscardCardForInfluenceAndDrawChoice}
         />
       )}
 

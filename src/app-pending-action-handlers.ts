@@ -19,7 +19,6 @@ import {
   recallSpyForPending,
   recallSpyForSupplyForPending,
   reinforceTroop,
-  resolveCapturedMentatChoice,
   resolveCommanderResourceSplitChoice,
   resolveCommandRespectTrade,
   resolveConflictTie,
@@ -28,6 +27,7 @@ import {
   resolveDemandResultsChoice,
   resolveDevastatingAssaultChoice,
   resolveDesertCallChoice,
+  resolveDiscardCardForInfluenceAndDrawChoice,
   resolveIrulanSignetRingChoice,
   resolveBoardInfluenceChoice,
   resolveJessicaOtherMemoriesChoice,
@@ -45,7 +45,6 @@ import {
   resolveThreatenSpiceProductionChoice,
   scoreGurneyAlwaysSmiling,
   skipCommandRespect,
-  skipCapturedMentat,
   skipConflictVpConversion,
   skipControlDefenseTroop,
   skipCorrinoMight,
@@ -53,6 +52,7 @@ import {
   skipDemandResults,
   skipDevastatingAssault,
   skipDesertCall,
+  skipDiscardCardForInfluenceAndDraw,
   skipLoseInfluence,
   skipLoseInfluenceForIntrigues,
   skipOptionalSpacePayment,
@@ -243,12 +243,14 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
       const recruitOwnerId = owner?.role === "Commander" ? activatedAllyIdFor(owner, current.players, commanderTargets) : undefined;
       return maybeStartCombatPhase(acquireCardForPending(current, pending, cardId, recruitOwnerId));
     });
-  const chooseCapturedMentat = (discardCardId: string, faction: FactionId) =>
-    runPending("captured-mentat", (current, pending) =>
-      maybeStartCombatPhase(resolveCapturedMentatChoice(current, pending, discardCardId, faction))
+  const chooseDiscardCardForInfluenceAndDraw = (discardCardId: string, faction: FactionId) =>
+    runPending("discard-card-for-influence-and-draw", (current, pending) =>
+      maybeStartCombatPhase(resolveDiscardCardForInfluenceAndDrawChoice(current, pending, discardCardId, faction))
     );
-  const skipCapturedMentatChoice = () =>
-    runPending("captured-mentat", (current, pending) => maybeStartCombatPhase(skipCapturedMentat(current, pending)));
+  const skipDiscardCardForInfluenceAndDrawChoice = () =>
+    runPending("discard-card-for-influence-and-draw", (current, pending) =>
+      maybeStartCombatPhase(skipDiscardCardForInfluenceAndDraw(current, pending))
+    );
   const chooseLoseInfluenceForIntrigues = (faction: FactionId) =>
     runPending("lose-influence-for-intrigues", (current, pending) =>
       maybeStartCombatPhase(resolveLoseInfluenceForIntriguesChoice(current, pending, faction))
@@ -278,7 +280,6 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     acquirePendingCard,
     adjustRevealReward,
     adjustThreatenSpiceProduction,
-    chooseCapturedMentat,
     chooseCommandRespectTrade,
     chooseCommanderResourceSplit,
     chooseConflictInfluence,
@@ -289,6 +290,7 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     chooseDemandAttention,
     chooseDemandResults,
     chooseDesertCall,
+    chooseDiscardCardForInfluenceAndDraw,
     chooseIrulanSignet,
     chooseJessicaOtherMemories,
     chooseJessicaReverendMother,
@@ -316,7 +318,6 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     recallSpy,
     recallSpyForSupply,
     reinforceOne,
-    skipCapturedMentatChoice,
     skipCommandRespectChoice,
     skipControlDefense,
     skipConflictVpReward,
@@ -325,6 +326,7 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     skipDemandAttentionChoice,
     skipDemandResultsChoice,
     skipDesertCallChoice,
+    skipDiscardCardForInfluenceAndDrawChoice,
     skipInfluenceLoss,
     skipLoseInfluenceForIntriguesChoice,
     skipOptionalSpacePaymentChoice,

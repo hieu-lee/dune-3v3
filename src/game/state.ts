@@ -13,9 +13,9 @@ import {
   playerConflictUnitCount,
 } from "./conflict-rules";
 import {
-  resolveCapturedMentatChoice as resolveCapturedMentatChoiceForPending,
-  skipCapturedMentat as resolveSkipCapturedMentat,
-} from "./captured-mentat-rules";
+  resolveDiscardCardForInfluenceAndDraw as resolveDiscardCardForInfluenceAndDrawForPending,
+  skipDiscardCardForInfluenceAndDraw as resolveSkipDiscardCardForInfluenceAndDraw,
+} from "./discard-influence-draw-rules";
 import {
   resolveLoseInfluenceForIntrigues as resolveLoseInfluenceForIntriguesForPending,
   skipLoseInfluenceForIntrigues as resolveSkipLoseInfluenceForIntrigues,
@@ -167,9 +167,9 @@ export {
 } from "./conflict-rules";
 
 export {
-  capturedMentatDiscardChoices,
-  capturedMentatInfluenceChoices,
-} from "./captured-mentat-rules";
+  discardCardForInfluenceAndDrawChoices,
+  discardCardForInfluenceAndDrawDiscardChoices,
+} from "./discard-influence-draw-rules";
 
 export {
   loseInfluenceForIntriguesChoices,
@@ -524,7 +524,7 @@ type RevealAdjustPendingAction = Extract<PendingAction, { kind: "reveal-adjust" 
 type RetreatTroopsForStrengthPendingAction = Extract<PendingAction, { kind: "retreat-troops-for-strength" }>;
 type CommanderResourceSplitPendingAction = Extract<PendingAction, { kind: "commander-resource-split" }>;
 type TrashCardPendingAction = Extract<PendingAction, { kind: "trash-card" }>;
-type CapturedMentatPendingAction = Extract<PendingAction, { kind: "captured-mentat" }>;
+type DiscardCardForInfluenceAndDrawPendingAction = Extract<PendingAction, { kind: "discard-card-for-influence-and-draw" }>;
 type LoseInfluenceForIntriguesPendingAction = Extract<PendingAction, { kind: "lose-influence-for-intrigues" }>;
 type BoardInfluenceChoicePendingAction = Extract<PendingAction, { kind: "board-influence-choice" }>;
 type OptionalSpacePaymentPendingAction = Extract<PendingAction, { kind: "optional-space-payment" }>;
@@ -647,19 +647,22 @@ export function skipOptionalSpacePayment(state: GameState, pending: OptionalSpac
   return continueAfterResolvedConflictReward(resolveSkipOptionalSpacePayment(state, pending));
 }
 
-export function resolveCapturedMentatChoice(
+export function resolveDiscardCardForInfluenceAndDrawChoice(
   state: GameState,
-  pending: CapturedMentatPendingAction,
+  pending: DiscardCardForInfluenceAndDrawPendingAction,
   discardCardId: string,
   faction: FactionId,
 ): GameState {
   return continueAfterResolvedConflictReward(
-    resolveCapturedMentatChoiceForPending(state, pending, discardCardId, faction),
+    resolveDiscardCardForInfluenceAndDrawForPending(state, pending, discardCardId, faction),
   );
 }
 
-export function skipCapturedMentat(state: GameState, pending: CapturedMentatPendingAction): GameState {
-  return continueAfterResolvedConflictReward(resolveSkipCapturedMentat(state, pending));
+export function skipDiscardCardForInfluenceAndDraw(
+  state: GameState,
+  pending: DiscardCardForInfluenceAndDrawPendingAction,
+): GameState {
+  return continueAfterResolvedConflictReward(resolveSkipDiscardCardForInfluenceAndDraw(state, pending));
 }
 
 export function resolveLoseInfluenceForIntriguesChoice(

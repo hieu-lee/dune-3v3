@@ -79,6 +79,13 @@ export type GameEffectSpec =
       optional?: boolean;
     }
   | {
+      kind: "discard-card-for-influence-and-draw";
+      selector: PlayerSelector;
+      drawCards: EffectAmountSpec;
+      influenceAmount: EffectAmountSpec;
+      optional?: boolean;
+    }
+  | {
       kind: "place-spies";
       selector: PlayerSelector;
       amount: EffectAmountSpec;
@@ -402,10 +409,13 @@ export type PendingAction =
       optional?: boolean;
     }
   | {
-      kind: "captured-mentat";
+      kind: "discard-card-for-influence-and-draw";
       ownerId: string;
       influenceOwnerId?: string;
       source: string;
+      drawCards: number;
+      influenceAmount: number;
+      optional: boolean;
     }
   | {
       kind: "lose-influence-for-intrigues";

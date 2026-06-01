@@ -125,6 +125,7 @@ try {
     ].filter(hasAgentPlaySpec).map((card) => card.name).sort(),
     [
       "Bene Gesserit Operative",
+      "Captured Mentat",
       "Cargo Runner",
       "Chani, Clever Tactician",
       "Maker Keeper",
@@ -274,6 +275,19 @@ try {
       )
     ),
     "Captured Mentat should carry a declarative Reveal Influence-for-Intrigue spec",
+  );
+  assert.ok(
+    capturedMentat.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.effects.some((effect) =>
+        effect.kind === "discard-card-for-influence-and-draw" &&
+        effect.selector === "self" &&
+        effect.drawCards === 1 &&
+        effect.influenceAmount === 1 &&
+        effect.optional === true
+      )
+    ),
+    "Captured Mentat should carry a declarative Agent discard-for-Influence-and-draw spec",
   );
   assert.ok(
     beneGesseritOperative.effects?.some((spec) =>
@@ -679,6 +693,70 @@ try {
     () => turnActions.revealTurnPlan({ ...p2, hand: [invalidInfluenceIntrigueAmountCard], highCouncilSeat: false }),
     /Invalid effect amount "-1"/,
     "Influence-for-Intrigue specs should require non-negative integer amounts",
+  );
+  const revealDiscardInfluenceDrawCard = {
+    ...convincingArgument,
+    id: "effect-spec-reveal-discard-influence-draw-card",
+    name: "Effect Spec Reveal Discard Influence Draw",
+    effects: [revealSpec([{
+      kind: "discard-card-for-influence-and-draw",
+      selector: "self",
+      drawCards: 1,
+      influenceAmount: 1,
+    }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [revealDiscardInfluenceDrawCard], highCouncilSeat: false }),
+    /Unsupported effect "discard-card-for-influence-and-draw" for reveal/,
+    "Discard-for-Influence-and-draw specs should stay in Agent play until other trigger resolvers support them",
+  );
+  const invalidDiscardInfluenceDrawSelectorCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-discard-influence-draw-selector-card",
+    name: "Effect Spec Invalid Discard Influence Draw Selector",
+    effects: [agentSpec([{
+      kind: "discard-card-for-influence-and-draw",
+      selector: "activated-ally",
+      drawCards: 1,
+      influenceAmount: 1,
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidDiscardInfluenceDrawSelectorCard, p4, p2),
+    /Unsupported effect selector "activated-ally" for discard-card-for-influence-and-draw/,
+    "Discard-for-Influence-and-draw specs should reject activated Ally selectors",
+  );
+  const invalidDiscardInfluenceDrawAmountCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-discard-influence-draw-amount-card",
+    name: "Effect Spec Invalid Discard Influence Draw Amount",
+    effects: [agentSpec([{
+      kind: "discard-card-for-influence-and-draw",
+      selector: "self",
+      drawCards: -1,
+      influenceAmount: 1,
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidDiscardInfluenceDrawAmountCard, p2, p2),
+    /Invalid effect amount "-1"/,
+    "Discard-for-Influence-and-draw specs should require non-negative draw amounts",
+  );
+  const invalidDiscardInfluenceAmountCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-discard-influence-amount-card",
+    name: "Effect Spec Invalid Discard Influence Amount",
+    effects: [agentSpec([{
+      kind: "discard-card-for-influence-and-draw",
+      selector: "self",
+      drawCards: 1,
+      influenceAmount: -1,
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidDiscardInfluenceAmountCard, p2, p2),
+    /Invalid effect amount "-1"/,
+    "Discard-for-Influence-and-draw specs should require non-negative Influence amounts",
   );
 	  const conditionalRevealRetreatCard = {
 	    ...convincingArgument,

@@ -100,6 +100,26 @@ export function revealLoseInfluenceForIntrigues(
   ], conditions);
 }
 
+export function agentDiscardCardForInfluenceAndDraw(
+  drawCards: EffectAmountSpec,
+  influenceAmount: EffectAmountSpec,
+  options: {
+    optional?: boolean;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return agentPlayEffects([
+    {
+      kind: "discard-card-for-influence-and-draw",
+      selector: "self",
+      drawCards,
+      influenceAmount,
+      optional: true,
+      ...options,
+    },
+  ], conditions);
+}
+
 export function agentDrawCards(amount: EffectAmountSpec, conditions?: GameEffectConditionSpec[]): CardEffectSpec {
   return agentPlayEffects([{ kind: "draw-cards", selector: "self", amount }], conditions);
 }
@@ -183,6 +203,12 @@ export function cloneCardEffects(effects: CardEffectSpec[] | undefined): CardEff
         : {}),
       ...("spiceReward" in effect && effect.spiceReward !== undefined
         ? { spiceReward: cloneAmount(effect.spiceReward) }
+        : {}),
+      ...("drawCards" in effect
+        ? { drawCards: cloneAmount(effect.drawCards) }
+        : {}),
+      ...("influenceAmount" in effect
+        ? { influenceAmount: cloneAmount(effect.influenceAmount) }
         : {}),
     })),
   }));

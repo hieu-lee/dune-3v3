@@ -107,6 +107,18 @@ try {
     ),
     "Captured Mentat should carry a declarative Reveal Influence-for-Intrigue spec",
   );
+  assert.ok(
+    capturedMentat.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.effects.some((effect) =>
+        effect.kind === "discard-card-for-influence-and-draw" &&
+        effect.drawCards === 1 &&
+        effect.influenceAmount === 1 &&
+        effect.optional === true
+      )
+    ),
+    "Captured Mentat should carry a declarative Agent discard-for-Influence-and-draw spec",
+  );
   assert.match(capturedMentat.play, /discard 1 card.*gain 1 Influence.*draw 1 card/i);
   assert.match(capturedMentat.reveal, /lose 1 Influence.*draw 1 Intrigue/i);
   const beneGesseritOperative = data.imperiumDeck.find((card) => card.name === "Bene Gesserit Operative");
@@ -640,29 +652,49 @@ try {
     selectedCard: capturedMentat,
     selectedSpace: highCouncil,
   });
-  assert.equal(capturedMentatPlayed.pendingAction?.kind, "captured-mentat", "Captured Mentat should queue its Agent choice");
+  assert.equal(
+    capturedMentatPlayed.pendingAction?.kind,
+    "discard-card-for-influence-and-draw",
+    "Captured Mentat should queue its Agent choice",
+  );
   assert.equal(capturedMentatPlayed.pendingAction.ownerId, p2.id);
+  assert.equal(capturedMentatPlayed.pendingAction.drawCards, 1);
+  assert.equal(capturedMentatPlayed.pendingAction.influenceAmount, 1);
+  assert.equal(capturedMentatPlayed.pendingAction.optional, true);
   assert.deepEqual(
-    state.capturedMentatDiscardChoices(playerById(capturedMentatPlayed, p2.id), capturedMentatPlayed.pendingAction).map((card) => card.id),
+    state.discardCardForInfluenceAndDrawDiscardChoices(
+      playerById(capturedMentatPlayed, p2.id),
+      capturedMentatPlayed.pendingAction,
+    ).map((card) => card.id),
     [capturedDiscardCard.id],
     "Captured Mentat should discard from the remaining hand",
   );
   assert.deepEqual(
-    state.capturedMentatInfluenceChoices(playerById(capturedMentatPlayed, p2.id)),
+    state.discardCardForInfluenceAndDrawChoices(playerById(capturedMentatPlayed, p2.id)),
     ["greatHouses", "spacing", "bene", "fringeWorlds"],
     "Ally Captured Mentat should choose among main-board Influence tracks",
   );
   assert.equal(
-    state.resolveCapturedMentatChoice(capturedMentatPlayed, capturedMentatPlayed.pendingAction, "missing-card", "bene"),
+    state.resolveDiscardCardForInfluenceAndDrawChoice(
+      capturedMentatPlayed,
+      capturedMentatPlayed.pendingAction,
+      "missing-card",
+      "bene",
+    ),
     capturedMentatPlayed,
     "Captured Mentat should reject missing discard cards",
   );
   assert.equal(
-    state.resolveCapturedMentatChoice(capturedMentatPlayed, capturedMentatPlayed.pendingAction, capturedDiscardCard.id, "emperor"),
+    state.resolveDiscardCardForInfluenceAndDrawChoice(
+      capturedMentatPlayed,
+      capturedMentatPlayed.pendingAction,
+      capturedDiscardCard.id,
+      "emperor",
+    ),
     capturedMentatPlayed,
     "Captured Mentat should reject invalid Influence choices",
   );
-  const capturedMentatResolved = state.resolveCapturedMentatChoice(
+  const capturedMentatResolved = state.resolveDiscardCardForInfluenceAndDrawChoice(
     capturedMentatPlayed,
     capturedMentatPlayed.pendingAction,
     capturedDiscardCard.id,
@@ -673,7 +705,7 @@ try {
   assert.equal(playerById(capturedMentatResolved, p2.id).discard.at(-1).id, capturedDiscardCard.id);
   assert.equal(playerById(capturedMentatResolved, p2.id).influence.bene, 1);
   assert.ok(capturedMentatResolved.log.some((entry) => /Captured Mentat: discards .* gains 1 Bene Gesserit Influence.*draws 1 card/.test(entry)));
-  const capturedMentatSkipped = state.skipCapturedMentat(capturedMentatPlayed, capturedMentatPlayed.pendingAction);
+  const capturedMentatSkipped = state.skipDiscardCardForInfluenceAndDraw(capturedMentatPlayed, capturedMentatPlayed.pendingAction);
   assert.equal(capturedMentatSkipped.pendingAction, undefined);
   assert.deepEqual(playerById(capturedMentatSkipped, p2.id).hand.map((card) => card.id), [capturedDiscardCard.id]);
   assert.equal(playerById(capturedMentatSkipped, p2.id).influence.bene, 0);
@@ -717,12 +749,12 @@ try {
     selectedSpace: highCouncil,
   });
   assert.deepEqual(
-    state.capturedMentatInfluenceChoices(playerById(commanderCapturedPlayed, p4.id)),
+    state.discardCardForInfluenceAndDrawChoices(playerById(commanderCapturedPlayed, p4.id)),
     ["emperor", "greatHouses", "spacing", "bene", "fringeWorlds"],
     "Shaddam Captured Mentat should include personal Emperor and main-board Influence choices",
   );
   assert.equal(commanderCapturedPlayed.pendingAction.influenceOwnerId, p2.id);
-  const commanderCapturedResolved = state.resolveCapturedMentatChoice(
+  const commanderCapturedResolved = state.resolveDiscardCardForInfluenceAndDrawChoice(
     commanderCapturedPlayed,
     commanderCapturedPlayed.pendingAction,
     commanderCapturedDiscard.id,

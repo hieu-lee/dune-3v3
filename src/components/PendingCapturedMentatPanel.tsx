@@ -2,30 +2,41 @@ import { useState } from "react";
 import { factionLabels } from "../game/data";
 import type { Card, FactionId, Player } from "../game/types";
 
-type PendingCapturedMentatPanelProps = {
+type PendingDiscardInfluenceDrawPanelProps = {
   discardChoices: Card[];
+  drawCards: number;
+  influenceAmount: number;
   influenceChoices: FactionId[];
+  optional: boolean;
   owner?: Player;
+  source: string;
   onResolve: (discardCardId: string, faction: FactionId) => void;
   onSkip: () => void;
 };
 
-export function PendingCapturedMentatPanel({
+export function PendingDiscardInfluenceDrawPanel({
   discardChoices,
+  drawCards,
+  influenceAmount,
   influenceChoices,
+  optional,
   owner,
+  source,
   onResolve,
   onSkip,
-}: PendingCapturedMentatPanelProps) {
+}: PendingDiscardInfluenceDrawPanelProps) {
   const [selectedCardId, setSelectedCardId] = useState<string>();
   const [selectedFaction, setSelectedFaction] = useState<FactionId>();
   const selectedCard = discardChoices.find((card) => card.id === selectedCardId);
   const canResolve = Boolean(selectedCard && selectedFaction);
+  const cardText = `${drawCards} card${drawCards === 1 ? "" : "s"}`;
+  const influenceText = `${influenceAmount} Influence`;
 
   return (
     <div className="pending-controls trade-intrigue-grid">
       <div className="trade-intrigue-column">
         <strong>{owner?.leader ?? "Player"}</strong>
+        <span>Discard 1 card to gain {influenceText} and draw {cardText}</span>
         {discardChoices.length === 0 && <span>No discardable cards</span>}
         {discardChoices.map((card) => (
           <button
@@ -42,7 +53,7 @@ export function PendingCapturedMentatPanel({
         ))}
       </div>
 
-      <div className="trade-intrigue-column captured-mentat-influence-column">
+      <div className="trade-intrigue-column discard-influence-column">
         <strong>Influence</strong>
         {influenceChoices.map((faction) => (
           <button
@@ -64,9 +75,9 @@ export function PendingCapturedMentatPanel({
           if (selectedCard && selectedFaction) onResolve(selectedCard.id, selectedFaction);
         }}
       >
-        Resolve Captured Mentat
+        Resolve {source}
       </button>
-      <button type="button" onClick={onSkip}>Skip</button>
+      {optional && <button type="button" onClick={onSkip}>Skip</button>}
     </div>
   );
 }

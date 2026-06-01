@@ -15,6 +15,7 @@ import {
   spiceMustFlowSourceId,
 } from "./card-identifiers";
 import {
+  agentDiscardCardForInfluenceAndDraw,
   agentDrawCards,
   agentDrawIntrigues,
   agentGainResource,
@@ -232,6 +233,7 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
   }
   if (card.id === capturedMentatSourceId) {
     return [
+      agentDiscardCardForInfluenceAndDraw(1, 1),
       revealGainPersuasion(1),
       revealLoseInfluenceForIntrigues(1),
     ];

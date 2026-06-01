@@ -1,7 +1,6 @@
 import { resolveInfluence } from "./agent-effects";
 import {
   canMoveCardToThroneRow,
-  isCapturedMentatCard,
   isCommandRespectCommanderCard,
   isCorrinoMightCommanderCard,
   isCriticalShipmentsCommanderCard,
@@ -20,12 +19,14 @@ import {
 } from "./conflict-rules";
 import { playerTroopSupply } from "./deck-utils";
 import {
+  resolveAgentDiscardCardForInfluenceAndDraws,
   resolveCardEffects,
   resolveRevealLoseInfluenceForIntrigues,
   resolveRevealRetreatTroopsForStrength,
   resolveRevealTrashCardEffects,
   type SpyPlacementEffectResult,
 } from "./effect-resolver";
+import { discardCardForInfluenceAndDrawChoices } from "./discard-influence-draw-rules";
 import { loseInfluenceForIntriguesChoices } from "./influence-intrigue-rules";
 import {
   feydRauthaLeaderName,
@@ -207,6 +208,38 @@ function pendingActionForAgentSpyPlacement(
   return undefined;
 }
 
+function pendingActionForAgentDiscardCardForInfluenceAndDraw(
+  card: Card,
+  source: Player,
+  state?: GameState,
+  target?: Player,
+): PendingAction | undefined {
+  if (!card.effects || !source.playArea.some((candidate) => candidate.id === card.id)) return undefined;
+  const players = state ? playersWithPendingCardEffect(state, source, target) : undefined;
+  const effectState = state && players ? { ...state, players } : undefined;
+  const effects = resolveAgentDiscardCardForInfluenceAndDraws(card.effects, {
+    trigger: "agent-play",
+    source,
+    target,
+    state: effectState,
+  });
+  return effects
+    .map((effect): PendingAction | undefined => {
+      if (effect.selector !== "self" || effect.drawCards <= 0 || effect.influenceAmount <= 0) return undefined;
+      if (source.hand.length === 0 || discardCardForInfluenceAndDrawChoices(source).length === 0) return undefined;
+      return {
+        kind: "discard-card-for-influence-and-draw",
+        ownerId: source.id,
+        ...(source.role === "Commander" && target ? { influenceOwnerId: target.id } : {}),
+        source: card.name,
+        drawCards: effect.drawCards,
+        influenceAmount: effect.influenceAmount,
+        optional: effect.optional,
+      };
+    })
+    .find((pending): pending is PendingAction => Boolean(pending));
+}
+
 export function pendingActionForCard(
   card: Card,
   source: Player,
@@ -216,6 +249,8 @@ export function pendingActionForCard(
 ): PendingAction | undefined {
   const agentSpyPlacementPending = pendingActionForAgentSpyPlacement(card, source, state, target);
   if (agentSpyPlacementPending) return agentSpyPlacementPending;
+  const agentDiscardInfluenceDrawPending = pendingActionForAgentDiscardCardForInfluenceAndDraw(card, source, state, target);
+  if (agentDiscardInfluenceDrawPending) return agentDiscardInfluenceDrawPending;
   if (
     (card.sourceId === 561 || card.name === "Imperial Tent") &&
     source.team === "shaddam" &&
@@ -223,18 +258,6 @@ export function pendingActionForCard(
     state?.imperiumRow.some(canMoveCardToThroneRow)
   ) {
     return { kind: "throne-row", ownerId: source.id, source: card.name };
-  }
-  if (
-    isCapturedMentatCard(card) &&
-    source.hand.length > 0 &&
-    source.playArea.some((candidate) => candidate.id === card.id && isCapturedMentatCard(candidate))
-  ) {
-    return {
-      kind: "captured-mentat",
-      ownerId: source.id,
-      ...(source.role === "Commander" && target ? { influenceOwnerId: target.id } : {}),
-      source: card.name,
-    };
   }
   if (isUsulCommanderCard(card)) {
     return commanderResourceSplitPendingAction(card, source, target, "muaddib", [

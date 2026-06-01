@@ -72,6 +72,13 @@ export type RevealLoseInfluenceForIntrigues = {
   optional: boolean;
 };
 
+export type AgentDiscardCardForInfluenceAndDraw = {
+  selector: PlayerSelector;
+  drawCards: number;
+  influenceAmount: number;
+  optional: boolean;
+};
+
 type PlayerEffectResult = {
   cardsToDraw: number;
   intriguesToDraw: number;
@@ -271,6 +278,17 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
       throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
     }
     validateAmount(effect.amount);
+    return;
+  }
+  if (effect.kind === "discard-card-for-influence-and-draw") {
+    if (trigger !== "agent-play") {
+      throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
+    }
+    if (effect.selector !== "self") {
+      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
+    validateAmount(effect.drawCards);
+    validateAmount(effect.influenceAmount);
     return;
   }
   if (effect.kind === "place-spies") {
@@ -483,6 +501,9 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
   if (effect.kind === "lose-influence-for-intrigues") {
     return result;
   }
+  if (effect.kind === "discard-card-for-influence-and-draw") {
+    return result;
+  }
   if (effect.kind === "place-spies") {
     const amount = amountFor(effect.amount, context.source);
     return addSelectedSpyPlacement(result, effect.selector, {
@@ -629,6 +650,25 @@ export function resolveRevealLoseInfluenceForIntrigues(
       .map((effect) => ({
         selector: effect.selector,
         amount: amountFor(effect.amount, context.source),
+        optional: effect.optional ?? true,
+      }));
+  });
+}
+
+export function resolveAgentDiscardCardForInfluenceAndDraws(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): AgentDiscardCardForInfluenceAndDraw[] {
+  specs?.forEach(validateSpec);
+  return (specs ?? []).flatMap((spec) => {
+    if (spec.trigger !== "agent-play") return [];
+    if (!specApplies(spec, context)) return [];
+    return spec.effects
+      .filter((effect) => effect.kind === "discard-card-for-influence-and-draw")
+      .map((effect) => ({
+        selector: effect.selector,
+        drawCards: amountFor(effect.drawCards, context.source),
+        influenceAmount: amountFor(effect.influenceAmount, context.source),
         optional: effect.optional ?? true,
       }));
   });

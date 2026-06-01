@@ -43,6 +43,7 @@ export type EffectAmountSpec =
 export type GameEffectConditionSpec =
   | { kind: "visited-maker-space" }
   | { kind: "has-spy-posts"; count: number }
+  | { kind: "has-conflict-units"; count: number }
   | { kind: "has-influence"; faction: FactionId; amount: number }
   | { kind: "has-completed-contracts"; count: number };
 export type GameEffectSpec =
@@ -50,6 +51,7 @@ export type GameEffectSpec =
   | { kind: "gain-persuasion"; selector: PlayerSelector; amount: EffectAmountSpec }
   | { kind: "gain-strength"; selector: PlayerSelector; amount: EffectAmountSpec }
   | { kind: "draw-cards"; selector: PlayerSelector; amount: EffectAmountSpec }
+  | { kind: "draw-intrigues"; selector: PlayerSelector; amount: EffectAmountSpec }
   | { kind: "recruit-troops"; selector: PlayerSelector; amount: EffectAmountSpec }
   | {
       kind: "place-spies";
@@ -234,6 +236,14 @@ export type Player = {
   wonConflicts: ConflictCard[];
 };
 
+export type PostDeployIntrigueDraw = {
+  recipientId: string;
+  conditionOwnerId: string;
+  amount: number;
+  minConflictUnits: number;
+  source: string;
+};
+
 export type PendingAction =
   | {
       kind: "deploy";
@@ -241,6 +251,7 @@ export type PendingAction =
       remaining: number;
       source: string;
       conflictBlocked?: boolean;
+      postDeployIntrigueDraw?: PostDeployIntrigueDraw;
     }
   | {
       kind: "control-defense";
@@ -336,6 +347,8 @@ export type PendingAction =
       cards: string[];
       persuasionAdjustment: number;
       strengthAdjustment: number;
+      allowPersuasionAdjustment?: boolean;
+      allowStrengthAdjustment?: boolean;
       source: string;
     }
   | {
@@ -374,6 +387,7 @@ export type PendingAction =
       canSummonSandworms: boolean;
       source: string;
       spaceId: string;
+      postDeployIntrigueDraw?: PostDeployIntrigueDraw;
     }
   | {
       kind: "sietch-tabr";
@@ -385,6 +399,7 @@ export type PendingAction =
       spaceId: string;
       extraRecruitedTroops?: number;
       conflictBlocked?: boolean;
+      postDeployIntrigueDraw?: PostDeployIntrigueDraw;
     }
   | {
       kind: "throne-row";

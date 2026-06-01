@@ -614,6 +614,8 @@ export function pendingActionsForReveal(
   const printedRevealCards = revealedCards
     .filter((card) => card.conditionalPersuasion || card.conditionalSwords)
     .map((card) => card.name);
+  const allowPersuasionAdjustment = revealedCards.some((card) => card.conditionalPersuasion);
+  const allowStrengthAdjustment = revealedCards.some((card) => card.conditionalSwords);
   const revealAdjustPending: PendingAction | undefined = printedRevealCards.length > 0
     ? {
         kind: "reveal-adjust",
@@ -622,6 +624,8 @@ export function pendingActionsForReveal(
         cards: printedRevealCards,
         persuasionAdjustment: 0,
         strengthAdjustment: 0,
+        allowPersuasionAdjustment,
+        allowStrengthAdjustment,
         source: "Printed reveal",
       }
     : undefined;

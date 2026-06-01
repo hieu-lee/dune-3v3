@@ -628,6 +628,8 @@ try {
         cards: ["Corrino Reveal Adjust Regression"],
         persuasionAdjustment: 0,
         strengthAdjustment: 0,
+        allowPersuasionAdjustment: false,
+        allowStrengthAdjustment: true,
         source: "Printed reveal",
       },
       corrinoMightPending,

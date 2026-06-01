@@ -4,6 +4,7 @@ import {
   calculusOfPowerSourceId,
   cargoRunnerSourceId,
   capturedMentatSourceId,
+  chaniCleverTacticianSourceId,
   interstellarTradeSourceId,
   makerKeeperSourceId,
   maulaPistolSourceId,
@@ -15,9 +16,11 @@ import {
 } from "./card-identifiers";
 import {
   agentDrawCards,
+  agentDrawIntrigues,
   agentGainResource,
   agentPlaceSpies,
   hasCompletedContracts,
+  hasConflictUnits,
   hasInfluence,
   hasSpyPosts,
   revealGainPersuasion,
@@ -197,6 +200,9 @@ function imperiumRevealText(card: HubCard, persuasion: number, swords: number, p
   if (card.id === beneGesseritOperativeSourceId) {
     return "+1 persuasion. If you have two or more spies on the board, +2 persuasion.";
   }
+  if (card.id === chaniCleverTacticianSourceId) {
+    return "Fremen Bond: +2 persuasion. You may retreat two troops to add 4 strength.";
+  }
   return printedReveal ? "Resolve printed reveal text." : revealText(persuasion, swords);
 }
 
@@ -228,6 +234,9 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
       agentDrawCards(1, [hasCompletedContracts(2)]),
       agentDrawCards(1, [hasCompletedContracts(4)]),
     ];
+  }
+  if (card.id === chaniCleverTacticianSourceId) {
+    return [agentDrawIntrigues(1, [hasConflictUnits(3)])];
   }
   if (card.id === maulaPistolSourceId) {
     return [agentDrawCards(1)];
@@ -305,6 +314,27 @@ function toImperiumCard(card: HubCard): Card {
       sourceSlug: card.slug,
       sourceType: card.type,
       traits: ["Faction: Bene Gesserit"],
+    };
+  }
+  if (card.id === chaniCleverTacticianSourceId) {
+    return {
+      id: `hub-${card.id}`,
+      name: card.name,
+      icons: card.attributes.flatMap(([name]) => iconAttributeMap[name] ?? []),
+      persuasion: 0,
+      swords: 0,
+      conditionalPersuasion: true,
+      conditionalSwords: false,
+      effects: imperiumCardEffects(card),
+      play: "If you have three or more units in the Conflict, draw 1 Intrigue.",
+      reveal: imperiumRevealText(card, 0, 0, true),
+      cost: 5,
+      imagePath: card.localImagePath ?? card.fullImageUrl ?? undefined,
+      thumbnailPath: card.localThumbnailPath ?? card.thumbnailImageUrl ?? undefined,
+      sourceId: card.id,
+      sourceSlug: card.slug,
+      sourceType: card.type,
+      traits: ["Faction: Fremen"],
     };
   }
   const persuasion = attributeNumber(card, "Persuasion on reveal");

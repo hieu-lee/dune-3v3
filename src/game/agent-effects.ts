@@ -91,6 +91,8 @@ export function applyCardAgentEffect(
   recruitedTroops?: number;
   blocksDeploymentsThisTurn?: boolean;
   sourceSpiceGained?: number;
+  sourceIntriguesToDraw?: number;
+  targetIntriguesToDraw?: number;
 } {
   const genericEffect = applyGenericCardAgentEffect(card, sourcePlayer, targetPlayer, state);
   if (genericEffect) return genericEffect;
@@ -177,6 +179,8 @@ function applyGenericCardAgentEffect(
   recruitedTroops?: number;
   blocksDeploymentsThisTurn?: boolean;
   sourceSpiceGained?: number;
+  sourceIntriguesToDraw?: number;
+  targetIntriguesToDraw?: number;
 } | undefined {
   if (!card.effects) return undefined;
   const players = state?.players.map((player) => {
@@ -197,9 +201,16 @@ function applyGenericCardAgentEffect(
     throw new Error(`Unsupported activated Ally draw result for ${card.name}`);
   }
   const recruitedTroops = result.recruitedTroops + result.activatedAlly.recruitedTroops;
+  const intriguesToDraw = result.intriguesToDraw + result.activatedAlly.intriguesToDraw;
   const hasSourceResourceGain = hasResourceGain(result.revealGain);
   const hasTargetResourceGain = hasResourceGain(result.activatedAlly.revealGain);
-  if (result.cardsToDraw === 0 && recruitedTroops === 0 && !hasSourceResourceGain && !hasTargetResourceGain) {
+  if (
+    result.cardsToDraw === 0 &&
+    recruitedTroops === 0 &&
+    intriguesToDraw === 0 &&
+    !hasSourceResourceGain &&
+    !hasTargetResourceGain
+  ) {
     return undefined;
   }
 
@@ -225,6 +236,8 @@ function applyGenericCardAgentEffect(
     log: agentEffectLog(card, sourcePlayer, targetPlayer, result, cardsDrawn),
     recruitedTroops,
     sourceSpiceGained: result.revealGain.spice ?? 0,
+    sourceIntriguesToDraw: result.intriguesToDraw,
+    targetIntriguesToDraw: result.activatedAlly.intriguesToDraw,
   };
 }
 

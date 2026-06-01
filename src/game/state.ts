@@ -10,6 +10,7 @@ import {
 import {
   canHaveMakerHooks,
   conflictDeploymentBlockedForOwner,
+  playerConflictUnitCount,
 } from "./conflict-rules";
 import {
   resolveCapturedMentatRevealChoice as resolveCapturedMentatRevealChoiceForPending,
@@ -20,6 +21,9 @@ import {
 import {
   playerTroopSupply,
 } from "./deck-utils";
+import {
+  drawIntrigueCards,
+} from "./intrigue-deck";
 import {
   scoreGurneyAlwaysSmiling,
 } from "./leader-rewards";
@@ -78,6 +82,7 @@ import type {
   FactionId,
   GameState,
   PendingAction,
+  PostDeployIntrigueDraw,
   ResourceId,
   Resources,
   TrashCardZone,
@@ -487,8 +492,11 @@ function continueAfterResolvedConflictReward(state: GameState): GameState {
 export function finishPendingAction(state: GameState): GameState {
   if (state.pendingAction?.kind === "spy" && state.pendingAction.mustPlaceSpy) return state;
   if (state.pendingAction?.kind === "acquire-card" && !state.pendingAction.optional) return state;
+  const resolvedState = state.pendingAction?.kind === "deploy"
+    ? resolvePostDeployIntrigueDraw(state, state.pendingAction.postDeployIntrigueDraw)
+    : state;
   return continueAfterResolvedConflictReward(
-    finishCombatIfNoActors({ ...state, ...advancePendingAction(state) }),
+    finishCombatIfNoActors({ ...resolvedState, ...advancePendingAction(resolvedState) }),
   );
 }
 
@@ -507,6 +515,68 @@ type CapturedMentatPendingAction = Extract<PendingAction, { kind: "captured-ment
 type CapturedMentatRevealPendingAction = Extract<PendingAction, { kind: "captured-mentat-reveal" }>;
 type BoardInfluenceChoicePendingAction = Extract<PendingAction, { kind: "board-influence-choice" }>;
 type OptionalSpacePaymentPendingAction = Extract<PendingAction, { kind: "optional-space-payment" }>;
+type PostDeployIntrigueDrawPendingAction = DeployPendingAction | MakerChoicePendingAction | SietchTabrPendingAction;
+
+function matchingPostDeployIntrigueDraw(
+  first: PostDeployIntrigueDraw | undefined,
+  second: PostDeployIntrigueDraw,
+) {
+  return Boolean(
+    first &&
+    first.recipientId === second.recipientId &&
+    first.conditionOwnerId === second.conditionOwnerId &&
+    first.amount === second.amount &&
+    first.minConflictUnits === second.minConflictUnits &&
+    first.source === second.source,
+  );
+}
+
+function withoutPostDeployIntrigueDraw(action: PostDeployIntrigueDrawPendingAction): PendingAction {
+  if (action.kind === "deploy") {
+    const { postDeployIntrigueDraw, ...nextAction } = action;
+    void postDeployIntrigueDraw;
+    return nextAction;
+  }
+  if (action.kind === "maker-choice") {
+    const { postDeployIntrigueDraw, ...nextAction } = action;
+    void postDeployIntrigueDraw;
+    return nextAction;
+  }
+  const { postDeployIntrigueDraw, ...nextAction } = action;
+  void postDeployIntrigueDraw;
+  return nextAction;
+}
+
+function clearResolvedPostDeployIntrigueDraw(
+  state: GameState,
+  draw: PostDeployIntrigueDraw,
+): GameState {
+  const stripAction = (action: PendingAction): PendingAction => {
+    if (action.kind !== "deploy" && action.kind !== "maker-choice" && action.kind !== "sietch-tabr") {
+      return action;
+    }
+    if (!matchingPostDeployIntrigueDraw(action.postDeployIntrigueDraw, draw)) {
+      return action;
+    }
+    return withoutPostDeployIntrigueDraw(action);
+  };
+
+  return {
+    ...state,
+    pendingAction: state.pendingAction ? stripAction(state.pendingAction) : undefined,
+    pendingQueue: state.pendingQueue.map(stripAction),
+  };
+}
+
+function resolvePostDeployIntrigueDraw(state: GameState, draw: PostDeployIntrigueDraw | undefined): GameState {
+  if (!draw || draw.amount <= 0) return state;
+  const conditionOwner = state.players.find((player) => player.id === draw.conditionOwnerId);
+  if (!conditionOwner || playerConflictUnitCount(conditionOwner) < draw.minConflictUnits) return state;
+  return clearResolvedPostDeployIntrigueDraw(
+    drawIntrigueCards(state, draw.recipientId, draw.amount, draw.source),
+    draw,
+  );
+}
 
 export function takeChoamContract(state: GameState, pending: ContractPendingAction, contractId: string): GameState {
   return continueAfterResolvedConflictReward(
@@ -734,11 +804,14 @@ export function resolveMakerChoice(
       ...state.log,
     ],
   };
+	  const postChoiceState = summon
+	    ? resolvePostDeployIntrigueDraw(nextState, pending.postDeployIntrigueDraw)
+	    : nextState;
   if (summon) {
     const actor = state.players[state.activeSeat];
-    return actor ? recordTurnUnitDeployment(nextState, actor.id, pending.sandworms) : nextState;
+    return actor ? recordTurnUnitDeployment(postChoiceState, actor.id, pending.sandworms) : postChoiceState;
   }
-  return recordTurnSpiceGain(nextState, spiceRecipient.id, pending.spice);
+  return recordTurnSpiceGain(postChoiceState, spiceRecipient.id, pending.spice);
 }
 
 export function resolveSietchTabrChoice(
@@ -768,7 +841,13 @@ export function resolveSietchTabrChoice(
   const ownerAfter = players.find((player) => player.id === owner.id) ?? owner;
   const deployable = Math.min(ownerAfter.garrison, (takeHooks ? 1 : 0) + Math.max(0, pending.extraRecruitedTroops ?? 0) + 2);
   const deployPending: PendingAction | undefined = !pending.conflictBlocked && deployable > 0
-    ? { kind: "deploy", ownerId: owner.id, remaining: deployable, source: pending.source }
+    ? {
+        kind: "deploy",
+        ownerId: owner.id,
+        remaining: deployable,
+        source: pending.source,
+        ...(pending.postDeployIntrigueDraw ? { postDeployIntrigueDraw: pending.postDeployIntrigueDraw } : {}),
+      }
     : undefined;
   const [nextAction, ...nextQueue] = state.pendingQueue;
 
@@ -811,8 +890,9 @@ export function deployTroopToConflict(state: GameState, pending: DeployPendingAc
     ...(remaining > 0 ? { pendingAction: { ...pending, remaining } } : advancePendingAction(state)),
     log: [`${owner.leader} deploys 1 troop from ${pending.source}.`, ...state.log],
   };
+  const postDeployState = resolvePostDeployIntrigueDraw(deployedState, pending.postDeployIntrigueDraw);
   const actor = state.players[state.activeSeat];
-  return actor ? recordTurnUnitDeployment(deployedState, actor.id, 1) : deployedState;
+  return actor ? recordTurnUnitDeployment(postDeployState, actor.id, 1) : postDeployState;
 }
 
 export function deployControlDefenseTroop(state: GameState, pending: ControlDefensePendingAction): GameState {

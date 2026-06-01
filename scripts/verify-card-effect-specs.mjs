@@ -61,6 +61,7 @@ try {
 
   const game = state.initialGame();
   const p2 = playerById(game, "p2");
+  const p3 = playerById(game, "p3");
   const p4 = playerById(game, "p4");
   const revealSpecCards = [
     ...data.allyStarterCards,
@@ -75,6 +76,7 @@ try {
   const interstellarTrade = data.imperiumDeck.find((card) => card.name === "Interstellar Trade");
   const beneGesseritOperative = data.imperiumDeck.find((card) => card.name === "Bene Gesserit Operative");
   const cargoRunner = data.imperiumDeck.find((card) => card.name === "Cargo Runner");
+  const chani = data.imperiumDeck.find((card) => card.name === "Chani, Clever Tactician");
   const makerKeeper = data.imperiumDeck.find((card) => card.name === "Maker Keeper");
   const maulaPistol = data.imperiumDeck.find((card) => card.name === "Maula Pistol");
   const northernWatermaster = data.imperiumDeck.find((card) => card.name === "Northern Watermaster");
@@ -83,6 +85,8 @@ try {
   const limitedLandsraadAccess = data.muadDibCommanderCards.find((card) => card.name === "Limited Landsraad Access");
   const devastatingAssault = data.emperorCommanderCards.find((card) => card.name === "Devastating Assault");
   const imperialOrnithopter = data.emperorCommanderCards.find((card) => card.name === "Imperial Ornithopter");
+  const arrakeen = data.boardSpaces.find((space) => space.id === "arrakeen");
+  const haggaBasin = data.boardSpaces.find((space) => space.id === "hagga-basin");
   const imperialBasin = data.boardSpaces.find((space) => space.id === "imperial-basin");
   const secrets = data.boardSpaces.find((space) => space.id === "secrets");
   const highCouncil = data.boardSpaces.find((space) => space.id === "high-council");
@@ -93,20 +97,30 @@ try {
     interstellarTrade &&
     beneGesseritOperative &&
     cargoRunner &&
+    chani &&
     makerKeeper &&
     maulaPistol &&
     northernWatermaster &&
     paracompass,
   );
   assert.ok(prepareTheWay && limitedLandsraadAccess && devastatingAssault && imperialOrnithopter);
-  assert.ok(imperialBasin && secrets && highCouncil);
+  assert.ok(arrakeen && haggaBasin && imperialBasin && secrets && highCouncil);
   assert.equal(revealSpecCards.length, 31, "Unexpected number of cards with declarative Reveal specs");
   assert.deepEqual(
     [
       ...data.reserveMarket,
       ...data.imperiumDeck,
     ].filter(hasAgentPlaySpec).map((card) => card.name).sort(),
-    ["Bene Gesserit Operative", "Cargo Runner", "Maker Keeper", "Maula Pistol", "Northern Watermaster", "Paracompass", "Prepare The Way"],
+    [
+      "Bene Gesserit Operative",
+      "Cargo Runner",
+      "Chani, Clever Tactician",
+      "Maker Keeper",
+      "Maula Pistol",
+      "Northern Watermaster",
+      "Paracompass",
+      "Prepare The Way",
+    ],
     "Unexpected cards with declarative Agent-play specs",
   );
   for (const card of [
@@ -173,6 +187,14 @@ try {
       spec.effects.some((effect) => effect.kind === "draw-cards" && effect.amount === 1)
     ),
     "Maula Pistol should carry an unconditional Agent draw spec",
+  );
+  assert.ok(
+    chani.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.conditions?.some((condition) => condition.kind === "has-conflict-units" && condition.count === 3) &&
+      spec.effects.some((effect) => effect.kind === "draw-intrigues" && effect.amount === 1)
+    ),
+    "Chani should carry a conflict-unit-gated Agent Intrigue draw spec",
   );
   assert.ok(
     beneGesseritOperative.effects?.some((spec) =>
@@ -440,6 +462,32 @@ try {
     /Unsupported effect "place-spies" for reveal/,
     "Spy placement specs should stay out of Reveal until a pending-action resolver supports them",
   );
+  const invalidConflictUnitsCountCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-conflict-units-count-card",
+    name: "Effect Spec Invalid Conflict Units Count",
+    effects: [{
+      trigger: "agent-play",
+      conditions: [{ kind: "has-conflict-units", count: -1 }],
+      effects: [{ kind: "draw-intrigues", selector: "self", amount: 1 }],
+    }],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidConflictUnitsCountCard, p2, p2),
+    /Invalid has-conflict-units count "-1"/,
+    "Conflict-unit conditions should require a non-negative integer threshold",
+  );
+  const revealIntrigueDrawCard = {
+    ...convincingArgument,
+    id: "effect-spec-reveal-intrigue-draw-card",
+    name: "Effect Spec Reveal Intrigue Draw",
+    effects: [revealSpec([{ kind: "draw-intrigues", selector: "self", amount: 1 }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [revealIntrigueDrawCard], highCouncilSeat: false }),
+    /Unsupported effect "draw-intrigues" for reveal/,
+    "Intrigue draw specs should stay out of Reveal until a reveal-time state resolver supports them",
+  );
   const unsupportedEffectCard = {
     ...convincingArgument,
     id: "effect-spec-unsupported-effect-card",
@@ -598,7 +646,290 @@ try {
   assert.equal(cargoRunnerFourContracts.source.hand.length, 2, "Cargo Runner should draw 2 cards with four completed contracts");
   assert.match(cargoRunnerFourContracts.log ?? "", /Cargo Runner: draws 2 cards/);
 
-  const makerKeeperSource = {
+  const chaniQualified = state.applyCardAgentEffect(
+    chani,
+    { ...p2, deployedTroops: 3, deployedSandworms: 0 },
+    p2,
+  );
+  assert.equal(chaniQualified.sourceIntriguesToDraw, 1, "Chani should expose a pending Intrigue draw at three conflict units");
+  assert.equal(chaniQualified.log, undefined, "Chani should let the actual Intrigue draw log report the draw");
+  const chaniWithWorm = state.applyCardAgentEffect(
+    chani,
+    { ...p2, deployedTroops: 2, deployedSandworms: 1 },
+    p2,
+  );
+  assert.equal(chaniWithWorm.sourceIntriguesToDraw, 1, "Chani should count sandworms as conflict units");
+  const commanderChani = state.applyCardAgentEffect(
+    chani,
+    p4,
+    { ...p2, deployedTroops: 3, deployedSandworms: 0 },
+  );
+  assert.equal(
+    commanderChani.sourceIntriguesToDraw,
+    1,
+    "Chani should use the activated Ally's conflict units during Commander Agent turns",
+  );
+  const chaniUnqualified = state.applyCardAgentEffect(
+    chani,
+    { ...p2, deployedTroops: 2, deployedSandworms: 0 },
+    p2,
+  );
+  assert.equal(chaniUnqualified.sourceIntriguesToDraw, undefined, "Chani should not draw below three conflict units");
+  assert.equal(chaniUnqualified.log, undefined, "Chani should not log below the conflict-unit threshold");
+
+	  const chaniIntrigue = data.intrigueCards[0];
+	  assert.ok(chaniIntrigue, "Verifier needs an Intrigue fixture");
+	  const chaniSecondIntrigue = data.intrigueCards[1];
+	  assert.ok(chaniSecondIntrigue, "Verifier needs a second Intrigue fixture");
+  const chaniFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 1,
+    deck: [{ ...dagger, id: "chani-arrakeen-board-draw-fixture" }],
+    discard: [],
+    deployedTroops: 3,
+    deployedSandworms: 0,
+    hand: [chani],
+    intrigues: [],
+    playArea: [],
+  }));
+  const chaniPlaced = turnActions.placeAgentAction(
+    { ...chaniFixture, intrigueDeck: [chaniIntrigue], intrigueDiscard: [], spaces: {} },
+    { commanderTargets: {}, selectedCard: chani, selectedSpace: arrakeen },
+  );
+  assert.equal(
+    playerById(chaniPlaced, p2.id).intrigues[0]?.id,
+    chaniIntrigue.id,
+    "Chani Agent spec should draw from the Intrigue deck during Agent placement",
+  );
+  assert.deepEqual(chaniPlaced.intrigueDeck, [], "Chani Agent spec should remove the drawn Intrigue from the deck");
+  assert.deepEqual(chaniPlaced.intrigueDiscard, [], "Chani Agent spec should not mutate the Intrigue discard");
+  assert.match(chaniPlaced.log.join("\n"), /draws an Intrigue card from Chani, Clever Tactician/);
+  const chaniBlockedFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 1,
+    deck: [{ ...dagger, id: "chani-blocked-arrakeen-board-draw-fixture" }],
+    discard: [],
+    deployedTroops: 2,
+    deployedSandworms: 0,
+    hand: [chani],
+    intrigues: [],
+    playArea: [],
+  }));
+  const chaniBlocked = turnActions.placeAgentAction(
+    { ...chaniBlockedFixture, intrigueDeck: [chaniIntrigue], intrigueDiscard: [], spaces: {} },
+    { commanderTargets: {}, selectedCard: chani, selectedSpace: arrakeen },
+  );
+  assert.equal(
+    playerById(chaniBlocked, p2.id).intrigues.length,
+    0,
+    "Chani Agent spec should not draw before reaching three conflict units",
+  );
+  assert.equal(chaniBlocked.intrigueDeck[0]?.id, chaniIntrigue.id, "Blocked Chani should leave the Intrigue deck untouched");
+  assert.deepEqual(chaniBlocked.intrigueDiscard, [], "Blocked Chani should leave the Intrigue discard untouched");
+  assert.equal(
+    chaniBlocked.pendingAction?.kind,
+    "deploy",
+    "Conflict-unit-gated Intrigue draw should defer while deployment can reach the threshold",
+  );
+  assert.equal(
+    chaniBlocked.pendingAction?.postDeployIntrigueDraw?.minConflictUnits,
+    3,
+    "Deferred Chani draw should track the printed conflict-unit threshold",
+  );
+  const chaniDeferred = state.deployTroopToConflict(chaniBlocked, chaniBlocked.pendingAction);
+  assert.equal(
+    playerById(chaniDeferred, p2.id).intrigues[0]?.id,
+    chaniIntrigue.id,
+    "Chani should draw after deployment reaches three conflict units",
+  );
+  assert.deepEqual(chaniDeferred.intrigueDeck, [], "Deferred Chani draw should remove the Intrigue from the deck");
+  assert.deepEqual(chaniDeferred.intrigueDiscard, [], "Deferred Chani draw should not mutate the Intrigue discard");
+	  assert.equal(
+	    chaniDeferred.pendingAction?.kind === "deploy"
+	      ? chaniDeferred.pendingAction.postDeployIntrigueDraw
+	      : undefined,
+	    undefined,
+	    "Deferred Chani draw should resolve at most once",
+	  );
+	  const chaniMultiDeployFixture = withActivePlayer(game, p2.id, () => ({
+	    agentsReady: 1,
+	    deck: [{ ...dagger, id: "chani-multi-arrakeen-board-draw-fixture" }],
+	    discard: [],
+	    deployedTroops: 1,
+	    deployedSandworms: 0,
+	    garrison: 2,
+	    hand: [chani],
+	    intrigues: [],
+	    playArea: [],
+	  }));
+	  const chaniMultiDeployPending = turnActions.placeAgentAction(
+	    { ...chaniMultiDeployFixture, intrigueDeck: [chaniIntrigue], intrigueDiscard: [], spaces: {} },
+	    { commanderTargets: {}, selectedCard: chani, selectedSpace: arrakeen },
+	  );
+	  assert.equal(
+	    chaniMultiDeployPending.pendingAction?.kind,
+	    "deploy",
+	    "Multi-deploy Chani fixture should queue deployment",
+	  );
+	  const chaniFirstDeploy = state.deployTroopToConflict(chaniMultiDeployPending, chaniMultiDeployPending.pendingAction);
+	  assert.equal(
+	    playerById(chaniFirstDeploy, p2.id).intrigues.length,
+	    0,
+	    "Chani should not draw after a first deployment that remains below three conflict units",
+	  );
+	  assert.equal(
+	    chaniFirstDeploy.pendingAction?.kind === "deploy"
+	      ? chaniFirstDeploy.pendingAction.postDeployIntrigueDraw?.minConflictUnits
+	      : undefined,
+	    3,
+	    "Chani's deferred draw should stay pending until a later deployment reaches the threshold",
+	  );
+	  assert.equal(chaniFirstDeploy.intrigueDeck[0]?.id, chaniIntrigue.id, "Below-threshold Chani deployment should leave the deck untouched");
+	  assert.equal(
+	    chaniFirstDeploy.pendingAction?.kind,
+	    "deploy",
+	    "Chani should still have a deployment pending after the first multi-deploy troop",
+	  );
+	  const chaniSecondDeploy = state.deployTroopToConflict(chaniFirstDeploy, chaniFirstDeploy.pendingAction);
+	  assert.equal(
+	    playerById(chaniSecondDeploy, p2.id).intrigues[0]?.id,
+	    chaniIntrigue.id,
+	    "Chani should draw after a later deployment reaches three conflict units",
+	  );
+	  assert.deepEqual(chaniSecondDeploy.intrigueDeck, [], "Multi-deploy Chani draw should remove the Intrigue from the deck");
+	  assert.equal(
+	    chaniSecondDeploy.pendingAction?.kind === "deploy"
+	      ? chaniSecondDeploy.pendingAction.postDeployIntrigueDraw
+	      : undefined,
+	    undefined,
+	    "Multi-deploy Chani draw should clear the deferred draw after it resolves",
+	  );
+	  const chaniSkippedFixture = withActivePlayer(game, p2.id, () => ({
+	    agentsReady: 1,
+	    deck: [{ ...dagger, id: "chani-skipped-arrakeen-board-draw-fixture" }],
+    discard: [],
+    deployedTroops: 2,
+    deployedSandworms: 0,
+    hand: [chani],
+    intrigues: [],
+    playArea: [],
+  }));
+  const chaniSkippedPending = turnActions.placeAgentAction(
+    { ...chaniSkippedFixture, intrigueDeck: [chaniIntrigue], intrigueDiscard: [], spaces: {} },
+    { commanderTargets: {}, selectedCard: chani, selectedSpace: arrakeen },
+  );
+  const chaniSkipped = state.finishPendingAction(chaniSkippedPending);
+  assert.equal(
+    playerById(chaniSkipped, p2.id).intrigues.length,
+    0,
+    "Skipping deployment should not resolve Chani's deferred Intrigue draw below the threshold",
+  );
+  assert.deepEqual(chaniSkipped.intrigueDeck, [chaniIntrigue], "Skipped Chani deployment should leave the Intrigue deck untouched");
+  assert.deepEqual(chaniSkipped.intrigueDiscard, [], "Skipped Chani deployment should leave the Intrigue discard untouched");
+
+  const chaniMakerFixture = withActivePlayer(game, p3.id, () => ({
+    agentsReady: 1,
+    deck: [],
+    discard: [],
+    deployedTroops: 2,
+    deployedSandworms: 0,
+    garrison: 0,
+    hand: [chani],
+    intrigues: [],
+    makerHooks: true,
+    playArea: [],
+    resources: { solari: 0, spice: 0, water: 1 },
+  }));
+  const chaniMakerChoice = turnActions.placeAgentAction(
+    { ...chaniMakerFixture, intrigueDeck: [chaniIntrigue], intrigueDiscard: [], shieldWall: false, spaces: {} },
+    { commanderTargets: {}, selectedCard: chani, selectedSpace: haggaBasin },
+  );
+  assert.equal(chaniMakerChoice.pendingAction?.kind, "maker-choice", "Chani on Hagga Basin should defer through the Maker choice");
+  assert.equal(
+    chaniMakerChoice.pendingAction?.kind === "maker-choice"
+      ? chaniMakerChoice.pendingAction.postDeployIntrigueDraw?.minConflictUnits
+      : undefined,
+    3,
+    "Maker-choice Chani draw should carry the conflict-unit threshold",
+  );
+  const chaniMakerWorm = state.resolveMakerChoice(chaniMakerChoice, chaniMakerChoice.pendingAction, "sandworms");
+  assert.equal(
+    playerById(chaniMakerWorm, p3.id).intrigues[0]?.id,
+    chaniIntrigue.id,
+    "Chani should draw after a Maker-choice sandworm reaches three conflict units",
+  );
+	  assert.deepEqual(chaniMakerWorm.intrigueDeck, [], "Maker-choice Chani draw should remove the Intrigue from the deck");
+	  assert.deepEqual(chaniMakerWorm.intrigueDiscard, [], "Maker-choice Chani draw should not mutate the Intrigue discard");
+	  const chaniMakerDeployFixture = withActivePlayer(game, p3.id, () => ({
+	    agentsReady: 1,
+	    deck: [],
+	    discard: [],
+	    deployedTroops: 2,
+	    deployedSandworms: 0,
+	    garrison: 1,
+	    hand: [chani],
+	    intrigues: [],
+	    makerHooks: true,
+	    playArea: [],
+	    resources: { solari: 0, spice: 0, water: 1 },
+	  }));
+	  const chaniMakerDeployChoice = turnActions.placeAgentAction(
+	    {
+	      ...chaniMakerDeployFixture,
+	      intrigueDeck: [chaniIntrigue, chaniSecondIntrigue],
+	      intrigueDiscard: [],
+	      shieldWall: false,
+	      spaces: {},
+	    },
+	    { commanderTargets: {}, selectedCard: chani, selectedSpace: haggaBasin },
+	  );
+	  assert.equal(
+	    chaniMakerDeployChoice.pendingAction?.kind,
+	    "maker-choice",
+	    "Maker-choice Chani fixture should resolve a Maker choice first",
+	  );
+	  assert.equal(
+	    chaniMakerDeployChoice.pendingQueue[0]?.kind,
+	    "deploy",
+	    "Maker-choice Chani fixture should keep deployment queued behind the Maker choice",
+	  );
+	  const chaniMakerDeployWorm = state.resolveMakerChoice(
+	    chaniMakerDeployChoice,
+	    chaniMakerDeployChoice.pendingAction,
+	    "sandworms",
+	  );
+	  assert.equal(
+	    playerById(chaniMakerDeployWorm, p3.id).intrigues.length,
+	    1,
+	    "Maker-choice Chani should draw once when the sandworm reaches the threshold",
+	  );
+	  assert.deepEqual(
+	    chaniMakerDeployWorm.intrigueDeck,
+	    [chaniSecondIntrigue],
+	    "Maker-choice Chani should leave the second Intrigue card in the deck after the first draw",
+	  );
+	  assert.equal(
+	    chaniMakerDeployWorm.pendingAction?.kind === "deploy"
+	      ? chaniMakerDeployWorm.pendingAction.postDeployIntrigueDraw
+	      : undefined,
+	    undefined,
+	    "Maker-choice Chani draw should clear duplicate deferred metadata from the queued deploy",
+	  );
+	  assert.equal(chaniMakerDeployWorm.pendingAction?.kind, "deploy", "Maker-choice Chani should advance to the queued deploy");
+	  const chaniMakerDeployAfterDeploy = state.deployTroopToConflict(
+	    chaniMakerDeployWorm,
+	    chaniMakerDeployWorm.pendingAction,
+	  );
+	  assert.equal(
+	    playerById(chaniMakerDeployAfterDeploy, p3.id).intrigues.length,
+	    1,
+	    "Queued deployment after a Maker-choice Chani draw should not draw a second Intrigue",
+	  );
+	  assert.deepEqual(
+	    chaniMakerDeployAfterDeploy.intrigueDeck,
+	    [chaniSecondIntrigue],
+	    "Queued deployment after a Maker-choice Chani draw should leave the remaining Intrigue in the deck",
+	  );
+
+	  const makerKeeperSource = {
     ...p2,
     resources: { solari: 0, spice: 0, water: 0 },
     influence: { ...p2.influence, bene: 2, fringeWorlds: 2 },

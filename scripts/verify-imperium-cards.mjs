@@ -88,6 +88,21 @@ try {
   );
   assert.match(beneGesseritOperative.play, /place 1 spy/i);
   assert.match(beneGesseritOperative.reveal, /two or more spies.*\+2 persuasion/i);
+  const chani = data.imperiumDeck.find((card) => card.name === "Chani, Clever Tactician");
+  assert.ok(chani, "Imperium deck should include Chani, Clever Tactician");
+  assert.equal(chani.cost, 5, "Chani should cost 5 persuasion");
+  assert.deepEqual(chani.icons, ["city", "fremen", "spice"], "Chani should reach City, Fremen, and Spice Trade spaces");
+  assert.equal(chani.persuasion, 0, "Chani's Fremen Bond persuasion should not be granted automatically");
+  assert.equal(chani.swords, 0, "Chani's troop-retreat strength should not be granted automatically");
+  assert.equal(chani.conditionalPersuasion, true, "Chani should require manual Fremen Bond reveal handling");
+  assert.equal(chani.conditionalSwords, false, "Chani troop-retreat strength should wait for automated retreat handling");
+  assert.ok(
+    chani.effects?.some((spec) => spec.trigger === "agent-play"),
+    "Chani should use a structured Agent Intrigue draw effect",
+  );
+  assert.deepEqual(chani.traits, ["Faction: Fremen"], "Chani should keep her Fremen trait");
+  assert.match(chani.play, /three or more units.*draw 1 Intrigue/i);
+  assert.match(chani.reveal, /Fremen Bond.*\+2 persuasion.*retreat two troops.*4 strength/i);
   const prepareTheWay = data.reserveMarket.find((card) => card.sourceId === 537);
   assert.ok(prepareTheWay, "Reserve market should include Prepare The Way");
   assert.equal(state.isPrepareTheWayCard(prepareTheWay), true, "Prepare The Way should be recognized");
@@ -107,7 +122,7 @@ try {
   assert.deepEqual(prepareTheWay.traits, ["Faction: Bene Gesserit"], "Prepare The Way should keep its Bene Gesserit trait");
   assert.match(prepareTheWay.play, /2 or more Bene Gesserit Influence.*draw 1 card/i);
   assert.match(prepareTheWay.reveal, /\+2 persuasion/i);
-  for (const name of ["Bene Gesserit Operative", "Cargo Runner", "Maker Keeper", "Maula Pistol", "Northern Watermaster", "Paracompass"]) {
+  for (const name of ["Bene Gesserit Operative", "Cargo Runner", "Chani, Clever Tactician", "Maker Keeper", "Maula Pistol", "Northern Watermaster", "Paracompass"]) {
     const card = data.imperiumDeck.find((candidate) => candidate.name === name);
     assert.ok(card?.effects?.some((spec) => spec.trigger === "agent-play"), `${name} should use a structured Agent effect`);
   }
@@ -132,6 +147,42 @@ try {
   const p6 = playerById(game, "p6");
   const dune = [...p2.hand, ...p2.deck, ...p2.discard].find((card) => card.name === "Dune, The Desert Planet");
   assert.ok(dune, "Feyd should have Dune, The Desert Planet available for a Spice Trade Agent turn");
+
+  const chaniRevealFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 0,
+    discard: [],
+    hand: [chani],
+    playArea: [],
+    persuasion: 0,
+    resources: { solari: 0, spice: 0, water: 0 },
+  }));
+  const chaniRevealPlan = turnActions.revealTurnPlan(playerById(chaniRevealFixture, p2.id), chaniRevealFixture);
+  assert.equal(chaniRevealPlan.persuasion, 0, "Chani should not automatically grant Fremen Bond persuasion");
+  assert.equal(chaniRevealPlan.swords, 0, "Chani should not automatically grant troop-retreat strength");
+  assert.deepEqual(
+    chaniRevealPlan.printedRevealCards,
+    [chani.name],
+    "Chani should queue manual printed reveal adjustment",
+  );
+  const chaniRevealed = turnActions.revealTurnAction(chaniRevealFixture, {
+    commanderTargets: {},
+    revealPlan: chaniRevealPlan,
+  });
+  assert.equal(chaniRevealed.pendingAction?.kind, "reveal-adjust", "Chani reveal should pause for printed text");
+  assert.equal(
+    chaniRevealed.pendingAction?.kind === "reveal-adjust"
+      ? chaniRevealed.pendingAction.allowPersuasionAdjustment
+      : undefined,
+    true,
+    "Chani reveal adjustment should allow Fremen Bond persuasion",
+  );
+  assert.equal(
+    chaniRevealed.pendingAction?.kind === "reveal-adjust"
+      ? chaniRevealed.pendingAction.allowStrengthAdjustment
+      : undefined,
+    false,
+    "Chani reveal adjustment should not allow troop-retreat strength without automated troop retreat",
+  );
 
   const prepareBuyFixture = withActivePlayer(game, p2.id, () => ({
     revealed: true,

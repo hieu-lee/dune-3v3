@@ -128,8 +128,10 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     runPending("reveal-adjust", (current, pending) => {
       const owner = current.players.find((player) => player.id === pending.ownerId);
       const recipient = current.players.find((player) => player.id === pending.combatRecipientId);
-      const appliedPersuasion = owner ? Math.max(-pending.persuasionAdjustment, persuasionDelta) : 0;
-      const appliedStrength = recipient
+      const appliedPersuasion = owner && pending.allowPersuasionAdjustment !== false
+        ? Math.max(-pending.persuasionAdjustment, persuasionDelta)
+        : 0;
+      const appliedStrength = recipient && pending.allowStrengthAdjustment !== false
         ? Math.max(-pending.strengthAdjustment, playerHasConflictUnits(recipient) ? strengthDelta : Math.min(0, strengthDelta))
         : 0;
       if (appliedPersuasion === 0 && appliedStrength === 0) return current;

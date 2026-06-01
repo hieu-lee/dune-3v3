@@ -24,20 +24,32 @@ export function PendingRevealAdjustPanel({
       <button
         type="button"
         onClick={() => onAdjust(-1, 0)}
-        disabled={pending.persuasionAdjustment <= 0}
+        disabled={pending.allowPersuasionAdjustment === false || pending.persuasionAdjustment <= 0}
       >
         -1
       </button>
-      <button type="button" onClick={() => onAdjust(1, 0)}>+1</button>
+      <button
+        type="button"
+        onClick={() => onAdjust(1, 0)}
+        disabled={pending.allowPersuasionAdjustment === false}
+      >
+        +1
+      </button>
       <span>{recipient.conflict} strength</span>
       <button
         type="button"
         onClick={() => onAdjust(0, -1)}
-        disabled={pending.strengthAdjustment <= 0}
+        disabled={pending.allowStrengthAdjustment === false || pending.strengthAdjustment <= 0}
       >
         -1
       </button>
-      <button type="button" onClick={() => onAdjust(0, 1)}>+1</button>
+      <button
+        type="button"
+        onClick={() => onAdjust(0, 1)}
+        disabled={pending.allowStrengthAdjustment === false}
+      >
+        +1
+      </button>
       <button type="button" onClick={onDone}>Done</button>
     </div>
   );

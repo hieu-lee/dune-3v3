@@ -4,6 +4,7 @@ import {
   effectiveFremenIconInfluence,
   effectiveRequirementInfluence,
 } from "./board-rules";
+import { playerConflictUnitCount } from "./conflict-rules";
 import { spyPostCount } from "./spy-posts";
 import type {
   Card,
@@ -40,8 +41,15 @@ export type GameEffectContext = {
   state?: EffectResolverState;
 };
 
+export type DeferredAgentIntrigueDraw = {
+  selector: PlayerSelector;
+  amount: number;
+  minConflictUnits: number;
+};
+
 type PlayerEffectResult = {
   cardsToDraw: number;
+  intriguesToDraw: number;
   recruitedTroops: number;
   revealGain: Partial<Resources>;
   spyPlacements: SpyPlacementEffectResult[];
@@ -55,6 +63,7 @@ export type GameEffectResult = PlayerEffectResult & {
 
 const emptyPlayerEffectResult: PlayerEffectResult = {
   cardsToDraw: 0,
+  intriguesToDraw: 0,
   recruitedTroops: 0,
   revealGain: {},
   spyPlacements: [],
@@ -62,6 +71,7 @@ const emptyPlayerEffectResult: PlayerEffectResult = {
 
 const emptyEffectResult: GameEffectResult = {
   cardsToDraw: 0,
+  intriguesToDraw: 0,
   recruitedTroops: 0,
   persuasion: 0,
   revealGain: {},
@@ -131,6 +141,10 @@ function validateCondition(condition: GameEffectConditionSpec) {
     if (isNonNegativeInteger(condition.count)) return;
     invalidSpecField("has-spy-posts count", condition.count);
   }
+  if (condition.kind === "has-conflict-units") {
+    if (isNonNegativeInteger(condition.count)) return;
+    invalidSpecField("has-conflict-units count", condition.count);
+  }
   if (condition.kind === "has-influence") {
     if (!supportedFactions.has(condition.faction)) {
       throw new Error(`Unsupported effect faction "${condition.faction}"`);
@@ -169,6 +183,13 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
   if (effect.kind === "draw-cards") {
     if (effect.selector !== "self") {
       throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
+    validateAmount(effect.amount);
+    return;
+  }
+  if (effect.kind === "draw-intrigues") {
+    if (trigger !== "agent-play") {
+      throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
     }
     validateAmount(effect.amount);
     return;
@@ -223,6 +244,9 @@ function conditionApplies(condition: GameEffectConditionSpec, context: GameEffec
       ) >= condition.count
       : false;
   }
+  if (condition.kind === "has-conflict-units") {
+    return playerConflictUnitCount(conflictUnitConditionPlayer(context)) >= condition.count;
+  }
   if (condition.kind === "has-influence") {
     return conditionInfluence(context.source, condition.faction, context.state?.players ?? [context.source]) >= condition.amount;
   }
@@ -236,6 +260,14 @@ function conditionInfluence(source: Player, faction: FactionId, players: Player[
   if (faction === "emperor") return effectiveEmperorIconInfluence(source, players);
   if (faction === "fremen") return effectiveFremenIconInfluence(source, players);
   return effectiveRequirementInfluence(source, faction, players);
+}
+
+function conflictUnitConditionPlayer(context: GameEffectContext) {
+  return context.source.role === "Commander" &&
+    context.target?.role === "Ally" &&
+    context.target.team === context.source.team
+    ? context.target
+    : context.source;
 }
 
 function specApplies(spec: CardEffectSpec, context: GameEffectContext) {
@@ -291,6 +323,22 @@ function addSelectedRecruitedTroops(result: GameEffectResult, selector: PlayerSe
   return unsupportedKind("effect selector", selector);
 }
 
+function addSelectedIntriguesToDraw(result: GameEffectResult, selector: PlayerSelector, amount: number) {
+  if (selector === "self") {
+    return { ...result, intriguesToDraw: result.intriguesToDraw + amount };
+  }
+  if (selector === "activated-ally") {
+    return {
+      ...result,
+      activatedAlly: {
+        ...result.activatedAlly,
+        intriguesToDraw: result.activatedAlly.intriguesToDraw + amount,
+      },
+    };
+  }
+  return unsupportedKind("effect selector", selector);
+}
+
 function addSelectedSpyPlacement(
   result: GameEffectResult,
   selector: PlayerSelector,
@@ -339,6 +387,10 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
     const amount = amountFor(effect.amount, context.source);
     return { ...result, cardsToDraw: result.cardsToDraw + amount };
   }
+  if (effect.kind === "draw-intrigues") {
+    const amount = amountFor(effect.amount, context.source);
+    return addSelectedIntriguesToDraw(result, effect.selector, amount);
+  }
   if (effect.kind === "recruit-troops") {
     const amount = amountFor(effect.amount, context.source);
     return addSelectedRecruitedTroops(result, effect.selector, amount);
@@ -367,6 +419,7 @@ export function resolveGameEffects(specs: CardEffectSpec[] | undefined, context:
 function mergeEffectResult(result: GameEffectResult, next: GameEffectResult): GameEffectResult {
   return {
     cardsToDraw: result.cardsToDraw + next.cardsToDraw,
+    intriguesToDraw: result.intriguesToDraw + next.intriguesToDraw,
     recruitedTroops: result.recruitedTroops + next.recruitedTroops,
     persuasion: result.persuasion + next.persuasion,
     revealGain: Object.entries(next.revealGain).reduce(
@@ -382,6 +435,7 @@ function mergeEffectResult(result: GameEffectResult, next: GameEffectResult): Ga
 function mergePlayerEffectResult(result: PlayerEffectResult, next: PlayerEffectResult): PlayerEffectResult {
   return {
     cardsToDraw: result.cardsToDraw + next.cardsToDraw,
+    intriguesToDraw: result.intriguesToDraw + next.intriguesToDraw,
     recruitedTroops: result.recruitedTroops + next.recruitedTroops,
     revealGain: Object.entries(next.revealGain).reduce(
       (gain, [resource, amount]) => addRevealGain(gain, resource as ResourceId, amount ?? 0),
@@ -395,9 +449,45 @@ export function resolveCardEffects(cards: Array<{ effects?: CardEffectSpec[] }>,
   return cards.reduce((result, card) => mergeEffectResult(result, resolveGameEffects(card.effects, context)), emptyEffectResult);
 }
 
+export function resolveDeferredAgentConflictUnitIntrigueDraws(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): DeferredAgentIntrigueDraw[] {
+  specs?.forEach(validateSpec);
+  return (specs ?? []).flatMap((spec) => {
+    if (spec.trigger !== "agent-play") return [];
+    if (!spec.effects.every((effect) => selectorApplies(effect.selector, context))) return [];
+
+    const conflictUnitConditions = (spec.conditions ?? []).filter((condition) => condition.kind === "has-conflict-units");
+    if (conflictUnitConditions.length === 0) return [];
+    if (conflictUnitConditions.length > 1) {
+      throw new Error("Unsupported multiple has-conflict-units conditions for deferred Agent Intrigue draw");
+    }
+    const [condition] = conflictUnitConditions;
+    if ((spec.conditions ?? [])
+      .filter((candidate) => candidate.kind !== "has-conflict-units")
+      .some((candidate) => !conditionApplies(candidate, context))) {
+      return [];
+    }
+    if (playerConflictUnitCount(conflictUnitConditionPlayer(context)) >= condition.count) return [];
+
+    const drawEffects = spec.effects.filter((effect) => effect.kind === "draw-intrigues");
+    if (drawEffects.length === 0) return [];
+    if (drawEffects.length !== spec.effects.length) {
+      throw new Error("Unsupported mixed deferred conflict-unit Agent effects");
+    }
+    return drawEffects.map((effect) => ({
+      selector: effect.selector,
+      amount: amountFor(effect.amount, context.source),
+      minConflictUnits: condition.count,
+    }));
+  });
+}
+
 function legacyRevealResult(card: Card): GameEffectResult {
   return {
     cardsToDraw: 0,
+    intriguesToDraw: 0,
     recruitedTroops: 0,
     persuasion: card.persuasion,
     revealGain: card.revealGain ? { ...card.revealGain } : {},

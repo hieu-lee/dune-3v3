@@ -32,13 +32,17 @@ import {
   resolveStabanSmuggleSpice,
   scoreGurneyAlwaysSmiling,
 } from "./game/state";
-import { resolveCardRevealEffects } from "./game/effect-resolver";
+import {
+  resolveCardRevealEffects,
+  resolveDeferredAgentConflictUnitIntrigueDraws,
+} from "./game/effect-resolver";
 import type {
   BoardSpace,
   Card,
   GameState,
   PendingAction,
   Player,
+  PostDeployIntrigueDraw,
   Resources,
 } from "./game/types";
 
@@ -55,6 +59,42 @@ type PlaceAgentInput = {
   selectedCard: Card;
   selectedSpace: BoardSpace;
 };
+
+function postDeployIntrigueDrawFor(
+  selectedCard: Card,
+  source: Player,
+  target: Player,
+): PostDeployIntrigueDraw | undefined {
+  const deferredDraws = resolveDeferredAgentConflictUnitIntrigueDraws(selectedCard.effects, {
+    trigger: "agent-play",
+    source,
+    target,
+  });
+  if (deferredDraws.length === 0) return undefined;
+  const first = deferredDraws[0];
+  if (deferredDraws.some((draw) =>
+    draw.selector !== first.selector ||
+    draw.minConflictUnits !== first.minConflictUnits
+  )) {
+    throw new Error(`Unsupported mixed deferred Agent Intrigue draws for ${selectedCard.name}`);
+  }
+  const recipient = first.selector === "activated-ally" ? target : source;
+  return {
+    recipientId: recipient.id,
+    conditionOwnerId: target.id,
+    amount: deferredDraws.reduce((sum, draw) => sum + draw.amount, 0),
+    minConflictUnits: first.minConflictUnits,
+    source: selectedCard.name,
+  };
+}
+
+function withPostDeployIntrigueDraw(
+  pending: PendingAction | undefined,
+  draw: PostDeployIntrigueDraw | undefined,
+) {
+  if (!pending || pending.kind !== "deploy" || !draw || draw.amount <= 0) return pending;
+  return { ...pending, postDeployIntrigueDraw: draw };
+}
 
 export function placeAgentAction(
   current: GameState,
@@ -118,7 +158,8 @@ export function placeAgentAction(
   effectedTarget = players.find((candidate) => candidate.id === effectedTarget.id) ?? effectedTarget;
   deploymentOwner = player.role === "Commander" ? effectedTarget : source;
   const postEffectState = { ...controlledPostEffectState, players, conflictDeploymentBlock };
-  const spacePending = sietchTabrPending
+  const postDeployIntrigueDraw = postDeployIntrigueDrawFor(selectedCard, source, deploymentOwner);
+  const baseSpacePending = sietchTabrPending
     ? undefined
     : pendingActionForSpace(
       selectedSpace,
@@ -128,6 +169,10 @@ export function placeAgentAction(
       cardAgentEffect.recruitedTroops,
       Boolean(cardAgentEffect.blocksDeploymentsThisTurn),
     );
+  const spacePending = withPostDeployIntrigueDraw(
+    baseSpacePending,
+    postDeployIntrigueDraw,
+  );
   const cardPending = pendingActionForCard(
     selectedCard,
     source,
@@ -171,12 +216,19 @@ export function placeAgentAction(
       ...sietchTabrPending,
       ...(cardAgentEffect.recruitedTroops ? { extraRecruitedTroops: cardAgentEffect.recruitedTroops } : {}),
       ...(cardAgentEffect.blocksDeploymentsThisTurn ? { conflictBlocked: true } : {}),
+      ...(postDeployIntrigueDraw ? { postDeployIntrigueDraw } : {}),
     };
     pendingActions.unshift(
       sietchAction,
     );
   }
-  if (makerChoicePending) pendingActions.unshift(makerChoicePending);
+  if (makerChoicePending) {
+    pendingActions.unshift(
+      postDeployIntrigueDraw && makerChoicePending.kind === "maker-choice"
+        ? { ...makerChoicePending, postDeployIntrigueDraw }
+        : makerChoicePending,
+    );
+  }
   const pending = queuePendingActions(
     controlledPostEffectState,
     pendingActions,
@@ -206,12 +258,18 @@ export function placeAgentAction(
   };
   const intrigueGain = boardSpaceIntrigueGainFor(selectedSpace, player);
   const influenceThresholdState = resolveLeaderInfluenceThresholdRewards(nextState, current.players);
-  const intrigueState = intrigueGain > 0
+  const boardIntrigueState = intrigueGain > 0
     ? drawIntrigueCards(influenceThresholdState, source.id, intrigueGain, selectedSpace.name)
     : influenceThresholdState;
+  const cardSourceIntrigueState = cardAgentEffect.sourceIntriguesToDraw
+    ? drawIntrigueCards(boardIntrigueState, source.id, cardAgentEffect.sourceIntriguesToDraw, selectedCard.name)
+    : boardIntrigueState;
+  const cardTargetIntrigueState = cardAgentEffect.targetIntriguesToDraw
+    ? drawIntrigueCards(cardSourceIntrigueState, effectedTarget.id, cardAgentEffect.targetIntriguesToDraw, selectedCard.name)
+    : cardSourceIntrigueState;
   const secretsState = selectedSpace.id === "secrets"
-    ? resolveSecretsIntriguePressure(intrigueState, source.id)
-    : intrigueState;
+    ? resolveSecretsIntriguePressure(cardTargetIntrigueState, source.id)
+    : cardTargetIntrigueState;
   // Commanders send the Agent; activated Allies only receive routed board effects.
   const resolvedState = resolveStabanSmuggleSpice(secretsState, player.id, selectedSpace.id);
   const makerTrackedState = selectedSpace.maker

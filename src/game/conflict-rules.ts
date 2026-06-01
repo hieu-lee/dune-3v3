@@ -1,8 +1,12 @@
 import { conflictProtectedByShieldWall } from "./critical-locations";
 import type { GameState, Player } from "./types";
 
+export function playerConflictUnitCount(player: Player) {
+  return player.deployedTroops + player.deployedSandworms;
+}
+
 export function playerHasConflictUnits(player: Player) {
-  return player.deployedTroops + player.deployedSandworms > 0;
+  return playerConflictUnitCount(player) > 0;
 }
 
 export function playerDoublesConflictRewards(player: Player) {

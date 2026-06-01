@@ -48,6 +48,13 @@ export function agentDrawCards(amount: EffectAmountSpec, conditions?: GameEffect
   return agentPlayEffects([{ kind: "draw-cards", selector: "self", amount }], conditions);
 }
 
+export function agentDrawIntrigues(
+  amount: EffectAmountSpec,
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return agentPlayEffects([{ kind: "draw-intrigues", selector: "self", amount }], conditions);
+}
+
 export function agentGainResource(
   resource: ResourceId,
   amount: EffectAmountSpec,
@@ -84,6 +91,10 @@ export function visitedMakerSpace() {
 
 export function hasSpyPosts(count: number) {
   return { kind: "has-spy-posts", count } as const;
+}
+
+export function hasConflictUnits(count: number) {
+  return { kind: "has-conflict-units", count } as const;
 }
 
 export function hasInfluence(faction: FactionId, amount: number) {

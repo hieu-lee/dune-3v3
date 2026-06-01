@@ -129,6 +129,37 @@ export async function runTableChoicesSmoke({
     "Throne Row choice should remove the selected card from the Imperium Row",
   );
 
+  await setDebugGameAndWait(page, states.imperialTentThroneRow);
+  pendingText = await page.locator(".pending-panel").innerText();
+  assert.match(pendingText, /Throne Row/i);
+  assert.match(pendingText, new RegExp(escapeRegExp(states.imperialTentThroneRowCardName)));
+  const imperialTentThroneBefore = await currentGame(page);
+  assert.equal(
+    imperialTentThroneBefore.pendingAction?.source,
+    "Imperial Tent",
+    "Imperial Tent's declarative pending source should be present in the debug state snapshot",
+  );
+  assert.equal(
+    imperialTentThroneBefore.throneRow.some((card) => card.id === states.imperialTentThroneRowCardId),
+    false,
+    "Imperial Tent's selected Throne Row target should start in the Imperium Row",
+  );
+  await screenshot(page, captures, "pending-imperial-tent-throne-row.png");
+
+  await page.locator(".pending-panel").getByRole("button", { name: states.imperialTentThroneRowCardName }).click();
+  await waitForNoPending(page);
+  const imperialTentThroneAfter = await currentGame(page);
+  assert.equal(
+    imperialTentThroneAfter.throneRow.some((card) => card.id === states.imperialTentThroneRowCardId),
+    true,
+    "Imperial Tent's declarative Throne Row choice should move the selected card",
+  );
+  assert.equal(
+    imperialTentThroneAfter.imperiumRow.some((card) => card.id === states.imperialTentThroneRowCardId),
+    false,
+    "Imperial Tent's declarative Throne Row choice should remove the selected card from the Imperium Row",
+  );
+
   await setDebugGameAndWait(page, states.conflictTie);
   pendingText = await page.locator(".pending-panel").innerText();
   assert.match(pendingText, /conflict tie/i);
@@ -186,6 +217,8 @@ async function createTableChoiceStates(server, initialPlayableGame) {
     card.id !== calculus.id && card.traits?.includes("Faction: Emperor")
   );
   assert.ok(calculusTrashTarget, "Expected an Emperor card for Calculus browser debug state");
+  const imperialTent = data.emperorCommanderCards.find((card) => card.name === "Imperial Tent");
+  assert.ok(imperialTent, "Expected Imperial Tent for declarative Throne Row browser debug state");
 
   const base = {
     ...game,
@@ -193,6 +226,25 @@ async function createTableChoiceStates(server, initialPlayableGame) {
     pendingAction: undefined,
     pendingQueue: [],
   };
+  const imperialTentCard = cloneCard(imperialTent);
+  const imperialTentPlayers = base.players.map((player) =>
+    player.id === "p4"
+      ? { ...player, playArea: [imperialTentCard], hand: [] }
+      : player,
+  );
+  const imperialTentState = {
+    ...base,
+    activeSeat: shaddamSeat,
+    players: imperialTentPlayers,
+  };
+  const imperialTentSource = imperialTentPlayers.find((player) => player.id === "p4");
+  assert.ok(imperialTentSource, "Expected Shaddam for declarative Throne Row browser debug state");
+  const imperialTentPending = state.pendingActionForCard(imperialTentCard, imperialTentSource, imperialTentState);
+  assert.deepEqual(
+    imperialTentPending,
+    { kind: "throne-row", ownerId: "p4", source: "Imperial Tent" },
+    "Imperial Tent should create the browser debug Throne Row pending action through card rules",
+  );
 
   return {
     revealAdjust: {
@@ -285,6 +337,12 @@ async function createTableChoiceStates(server, initialPlayableGame) {
     },
     throneRowCardId: throneRowCard.id,
     throneRowCardName: throneRowCard.name,
+    imperialTentThroneRow: {
+      ...imperialTentState,
+      pendingAction: imperialTentPending,
+    },
+    imperialTentThroneRowCardId: throneRowCard.id,
+    imperialTentThroneRowCardName: throneRowCard.name,
     conflictTie: {
       ...base,
       activeSeat: feydSeat,

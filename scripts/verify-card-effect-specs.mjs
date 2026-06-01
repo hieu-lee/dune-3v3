@@ -96,6 +96,7 @@ try {
   const limitedLandsraadAccess = data.muadDibCommanderCards.find((card) => card.name === "Limited Landsraad Access");
   const muadDibSignet = data.muadDibCommanderCards.find((card) => card.name === "Signet Ring");
   const devastatingAssault = data.emperorCommanderCards.find((card) => card.name === "Devastating Assault");
+  const imperialTent = data.emperorCommanderCards.find((card) => card.name === "Imperial Tent");
   const emperorSignet = data.emperorCommanderCards.find((card) => card.name === "Signet Ring");
   const imperialOrnithopter = data.emperorCommanderCards.find((card) => card.name === "Imperial Ornithopter");
   const arrakeen = data.boardSpaces.find((space) => space.id === "arrakeen");
@@ -119,7 +120,7 @@ try {
     northernWatermaster &&
     paracompass,
   );
-  assert.ok(prepareTheWay && limitedLandsraadAccess && muadDibSignet && devastatingAssault && emperorSignet && imperialOrnithopter);
+  assert.ok(prepareTheWay && limitedLandsraadAccess && muadDibSignet && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
   assert.ok(arrakeen && haggaBasin && imperialBasin && secrets && highCouncil);
   assert.equal(revealSpecCards.length, 34, "Unexpected number of cards with declarative Reveal specs");
   assert.deepEqual(
@@ -424,6 +425,19 @@ try {
       )
     ),
     "Devastating Assault should carry a routed Agent recruit spec",
+  );
+  assert.ok(
+    imperialTent.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.conditions?.some((condition) => condition.kind === "has-team" && condition.team === "shaddam") &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Commander") &&
+      spec.effects.some((effect) =>
+        effect.kind === "move-card-to-throne-row" &&
+        effect.selector === "self" &&
+        effect.source === "Imperial Tent"
+      )
+    ),
+    "Imperial Tent should carry a declarative Agent Throne Row movement spec",
   );
   assert.ok(
     emperorSignet.effects?.some((spec) =>
@@ -1006,6 +1020,39 @@ try {
     () => state.applyCardAgentEffect(invalidDeploymentBlockSourceCard, p2, p2),
     /Invalid block-conflict-deployment source ""/,
     "Deployment-block specs should reject empty source labels",
+  );
+  const revealThroneRowMoveCard = {
+    ...convincingArgument,
+    id: "effect-spec-reveal-throne-row-move-card",
+    name: "Effect Spec Reveal Throne Row Move",
+    effects: [revealSpec([{ kind: "move-card-to-throne-row", selector: "self" }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [revealThroneRowMoveCard], highCouncilSeat: false }),
+    /Unsupported effect "move-card-to-throne-row" for reveal/,
+    "Throne Row movement specs should stay in Agent play",
+  );
+  const invalidThroneRowMoveSelectorCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-throne-row-move-selector-card",
+    name: "Effect Spec Invalid Throne Row Move Selector",
+    effects: [agentSpec([{ kind: "move-card-to-throne-row", selector: "activated-ally" }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidThroneRowMoveSelectorCard, p4, p2),
+    /Unsupported effect selector "activated-ally" for move-card-to-throne-row/,
+    "Throne Row movement specs should reject activated Ally selectors",
+  );
+  const invalidThroneRowMoveSourceCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-throne-row-move-source-card",
+    name: "Effect Spec Invalid Throne Row Move Source",
+    effects: [agentSpec([{ kind: "move-card-to-throne-row", selector: "self", source: "" }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidThroneRowMoveSourceCard, p2, p2),
+    /Invalid move-card-to-throne-row source ""/,
+    "Throne Row movement specs should reject empty source labels",
   );
 	  const conditionalRevealRetreatCard = {
 	    ...convincingArgument,

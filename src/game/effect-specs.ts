@@ -131,6 +131,15 @@ export function agentBlockConflictDeployment(
   return agentPlayEffects([{ kind: "block-conflict-deployment", selector: "self", ...options }], conditions);
 }
 
+export function agentMoveCardToThroneRow(
+  options: {
+    source?: string;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return agentPlayEffects([{ kind: "move-card-to-throne-row", selector: "self", ...options }], conditions);
+}
+
 export function agentDrawCards(
   amount: EffectAmountSpec,
   conditions?: GameEffectConditionSpec[],

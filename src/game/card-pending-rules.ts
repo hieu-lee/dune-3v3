@@ -20,6 +20,7 @@ import {
 import { playerTroopSupply } from "./deck-utils";
 import {
   resolveAgentDiscardCardForInfluenceAndDraws,
+  resolveAgentMoveCardToThroneRows,
   resolveCardEffects,
   resolveRevealLoseInfluenceForIntrigues,
   resolveRevealRetreatTroopsForStrength,
@@ -241,6 +242,35 @@ function pendingActionForAgentDiscardCardForInfluenceAndDraw(
     .find((pending): pending is PendingAction => Boolean(pending));
 }
 
+function pendingActionForAgentThroneRowMove(
+  card: Card,
+  source: Player,
+  state?: GameState,
+  target?: Player,
+): PendingAction | undefined {
+  if (!card.effects || !source.playArea.some((candidate) => candidate.id === card.id)) return undefined;
+  if (source.team !== "shaddam" || source.role !== "Commander") return undefined;
+  if (!state?.imperiumRow.some(canMoveCardToThroneRow)) return undefined;
+  const players = playersWithPendingCardEffect(state, source, target);
+  const effectState = { ...state, players };
+  const effects = resolveAgentMoveCardToThroneRows(card.effects, {
+    trigger: "agent-play",
+    source,
+    target,
+    state: effectState,
+  });
+  return effects
+    .map((effect): PendingAction | undefined => {
+      if (effect.selector !== "self") return undefined;
+      return {
+        kind: "throne-row",
+        ownerId: source.id,
+        source: effect.source ?? card.name,
+      };
+    })
+    .find((pending): pending is PendingAction => Boolean(pending));
+}
+
 export function pendingActionForCard(
   card: Card,
   source: Player,
@@ -252,14 +282,8 @@ export function pendingActionForCard(
   if (agentSpyPlacementPending) return agentSpyPlacementPending;
   const agentDiscardInfluenceDrawPending = pendingActionForAgentDiscardCardForInfluenceAndDraw(card, source, state, target);
   if (agentDiscardInfluenceDrawPending) return agentDiscardInfluenceDrawPending;
-  if (
-    (card.sourceId === 561 || card.name === "Imperial Tent") &&
-    source.team === "shaddam" &&
-    source.role === "Commander" &&
-    state?.imperiumRow.some(canMoveCardToThroneRow)
-  ) {
-    return { kind: "throne-row", ownerId: source.id, source: card.name };
-  }
+  const agentThroneRowPending = pendingActionForAgentThroneRowMove(card, source, state, target);
+  if (agentThroneRowPending) return agentThroneRowPending;
   if (isUsulCommanderCard(card)) {
     return commanderResourceSplitPendingAction(card, source, target, "muaddib", [
       { commanderResource: "water", commanderAmount: 1, allyResource: "spice", allyAmount: 1 },

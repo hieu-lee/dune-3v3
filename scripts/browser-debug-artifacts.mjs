@@ -90,6 +90,7 @@ const generatedScreenshotNames = [
   "calculus-trash-ready.png",
   "pending-calculus-trash.png",
   "pending-throne-row.png",
+  "pending-imperial-tent-throne-row.png",
   "pending-conflict-tie.png",
   "pending-trade-resource.png",
   "pending-trade-intrigue.png",

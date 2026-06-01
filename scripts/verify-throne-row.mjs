@@ -67,16 +67,51 @@ try {
     undefined,
     "The Emperor personal board should not queue when no non-Fremen row card is available",
   );
-  const pending = state.pendingActionForCard(imperialTent, shaddam, fixture);
+  const shaddamWithImperialTent = {
+    ...shaddam,
+    playArea: [imperialTent],
+  };
+  const imperialTentFixture = {
+    ...fixture,
+    players: fixture.players.map((player) => player.id === shaddam.id ? shaddamWithImperialTent : player),
+  };
+  const pending = state.pendingActionForCard(imperialTent, shaddamWithImperialTent, imperialTentFixture);
   assert.deepEqual(
     pending,
     { kind: "throne-row", ownerId: shaddam.id, source: "Imperial Tent" },
     "Imperial Tent should queue a Throne Row choice when an eligible row card exists",
   );
   assert.equal(
-    state.pendingActionForCard(imperialTent, muadDib, fixture),
+    state.pendingActionForCard(imperialTent, { ...muadDib, playArea: [imperialTent] }, fixture),
     undefined,
     "Muad'Dib team must not trigger Shaddam's Throne Row",
+  );
+  const ungatedThroneRowCard = {
+    ...imperialTent,
+    id: "verify-ungated-throne-row",
+    effects: [{
+      trigger: "agent-play",
+      effects: [{ kind: "move-card-to-throne-row", selector: "self", source: "Ungated Throne Row" }],
+    }],
+  };
+  assert.equal(
+    state.pendingActionForCard(ungatedThroneRowCard, { ...muadDib, playArea: [ungatedThroneRowCard] }, fixture),
+    undefined,
+    "A generic Throne Row move spec should not queue an unresolvable non-Shaddam pending action",
+  );
+  const shaddamAlly = fixture.players.find((player) => player.team === "shaddam" && player.role === "Ally");
+  assert.ok(shaddamAlly, "Verifier needs a Shaddam Ally");
+  assert.equal(
+    state.pendingActionForCard(
+      ungatedThroneRowCard,
+      {
+        ...shaddamAlly,
+        playArea: [ungatedThroneRowCard],
+      },
+      fixture,
+    ),
+    undefined,
+    "A generic Throne Row move spec should not queue an unresolvable Shaddam Ally pending action",
   );
 
   const moved = state.moveImperiumCardToThroneRow(fixture, pending, eligible.id);

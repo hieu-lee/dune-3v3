@@ -90,6 +90,7 @@ export type GameEffectSpec =
       optional?: boolean;
     }
   | { kind: "block-conflict-deployment"; selector: PlayerSelector; source?: string }
+  | { kind: "move-card-to-throne-row"; selector: PlayerSelector; source?: string }
   | {
       kind: "place-spies";
       selector: PlayerSelector;

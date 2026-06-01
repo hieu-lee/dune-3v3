@@ -83,6 +83,11 @@ export type AgentDiscardCardForInfluenceAndDraw = {
   optional: boolean;
 };
 
+export type AgentMoveCardToThroneRow = {
+  selector: PlayerSelector;
+  source?: string;
+};
+
 type PlayerEffectResult = {
   cardsToDraw: number;
   drawCardsSource?: string;
@@ -349,6 +354,16 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
       throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
     }
     validateSourceLabel("block-conflict-deployment source", effect.source);
+    return;
+  }
+  if (effect.kind === "move-card-to-throne-row") {
+    if (trigger !== "agent-play") {
+      throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
+    }
+    if (effect.selector !== "self") {
+      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
+    validateSourceLabel("move-card-to-throne-row source", effect.source);
     return;
   }
   if (effect.kind === "place-spies") {
@@ -641,6 +656,9 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
       deploymentBlockSource: effect.source ?? result.deploymentBlockSource,
     };
   }
+  if (effect.kind === "move-card-to-throne-row") {
+    return result;
+  }
   if (effect.kind === "place-spies") {
     const amount = amountFor(effect.amount, context.source);
     return addSelectedSpyPlacement(result, effect.selector, {
@@ -849,6 +867,23 @@ export function resolveAgentDiscardCardForInfluenceAndDraws(
         drawCards: amountFor(effect.drawCards, context.source),
         influenceAmount: amountFor(effect.influenceAmount, context.source),
         optional: effect.optional ?? true,
+      }));
+  });
+}
+
+export function resolveAgentMoveCardToThroneRows(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): AgentMoveCardToThroneRow[] {
+  specs?.forEach(validateSpec);
+  return (specs ?? []).flatMap((spec) => {
+    if (spec.trigger !== "agent-play") return [];
+    if (!specApplies(spec, context)) return [];
+    return spec.effects
+      .filter((effect) => effect.kind === "move-card-to-throne-row")
+      .map((effect) => ({
+        selector: effect.selector,
+        source: effect.source,
       }));
   });
 }

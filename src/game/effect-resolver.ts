@@ -20,6 +20,7 @@ import type {
   PlayerSelector,
   ResourceId,
   Resources,
+  TrashCardZone,
 } from "./types";
 
 export type SpyPlacementEffectResult = {
@@ -52,6 +53,17 @@ export type RevealRetreatTroopsForStrength = {
   troopCount: number;
   strength: number;
   optional: boolean;
+};
+
+export type RevealTrashCardEffect = {
+  selector: PlayerSelector;
+  optional: boolean;
+  zones?: TrashCardZone[];
+  excludeSource: boolean;
+  requiredTrait?: string;
+  strengthReward?: number;
+  spiceRewardCostThreshold?: number;
+  spiceReward?: number;
 };
 
 type PlayerEffectResult = {
@@ -100,6 +112,7 @@ const supportedTriggers = new Set<GameEffectTrigger>([
 ]);
 
 const supportedResources = new Set<ResourceId>(["solari", "spice", "water"]);
+const supportedTrashZones = new Set<TrashCardZone>(["hand", "discard", "playArea"]);
 const supportedFactions = new Set<FactionId>([
   "emperor",
   "spacing",
@@ -221,6 +234,27 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     }
     validateAmount(effect.amount);
     validateAmount(effect.strength);
+    return;
+  }
+  if (effect.kind === "trash-card") {
+    if (trigger !== "reveal") {
+      throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
+    }
+    if (effect.selector !== "self") {
+      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
+    if (effect.zones?.some((zone) => !supportedTrashZones.has(zone))) {
+      throw new Error(`Unsupported trash-card zone "${effect.zones.find((zone) => !supportedTrashZones.has(zone))}"`);
+    }
+    if (
+      effect.requiredTrait !== undefined &&
+      (typeof effect.requiredTrait !== "string" || effect.requiredTrait.trim().length === 0)
+    ) {
+      invalidSpecField("trash-card requiredTrait", effect.requiredTrait);
+    }
+    if (effect.strengthReward !== undefined) validateAmount(effect.strengthReward);
+    if (effect.spiceRewardCostThreshold !== undefined) validateAmount(effect.spiceRewardCostThreshold);
+    if (effect.spiceReward !== undefined) validateAmount(effect.spiceReward);
     return;
   }
   if (effect.kind === "place-spies") {
@@ -427,6 +461,9 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
   if (effect.kind === "retreat-troops-for-strength") {
     return result;
   }
+  if (effect.kind === "trash-card") {
+    return result;
+  }
   if (effect.kind === "place-spies") {
     const amount = amountFor(effect.amount, context.source);
     return addSelectedSpyPlacement(result, effect.selector, {
@@ -531,6 +568,31 @@ export function resolveRevealRetreatTroopsForStrength(
         troopCount: amountFor(effect.amount, context.source),
         strength: amountFor(effect.strength, context.source),
         optional: effect.optional ?? true,
+      }));
+  });
+}
+
+export function resolveRevealTrashCardEffects(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): RevealTrashCardEffect[] {
+  specs?.forEach(validateSpec);
+  return (specs ?? []).flatMap((spec) => {
+    if (spec.trigger !== "reveal") return [];
+    if (!specApplies(spec, context)) return [];
+    return spec.effects
+      .filter((effect) => effect.kind === "trash-card")
+      .map((effect) => ({
+        selector: effect.selector,
+        optional: effect.optional ?? true,
+        zones: effect.zones ? [...effect.zones] : undefined,
+        excludeSource: effect.excludeSource ?? false,
+        requiredTrait: effect.requiredTrait,
+        strengthReward: effect.strengthReward === undefined ? undefined : amountFor(effect.strengthReward, context.source),
+        spiceRewardCostThreshold: effect.spiceRewardCostThreshold === undefined
+          ? undefined
+          : amountFor(effect.spiceRewardCostThreshold, context.source),
+        spiceReward: effect.spiceReward === undefined ? undefined : amountFor(effect.spiceReward, context.source),
       }));
   });
 }

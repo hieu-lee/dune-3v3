@@ -62,6 +62,17 @@ export type GameEffectSpec =
       optional?: boolean;
     }
   | {
+      kind: "trash-card";
+      selector: PlayerSelector;
+      optional?: boolean;
+      zones?: TrashCardZone[];
+      excludeSource?: boolean;
+      requiredTrait?: string;
+      strengthReward?: EffectAmountSpec;
+      spiceRewardCostThreshold?: EffectAmountSpec;
+      spiceReward?: EffectAmountSpec;
+    }
+  | {
       kind: "place-spies";
       selector: PlayerSelector;
       amount: EffectAmountSpec;

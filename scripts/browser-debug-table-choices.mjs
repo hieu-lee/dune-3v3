@@ -86,6 +86,29 @@ export async function runTableChoicesSmoke({
   assert.equal(chaniBondAfter.pendingAction, undefined, "Chani Fremen Bond should not create a reveal-adjust pending action");
   await screenshot(page, captures, "chani-fremen-bond-after-reveal.png");
 
+  await setDebugGameAndWait(page, states.calculusTrashReveal);
+  await screenshot(page, captures, "calculus-trash-ready.png");
+  await page.getByTestId("reveal-turn").click();
+  await page.waitForFunction(() => window.__DUNE_DEBUG__?.getGame().pendingAction?.kind === "trash-card");
+  pendingText = await page.locator(".pending-panel").innerText();
+  assert.match(pendingText, /Calculus of Power/i);
+  assert.match(pendingText, new RegExp(escapeRegExp(states.calculusTrashTargetName)));
+  await screenshot(page, captures, "pending-calculus-trash.png");
+  const calculusBefore = await currentGame(page);
+  const calculusOwnerBefore = calculusBefore.players.find((player) => player.id === "p2");
+  assert.ok(calculusOwnerBefore, "Expected Feyd before Calculus trash");
+  await page.locator(".pending-panel").getByRole("button", { name: states.calculusTrashTargetName }).click();
+  await waitForNoPending(page);
+  const calculusAfter = await currentGame(page);
+  const calculusOwnerAfter = calculusAfter.players.find((player) => player.id === "p2");
+  assert.ok(calculusOwnerAfter, "Expected Feyd after Calculus trash");
+  assert.equal(calculusOwnerAfter.conflict, calculusOwnerBefore.conflict + 3, "Calculus trash should add 3 strength");
+  assert.equal(
+    calculusOwnerAfter.playArea.some((card) => card.id === states.calculusTrashTargetId),
+    false,
+    "Calculus should trash the selected Emperor card",
+  );
+
   await setDebugGameAndWait(page, states.throneRow);
   pendingText = await page.locator(".pending-panel").innerText();
   assert.match(pendingText, /Throne Row/i);
@@ -157,6 +180,12 @@ async function createTableChoiceStates(server, initialPlayableGame) {
     conditionalPersuasion: false,
     conditionalSwords: false,
   };
+  const calculus = data.imperiumDeck.find((card) => card.name === "Calculus of Power");
+  assert.ok(calculus, "Expected Calculus of Power for browser debug state");
+  const calculusTrashTarget = data.imperiumDeck.find((card) =>
+    card.id !== calculus.id && card.traits?.includes("Faction: Emperor")
+  );
+  assert.ok(calculusTrashTarget, "Expected an Emperor card for Calculus browser debug state");
 
   const base = {
     ...game,
@@ -222,6 +251,29 @@ async function createTableChoiceStates(server, initialPlayableGame) {
           : { ...player, conflict: 0, deployedTroops: 0 }
       ),
     },
+    calculusTrashReveal: {
+      ...base,
+      activeSeat: feydSeat,
+      players: base.players.map((player) =>
+        player.id === "p2"
+          ? {
+              ...player,
+              agentsReady: 0,
+              conflict: 4,
+              deployedSandworms: 0,
+              deployedTroops: 1,
+              discard: [],
+              hand: [cloneCard(calculus)],
+              highCouncilSeat: false,
+              persuasion: 0,
+              playArea: [cloneCard(calculusTrashTarget)],
+              revealed: false,
+            }
+          : { ...player, conflict: 0, deployedSandworms: 0, deployedTroops: 0 }
+      ),
+    },
+    calculusTrashTargetId: calculusTrashTarget.id,
+    calculusTrashTargetName: calculusTrashTarget.name,
     throneRow: {
       ...base,
       activeSeat: shaddamSeat,

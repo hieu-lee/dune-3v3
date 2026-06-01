@@ -82,6 +82,7 @@ try {
   const dagger = data.allyStarterCards.find((card) => card.name === "Dagger");
   const smuggler = data.imperiumDeck.find((card) => card.name === "Smuggler's Harvester");
   const interstellarTrade = data.imperiumDeck.find((card) => card.name === "Interstellar Trade");
+  const calculus = data.imperiumDeck.find((card) => card.name === "Calculus of Power");
   const beneGesseritOperative = data.imperiumDeck.find((card) => card.name === "Bene Gesserit Operative");
   const cargoRunner = data.imperiumDeck.find((card) => card.name === "Cargo Runner");
   const chani = data.imperiumDeck.find((card) => card.name === "Chani, Clever Tactician");
@@ -103,6 +104,7 @@ try {
     dagger &&
     smuggler &&
     interstellarTrade &&
+    calculus &&
     beneGesseritOperative &&
     cargoRunner &&
     chani &&
@@ -113,7 +115,7 @@ try {
   );
   assert.ok(prepareTheWay && limitedLandsraadAccess && devastatingAssault && imperialOrnithopter);
   assert.ok(arrakeen && haggaBasin && imperialBasin && secrets && highCouncil);
-  assert.equal(revealSpecCards.length, 32, "Unexpected number of cards with declarative Reveal specs");
+  assert.equal(revealSpecCards.length, 33, "Unexpected number of cards with declarative Reveal specs");
   assert.deepEqual(
     [
       ...data.reserveMarket,
@@ -139,6 +141,7 @@ try {
 	    imperialOrnithopter,
 	    smuggler,
 	    interstellarTrade,
+      calculus,
 	    beneGesseritOperative,
 	    chani,
 	  ]) {
@@ -227,8 +230,30 @@ try {
 	        effect.optional === true
 	      )
 	    ),
-	    "Chani should carry a declarative Reveal troop-retreat strength spec",
+    "Chani should carry a declarative Reveal troop-retreat strength spec",
 	  );
+  assert.ok(
+    calculus.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.effects.some((effect) => effect.kind === "gain-persuasion" && effect.amount === 2)
+    ),
+    "Calculus of Power should carry its printed persuasion in Reveal specs",
+  );
+  assert.ok(
+    calculus.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.effects.some((effect) =>
+        effect.kind === "trash-card" &&
+        effect.optional === true &&
+        effect.excludeSource === true &&
+        effect.requiredTrait === "Faction: Emperor" &&
+        effect.strengthReward === 3 &&
+        effect.zones?.length === 1 &&
+        effect.zones[0] === "playArea"
+      )
+    ),
+    "Calculus of Power should carry a declarative Reveal trash-card strength spec",
+  );
   assert.ok(
     beneGesseritOperative.effects?.some((spec) =>
       spec.trigger === "agent-play" &&
@@ -552,11 +577,55 @@ try {
     name: "Effect Spec Reveal Spy Placement",
     effects: [revealSpec([{ kind: "place-spies", selector: "self", amount: 1 }])],
   };
-	  assert.throws(
-	    () => turnActions.revealTurnPlan({ ...p2, hand: [revealSpyPlacementCard], highCouncilSeat: false }),
-	    /Unsupported effect "place-spies" for reveal/,
-	    "Spy placement specs should stay out of Reveal until a pending-action resolver supports them",
-	  );
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [revealSpyPlacementCard], highCouncilSeat: false }),
+    /Unsupported effect "place-spies" for reveal/,
+    "Spy placement specs should stay out of Reveal until a pending-action resolver supports them",
+  );
+  const agentTrashCard = {
+    ...convincingArgument,
+    id: "effect-spec-agent-trash-card",
+    name: "Effect Spec Agent Trash Card",
+    effects: [agentSpec([{ kind: "trash-card", selector: "self", optional: true }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(agentTrashCard, p2, p2),
+    /Unsupported effect "trash-card" for agent-play/,
+    "Trash-card specs should fail outside Reveal until an Agent pending-action resolver supports them",
+  );
+  const invalidTrashZoneCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-trash-zone-card",
+    name: "Effect Spec Invalid Trash Zone",
+    effects: [revealSpec([{ kind: "trash-card", selector: "self", zones: ["deck"], optional: true }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [invalidTrashZoneCard], highCouncilSeat: false }),
+    /Unsupported trash-card zone "deck"/,
+    "Trash-card specs should reject unsupported zones",
+  );
+  const invalidTrashTraitCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-trash-trait-card",
+    name: "Effect Spec Invalid Trash Trait",
+    effects: [revealSpec([{ kind: "trash-card", selector: "self", requiredTrait: "", optional: true }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [invalidTrashTraitCard], highCouncilSeat: false }),
+    /Invalid trash-card requiredTrait ""/,
+    "Trash-card specs should require a non-empty required trait",
+  );
+  const invalidTrashStrengthCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-trash-strength-card",
+    name: "Effect Spec Invalid Trash Strength",
+    effects: [revealSpec([{ kind: "trash-card", selector: "self", strengthReward: -1, optional: true }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [invalidTrashStrengthCard], highCouncilSeat: false }),
+    /Invalid effect amount "-1"/,
+    "Trash-card strength rewards should require non-negative integer amounts",
+  );
 	  const conditionalRevealRetreatCard = {
 	    ...convincingArgument,
 	    id: "effect-spec-conditional-reveal-retreat-card",

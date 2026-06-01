@@ -64,6 +64,23 @@ try {
     false,
     "Calculus of Power should use structured optional trash strength instead of manual printed reveal handling",
   );
+  assert.ok(
+    calculus.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.effects.some((effect) => effect.kind === "gain-persuasion" && effect.amount === 2)
+    ) &&
+    calculus.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.effects.some((effect) =>
+        effect.kind === "trash-card" &&
+          effect.optional === true &&
+          effect.requiredTrait === "Faction: Emperor" &&
+          effect.excludeSource === true &&
+          effect.strengthReward === 3
+      )
+    ),
+    "Calculus of Power should use declarative Reveal persuasion and trash-card strength effects",
+  );
   assert.match(calculus.reveal, /another Emperor card/, "Calculus of Power should describe its structured Reveal trash text");
   const capturedMentat = data.imperiumDeck.find((card) => card.name === "Captured Mentat");
   assert.ok(capturedMentat, "Imperium deck should include Captured Mentat");

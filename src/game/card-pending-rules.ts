@@ -3,7 +3,6 @@ import {
   canMoveCardToThroneRow,
   isCapturedMentatCard,
   isCommandRespectCommanderCard,
-  isCalculusOfPowerCard,
   isCorrinoMightCommanderCard,
   isCriticalShipmentsCommanderCard,
   isDemandAttentionCommanderCard,
@@ -24,6 +23,7 @@ import { playerTroopSupply } from "./deck-utils";
 import {
   resolveCardEffects,
   resolveRevealRetreatTroopsForStrength,
+  resolveRevealTrashCardEffects,
   type SpyPlacementEffectResult,
 } from "./effect-resolver";
 import {
@@ -45,6 +45,7 @@ import {
   recallableSpySupplySpaces,
 } from "./spy-choices";
 import { threatenSpiceProductionCost } from "./threaten-spice-production";
+import { trashableCardsForPending } from "./trash-rules";
 import { hasUsedReverendMotherJessicaRepeat } from "./turn-trackers";
 import type {
   BoardSpace,
@@ -63,7 +64,6 @@ export const stabanUnseenNetworkFactionIcons: IconId[] = ["emperor", "spacing", 
 export const corrinoMightCost = 3;
 export const devastatingAssaultCost = 3;
 export const devastatingAssaultStrength = 5;
-export const emperorCardTrait = "Faction: Emperor";
 export const shaddamSignetRingTroopCost = 1;
 export const shaddamSignetRingInfluenceCost = 3;
 export const shaddamSignetRingInfluenceChoices: FactionId[] = [
@@ -523,37 +523,6 @@ export function pendingActionForCorrinoMightReveal(
   };
 }
 
-export function pendingActionForCalculusOfPowerReveal(
-  card: Card,
-  source: Player,
-  state: GameState,
-  combatRecipientId: string,
-): PendingAction | undefined {
-  const combatRecipient = state.players.find((player) => player.id === combatRecipientId);
-  if (
-    !isCalculusOfPowerCard(card) ||
-    !combatRecipient ||
-    !playerHasConflictUnits(combatRecipient) ||
-    !source.playArea.some((candidate) =>
-      candidate.id !== card.id && candidate.traits?.includes(emperorCardTrait)
-    )
-  ) {
-    return undefined;
-  }
-
-  return {
-    kind: "trash-card",
-    ownerId: source.id,
-    source: card.name,
-    optional: true,
-    zones: ["playArea"],
-    excludeCardId: card.id,
-    requiredTrait: emperorCardTrait,
-    combatRecipientId,
-    strengthReward: 3,
-  };
-}
-
 export function pendingActionForDevastatingAssaultReveal(
   card: Card,
   source: Player,
@@ -633,9 +602,9 @@ export function pendingActionsForReveal(
   const corrinoMightPending = revealedCards
     .map((card) => pendingActionForCorrinoMightReveal(card, source, state))
     .find((pending): pending is PendingAction => Boolean(pending));
-  const calculusOfPowerPending = revealedCards
-    .map((card) => pendingActionForCalculusOfPowerReveal(card, source, state, combatRecipientId))
-    .find((pending): pending is PendingAction => Boolean(pending));
+  const revealTrashCardPendings = revealedCards.flatMap((card) =>
+    pendingActionsForRevealTrashCards(card, source, state, combatRecipientId)
+  );
   const devastatingAssaultPending = revealedCards
     .map((card) => pendingActionForDevastatingAssaultReveal(card, source, state, combatRecipientId))
     .find((pending): pending is PendingAction => Boolean(pending));
@@ -650,7 +619,7 @@ export function pendingActionsForReveal(
 
   return [
     revealAdjustPending,
-    calculusOfPowerPending,
+    ...revealTrashCardPendings,
     devastatingAssaultPending,
     corrinoMightPending,
     capturedMentatRevealPending,
@@ -693,6 +662,42 @@ function pendingActionForLadyAmberDesertScouts(source: Player): PendingAction | 
     ownerId: source.id,
     source: "Desert Scouts",
   };
+}
+
+function pendingActionsForRevealTrashCards(
+  card: Card,
+  source: Player,
+  state: GameState,
+  combatRecipientId: string,
+): PendingAction[] {
+  const recipient = state.players.find((player) => player.id === combatRecipientId);
+  return resolveRevealTrashCardEffects(card.effects, {
+    trigger: "reveal",
+    source,
+    target: recipient,
+    state,
+  }).flatMap((effect) => {
+    if (effect.selector !== "self") return [];
+    if (effect.strengthReward !== undefined && (!recipient || !playerHasConflictUnits(recipient))) return [];
+    const pending: Extract<PendingAction, { kind: "trash-card" }> = {
+      kind: "trash-card",
+      ownerId: source.id,
+      source: card.name,
+      optional: effect.optional,
+      ...(effect.zones ? { zones: effect.zones } : {}),
+      ...(effect.excludeSource ? { excludeCardId: card.id } : {}),
+      ...(effect.requiredTrait ? { requiredTrait: effect.requiredTrait } : {}),
+      ...(effect.strengthReward !== undefined && recipient ? {
+        combatRecipientId: recipient.id,
+        strengthReward: effect.strengthReward,
+      } : {}),
+      ...(effect.spiceRewardCostThreshold !== undefined ? {
+        spiceRewardCostThreshold: effect.spiceRewardCostThreshold,
+      } : {}),
+      ...(effect.spiceReward !== undefined ? { spiceReward: effect.spiceReward } : {}),
+    };
+    return trashableCardsForPending(source, pending).length > 0 ? [pending] : [];
+  });
 }
 
 function pendingActionsForRevealRetreatTroopsForStrength(

@@ -27,6 +27,7 @@ import {
   revealGainPersuasion,
   revealGainResource,
   revealRetreatTroopsForStrength,
+  revealTrashCardForStrength,
   visitedMakerSpace,
 } from "./effect-specs";
 import type {
@@ -217,6 +218,16 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
   }
   if (card.id === interstellarTradeSourceId) {
     return [revealGainPersuasion({ kind: "completed-contracts" })];
+  }
+  if (card.id === calculusOfPowerSourceId) {
+    return [
+      revealGainPersuasion(2),
+      revealTrashCardForStrength(3, {
+        zones: ["playArea"],
+        excludeSource: true,
+        requiredTrait: "Faction: Emperor",
+      }),
+    ];
   }
   if (card.id === beneGesseritOperativeSourceId) {
     return [

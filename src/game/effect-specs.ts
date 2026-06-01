@@ -7,6 +7,7 @@ import type {
   IconId,
   PlayerSelector,
   ResourceId,
+  TrashCardZone,
 } from "./types";
 
 export function agentPlayEffects(effects: GameEffectSpec[], conditions?: GameEffectConditionSpec[]): CardEffectSpec {
@@ -56,6 +57,27 @@ export function revealRetreatTroopsForStrength(
       amount: troops,
       strength,
       optional: true,
+    },
+  ], conditions);
+}
+
+export function revealTrashCardForStrength(
+  strength: EffectAmountSpec,
+  options: {
+    zones?: TrashCardZone[];
+    excludeSource?: boolean;
+    requiredTrait?: string;
+    optional?: boolean;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return revealEffects([
+    {
+      kind: "trash-card",
+      selector: "self",
+      strengthReward: strength,
+      optional: true,
+      ...options,
     },
   ], conditions);
 }
@@ -131,10 +153,23 @@ export function cloneCardEffects(effects: CardEffectSpec[] | undefined): CardEff
     conditions: spec.conditions?.map((condition) => ({ ...condition })),
     effects: spec.effects.map((effect) => ({
       ...effect,
-      amount: typeof effect.amount === "number" ? effect.amount : { ...effect.amount },
+      ...("amount" in effect ? { amount: cloneAmount(effect.amount) } : {}),
       ...("strength" in effect
-        ? { strength: typeof effect.strength === "number" ? effect.strength : { ...effect.strength } }
+        ? { strength: cloneAmount(effect.strength) }
+        : {}),
+      ...("strengthReward" in effect && effect.strengthReward !== undefined
+        ? { strengthReward: cloneAmount(effect.strengthReward) }
+        : {}),
+      ...("spiceRewardCostThreshold" in effect && effect.spiceRewardCostThreshold !== undefined
+        ? { spiceRewardCostThreshold: cloneAmount(effect.spiceRewardCostThreshold) }
+        : {}),
+      ...("spiceReward" in effect && effect.spiceReward !== undefined
+        ? { spiceReward: cloneAmount(effect.spiceReward) }
         : {}),
     })),
   }));
+}
+
+function cloneAmount(amount: EffectAmountSpec): EffectAmountSpec {
+  return typeof amount === "number" ? amount : { ...amount };
 }

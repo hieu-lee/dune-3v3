@@ -16,15 +16,15 @@ These cards currently use typed Agent effect specs:
 
 - Ally starter cards: Signet Ring leader-gated immediate rewards for Gurney Halleck and Lady Amber Metulli, plus spy placement pending rewards for Lady Margot Fenring and Staban Tuek.
 - Reserve cards: Prepare The Way.
-- Muad'Dib Commander cards: Signet Ring.
-- Emperor Commander cards: Devastating Assault, Imperial Tent, Signet Ring.
+- Muad'Dib Commander cards: Signet Ring, Usul.
+- Emperor Commander cards: Critical Shipments, Devastating Assault, Imperial Tent, Signet Ring.
 - Imperium cards: Bene Gesserit Operative, Captured Mentat, Cargo Runner, Chani, Clever Tactician, Maker Keeper, Maula Pistol, Northern Watermaster, Paracompass.
 
 ## Bespoke Automated Cards
 
 These cards are automated but still rely on explicit card or leader branches while the shared primitive library grows:
 
-- Commander starter cards: Command Respect, Critical Shipments, Demand Attention, Demand Results, Desert Call, Devastating Assault Reveal payment, Corrino Might, Threaten Spice Production, Usul, Shaddam Signet Ring choices.
+- Commander starter cards: Command Respect, Demand Attention, Demand Results, Desert Call, Devastating Assault Reveal payment, Corrino Might, Threaten Spice Production, Shaddam Signet Ring choices.
 - Ally leader Signet Ring pay/choice effects: Lady Jessica, Princess Irulan, Reverend Mother Jessica.
 - Plot and Combat Intrigues: currently automated through pattern modules and card-specific branches, not effect specs.
 
@@ -46,9 +46,9 @@ The largest current gaps are Agent and choice primitives:
 - Conditions: combat participation beyond current conflict-unit count checks.
 - Selectors: activated Ally outside routed troop recruitment, teammate, faction, board space, market card, reserve card, contract, hand/discard/play-area card.
 - Effects: deploy troops, variable retreat troops, gain/lose Influence, recall spy, acquire card, take/complete contract, trash/discard card, gain VP, remove Shield Wall, summon sandworm.
-- Choices: optional effect, pay-or-skip, choose one, choose N, split Commander/Ally rewards.
+- Choices: optional effect, pay-or-skip, choose one, choose N, non-resource split Commander/Ally rewards.
 
 ## Verification
 
-- `pnpm run verify:card-effect-specs` verifies reveal specs, Agent card draw/source-label/resource/recruit/spy-placement/post-placement/Intrigue draw/discard-for-Influence/deployment-block/Throne Row movement specs, Reveal Fremen Bond trait checks, Reveal troop-retreat strength specs, Reveal trash-card strength specs, Reveal Influence-for-Intrigue specs, legacy fallback, no double-counting, conditional Maker/contract/spy/influence/conflict-unit/leader/alliance behavior, shared spy posts, and manual reveal fallback.
+- `pnpm run verify:card-effect-specs` verifies reveal specs, Agent card draw/source-label/resource/recruit/spy-placement/post-placement/Intrigue draw/discard-for-Influence/deployment-block/Throne Row movement/Commander resource-split specs, Reveal Fremen Bond trait checks, Reveal troop-retreat strength specs, Reveal trash-card strength specs, Reveal Influence-for-Intrigue specs, legacy fallback, no double-counting, conditional Maker/contract/spy/influence/conflict-unit/leader/alliance behavior, shared spy posts, and manual reveal fallback.
 - `pnpm run verify` includes the effect-spec verifier through `package.json`.

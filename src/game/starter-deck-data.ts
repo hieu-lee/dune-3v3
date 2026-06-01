@@ -1,6 +1,7 @@
 import catalogJson from "./uprising-catalog.generated.json";
 import {
   agentBlockConflictDeployment,
+  agentCommanderResourceSplit,
   agentDrawCards,
   agentGainResource,
   agentMoveCardToThroneRow,
@@ -337,7 +338,17 @@ const muadDibCommanderSpecs: Array<StarterCardSpec & { sourceId: number }> = [
     icons: ["city"],
     persuasion: 2,
     swords: 0,
-    effects: [revealGainPersuasion(2)],
+    effects: [
+      agentCommanderResourceSplit(
+        [
+          { commanderResource: "water", commanderAmount: 1, allyResource: "spice", allyAmount: 1 },
+          { commanderResource: "spice", commanderAmount: 1, allyResource: "water", allyAmount: 1 },
+        ],
+        { source: "Usul" },
+        [hasTeam("muaddib"), hasRole("Commander")],
+      ),
+      revealGainPersuasion(2),
+    ],
     play: "Commander and activated Ally split the printed reward.",
     reveal: starterRevealText(2, 0),
   },
@@ -373,7 +384,17 @@ const emperorCommanderSpecs: Array<StarterCardSpec & { sourceId: number }> = [
     icons: ["spice"],
     persuasion: 2,
     swords: 0,
-    effects: [revealGainPersuasion(2)],
+    effects: [
+      agentCommanderResourceSplit(
+        [
+          { commanderResource: "water", commanderAmount: 1, allyResource: "solari", allyAmount: 2 },
+          { commanderResource: "solari", commanderAmount: 2, allyResource: "water", allyAmount: 1 },
+        ],
+        { source: "Critical Shipments" },
+        [hasTeam("shaddam"), hasRole("Commander")],
+      ),
+      revealGainPersuasion(2),
+    ],
     play: "Commander and activated Ally split the printed reward.",
     reveal: starterRevealText(2, 0),
   },

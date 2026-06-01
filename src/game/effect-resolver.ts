@@ -9,6 +9,7 @@ import { spyPostCount } from "./spy-posts";
 import type {
   Card,
   CardEffectSpec,
+  CommanderResourceSplitOption,
   EffectAmountSpec,
   FactionId,
   GameEffectConditionSpec,
@@ -85,6 +86,12 @@ export type AgentDiscardCardForInfluenceAndDraw = {
 
 export type AgentMoveCardToThroneRow = {
   selector: PlayerSelector;
+  source?: string;
+};
+
+export type AgentCommanderResourceSplit = {
+  selector: PlayerSelector;
+  options: CommanderResourceSplitOption[];
   source?: string;
 };
 
@@ -184,6 +191,11 @@ function validateAmount(amount: EffectAmountSpec) {
     invalidSpecField("completed-contracts multiplier", amount.multiplier);
   }
   unsupportedKind("effect amount", amount);
+}
+
+function validateFixedAmount(label: string, amount: number) {
+  if (isNonNegativeInteger(amount)) return;
+  invalidSpecField(label, amount);
 }
 
 function validateSourceLabel(label: string, value: unknown) {
@@ -346,6 +358,20 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     validateAmount(effect.influenceAmount);
     return;
   }
+  if (effect.kind === "commander-resource-split") {
+    if (trigger !== "agent-play") {
+      throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
+    }
+    if (effect.selector !== "self") {
+      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
+    validateSourceLabel("commander-resource-split source", effect.source);
+    if (!Array.isArray(effect.options) || effect.options.length === 0) {
+      invalidSpecField("commander-resource-split options", effect.options);
+    }
+    effect.options.forEach(validateCommanderResourceSplitOption);
+    return;
+  }
   if (effect.kind === "block-conflict-deployment") {
     if (trigger !== "agent-play") {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
@@ -381,6 +407,17 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     return;
   }
   unsupportedKind("effect", effect);
+}
+
+function validateCommanderResourceSplitOption(option: CommanderResourceSplitOption) {
+  if (!supportedResources.has(option.commanderResource)) {
+    throw new Error(`Unsupported effect resource "${option.commanderResource}"`);
+  }
+  if (!supportedResources.has(option.allyResource)) {
+    throw new Error(`Unsupported effect resource "${option.allyResource}"`);
+  }
+  validateFixedAmount("commander-resource-split commanderAmount", option.commanderAmount);
+  validateFixedAmount("commander-resource-split allyAmount", option.allyAmount);
 }
 
 function validateSpec(spec: CardEffectSpec) {
@@ -649,6 +686,9 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
   if (effect.kind === "discard-card-for-influence-and-draw") {
     return result;
   }
+  if (effect.kind === "commander-resource-split") {
+    return result;
+  }
   if (effect.kind === "block-conflict-deployment") {
     return {
       ...result,
@@ -883,6 +923,24 @@ export function resolveAgentMoveCardToThroneRows(
       .filter((effect) => effect.kind === "move-card-to-throne-row")
       .map((effect) => ({
         selector: effect.selector,
+        source: effect.source,
+      }));
+  });
+}
+
+export function resolveAgentCommanderResourceSplits(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): AgentCommanderResourceSplit[] {
+  specs?.forEach(validateSpec);
+  return (specs ?? []).flatMap((spec) => {
+    if (spec.trigger !== "agent-play") return [];
+    if (!specApplies(spec, context)) return [];
+    return spec.effects
+      .filter((effect) => effect.kind === "commander-resource-split")
+      .map((effect) => ({
+        selector: effect.selector,
+        options: effect.options.map((option) => ({ ...option })),
         source: effect.source,
       }));
   });

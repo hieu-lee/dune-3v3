@@ -1,5 +1,6 @@
 import type {
   CardEffectSpec,
+  CommanderResourceSplitOption,
   EffectAmountSpec,
   FactionId,
   GameEffectConditionSpec,
@@ -129,6 +130,16 @@ export function agentBlockConflictDeployment(
   conditions?: GameEffectConditionSpec[],
 ): CardEffectSpec {
   return agentPlayEffects([{ kind: "block-conflict-deployment", selector: "self", ...options }], conditions);
+}
+
+export function agentCommanderResourceSplit(
+  splitOptions: CommanderResourceSplitOption[],
+  options: {
+    source?: string;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return agentPlayEffects([{ kind: "commander-resource-split", selector: "self", options: splitOptions, ...options }], conditions);
 }
 
 export function agentMoveCardToThroneRow(
@@ -290,6 +301,9 @@ export function cloneCardEffects(effects: CardEffectSpec[] | undefined): CardEff
         : {}),
       ...("influenceAmount" in effect
         ? { influenceAmount: cloneAmount(effect.influenceAmount) }
+        : {}),
+      ...("options" in effect
+        ? { options: effect.options.map((option) => ({ ...option })) }
         : {}),
     })),
   }));

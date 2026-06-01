@@ -58,7 +58,12 @@ try {
   const usul = data.muadDibCommanderCards.find((card) => card.name === "Usul");
   assert.ok(usul, "Muad'Dib Commander deck should include Usul");
   assert.equal(state.isUsulCommanderCard(usul), true, "Usul should be recognized as its Commander starter card");
-  const usulPending = state.pendingActionForCard(usul, muadDib, game, muadDibAllyA);
+  const muadDibWithUsul = { ...muadDib, playArea: [usul] };
+  const usulGame = {
+    ...game,
+    players: game.players.map((player) => player.id === muadDib.id ? muadDibWithUsul : player),
+  };
+  const usulPending = state.pendingActionForCard(usul, muadDibWithUsul, usulGame, muadDibAllyA);
   assert.deepEqual(usulPending, {
     kind: "commander-resource-split",
     commanderId: muadDib.id,
@@ -71,17 +76,22 @@ try {
     ],
   });
   assert.equal(
-    state.pendingActionForCard(usul, muadDib, game, shaddamAlly),
+    state.pendingActionForCard(usul, muadDib, game, muadDibAllyA),
+    undefined,
+    "Usul should require the played card in the Commander's play area",
+  );
+  assert.equal(
+    state.pendingActionForCard(usul, muadDibWithUsul, usulGame, shaddamAlly),
     undefined,
     "Usul should not target an opposing Ally",
   );
   assert.equal(
-    state.pendingActionForCard(usul, muadDibAllyA, game, muadDibAllyB),
+    state.pendingActionForCard(usul, { ...muadDibAllyA, playArea: [usul] }, game, muadDibAllyB),
     undefined,
     "Usul should not trigger from an Ally starter deck owner",
   );
   assert.equal(
-    state.pendingActionForCard(usul, muadDib, game),
+    state.pendingActionForCard(usul, muadDibWithUsul, usulGame),
     undefined,
     "Usul needs the activated Ally target",
   );
@@ -157,7 +167,17 @@ try {
     true,
     "Critical Shipments should be recognized as its Commander starter card",
   );
-  const criticalShipmentsPending = state.pendingActionForCard(criticalShipments, emperor, game, shaddamAlly);
+  const emperorWithCriticalShipments = { ...emperor, playArea: [criticalShipments] };
+  const criticalShipmentsGame = {
+    ...game,
+    players: game.players.map((player) => player.id === emperor.id ? emperorWithCriticalShipments : player),
+  };
+  const criticalShipmentsPending = state.pendingActionForCard(
+    criticalShipments,
+    emperorWithCriticalShipments,
+    criticalShipmentsGame,
+    shaddamAlly,
+  );
   assert.deepEqual(criticalShipmentsPending, {
     kind: "commander-resource-split",
     commanderId: emperor.id,
@@ -170,17 +190,22 @@ try {
     ],
   });
   assert.equal(
-    state.pendingActionForCard(criticalShipments, emperor, game, muadDibAllyA),
+    state.pendingActionForCard(criticalShipments, emperor, game, shaddamAlly),
+    undefined,
+    "Critical Shipments should require the played card in the Commander's play area",
+  );
+  assert.equal(
+    state.pendingActionForCard(criticalShipments, emperorWithCriticalShipments, criticalShipmentsGame, muadDibAllyA),
     undefined,
     "Critical Shipments should not target an opposing Ally",
   );
   assert.equal(
-    state.pendingActionForCard(criticalShipments, shaddamAlly, game, shaddamAllyB),
+    state.pendingActionForCard(criticalShipments, { ...shaddamAlly, playArea: [criticalShipments] }, game, shaddamAllyB),
     undefined,
     "Critical Shipments should not trigger from an Ally starter deck owner",
   );
   assert.equal(
-    state.pendingActionForCard(criticalShipments, emperor, game),
+    state.pendingActionForCard(criticalShipments, emperorWithCriticalShipments, criticalShipmentsGame),
     undefined,
     "Critical Shipments needs the activated Ally target",
   );

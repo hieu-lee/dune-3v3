@@ -3,7 +3,6 @@ import {
   canMoveCardToThroneRow,
   isCommandRespectCommanderCard,
   isCorrinoMightCommanderCard,
-  isCriticalShipmentsCommanderCard,
   isDemandAttentionCommanderCard,
   isDemandResultsCommanderCard,
   isDesertCallCommanderCard,
@@ -11,7 +10,6 @@ import {
   isGenericSignetRingCard,
   isShaddamSignetRingCard,
   isThreatenSpiceProductionCommanderCard,
-  isUsulCommanderCard,
 } from "./card-identifiers";
 import {
   canSummonSandworms,
@@ -19,6 +17,7 @@ import {
 } from "./conflict-rules";
 import { playerTroopSupply } from "./deck-utils";
 import {
+  resolveAgentCommanderResourceSplits,
   resolveAgentDiscardCardForInfluenceAndDraws,
   resolveAgentMoveCardToThroneRows,
   resolveCardEffects,
@@ -51,13 +50,11 @@ import { hasUsedReverendMotherJessicaRepeat } from "./turn-trackers";
 import type {
   BoardSpace,
   Card,
-  CommanderResourceSplitOption,
   FactionId,
   GameState,
   IconId,
   PendingAction,
   Player,
-  TeamId,
 } from "./types";
 
 export const stabanUnseenNetworkSource = "Unseen Network";
@@ -109,31 +106,6 @@ function potentialDeferredMakerChoiceSpice(state: GameState, source: Player, tar
 function demandAttentionRecipient(source: Player, target: Player | undefined, space: BoardSpace) {
   if (space.personal) return source;
   return target;
-}
-
-function commanderResourceSplitPendingAction(
-  card: Card,
-  source: Player,
-  target: Player | undefined,
-  team: TeamId,
-  options: CommanderResourceSplitOption[],
-): PendingAction | undefined {
-  if (
-    source.team !== team ||
-    source.role !== "Commander" ||
-    target?.team !== source.team ||
-    target.role !== "Ally"
-  ) {
-    return undefined;
-  }
-  return {
-    kind: "commander-resource-split",
-    commanderId: source.id,
-    allyId: target.id,
-    team,
-    source: card.name,
-    options,
-  };
 }
 
 function sameSpyPlacementDetails(first: SpyPlacementEffectResult, second: SpyPlacementEffectResult) {
@@ -271,6 +243,37 @@ function pendingActionForAgentThroneRowMove(
     .find((pending): pending is PendingAction => Boolean(pending));
 }
 
+function pendingActionForAgentCommanderResourceSplit(
+  card: Card,
+  source: Player,
+  state?: GameState,
+  target?: Player,
+): PendingAction | undefined {
+  if (!card.effects || !source.playArea.some((candidate) => candidate.id === card.id)) return undefined;
+  if (source.role !== "Commander" || target?.team !== source.team || target.role !== "Ally") return undefined;
+  const players = state ? playersWithPendingCardEffect(state, source, target) : undefined;
+  const effectState = state && players ? { ...state, players } : undefined;
+  const effects = resolveAgentCommanderResourceSplits(card.effects, {
+    trigger: "agent-play",
+    source,
+    target,
+    state: effectState,
+  });
+  return effects
+    .map((effect): PendingAction | undefined => {
+      if (effect.selector !== "self" || effect.options.length === 0) return undefined;
+      return {
+        kind: "commander-resource-split",
+        commanderId: source.id,
+        allyId: target.id,
+        team: source.team,
+        source: effect.source ?? card.name,
+        options: effect.options.map((option) => ({ ...option })),
+      };
+    })
+    .find((pending): pending is PendingAction => Boolean(pending));
+}
+
 export function pendingActionForCard(
   card: Card,
   source: Player,
@@ -284,18 +287,8 @@ export function pendingActionForCard(
   if (agentDiscardInfluenceDrawPending) return agentDiscardInfluenceDrawPending;
   const agentThroneRowPending = pendingActionForAgentThroneRowMove(card, source, state, target);
   if (agentThroneRowPending) return agentThroneRowPending;
-  if (isUsulCommanderCard(card)) {
-    return commanderResourceSplitPendingAction(card, source, target, "muaddib", [
-      { commanderResource: "water", commanderAmount: 1, allyResource: "spice", allyAmount: 1 },
-      { commanderResource: "spice", commanderAmount: 1, allyResource: "water", allyAmount: 1 },
-    ]);
-  }
-  if (isCriticalShipmentsCommanderCard(card)) {
-    return commanderResourceSplitPendingAction(card, source, target, "shaddam", [
-      { commanderResource: "water", commanderAmount: 1, allyResource: "solari", allyAmount: 2 },
-      { commanderResource: "solari", commanderAmount: 2, allyResource: "water", allyAmount: 1 },
-    ]);
-  }
+  const agentCommanderResourceSplitPending = pendingActionForAgentCommanderResourceSplit(card, source, state, target);
+  if (agentCommanderResourceSplitPending) return agentCommanderResourceSplitPending;
   if (
     isShaddamSignetRingCard(card) &&
     source.team === "shaddam" &&

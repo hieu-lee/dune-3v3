@@ -63,6 +63,23 @@ export async function runSpaceChoicesSmoke({
   assert.equal(commanderAfter.resources.spice, commanderBefore.resources.spice + 1, "Resource split should pay the commander");
   assert.equal(allyAfter.resources.water, allyBefore.resources.water + 1, "Resource split should pay the ally");
 
+  await setDebugGameAndWait(page, states.usulResourceSplit);
+  pendingText = await page.locator(".pending-panel").innerText();
+  assert.match(pendingText, /Muad'Dib Usul/i);
+  assert.match(pendingText, /Muad'Dib \/ Gurney Halleck/i);
+  await screenshot(page, captures, "pending-usul-resource-split.png");
+
+  const usulBefore = await currentGame(page);
+  const usulCommanderBefore = usulBefore.players.find((player) => player.id === "p1");
+  const usulAllyBefore = usulBefore.players.find((player) => player.id === "p3");
+  await page.locator(".pending-panel").getByRole("button", { name: /Commander water \/ Ally spice/ }).click();
+  await waitForNoPending(page);
+  const usulAfter = await currentGame(page);
+  const usulCommanderAfter = usulAfter.players.find((player) => player.id === "p1");
+  const usulAllyAfter = usulAfter.players.find((player) => player.id === "p3");
+  assert.equal(usulCommanderAfter.resources.water, usulCommanderBefore.resources.water + 1, "Usul should pay Commander water through card rules");
+  assert.equal(usulAllyAfter.resources.spice, usulAllyBefore.resources.spice + 1, "Usul should pay activated Ally spice through card rules");
+
   await setDebugGameAndWait(page, states.optionalSpacePayment);
   pendingText = await page.locator(".pending-panel").innerText();
   assert.match(pendingText, /Gather Support/i);
@@ -94,8 +111,11 @@ export async function runSpaceChoicesSmoke({
 }
 
 async function createSpaceChoiceStates(server, initialPlayableGame) {
+  const data = await server.ssrLoadModule("/src/game/data.ts");
   const state = await server.ssrLoadModule("/src/game/state.ts");
   const game = initialPlayableGame(state);
+  const usul = data.muadDibCommanderCards.find((card) => card.name === "Usul");
+  assert.ok(usul, "Expected Usul for declarative resource-split browser debug state");
   const base = {
     ...game,
     activeSeat: 0,
@@ -104,6 +124,35 @@ async function createSpaceChoiceStates(server, initialPlayableGame) {
     pendingQueue: [],
     shieldWall: true,
   };
+  const usulCard = cloneCard(usul);
+  const usulPlayers = game.players.map((player) => {
+    if (player.id === "p1") return { ...player, hand: [], playArea: [usulCard], resources: { solari: 0, spice: 0, water: 0 } };
+    if (player.id === "p3") return { ...player, resources: { solari: 0, spice: 0, water: 0 } };
+    return player;
+  });
+  const usulState = {
+    ...base,
+    players: usulPlayers,
+  };
+  const usulCommander = usulPlayers.find((player) => player.id === "p1");
+  const usulAlly = usulPlayers.find((player) => player.id === "p3");
+  assert.ok(usulCommander && usulAlly, "Expected Muad'Dib and Gurney for declarative resource-split browser debug state");
+  const usulPending = state.pendingActionForCard(usulCard, usulCommander, usulState, usulAlly);
+  assert.deepEqual(
+    usulPending,
+    {
+      kind: "commander-resource-split",
+      commanderId: "p1",
+      allyId: "p3",
+      team: "muaddib",
+      source: "Usul",
+      options: [
+        { commanderResource: "water", commanderAmount: 1, allyResource: "spice", allyAmount: 1 },
+        { commanderResource: "spice", commanderAmount: 1, allyResource: "water", allyAmount: 1 },
+      ],
+    },
+    "Usul should create the browser debug resource-split pending action through card rules",
+  );
 
   return {
     maker: {
@@ -145,6 +194,10 @@ async function createSpaceChoiceStates(server, initialPlayableGame) {
         options: [{ commanderResource: "spice", commanderAmount: 1, allyResource: "water", allyAmount: 1 }],
       },
     },
+    usulResourceSplit: {
+      ...usulState,
+      pendingAction: usulPending,
+    },
     optionalSpacePayment: {
       ...base,
       players: game.players.map((player) =>
@@ -173,4 +226,8 @@ async function createSpaceChoiceStates(server, initialPlayableGame) {
       },
     },
   };
+}
+
+function cloneCard(card) {
+  return { ...card, traits: card.traits ? [...card.traits] : undefined };
 }

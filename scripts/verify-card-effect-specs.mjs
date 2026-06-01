@@ -95,6 +95,8 @@ try {
   const prepareTheWay = data.reserveMarket.find((card) => card.sourceId === 537);
   const limitedLandsraadAccess = data.muadDibCommanderCards.find((card) => card.name === "Limited Landsraad Access");
   const muadDibSignet = data.muadDibCommanderCards.find((card) => card.name === "Signet Ring");
+  const usul = data.muadDibCommanderCards.find((card) => card.name === "Usul");
+  const criticalShipments = data.emperorCommanderCards.find((card) => card.name === "Critical Shipments");
   const devastatingAssault = data.emperorCommanderCards.find((card) => card.name === "Devastating Assault");
   const imperialTent = data.emperorCommanderCards.find((card) => card.name === "Imperial Tent");
   const emperorSignet = data.emperorCommanderCards.find((card) => card.name === "Signet Ring");
@@ -120,7 +122,7 @@ try {
     northernWatermaster &&
     paracompass,
   );
-  assert.ok(prepareTheWay && limitedLandsraadAccess && muadDibSignet && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
+  assert.ok(prepareTheWay && limitedLandsraadAccess && muadDibSignet && usul && criticalShipments && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
   assert.ok(arrakeen && haggaBasin && imperialBasin && secrets && highCouncil);
   assert.equal(revealSpecCards.length, 34, "Unexpected number of cards with declarative Reveal specs");
   assert.deepEqual(
@@ -182,6 +184,32 @@ try {
       )
     ),
     "Muad'Dib Signet Ring should carry a declarative Agent draw spec",
+  );
+  assert.ok(
+    usul.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.conditions?.some((condition) => condition.kind === "has-team" && condition.team === "muaddib") &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Commander") &&
+      spec.effects.some((effect) =>
+        effect.kind === "commander-resource-split" &&
+        effect.selector === "self" &&
+        effect.source === "Usul" &&
+        effect.options.length === 2 &&
+        effect.options.some((option) =>
+          option.commanderResource === "water" &&
+          option.commanderAmount === 1 &&
+          option.allyResource === "spice" &&
+          option.allyAmount === 1
+        ) &&
+        effect.options.some((option) =>
+          option.commanderResource === "spice" &&
+          option.commanderAmount === 1 &&
+          option.allyResource === "water" &&
+          option.allyAmount === 1
+        )
+      )
+    ),
+    "Usul should carry a declarative Commander resource-split spec",
   );
   assert.ok(
     allySignet.effects?.some((spec) =>
@@ -425,6 +453,32 @@ try {
       )
     ),
     "Devastating Assault should carry a routed Agent recruit spec",
+  );
+  assert.ok(
+    criticalShipments.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.conditions?.some((condition) => condition.kind === "has-team" && condition.team === "shaddam") &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Commander") &&
+      spec.effects.some((effect) =>
+        effect.kind === "commander-resource-split" &&
+        effect.selector === "self" &&
+        effect.source === "Critical Shipments" &&
+        effect.options.length === 2 &&
+        effect.options.some((option) =>
+          option.commanderResource === "water" &&
+          option.commanderAmount === 1 &&
+          option.allyResource === "solari" &&
+          option.allyAmount === 2
+        ) &&
+        effect.options.some((option) =>
+          option.commanderResource === "solari" &&
+          option.commanderAmount === 2 &&
+          option.allyResource === "water" &&
+          option.allyAmount === 1
+        )
+      )
+    ),
+    "Critical Shipments should carry a declarative Commander resource-split spec",
   );
   assert.ok(
     imperialTent.effects?.some((spec) =>
@@ -1020,6 +1074,82 @@ try {
     () => state.applyCardAgentEffect(invalidDeploymentBlockSourceCard, p2, p2),
     /Invalid block-conflict-deployment source ""/,
     "Deployment-block specs should reject empty source labels",
+  );
+  const revealCommanderResourceSplitCard = {
+    ...convincingArgument,
+    id: "effect-spec-reveal-commander-resource-split-card",
+    name: "Effect Spec Reveal Commander Resource Split",
+    effects: [revealSpec([{ kind: "commander-resource-split", selector: "self", options: [
+      { commanderResource: "water", commanderAmount: 1, allyResource: "spice", allyAmount: 1 },
+    ] }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [revealCommanderResourceSplitCard], highCouncilSeat: false }),
+    /Unsupported effect "commander-resource-split" for reveal/,
+    "Commander resource split specs should stay in Agent play",
+  );
+  const invalidCommanderResourceSplitSelectorCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-commander-resource-split-selector-card",
+    name: "Effect Spec Invalid Commander Resource Split Selector",
+    effects: [agentSpec([{ kind: "commander-resource-split", selector: "activated-ally", options: [
+      { commanderResource: "water", commanderAmount: 1, allyResource: "spice", allyAmount: 1 },
+    ] }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidCommanderResourceSplitSelectorCard, p4, p2),
+    /Unsupported effect selector "activated-ally" for commander-resource-split/,
+    "Commander resource split specs should reject activated Ally selectors",
+  );
+  const invalidCommanderResourceSplitSourceCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-commander-resource-split-source-card",
+    name: "Effect Spec Invalid Commander Resource Split Source",
+    effects: [agentSpec([{ kind: "commander-resource-split", selector: "self", source: "", options: [
+      { commanderResource: "water", commanderAmount: 1, allyResource: "spice", allyAmount: 1 },
+    ] }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidCommanderResourceSplitSourceCard, p2, p2),
+    /Invalid commander-resource-split source ""/,
+    "Commander resource split specs should reject empty source labels",
+  );
+  const invalidCommanderResourceSplitOptionsCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-commander-resource-split-options-card",
+    name: "Effect Spec Invalid Commander Resource Split Options",
+    effects: [agentSpec([{ kind: "commander-resource-split", selector: "self", options: [] }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidCommanderResourceSplitOptionsCard, p2, p2),
+    /Invalid commander-resource-split options/,
+    "Commander resource split specs should require at least one option",
+  );
+  const invalidCommanderResourceSplitResourceCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-commander-resource-split-resource-card",
+    name: "Effect Spec Invalid Commander Resource Split Resource",
+    effects: [agentSpec([{ kind: "commander-resource-split", selector: "self", options: [
+      { commanderResource: "melange", commanderAmount: 1, allyResource: "spice", allyAmount: 1 },
+    ] }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidCommanderResourceSplitResourceCard, p2, p2),
+    /Unsupported effect resource "melange"/,
+    "Commander resource split specs should reject unsupported resource ids",
+  );
+  const invalidCommanderResourceSplitAmountCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-commander-resource-split-amount-card",
+    name: "Effect Spec Invalid Commander Resource Split Amount",
+    effects: [agentSpec([{ kind: "commander-resource-split", selector: "self", options: [
+      { commanderResource: "water", commanderAmount: -1, allyResource: "spice", allyAmount: 1 },
+    ] }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidCommanderResourceSplitAmountCard, p2, p2),
+    /Invalid commander-resource-split commanderAmount "-1"/,
+    "Commander resource split specs should reject negative amounts",
   );
   const revealThroneRowMoveCard = {
     ...convincingArgument,

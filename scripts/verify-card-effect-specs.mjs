@@ -94,6 +94,7 @@ try {
   const paracompass = data.imperiumDeck.find((card) => card.name === "Paracompass");
   const prepareTheWay = data.reserveMarket.find((card) => card.sourceId === 537);
   const limitedLandsraadAccess = data.muadDibCommanderCards.find((card) => card.name === "Limited Landsraad Access");
+  const demandAttention = data.muadDibCommanderCards.find((card) => card.name === "Demand Attention");
   const muadDibSignet = data.muadDibCommanderCards.find((card) => card.name === "Signet Ring");
   const usul = data.muadDibCommanderCards.find((card) => card.name === "Usul");
   const criticalShipments = data.emperorCommanderCards.find((card) => card.name === "Critical Shipments");
@@ -122,7 +123,7 @@ try {
     northernWatermaster &&
     paracompass,
   );
-  assert.ok(prepareTheWay && limitedLandsraadAccess && muadDibSignet && usul && criticalShipments && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
+  assert.ok(prepareTheWay && limitedLandsraadAccess && demandAttention && muadDibSignet && usul && criticalShipments && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
   assert.ok(arrakeen && haggaBasin && imperialBasin && secrets && highCouncil);
   assert.equal(revealSpecCards.length, 34, "Unexpected number of cards with declarative Reveal specs");
   assert.deepEqual(
@@ -184,6 +185,25 @@ try {
       )
     ),
     "Muad'Dib Signet Ring should carry a declarative Agent draw spec",
+  );
+  assert.ok(
+    demandAttention.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.conditions?.some((condition) => condition.kind === "has-team" && condition.team === "muaddib") &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Commander") &&
+      spec.effects.some((effect) =>
+        effect.kind === "pay-resource-for-influence" &&
+        effect.selector === "self" &&
+        effect.resource === "solari" &&
+        effect.cost === 4 &&
+        effect.faction === "board-space" &&
+        effect.amount === 1 &&
+        effect.recipient === "board-effect-recipient" &&
+        effect.trashSource === true &&
+        effect.source === "Demand Attention"
+      )
+    ),
+    "Demand Attention should carry a declarative Agent resource-for-Influence payment spec",
   );
   assert.ok(
     usul.effects?.some((spec) =>
@@ -1119,6 +1139,179 @@ try {
   );
   assert.equal(playerById(selfPayResolved, p2.id).resources.spice, 0, "Self resource-for-strength should spend the owner resource");
   assert.equal(playerById(selfPayResolved, p2.id).conflict, 5, "Self resource-for-strength should add strength to the same player");
+  const revealPayResourceInfluenceCard = {
+    ...convincingArgument,
+    id: "effect-spec-reveal-pay-resource-influence-card",
+    name: "Effect Spec Reveal Pay Resource Influence",
+    effects: [revealSpec([{
+      kind: "pay-resource-for-influence",
+      selector: "self",
+      resource: "solari",
+      cost: 1,
+      faction: "bene",
+      amount: 1,
+      recipient: "board-effect-recipient",
+    }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [revealPayResourceInfluenceCard], highCouncilSeat: false }),
+    /Unsupported effect "pay-resource-for-influence" for reveal/,
+    "Resource-for-Influence specs should stay in Agent play",
+  );
+  const invalidPayResourceInfluenceSelectorCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-pay-resource-influence-selector-card",
+    name: "Effect Spec Invalid Pay Resource Influence Selector",
+    effects: [agentSpec([{
+      kind: "pay-resource-for-influence",
+      selector: "activated-ally",
+      resource: "solari",
+      cost: 1,
+      faction: "bene",
+      amount: 1,
+      recipient: "board-effect-recipient",
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidPayResourceInfluenceSelectorCard, p4, p2),
+    /Unsupported effect selector "activated-ally" for pay-resource-for-influence/,
+    "Resource-for-Influence specs should reject activated Ally selectors",
+  );
+  const invalidPayResourceInfluenceResourceCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-pay-resource-influence-resource-card",
+    name: "Effect Spec Invalid Pay Resource Influence Resource",
+    effects: [agentSpec([{
+      kind: "pay-resource-for-influence",
+      selector: "self",
+      resource: "melange",
+      cost: 1,
+      faction: "bene",
+      amount: 1,
+      recipient: "board-effect-recipient",
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidPayResourceInfluenceResourceCard, p2, p2),
+    /Unsupported effect resource "melange"/,
+    "Resource-for-Influence specs should reject unsupported resource ids",
+  );
+  const invalidPayResourceInfluenceFactionCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-pay-resource-influence-faction-card",
+    name: "Effect Spec Invalid Pay Resource Influence Faction",
+    effects: [agentSpec([{
+      kind: "pay-resource-for-influence",
+      selector: "self",
+      resource: "solari",
+      cost: 1,
+      faction: "sardaukar",
+      amount: 1,
+      recipient: "board-effect-recipient",
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidPayResourceInfluenceFactionCard, p2, p2),
+    /Unsupported effect faction "sardaukar"/,
+    "Resource-for-Influence specs should reject unsupported faction ids",
+  );
+  const invalidPayResourceInfluenceRecipientCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-pay-resource-influence-recipient-card",
+    name: "Effect Spec Invalid Pay Resource Influence Recipient",
+    effects: [agentSpec([{
+      kind: "pay-resource-for-influence",
+      selector: "self",
+      resource: "solari",
+      cost: 1,
+      faction: "bene",
+      amount: 1,
+      recipient: "self",
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidPayResourceInfluenceRecipientCard, p2, p2),
+    /Invalid pay-resource-for-influence recipient "self"/,
+    "Resource-for-Influence specs should reject unsupported recipient routing",
+  );
+  const invalidPayResourceInfluenceCostCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-pay-resource-influence-cost-card",
+    name: "Effect Spec Invalid Pay Resource Influence Cost",
+    effects: [agentSpec([{
+      kind: "pay-resource-for-influence",
+      selector: "self",
+      resource: "solari",
+      cost: -1,
+      faction: "bene",
+      amount: 1,
+      recipient: "board-effect-recipient",
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidPayResourceInfluenceCostCard, p2, p2),
+    /Invalid effect amount "-1"/,
+    "Resource-for-Influence specs should require non-negative costs",
+  );
+  const invalidPayResourceInfluenceAmountCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-pay-resource-influence-amount-card",
+    name: "Effect Spec Invalid Pay Resource Influence Amount",
+    effects: [agentSpec([{
+      kind: "pay-resource-for-influence",
+      selector: "self",
+      resource: "solari",
+      cost: 1,
+      faction: "bene",
+      amount: -1,
+      recipient: "board-effect-recipient",
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidPayResourceInfluenceAmountCard, p2, p2),
+    /Invalid effect amount "-1"/,
+    "Resource-for-Influence specs should require non-negative Influence amounts",
+  );
+  const invalidPayResourceInfluenceSourceCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-pay-resource-influence-source-card",
+    name: "Effect Spec Invalid Pay Resource Influence Source",
+    effects: [agentSpec([{
+      kind: "pay-resource-for-influence",
+      selector: "self",
+      resource: "solari",
+      cost: 1,
+      faction: "bene",
+      amount: 1,
+      recipient: "board-effect-recipient",
+      source: "",
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidPayResourceInfluenceSourceCard, p2, p2),
+    /Invalid pay-resource-for-influence source ""/,
+    "Resource-for-Influence specs should reject empty source labels",
+  );
+  const requiredPayResourceInfluenceCard = {
+    ...convincingArgument,
+    id: "effect-spec-required-pay-resource-influence-card",
+    name: "Effect Spec Required Pay Resource Influence",
+    effects: [agentSpec([{
+      kind: "pay-resource-for-influence",
+      selector: "self",
+      resource: "solari",
+      cost: 1,
+      faction: "bene",
+      amount: 1,
+      recipient: "board-effect-recipient",
+      optional: false,
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(requiredPayResourceInfluenceCard, p2, p2),
+    /Invalid pay-resource-for-influence optional "false"/,
+    "Resource-for-Influence specs should stay optional so queued payments cannot deadlock if resources change",
+  );
   const revealDiscardInfluenceDrawCard = {
     ...convincingArgument,
     id: "effect-spec-reveal-discard-influence-draw-card",

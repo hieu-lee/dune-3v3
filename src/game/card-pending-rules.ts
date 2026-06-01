@@ -3,7 +3,6 @@ import {
   canMoveCardToThroneRow,
   isCommandRespectCommanderCard,
   isCorrinoMightCommanderCard,
-  isDemandAttentionCommanderCard,
   isDemandResultsCommanderCard,
   isDesertCallCommanderCard,
   isGenericSignetRingCard,
@@ -19,6 +18,7 @@ import {
   resolveAgentCommanderResourceSplits,
   resolveAgentDiscardCardForInfluenceAndDraws,
   resolveAgentMoveCardToThroneRows,
+  resolveAgentPayResourceForInfluences,
   resolveCardEffects,
   resolveRevealLoseInfluenceForIntrigues,
   resolveRevealPayResourceForStrengths,
@@ -99,11 +99,6 @@ function potentialDeferredMakerChoiceSpice(state: GameState, source: Player, tar
     return 0;
   }
   return spice;
-}
-
-function demandAttentionRecipient(source: Player, target: Player | undefined, space: BoardSpace) {
-  if (space.personal) return source;
-  return target;
 }
 
 function sameSpyPlacementDetails(first: SpyPlacementEffectResult, second: SpyPlacementEffectResult) {
@@ -212,6 +207,56 @@ function pendingActionForAgentDiscardCardForInfluenceAndDraw(
     .find((pending): pending is PendingAction => Boolean(pending));
 }
 
+function pendingActionForAgentPayResourceForInfluence(
+  card: Card,
+  source: Player,
+  state?: GameState,
+  target?: Player,
+  space?: BoardSpace,
+): PendingAction | undefined {
+  if (!card.effects || !source.playArea.some((candidate) => candidate.id === card.id)) return undefined;
+  if (!state) return undefined;
+  const players = playersWithPendingCardEffect(state, source, target);
+  const effectState = { ...state, players };
+  const effects = resolveAgentPayResourceForInfluences(card.effects, {
+    trigger: "agent-play",
+    source,
+    target,
+    state: effectState,
+  });
+  return effects
+    .map((effect): PendingAction | undefined => {
+      if (effect.selector !== "self" || effect.cost <= 0 || effect.amount <= 0) return undefined;
+      if (source.resources[effect.resource] < effect.cost) return undefined;
+      if (effect.recipient !== "board-effect-recipient") return undefined;
+      const recipient = space?.personal ? source : target;
+      if (!recipient) return undefined;
+      if (
+        recipient.team !== source.team ||
+        (recipient.id !== source.id && recipient.role !== "Ally")
+      ) {
+        return undefined;
+      }
+      const faction = effect.faction === "board-space"
+        ? space ? resolveInfluence(space, source) : null
+        : effect.faction;
+      if (!faction) return undefined;
+      return {
+        kind: "pay-resource-for-influence",
+        ownerId: source.id,
+        influenceOwnerId: recipient.id,
+        resource: effect.resource,
+        cost: effect.cost,
+        faction,
+        amount: effect.amount,
+        optional: effect.optional,
+        ...(effect.trashSource ? { trashSource: true, cardId: card.id } : {}),
+        source: effect.source ?? card.name,
+      };
+    })
+    .find((pending): pending is PendingAction => Boolean(pending));
+}
+
 function pendingActionForAgentThroneRowMove(
   card: Card,
   source: Player,
@@ -283,6 +328,8 @@ export function pendingActionForCard(
   if (agentSpyPlacementPending) return agentSpyPlacementPending;
   const agentDiscardInfluenceDrawPending = pendingActionForAgentDiscardCardForInfluenceAndDraw(card, source, state, target);
   if (agentDiscardInfluenceDrawPending) return agentDiscardInfluenceDrawPending;
+  const agentPayResourceInfluencePending = pendingActionForAgentPayResourceForInfluence(card, source, state, target, space);
+  if (agentPayResourceInfluencePending) return agentPayResourceInfluencePending;
   const agentThroneRowPending = pendingActionForAgentThroneRowMove(card, source, state, target);
   if (agentThroneRowPending) return agentThroneRowPending;
   const agentCommanderResourceSplitPending = pendingActionForAgentCommanderResourceSplit(card, source, state, target);
@@ -428,32 +475,6 @@ export function pendingActionForCard(
       commanderId: source.id,
       allyIds,
       contractIds: [state.contractOffer[0].id, state.contractOffer[1].id],
-      cardId: card.id,
-      source: card.name,
-    };
-  }
-  const demandAttentionFaction = space ? resolveInfluence(space, source) : null;
-  if (
-    space &&
-    demandAttentionFaction &&
-    isDemandAttentionCommanderCard(card) &&
-    source.team === "muaddib" &&
-    source.role === "Commander" &&
-    source.resources.solari >= 4
-  ) {
-    const recipient = demandAttentionRecipient(source, target, space);
-    if (
-      !recipient ||
-      recipient.team !== source.team ||
-      (recipient.id !== source.id && recipient.role !== "Ally")
-    ) {
-      return undefined;
-    }
-    return {
-      kind: "demand-attention",
-      commanderId: source.id,
-      recipientId: recipient.id,
-      faction: demandAttentionFaction,
       cardId: card.id,
       source: card.name,
     };

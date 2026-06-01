@@ -5,6 +5,7 @@ import {
   agentDrawCards,
   agentGainResource,
   agentMoveCardToThroneRow,
+  agentPayResourceForInfluence,
   agentPlaceSpies,
   agentPlayEffects,
   agentRecruitTroops,
@@ -267,8 +268,18 @@ const muadDibCommanderSpecs: Array<StarterCardSpec & { sourceId: number }> = [
     icons: ["emperor", "spacing", "bene", "fremen"],
     persuasion: 1,
     swords: 0,
-    effects: [revealGainPersuasion(1)],
-    play: "Resolve the printed four-influence trash upgrade.",
+    effects: [
+      agentPayResourceForInfluence(
+        "solari",
+        4,
+        "board-space",
+        1,
+        { source: "Demand Attention", trashSource: true },
+        [hasTeam("muaddib"), hasRole("Commander")],
+      ),
+      revealGainPersuasion(1),
+    ],
+    play: "Pay 4 Solari to add 1 more Influence from the visited faction space, then trash this card.",
     reveal: starterRevealText(1, 0),
   },
   {

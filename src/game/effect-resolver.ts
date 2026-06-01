@@ -17,6 +17,8 @@ import type {
   GameEffectTrigger,
   GameState,
   IconId,
+  InfluenceEffectFaction,
+  InfluenceEffectRecipient,
   Player,
   PlayerSelector,
   ResourceId,
@@ -91,6 +93,18 @@ export type AgentDiscardCardForInfluenceAndDraw = {
   drawCards: number;
   influenceAmount: number;
   optional: boolean;
+};
+
+export type AgentPayResourceForInfluence = {
+  selector: PlayerSelector;
+  resource: ResourceId;
+  cost: number;
+  faction: InfluenceEffectFaction;
+  amount: number;
+  recipient: InfluenceEffectRecipient;
+  optional: true;
+  trashSource: boolean;
+  source?: string;
 };
 
 export type AgentMoveCardToThroneRow = {
@@ -385,6 +399,31 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     }
     validateAmount(effect.drawCards);
     validateAmount(effect.influenceAmount);
+    return;
+  }
+  if (effect.kind === "pay-resource-for-influence") {
+    if (trigger !== "agent-play") {
+      throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
+    }
+    if (effect.selector !== "self") {
+      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
+    if (!supportedResources.has(effect.resource)) {
+      throw new Error(`Unsupported effect resource "${effect.resource}"`);
+    }
+    if (effect.faction !== "board-space" && !supportedFactions.has(effect.faction)) {
+      throw new Error(`Unsupported effect faction "${effect.faction}"`);
+    }
+    if (effect.recipient !== "board-effect-recipient") {
+      invalidSpecField("pay-resource-for-influence recipient", effect.recipient);
+    }
+    validateSourceLabel("pay-resource-for-influence source", effect.source);
+    validateAmount(effect.cost);
+    validateAmount(effect.amount);
+    const optional = (effect as { optional?: unknown }).optional;
+    if (optional === false) {
+      invalidSpecField("pay-resource-for-influence optional", optional);
+    }
     return;
   }
   if (effect.kind === "commander-resource-split") {
@@ -721,6 +760,9 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
   if (effect.kind === "discard-card-for-influence-and-draw") {
     return result;
   }
+  if (effect.kind === "pay-resource-for-influence") {
+    return result;
+  }
   if (effect.kind === "commander-resource-split") {
     return result;
   }
@@ -963,6 +1005,30 @@ export function resolveAgentDiscardCardForInfluenceAndDraws(
         drawCards: amountFor(effect.drawCards, context.source),
         influenceAmount: amountFor(effect.influenceAmount, context.source),
         optional: effect.optional ?? true,
+      }));
+  });
+}
+
+export function resolveAgentPayResourceForInfluences(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): AgentPayResourceForInfluence[] {
+  specs?.forEach(validateSpec);
+  return (specs ?? []).flatMap((spec) => {
+    if (spec.trigger !== "agent-play") return [];
+    if (!specApplies(spec, context)) return [];
+    return spec.effects
+      .filter((effect) => effect.kind === "pay-resource-for-influence")
+      .map((effect) => ({
+        selector: effect.selector,
+        resource: effect.resource,
+        cost: amountFor(effect.cost, context.source),
+        faction: effect.faction,
+        amount: amountFor(effect.amount, context.source),
+        recipient: effect.recipient,
+        optional: true,
+        trashSource: effect.trashSource ?? false,
+        source: effect.source,
       }));
   });
 }

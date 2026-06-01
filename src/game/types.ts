@@ -37,6 +37,8 @@ export type PlayerSelector =
   | "teammate"
   | "opponent"
   | "combat-participant";
+export type InfluenceEffectFaction = FactionId | "board-space";
+export type InfluenceEffectRecipient = "board-effect-recipient";
 export type EffectAmountSpec =
   | number
   | { kind: "completed-contracts"; multiplier?: number };
@@ -98,6 +100,18 @@ export type GameEffectSpec =
       drawCards: EffectAmountSpec;
       influenceAmount: EffectAmountSpec;
       optional?: boolean;
+    }
+  | {
+      kind: "pay-resource-for-influence";
+      selector: PlayerSelector;
+      resource: ResourceId;
+      cost: EffectAmountSpec;
+      faction: InfluenceEffectFaction;
+      amount: EffectAmountSpec;
+      recipient: InfluenceEffectRecipient;
+      optional?: true;
+      trashSource?: boolean;
+      source?: string;
     }
   | {
       kind: "commander-resource-split";
@@ -460,6 +474,19 @@ export type PendingAction =
       optional: boolean;
     }
   | {
+      kind: "pay-resource-for-influence";
+      ownerId: string;
+      influenceOwnerId: string;
+      resource: ResourceId;
+      cost: number;
+      faction: FactionId;
+      amount: number;
+      optional: true;
+      trashSource?: boolean;
+      cardId?: string;
+      source: string;
+    }
+  | {
       kind: "maker-choice";
       ownerId: string;
       spiceOwnerId: string;
@@ -515,14 +542,6 @@ export type PendingAction =
       commanderId: string;
       allyIds: [string, string];
       cost: number;
-      cardId: string;
-      source: string;
-    }
-  | {
-      kind: "demand-attention";
-      commanderId: string;
-      recipientId: string;
-      faction: FactionId;
       cardId: string;
       source: string;
     }

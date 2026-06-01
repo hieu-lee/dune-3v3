@@ -14,6 +14,25 @@ export function verifyStarterDeckDemandAttention({
     true,
     "Demand Attention should be recognized as its Commander starter card",
   );
+  assert.ok(
+    demandAttention.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.conditions?.some((condition) => condition.kind === "has-team" && condition.team === "muaddib") &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Commander") &&
+      spec.effects.some((effect) =>
+        effect.kind === "pay-resource-for-influence" &&
+        effect.selector === "self" &&
+        effect.resource === "solari" &&
+        effect.cost === 4 &&
+        effect.faction === "board-space" &&
+        effect.amount === 1 &&
+        effect.recipient === "board-effect-recipient" &&
+        effect.trashSource === true &&
+        effect.source === "Demand Attention"
+      )
+    ),
+    "Demand Attention should carry a typed Agent pay-resource-for-Influence spec",
+  );
   const secrets = data.boardSpaces.find((space) => space.id === "secrets");
   assert.ok(secrets, "Secrets should exist for Demand Attention faction-space regression");
   const arrakeenForDemandAttention = data.boardSpaces.find((space) => space.id === "arrakeen");
@@ -54,10 +73,15 @@ export function verifyStarterDeckDemandAttention({
     secrets,
   );
   assert.deepEqual(demandAttentionPending, {
-    kind: "demand-attention",
-    commanderId: muadDib.id,
-    recipientId: muadDibAllyA.id,
+    kind: "pay-resource-for-influence",
+    ownerId: muadDib.id,
+    influenceOwnerId: muadDibAllyA.id,
+    resource: "solari",
+    cost: 4,
     faction: "bene",
+    amount: 1,
+    optional: true,
+    trashSource: true,
     cardId: demandAttention.id,
     source: "Demand Attention",
   });
@@ -135,7 +159,7 @@ export function verifyStarterDeckDemandAttention({
     }),
     log: [],
   };
-  const resolvedDemandAttention = state.resolveDemandAttentionChoice(
+  const resolvedDemandAttention = state.resolvePayResourceForInfluenceChoice(
     baseDemandAttentionResolution,
     demandAttentionPending,
   );
@@ -162,7 +186,7 @@ export function verifyStarterDeckDemandAttention({
   assert.equal(resolvedDemandAttention.pendingAction, undefined, "Demand Attention resolution should advance pending action");
   assert.match(resolvedDemandAttention.log[0], /spends 4 Solari for Demand Attention/, "Demand Attention should log resolution");
 
-  const skippedDemandAttention = state.skipDemandAttention(baseDemandAttentionResolution, demandAttentionPending);
+  const skippedDemandAttention = state.skipPayResourceForInfluence(baseDemandAttentionResolution, demandAttentionPending);
   assert.equal(
     playerById(skippedDemandAttention, muadDib.id).resources.solari,
     4,
@@ -190,7 +214,7 @@ export function verifyStarterDeckDemandAttention({
     ),
   };
   assert.equal(
-    state.resolveDemandAttentionChoice(noCardDemandAttentionState, demandAttentionPending),
+    state.resolvePayResourceForInfluenceChoice(noCardDemandAttentionState, demandAttentionPending),
     noCardDemandAttentionState,
     "Demand Attention should not resolve if the card is no longer in play",
   );
@@ -199,7 +223,7 @@ export function verifyStarterDeckDemandAttention({
     players: baseDemandAttentionResolution.players.filter((player) => player.id !== muadDibAllyA.id),
   };
   assert.equal(
-    state.resolveDemandAttentionChoice(missingRecipientDemandAttentionState, demandAttentionPending),
+    state.resolvePayResourceForInfluenceChoice(missingRecipientDemandAttentionState, demandAttentionPending),
     missingRecipientDemandAttentionState,
     "Demand Attention should not resolve if the pending recipient is no longer in the game",
   );
@@ -236,14 +260,19 @@ export function verifyStarterDeckDemandAttention({
     desertMastery,
   );
   assert.deepEqual(personalDemandAttentionPending, {
-    kind: "demand-attention",
-    commanderId: muadDib.id,
-    recipientId: muadDib.id,
+    kind: "pay-resource-for-influence",
+    ownerId: muadDib.id,
+    influenceOwnerId: muadDib.id,
+    resource: "solari",
+    cost: 4,
     faction: "fremen",
+    amount: 1,
+    optional: true,
+    trashSource: true,
     cardId: demandAttention.id,
     source: "Demand Attention",
   });
-  const resolvedPersonalDemandAttention = state.resolveDemandAttentionChoice(
+  const resolvedPersonalDemandAttention = state.resolvePayResourceForInfluenceChoice(
     {
       ...game,
       pendingAction: personalDemandAttentionPending,

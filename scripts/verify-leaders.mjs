@@ -192,10 +192,15 @@ try {
   assert.equal(playerById(margotSietchRitual, ladyMargot.id).resources.spice, 2, "Sietch Ritual should trigger Margot Loyalty");
   assert.equal(margotSietchRitual.turnSpiceGains[ladyMargot.id], 2, "Sietch Ritual Loyalty spice should be tracked");
   const demandAttentionPending = {
-    kind: "demand-attention",
-    commanderId: muadDib.id,
-    recipientId: ladyMargot.id,
+    kind: "pay-resource-for-influence",
+    ownerId: muadDib.id,
+    influenceOwnerId: ladyMargot.id,
+    resource: "solari",
+    cost: 4,
     faction: "bene",
+    amount: 1,
+    optional: true,
+    trashSource: true,
     cardId: demandAttention.id,
     source: "Demand Attention",
   };
@@ -223,7 +228,7 @@ try {
       return player;
     }),
   };
-  const margotDemandAttention = state.resolveDemandAttentionChoice(
+  const margotDemandAttention = state.resolvePayResourceForInfluenceChoice(
     margotDemandAttentionBase,
     demandAttentionPending,
   );

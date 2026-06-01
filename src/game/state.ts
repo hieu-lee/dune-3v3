@@ -221,15 +221,15 @@ export {
 export {
   resolveCommandRespectTrade,
   resolveCorrinoMightChoice,
-  resolveDemandAttentionChoice,
   resolveDemandResultsChoice,
   resolveDesertCallChoice,
+  resolvePayResourceForInfluenceChoice,
   resolvePayResourceForStrengthChoice,
   skipCommandRespect,
   skipCorrinoMight,
-  skipDemandAttention,
   skipDemandResults,
   skipDesertCall,
+  skipPayResourceForInfluence,
   skipPayResourceForStrength,
 } from "./commander-pending-rules";
 

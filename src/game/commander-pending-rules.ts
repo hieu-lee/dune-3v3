@@ -4,7 +4,6 @@ import {
 import {
   isCommandRespectCommanderCard,
   isCorrinoMightCommanderCard,
-  isDemandAttentionCommanderCard,
   isDemandResultsCommanderCard,
   isDesertCallCommanderCard,
 } from "./card-identifiers";
@@ -36,7 +35,7 @@ type CommandRespectPendingAction = Extract<PendingAction, { kind: "command-respe
 type DemandResultsPendingAction = Extract<PendingAction, { kind: "demand-results" }>;
 type CorrinoMightPendingAction = Extract<PendingAction, { kind: "corrino-might" }>;
 type PayResourceForStrengthPendingAction = Extract<PendingAction, { kind: "pay-resource-for-strength" }>;
-type DemandAttentionPendingAction = Extract<PendingAction, { kind: "demand-attention" }>;
+type PayResourceForInfluencePendingAction = Extract<PendingAction, { kind: "pay-resource-for-influence" }>;
 type DesertCallPendingAction = Extract<PendingAction, { kind: "desert-call" }>;
 
 const resourceLabels: Record<ResourceId, string> = {
@@ -321,36 +320,39 @@ export function skipPayResourceForStrength(state: GameState, pending: PayResourc
   };
 }
 
-export function resolveDemandAttentionChoice(
+export function resolvePayResourceForInfluenceChoice(
   state: GameState,
-  pending: DemandAttentionPendingAction,
+  pending: PayResourceForInfluencePendingAction,
 ): GameState {
-  const commander = state.players.find((player) => player.id === pending.commanderId);
-  const recipient = state.players.find((player) => player.id === pending.recipientId);
+  if (state.pendingAction !== pending) return state;
+  const owner = state.players.find((player) => player.id === pending.ownerId);
+  const recipient = state.players.find((player) => player.id === pending.influenceOwnerId);
   if (
-    !commander ||
-    commander.team !== "muaddib" ||
-    commander.role !== "Commander" ||
-    commander.resources.solari < 4 ||
-    !commander.playArea.some((card) => card.id === pending.cardId && isDemandAttentionCommanderCard(card)) ||
+    !owner ||
+    owner.resources[pending.resource] < pending.cost ||
+    pending.cost <= 0 ||
+    pending.amount <= 0 ||
+    (pending.cardId !== undefined && !owner.playArea.some((card) => card.id === pending.cardId)) ||
     !recipient ||
-    recipient.team !== commander.team ||
-    (recipient.id !== commander.id && recipient.role !== "Ally")
+    recipient.team !== owner.team ||
+    (recipient.id !== owner.id && recipient.role !== "Ally")
   ) {
     return state;
   }
 
   const players = state.players.map((player) => {
     let next = player;
-    if (player.id === commander.id) {
+    if (player.id === owner.id) {
       next = {
         ...next,
-        resources: { ...next.resources, solari: next.resources.solari - 4 },
-        playArea: next.playArea.filter((card) => card.id !== pending.cardId),
+        resources: { ...next.resources, [pending.resource]: next.resources[pending.resource] - pending.cost },
+        ...(pending.trashSource && pending.cardId
+          ? { playArea: next.playArea.filter((card) => card.id !== pending.cardId) }
+          : {}),
       };
     }
     if (player.id === recipient.id) {
-      next = adjustInfluence(next, pending.faction, 1);
+      next = adjustInfluence(next, pending.faction, pending.amount);
     }
     return next;
   });
@@ -360,19 +362,20 @@ export function resolveDemandAttentionChoice(
     players,
     ...advancePendingAction(state),
     log: [
-      `${commander.leader} spends 4 Solari for ${pending.source}; ${recipient.leader} gains 1 more ${factionLabels[pending.faction]} Influence.`,
+      `${owner.leader} spends ${pending.cost} ${resourceLabels[pending.resource]} for ${pending.source}; ${recipient.leader} gains ${pending.amount} ${factionLabels[pending.faction]} Influence.`,
       ...state.log,
     ],
   };
   return resolveLeaderInfluenceThresholdRewards(nextState, state.players);
 }
 
-export function skipDemandAttention(state: GameState, pending: DemandAttentionPendingAction): GameState {
-  const commander = state.players.find((player) => player.id === pending.commanderId);
+export function skipPayResourceForInfluence(state: GameState, pending: PayResourceForInfluencePendingAction): GameState {
+  if (state.pendingAction !== pending) return state;
+  const owner = state.players.find((player) => player.id === pending.ownerId);
   return {
     ...state,
     ...advancePendingAction(state),
-    log: [`${commander?.leader ?? "Muad'Dib"} declines to pay 4 Solari for ${pending.source}.`, ...state.log],
+    log: [`${owner?.leader ?? "Player"} declines to pay ${pending.cost} ${resourceLabels[pending.resource]} for ${pending.source}.`, ...state.log],
   };
 }
 

@@ -6,6 +6,8 @@ import type {
   GameEffectConditionSpec,
   GameEffectSpec,
   IconId,
+  InfluenceEffectFaction,
+  InfluenceEffectRecipient,
   PlayerSelector,
   ResourceId,
   Role,
@@ -142,6 +144,35 @@ export function agentDiscardCardForInfluenceAndDraw(
       influenceAmount,
       optional: true,
       ...options,
+    },
+  ], conditions);
+}
+
+export function agentPayResourceForInfluence(
+  resource: ResourceId,
+  cost: EffectAmountSpec,
+  faction: InfluenceEffectFaction,
+  amount: EffectAmountSpec,
+  options: {
+    recipient?: InfluenceEffectRecipient;
+    optional?: true;
+    trashSource?: boolean;
+    source?: string;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return agentPlayEffects([
+    {
+      kind: "pay-resource-for-influence",
+      selector: "self",
+      resource,
+      cost,
+      faction,
+      amount,
+      recipient: options.recipient ?? "board-effect-recipient",
+      optional: true,
+      ...(options.trashSource ? { trashSource: true } : {}),
+      ...(options.source ? { source: options.source } : {}),
     },
   ], conditions);
 }

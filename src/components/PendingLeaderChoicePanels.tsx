@@ -353,28 +353,37 @@ export function PendingPayResourceForStrengthPanel({
   );
 }
 
-type PendingDemandAttentionPanelProps = {
+type PendingPayResourceForInfluencePanelProps = {
+  amount: number;
+  cost: number;
   factionLabel: string;
-  recipient?: Player;
   onChoose: () => void;
   onSkip: () => void;
+  owner?: Player;
+  recipient?: Player;
+  resource: ResourceId;
 };
 
-export function PendingDemandAttentionPanel({
+export function PendingPayResourceForInfluencePanel({
+  amount,
+  cost,
   factionLabel,
-  recipient,
   onChoose,
   onSkip,
-}: PendingDemandAttentionPanelProps) {
+  owner,
+  recipient,
+  resource,
+}: PendingPayResourceForInfluencePanelProps) {
+  const resourceLabel = resourceLabels[resource];
   return (
     <div className="pending-controls">
       {recipient ? (
-        <button type="button" onClick={onChoose}>
+        <button type="button" onClick={onChoose} disabled={!owner || owner.resources[resource] < cost}>
           <CircleDollarSign size={15} />
-          Spend 4: {recipient.leader} +1 {factionLabel} Influence
+          Spend {cost} {resourceLabel}: {recipient.leader} +{amount} {factionLabel} Influence
         </button>
       ) : (
-        <span>Demand Attention can no longer resolve with the current table state.</span>
+        <span>{owner?.leader ?? "Player"} can no longer add Influence with the current table state.</span>
       )}
       <button type="button" onClick={onSkip}>Skip</button>
     </div>

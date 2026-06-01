@@ -185,7 +185,7 @@ try {
   );
   assert.equal(
     demandAttentionControversialTech.pendingAction?.kind,
-    "demand-attention",
+    "pay-resource-for-influence",
     "Controversial Technology trash should wait for card-specific pending choices",
   );
   assert.equal(
@@ -193,7 +193,7 @@ try {
     "trash-card",
     "Controversial Technology trash should remain queued after card-specific pending choices",
   );
-  const demandAttentionResolved = state.resolveDemandAttentionChoice(
+  const demandAttentionResolved = state.resolvePayResourceForInfluenceChoice(
     demandAttentionControversialTech,
     demandAttentionControversialTech.pendingAction,
   );

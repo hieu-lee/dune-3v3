@@ -234,13 +234,13 @@ export async function runLeaderCharacterChoicesSmoke({
   await setDebugGameAndWait(page, states.demandAttention);
   pendingText = await page.locator(".pending-panel").innerText();
   assert.match(pendingText, /Demand Attention/i);
-  assert.match(pendingText, /Spend 4: Gurney Halleck \+1 Fremen Influence/i);
+  assert.match(pendingText, /Spend 4 Solari: Gurney Halleck \+1 Bene Gesserit Influence/i);
   await screenshot(page, captures, "pending-demand-attention.png");
   before = await currentGame(page);
   const demandAttentionCommanderBefore = before.players.find((player) => player.id === "p1");
   const demandAttentionRecipientBefore = before.players.find((player) => player.id === "p3");
   const demandAttentionCardId = before.pendingAction.cardId;
-  await page.locator(".pending-panel").getByRole("button", { name: /Spend 4: Gurney Halleck \+1 Fremen Influence/ }).click();
+  await page.locator(".pending-panel").getByRole("button", { name: /Spend 4 Solari: Gurney Halleck \+1 Bene Gesserit Influence/ }).click();
   await waitForNoPending(page);
   after = await currentGame(page);
   const demandAttentionCommanderAfter = after.players.find((player) => player.id === "p1");
@@ -251,9 +251,9 @@ export async function runLeaderCharacterChoicesSmoke({
     "Demand Attention should spend 4 Solari",
   );
   assert.equal(
-    demandAttentionRecipientAfter.influence.fremen,
-    demandAttentionRecipientBefore.influence.fremen + 1,
-    "Demand Attention should add Fremen Influence",
+    demandAttentionRecipientAfter.influence.bene,
+    demandAttentionRecipientBefore.influence.bene + 1,
+    "Demand Attention should add Bene Gesserit Influence",
   );
   assert.equal(
     demandAttentionCommanderAfter.playArea.some((card) => card.id === demandAttentionCardId),
@@ -346,6 +346,7 @@ async function createLeaderCharacterChoiceStates(server, initialPlayableGame) {
     pendingQueue: [],
     turnReverendMotherJessicaRepeats: {},
   };
+  const secrets = findSpace(data.boardSpaces, "secrets", "Secrets");
   const debugDevastatingAssault = { ...devastatingAssault, id: "debug-devastating-assault" };
   const devastatingAssaultState = {
     ...base,
@@ -372,6 +373,32 @@ async function createLeaderCharacterChoiceStates(server, initialPlayableGame) {
     "p2",
   )[0];
   assert.ok(devastatingAssaultPending, "Expected a derived Devastating Assault payment pending action");
+  const debugDemandAttention = { ...demandAttention, id: "debug-demand-attention" };
+  const demandAttentionState = {
+    ...base,
+    activeSeat: p1Seat,
+    players: base.players.map((player) => {
+      if (player.id === "p1") {
+        return {
+          ...player,
+          resources: { ...player.resources, solari: 4 },
+          playArea: [debugDemandAttention, ...player.playArea],
+        };
+      }
+      if (player.id === "p3") {
+        return { ...player, influence: { ...player.influence, bene: 1 } };
+      }
+      return player;
+    }),
+  };
+  const demandAttentionPending = state.pendingActionForCard(
+    debugDemandAttention,
+    demandAttentionState.players.find((player) => player.id === "p1"),
+    demandAttentionState,
+    demandAttentionState.players.find((player) => player.id === "p3"),
+    secrets,
+  );
+  assert.ok(demandAttentionPending, "Expected a derived Demand Attention payment pending action");
 
   return {
     stabanUnseenNetwork: {
@@ -550,25 +577,8 @@ async function createLeaderCharacterChoiceStates(server, initialPlayableGame) {
       pendingAction: devastatingAssaultPending,
     },
     demandAttention: {
-      ...base,
-      activeSeat: p1Seat,
-      players: base.players.map((player) =>
-        player.id === "p1"
-          ? {
-              ...player,
-              resources: { ...player.resources, solari: 4 },
-              playArea: [{ ...demandAttention, id: "debug-demand-attention" }, ...player.playArea],
-            }
-          : player,
-      ),
-      pendingAction: {
-        kind: "demand-attention",
-        commanderId: "p1",
-        recipientId: "p3",
-        faction: "fremen",
-        cardId: "debug-demand-attention",
-        source: "Demand Attention",
-      },
+      ...demandAttentionState,
+      pendingAction: demandAttentionPending,
     },
     desertCall: {
       ...base,
@@ -626,6 +636,12 @@ function findCard(cards, sourceId, label) {
   const card = cards.find((candidate) => candidate.sourceId === sourceId);
   assert.ok(card, `Expected ${label}`);
   return card;
+}
+
+function findSpace(spaces, id, label) {
+  const space = spaces.find((candidate) => candidate.id === id);
+  assert.ok(space, `Expected ${label}`);
+  return space;
 }
 
 function seatFor(game, playerId) {

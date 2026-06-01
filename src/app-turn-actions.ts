@@ -13,7 +13,10 @@ import {
   effectiveCost,
   pendingActionForCard,
   pendingActionForJessicaOtherMemories,
+  pendingActionForBoardInfluenceChoice,
+  pendingActionForBoardTrash,
   pendingActionForMakerChoice,
+  pendingActionForOptionalSpacePayment,
   pendingActionForReverendMotherJessicaRepeat,
   pendingActionForSietchTabr,
   pendingActionForSpace,
@@ -23,6 +26,7 @@ import {
   queuePendingActions,
   recordRoundMakerSpaceVisit,
   recordTurnSpiceGain,
+  resolveSecretsIntriguePressure,
   resolveLeaderInfluenceThresholdRewards,
   resolveLocationControlIncome,
   resolveStabanSmuggleSpice,
@@ -70,12 +74,17 @@ export function placeAgentAction(
   const makerChoicePending = pendingActionForMakerChoice(current, selectedSpace, makerChoiceOwner, player);
   const spiceGain = boardSpaceSpiceGainFor(selectedSpace, player, makerBonus, Boolean(makerChoicePending));
   const sietchTabrPending = pendingActionForSietchTabr(current, selectedSpace, makerChoiceOwner, player);
+  const spendsSwordmasterAgent = player.swordmasterBonus &&
+    !player.swordmasterAgentSpent &&
+    player.agentsTotal > 2 &&
+    player.agentsReady === 1;
   let { source, target: effectedTarget } = applyBoardEffect(
     {
       ...player,
       hand,
       playArea,
       agentsReady: player.agentsReady - 1,
+      swordmasterAgentSpent: spendsSwordmasterAgent ? true : player.swordmasterAgentSpent,
     },
     target,
     selectedSpace,
@@ -126,6 +135,13 @@ export function placeAgentAction(
     deploymentOwner,
     selectedSpace,
   );
+  const optionalSpacePaymentPending = pendingActionForOptionalSpacePayment(selectedSpace, source);
+  const boardInfluencePending = pendingActionForBoardInfluenceChoice(selectedSpace, source, effectedTarget);
+  const boardTrashPending = pendingActionForBoardTrash(selectedSpace, source);
+  const boardChoicePendings = [
+    optionalSpacePaymentPending,
+    boardInfluencePending,
+  ].filter((action): action is PendingAction => Boolean(action));
   const jessicaOtherMemoriesPending = pendingActionForJessicaOtherMemories(source, selectedSpace);
   const jessicaRepeatDeferredWater = cardPending?.kind === "jessica-water-of-life" ? 1 : 0;
   const jessicaReverendMotherPending = pendingActionForReverendMotherJessicaRepeat(
@@ -141,9 +157,15 @@ export function placeAgentAction(
   const pendingActions = prioritizedCardPending || jessicaOtherMemoriesPending || jessicaReverendMotherPending
     ? [
         ...[prioritizedCardPending, jessicaOtherMemoriesPending, jessicaReverendMotherPending].filter((action): action is PendingAction => Boolean(action)),
+        ...boardChoicePendings,
         ...pendingActionsFor(spacePending, prioritizedCardPending ? undefined : cardPending, source.spies),
+        ...[boardTrashPending].filter((action): action is PendingAction => Boolean(action)),
       ]
-    : pendingActionsFor(spacePending, cardPending, source.spies);
+    : [
+        ...boardChoicePendings,
+        ...pendingActionsFor(spacePending, cardPending, source.spies),
+        ...[boardTrashPending].filter((action): action is PendingAction => Boolean(action)),
+      ];
   if (sietchTabrPending) {
     const sietchAction = {
       ...sietchTabrPending,
@@ -187,8 +209,11 @@ export function placeAgentAction(
   const intrigueState = intrigueGain > 0
     ? drawIntrigueCards(influenceThresholdState, source.id, intrigueGain, selectedSpace.name)
     : influenceThresholdState;
+  const secretsState = selectedSpace.id === "secrets"
+    ? resolveSecretsIntriguePressure(intrigueState, source.id)
+    : intrigueState;
   // Commanders send the Agent; activated Allies only receive routed board effects.
-  const resolvedState = resolveStabanSmuggleSpice(intrigueState, player.id, selectedSpace.id);
+  const resolvedState = resolveStabanSmuggleSpice(secretsState, player.id, selectedSpace.id);
   const makerTrackedState = selectedSpace.maker
     ? recordRoundMakerSpaceVisit(resolvedState, player.id)
     : resolvedState;

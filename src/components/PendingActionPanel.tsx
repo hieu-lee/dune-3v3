@@ -30,6 +30,7 @@ import type {
   StabanUnseenNetworkChoice,
 } from "../game/state";
 import type { FactionId, GameState, PendingAction, Player, TradeGoodId, TrashCardZone } from "../game/types";
+import { PendingBoardInfluenceChoicePanel, PendingOptionalSpacePaymentPanel } from "./PendingBoardChoicePanels";
 import { PendingAcquireCardPanel, PendingContractPanel } from "./PendingCardChoicePanels";
 import { PendingCapturedMentatPanel, PendingCapturedMentatRevealPanel } from "./PendingCapturedMentatPanel";
 import { PendingConflictInfluencePanel } from "./PendingConflictInfluencePanel";
@@ -71,6 +72,7 @@ type PendingActionPanelProps = {
   chooseCommandRespectTrade: (partnerId: string) => void;
   chooseCommanderResourceSplit: (optionIndex: number) => void;
   chooseConflictInfluence: (faction: FactionId) => void;
+  chooseBoardInfluence: (ownerId: string, faction: FactionId) => void;
   chooseConflictTieWinner: (winnerId?: string) => void;
   chooseCapturedMentat: (discardCardId: string, faction: FactionId) => void;
   chooseCapturedMentatReveal: (faction: FactionId) => void;
@@ -98,6 +100,7 @@ type PendingActionPanelProps = {
   finishRevealAdjust: () => void;
   loseInfluence: (ownerId: string, faction: FactionId) => void;
   payConflictVpReward: () => void;
+  payOptionalSpacePayment: () => void;
   placeSpy: (spaceId: string) => void;
   recallConflictRewardSpy: (spaceId: string) => void;
   recallSpy: (spaceId: string) => void;
@@ -114,6 +117,7 @@ type PendingActionPanelProps = {
   skipDemandResultsChoice: () => void;
   skipDesertCallChoice: () => void;
   skipInfluenceLoss: () => void;
+  skipOptionalSpacePaymentChoice: () => void;
   skipRecall: () => void;
   skipThreatenSpiceProductionChoice: () => void;
   skipTrash: () => void;
@@ -132,6 +136,7 @@ export function PendingActionPanel({
   chooseCommandRespectTrade,
   chooseCommanderResourceSplit,
   chooseConflictInfluence,
+  chooseBoardInfluence,
   chooseConflictTieWinner,
   chooseCapturedMentat,
   chooseCapturedMentatReveal,
@@ -159,6 +164,7 @@ export function PendingActionPanel({
   finishRevealAdjust,
   loseInfluence,
   payConflictVpReward,
+  payOptionalSpacePayment,
   placeSpy,
   recallConflictRewardSpy,
   recallSpy,
@@ -175,6 +181,7 @@ export function PendingActionPanel({
   skipDemandResultsChoice,
   skipDesertCallChoice,
   skipInfluenceLoss,
+  skipOptionalSpacePaymentChoice,
   skipRecall,
   skipThreatenSpiceProductionChoice,
   skipTrash,
@@ -372,6 +379,8 @@ export function PendingActionPanel({
     pendingAction.kind === "conflict-vp-conversion" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingConflictInfluenceOwner =
     pendingAction.kind === "conflict-influence" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
+  const pendingOptionalSpacePaymentOwner =
+    pendingAction.kind === "optional-space-payment" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingConflictVpCanPay =
     pendingAction.kind === "conflict-vp-conversion" ? canPayConflictVpConversion(game, pendingAction) : false;
   const pendingConflictVpSpyChoices =
@@ -457,6 +466,8 @@ export function PendingActionPanel({
           {pendingAction.kind === "jessica-reverend-mother" && `${pendingJessicaReverendMotherOwner?.leader ?? "Reverend Mother Jessica"} Reverend Mother`}
           {pendingAction.kind === "jessica-other-memories" && `${pendingJessicaOtherMemoriesOwner?.leader ?? "Lady Jessica"} Other Memories`}
           {pendingAction.kind === "conflict-influence" && `${pendingConflictInfluenceOwner?.leader ?? "Player"} Conflict Influence`}
+          {pendingAction.kind === "board-influence-choice" && `${pendingAction.source} Influence`}
+          {pendingAction.kind === "optional-space-payment" && `${pendingOptionalSpacePaymentOwner?.leader ?? "Player"} ${pendingAction.source}`}
           {pendingAction.kind === "conflict-vp-conversion" && `${pendingConflictVpOwner?.leader ?? "Player"} Conflict reward`}
           {pendingAction.kind === "command-respect" && `${pendingCommandRespectCommander?.leader ?? "Muad'Dib"} Command Respect`}
           {pendingAction.kind === "demand-results" && `${pendingDemandResultsCommander?.leader ?? "Shaddam"} Demand Results`}
@@ -657,6 +668,21 @@ export function PendingActionPanel({
           owner={pendingConflictInfluenceOwner}
           pending={pendingAction}
           onChoose={chooseConflictInfluence}
+        />
+      )}
+      {pendingAction.kind === "board-influence-choice" && (
+        <PendingBoardInfluenceChoicePanel
+          game={game}
+          pending={pendingAction}
+          onChoose={chooseBoardInfluence}
+        />
+      )}
+      {pendingAction.kind === "optional-space-payment" && pendingOptionalSpacePaymentOwner && (
+        <PendingOptionalSpacePaymentPanel
+          ownerName={pendingOptionalSpacePaymentOwner.leader}
+          pending={pendingAction}
+          onPay={payOptionalSpacePayment}
+          onSkip={skipOptionalSpacePaymentChoice}
         />
       )}
 

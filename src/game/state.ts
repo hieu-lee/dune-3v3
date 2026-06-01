@@ -63,6 +63,11 @@ import {
 } from "./trade-rules";
 import { skipTrashCard as resolveSkipTrashCard, trashPlayerCard as resolveTrashPlayerCard } from "./trash-rules";
 import {
+  resolveBoardInfluenceChoice as resolveBoardInfluenceChoiceForPending,
+  resolveOptionalSpacePayment as resolveOptionalSpacePaymentForPending,
+  skipOptionalSpacePayment as resolveSkipOptionalSpacePayment,
+} from "./board-location-rules";
+import {
   allPlayersDone,
 } from "./game-flow";
 import {
@@ -336,9 +341,16 @@ export {
   defaultActivatedAllyId,
   iconCanReach,
   pendingActionForMakerChoice,
+  pendingActionForBoardInfluenceChoice,
+  pendingActionForBoardTrash,
+  pendingActionForOptionalSpacePayment,
   pendingActionForSietchTabr,
   pendingActionForSpace,
 } from "./placement-rules";
+
+export {
+  resolveSecretsIntriguePressure,
+} from "./board-location-rules";
 
 export {
   canPlaceSpyPost,
@@ -493,6 +505,8 @@ type CommanderResourceSplitPendingAction = Extract<PendingAction, { kind: "comma
 type TrashCardPendingAction = Extract<PendingAction, { kind: "trash-card" }>;
 type CapturedMentatPendingAction = Extract<PendingAction, { kind: "captured-mentat" }>;
 type CapturedMentatRevealPendingAction = Extract<PendingAction, { kind: "captured-mentat-reveal" }>;
+type BoardInfluenceChoicePendingAction = Extract<PendingAction, { kind: "board-influence-choice" }>;
+type OptionalSpacePaymentPendingAction = Extract<PendingAction, { kind: "optional-space-payment" }>;
 
 export function takeChoamContract(state: GameState, pending: ContractPendingAction, contractId: string): GameState {
   return continueAfterResolvedConflictReward(
@@ -526,6 +540,28 @@ export function trashPlayerCard(
 
 export function skipTrashCard(state: GameState, pending: TrashCardPendingAction): GameState {
   return continueAfterResolvedConflictReward(resolveSkipTrashCard(state, pending));
+}
+
+export function resolveBoardInfluenceChoice(
+  state: GameState,
+  pending: BoardInfluenceChoicePendingAction,
+  ownerId: string,
+  faction: FactionId,
+): GameState {
+  return continueAfterResolvedConflictReward(
+    resolveBoardInfluenceChoiceForPending(state, pending, ownerId, faction),
+  );
+}
+
+export function resolveOptionalSpacePayment(
+  state: GameState,
+  pending: OptionalSpacePaymentPendingAction,
+): GameState {
+  return continueAfterResolvedConflictReward(resolveOptionalSpacePaymentForPending(state, pending));
+}
+
+export function skipOptionalSpacePayment(state: GameState, pending: OptionalSpacePaymentPendingAction): GameState {
+  return continueAfterResolvedConflictReward(resolveSkipOptionalSpacePayment(state, pending));
 }
 
 export function resolveCapturedMentatChoice(

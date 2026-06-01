@@ -32,6 +32,21 @@ export function trashableCardsForPending(player: Player, pending: TrashCardPendi
   );
 }
 
+export function advancePastUnresolvableMandatoryTrash(state: GameState): GameState {
+  let nextState = state;
+  while (nextState.pendingAction?.kind === "trash-card" && !nextState.pendingAction.optional) {
+    const pending = nextState.pendingAction;
+    const owner = nextState.players.find((player) => player.id === pending.ownerId);
+    if (owner && trashableCardsForPending(owner, pending).length > 0) break;
+    nextState = {
+      ...nextState,
+      ...advancePendingAction(nextState),
+      log: [`${owner?.leader ?? "Player"} has no trashable cards for ${pending.source}.`, ...nextState.log],
+    };
+  }
+  return nextState;
+}
+
 export function trashPlayerCard(
   state: GameState,
   pending: TrashCardPendingAction,
@@ -39,8 +54,11 @@ export function trashPlayerCard(
   cardId: string,
 ): GameState {
   const owner = state.players.find((player) => player.id === pending.ownerId);
-  if (!owner) return { ...state, ...advancePendingAction(state) };
+  if (!owner) return advancePastUnresolvableMandatoryTrash({ ...state, ...advancePendingAction(state) });
   if (!trashableCardsForPending(owner, pending).some((choice) => choice.zone === zone && choice.card.id === cardId)) {
+    if (!pending.optional && trashableCardsForPending(owner, pending).length === 0) {
+      return advancePastUnresolvableMandatoryTrash(state);
+    }
     return state;
   }
   const cards = cardsForTrashZone(owner, zone);
@@ -82,15 +100,20 @@ export function trashPlayerCard(
       ...state.log,
     ],
   };
-  return recordTurnSpiceGain(nextState, owner.id, spiceReward);
+  return advancePastUnresolvableMandatoryTrash(recordTurnSpiceGain(nextState, owner.id, spiceReward));
 }
 
 export function skipTrashCard(state: GameState, pending: TrashCardPendingAction): GameState {
-  if (!pending.optional) return state;
   const owner = state.players.find((player) => player.id === pending.ownerId);
-  return {
+  if (!pending.optional && owner && trashableCardsForPending(owner, pending).length > 0) return state;
+  return advancePastUnresolvableMandatoryTrash({
     ...state,
     ...advancePendingAction(state),
-    log: [`${owner?.leader ?? "Player"} declines to trash a card from ${pending.source}.`, ...state.log],
-  };
+    log: [
+      pending.optional
+        ? `${owner?.leader ?? "Player"} declines to trash a card from ${pending.source}.`
+        : `${owner?.leader ?? "Player"} has no trashable cards for ${pending.source}.`,
+      ...state.log,
+    ],
+  });
 }

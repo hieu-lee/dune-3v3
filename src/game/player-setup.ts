@@ -81,6 +81,7 @@ export function makePlayer(
     jessicaMemories: 0,
     purchaseSequence: 0,
     swordmasterBonus: false,
+    swordmasterAgentSpent: false,
     contracts: [],
     reservedContracts: team === "shaddam" && role === "Commander" ? buildShaddamContractReserve() : [],
     objectives: [],

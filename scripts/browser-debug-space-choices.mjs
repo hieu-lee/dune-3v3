@@ -62,6 +62,35 @@ export async function runSpaceChoicesSmoke({
   const allyAfter = splitAfter.players.find((player) => player.id === "p3");
   assert.equal(commanderAfter.resources.spice, commanderBefore.resources.spice + 1, "Resource split should pay the commander");
   assert.equal(allyAfter.resources.water, allyBefore.resources.water + 1, "Resource split should pay the ally");
+
+  await setDebugGameAndWait(page, states.optionalSpacePayment);
+  pendingText = await page.locator(".pending-panel").innerText();
+  assert.match(pendingText, /Gather Support/i);
+  assert.match(pendingText, /optional payment/i);
+  await screenshot(page, captures, "pending-optional-space-payment.png");
+
+  const optionalBefore = await currentGame(page);
+  const optionalOwnerBefore = optionalBefore.players.find((player) => player.id === "p2");
+  await page.locator(".pending-panel").getByRole("button", { name: /Pay 2 solari/i }).click();
+  await waitForNoPending(page);
+  const optionalAfter = await currentGame(page);
+  const optionalOwnerAfter = optionalAfter.players.find((player) => player.id === "p2");
+  assert.equal(optionalOwnerAfter.resources.solari, optionalOwnerBefore.resources.solari - 2, "Optional space payment should spend Solari");
+  assert.equal(optionalOwnerAfter.resources.water, optionalOwnerBefore.resources.water + 1, "Optional space payment should grant water");
+
+  await setDebugGameAndWait(page, states.boardInfluenceChoice);
+  pendingText = await page.locator(".pending-panel").innerText();
+  assert.match(pendingText, /Shipping Influence/i);
+  assert.match(pendingText, /Shaddam Corrino IV/i);
+  await screenshot(page, captures, "pending-board-influence-choice.png");
+
+  const influenceBefore = await currentGame(page);
+  const shaddamBefore = influenceBefore.players.find((player) => player.id === "p4");
+  await page.locator(".pending-panel").getByRole("button", { name: /Shaddam Corrino IV/i }).click();
+  await waitForNoPending(page);
+  const influenceAfter = await currentGame(page);
+  const shaddamAfter = influenceAfter.players.find((player) => player.id === "p4");
+  assert.equal(shaddamAfter.influence.emperor, shaddamBefore.influence.emperor + 1, "Board influence choice should apply to the selected owner and track");
 }
 
 async function createSpaceChoiceStates(server, initialPlayableGame) {
@@ -114,6 +143,33 @@ async function createSpaceChoiceStates(server, initialPlayableGame) {
         team: "muaddib",
         source: "Browser debug split",
         options: [{ commanderResource: "spice", commanderAmount: 1, allyResource: "water", allyAmount: 1 }],
+      },
+    },
+    optionalSpacePayment: {
+      ...base,
+      players: game.players.map((player) =>
+        player.id === "p2" ? { ...player, resources: { ...player.resources, solari: 3, water: 1 } } : player,
+      ),
+      pendingAction: {
+        kind: "optional-space-payment",
+        ownerId: "p2",
+        source: "Gather Support",
+        cost: { solari: 2 },
+        gain: { water: 1 },
+      },
+    },
+    boardInfluenceChoice: {
+      ...base,
+      pendingAction: {
+        kind: "board-influence-choice",
+        source: "Shipping",
+        choices: [
+          { ownerId: "p4", faction: "emperor" },
+          { ownerId: "p2", faction: "greatHouses" },
+          { ownerId: "p2", faction: "spacing" },
+          { ownerId: "p2", faction: "bene" },
+          { ownerId: "p2", faction: "fringeWorlds" },
+        ],
       },
     },
   };

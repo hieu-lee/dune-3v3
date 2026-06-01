@@ -71,8 +71,8 @@ try {
   );
   assert.equal(
     spies.canPlaceSpyPost({ ...game, swordmasterClaimed: true }, swordmaster, feyd),
-    false,
-    "Swordmaster observation post should close after Swordmaster is claimed",
+    true,
+    "Swordmaster observation post should stay usable because the space remains available to unclaimed players",
   );
 
   assert.equal(spies.canPlaceSpyPost(game, vastWealth, shaddam), true, "Shaddam Commander can use Shaddam personal spaces");

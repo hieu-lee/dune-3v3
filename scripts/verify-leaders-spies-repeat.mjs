@@ -2,6 +2,16 @@ import assert from "node:assert/strict";
 
 import { playerById } from "./verify-leaders-fixtures.mjs";
 
+function withStubbedRandom(value, action) {
+  const originalRandom = Math.random;
+  Math.random = () => value;
+  try {
+    return action();
+  } finally {
+    Math.random = originalRandom;
+  }
+}
+
 export function verifyLeaderSpiesAndReverendRepeat({ cards, data, game, players, spaces, state, states }) {
   const { allySignet, intrigueCard, leadTheWayDraw } = cards;
   const { feyd, irulan, ladyJessica, muadDib, muadDibAllyA, reverendJessicaOwner } = players;
@@ -352,17 +362,36 @@ export function verifyLeaderSpiesAndReverendRepeat({ cards, data, game, players,
   );
   assert.equal(playerById(skippedReverendRepeat, ladyJessica.id).resources.water, 1, "Skipping Reverend Mother should not spend water");
   assert.equal(playerById(skippedReverendRepeat, ladyJessica.id).influence.bene, 0, "Skipping Reverend Mother should not repeat Influence");
-  const repeatedSecrets = state.resolveJessicaReverendMotherChoice(
-    { ...reverendRepeatGame, pendingAction: reverendRepeatPending, pendingQueue: [] },
-    reverendRepeatPending,
-    "repeat",
+  const secretsPressureIntrigues = [
+    { id: "secrets-pressure-a", name: "Secrets Pressure A", summary: "test" },
+    { id: "secrets-pressure-b", name: "Secrets Pressure B", summary: "test" },
+    { id: "secrets-pressure-c", name: "Secrets Pressure C", summary: "test" },
+    { id: "secrets-pressure-d", name: "Secrets Pressure D", summary: "test" },
+  ];
+  const reverendSecretsGame = {
+    ...reverendRepeatGame,
+    players: reverendRepeatGame.players.map((player) =>
+      player.id === feyd.id ? { ...player, intrigues: secretsPressureIntrigues } : player,
+    ),
+  };
+  const repeatedSecrets = withStubbedRandom(0.49, () =>
+    state.resolveJessicaReverendMotherChoice(
+      { ...reverendSecretsGame, pendingAction: reverendRepeatPending, pendingQueue: [] },
+      reverendRepeatPending,
+      "repeat",
+    ),
   );
   assert.equal(playerById(repeatedSecrets, ladyJessica.id).resources.water, 0, "Reverend Mother should spend 1 water");
   assert.equal(playerById(repeatedSecrets, ladyJessica.id).influence.bene, 1, "Reverend Mother should repeat the Bene Gesserit Influence");
   assert.deepEqual(
     playerById(repeatedSecrets, ladyJessica.id).intrigues.map((card) => card.id),
-    [intrigueCard.id],
-    "Reverend Mother should repeat printed Intrigue gains",
+    [intrigueCard.id, "secrets-pressure-b"],
+    "Reverend Mother should repeat printed Intrigue gains and Secrets pressure",
+  );
+  assert.deepEqual(
+    playerById(repeatedSecrets, feyd.id).intrigues.map((card) => card.id),
+    ["secrets-pressure-a", "secrets-pressure-c", "secrets-pressure-d"],
+    "Reverend Mother repeating Secrets should remove the random Intrigue from an opponent with four",
   );
   assert.equal(repeatedSecrets.turnReverendMotherJessicaRepeats[ladyJessica.id], true, "Reverend Mother use should be marked for the turn");
   assert.equal(repeatedSecrets.pendingAction, undefined, "Reverend Mother without deferred space effects should advance pending actions");
@@ -394,6 +423,56 @@ export function verifyLeaderSpiesAndReverendRepeat({ cards, data, game, players,
     playerById(repeatedControversialTech, ladyJessica.id).hand.map((card) => card.id),
     [leadTheWayDraw.id],
     "Reverend Mother should repeat printed card draw",
+  );
+  assert.equal(repeatedControversialTech.pendingAction?.kind, "trash-card", "Reverend Mother should repeat Controversial Technology's mandatory trash");
+  assert.equal(repeatedControversialTech.pendingAction?.optional, false, "Repeated Controversial Technology trash should be mandatory");
+  const originalControversialTrashPending = {
+    kind: "trash-card",
+    ownerId: ladyJessica.id,
+    source: "Controversial Technology",
+    optional: false,
+  };
+  const oneTrashReverendRepeatGame = {
+    ...reverendRepeatGame,
+    players: reverendRepeatGame.players.map((player) =>
+      player.id === ladyJessica.id ? { ...reverendRepeatOwner, playArea: [] } : player,
+    ),
+  };
+  const repeatedControversialWithOriginalTrash = state.resolveJessicaReverendMotherChoice(
+    {
+      ...oneTrashReverendRepeatGame,
+      intrigueDeck: [intrigueCard],
+      pendingAction: controversialRepeatPending,
+      pendingQueue: [originalControversialTrashPending],
+    },
+    controversialRepeatPending,
+    "repeat",
+  );
+  assert.equal(
+    repeatedControversialWithOriginalTrash.pendingAction?.kind,
+    "trash-card",
+    "Reverend Mother should place the repeated Controversial Technology trash before the original one",
+  );
+  assert.equal(
+    repeatedControversialWithOriginalTrash.pendingQueue[0]?.kind,
+    "trash-card",
+    "The original Controversial Technology trash should remain queued",
+  );
+  const repeatedControversialAfterOnlyTrash = state.trashPlayerCard(
+    repeatedControversialWithOriginalTrash,
+    repeatedControversialWithOriginalTrash.pendingAction,
+    "hand",
+    leadTheWayDraw.id,
+  );
+  assert.equal(
+    repeatedControversialAfterOnlyTrash.pendingAction,
+    undefined,
+    "Empty mandatory Controversial Technology trash should advance instead of deadlocking",
+  );
+  assert.match(
+    repeatedControversialAfterOnlyTrash.log[0],
+    /has no trashable cards for Controversial Technology/,
+    "The skipped empty mandatory trash should be logged",
   );
   const espionageRepeatOwner = {
     ...reverendRepeatOwner,
@@ -446,8 +525,8 @@ export function verifyLeaderSpiesAndReverendRepeat({ cards, data, game, players,
   );
   assert.deepEqual(
     playerById(repeatedEspionage, ladyJessica.id).intrigues.map((card) => card.id),
-    [intrigueCard.id],
-    "Repeated Espionage should draw its repeated Intrigue before spy placement",
+    [],
+    "Repeated Espionage should not draw an Intrigue on the six-player board",
   );
   assert.equal(
     repeatedEspionage.pendingQueue.length,

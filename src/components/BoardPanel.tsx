@@ -36,13 +36,12 @@ export function BoardPanel({ game, legalSpaceIds, playingPhase, selectedSpaceId,
             .filter((player): player is Player => Boolean(player));
           const controlOwnerId = locationControlOwnerId(game, space.id);
           const controlOwner = controlOwnerId ? game.players.find((player) => player.id === controlOwnerId) : undefined;
-          const unavailable = space.id === "swordmaster" && game.swordmasterClaimed;
           const legal = legalSpaceIds.has(space.id);
           const selected = playingPhase && selectedSpaceId === space.id;
           return (
             <button
               key={space.id}
-              className={`space-tile ${legal ? "legal" : ""} ${selected ? "selected" : ""} ${occupant || unavailable ? "occupied" : ""}`}
+              className={`space-tile ${legal ? "legal" : ""} ${selected ? "selected" : ""} ${occupant ? "occupied" : ""}`}
               type="button"
               data-testid={`space-${space.id}`}
               data-space-id={space.id}
@@ -77,7 +76,7 @@ export function BoardPanel({ game, legalSpaceIds, playingPhase, selectedSpaceId,
                 {space.combat && <Swords size={14} />}
                 {space.team && <Users size={14} />}
                 {space.contract && <FileText size={14} />}
-                {occupant ? occupant.leader : unavailable ? "Claimed" : costLabel(effectiveCost(space, game.players))}
+                {occupant ? occupant.leader : costLabel(effectiveCost(space, game.players))}
               </span>
             </button>
           );

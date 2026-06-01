@@ -20,6 +20,7 @@ import {
   playerTroopSupply,
 } from "./deck-utils";
 import { drawIntrigueCards } from "./intrigue-deck";
+import { resolveSecretsIntriguePressure } from "./board-location-rules";
 import {
   ladyAmberMetulliLeaderName,
   ladyJessicaLeaderName,
@@ -40,7 +41,10 @@ import {
   advancePendingAction,
   prependPendingAction,
 } from "./pending-actions";
-import { pendingActionForSpace } from "./placement-rules";
+import {
+  pendingActionForBoardTrash,
+  pendingActionForSpace,
+} from "./placement-rules";
 import {
   hasUsedReverendMotherJessicaRepeat,
   recordReverendMotherJessicaRepeat,
@@ -357,13 +361,18 @@ export function resolveJessicaReverendMotherChoice(
     log: [`${owner.leader} spends 1 water for ${pending.source} to repeat ${space.name}.`, ...state.log],
   }, owner.id);
   const repeatedPending = pendingActionForSpace(space, repeatedOwner, repeatedOwner, players);
-  const withPending = prependPendingAction(baseState, repeatedPending);
+  const repeatedTrashPending = pendingActionForBoardTrash(space, repeatedOwner);
+  const withPending = prependPendingAction(
+    prependPendingAction(baseState, repeatedPending),
+    repeatedTrashPending,
+  );
   const intrigueGain = boardSpaceRewardApplies(space, paidOwner) ? space.gain?.intrigue ?? 0 : 0;
   const withIntrigue = intrigueGain > 0
     ? drawIntrigueCards(withPending, owner.id, intrigueGain, `${pending.source} / ${space.name}`)
     : withPending;
   const spiceGain = boardSpaceRewardApplies(space, paidOwner) ? space.gain?.spice ?? 0 : 0;
-  return spiceGain > 0 ? recordTurnSpiceGain(withIntrigue, owner.id, spiceGain) : withIntrigue;
+  const secretsState = space.id === "secrets" ? resolveSecretsIntriguePressure(withIntrigue, owner.id) : withIntrigue;
+  return spiceGain > 0 ? recordTurnSpiceGain(secretsState, owner.id, spiceGain) : secretsState;
 }
 
 export function resolveJessicaOtherMemoriesChoice(

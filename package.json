@@ -23,6 +23,7 @@
     "verify:app-high-council": "node scripts/verify-app-high-council.mjs",
     "verify:battle-icons": "node scripts/verify-battle-icons.mjs",
     "verify:board-requirements": "node scripts/verify-board-requirements.mjs",
+    "verify:board-location-effects": "node scripts/verify-board-location-effects.mjs",
     "verify:board-rules": "node scripts/verify-board-rules.mjs",
     "verify:board-spaces": "node scripts/verify-board-spaces.mjs",
     "verify:card-effect-specs": "node scripts/verify-card-effect-specs.mjs",

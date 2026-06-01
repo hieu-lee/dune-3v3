@@ -46,7 +46,7 @@ export function canUseSpyPost(
   space: BoardSpace,
   owner: Player,
 ) {
-  if (space.id === "swordmaster" && state.swordmasterClaimed) return false;
+  void state;
   if (!space.personal) return true;
   return owner.role === "Commander" && owner.team === space.personal;
 }

@@ -66,19 +66,46 @@ try {
     ...feyd,
     influence: { ...feyd.influence, greatHouses: 1, emperor: 1 },
   };
-  const shaddamOnEmperorIcon = state.applyBoardEffect(shaddam, oneGreatHouseFeyd, dutifulService);
+  const allyOnEmperorIcon = state.applyBoardEffect(oneGreatHouseFeyd, oneGreatHouseFeyd, dutifulService);
   assert.equal(
-    shaddamOnEmperorIcon.target.influence.greatHouses,
+    allyOnEmperorIcon.source.influence.greatHouses,
     2,
     "Non-personal Emperor-icon spaces should use the six-player Great Houses track for Allies",
   );
   assert.equal(
-    shaddamOnEmperorIcon.target.influence.emperor,
+    allyOnEmperorIcon.source.influence.emperor,
     1,
     "Non-personal Emperor-icon spaces should not move an Ally on Shaddam's personal Emperor track",
   );
-  assert.equal(shaddamOnEmperorIcon.target.vp, oneGreatHouseFeyd.vp + 1);
+  assert.equal(allyOnEmperorIcon.source.vp, oneGreatHouseFeyd.vp + 1);
+
+  const shaddamOnEmperorIcon = state.applyBoardEffect(shaddam, oneGreatHouseFeyd, dutifulService);
+  assert.equal(
+    shaddamOnEmperorIcon.target.influence.greatHouses,
+    1,
+    "Shaddam should not auto-apply mapped Emperor-icon Influence before choosing a track",
+  );
+  assert.equal(
+    shaddamOnEmperorIcon.target.influence.emperor,
+    1,
+    "Shaddam's mapped Emperor-icon choice should not move an Ally before it is resolved",
+  );
+  assert.equal(shaddamOnEmperorIcon.target.vp, oneGreatHouseFeyd.vp);
   assert.equal(shaddamOnEmperorIcon.source.influence.emperor, shaddam.influence.emperor);
+
+  const shaddamDutifulChoice = state.pendingActionForBoardInfluenceChoice(dutifulService, shaddam, oneGreatHouseFeyd);
+  assert.deepEqual(
+    shaddamDutifulChoice,
+    {
+      kind: "board-influence-choice",
+      source: "Dutiful Service",
+      choices: [
+        { faction: "greatHouses", ownerId: oneGreatHouseFeyd.id },
+        { faction: "emperor", ownerId: shaddam.id },
+      ],
+    },
+    "Shaddam should choose between Great Houses and personal Emperor Influence on mapped Emperor spaces",
+  );
 
   const vastWealth = spaceById(data, "vast-wealth");
   const oneInfluenceShaddam = {

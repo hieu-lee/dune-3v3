@@ -61,6 +61,8 @@ const generatedScreenshotNames = [
   "pending-maker-choice.png",
   "pending-sietch-tabr.png",
   "pending-resource-split.png",
+  "pending-optional-space-payment.png",
+  "pending-board-influence-choice.png",
   "pending-shaddam-signet.png",
   "pending-irulan-signet.png",
   "pending-staban-unseen-network.png",

@@ -38,7 +38,9 @@ export function PendingTrashPanel({
           </button>
         ))}
       </div>
-      {pending.optional && <button type="button" onClick={onSkip}>Skip</button>}
+      {(pending.optional || choices.length === 0) && (
+        <button type="button" onClick={onSkip}>{pending.optional ? "Skip" : "Continue"}</button>
+      )}
     </div>
   );
 }

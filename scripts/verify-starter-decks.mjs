@@ -366,24 +366,24 @@ try {
     undefined,
     "Demand Results should not trigger for Muad'Dib's Commander",
   );
-  const gatherSupport = data.boardSpaces.find((space) => space.id === "gather-support");
-  assert.ok(gatherSupport, "Gather Support should exist for Demand Results post-cost regression");
+  const highCouncil = data.boardSpaces.find((space) => space.id === "high-council");
+  assert.ok(highCouncil, "High Council should exist for Demand Results post-cost regression");
   const poorDemandResultsSource = state.applyBoardEffect(
-    { ...emperor, resources: { solari: 2, spice: 0, water: 0 } },
+    { ...emperor, resources: { solari: 6, spice: 0, water: 0 } },
     shaddamAlly,
-    gatherSupport,
-    gatherSupport.cost,
+    highCouncil,
+    highCouncil.cost,
   ).source;
   assert.equal(
     state.pendingActionForCard(demandResults, poorDemandResultsSource, game, shaddamAlly),
     undefined,
-    "Demand Results should not queue if the Landsraad space cost leaves Shaddam without 2 Solari",
+    "Demand Results should not queue if the High Council cost leaves Shaddam without 2 Solari",
   );
   const richDemandResultsSource = state.applyBoardEffect(
-    { ...emperor, resources: { solari: 4, spice: 0, water: 0 } },
+    { ...emperor, resources: { solari: 7, spice: 0, water: 0 } },
     shaddamAlly,
-    gatherSupport,
-    gatherSupport.cost,
+    highCouncil,
+    highCouncil.cost,
   ).source;
   assert.equal(
     state.pendingActionForCard(demandResults, richDemandResultsSource, game, shaddamAlly)?.kind,

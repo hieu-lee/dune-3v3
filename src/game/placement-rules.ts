@@ -1,14 +1,18 @@
 import {
   canEnterSpace,
   canMeetInfluenceRequirement,
+  canPay,
+  needsCommanderMappedInfluenceChoice,
 } from "./board-rules";
 import {
   canHaveMakerHooks,
   canSummonSandworms,
 } from "./conflict-rules";
+import { mainBoardInfluenceChoices, changeAllegiancesGainChoices } from "./influence-choices";
 import { playerHasSpyPost } from "./spy-posts";
 import { defaultTradePartnerId } from "./trade-rules";
-import type { BoardSpace, Card, GameState, PendingAction, Player } from "./types";
+import { trashableCardsForPending } from "./trash-rules";
+import type { BoardSpace, Card, FactionId, GameState, PendingAction, Player, Resources } from "./types";
 
 export function iconCanReach(
   card: Card,
@@ -34,6 +38,72 @@ export function iconCanReach(
 
 export function defaultActivatedAllyId(player: Player, players: Player[]) {
   return players.find((candidate) => candidate.team === player.team && candidate.role === "Ally")?.id ?? player.id;
+}
+
+function influenceChoiceOwnerId(source: Player, target: Player, faction: FactionId) {
+  if (source.role !== "Commander") return source.id;
+  return faction === "emperor" || faction === "fremen" ? source.id : target.id;
+}
+
+export function pendingActionForBoardInfluenceChoice(
+  space: BoardSpace,
+  source: Player,
+  target: Player,
+): PendingAction | undefined {
+  if (space.id === "shipping") {
+    const factions = source.role === "Commander" ? changeAllegiancesGainChoices(source) : mainBoardInfluenceChoices;
+    return {
+      kind: "board-influence-choice",
+      source: space.name,
+      choices: factions.map((faction) => ({
+        faction,
+        ownerId: influenceChoiceOwnerId(source, target, faction),
+      })),
+    };
+  }
+
+  if (!needsCommanderMappedInfluenceChoice(space, source) || !space.influence) return undefined;
+  const mappedFaction = space.influence === "emperor" ? "greatHouses" : "fringeWorlds";
+  return {
+    kind: "board-influence-choice",
+    source: space.name,
+    choices: [
+      { faction: mappedFaction, ownerId: target.id },
+      { faction: space.influence, ownerId: source.id },
+    ],
+  };
+}
+
+function optionalSpacePayment(space: BoardSpace): { cost: Partial<Resources>; gain: Partial<Resources> } | undefined {
+  if (space.id === "gather-support") return { cost: { solari: 2 }, gain: { water: 1 } };
+  if (space.id === "spice-refinery") return { cost: { spice: 1 }, gain: { solari: 2 } };
+  return undefined;
+}
+
+export function pendingActionForOptionalSpacePayment(
+  space: BoardSpace,
+  source: Player,
+): PendingAction | undefined {
+  const payment = optionalSpacePayment(space);
+  if (!payment || !canPay(source, payment.cost)) return undefined;
+  return {
+    kind: "optional-space-payment",
+    ownerId: source.id,
+    source: space.name,
+    cost: payment.cost,
+    gain: payment.gain,
+  };
+}
+
+export function pendingActionForBoardTrash(space: BoardSpace, source: Player): PendingAction | undefined {
+  if (space.id !== "controversial-tech") return undefined;
+  const pending: PendingAction = {
+    kind: "trash-card",
+    ownerId: source.id,
+    source: space.name,
+    optional: false,
+  };
+  return trashableCardsForPending(source, pending).length > 0 ? pending : undefined;
 }
 
 export function pendingActionForSpace(

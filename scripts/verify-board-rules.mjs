@@ -37,6 +37,12 @@ try {
   assert.equal(rules.canPay(feyd, {}), true, "Empty costs should be payable");
   assert.equal(rules.canPay(feyd, { solari: feyd.resources.solari + 1 }), false, "Costs should require enough resources");
   assert.deepEqual(rules.effectiveCost(shipping, game.players), shipping.cost, "Effective cost should preserve printed cost");
+  assert.deepEqual(rules.effectiveCost(swordmaster, game.players), { solari: 8 }, "Swordmaster should cost 8 before anyone has it");
+  assert.deepEqual(
+    rules.effectiveCost(swordmaster, game.players.map((player) => (player.id === feyd.id ? { ...player, swordmasterBonus: true } : player))),
+    { solari: 6 },
+    "Swordmaster should cost 6 once any player has it",
+  );
 
   const fourCouncilSeatsFilled = game.players.map((player, index) => ({ ...player, highCouncilSeat: index < 4 }));
   const noSeatPlayer = { ...fourCouncilSeatsFilled[4], highCouncilSeat: false };
@@ -56,7 +62,11 @@ try {
   );
 
   assert.equal(rules.canEnterSpace(swordmaster, feyd), true);
-  assert.equal(rules.canEnterSpace(swordmaster, feyd, true), false, "Swordmaster should close after it is claimed");
+  assert.equal(
+    rules.canEnterSpace(swordmaster, feyd, true),
+    true,
+    "Swordmaster should remain open to players who have not claimed it",
+  );
   assert.equal(
     rules.canEnterSpace(swordmaster, { ...feyd, swordmasterBonus: true }),
     false,

@@ -139,8 +139,8 @@ export function verifyDistractionPlotIntrigue({ cards, data, game, state }) {
   };
   assert.equal(
     state.canPlayDistractionPlotIntrigue(claimedSwordmasterDistraction, playerById(claimedSwordmasterDistraction, "p2")),
-    false,
-    "Distraction should not place onto a claimed Swordmaster observation post",
+    true,
+    "Distraction should still place onto Swordmaster after another player claims Swordmaster",
   );
   const noSupplyDistraction = {
     ...distractionFixture,

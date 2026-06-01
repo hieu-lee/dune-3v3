@@ -30,12 +30,14 @@ import {
   resolveDevastatingAssaultChoice,
   resolveDesertCallChoice,
   resolveIrulanSignetRingChoice,
+  resolveBoardInfluenceChoice,
   resolveJessicaOtherMemoriesChoice,
   resolveJessicaReverendMotherChoice,
   resolveJessicaSpiceAgonyChoice,
   resolveJessicaWaterOfLifeChoice,
   resolveLadyAmberDesertScoutsChoice,
   resolveMakerChoice,
+  resolveOptionalSpacePayment,
   resolveShaddamSignetRingChoice,
   resolveSietchTabrChoice,
   resolveStabanUnseenNetworkChoice,
@@ -52,6 +54,7 @@ import {
   skipDevastatingAssault,
   skipDesertCall,
   skipLoseInfluence,
+  skipOptionalSpacePayment,
   skipRecallSpy,
   skipThreatenSpiceProduction,
   skipTrashCard,
@@ -252,6 +255,12 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     runPending("conflict-vp-conversion", (current, pending) => startNextRound(skipConflictVpConversion(current, pending)));
   const chooseConflictInfluence = (faction: FactionId) =>
     runPending("conflict-influence", (current, pending) => startNextRound(gainConflictInfluenceForPending(current, pending, faction)));
+  const chooseBoardInfluence = (ownerId: string, faction: FactionId) =>
+    runPending("board-influence-choice", (current, pending) => maybeStartCombatPhase(resolveBoardInfluenceChoice(current, pending, ownerId, faction)));
+  const payOptionalSpacePayment = () =>
+    runPending("optional-space-payment", (current, pending) => maybeStartCombatPhase(resolveOptionalSpacePayment(current, pending)));
+  const skipOptionalSpacePaymentChoice = () =>
+    runPending("optional-space-payment", (current, pending) => maybeStartCombatPhase(skipOptionalSpacePayment(current, pending)));
 
   return {
     acquirePendingCard,
@@ -262,6 +271,7 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     chooseCommandRespectTrade,
     chooseCommanderResourceSplit,
     chooseConflictInfluence,
+    chooseBoardInfluence,
     chooseConflictTieWinner,
     chooseCorrinoMight,
     chooseDevastatingAssault,
@@ -287,6 +297,7 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     finishRevealAdjust,
     loseInfluence,
     payConflictVpReward,
+    payOptionalSpacePayment,
     placeSpy,
     recallConflictRewardSpy,
     recallSpy,
@@ -303,6 +314,7 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     skipDemandResultsChoice,
     skipDesertCallChoice,
     skipInfluenceLoss,
+    skipOptionalSpacePaymentChoice,
     skipRecall,
     skipThreatenSpiceProductionChoice,
     skipTrash,

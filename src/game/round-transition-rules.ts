@@ -14,6 +14,7 @@ import {
 } from "./game-flow";
 import { pendingActionForControlDefense } from "./location-control";
 import { resolvePlayCombatIntrigue } from "./combat-intrigue-play-rules";
+import { advancePastUnresolvableMandatoryTrash } from "./trash-rules";
 import type { CombatIntrigueChoice } from "./combat-intrigue-play-rules";
 import type { GameState } from "./types";
 
@@ -51,11 +52,13 @@ export function startNextRound(state: GameState): GameState {
 
   const firstSeat = (resolvedState.firstSeat + 1) % resolvedState.players.length;
   const [nextConflict, ...conflictDeck] = resolvedState.conflictDeck;
-  const players = resolvedState.players.map((player) =>
-    drawCards(
+  const players = resolvedState.players.map((player) => {
+    const agentsTotal = player.swordmasterAgentSpent ? 2 : player.agentsTotal;
+    return drawCards(
       {
         ...player,
-        agentsReady: player.agentsTotal,
+        agentsTotal,
+        agentsReady: agentsTotal,
         revealed: false,
         persuasion: 0,
         highCouncilSeat: player.highCouncilSeat,
@@ -71,8 +74,8 @@ export function startNextRound(state: GameState): GameState {
         manipulatedCards: [],
       },
       5,
-    ),
-  );
+    );
+  });
   const controlDefensePending = pendingActionForControlDefense(resolvedState, nextConflict, players);
   return {
     ...resolvedState,
@@ -141,11 +144,12 @@ export function startCombatPhase(state: GameState): GameState {
 }
 
 export function maybeStartCombatPhase(state: GameState): GameState {
-  if (state.phase !== "playing") return state;
-  if (state.pendingAction || state.pendingQueue.length > 0) return state;
-  if (state.players[state.activeSeat]?.revealed) return state;
-  if (!allPlayersDone(state.players)) return state;
-  return startCombatPhase(state);
+  const resolvedState = advancePastUnresolvableMandatoryTrash(state);
+  if (resolvedState.phase !== "playing") return resolvedState;
+  if (resolvedState.pendingAction || resolvedState.pendingQueue.length > 0) return resolvedState;
+  if (resolvedState.players[resolvedState.activeSeat]?.revealed) return resolvedState;
+  if (!allPlayersDone(resolvedState.players)) return resolvedState;
+  return startCombatPhase(resolvedState);
 }
 
 export function finishRevealTurn(state: GameState, playerId: string): GameState {

@@ -216,6 +216,7 @@ export type Player = {
   jessicaMemories: number;
   purchaseSequence: number;
   swordmasterBonus: boolean;
+  swordmasterAgentSpent: boolean;
   contracts: PlayerContract[];
   reservedContracts: ContractCard[];
   objectives: ObjectiveCard[];
@@ -288,6 +289,21 @@ export type PendingAction =
       remaining: number;
       source: string;
       choices?: FactionId[];
+    }
+  | {
+      kind: "board-influence-choice";
+      source: string;
+      choices: Array<{
+        ownerId: string;
+        faction: FactionId;
+      }>;
+    }
+  | {
+      kind: "optional-space-payment";
+      ownerId: string;
+      source: string;
+      cost: Partial<Resources>;
+      gain: Partial<Resources>;
     }
   | {
       kind: "trash-card";

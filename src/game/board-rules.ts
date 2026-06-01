@@ -7,6 +7,9 @@ export function canPay(player: Player, cost: Partial<Resources> = {}) {
 }
 
 export function effectiveCost(space: BoardSpace, players: Player[]) {
+  if (space.id === "swordmaster" && players.some((player) => player.swordmasterBonus)) {
+    return { solari: 6 };
+  }
   return space.cost;
 }
 
@@ -24,7 +27,8 @@ export function canEnterSpace(
   swordmasterClaimed = false,
   players: Player[] = [player],
 ) {
-  if (space.id === "swordmaster" && (player.swordmasterBonus || swordmasterClaimed)) return false;
+  void swordmasterClaimed;
+  if (space.id === "swordmaster" && player.swordmasterBonus) return false;
   if (space.id === "high-council" && !player.highCouncilSeat && highCouncilSeatsTaken(players) >= highCouncilSeatLimit) {
     return false;
   }
@@ -67,4 +71,22 @@ export function canMeetInfluenceRequirement(space: BoardSpace, player: Player, p
     ) >= space.requirement.amount;
   }
   return effectiveRequirementInfluence(player, space.requirement.faction, players) >= space.requirement.amount;
+}
+
+export function needsCommanderMappedInfluenceChoice(space: BoardSpace, player: Player) {
+  return (
+    !space.personal &&
+    (
+      (space.influence === "emperor" && player.role === "Commander" && player.team === "shaddam") ||
+      (space.influence === "fremen" && player.role === "Commander" && player.team === "muaddib")
+    )
+  );
+}
+
+export function automaticBoardInfluence(space: BoardSpace, player: Player): FactionId | null {
+  if (!space.influence || space.id === "shipping" || needsCommanderMappedInfluenceChoice(space, player)) return null;
+  if (space.personal) return space.influence;
+  if (space.influence === "emperor") return "greatHouses";
+  if (space.influence === "fremen") return "fringeWorlds";
+  return space.influence;
 }

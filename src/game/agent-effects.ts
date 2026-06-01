@@ -1,5 +1,6 @@
 import { playerHasAnyAlliance } from "./alliance-rules";
 import {
+  automaticBoardInfluence,
   boardSpaceRewardApplies,
 } from "./board-rules";
 import {
@@ -50,7 +51,7 @@ export function applyBoardEffect(
   let source: Player = { ...sourcePlayer, resources: resourcesNext };
   let target: Player = targetPlayer;
 
-  const influence = resolveInfluence(space, sourcePlayer);
+  const influence = automaticBoardInfluence(space, sourcePlayer);
   if (influence) {
     if (sourcePlayer.role === "Commander" && !space.personal) {
       target = adjustInfluence(target, influence, 1);

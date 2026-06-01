@@ -15,6 +15,7 @@ import {
   tableStateLockedByPendingActions,
   type ChangeAllegiancesSelection,
 } from "./app-helpers";
+import { createPendingActionHandlers } from "./app-pending-action-handlers";
 import { createPlotActionHandlers } from "./app-plot-actions";
 import {
   activatedAllyIdFor,
@@ -24,87 +25,33 @@ import {
 } from "./app-turn-actions";
 import { boardSpaces } from "./game/data";
 import {
-  acquireCardForPending,
   advanceSeat,
   acquireMarketCard,
   canPay,
-  collectChoamContractFallback,
-  deployControlDefenseTroop,
-  deployTroopToConflict,
   endgameBattleIconChoices,
   endgameConditionalIntrigueChoices,
   effectiveCost,
   finishEndgame,
-  finishPendingAction,
   finishRevealTurn,
-  finishRevealAdjustment as resolveRevealAdjustment,
-  gainConflictInfluenceForPending,
   iconCanReach,
   initialGame,
-  loseInfluenceForPending,
   manipulateAcquisitionCost,
   maybeStartCombatPhase,
   passCombatIntrigue,
   playCombatIntrigue,
-  playerHasConflictUnits,
-  placeSpyForPending,
-  recallSpyForSupplyForPending,
-  recallSpyForPending,
-  reinforceTroop,
-  moveImperiumCardToThroneRow,
-  resolveConflictTie,
   scoreEndgameBattleIconIntrigue,
   scoreEndgameConditionalIntrigue,
-  adjustThreatenSpiceProductionContribution,
-  payConflictVpConversion,
   setMakerHooks,
   setShieldWall,
   setAllianceOwner,
   setChoamContractCompleted,
-  resolveCommandRespectTrade,
-  resolveCorrinoMightChoice,
-  resolveCommanderResourceSplitChoice,
-  resolveDemandAttentionChoice,
-  resolveDemandResultsChoice,
-  resolveDesertCallChoice,
-  resolveIrulanSignetRingChoice,
-  resolveJessicaOtherMemoriesChoice,
-  resolveJessicaReverendMotherChoice,
-  resolveJessicaSpiceAgonyChoice,
-  resolveJessicaWaterOfLifeChoice,
-  resolveLadyAmberDesertScoutsChoice,
-  recallSpyForConflictVpConversion,
-  resolveMakerChoice,
-  resolveSietchTabrChoice,
-  resolveShaddamSignetRingChoice,
-  resolveStabanUnseenNetworkChoice,
-  scoreGurneyAlwaysSmiling,
-  resolveThreatenSpiceProductionChoice,
-  skipCommandRespect,
-  skipControlDefenseTroop,
-  skipDemandAttention,
-  skipCorrinoMight,
-  skipDemandResults,
-  skipDesertCall,
-  skipConflictVpConversion,
-  skipThreatenSpiceProduction,
-  skipLoseInfluence,
-  skipRecallSpy,
-  skipTrashCard,
-  startNextRound,
-  takeChoamContract,
-  trashPlayerCard,
-  transferTradeGood,
-  updateTradeSelection,
 } from "./game/state";
 import type {
   Card,
   FactionId,
   GameState,
-  TradeGoodId,
-  TrashCardZone,
 } from "./game/types";
-import type { CombatIntrigueChoice, IrulanSignetRingChoice, JessicaOtherMemoriesChoice, JessicaReverendMotherChoice, JessicaSpiceAgonyChoice, JessicaWaterOfLifeChoice, LadyAmberDesertScoutsChoice, ShaddamSignetRingChoice, StabanUnseenNetworkChoice } from "./game/state";
+import type { CombatIntrigueChoice } from "./game/state";
 
 export {
   boardSpaceIntrigueGainFor,
@@ -255,15 +202,6 @@ export default function App() {
     });
   }
 
-  function chooseThroneRowCard(cardId: string) {
-    if (game.pendingAction?.kind !== "throne-row") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "throne-row") return current;
-      return maybeStartCombatPhase(moveImperiumCardToThroneRow(current, pending, cardId));
-    });
-  }
-
   function endReveal() {
     if (game.phase !== "playing") return;
     if (game.pendingAction) return;
@@ -273,424 +211,6 @@ export default function App() {
     });
     setSelectedCardId(null);
     setSelectedSpaceId(null);
-  }
-
-  function clearPendingAction() {
-    setGame((current) => maybeStartCombatPhase(finishPendingAction(current)));
-  }
-
-  function trashCard(zone: TrashCardZone, cardId: string) {
-    if (game.pendingAction?.kind !== "trash-card") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "trash-card") return current;
-      return maybeStartCombatPhase(trashPlayerCard(current, pending, zone, cardId));
-    });
-  }
-
-  function skipTrash() {
-    if (game.pendingAction?.kind !== "trash-card") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "trash-card") return current;
-      return maybeStartCombatPhase(skipTrashCard(current, pending));
-    });
-  }
-
-  function recallSpy(spaceId: string) {
-    if (game.pendingAction?.kind !== "recall-spy") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "recall-spy") return current;
-      return maybeStartCombatPhase(recallSpyForPending(current, pending, spaceId));
-    });
-  }
-
-  function skipRecall() {
-    if (game.pendingAction?.kind !== "recall-spy") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "recall-spy") return current;
-      return maybeStartCombatPhase(skipRecallSpy(current, pending));
-    });
-  }
-
-  function loseInfluence(ownerId: string, faction: FactionId) {
-    if (game.pendingAction?.kind !== "lose-influence") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "lose-influence") return current;
-      return maybeStartCombatPhase(loseInfluenceForPending(current, pending, ownerId, faction));
-    });
-  }
-
-  function skipInfluenceLoss() {
-    if (game.pendingAction?.kind !== "lose-influence") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "lose-influence") return current;
-      return maybeStartCombatPhase(skipLoseInfluence(current, pending));
-    });
-  }
-
-  function placeSpy(spaceId: string) {
-    if (game.pendingAction?.kind !== "spy") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "spy") return current;
-      return maybeStartCombatPhase(placeSpyForPending(current, pending, spaceId));
-    });
-  }
-
-  function recallSpyForSupply(spaceId: string) {
-    if (game.pendingAction?.kind !== "spy") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "spy") return current;
-      return recallSpyForSupplyForPending(current, pending, spaceId);
-    });
-  }
-
-  function adjustRevealReward(persuasionDelta: number, strengthDelta: number) {
-    if (game.pendingAction?.kind !== "reveal-adjust") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "reveal-adjust") return current;
-      const owner = current.players.find((player) => player.id === pending.ownerId);
-      const recipient = current.players.find((player) => player.id === pending.combatRecipientId);
-      const appliedPersuasion = owner
-        ? Math.max(-pending.persuasionAdjustment, persuasionDelta)
-        : 0;
-      const appliedStrength = recipient
-        ? Math.max(-pending.strengthAdjustment, playerHasConflictUnits(recipient) ? strengthDelta : Math.min(0, strengthDelta))
-        : 0;
-      if (appliedPersuasion === 0 && appliedStrength === 0) return current;
-      const players = current.players.map((player) => {
-        let next = player;
-        if (player.id === pending.ownerId) next = { ...next, persuasion: next.persuasion + appliedPersuasion };
-        if (player.id === pending.combatRecipientId) next = { ...next, conflict: next.conflict + appliedStrength };
-        return next;
-      });
-      return {
-        ...current,
-        players,
-        pendingAction: {
-          ...pending,
-          persuasionAdjustment: pending.persuasionAdjustment + appliedPersuasion,
-          strengthAdjustment: pending.strengthAdjustment + appliedStrength,
-        },
-      };
-    });
-  }
-
-  function finishRevealAdjust() {
-    if (game.pendingAction?.kind !== "reveal-adjust") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "reveal-adjust") return current;
-      return resolveRevealAdjustment(current, pending);
-    });
-  }
-
-  function chooseMakerReward(choice: "spice" | "sandworms") {
-    if (game.pendingAction?.kind !== "maker-choice") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "maker-choice") return current;
-      if (choice === "sandworms" && !pending.canSummonSandworms) return current;
-      return maybeStartCombatPhase(resolveMakerChoice(current, pending, choice));
-    });
-  }
-
-  function chooseSietchTabr(choice: "hooks" | "shield-wall") {
-    if (game.pendingAction?.kind !== "sietch-tabr") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "sietch-tabr") return current;
-      return maybeStartCombatPhase(resolveSietchTabrChoice(current, pending, choice));
-    });
-  }
-
-  function chooseCommanderResourceSplit(optionIndex: number) {
-    if (game.pendingAction?.kind !== "commander-resource-split") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "commander-resource-split") return current;
-      return maybeStartCombatPhase(resolveCommanderResourceSplitChoice(current, pending, optionIndex));
-    });
-  }
-
-  function chooseShaddamSignet(choice: ShaddamSignetRingChoice) {
-    if (game.pendingAction?.kind !== "shaddam-signet-ring") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "shaddam-signet-ring") return current;
-      return maybeStartCombatPhase(resolveShaddamSignetRingChoice(current, pending, choice));
-    });
-  }
-
-  function chooseIrulanSignet(choice: IrulanSignetRingChoice) {
-    if (game.pendingAction?.kind !== "irulan-signet-ring") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "irulan-signet-ring") return current;
-      return maybeStartCombatPhase(resolveIrulanSignetRingChoice(current, pending, choice));
-    });
-  }
-
-  function chooseStabanUnseenNetwork(choice: StabanUnseenNetworkChoice) {
-    if (game.pendingAction?.kind !== "staban-unseen-network") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "staban-unseen-network") return current;
-      return maybeStartCombatPhase(resolveStabanUnseenNetworkChoice(current, pending, choice));
-    });
-  }
-
-  function chooseLadyAmberDesertScouts(choice: LadyAmberDesertScoutsChoice) {
-    if (game.pendingAction?.kind !== "amber-desert-scouts") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "amber-desert-scouts") return current;
-      return maybeStartCombatPhase(resolveLadyAmberDesertScoutsChoice(current, pending, choice));
-    });
-  }
-
-  function chooseJessicaSpiceAgony(choice: JessicaSpiceAgonyChoice) {
-    if (game.pendingAction?.kind !== "jessica-spice-agony") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "jessica-spice-agony") return current;
-      return maybeStartCombatPhase(resolveJessicaSpiceAgonyChoice(current, pending, choice));
-    });
-  }
-
-  function chooseJessicaWaterOfLife(choice: JessicaWaterOfLifeChoice) {
-    if (game.pendingAction?.kind !== "jessica-water-of-life") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "jessica-water-of-life") return current;
-      return maybeStartCombatPhase(resolveJessicaWaterOfLifeChoice(current, pending, choice));
-    });
-  }
-
-  function chooseJessicaReverendMother(choice: JessicaReverendMotherChoice) {
-    if (game.pendingAction?.kind !== "jessica-reverend-mother") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "jessica-reverend-mother") return current;
-      return maybeStartCombatPhase(resolveJessicaReverendMotherChoice(current, pending, choice));
-    });
-  }
-
-  function chooseJessicaOtherMemories(choice: JessicaOtherMemoriesChoice) {
-    if (game.pendingAction?.kind !== "jessica-other-memories") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "jessica-other-memories") return current;
-      return maybeStartCombatPhase(resolveJessicaOtherMemoriesChoice(current, pending, choice));
-    });
-  }
-
-  function chooseCommandRespectTrade(partnerId: string) {
-    if (game.pendingAction?.kind !== "command-respect") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "command-respect") return current;
-      return resolveCommandRespectTrade(current, pending, partnerId);
-    });
-  }
-
-  function skipCommandRespectChoice() {
-    if (game.pendingAction?.kind !== "command-respect") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "command-respect") return current;
-      return maybeStartCombatPhase(skipCommandRespect(current, pending));
-    });
-  }
-
-  function chooseDemandResults(optionIndex: number) {
-    if (game.pendingAction?.kind !== "demand-results") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "demand-results") return current;
-      return maybeStartCombatPhase(resolveDemandResultsChoice(current, pending, optionIndex));
-    });
-  }
-
-  function skipDemandResultsChoice() {
-    if (game.pendingAction?.kind !== "demand-results") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "demand-results") return current;
-      return maybeStartCombatPhase(skipDemandResults(current, pending));
-    });
-  }
-
-  function chooseCorrinoMight() {
-    if (game.pendingAction?.kind !== "corrino-might") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "corrino-might") return current;
-      return maybeStartCombatPhase(resolveCorrinoMightChoice(current, pending));
-    });
-  }
-
-  function skipCorrinoMightChoice() {
-    if (game.pendingAction?.kind !== "corrino-might") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "corrino-might") return current;
-      return maybeStartCombatPhase(skipCorrinoMight(current, pending));
-    });
-  }
-
-  function chooseDemandAttention() {
-    if (game.pendingAction?.kind !== "demand-attention") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "demand-attention") return current;
-      return maybeStartCombatPhase(resolveDemandAttentionChoice(current, pending));
-    });
-  }
-
-  function skipDemandAttentionChoice() {
-    if (game.pendingAction?.kind !== "demand-attention") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "demand-attention") return current;
-      return maybeStartCombatPhase(skipDemandAttention(current, pending));
-    });
-  }
-
-  function chooseDesertCall() {
-    if (game.pendingAction?.kind !== "desert-call") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "desert-call") return current;
-      return maybeStartCombatPhase(resolveDesertCallChoice(current, pending));
-    });
-  }
-
-  function skipDesertCallChoice() {
-    if (game.pendingAction?.kind !== "desert-call") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "desert-call") return current;
-      return maybeStartCombatPhase(skipDesertCall(current, pending));
-    });
-  }
-
-  function adjustThreatenSpiceProduction(contributorId: string, delta: number) {
-    if (game.pendingAction?.kind !== "threaten-spice-production") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "threaten-spice-production") return current;
-      return adjustThreatenSpiceProductionContribution(current, pending, contributorId, delta);
-    });
-  }
-
-  function chooseThreatenSpiceProduction() {
-    if (game.pendingAction?.kind !== "threaten-spice-production") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "threaten-spice-production") return current;
-      return maybeStartCombatPhase(resolveThreatenSpiceProductionChoice(current, pending));
-    });
-  }
-
-  function skipThreatenSpiceProductionChoice() {
-    if (game.pendingAction?.kind !== "threaten-spice-production") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "threaten-spice-production") return current;
-      return maybeStartCombatPhase(skipThreatenSpiceProduction(current, pending));
-    });
-  }
-
-  function deployOne() {
-    if (game.pendingAction?.kind !== "deploy") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "deploy") return current;
-      const deployed = deployTroopToConflict(current, pending);
-      return maybeStartCombatPhase(scoreGurneyAlwaysSmiling(deployed, current.players[current.activeSeat].id));
-    });
-  }
-
-  function deployControlDefense() {
-    if (game.pendingAction?.kind !== "control-defense") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "control-defense") return current;
-      return deployControlDefenseTroop(current, pending);
-    });
-  }
-
-  function skipControlDefense() {
-    if (game.pendingAction?.kind !== "control-defense") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "control-defense") return current;
-      return skipControlDefenseTroop(current, pending);
-    });
-  }
-
-  function reinforceOne(playerId: string, destination: "garrison" | "conflict") {
-    if (game.pendingAction?.kind !== "reinforce") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "reinforce") return current;
-      return maybeStartCombatPhase(reinforceTroop(current, pending, playerId, destination));
-    });
-  }
-
-  function updateTrade(resource: TradeGoodId, partnerId?: string) {
-    if (game.pendingAction?.kind !== "trade") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "trade") return current;
-      return updateTradeSelection(current, pending, resource, partnerId);
-    });
-  }
-
-  function transferTrade(fromId: string, toId: string, intrigueId?: string) {
-    if (game.pendingAction?.kind !== "trade") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "trade") return current;
-      return transferTradeGood(current, pending, fromId, toId, intrigueId);
-    });
-  }
-
-  function takeContract(contractId: string) {
-    if (game.pendingAction?.kind !== "contract") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "contract") return current;
-      return maybeStartCombatPhase(takeChoamContract(current, pending, contractId));
-    });
-  }
-
-  function acquirePendingCard(cardId: string) {
-    if (game.pendingAction?.kind !== "acquire-card") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "acquire-card") return current;
-      const owner = current.players.find((player) => player.id === pending.ownerId);
-      const recruitOwnerId = owner?.role === "Commander" ? activatedAllyIdFor(owner, current.players, commanderTargets) : undefined;
-      return maybeStartCombatPhase(acquireCardForPending(current, pending, cardId, recruitOwnerId));
-    });
-  }
-
-  function collectContractFallback() {
-    if (game.pendingAction?.kind !== "contract") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "contract") return current;
-      return maybeStartCombatPhase(collectChoamContractFallback(current, pending));
-    });
   }
 
   function updateContractCompleted(playerId: string, contractId: string, completed: boolean) {
@@ -712,51 +232,6 @@ export default function App() {
     setGame((current) => {
       if (tableStateLockedByPendingActions(current)) return current;
       return setShieldWall(current, standing);
-    });
-  }
-
-  function chooseConflictTieWinner(winnerId?: string) {
-    if (game.pendingAction?.kind !== "conflict-tie") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "conflict-tie") return current;
-      return startNextRound(resolveConflictTie(current, pending, winnerId));
-    });
-  }
-
-  function payConflictVpReward() {
-    if (game.pendingAction?.kind !== "conflict-vp-conversion") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "conflict-vp-conversion") return current;
-      return startNextRound(payConflictVpConversion(current, pending));
-    });
-  }
-
-  function recallConflictRewardSpy(spaceId: string) {
-    if (game.pendingAction?.kind !== "conflict-vp-conversion") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "conflict-vp-conversion") return current;
-      return startNextRound(recallSpyForConflictVpConversion(current, pending, spaceId));
-    });
-  }
-
-  function skipConflictVpReward() {
-    if (game.pendingAction?.kind !== "conflict-vp-conversion") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "conflict-vp-conversion") return current;
-      return startNextRound(skipConflictVpConversion(current, pending));
-    });
-  }
-
-  function chooseConflictInfluence(faction: FactionId) {
-    if (game.pendingAction?.kind !== "conflict-influence") return;
-    setGame((current) => {
-      const pending = current.pendingAction;
-      if (!pending || pending.kind !== "conflict-influence") return current;
-      return startNextRound(gainConflictInfluenceForPending(current, pending, faction));
     });
   }
 
@@ -801,6 +276,11 @@ export default function App() {
   const pendingLocked = Boolean(game.pendingAction) || game.pendingQueue.length > 0;
   const plotIntrigueLocked = !playingPhase || pendingLocked;
   const debugCaptureAvailable = browserDebugEnabled && typeof window.__DUNE_DEBUG_CAPTURE__ === "function";
+  const pendingActionHandlers = createPendingActionHandlers({
+    commanderTargets,
+    game,
+    setGame,
+  });
   const plotActionHandlers = createPlotActionHandlers({
     commanderTargets,
     setChangeAllegiancesSelections,
@@ -868,56 +348,7 @@ export default function App() {
           <PendingActionPanel
             game={game}
             pendingAction={pendingAction}
-            acquirePendingCard={acquirePendingCard}
-            adjustRevealReward={adjustRevealReward}
-            adjustThreatenSpiceProduction={adjustThreatenSpiceProduction}
-            chooseCommandRespectTrade={chooseCommandRespectTrade}
-            chooseCommanderResourceSplit={chooseCommanderResourceSplit}
-            chooseConflictInfluence={chooseConflictInfluence}
-            chooseConflictTieWinner={chooseConflictTieWinner}
-            chooseCorrinoMight={chooseCorrinoMight}
-            chooseDemandAttention={chooseDemandAttention}
-            chooseDemandResults={chooseDemandResults}
-            chooseDesertCall={chooseDesertCall}
-            chooseIrulanSignet={chooseIrulanSignet}
-            chooseJessicaOtherMemories={chooseJessicaOtherMemories}
-            chooseJessicaReverendMother={chooseJessicaReverendMother}
-            chooseJessicaSpiceAgony={chooseJessicaSpiceAgony}
-            chooseJessicaWaterOfLife={chooseJessicaWaterOfLife}
-            chooseLadyAmberDesertScouts={chooseLadyAmberDesertScouts}
-            chooseMakerReward={chooseMakerReward}
-            chooseShaddamSignet={chooseShaddamSignet}
-            chooseSietchTabr={chooseSietchTabr}
-            chooseStabanUnseenNetwork={chooseStabanUnseenNetwork}
-            chooseThreatenSpiceProduction={chooseThreatenSpiceProduction}
-            chooseThroneRowCard={chooseThroneRowCard}
-            clearPendingAction={clearPendingAction}
-            collectContractFallback={collectContractFallback}
-            deployControlDefense={deployControlDefense}
-            deployOne={deployOne}
-            finishRevealAdjust={finishRevealAdjust}
-            loseInfluence={loseInfluence}
-            payConflictVpReward={payConflictVpReward}
-            placeSpy={placeSpy}
-            recallConflictRewardSpy={recallConflictRewardSpy}
-            recallSpy={recallSpy}
-            recallSpyForSupply={recallSpyForSupply}
-            reinforceOne={reinforceOne}
-            skipCommandRespectChoice={skipCommandRespectChoice}
-            skipControlDefense={skipControlDefense}
-            skipConflictVpReward={skipConflictVpReward}
-            skipCorrinoMightChoice={skipCorrinoMightChoice}
-            skipDemandAttentionChoice={skipDemandAttentionChoice}
-            skipDemandResultsChoice={skipDemandResultsChoice}
-            skipDesertCallChoice={skipDesertCallChoice}
-            skipInfluenceLoss={skipInfluenceLoss}
-            skipRecall={skipRecall}
-            skipThreatenSpiceProductionChoice={skipThreatenSpiceProductionChoice}
-            skipTrash={skipTrash}
-            takeContract={takeContract}
-            transferTrade={transferTrade}
-            trashCard={trashCard}
-            updateTrade={updateTrade}
+            {...pendingActionHandlers}
           />
         )}
 

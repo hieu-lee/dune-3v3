@@ -1,9 +1,7 @@
 import { factionLabels } from "./data";
 import { drawCards } from "./deck-utils";
-import { drawIntrigueCards } from "./intrigue-deck";
 import { changeAllegiancesGainChoices } from "./influence-choices";
 import {
-  allowedInfluenceLossChoices,
   influenceEffectOwnerForChoice,
 } from "./influence-loss-rules";
 import {
@@ -14,7 +12,6 @@ import { advancePendingAction } from "./pending-actions";
 import type { Card, FactionId, GameState, PendingAction, Player } from "./types";
 
 type CapturedMentatPendingAction = Extract<PendingAction, { kind: "captured-mentat" }>;
-type CapturedMentatRevealPendingAction = Extract<PendingAction, { kind: "captured-mentat-reveal" }>;
 
 export function capturedMentatDiscardChoices(player: Player, pending: CapturedMentatPendingAction): Card[] {
   if (player.id !== pending.ownerId) return [];
@@ -23,10 +20,6 @@ export function capturedMentatDiscardChoices(player: Player, pending: CapturedMe
 
 export function capturedMentatInfluenceChoices(player: Player): FactionId[] {
   return changeAllegiancesGainChoices(player);
-}
-
-export function capturedMentatRevealInfluenceChoices(player: Player): FactionId[] {
-  return allowedInfluenceLossChoices(player);
 }
 
 export function resolveCapturedMentatChoice(
@@ -86,41 +79,5 @@ export function skipCapturedMentat(state: GameState, pending: CapturedMentatPend
     ...state,
     ...advancePendingAction(state),
     log: [`${owner?.leader ?? "Player"} declines to discard a card for Captured Mentat.`, ...state.log],
-  };
-}
-
-export function resolveCapturedMentatRevealChoice(
-  state: GameState,
-  pending: CapturedMentatRevealPendingAction,
-  faction: FactionId,
-): GameState {
-  if (state.pendingAction !== pending) return state;
-  const owner = state.players.find((player) => player.id === pending.ownerId);
-  if (!owner || !capturedMentatRevealInfluenceChoices(owner).includes(faction)) return state;
-
-  const influenceState = {
-    ...state,
-    players: state.players.map((player) =>
-      player.id === owner.id ? adjustInfluence(player, faction, -1) : player,
-    ),
-    ...advancePendingAction(state),
-    log: [
-      `${owner.leader} resolves Captured Mentat: loses 1 ${factionLabels[faction]} Influence.`,
-      ...state.log,
-    ],
-  };
-  return drawIntrigueCards(influenceState, owner.id, 1, pending.source);
-}
-
-export function skipCapturedMentatReveal(
-  state: GameState,
-  pending: CapturedMentatRevealPendingAction,
-): GameState {
-  if (state.pendingAction !== pending) return state;
-  const owner = state.players.find((player) => player.id === pending.ownerId);
-  return {
-    ...state,
-    ...advancePendingAction(state),
-    log: [`${owner?.leader ?? "Player"} keeps their Influence for Captured Mentat.`, ...state.log],
   };
 }

@@ -66,6 +66,12 @@ export type RevealTrashCardEffect = {
   spiceReward?: number;
 };
 
+export type RevealLoseInfluenceForIntrigues = {
+  selector: PlayerSelector;
+  amount: number;
+  optional: boolean;
+};
+
 type PlayerEffectResult = {
   cardsToDraw: number;
   intriguesToDraw: number;
@@ -255,6 +261,16 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     if (effect.strengthReward !== undefined) validateAmount(effect.strengthReward);
     if (effect.spiceRewardCostThreshold !== undefined) validateAmount(effect.spiceRewardCostThreshold);
     if (effect.spiceReward !== undefined) validateAmount(effect.spiceReward);
+    return;
+  }
+  if (effect.kind === "lose-influence-for-intrigues") {
+    if (trigger !== "reveal") {
+      throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
+    }
+    if (effect.selector !== "self") {
+      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
+    validateAmount(effect.amount);
     return;
   }
   if (effect.kind === "place-spies") {
@@ -464,6 +480,9 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
   if (effect.kind === "trash-card") {
     return result;
   }
+  if (effect.kind === "lose-influence-for-intrigues") {
+    return result;
+  }
   if (effect.kind === "place-spies") {
     const amount = amountFor(effect.amount, context.source);
     return addSelectedSpyPlacement(result, effect.selector, {
@@ -593,6 +612,24 @@ export function resolveRevealTrashCardEffects(
           ? undefined
           : amountFor(effect.spiceRewardCostThreshold, context.source),
         spiceReward: effect.spiceReward === undefined ? undefined : amountFor(effect.spiceReward, context.source),
+      }));
+  });
+}
+
+export function resolveRevealLoseInfluenceForIntrigues(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): RevealLoseInfluenceForIntrigues[] {
+  specs?.forEach(validateSpec);
+  return (specs ?? []).flatMap((spec) => {
+    if (spec.trigger !== "reveal") return [];
+    if (!specApplies(spec, context)) return [];
+    return spec.effects
+      .filter((effect) => effect.kind === "lose-influence-for-intrigues")
+      .map((effect) => ({
+        selector: effect.selector,
+        amount: amountFor(effect.amount, context.source),
+        optional: effect.optional ?? true,
       }));
   });
 }

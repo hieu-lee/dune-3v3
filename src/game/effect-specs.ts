@@ -82,6 +82,24 @@ export function revealTrashCardForStrength(
   ], conditions);
 }
 
+export function revealLoseInfluenceForIntrigues(
+  amount: EffectAmountSpec,
+  options: {
+    optional?: boolean;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return revealEffects([
+    {
+      kind: "lose-influence-for-intrigues",
+      selector: "self",
+      amount,
+      optional: true,
+      ...options,
+    },
+  ], conditions);
+}
+
 export function agentDrawCards(amount: EffectAmountSpec, conditions?: GameEffectConditionSpec[]): CardEffectSpec {
   return agentPlayEffects([{ kind: "draw-cards", selector: "self", amount }], conditions);
 }

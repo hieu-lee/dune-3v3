@@ -10,7 +10,7 @@ These cards currently use typed reveal effect specs:
 - Muad'Dib Commander reveal cards: Command Respect, Convincing Argument, Demand Attention, Desert Call, Limited Landsraad Access, Signet Ring, Threaten Spice Production, Usul.
 - Emperor Commander reveal cards: Convincing Argument, Corrino Might, Critical Shipments, Demand Results, Devastating Assault, Imperial Ornithopter, Imperial Tent, Signet Ring.
 - Reserve cards: Prepare The Way.
-- Imperium cards: Smuggler's Harvester, Interstellar Trade, Bene Gesserit Operative, Calculus of Power, Chani, Clever Tactician.
+- Imperium cards: Smuggler's Harvester, Interstellar Trade, Bene Gesserit Operative, Captured Mentat, Calculus of Power, Chani, Clever Tactician.
 
 These cards currently use typed Agent effect specs:
 
@@ -23,7 +23,6 @@ These cards currently use typed Agent effect specs:
 These cards are automated but still rely on explicit card or leader branches while the shared primitive library grows:
 
 - Imperium / reserve Agent effects: Captured Mentat.
-- Imperium / reserve Reveal choices: Captured Mentat.
 - Commander starter cards: Command Respect, Critical Shipments, Demand Attention, Demand Results, Desert Call, Devastating Assault Reveal payment, Imperial Tent, Corrino Might, Threaten Spice Production, Usul, Signet Rings.
 - Ally leader Signet Ring effects: Gurney Halleck, Lady Amber Metulli, Lady Jessica, Lady Margot Fenring, Princess Irulan, Reverend Mother Jessica, Staban Tuek.
 - Plot and Combat Intrigues: currently automated through pattern modules and card-specific branches, not effect specs.
@@ -50,5 +49,5 @@ The largest current gaps are Agent and choice primitives:
 
 ## Verification
 
-- `pnpm run verify:card-effect-specs` verifies reveal specs, Agent card draw/resource/recruit/spy-placement/Intrigue draw specs, Reveal Fremen Bond trait checks, Reveal troop-retreat strength specs, Reveal trash-card strength specs, legacy fallback, no double-counting, conditional Maker/contract/spy/influence/conflict-unit behavior, shared spy posts, and manual reveal fallback.
+- `pnpm run verify:card-effect-specs` verifies reveal specs, Agent card draw/resource/recruit/spy-placement/Intrigue draw specs, Reveal Fremen Bond trait checks, Reveal troop-retreat strength specs, Reveal trash-card strength specs, Reveal Influence-for-Intrigue specs, legacy fallback, no double-counting, conditional Maker/contract/spy/influence/conflict-unit behavior, shared spy posts, and manual reveal fallback.
 - `pnpm run verify` includes the effect-spec verifier through `package.json`.

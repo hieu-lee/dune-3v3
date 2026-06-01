@@ -9,10 +9,10 @@ import {
   conflictVpConversionSpyChoices,
   capturedMentatDiscardChoices,
   capturedMentatInfluenceChoices,
-  capturedMentatRevealInfluenceChoices,
   influenceLossOptions,
   irulanSignetAcquireCards,
   irulanSignetTrashableCards,
+  loseInfluenceForIntriguesChoices,
   placeableSpySpaces,
   playerTroopSupply,
   recallableSpySpaces,
@@ -33,7 +33,7 @@ import type {
 import type { FactionId, GameState, PendingAction, Player, TradeGoodId, TrashCardZone } from "../game/types";
 import { PendingBoardInfluenceChoicePanel, PendingOptionalSpacePaymentPanel } from "./PendingBoardChoicePanels";
 import { PendingAcquireCardPanel, PendingContractPanel } from "./PendingCardChoicePanels";
-import { PendingCapturedMentatPanel, PendingCapturedMentatRevealPanel } from "./PendingCapturedMentatPanel";
+import { PendingCapturedMentatPanel, PendingInfluenceIntriguePanel } from "./PendingCapturedMentatPanel";
 import { PendingConflictInfluencePanel } from "./PendingConflictInfluencePanel";
 import { PendingConflictVpPanel } from "./PendingConflictVpPanel";
 import { PendingInfluenceLossPanel } from "./PendingInfluenceLossPanel";
@@ -81,7 +81,7 @@ type PendingActionPanelProps = {
   chooseBoardInfluence: (ownerId: string, faction: FactionId) => void;
   chooseConflictTieWinner: (winnerId?: string) => void;
   chooseCapturedMentat: (discardCardId: string, faction: FactionId) => void;
-  chooseCapturedMentatReveal: (faction: FactionId) => void;
+  chooseLoseInfluenceForIntrigues: (faction: FactionId) => void;
   chooseCorrinoMight: () => void;
   chooseDevastatingAssault: () => void;
   chooseDemandAttention: () => void;
@@ -115,7 +115,7 @@ type PendingActionPanelProps = {
   reinforceOne: (playerId: string, destination: "garrison" | "conflict") => void;
   skipCommandRespectChoice: () => void;
   skipCapturedMentatChoice: () => void;
-  skipCapturedMentatRevealChoice: () => void;
+  skipLoseInfluenceForIntriguesChoice: () => void;
   skipControlDefense: () => void;
   skipConflictVpReward: () => void;
   skipCorrinoMightChoice: () => void;
@@ -147,7 +147,7 @@ export function PendingActionPanel({
   chooseBoardInfluence,
   chooseConflictTieWinner,
   chooseCapturedMentat,
-  chooseCapturedMentatReveal,
+  chooseLoseInfluenceForIntrigues,
   chooseCorrinoMight,
   chooseDevastatingAssault,
   chooseDemandAttention,
@@ -181,7 +181,7 @@ export function PendingActionPanel({
   reinforceOne,
   skipCommandRespectChoice,
   skipCapturedMentatChoice,
-  skipCapturedMentatRevealChoice,
+  skipLoseInfluenceForIntriguesChoice,
   skipControlDefense,
   skipConflictVpReward,
   skipCorrinoMightChoice,
@@ -222,11 +222,11 @@ export function PendingActionPanel({
     pendingAction.kind === "captured-mentat" && pendingCapturedMentatOwner
       ? capturedMentatInfluenceChoices(pendingCapturedMentatOwner)
       : [];
-  const pendingCapturedMentatRevealOwner =
-    pendingAction.kind === "captured-mentat-reveal" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
-  const pendingCapturedMentatRevealInfluenceChoices =
-    pendingAction.kind === "captured-mentat-reveal" && pendingCapturedMentatRevealOwner
-      ? capturedMentatRevealInfluenceChoices(pendingCapturedMentatRevealOwner)
+  const pendingInfluenceIntrigueOwner =
+    pendingAction.kind === "lose-influence-for-intrigues" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
+  const pendingInfluenceIntrigueChoices =
+    pendingAction.kind === "lose-influence-for-intrigues" && pendingInfluenceIntrigueOwner
+      ? loseInfluenceForIntriguesChoices(pendingInfluenceIntrigueOwner)
       : [];
   const pendingMakerOwner =
     pendingAction.kind === "maker-choice" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
@@ -476,7 +476,7 @@ export function PendingActionPanel({
           {pendingAction.kind === "contract" && `${pendingContractOwner?.leader ?? "Player"} CHOAM contract`}
           {pendingAction.kind === "acquire-card" && `${pendingAcquireOwner?.leader ?? "Player"} acquisition`}
           {pendingAction.kind === "captured-mentat" && `${pendingCapturedMentatOwner?.leader ?? "Player"} Captured Mentat`}
-          {pendingAction.kind === "captured-mentat-reveal" && `${pendingCapturedMentatRevealOwner?.leader ?? "Player"} Captured Mentat reveal`}
+          {pendingAction.kind === "lose-influence-for-intrigues" && `${pendingInfluenceIntrigueOwner?.leader ?? "Player"} ${pendingAction.source} reveal`}
           {pendingAction.kind === "maker-choice" && `${pendingMakerLabel ?? "Player"} Maker space`}
           {pendingAction.kind === "sietch-tabr" && `${pendingSietchLabel ?? "Player"} Sietch Tabr`}
           {pendingAction.kind === "commander-resource-split" && `${pendingResourceSplitCommander?.leader ?? "Commander"} ${pendingAction.source}`}
@@ -841,12 +841,15 @@ export function PendingActionPanel({
         />
       )}
 
-      {pendingAction.kind === "captured-mentat-reveal" && (
-        <PendingCapturedMentatRevealPanel
-          influenceChoices={pendingCapturedMentatRevealInfluenceChoices}
-          owner={pendingCapturedMentatRevealOwner}
-          onChoose={chooseCapturedMentatReveal}
-          onSkip={skipCapturedMentatRevealChoice}
+      {pendingAction.kind === "lose-influence-for-intrigues" && (
+        <PendingInfluenceIntriguePanel
+          amount={pendingAction.amount}
+          influenceChoices={pendingInfluenceIntrigueChoices}
+          optional={pendingAction.optional}
+          owner={pendingInfluenceIntrigueOwner}
+          source={pendingAction.source}
+          onChoose={chooseLoseInfluenceForIntrigues}
+          onSkip={skipLoseInfluenceForIntriguesChoice}
         />
       )}
 

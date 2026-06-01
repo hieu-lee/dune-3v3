@@ -13,11 +13,13 @@ import {
   playerConflictUnitCount,
 } from "./conflict-rules";
 import {
-  resolveCapturedMentatRevealChoice as resolveCapturedMentatRevealChoiceForPending,
   resolveCapturedMentatChoice as resolveCapturedMentatChoiceForPending,
-  skipCapturedMentatReveal as resolveSkipCapturedMentatReveal,
   skipCapturedMentat as resolveSkipCapturedMentat,
 } from "./captured-mentat-rules";
+import {
+  resolveLoseInfluenceForIntrigues as resolveLoseInfluenceForIntriguesForPending,
+  skipLoseInfluenceForIntrigues as resolveSkipLoseInfluenceForIntrigues,
+} from "./influence-intrigue-rules";
 import {
   playerTroopSupply,
 } from "./deck-utils";
@@ -167,8 +169,11 @@ export {
 export {
   capturedMentatDiscardChoices,
   capturedMentatInfluenceChoices,
-  capturedMentatRevealInfluenceChoices,
 } from "./captured-mentat-rules";
+
+export {
+  loseInfluenceForIntriguesChoices,
+} from "./influence-intrigue-rules";
 
 export {
   buyAccessPairChoices,
@@ -208,7 +213,6 @@ export {
   devastatingAssaultCost,
   devastatingAssaultStrength,
   pendingActionForCard,
-  pendingActionForCapturedMentatReveal,
   pendingActionForCorrinoMightReveal,
   pendingActionForDevastatingAssaultReveal,
   pendingActionForJessicaOtherMemories,
@@ -521,7 +525,7 @@ type RetreatTroopsForStrengthPendingAction = Extract<PendingAction, { kind: "ret
 type CommanderResourceSplitPendingAction = Extract<PendingAction, { kind: "commander-resource-split" }>;
 type TrashCardPendingAction = Extract<PendingAction, { kind: "trash-card" }>;
 type CapturedMentatPendingAction = Extract<PendingAction, { kind: "captured-mentat" }>;
-type CapturedMentatRevealPendingAction = Extract<PendingAction, { kind: "captured-mentat-reveal" }>;
+type LoseInfluenceForIntriguesPendingAction = Extract<PendingAction, { kind: "lose-influence-for-intrigues" }>;
 type BoardInfluenceChoicePendingAction = Extract<PendingAction, { kind: "board-influence-choice" }>;
 type OptionalSpacePaymentPendingAction = Extract<PendingAction, { kind: "optional-space-payment" }>;
 type PostDeployIntrigueDrawPendingAction = DeployPendingAction | MakerChoicePendingAction | SietchTabrPendingAction;
@@ -658,18 +662,21 @@ export function skipCapturedMentat(state: GameState, pending: CapturedMentatPend
   return continueAfterResolvedConflictReward(resolveSkipCapturedMentat(state, pending));
 }
 
-export function resolveCapturedMentatRevealChoice(
+export function resolveLoseInfluenceForIntriguesChoice(
   state: GameState,
-  pending: CapturedMentatRevealPendingAction,
+  pending: LoseInfluenceForIntriguesPendingAction,
   faction: FactionId,
 ): GameState {
   return continueAfterResolvedConflictReward(
-    resolveCapturedMentatRevealChoiceForPending(state, pending, faction),
+    resolveLoseInfluenceForIntriguesForPending(state, pending, faction),
   );
 }
 
-export function skipCapturedMentatReveal(state: GameState, pending: CapturedMentatRevealPendingAction): GameState {
-  return continueAfterResolvedConflictReward(resolveSkipCapturedMentatReveal(state, pending));
+export function skipLoseInfluenceForIntrigues(
+  state: GameState,
+  pending: LoseInfluenceForIntriguesPendingAction,
+): GameState {
+  return continueAfterResolvedConflictReward(resolveSkipLoseInfluenceForIntrigues(state, pending));
 }
 
 export function placeSpyForPending(

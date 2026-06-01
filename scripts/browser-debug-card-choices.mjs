@@ -326,9 +326,11 @@ async function createCardChoiceStates(server, initialPlayableGame) {
           : player,
       ),
       pendingAction: {
-        kind: "captured-mentat-reveal",
+        kind: "lose-influence-for-intrigues",
         ownerId,
         source: "Captured Mentat",
+        amount: 1,
+        optional: true,
       },
     },
     acquireEmpty: {

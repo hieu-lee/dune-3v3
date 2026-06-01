@@ -71,22 +71,29 @@ export function PendingCapturedMentatPanel({
   );
 }
 
-type PendingCapturedMentatRevealPanelProps = {
+type PendingInfluenceIntriguePanelProps = {
   influenceChoices: FactionId[];
+  amount: number;
+  optional: boolean;
   owner?: Player;
+  source: string;
   onChoose: (faction: FactionId) => void;
   onSkip: () => void;
 };
 
-export function PendingCapturedMentatRevealPanel({
+export function PendingInfluenceIntriguePanel({
   influenceChoices,
+  amount,
+  optional,
   owner,
+  source,
   onChoose,
   onSkip,
-}: PendingCapturedMentatRevealPanelProps) {
+}: PendingInfluenceIntriguePanelProps) {
   return (
     <div className="pending-controls">
       <strong>{owner?.leader ?? "Player"}</strong>
+      <span>{source}: lose 1 Influence to draw {amount} Intrigue{amount === 1 ? "" : "s"}</span>
       {influenceChoices.map((faction) => (
         <button
           type="button"
@@ -96,7 +103,7 @@ export function PendingCapturedMentatRevealPanel({
           {factionLabels[faction]}
         </button>
       ))}
-      <button type="button" onClick={onSkip}>Skip</button>
+      {optional && <button type="button" onClick={onSkip}>Skip</button>}
     </div>
   );
 }

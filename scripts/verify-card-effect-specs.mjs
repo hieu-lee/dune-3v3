@@ -83,6 +83,7 @@ try {
   const smuggler = data.imperiumDeck.find((card) => card.name === "Smuggler's Harvester");
   const interstellarTrade = data.imperiumDeck.find((card) => card.name === "Interstellar Trade");
   const calculus = data.imperiumDeck.find((card) => card.name === "Calculus of Power");
+  const capturedMentat = data.imperiumDeck.find((card) => card.name === "Captured Mentat");
   const beneGesseritOperative = data.imperiumDeck.find((card) => card.name === "Bene Gesserit Operative");
   const cargoRunner = data.imperiumDeck.find((card) => card.name === "Cargo Runner");
   const chani = data.imperiumDeck.find((card) => card.name === "Chani, Clever Tactician");
@@ -105,6 +106,7 @@ try {
     smuggler &&
     interstellarTrade &&
     calculus &&
+    capturedMentat &&
     beneGesseritOperative &&
     cargoRunner &&
     chani &&
@@ -115,7 +117,7 @@ try {
   );
   assert.ok(prepareTheWay && limitedLandsraadAccess && devastatingAssault && imperialOrnithopter);
   assert.ok(arrakeen && haggaBasin && imperialBasin && secrets && highCouncil);
-  assert.equal(revealSpecCards.length, 33, "Unexpected number of cards with declarative Reveal specs");
+  assert.equal(revealSpecCards.length, 34, "Unexpected number of cards with declarative Reveal specs");
   assert.deepEqual(
     [
       ...data.reserveMarket,
@@ -139,9 +141,10 @@ try {
     prepareTheWay,
     limitedLandsraadAccess,
 	    imperialOrnithopter,
-	    smuggler,
+      smuggler,
 	    interstellarTrade,
       calculus,
+      capturedMentat,
 	    beneGesseritOperative,
 	    chani,
 	  ]) {
@@ -253,6 +256,24 @@ try {
       )
     ),
     "Calculus of Power should carry a declarative Reveal trash-card strength spec",
+  );
+  assert.ok(
+    capturedMentat.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.effects.some((effect) => effect.kind === "gain-persuasion" && effect.amount === 1)
+    ),
+    "Captured Mentat should carry its printed persuasion in Reveal specs",
+  );
+  assert.ok(
+    capturedMentat.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.effects.some((effect) =>
+        effect.kind === "lose-influence-for-intrigues" &&
+        effect.amount === 1 &&
+        effect.optional === true
+      )
+    ),
+    "Captured Mentat should carry a declarative Reveal Influence-for-Intrigue spec",
   );
   assert.ok(
     beneGesseritOperative.effects?.some((spec) =>
@@ -625,6 +646,39 @@ try {
     () => turnActions.revealTurnPlan({ ...p2, hand: [invalidTrashStrengthCard], highCouncilSeat: false }),
     /Invalid effect amount "-1"/,
     "Trash-card strength rewards should require non-negative integer amounts",
+  );
+  const agentInfluenceIntrigueCard = {
+    ...convincingArgument,
+    id: "effect-spec-agent-influence-intrigue-card",
+    name: "Effect Spec Agent Influence Intrigue",
+    effects: [agentSpec([{ kind: "lose-influence-for-intrigues", selector: "self", amount: 1 }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(agentInfluenceIntrigueCard, p2, p2),
+    /Unsupported effect "lose-influence-for-intrigues" for agent-play/,
+    "Influence-for-Intrigue specs should stay in Reveal until other trigger resolvers support them",
+  );
+  const invalidInfluenceIntrigueSelectorCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-influence-intrigue-selector-card",
+    name: "Effect Spec Invalid Influence Intrigue Selector",
+    effects: [revealSpec([{ kind: "lose-influence-for-intrigues", selector: "activated-ally", amount: 1 }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [invalidInfluenceIntrigueSelectorCard], highCouncilSeat: false }),
+    /Unsupported effect selector "activated-ally" for reveal/,
+    "Influence-for-Intrigue specs should reject activated Ally reveal selectors",
+  );
+  const invalidInfluenceIntrigueAmountCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-influence-intrigue-amount-card",
+    name: "Effect Spec Invalid Influence Intrigue Amount",
+    effects: [revealSpec([{ kind: "lose-influence-for-intrigues", selector: "self", amount: -1 }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [invalidInfluenceIntrigueAmountCard], highCouncilSeat: false }),
+    /Invalid effect amount "-1"/,
+    "Influence-for-Intrigue specs should require non-negative integer amounts",
   );
 	  const conditionalRevealRetreatCard = {
 	    ...convincingArgument,

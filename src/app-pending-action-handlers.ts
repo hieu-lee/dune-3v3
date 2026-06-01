@@ -19,7 +19,6 @@ import {
   recallSpyForPending,
   recallSpyForSupplyForPending,
   reinforceTroop,
-  resolveCapturedMentatRevealChoice,
   resolveCapturedMentatChoice,
   resolveCommanderResourceSplitChoice,
   resolveCommandRespectTrade,
@@ -36,6 +35,7 @@ import {
   resolveJessicaSpiceAgonyChoice,
   resolveJessicaWaterOfLifeChoice,
   resolveLadyAmberDesertScoutsChoice,
+  resolveLoseInfluenceForIntriguesChoice,
   resolveMakerChoice,
   resolveOptionalSpacePayment,
   resolveRetreatTroopsForStrength,
@@ -45,7 +45,6 @@ import {
   resolveThreatenSpiceProductionChoice,
   scoreGurneyAlwaysSmiling,
   skipCommandRespect,
-  skipCapturedMentatReveal,
   skipCapturedMentat,
   skipConflictVpConversion,
   skipControlDefenseTroop,
@@ -55,6 +54,7 @@ import {
   skipDevastatingAssault,
   skipDesertCall,
   skipLoseInfluence,
+  skipLoseInfluenceForIntrigues,
   skipOptionalSpacePayment,
   skipRecallSpy,
   skipRetreatTroopsForStrength,
@@ -249,12 +249,12 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     );
   const skipCapturedMentatChoice = () =>
     runPending("captured-mentat", (current, pending) => maybeStartCombatPhase(skipCapturedMentat(current, pending)));
-  const chooseCapturedMentatReveal = (faction: FactionId) =>
-    runPending("captured-mentat-reveal", (current, pending) =>
-      maybeStartCombatPhase(resolveCapturedMentatRevealChoice(current, pending, faction))
+  const chooseLoseInfluenceForIntrigues = (faction: FactionId) =>
+    runPending("lose-influence-for-intrigues", (current, pending) =>
+      maybeStartCombatPhase(resolveLoseInfluenceForIntriguesChoice(current, pending, faction))
     );
-  const skipCapturedMentatRevealChoice = () =>
-    runPending("captured-mentat-reveal", (current, pending) => maybeStartCombatPhase(skipCapturedMentatReveal(current, pending)));
+  const skipLoseInfluenceForIntriguesChoice = () =>
+    runPending("lose-influence-for-intrigues", (current, pending) => maybeStartCombatPhase(skipLoseInfluenceForIntrigues(current, pending)));
   const collectContractFallback = () =>
     runPending("contract", (current, pending) => maybeStartCombatPhase(collectChoamContractFallback(current, pending)));
   const chooseConflictTieWinner = (winnerId?: string) =>
@@ -279,7 +279,6 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     adjustRevealReward,
     adjustThreatenSpiceProduction,
     chooseCapturedMentat,
-    chooseCapturedMentatReveal,
     chooseCommandRespectTrade,
     chooseCommanderResourceSplit,
     chooseConflictInfluence,
@@ -296,6 +295,7 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     chooseJessicaSpiceAgony,
     chooseJessicaWaterOfLife,
     chooseLadyAmberDesertScouts,
+    chooseLoseInfluenceForIntrigues,
     chooseMakerReward,
     chooseRetreatTroopsForStrength,
     chooseShaddamSignet,
@@ -317,7 +317,6 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     recallSpyForSupply,
     reinforceOne,
     skipCapturedMentatChoice,
-    skipCapturedMentatRevealChoice,
     skipCommandRespectChoice,
     skipControlDefense,
     skipConflictVpReward,
@@ -327,6 +326,7 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     skipDemandResultsChoice,
     skipDesertCallChoice,
     skipInfluenceLoss,
+    skipLoseInfluenceForIntriguesChoice,
     skipOptionalSpacePaymentChoice,
     skipRecall,
     skipRetreatTroopsForStrengthChoice,

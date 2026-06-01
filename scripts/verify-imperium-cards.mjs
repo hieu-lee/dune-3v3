@@ -89,6 +89,24 @@ try {
   assert.deepEqual(capturedMentat.icons, ["landsraad", "spice"], "Captured Mentat should reach Landsraad and Spice Trade spaces");
   assert.equal(capturedMentat.persuasion, 1, "Captured Mentat should reveal for 1 persuasion");
   assert.equal(capturedMentat.conditionalPersuasion, false, "Captured Mentat should not need manual persuasion entry");
+  assert.ok(
+    capturedMentat.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.effects.some((effect) => effect.kind === "gain-persuasion" && effect.amount === 1)
+    ),
+    "Captured Mentat should carry its printed persuasion in Reveal specs",
+  );
+  assert.ok(
+    capturedMentat.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.effects.some((effect) =>
+        effect.kind === "lose-influence-for-intrigues" &&
+        effect.amount === 1 &&
+        effect.optional === true
+      )
+    ),
+    "Captured Mentat should carry a declarative Reveal Influence-for-Intrigue spec",
+  );
   assert.match(capturedMentat.play, /discard 1 card.*gain 1 Influence.*draw 1 card/i);
   assert.match(capturedMentat.reveal, /lose 1 Influence.*draw 1 Intrigue/i);
   const beneGesseritOperative = data.imperiumDeck.find((card) => card.name === "Bene Gesserit Operative");
@@ -746,18 +764,20 @@ try {
     commanderTargets: {},
     revealPlan: capturedMentatRevealPlan,
   });
-  assert.equal(capturedMentatRevealed.pendingAction?.kind, "captured-mentat-reveal");
+  assert.equal(capturedMentatRevealed.pendingAction?.kind, "lose-influence-for-intrigues");
+  assert.equal(capturedMentatRevealed.pendingAction?.amount, 1);
+  assert.equal(capturedMentatRevealed.pendingAction?.optional, true);
   assert.deepEqual(
-    state.capturedMentatRevealInfluenceChoices(playerById(capturedMentatRevealed, p2.id)),
+    state.loseInfluenceForIntriguesChoices(playerById(capturedMentatRevealed, p2.id)),
     ["bene"],
     "Captured Mentat reveal should expose positive Influence tracks",
   );
   assert.equal(
-    state.resolveCapturedMentatRevealChoice(capturedMentatRevealed, capturedMentatRevealed.pendingAction, "emperor"),
+    state.resolveLoseInfluenceForIntriguesChoice(capturedMentatRevealed, capturedMentatRevealed.pendingAction, "emperor"),
     capturedMentatRevealed,
     "Captured Mentat reveal should reject Influence tracks the player cannot lose",
   );
-  const capturedMentatRevealResolved = state.resolveCapturedMentatRevealChoice(
+  const capturedMentatRevealResolved = state.resolveLoseInfluenceForIntriguesChoice(
     capturedMentatRevealed,
     capturedMentatRevealed.pendingAction,
     "bene",
@@ -766,7 +786,7 @@ try {
   assert.equal(playerById(capturedMentatRevealResolved, p2.id).influence.bene, 1);
   assert.equal(playerById(capturedMentatRevealResolved, p2.id).vp, 0, "Captured Mentat reveal should lose Influence threshold VP");
   assert.equal(playerById(capturedMentatRevealResolved, p2.id).intrigues.at(-1).id, capturedMentatIntrigue.id);
-  const capturedMentatRevealSkipped = state.skipCapturedMentatReveal(capturedMentatRevealed, capturedMentatRevealed.pendingAction);
+  const capturedMentatRevealSkipped = state.skipLoseInfluenceForIntrigues(capturedMentatRevealed, capturedMentatRevealed.pendingAction);
   assert.equal(capturedMentatRevealSkipped.pendingAction, undefined);
   assert.equal(playerById(capturedMentatRevealSkipped, p2.id).influence.bene, 2);
   assert.equal(playerById(capturedMentatRevealSkipped, p2.id).intrigues.length, 0);
@@ -802,11 +822,11 @@ try {
     revealPlan: commanderCapturedRevealPlan,
   });
   assert.deepEqual(
-    state.capturedMentatRevealInfluenceChoices(playerById(commanderCapturedRevealed, p4.id)),
+    state.loseInfluenceForIntriguesChoices(playerById(commanderCapturedRevealed, p4.id)),
     ["emperor"],
     "Commander Captured Mentat reveal should expose only personal Influence",
   );
-  const commanderCapturedRevealResolved = state.resolveCapturedMentatRevealChoice(
+  const commanderCapturedRevealResolved = state.resolveLoseInfluenceForIntriguesChoice(
     commanderCapturedRevealed,
     commanderCapturedRevealed.pendingAction,
     "emperor",

@@ -18,14 +18,15 @@ import {
   canSummonSandworms,
   playerHasConflictUnits,
 } from "./conflict-rules";
-import { capturedMentatRevealInfluenceChoices } from "./captured-mentat-rules";
 import { playerTroopSupply } from "./deck-utils";
 import {
   resolveCardEffects,
+  resolveRevealLoseInfluenceForIntrigues,
   resolveRevealRetreatTroopsForStrength,
   resolveRevealTrashCardEffects,
   type SpyPlacementEffectResult,
 } from "./effect-resolver";
+import { loseInfluenceForIntriguesChoices } from "./influence-intrigue-rules";
 import {
   feydRauthaLeaderName,
   ladyAmberMetulliLeaderName,
@@ -556,25 +557,6 @@ export function pendingActionForDevastatingAssaultReveal(
   };
 }
 
-export function pendingActionForCapturedMentatReveal(
-  card: Card,
-  source: Player,
-): PendingAction | undefined {
-  if (
-    !isCapturedMentatCard(card) ||
-    !source.playArea.some((candidate) => candidate.id === card.id && isCapturedMentatCard(candidate)) ||
-    capturedMentatRevealInfluenceChoices(source).length === 0
-  ) {
-    return undefined;
-  }
-
-  return {
-    kind: "captured-mentat-reveal",
-    ownerId: source.id,
-    source: card.name,
-  };
-}
-
 export function pendingActionsForReveal(
   source: Player,
   state: GameState,
@@ -608,9 +590,9 @@ export function pendingActionsForReveal(
   const devastatingAssaultPending = revealedCards
     .map((card) => pendingActionForDevastatingAssaultReveal(card, source, state, combatRecipientId))
     .find((pending): pending is PendingAction => Boolean(pending));
-  const capturedMentatRevealPending = revealedCards
-    .map((card) => pendingActionForCapturedMentatReveal(card, source))
-    .find((pending): pending is PendingAction => Boolean(pending));
+  const influenceIntriguePendings = revealedCards.flatMap((card) =>
+    pendingActionsForRevealInfluenceIntrigues(card, source, state, combatRecipientId)
+  );
   const retreatTroopStrengthPendings = revealedCards.flatMap((card) =>
     pendingActionsForRevealRetreatTroopsForStrength(card, source, state, combatRecipientId)
   );
@@ -622,11 +604,36 @@ export function pendingActionsForReveal(
     ...revealTrashCardPendings,
     devastatingAssaultPending,
     corrinoMightPending,
-    capturedMentatRevealPending,
+    ...influenceIntriguePendings,
     ...retreatTroopStrengthPendings,
     feydDeviousStrengthPending,
     amberDesertScoutsPending,
   ].filter((action): action is PendingAction => Boolean(action));
+}
+
+function pendingActionsForRevealInfluenceIntrigues(
+  card: Card,
+  source: Player,
+  state: GameState,
+  combatRecipientId: string,
+): PendingAction[] {
+  const recipient = state.players.find((player) => player.id === combatRecipientId);
+  return resolveRevealLoseInfluenceForIntrigues(card.effects, {
+    trigger: "reveal",
+    source,
+    target: recipient,
+    state,
+  }).flatMap((effect) => {
+    if (effect.selector !== "self" || effect.amount <= 0) return [];
+    if (loseInfluenceForIntriguesChoices(source).length === 0) return [];
+    return [{
+      kind: "lose-influence-for-intrigues",
+      ownerId: source.id,
+      source: card.name,
+      amount: effect.amount,
+      optional: effect.optional,
+    }];
+  });
 }
 
 function pendingActionForFeydDeviousStrength(

@@ -73,6 +73,12 @@ export type GameEffectSpec =
       spiceReward?: EffectAmountSpec;
     }
   | {
+      kind: "lose-influence-for-intrigues";
+      selector: PlayerSelector;
+      amount: EffectAmountSpec;
+      optional?: boolean;
+    }
+  | {
       kind: "place-spies";
       selector: PlayerSelector;
       amount: EffectAmountSpec;
@@ -402,9 +408,11 @@ export type PendingAction =
       source: string;
     }
   | {
-      kind: "captured-mentat-reveal";
+      kind: "lose-influence-for-intrigues";
       ownerId: string;
       source: string;
+      amount: number;
+      optional: boolean;
     }
   | {
       kind: "maker-choice";

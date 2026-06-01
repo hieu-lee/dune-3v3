@@ -26,6 +26,7 @@ import {
   hasSpyPosts,
   revealGainPersuasion,
   revealGainResource,
+  revealLoseInfluenceForIntrigues,
   revealRetreatTroopsForStrength,
   revealTrashCardForStrength,
   visitedMakerSpace,
@@ -229,6 +230,12 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
       }),
     ];
   }
+  if (card.id === capturedMentatSourceId) {
+    return [
+      revealGainPersuasion(1),
+      revealLoseInfluenceForIntrigues(1),
+    ];
+  }
   if (card.id === beneGesseritOperativeSourceId) {
     return [
       agentPlaceSpies("self", 1, { recallForSupply: true, mustPlace: true }),
@@ -301,6 +308,7 @@ function toImperiumCard(card: HubCard): Card {
       swords: 0,
       conditionalPersuasion: false,
       conditionalSwords: false,
+      effects: imperiumCardEffects(card),
       play: "You may discard 1 card to gain 1 Influence and draw 1 card.",
       reveal: imperiumRevealText(card, 1, 0, false),
       cost: 5,

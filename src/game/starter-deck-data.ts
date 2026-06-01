@@ -1,5 +1,6 @@
 import catalogJson from "./uprising-catalog.generated.json";
 import {
+  agentPlayEffects,
   cloneCardEffects,
   revealEffects,
   revealGainPersuasion,
@@ -343,8 +344,14 @@ const emperorCommanderSpecs: Array<StarterCardSpec & { sourceId: number }> = [
     icons: ["spice"],
     persuasion: 1,
     swords: 0,
-    effects: [revealGainPersuasion(1)],
-    play: "Resolve the printed agent reward.",
+    effects: [
+      agentPlayEffects([
+        { kind: "gain-resource", selector: "self", resource: "solari", amount: 1 },
+        { kind: "recruit-troops", selector: "activated-ally", amount: 1 },
+      ]),
+      revealGainPersuasion(1),
+    ],
+    play: "Gain 1 Solari; the activated Ally recruits 1 troop.",
     reveal: "+1 persuasion. If you have a Swordmaster bonus token, you may spend 3 Solari to add 5 strength.",
   },
   {

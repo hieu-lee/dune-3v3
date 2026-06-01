@@ -15,6 +15,7 @@ import type {
   GameEffectTrigger,
   GameState,
   Player,
+  PlayerSelector,
   ResourceId,
   Resources,
 } from "./types";
@@ -26,21 +27,35 @@ export type EffectResolverState = Partial<
 export type GameEffectContext = {
   trigger: GameEffectTrigger;
   source: Player;
+  target?: Player;
   state?: EffectResolverState;
 };
 
-export type GameEffectResult = {
+type PlayerEffectResult = {
   cardsToDraw: number;
-  persuasion: number;
+  recruitedTroops: number;
   revealGain: Partial<Resources>;
+};
+
+export type GameEffectResult = PlayerEffectResult & {
+  activatedAlly: PlayerEffectResult;
+  persuasion: number;
   swords: number;
+};
+
+const emptyPlayerEffectResult: PlayerEffectResult = {
+  cardsToDraw: 0,
+  recruitedTroops: 0,
+  revealGain: {},
 };
 
 const emptyEffectResult: GameEffectResult = {
   cardsToDraw: 0,
+  recruitedTroops: 0,
   persuasion: 0,
   revealGain: {},
   swords: 0,
+  activatedAlly: emptyPlayerEffectResult,
 };
 
 const supportedTriggers = new Set<GameEffectTrigger>([
@@ -114,9 +129,12 @@ function validateCondition(condition: GameEffectConditionSpec) {
   unsupportedKind("effect condition", condition);
 }
 
-function validateEffect(effect: GameEffectSpec) {
-  if (effect.selector !== "self") {
+function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
+  if (effect.selector !== "self" && effect.selector !== "activated-ally") {
     throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+  }
+  if (effect.selector === "activated-ally" && trigger !== "agent-play") {
+    throw new Error(`Unsupported effect selector "${effect.selector}" for ${trigger}`);
   }
   if (effect.kind === "gain-resource") {
     if (!supportedResources.has(effect.resource)) {
@@ -126,10 +144,20 @@ function validateEffect(effect: GameEffectSpec) {
     return;
   }
   if (effect.kind === "gain-persuasion" || effect.kind === "gain-strength") {
+    if (effect.selector !== "self") {
+      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
     validateAmount(effect.amount);
     return;
   }
   if (effect.kind === "draw-cards") {
+    if (effect.selector !== "self") {
+      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
+    validateAmount(effect.amount);
+    return;
+  }
+  if (effect.kind === "recruit-troops") {
     validateAmount(effect.amount);
     return;
   }
@@ -139,7 +167,7 @@ function validateEffect(effect: GameEffectSpec) {
 function validateSpec(spec: CardEffectSpec) {
   validateTrigger(spec.trigger);
   spec.conditions?.forEach(validateCondition);
-  spec.effects.forEach(validateEffect);
+  spec.effects.forEach((effect) => validateEffect(effect, spec.trigger));
 }
 
 function addRevealGain(gain: Partial<Resources>, resource: ResourceId, amount: number) {
@@ -185,28 +213,88 @@ function conditionInfluence(source: Player, faction: FactionId, players: Player[
 }
 
 function specApplies(spec: CardEffectSpec, context: GameEffectContext) {
-  return spec.trigger === context.trigger && (spec.conditions ?? []).every((condition) => conditionApplies(condition, context));
+  return spec.trigger === context.trigger &&
+    spec.effects.every((effect) => selectorApplies(effect.selector, context)) &&
+    (spec.conditions ?? []).every((condition) => conditionApplies(condition, context));
+}
+
+function selectorApplies(selector: PlayerSelector, context: GameEffectContext) {
+  if (selector === "self") return true;
+  if (selector === "activated-ally") {
+    return context.source.role === "Commander" &&
+      context.target?.role === "Ally" &&
+      context.target.team === context.source.team;
+  }
+  return unsupportedKind("effect selector", selector);
+}
+
+function addSelectedRevealGain(
+  result: GameEffectResult,
+  selector: PlayerSelector,
+  resource: ResourceId,
+  amount: number,
+) {
+  if (selector === "self") {
+    return { ...result, revealGain: addRevealGain(result.revealGain, resource, amount) };
+  }
+  if (selector === "activated-ally") {
+    return {
+      ...result,
+      activatedAlly: {
+        ...result.activatedAlly,
+        revealGain: addRevealGain(result.activatedAlly.revealGain, resource, amount),
+      },
+    };
+  }
+  return unsupportedKind("effect selector", selector);
+}
+
+function addSelectedRecruitedTroops(result: GameEffectResult, selector: PlayerSelector, amount: number) {
+  if (selector === "self") {
+    return { ...result, recruitedTroops: result.recruitedTroops + amount };
+  }
+  if (selector === "activated-ally") {
+    return {
+      ...result,
+      activatedAlly: {
+        ...result.activatedAlly,
+        recruitedTroops: result.activatedAlly.recruitedTroops + amount,
+      },
+    };
+  }
+  return unsupportedKind("effect selector", selector);
 }
 
 function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context: GameEffectContext): GameEffectResult {
-  if (effect.selector !== "self") {
-    throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
-  }
+  if (!selectorApplies(effect.selector, context)) return result;
   if (effect.kind === "gain-resource") {
     const amount = amountFor(effect.amount, context.source);
-    return { ...result, revealGain: addRevealGain(result.revealGain, effect.resource, amount) };
+    return addSelectedRevealGain(result, effect.selector, effect.resource, amount);
   }
   if (effect.kind === "gain-persuasion") {
+    if (effect.selector !== "self") {
+      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
     const amount = amountFor(effect.amount, context.source);
     return { ...result, persuasion: result.persuasion + amount };
   }
   if (effect.kind === "gain-strength") {
+    if (effect.selector !== "self") {
+      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
     const amount = amountFor(effect.amount, context.source);
     return { ...result, swords: result.swords + amount };
   }
   if (effect.kind === "draw-cards") {
+    if (effect.selector !== "self") {
+      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
     const amount = amountFor(effect.amount, context.source);
     return { ...result, cardsToDraw: result.cardsToDraw + amount };
+  }
+  if (effect.kind === "recruit-troops") {
+    const amount = amountFor(effect.amount, context.source);
+    return addSelectedRecruitedTroops(result, effect.selector, amount);
   }
   return unsupportedKind("effect", effect);
 }
@@ -222,12 +310,25 @@ export function resolveGameEffects(specs: CardEffectSpec[] | undefined, context:
 function mergeEffectResult(result: GameEffectResult, next: GameEffectResult): GameEffectResult {
   return {
     cardsToDraw: result.cardsToDraw + next.cardsToDraw,
+    recruitedTroops: result.recruitedTroops + next.recruitedTroops,
     persuasion: result.persuasion + next.persuasion,
     revealGain: Object.entries(next.revealGain).reduce(
       (gain, [resource, amount]) => addRevealGain(gain, resource as ResourceId, amount ?? 0),
       result.revealGain,
     ),
     swords: result.swords + next.swords,
+    activatedAlly: mergePlayerEffectResult(result.activatedAlly, next.activatedAlly),
+  };
+}
+
+function mergePlayerEffectResult(result: PlayerEffectResult, next: PlayerEffectResult): PlayerEffectResult {
+  return {
+    cardsToDraw: result.cardsToDraw + next.cardsToDraw,
+    recruitedTroops: result.recruitedTroops + next.recruitedTroops,
+    revealGain: Object.entries(next.revealGain).reduce(
+      (gain, [resource, amount]) => addRevealGain(gain, resource as ResourceId, amount ?? 0),
+      result.revealGain,
+    ),
   };
 }
 
@@ -238,9 +339,11 @@ export function resolveCardEffects(cards: Array<{ effects?: CardEffectSpec[] }>,
 function legacyRevealResult(card: Card): GameEffectResult {
   return {
     cardsToDraw: 0,
+    recruitedTroops: 0,
     persuasion: card.persuasion,
     revealGain: card.revealGain ? { ...card.revealGain } : {},
     swords: card.swords,
+    activatedAlly: emptyPlayerEffectResult,
   };
 }
 

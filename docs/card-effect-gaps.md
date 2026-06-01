@@ -7,19 +7,18 @@ This document records bespoke card behavior that should be replaced by reusable 
 Implemented primitives:
 
 - Triggers: `reveal`, `agent-play`
-- Effects: gain persuasion, gain strength, gain resource, draw cards
+- Effects: gain persuasion, gain strength, gain resource, draw cards, recruit troops
 - Amounts: fixed non-negative integer, completed contract count with optional non-negative integer multiplier
 - Conditions: visited Maker space this round, has at least N own spy posts, has at least N effective Influence
-- Selector: `self`
+- Selectors: `self`, `activated-ally` for Agent routed troop recruitment
 
-The reveal resolver treats reveal specs as the full reveal model for a card. If a card has a reveal spec, legacy fields such as `persuasion`, `swords`, and `revealGain` remain available for display and compatibility but are not added again during reveal planning. Agent-play specs currently cover immediate self effects such as Influence-gated card draw and resource gains.
-Unsupported spec shapes, including triggers, intentionally throw instead of falling back silently. Selectors other than `self` are part of the planned type surface but fail until the resolver implements them.
+The reveal resolver treats reveal specs as the full reveal model for a card. If a card has a reveal spec, legacy fields such as `persuasion`, `swords`, and `revealGain` remain available for display and compatibility but are not added again during reveal planning. Agent-play specs currently cover immediate self effects such as Influence-gated card draw and resource gains, plus routed activated-Ally troop recruitment.
+Unsupported spec shapes, including triggers, intentionally throw instead of falling back silently. Selectors beyond `self` and the currently supported `activated-ally` Agent routing are part of the planned type surface but fail until the resolver implements them.
 
 ## Bespoke Handlers To Retire
 
 - `applyCardAgentEffect`
   - Commander and Ally signet immediate rewards
-  - Devastating Assault Agent reward
 - `pendingActionForCard`
   - Captured Mentat Agent and Reveal choices
   - Bene Gesserit Operative Agent spy placement
@@ -33,7 +32,7 @@ Unsupported spec shapes, including triggers, intentionally throw instead of fall
 
 ## Next Primitive Candidates
 
-1. Agent immediate gains: recruit troops, draw Intrigue, gain resources or draw cards with non-self routing.
+1. Agent immediate gains: draw Intrigue, gain resources or draw cards with non-self routing.
 2. Agent spy primitives: place spy, optional place spy, recall-for-supply, shared post placement, restricted post icon.
 3. Costs and choices: pay resource, optional pay, discard/trash selected card, lose Influence.
 4. Routing: self versus activated Ally, Commander personal board influence, team-shared Influence checks.

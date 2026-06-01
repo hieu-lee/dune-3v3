@@ -90,11 +90,14 @@ export async function runLeaderCharacterChoicesSmoke({
   before = await currentGame(page);
   ownerBefore = before.players.find((player) => player.id === "p5");
   await page.locator(".pending-panel").getByRole("button", { name: /Spend 1 water: repeat Expedition/ }).click();
+  await page.waitForFunction(() => window.__DUNE_DEBUG__?.getGame().pendingAction?.kind === "contract");
+  await page.locator(".pending-panel .contract-choice button").first().click();
   await waitForNoPending(page);
   after = await currentGame(page);
   ownerAfter = after.players.find((player) => player.id === "p5");
   assert.equal(ownerAfter.resources.water, ownerBefore.resources.water - 1, "Reverend Mother should spend 1 water");
-  assert.equal(ownerAfter.resources.solari, ownerBefore.resources.solari + 2, "Reverend Mother should apply Expedition rewards");
+  assert.equal(ownerAfter.resources.solari, ownerBefore.resources.solari, "Reverend Mother should not gain Expedition fallback Solari while contracts remain");
+  assert.equal(ownerAfter.contracts.length, ownerBefore.contracts.length + 1, "Reverend Mother should repeat Expedition's contract pending action");
 
   await setDebugGameAndWait(page, states.jessicaOtherMemories);
   pendingText = await page.locator(".pending-panel").innerText();

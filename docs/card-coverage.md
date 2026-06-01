@@ -15,6 +15,7 @@ These cards currently use typed reveal effect specs:
 These cards currently use typed Agent effect specs:
 
 - Reserve cards: Prepare The Way.
+- Emperor Commander cards: Devastating Assault.
 - Imperium cards: Maker Keeper, Northern Watermaster, Paracompass.
 
 ## Bespoke Automated Cards
@@ -23,7 +24,7 @@ These cards are automated but still rely on explicit card or leader branches whi
 
 - Imperium / reserve Agent effects: Captured Mentat, Bene Gesserit Operative.
 - Imperium / reserve Reveal choices: Captured Mentat, Calculus of Power.
-- Commander starter cards: Command Respect, Critical Shipments, Demand Attention, Demand Results, Desert Call, Devastating Assault, Imperial Tent, Corrino Might, Threaten Spice Production, Usul, Signet Rings.
+- Commander starter cards: Command Respect, Critical Shipments, Demand Attention, Demand Results, Desert Call, Devastating Assault Reveal payment, Imperial Tent, Corrino Might, Threaten Spice Production, Usul, Signet Rings.
 - Ally leader Signet Ring effects: Gurney Halleck, Lady Amber Metulli, Lady Jessica, Lady Margot Fenring, Princess Irulan, Reverend Mother Jessica, Staban Tuek.
 - Plot and Combat Intrigues: currently automated through pattern modules and card-specific branches, not effect specs.
 
@@ -43,8 +44,8 @@ The largest current gaps are Agent and choice primitives:
 
 - Costs: pay resources, discard card, trash card, lose Influence, recall spy, retreat troops.
 - Conditions: alliance, role/team, completed contracts outside reveal, combat participation.
-- Selectors: activated Ally, teammate, faction, board space, market card, reserve card, contract, hand/discard/play-area card.
-- Effects: recruit/deploy/retreat troops, gain/lose Influence, place/recall spy, acquire card, take/complete contract, trash/discard card, gain VP, remove Shield Wall, summon sandworm.
+- Selectors: activated Ally outside routed troop recruitment, teammate, faction, board space, market card, reserve card, contract, hand/discard/play-area card.
+- Effects: deploy/retreat troops, gain/lose Influence, place/recall spy, acquire card, take/complete contract, trash/discard card, gain VP, remove Shield Wall, summon sandworm.
 - Choices: optional effect, pay-or-skip, choose one, choose N, split Commander/Ally rewards.
 
 ## Verification

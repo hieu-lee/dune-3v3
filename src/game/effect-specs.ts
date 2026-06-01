@@ -4,6 +4,7 @@ import type {
   FactionId,
   GameEffectConditionSpec,
   GameEffectSpec,
+  PlayerSelector,
   ResourceId,
 } from "./types";
 
@@ -52,6 +53,14 @@ export function agentGainResource(
   conditions?: GameEffectConditionSpec[],
 ): CardEffectSpec {
   return agentPlayEffects([{ kind: "gain-resource", selector: "self", resource, amount }], conditions);
+}
+
+export function agentRecruitTroops(
+  selector: PlayerSelector,
+  amount: EffectAmountSpec,
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return agentPlayEffects([{ kind: "recruit-troops", selector, amount }], conditions);
 }
 
 export function visitedMakerSpace() {

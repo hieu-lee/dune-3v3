@@ -4,13 +4,12 @@ import {
   boardSpaceRewardApplies,
 } from "./board-rules";
 import {
-  isDevastatingAssaultCommanderCard,
   isGenericSignetRingCard,
   isMuadDibSignetRingCard,
   isShaddamSignetRingCard,
 } from "./card-identifiers";
 import { drawCards } from "./deck-utils";
-import { resolveCardEffects } from "./effect-resolver";
+import { resolveCardEffects, type GameEffectResult } from "./effect-resolver";
 import {
   gurneyHalleckLeaderName,
   ladyAmberMetulliLeaderName,
@@ -163,30 +162,6 @@ export function applyCardAgentEffect(
     };
   }
 
-  if (
-    isDevastatingAssaultCommanderCard(card) &&
-    sourcePlayer.team === "shaddam" &&
-    sourcePlayer.role === "Commander" &&
-    targetPlayer.team === sourcePlayer.team &&
-    targetPlayer.role === "Ally"
-  ) {
-    return {
-      source: {
-        ...sourcePlayer,
-        resources: {
-          ...sourcePlayer.resources,
-          solari: sourcePlayer.resources.solari + 1,
-        },
-      },
-      target: {
-        ...targetPlayer,
-        garrison: targetPlayer.garrison + 1,
-      },
-      log: `${sourcePlayer.leader} resolves ${card.name}: gains 1 Solari; ${targetPlayer.leader} recruits 1 troop.`,
-      recruitedTroops: 1,
-    };
-  }
-
   return { source: sourcePlayer, target: targetPlayer };
 }
 
@@ -212,46 +187,73 @@ function applyGenericCardAgentEffect(
   const result = resolveCardEffects([card], {
     trigger: "agent-play",
     source: sourcePlayer,
+    target: targetPlayer,
     state: state ? { ...state, players } : undefined,
   });
   if (result.persuasion > 0 || result.swords > 0) {
     throw new Error(`Unsupported Agent effect result for ${card.name}`);
   }
-  const hasResourceGain = Object.values(result.revealGain).some((amount) => (amount ?? 0) > 0);
-  if (result.cardsToDraw === 0 && !hasResourceGain) return undefined;
+  if (result.activatedAlly.cardsToDraw > 0) {
+    throw new Error(`Unsupported activated Ally draw result for ${card.name}`);
+  }
+  const recruitedTroops = result.recruitedTroops + result.activatedAlly.recruitedTroops;
+  const hasSourceResourceGain = hasResourceGain(result.revealGain);
+  const hasTargetResourceGain = hasResourceGain(result.activatedAlly.revealGain);
+  if (result.cardsToDraw === 0 && recruitedTroops === 0 && !hasSourceResourceGain && !hasTargetResourceGain) {
+    return undefined;
+  }
 
   let source = {
     ...sourcePlayer,
-    resources: {
-      ...sourcePlayer.resources,
-      solari: sourcePlayer.resources.solari + (result.revealGain.solari ?? 0),
-      spice: sourcePlayer.resources.spice + (result.revealGain.spice ?? 0),
-      water: sourcePlayer.resources.water + (result.revealGain.water ?? 0),
-    },
+    garrison: sourcePlayer.garrison + result.recruitedTroops,
+    resources: addResources(sourcePlayer.resources, result.revealGain),
+  };
+  let target = {
+    ...targetPlayer,
+    garrison: targetPlayer.garrison + result.activatedAlly.recruitedTroops,
+    resources: addResources(targetPlayer.resources, result.activatedAlly.revealGain),
   };
   const handBeforeDraw = source.hand.length;
   if (result.cardsToDraw > 0) {
     source = drawCards(source, source.hand.length + result.cardsToDraw);
   }
+  if (target.id === source.id) target = source;
   const cardsDrawn = source.hand.length - handBeforeDraw;
   return {
     source,
-    target: targetPlayer,
-    log: agentEffectLog(card, sourcePlayer, result.revealGain, result.cardsToDraw, cardsDrawn),
+    target,
+    log: agentEffectLog(card, sourcePlayer, targetPlayer, result, cardsDrawn),
+    recruitedTroops,
     sourceSpiceGained: result.revealGain.spice ?? 0,
+  };
+}
+
+function hasResourceGain(gain: Partial<Resources>) {
+  return Object.values(gain).some((amount) => (amount ?? 0) > 0);
+}
+
+function addResources(resources: Resources, gain: Partial<Resources>): Resources {
+  return {
+    ...resources,
+    solari: resources.solari + (gain.solari ?? 0),
+    spice: resources.spice + (gain.spice ?? 0),
+    water: resources.water + (gain.water ?? 0),
   };
 }
 
 function agentEffectLog(
   card: Card,
   sourcePlayer: Player,
-  gain: Partial<Resources>,
-  cardsToDraw: number,
+  targetPlayer: Player,
+  result: GameEffectResult,
   cardsDrawn: number,
 ) {
   const parts = [
-    resourceGainText(gain),
-    drawText(cardsToDraw, cardsDrawn),
+    resourceGainText(result.revealGain),
+    recruitText(undefined, result.recruitedTroops),
+    drawText(result.cardsToDraw, cardsDrawn),
+    playerResourceGainText(targetPlayer, result.activatedAlly.revealGain),
+    recruitText(targetPlayer.leader, result.activatedAlly.recruitedTroops),
   ].filter((part): part is string => Boolean(part));
   if (parts.length === 0) return undefined;
   return `${sourcePlayer.leader} resolves ${card.name}: ${parts.join("; ")}.`;
@@ -272,6 +274,16 @@ function resourceGainText(gain: Partial<Resources>) {
     resourceAmountText("water", gain.water),
   ].filter((part): part is string => Boolean(part));
   return parts.length > 0 ? `gains ${parts.join(" and ")}` : undefined;
+}
+
+function playerResourceGainText(player: Player, gain: Partial<Resources>) {
+  const text = resourceGainText(gain);
+  return text ? `${player.leader} ${text}` : undefined;
+}
+
+function recruitText(leader: string | undefined, amount: number) {
+  if (amount === 0) return undefined;
+  return `${leader ? `${leader} recruits` : "recruits"} ${amount} troop${amount === 1 ? "" : "s"}`;
 }
 
 function resourceAmountText(label: string, amount: number | undefined) {

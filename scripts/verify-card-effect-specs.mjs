@@ -79,6 +79,7 @@ try {
   const paracompass = data.imperiumDeck.find((card) => card.name === "Paracompass");
   const prepareTheWay = data.reserveMarket.find((card) => card.sourceId === 537);
   const limitedLandsraadAccess = data.muadDibCommanderCards.find((card) => card.name === "Limited Landsraad Access");
+  const devastatingAssault = data.emperorCommanderCards.find((card) => card.name === "Devastating Assault");
   const imperialOrnithopter = data.emperorCommanderCards.find((card) => card.name === "Imperial Ornithopter");
   const imperialBasin = data.boardSpaces.find((space) => space.id === "imperial-basin");
   const secrets = data.boardSpaces.find((space) => space.id === "secrets");
@@ -93,7 +94,7 @@ try {
     northernWatermaster &&
     paracompass,
   );
-  assert.ok(prepareTheWay && limitedLandsraadAccess && imperialOrnithopter);
+  assert.ok(prepareTheWay && limitedLandsraadAccess && devastatingAssault && imperialOrnithopter);
   assert.ok(imperialBasin && secrets && highCouncil);
   assert.equal(revealSpecCards.length, 31, "Unexpected number of cards with declarative Reveal specs");
   assert.deepEqual(
@@ -162,6 +163,23 @@ try {
       spec.effects.some((effect) => effect.kind === "gain-resource" && effect.resource === "solari" && effect.amount === 2)
     ),
     "Paracompass should carry a Solari Agent spec",
+  );
+  assert.ok(
+    devastatingAssault.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-resource" &&
+        effect.selector === "self" &&
+        effect.resource === "solari" &&
+        effect.amount === 1
+      ) &&
+      spec.effects.some((effect) =>
+        effect.kind === "recruit-troops" &&
+        effect.selector === "activated-ally" &&
+        effect.amount === 1
+      )
+    ),
+    "Devastating Assault should carry a routed Agent recruit spec",
   );
   for (const card of revealSpecCards) {
     assert.deepEqual(
@@ -508,6 +526,22 @@ try {
   );
   assert.deepEqual(paracompassEffect.source.resources, { solari: 2, spice: 0, water: 0 }, "Paracompass should gain 2 Agent Solari");
   assert.match(paracompassEffect.log ?? "", /Paracompass: gains 2 Solari/);
+  const devastatingAssaultEffect = state.applyCardAgentEffect(
+    devastatingAssault,
+    { ...p4, resources: { solari: 0, spice: 0, water: 0 } },
+    { ...p2, garrison: 0 },
+  );
+  assert.equal(devastatingAssaultEffect.source.resources.solari, 1, "Devastating Assault should gain 1 Agent Solari");
+  assert.equal(devastatingAssaultEffect.target.garrison, 1, "Devastating Assault should recruit 1 troop for the activated Ally");
+  assert.equal(devastatingAssaultEffect.recruitedTroops, 1, "Activated-Ally Agent recruits should be exposed for deployment limits");
+  assert.match(devastatingAssaultEffect.log ?? "", /Devastating Assault: gains 1 Solari; .* recruits 1 troop/);
+  const invalidDevastatingAssaultEffect = state.applyCardAgentEffect(
+    devastatingAssault,
+    { ...p4, resources: { solari: 0, spice: 0, water: 0 } },
+    p4,
+  );
+  assert.equal(invalidDevastatingAssaultEffect.source.resources.solari, 0, "Routed Agent specs should not partially apply without an activated Ally");
+  assert.equal(invalidDevastatingAssaultEffect.log, undefined, "Invalid routed Agent specs should not log");
 
   const manualCard = {
     ...convincingArgument,

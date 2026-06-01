@@ -294,6 +294,17 @@ export type PendingAction =
       optional?: boolean;
     }
   | {
+      kind: "captured-mentat";
+      ownerId: string;
+      influenceOwnerId?: string;
+      source: string;
+    }
+  | {
+      kind: "captured-mentat-reveal";
+      ownerId: string;
+      source: string;
+    }
+  | {
       kind: "maker-choice";
       ownerId: string;
       spiceOwnerId: string;

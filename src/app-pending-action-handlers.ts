@@ -19,6 +19,8 @@ import {
   recallSpyForPending,
   recallSpyForSupplyForPending,
   reinforceTroop,
+  resolveCapturedMentatRevealChoice,
+  resolveCapturedMentatChoice,
   resolveCommanderResourceSplitChoice,
   resolveCommandRespectTrade,
   resolveConflictTie,
@@ -40,6 +42,8 @@ import {
   resolveThreatenSpiceProductionChoice,
   scoreGurneyAlwaysSmiling,
   skipCommandRespect,
+  skipCapturedMentatReveal,
+  skipCapturedMentat,
   skipConflictVpConversion,
   skipControlDefenseTroop,
   skipCorrinoMight,
@@ -224,6 +228,18 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
       const recruitOwnerId = owner?.role === "Commander" ? activatedAllyIdFor(owner, current.players, commanderTargets) : undefined;
       return maybeStartCombatPhase(acquireCardForPending(current, pending, cardId, recruitOwnerId));
     });
+  const chooseCapturedMentat = (discardCardId: string, faction: FactionId) =>
+    runPending("captured-mentat", (current, pending) =>
+      maybeStartCombatPhase(resolveCapturedMentatChoice(current, pending, discardCardId, faction))
+    );
+  const skipCapturedMentatChoice = () =>
+    runPending("captured-mentat", (current, pending) => maybeStartCombatPhase(skipCapturedMentat(current, pending)));
+  const chooseCapturedMentatReveal = (faction: FactionId) =>
+    runPending("captured-mentat-reveal", (current, pending) =>
+      maybeStartCombatPhase(resolveCapturedMentatRevealChoice(current, pending, faction))
+    );
+  const skipCapturedMentatRevealChoice = () =>
+    runPending("captured-mentat-reveal", (current, pending) => maybeStartCombatPhase(skipCapturedMentatReveal(current, pending)));
   const collectContractFallback = () =>
     runPending("contract", (current, pending) => maybeStartCombatPhase(collectChoamContractFallback(current, pending)));
   const chooseConflictTieWinner = (winnerId?: string) =>
@@ -241,6 +257,8 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     acquirePendingCard,
     adjustRevealReward,
     adjustThreatenSpiceProduction,
+    chooseCapturedMentat,
+    chooseCapturedMentatReveal,
     chooseCommandRespectTrade,
     chooseCommanderResourceSplit,
     chooseConflictInfluence,
@@ -274,6 +292,8 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     recallSpy,
     recallSpyForSupply,
     reinforceOne,
+    skipCapturedMentatChoice,
+    skipCapturedMentatRevealChoice,
     skipCommandRespectChoice,
     skipControlDefense,
     skipConflictVpReward,

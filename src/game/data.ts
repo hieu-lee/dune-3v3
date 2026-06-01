@@ -1,6 +1,7 @@
 import catalogJson from "./uprising-catalog.generated.json";
 import {
   calculusOfPowerSourceId,
+  capturedMentatSourceId,
   interstellarTradeSourceId,
   prepareTheWaySourceId,
   smugglersHarvesterSourceId,
@@ -172,6 +173,9 @@ function imperiumRevealText(card: HubCard, persuasion: number, swords: number, p
   if (card.id === calculusOfPowerSourceId) {
     return "+2 persuasion. You may trash another Emperor card you have in play to add 3 strength.";
   }
+  if (card.id === capturedMentatSourceId) {
+    return "+1 persuasion. You may lose 1 Influence to draw 1 Intrigue.";
+  }
   return printedReveal ? "Resolve printed reveal text." : revealText(persuasion, swords);
 }
 
@@ -194,6 +198,26 @@ function toImperiumCard(card: HubCard): Card {
       sourceSlug: card.slug,
       sourceType: card.type,
       traits: ["Faction: Bene Gesserit"],
+    };
+  }
+  if (card.id === capturedMentatSourceId) {
+    return {
+      id: `hub-${card.id}`,
+      name: card.name,
+      icons: card.attributes.flatMap(([name]) => iconAttributeMap[name] ?? []),
+      persuasion: 1,
+      swords: 0,
+      conditionalPersuasion: false,
+      conditionalSwords: false,
+      play: "You may discard 1 card to gain 1 Influence and draw 1 card.",
+      reveal: imperiumRevealText(card, 1, 0, false),
+      cost: 5,
+      imagePath: card.localImagePath ?? card.fullImageUrl ?? undefined,
+      thumbnailPath: card.localThumbnailPath ?? card.thumbnailImageUrl ?? undefined,
+      sourceId: card.id,
+      sourceSlug: card.slug,
+      sourceType: card.type,
+      traits: card.attributes.map(([name]) => name),
     };
   }
   const persuasion = attributeNumber(card, "Persuasion on reveal");

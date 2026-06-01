@@ -1,6 +1,7 @@
 import { resolveInfluence } from "./agent-effects";
 import {
   canMoveCardToThroneRow,
+  isCapturedMentatCard,
   isCommandRespectCommanderCard,
   isCalculusOfPowerCard,
   isCorrinoMightCommanderCard,
@@ -18,6 +19,7 @@ import {
   canSummonSandworms,
   playerHasConflictUnits,
 } from "./conflict-rules";
+import { capturedMentatRevealInfluenceChoices } from "./captured-mentat-rules";
 import { playerTroopSupply } from "./deck-utils";
 import {
   feydRauthaLeaderName,
@@ -142,6 +144,18 @@ export function pendingActionForCard(
     state?.imperiumRow.some(canMoveCardToThroneRow)
   ) {
     return { kind: "throne-row", ownerId: source.id, source: card.name };
+  }
+  if (
+    isCapturedMentatCard(card) &&
+    source.hand.length > 0 &&
+    source.playArea.some((candidate) => candidate.id === card.id && isCapturedMentatCard(candidate))
+  ) {
+    return {
+      kind: "captured-mentat",
+      ownerId: source.id,
+      ...(source.role === "Commander" && target ? { influenceOwnerId: target.id } : {}),
+      source: card.name,
+    };
   }
   if (isUsulCommanderCard(card)) {
     return commanderResourceSplitPendingAction(card, source, target, "muaddib", [
@@ -495,6 +509,25 @@ export function pendingActionForDevastatingAssaultReveal(
   };
 }
 
+export function pendingActionForCapturedMentatReveal(
+  card: Card,
+  source: Player,
+): PendingAction | undefined {
+  if (
+    !isCapturedMentatCard(card) ||
+    !source.playArea.some((candidate) => candidate.id === card.id && isCapturedMentatCard(candidate)) ||
+    capturedMentatRevealInfluenceChoices(source).length === 0
+  ) {
+    return undefined;
+  }
+
+  return {
+    kind: "captured-mentat-reveal",
+    ownerId: source.id,
+    source: card.name,
+  };
+}
+
 export function pendingActionsForReveal(
   source: Player,
   state: GameState,
@@ -524,10 +557,21 @@ export function pendingActionsForReveal(
   const devastatingAssaultPending = revealedCards
     .map((card) => pendingActionForDevastatingAssaultReveal(card, source, state, combatRecipientId))
     .find((pending): pending is PendingAction => Boolean(pending));
+  const capturedMentatRevealPending = revealedCards
+    .map((card) => pendingActionForCapturedMentatReveal(card, source))
+    .find((pending): pending is PendingAction => Boolean(pending));
   const feydDeviousStrengthPending = pendingActionForFeydDeviousStrength(source, state, combatRecipientId);
   const amberDesertScoutsPending = pendingActionForLadyAmberDesertScouts(source);
 
-  return [revealAdjustPending, calculusOfPowerPending, devastatingAssaultPending, corrinoMightPending, feydDeviousStrengthPending, amberDesertScoutsPending].filter((action): action is PendingAction => Boolean(action));
+  return [
+    revealAdjustPending,
+    calculusOfPowerPending,
+    devastatingAssaultPending,
+    corrinoMightPending,
+    capturedMentatRevealPending,
+    feydDeviousStrengthPending,
+    amberDesertScoutsPending,
+  ].filter((action): action is PendingAction => Boolean(action));
 }
 
 function pendingActionForFeydDeviousStrength(

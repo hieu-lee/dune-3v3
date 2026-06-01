@@ -79,6 +79,44 @@ export async function runCardChoicesSmoke({
   assert.equal(ownerAfter.discard.at(-1).sourceId, 537, "Reserve acquire should take Prepare The Way");
   assert.ok(after.reserveMarket.some((card) => card.sourceId === 537), "Prepare The Way reserve should remain available");
 
+  await setDebugGameAndWait(page, states.capturedMentat);
+  pendingText = await page.locator(".pending-panel").innerText();
+  const capturedMentatDiscardName = states.capturedMentat.capturedMentatDiscardName;
+  const capturedMentatDiscardId = states.capturedMentat.capturedMentatDiscardId;
+  const capturedMentatDrawId = states.capturedMentat.capturedMentatDrawId;
+  assert.match(pendingText, /Captured Mentat/i);
+  assert.match(pendingText, new RegExp(escapeRegExp(capturedMentatDiscardName)));
+  assert.match(pendingText, /Bene Gesserit/i);
+  await screenshot(page, captures, "pending-captured-mentat.png");
+
+  before = await currentGame(page);
+  ownerBefore = before.players.find((player) => player.id === "p2");
+  await page.locator(".pending-panel").getByRole("button", { name: capturedMentatDiscardName }).click();
+  await page.locator(".pending-panel").getByRole("button", { name: "Bene Gesserit" }).click();
+  await page.locator(".pending-panel").getByRole("button", { name: "Resolve Captured Mentat" }).click();
+  await waitForNoPending(page);
+  after = await currentGame(page);
+  ownerAfter = after.players.find((player) => player.id === "p2");
+  assert.equal(ownerAfter.discard.at(-1).id, capturedMentatDiscardId, "Captured Mentat should discard the selected card");
+  assert.equal(ownerAfter.hand.at(-1).id, capturedMentatDrawId, "Captured Mentat should draw one deck card");
+  assert.equal(ownerAfter.influence.bene, ownerBefore.influence.bene + 1, "Captured Mentat should gain chosen Influence");
+
+  await setDebugGameAndWait(page, states.capturedMentatReveal);
+  pendingText = await page.locator(".pending-panel").innerText();
+  const capturedMentatIntrigueId = states.capturedMentatReveal.capturedMentatIntrigueId;
+  assert.match(pendingText, /Captured Mentat reveal/i);
+  assert.match(pendingText, /Bene Gesserit/i);
+  await screenshot(page, captures, "pending-captured-mentat-reveal.png");
+
+  before = await currentGame(page);
+  ownerBefore = before.players.find((player) => player.id === "p2");
+  await page.locator(".pending-panel").getByRole("button", { name: "Bene Gesserit" }).click();
+  await waitForNoPending(page);
+  after = await currentGame(page);
+  ownerAfter = after.players.find((player) => player.id === "p2");
+  assert.equal(ownerAfter.influence.bene, ownerBefore.influence.bene - 1, "Captured Mentat reveal should lose chosen Influence");
+  assert.equal(ownerAfter.intrigues.at(-1).id, capturedMentatIntrigueId, "Captured Mentat reveal should draw one Intrigue");
+
   await setDebugGameAndWait(page, states.acquireEmpty);
   pendingText = await page.locator(".pending-panel").innerText();
   assert.match(pendingText, /No eligible cards cost 99 or less/i);
@@ -86,6 +124,7 @@ export async function runCardChoicesSmoke({
 }
 
 async function createCardChoiceStates(server, initialPlayableGame) {
+  const data = await server.ssrLoadModule("/src/game/data.ts");
   const state = await server.ssrLoadModule("/src/game/state.ts");
   const game = initialPlayableGame(state);
   const ownerId = "p2";
@@ -95,6 +134,13 @@ async function createCardChoiceStates(server, initialPlayableGame) {
   assert.ok(game.imperiumRow[0], "Expected at least one Imperium Row card");
   const prepareTheWay = game.reserveMarket.find((card) => card.sourceId === 537);
   assert.ok(prepareTheWay, "Expected Prepare The Way reserve card");
+  const capturedMentat = data.imperiumDeck.find((card) => card.sourceId === 61);
+  assert.ok(capturedMentat, "Expected Captured Mentat Imperium card");
+  const capturedMentatDiscard = { ...data.allyStarterCards[0], id: "browser-captured-mentat-discard-card" };
+  const capturedMentatDraw = { ...data.imperiumDeck.find((card) => card.name === "Calculus of Power"), id: "browser-captured-mentat-draw-card" };
+  assert.ok(capturedMentatDraw.name, "Expected Captured Mentat draw card");
+  const capturedMentatIntrigue = { ...data.intrigueCards[0], id: "browser-captured-mentat-intrigue-card" };
+  assert.ok(capturedMentatIntrigue.name, "Expected Captured Mentat reveal Intrigue card");
 
   const base = {
     ...game,
@@ -146,6 +192,51 @@ async function createCardChoiceStates(server, initialPlayableGame) {
         minCost: prepareTheWay.cost,
         maxCost: prepareTheWay.cost,
         destination: "discard",
+      },
+    },
+    capturedMentat: {
+      ...base,
+      capturedMentatDiscardId: capturedMentatDiscard.id,
+      capturedMentatDiscardName: capturedMentatDiscard.name,
+      capturedMentatDrawId: capturedMentatDraw.id,
+      players: base.players.map((player) =>
+        player.id === ownerId
+          ? {
+              ...player,
+              deck: [capturedMentatDraw],
+              discard: [],
+              hand: [capturedMentatDiscard],
+              influence: { ...player.influence, bene: 0 },
+              playArea: [capturedMentat],
+            }
+          : player,
+      ),
+      pendingAction: {
+        kind: "captured-mentat",
+        ownerId,
+        source: "Captured Mentat",
+      },
+    },
+    capturedMentatReveal: {
+      ...base,
+      capturedMentatIntrigueId: capturedMentatIntrigue.id,
+      intrigueDeck: [capturedMentatIntrigue],
+      intrigueDiscard: [],
+      players: base.players.map((player) =>
+        player.id === ownerId
+          ? {
+              ...player,
+              hand: [],
+              influence: { ...player.influence, bene: 1 },
+              intrigues: [],
+              playArea: [capturedMentat],
+            }
+          : player,
+      ),
+      pendingAction: {
+        kind: "captured-mentat-reveal",
+        ownerId,
+        source: "Captured Mentat",
       },
     },
     acquireEmpty: {

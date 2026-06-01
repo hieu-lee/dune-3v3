@@ -156,6 +156,16 @@
   overflow-wrap: anywhere;
 }
 
+.captured-mentat-influence-column button {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.pending-controls button.selected,
+.pending-controls button[aria-pressed="true"] {
+  border-color: #f2b84b;
+  background: rgba(242, 184, 75, 0.18);
+}
+
 .resource-picker button.selected {
   border-color: #f2b84b;
   background: rgba(242, 184, 75, 0.18);

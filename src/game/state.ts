@@ -12,6 +12,12 @@ import {
   conflictDeploymentBlockedForOwner,
 } from "./conflict-rules";
 import {
+  resolveCapturedMentatRevealChoice as resolveCapturedMentatRevealChoiceForPending,
+  resolveCapturedMentatChoice as resolveCapturedMentatChoiceForPending,
+  skipCapturedMentatReveal as resolveSkipCapturedMentatReveal,
+  skipCapturedMentat as resolveSkipCapturedMentat,
+} from "./captured-mentat-rules";
+import {
   playerTroopSupply,
 } from "./deck-utils";
 import {
@@ -64,6 +70,7 @@ import {
   startNextRound,
 } from "./round-transition-rules";
 import type {
+  FactionId,
   GameState,
   PendingAction,
   ResourceId,
@@ -144,6 +151,12 @@ export {
 } from "./conflict-rules";
 
 export {
+  capturedMentatDiscardChoices,
+  capturedMentatInfluenceChoices,
+  capturedMentatRevealInfluenceChoices,
+} from "./captured-mentat-rules";
+
+export {
   buyAccessPairChoices,
   changeAllegiancesGainChoices,
   imperiumPoliticsFactionChoices,
@@ -181,6 +194,7 @@ export {
   devastatingAssaultCost,
   devastatingAssaultStrength,
   pendingActionForCard,
+  pendingActionForCapturedMentatReveal,
   pendingActionForCorrinoMightReveal,
   pendingActionForDevastatingAssaultReveal,
   pendingActionForJessicaOtherMemories,
@@ -389,6 +403,7 @@ export {
   isBackedByChoamIntrigue,
   isBuyAccessIntrigue,
   isCalculusOfPowerCard,
+  isCapturedMentatCard,
   isCallToArmsIntrigue,
   isChangeAllegiancesIntrigue,
   isCommandRespectCommanderCard,
@@ -475,6 +490,8 @@ type StabanUnseenNetworkPendingAction = Extract<PendingAction, { kind: "staban-u
 type RevealAdjustPendingAction = Extract<PendingAction, { kind: "reveal-adjust" }>;
 type CommanderResourceSplitPendingAction = Extract<PendingAction, { kind: "commander-resource-split" }>;
 type TrashCardPendingAction = Extract<PendingAction, { kind: "trash-card" }>;
+type CapturedMentatPendingAction = Extract<PendingAction, { kind: "captured-mentat" }>;
+type CapturedMentatRevealPendingAction = Extract<PendingAction, { kind: "captured-mentat-reveal" }>;
 
 export function takeChoamContract(state: GameState, pending: ContractPendingAction, contractId: string): GameState {
   return continueAfterResolvedConflictReward(
@@ -508,6 +525,35 @@ export function trashPlayerCard(
 
 export function skipTrashCard(state: GameState, pending: TrashCardPendingAction): GameState {
   return continueAfterResolvedConflictReward(resolveSkipTrashCard(state, pending));
+}
+
+export function resolveCapturedMentatChoice(
+  state: GameState,
+  pending: CapturedMentatPendingAction,
+  discardCardId: string,
+  faction: FactionId,
+): GameState {
+  return continueAfterResolvedConflictReward(
+    resolveCapturedMentatChoiceForPending(state, pending, discardCardId, faction),
+  );
+}
+
+export function skipCapturedMentat(state: GameState, pending: CapturedMentatPendingAction): GameState {
+  return continueAfterResolvedConflictReward(resolveSkipCapturedMentat(state, pending));
+}
+
+export function resolveCapturedMentatRevealChoice(
+  state: GameState,
+  pending: CapturedMentatRevealPendingAction,
+  faction: FactionId,
+): GameState {
+  return continueAfterResolvedConflictReward(
+    resolveCapturedMentatRevealChoiceForPending(state, pending, faction),
+  );
+}
+
+export function skipCapturedMentatReveal(state: GameState, pending: CapturedMentatRevealPendingAction): GameState {
+  return continueAfterResolvedConflictReward(resolveSkipCapturedMentatReveal(state, pending));
 }
 
 export function placeSpyForPending(

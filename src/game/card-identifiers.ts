@@ -53,6 +53,7 @@ export const devastatingAssaultSourceId = 559;
 export const smugglersHarvesterSourceId = 17;
 export const interstellarTradeSourceId = 184;
 export const calculusOfPowerSourceId = 42;
+export const capturedMentatSourceId = 61;
 
 export const shadowAllianceFactions: FactionId[] = [
   "emperor",
@@ -201,6 +202,10 @@ export function isFremenCard(card: Card) {
 
 export function isPrepareTheWayCard(card: Card) {
   return card.sourceId === prepareTheWaySourceId || card.name === "Prepare The Way";
+}
+
+export function isCapturedMentatCard(card: Card) {
+  return card.sourceId === capturedMentatSourceId || card.name === "Captured Mentat";
 }
 
 export function canMoveCardToThroneRow(card: Card) {

@@ -65,6 +65,15 @@ try {
     "Calculus of Power should use structured optional trash strength instead of manual printed reveal handling",
   );
   assert.match(calculus.reveal, /another Emperor card/, "Calculus of Power should describe its structured Reveal trash text");
+  const capturedMentat = data.imperiumDeck.find((card) => card.name === "Captured Mentat");
+  assert.ok(capturedMentat, "Imperium deck should include Captured Mentat");
+  assert.equal(state.isCapturedMentatCard(capturedMentat), true, "Captured Mentat should be recognized");
+  assert.equal(capturedMentat.cost, 5, "Captured Mentat should cost 5 persuasion");
+  assert.deepEqual(capturedMentat.icons, ["landsraad", "spice"], "Captured Mentat should reach Landsraad and Spice Trade spaces");
+  assert.equal(capturedMentat.persuasion, 1, "Captured Mentat should reveal for 1 persuasion");
+  assert.equal(capturedMentat.conditionalPersuasion, false, "Captured Mentat should not need manual persuasion entry");
+  assert.match(capturedMentat.play, /discard 1 card.*gain 1 Influence.*draw 1 card/i);
+  assert.match(capturedMentat.reveal, /lose 1 Influence.*draw 1 Intrigue/i);
   const prepareTheWay = data.reserveMarket.find((card) => card.sourceId === 537);
   assert.ok(prepareTheWay, "Reserve market should include Prepare The Way");
   assert.equal(state.isPrepareTheWayCard(prepareTheWay), true, "Prepare The Way should be recognized");
@@ -92,6 +101,8 @@ try {
   assert.ok(imperialBasin?.maker, "Imperial Basin should be a Maker board space");
   const carthag = data.boardSpaces.find((space) => space.id === "carthag");
   assert.ok(carthag, "Carthag should exist for Prepare The Way Agent coverage");
+  const highCouncil = data.boardSpaces.find((space) => space.id === "high-council");
+  assert.ok(highCouncil, "High Council should exist for Captured Mentat Agent coverage");
   const p2 = playerById(game, "p2");
   const p4 = playerById(game, "p4");
   const dune = [...p2.hand, ...p2.deck, ...p2.discard].find((card) => card.name === "Dune, The Desert Planet");
@@ -156,6 +167,222 @@ try {
     false,
     "Prepare The Way should not log a draw when the threshold is unmet",
   );
+
+  const capturedDiscardCard = { ...dune, id: "captured-mentat-discard-card" };
+  const capturedDrawCard = { ...calculusTrashTarget, id: "captured-mentat-draw-card" };
+  const capturedMentatFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 1,
+    deck: [capturedDrawCard],
+    discard: [],
+    hand: [capturedMentat, capturedDiscardCard],
+    influence: { emperor: 0, spacing: 0, bene: 0, fremen: 0, greatHouses: 0, fringeWorlds: 0 },
+    playArea: [],
+    resources: { solari: 6, spice: 0, water: 0 },
+    vp: 0,
+  }));
+  assert.equal(
+    state.pendingActionForCard(capturedMentat, playerById(capturedMentatFixture, p2.id), capturedMentatFixture),
+    undefined,
+    "Captured Mentat should only queue from play",
+  );
+  const capturedMentatPlayed = turnActions.placeAgentAction(capturedMentatFixture, {
+    commanderTargets: {},
+    selectedCard: capturedMentat,
+    selectedSpace: highCouncil,
+  });
+  assert.equal(capturedMentatPlayed.pendingAction?.kind, "captured-mentat", "Captured Mentat should queue its Agent choice");
+  assert.equal(capturedMentatPlayed.pendingAction.ownerId, p2.id);
+  assert.deepEqual(
+    state.capturedMentatDiscardChoices(playerById(capturedMentatPlayed, p2.id), capturedMentatPlayed.pendingAction).map((card) => card.id),
+    [capturedDiscardCard.id],
+    "Captured Mentat should discard from the remaining hand",
+  );
+  assert.deepEqual(
+    state.capturedMentatInfluenceChoices(playerById(capturedMentatPlayed, p2.id)),
+    ["greatHouses", "spacing", "bene", "fringeWorlds"],
+    "Ally Captured Mentat should choose among main-board Influence tracks",
+  );
+  assert.equal(
+    state.resolveCapturedMentatChoice(capturedMentatPlayed, capturedMentatPlayed.pendingAction, "missing-card", "bene"),
+    capturedMentatPlayed,
+    "Captured Mentat should reject missing discard cards",
+  );
+  assert.equal(
+    state.resolveCapturedMentatChoice(capturedMentatPlayed, capturedMentatPlayed.pendingAction, capturedDiscardCard.id, "emperor"),
+    capturedMentatPlayed,
+    "Captured Mentat should reject invalid Influence choices",
+  );
+  const capturedMentatResolved = state.resolveCapturedMentatChoice(
+    capturedMentatPlayed,
+    capturedMentatPlayed.pendingAction,
+    capturedDiscardCard.id,
+    "bene",
+  );
+  assert.equal(capturedMentatResolved.pendingAction, undefined);
+  assert.deepEqual(playerById(capturedMentatResolved, p2.id).hand.map((card) => card.id), [capturedDrawCard.id]);
+  assert.equal(playerById(capturedMentatResolved, p2.id).discard.at(-1).id, capturedDiscardCard.id);
+  assert.equal(playerById(capturedMentatResolved, p2.id).influence.bene, 1);
+  assert.ok(capturedMentatResolved.log.some((entry) => /Captured Mentat: discards .* gains 1 Bene Gesserit Influence.*draws 1 card/.test(entry)));
+  const capturedMentatSkipped = state.skipCapturedMentat(capturedMentatPlayed, capturedMentatPlayed.pendingAction);
+  assert.equal(capturedMentatSkipped.pendingAction, undefined);
+  assert.deepEqual(playerById(capturedMentatSkipped, p2.id).hand.map((card) => card.id), [capturedDiscardCard.id]);
+  assert.equal(playerById(capturedMentatSkipped, p2.id).influence.bene, 0);
+
+  const capturedMentatNoDiscard = turnActions.placeAgentAction(
+    withActivePlayer(game, p2.id, () => ({
+      agentsReady: 1,
+      deck: [capturedDrawCard],
+      discard: [],
+      hand: [capturedMentat],
+      playArea: [],
+      resources: { solari: 6, spice: 0, water: 0 },
+    })),
+    { commanderTargets: {}, selectedCard: capturedMentat, selectedSpace: highCouncil },
+  );
+  assert.equal(capturedMentatNoDiscard.pendingAction, undefined, "Captured Mentat should not pause without a card to discard");
+
+  const commanderCapturedDiscard = { ...dune, id: "commander-captured-mentat-discard-card" };
+  const commanderCapturedDraw = { ...calculusTrashTarget, id: "commander-captured-mentat-draw-card" };
+  const commanderCapturedBase = withActivePlayer(game, p4.id, (player) => ({
+    agentsReady: 1,
+    deck: [commanderCapturedDraw],
+    discard: [],
+    hand: [capturedMentat, commanderCapturedDiscard],
+    influence: { ...player.influence, emperor: 0, greatHouses: 0 },
+    playArea: [],
+    resources: { solari: 6, spice: 0, water: 0 },
+    vp: 0,
+  }));
+  const commanderCapturedFixture = {
+    ...commanderCapturedBase,
+    players: commanderCapturedBase.players.map((player) =>
+      player.id === p2.id
+        ? { ...player, influence: { ...player.influence, greatHouses: 0 }, vp: 0 }
+        : player,
+    ),
+  };
+  const commanderCapturedPlayed = turnActions.placeAgentAction(commanderCapturedFixture, {
+    commanderTargets: { [p4.id]: p2.id },
+    selectedCard: capturedMentat,
+    selectedSpace: highCouncil,
+  });
+  assert.deepEqual(
+    state.capturedMentatInfluenceChoices(playerById(commanderCapturedPlayed, p4.id)),
+    ["emperor", "greatHouses", "spacing", "bene", "fringeWorlds"],
+    "Shaddam Captured Mentat should include personal Emperor and main-board Influence choices",
+  );
+  assert.equal(commanderCapturedPlayed.pendingAction.influenceOwnerId, p2.id);
+  const commanderCapturedResolved = state.resolveCapturedMentatChoice(
+    commanderCapturedPlayed,
+    commanderCapturedPlayed.pendingAction,
+    commanderCapturedDiscard.id,
+    "greatHouses",
+  );
+  assert.equal(playerById(commanderCapturedResolved, p2.id).influence.greatHouses, 1);
+  assert.equal(playerById(commanderCapturedResolved, p4.id).influence.greatHouses, 0);
+  assert.deepEqual(playerById(commanderCapturedResolved, p4.id).hand.map((card) => card.id), [commanderCapturedDraw.id]);
+  assert.equal(playerById(commanderCapturedResolved, p2.id).hand.length, playerById(commanderCapturedPlayed, p2.id).hand.length);
+
+  const capturedMentatIntrigue = { ...data.intrigueCards[0], id: "captured-mentat-intrigue-draw" };
+  const capturedMentatRevealBase = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 0,
+    discard: [],
+    hand: [capturedMentat],
+    influence: { emperor: 0, spacing: 0, bene: 2, fremen: 0, greatHouses: 0, fringeWorlds: 0 },
+    intrigues: [],
+    playArea: [],
+    persuasion: 0,
+    resources: { solari: 0, spice: 0, water: 0 },
+    vp: 1,
+  }));
+  const capturedMentatRevealFixture = {
+    ...capturedMentatRevealBase,
+    intrigueDeck: [capturedMentatIntrigue],
+    intrigueDiscard: [],
+  };
+  const capturedMentatRevealPlan = turnActions.revealTurnPlan(
+    playerById(capturedMentatRevealFixture, p2.id),
+    capturedMentatRevealFixture,
+  );
+  assert.equal(capturedMentatRevealPlan.persuasion, 1, "Captured Mentat should reveal for 1 persuasion");
+  assert.deepEqual(
+    capturedMentatRevealPlan.printedRevealCards,
+    [],
+    "Captured Mentat reveal should use structured Influence-for-Intrigue handling",
+  );
+  const capturedMentatRevealed = turnActions.revealTurnAction(capturedMentatRevealFixture, {
+    commanderTargets: {},
+    revealPlan: capturedMentatRevealPlan,
+  });
+  assert.equal(capturedMentatRevealed.pendingAction?.kind, "captured-mentat-reveal");
+  assert.deepEqual(
+    state.capturedMentatRevealInfluenceChoices(playerById(capturedMentatRevealed, p2.id)),
+    ["bene"],
+    "Captured Mentat reveal should expose positive Influence tracks",
+  );
+  assert.equal(
+    state.resolveCapturedMentatRevealChoice(capturedMentatRevealed, capturedMentatRevealed.pendingAction, "emperor"),
+    capturedMentatRevealed,
+    "Captured Mentat reveal should reject Influence tracks the player cannot lose",
+  );
+  const capturedMentatRevealResolved = state.resolveCapturedMentatRevealChoice(
+    capturedMentatRevealed,
+    capturedMentatRevealed.pendingAction,
+    "bene",
+  );
+  assert.equal(capturedMentatRevealResolved.pendingAction, undefined);
+  assert.equal(playerById(capturedMentatRevealResolved, p2.id).influence.bene, 1);
+  assert.equal(playerById(capturedMentatRevealResolved, p2.id).vp, 0, "Captured Mentat reveal should lose Influence threshold VP");
+  assert.equal(playerById(capturedMentatRevealResolved, p2.id).intrigues.at(-1).id, capturedMentatIntrigue.id);
+  const capturedMentatRevealSkipped = state.skipCapturedMentatReveal(capturedMentatRevealed, capturedMentatRevealed.pendingAction);
+  assert.equal(capturedMentatRevealSkipped.pendingAction, undefined);
+  assert.equal(playerById(capturedMentatRevealSkipped, p2.id).influence.bene, 2);
+  assert.equal(playerById(capturedMentatRevealSkipped, p2.id).intrigues.length, 0);
+
+  const commanderCapturedMentatIntrigue = { ...data.intrigueCards[1], id: "commander-captured-mentat-intrigue-draw" };
+  const commanderCapturedRevealBase = withActivePlayer(game, p4.id, (player) => ({
+    agentsReady: 0,
+    discard: [],
+    hand: [capturedMentat],
+    influence: { ...player.influence, emperor: 2, greatHouses: 0 },
+    intrigues: [],
+    playArea: [],
+    persuasion: 0,
+    resources: { solari: 0, spice: 0, water: 0 },
+    vp: 1,
+  }));
+  const commanderCapturedRevealFixture = {
+    ...commanderCapturedRevealBase,
+    intrigueDeck: [commanderCapturedMentatIntrigue],
+    intrigueDiscard: [],
+    players: commanderCapturedRevealBase.players.map((player) =>
+      player.id === p2.id
+        ? { ...player, influence: { ...player.influence, greatHouses: 2 }, vp: 1 }
+        : player,
+    ),
+  };
+  const commanderCapturedRevealPlan = turnActions.revealTurnPlan(
+    playerById(commanderCapturedRevealFixture, p4.id),
+    commanderCapturedRevealFixture,
+  );
+  const commanderCapturedRevealed = turnActions.revealTurnAction(commanderCapturedRevealFixture, {
+    commanderTargets: { [p4.id]: p2.id },
+    revealPlan: commanderCapturedRevealPlan,
+  });
+  assert.deepEqual(
+    state.capturedMentatRevealInfluenceChoices(playerById(commanderCapturedRevealed, p4.id)),
+    ["emperor"],
+    "Commander Captured Mentat reveal should expose only personal Influence",
+  );
+  const commanderCapturedRevealResolved = state.resolveCapturedMentatRevealChoice(
+    commanderCapturedRevealed,
+    commanderCapturedRevealed.pendingAction,
+    "emperor",
+  );
+  assert.equal(playerById(commanderCapturedRevealResolved, p4.id).influence.emperor, 1);
+  assert.equal(playerById(commanderCapturedRevealResolved, p4.id).intrigues.at(-1).id, commanderCapturedMentatIntrigue.id);
+  assert.equal(playerById(commanderCapturedRevealResolved, p2.id).influence.greatHouses, 2);
+  assert.equal(playerById(commanderCapturedRevealResolved, p2.id).intrigues.length, playerById(commanderCapturedRevealed, p2.id).intrigues.length);
 
   const commanderPrepareDrawCard = { ...calculusTrashTarget, id: "commander-prepare-way-draw-target" };
   const commanderPrepareBase = withActivePlayer(game, p4.id, (player) => ({

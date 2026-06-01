@@ -25,6 +25,7 @@
     "verify:board-requirements": "node scripts/verify-board-requirements.mjs",
     "verify:board-rules": "node scripts/verify-board-rules.mjs",
     "verify:board-spaces": "node scripts/verify-board-spaces.mjs",
+    "verify:card-effect-specs": "node scripts/verify-card-effect-specs.mjs",
     "verify:combat-intrigues": "node scripts/verify-combat-intrigues.mjs",
     "verify:conflict-awards": "node scripts/verify-conflict-awards.mjs",
     "verify:contracts": "node scripts/verify-contracts.mjs",

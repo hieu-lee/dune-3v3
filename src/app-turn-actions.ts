@@ -3,7 +3,6 @@ import {
   boardSpaceIntrigueGainFor,
   boardSpaceSpiceGainFor,
   revealGainLabel,
-  revealPersuasionFor,
 } from "./app-helpers";
 import {
   applyBoardEffect,
@@ -22,7 +21,6 @@ import {
   pendingActionsForReveal,
   playerHasConflictUnits,
   queuePendingActions,
-  hasVisitedMakerSpaceThisRound,
   recordRoundMakerSpaceVisit,
   recordTurnSpiceGain,
   resolveLeaderInfluenceThresholdRewards,
@@ -30,19 +28,13 @@ import {
   resolveStabanSmuggleSpice,
   scoreGurneyAlwaysSmiling,
 } from "./game/state";
-import {
-  isBeneGesseritOperativeCard,
-  isInterstellarTradeCard,
-  isSmugglersHarvesterCard,
-} from "./game/card-identifiers";
-import { spyPostCount } from "./game/spy-posts";
+import { resolveCardRevealEffects } from "./game/effect-resolver";
 import type {
   BoardSpace,
   Card,
   GameState,
   PendingAction,
   Player,
-  ResourceId,
   Resources,
 } from "./game/types";
 
@@ -215,26 +207,11 @@ export function revealTurnPlan(
   activePlayer: Player,
   state?: Pick<GameState, "roundMakerSpaceVisits" | "spyPosts" | "sharedSpyPosts">,
 ): RevealTurnPlan {
-  const interstellarTradePersuasion = activePlayer.hand
-    .filter(isInterstellarTradeCard)
-    .reduce((sum) => sum + activePlayer.contracts.filter((contract) => contract.completed).length, 0);
-  const beneGesseritOperativePersuasion = state && spyPostCount(state, activePlayer.id) >= 2
-    ? activePlayer.hand.filter(isBeneGesseritOperativeCard).length * 2
-    : 0;
-  const persuasion = revealPersuasionFor(activePlayer) + interstellarTradePersuasion + beneGesseritOperativePersuasion;
-  const swords = activePlayer.hand.reduce((sum, card) => sum + card.swords, 0) + (activePlayer.swordmasterBonus ? 2 : 0);
-  const revealGain = activePlayer.hand.reduce<Partial<Resources>>((gain, card) => {
-    Object.entries(card.revealGain ?? {}).forEach(([resource, amount]) => {
-      gain[resource as ResourceId] = (gain[resource as ResourceId] ?? 0) + (amount ?? 0);
-    });
-    return gain;
-  }, {});
-  const smugglersHarvesterCount = state && hasVisitedMakerSpaceThisRound(state, activePlayer.id)
-    ? activePlayer.hand.filter(isSmugglersHarvesterCard).length
-    : 0;
-  if (smugglersHarvesterCount > 0) {
-    revealGain.spice = (revealGain.spice ?? 0) + smugglersHarvesterCount;
-  }
+  const effectResult = resolveCardRevealEffects(activePlayer.hand, activePlayer, state);
+  const highCouncilPersuasion = activePlayer.highCouncilSeat ? 2 : 0;
+  const persuasion = effectResult.persuasion + highCouncilPersuasion;
+  const swords = effectResult.swords + (activePlayer.swordmasterBonus ? 2 : 0);
+  const revealGain = effectResult.revealGain;
   const printedRevealCards = activePlayer.hand
     .filter((card) => card.conditionalPersuasion || card.conditionalSwords)
     .map((card) => card.name);

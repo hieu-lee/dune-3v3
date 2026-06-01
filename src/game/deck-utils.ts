@@ -1,3 +1,4 @@
+import { cloneCardEffects } from "./effect-specs";
 import type { Card, ConflictCard, ContractCard, IntrigueCard, ObjectiveCard, Player } from "./types";
 
 const playerTroopPieceCount = 12;
@@ -6,6 +7,7 @@ export function cloneCards(cards: Card[]) {
   return cards.map((card) => ({
     ...card,
     icons: [...card.icons],
+    effects: cloneCardEffects(card.effects),
     revealGain: card.revealGain ? { ...card.revealGain } : undefined,
     traits: card.traits ? [...card.traits] : undefined,
   }));

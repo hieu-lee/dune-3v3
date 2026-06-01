@@ -1,4 +1,5 @@
 import { CircleDollarSign, Droplets, Eye, Sparkles, type LucideIcon } from "lucide-react";
+import { resolveCardRevealEffects } from "./game/effect-resolver";
 import { boardSpaceRewardApplies } from "./game/state";
 import type {
   BoardSpace,
@@ -57,9 +58,9 @@ export function selectedFactionChoice(selected: FactionId | undefined, choices: 
   return selected && choices.includes(selected) ? selected : choices[0];
 }
 
-export function revealPersuasionFor(player: Player) {
+export function revealPersuasionFor(player: Player, state?: Pick<GameState, "roundMakerSpaceVisits" | "sharedSpyPosts" | "spyPosts">) {
   const highCouncilPersuasion = player.highCouncilSeat ? 2 : 0;
-  return player.hand.reduce((sum, card) => sum + card.persuasion, 0) + highCouncilPersuasion;
+  return resolveCardRevealEffects(player.hand, player, state).persuasion + highCouncilPersuasion;
 }
 
 export function boardSpaceIntrigueGainFor(space: BoardSpace, player: Player) {

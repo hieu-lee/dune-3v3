@@ -8,6 +8,12 @@ import {
   smugglersHarvesterSourceId,
   spiceMustFlowSourceId,
 } from "./card-identifiers";
+import {
+  hasSpyPosts,
+  revealGainPersuasion,
+  revealGainResource,
+  visitedMakerSpace,
+} from "./effect-specs";
 import type {
   BattleIconId,
   BoardSpace,
@@ -18,6 +24,7 @@ import type {
   IconId,
   IntrigueCard,
   LeaderCard,
+  CardEffectSpec,
 } from "./types";
 export {
   battleIconLabels,
@@ -183,6 +190,25 @@ function imperiumRevealText(card: HubCard, persuasion: number, swords: number, p
   return printedReveal ? "Resolve printed reveal text." : revealText(persuasion, swords);
 }
 
+function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
+  if (card.id === smugglersHarvesterSourceId) {
+    return [
+      revealGainPersuasion(1),
+      revealGainResource("spice", 1, [visitedMakerSpace()]),
+    ];
+  }
+  if (card.id === interstellarTradeSourceId) {
+    return [revealGainPersuasion({ kind: "completed-contracts" })];
+  }
+  if (card.id === beneGesseritOperativeSourceId) {
+    return [
+      revealGainPersuasion(1),
+      revealGainPersuasion(2, [hasSpyPosts(2)]),
+    ];
+  }
+  return undefined;
+}
+
 function toImperiumCard(card: HubCard): Card {
   if (card.id === prepareTheWaySourceId) {
     return {
@@ -193,6 +219,7 @@ function toImperiumCard(card: HubCard): Card {
       swords: 0,
       conditionalPersuasion: false,
       conditionalSwords: false,
+      effects: [revealGainPersuasion(2)],
       play: "If you have 2 or more Bene Gesserit Influence, draw 1 card.",
       reveal: "+2 persuasion.",
       cost: 2,
@@ -233,6 +260,7 @@ function toImperiumCard(card: HubCard): Card {
       swords: 0,
       conditionalPersuasion: false,
       conditionalSwords: false,
+      effects: imperiumCardEffects(card),
       play: "Place 1 spy.",
       reveal: imperiumRevealText(card, 1, 0, false),
       cost: 3,
@@ -246,6 +274,7 @@ function toImperiumCard(card: HubCard): Card {
   }
   const persuasion = attributeNumber(card, "Persuasion on reveal");
   const swords = attributeNumber(card, "Swords");
+  const effects = imperiumCardEffects(card);
   const automatedContractPersuasion = card.id === interstellarTradeSourceId;
   const automatedConditionalSwords = card.id === calculusOfPowerSourceId;
   const conditionalPersuasion =
@@ -260,6 +289,7 @@ function toImperiumCard(card: HubCard): Card {
     swords,
     conditionalPersuasion,
     conditionalSwords,
+    effects,
     play: summarizeAttributes(card),
     reveal: imperiumRevealText(card, persuasion, swords, conditionalPersuasion || conditionalSwords),
     cost: attributeNumber(card, "Persuasion cost"),

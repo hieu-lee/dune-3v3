@@ -32,6 +32,14 @@ export function starterCard(data, index) {
   return {
     ...card,
     icons: [...card.icons],
+    effects: card.effects ? card.effects.map((spec) => ({
+      ...spec,
+      conditions: spec.conditions?.map((condition) => ({ ...condition })),
+      effects: spec.effects.map((effect) => ({
+        ...effect,
+        amount: typeof effect.amount === "number" ? effect.amount : { ...effect.amount },
+      })),
+    })) : undefined,
     revealGain: card.revealGain ? { ...card.revealGain } : undefined,
     traits: card.traits ? [...card.traits] : undefined,
   };

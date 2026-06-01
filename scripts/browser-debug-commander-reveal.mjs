@@ -106,6 +106,7 @@ export async function runCommanderRevealSmoke({
 async function createCommanderRevealState(server, initialPlayableGame) {
   const data = await server.ssrLoadModule("/src/game/data.ts");
   const state = await server.ssrLoadModule("/src/game/state.ts");
+  const turnActions = await server.ssrLoadModule("/src/app-turn-actions.ts");
   const game = initialPlayableGame(state);
   const activeSeat = game.players.findIndex((player) => player.id === "p1");
   assert.ok(activeSeat >= 0, "Expected Muad'Dib Commander in browser debug game");
@@ -113,7 +114,7 @@ async function createCommanderRevealState(server, initialPlayableGame) {
   const callToArms = intrigueBySourceId(data, 138);
   const hand = ["Convincing Argument", "Usul", "Demand Attention", "Desert Call"]
     .map((name) => commanderStarterByName(data, name));
-  const persuasion = hand.reduce((sum, card) => sum + card.persuasion, 0);
+  const persuasion = turnActions.revealTurnPlan({ ...game.players[activeSeat], hand }).persuasion;
   const marketCard = data.imperiumDeck.find((card) => (card.cost ?? 99) > 0 && (card.cost ?? 99) <= persuasion);
   assert.ok(marketCard, `Expected an Imperium Row card costing ${persuasion} or less`);
   const replacement = data.imperiumDeck.find((card) => card.id !== marketCard.id);

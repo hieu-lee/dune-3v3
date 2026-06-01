@@ -21,6 +21,37 @@ export type ResourceId = "solari" | "spice" | "water";
 export type CriticalLocationId = "arrakeen" | "spice-refinery" | "imperial-basin";
 export type BattleIconId = "crysknife" | "desertMouse" | "ornithopter";
 export type ConflictBattleIconId = BattleIconId | "wild";
+export type GameEffectTrigger =
+  | "agent-play"
+  | "reveal"
+  | "acquire"
+  | "plot-intrigue"
+  | "combat-intrigue"
+  | "conflict-reward"
+  | "endgame"
+  | "round-start"
+  | "round-end";
+export type PlayerSelector =
+  | "self"
+  | "activated-ally"
+  | "teammate"
+  | "opponent"
+  | "combat-participant";
+export type EffectAmountSpec =
+  | number
+  | { kind: "completed-contracts"; multiplier?: number };
+export type GameEffectConditionSpec =
+  | { kind: "visited-maker-space" }
+  | { kind: "has-spy-posts"; count: number };
+export type GameEffectSpec =
+  | { kind: "gain-resource"; selector: PlayerSelector; resource: ResourceId; amount: EffectAmountSpec }
+  | { kind: "gain-persuasion"; selector: PlayerSelector; amount: EffectAmountSpec }
+  | { kind: "gain-strength"; selector: PlayerSelector; amount: EffectAmountSpec };
+export type CardEffectSpec = {
+  trigger: GameEffectTrigger;
+  conditions?: GameEffectConditionSpec[];
+  effects: GameEffectSpec[];
+};
 
 export type Resources = Record<ResourceId, number>;
 export type Influence = Record<FactionId, number>;
@@ -48,6 +79,7 @@ export type Card = {
   conditionalPersuasion?: boolean;
   conditionalSwords?: boolean;
   revealGain?: Partial<Resources>;
+  effects?: CardEffectSpec[];
   trashOnPlay?: boolean;
   play: string;
   reveal: string;

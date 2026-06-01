@@ -10,11 +10,16 @@ import {
   criticalLocationNames,
 } from "./critical-locations";
 import {
+  conflictBattleRewardForSourceId,
+  type ConflictBattleReward,
+  type ConflictRewardRank,
+} from "./conflict-reward-data";
+import {
   playerDoublesConflictRewards,
   playerHasConflictUnits,
   sandwormRewardReminderEntries,
 } from "./conflict-rules";
-import { advancePendingAction } from "./pending-actions";
+import { advancePendingAction, queuePendingActions } from "./pending-actions";
 import {
   playerHasSpyPost,
   removeSpyPostOwner,
@@ -45,21 +50,6 @@ function isStandardBattleIcon(icon: ConflictCard["battleIcon"]): icon is BattleI
   return icon !== "wild";
 }
 
-type FirstPlaceBattleReward = {
-  fixedVp: number;
-  contracts?: number;
-  influence?: Partial<Record<FactionId, number>>;
-  intrigues?: number;
-  resources?: Partial<Record<ResourceId, number>>;
-  influenceChoices?: number;
-  influenceChoiceOptions?: FactionId[];
-  spies?: number;
-  trashCards?: number;
-  troops?: number;
-  conversion?:
-    | { kind: "resource"; resource: ResourceId; amount: number; vp: number }
-    | { kind: "recall-spies"; count: number; vp: number };
-};
 type ConflictVpConversionPendingAction = Extract<PendingAction, { kind: "conflict-vp-conversion" }>;
 type ConflictInfluencePendingAction = Extract<PendingAction, { kind: "conflict-influence" }>;
 type ContractPendingAction = Extract<PendingAction, { kind: "contract" }>;
@@ -67,94 +57,11 @@ type SpyPendingAction = Extract<PendingAction, { kind: "spy" }>;
 type TrashPendingAction = Extract<PendingAction, { kind: "trash-card" }>;
 
 const resourceIds: ResourceId[] = ["solari", "spice", "water"];
-const propagandaInfluenceChoices: FactionId[] = ["emperor", "spacing", "bene", "fremen"];
-
-const firstPlaceBattleRewardsBySourceId: Record<number, FirstPlaceBattleReward> = {
-  451: {
-    fixedVp: 0,
-    influenceChoices: 1,
-  },
-  452: {
-    fixedVp: 0,
-    intrigues: 1,
-    resources: { solari: 1 },
-  },
-  453: {
-    fixedVp: 0,
-    resources: { solari: 2 },
-  },
-  454: {
-    fixedVp: 0,
-    contracts: 1,
-    influence: { spacing: 1 },
-    troops: 1,
-  },
-  455: {
-    fixedVp: 0,
-    influenceChoices: 1,
-    conversion: { kind: "resource", resource: "spice", amount: 3, vp: 1 },
-  },
-  456: {
-    fixedVp: 0,
-    resources: { solari: 2 },
-    troops: 2,
-  },
-  457: {
-    fixedVp: 0,
-    resources: { spice: 2 },
-    spies: 1,
-  },
-  458: {
-    fixedVp: 0,
-    influence: { emperor: 1 },
-    resources: { solari: 2 },
-    spies: 1,
-  },
-  459: {
-    fixedVp: 0,
-    influence: { bene: 1 },
-    intrigues: 1,
-  },
-  460: {
-    fixedVp: 0,
-    resources: { spice: 2 },
-    troops: 1,
-  },
-  461: {
-    fixedVp: 0,
-    influence: { fremen: 1 },
-    resources: { water: 1 },
-    troops: 1,
-  },
-  462: {
-    fixedVp: 0,
-    contracts: 1,
-    resources: { water: 1 },
-    trashCards: 1,
-  },
-  463: {
-    fixedVp: 0,
-    influenceChoices: 2,
-    influenceChoiceOptions: propagandaInfluenceChoices,
-  },
-  464: {
-    fixedVp: 1,
-    conversion: { kind: "resource", resource: "spice", amount: 4, vp: 1 },
-  },
-  465: {
-    fixedVp: 1,
-    conversion: { kind: "recall-spies", count: 2, vp: 1 },
-  },
-  466: {
-    fixedVp: 1,
-    conversion: { kind: "resource", resource: "solari", amount: 6, vp: 1 },
-  },
-};
 
 function canPayConflictConversion(
   state: GameState,
   owner: Player,
-  conversion: FirstPlaceBattleReward["conversion"],
+  conversion: ConflictBattleReward["conversion"],
 ) {
   if (!conversion) return false;
   if (conversion.kind === "resource") return owner.resources[conversion.resource] >= conversion.amount;
@@ -164,7 +71,7 @@ function canPayConflictConversion(
 function pendingActionsForConflictInfluence(
   owner: Player,
   conflict: ConflictCard,
-  reward: FirstPlaceBattleReward | undefined,
+  reward: ConflictBattleReward | undefined,
   multiplier: number,
 ): ConflictInfluencePendingAction[] {
   const choices = reward?.influenceChoices ?? 0;
@@ -190,7 +97,7 @@ function pendingActionForConflictConversion(
   state: GameState,
   owner: Player,
   conflict: ConflictCard,
-  reward: FirstPlaceBattleReward | undefined,
+  reward: ConflictBattleReward | undefined,
   multiplier: number,
 ): ConflictVpConversionPendingAction | undefined {
   const conversion = reward?.conversion;
@@ -230,7 +137,7 @@ function pendingActionsForContractReward(
   state: GameState,
   owner: Player,
   conflict: ConflictCard,
-  reward: FirstPlaceBattleReward | undefined,
+  reward: ConflictBattleReward | undefined,
   multiplier: number,
 ): ContractPendingAction[] {
   const requested = (reward?.contracts ?? 0) * multiplier;
@@ -249,7 +156,7 @@ function pendingActionsForContractReward(
 function pendingActionsForTrashReward(
   owner: Player,
   conflict: ConflictCard,
-  reward: FirstPlaceBattleReward | undefined,
+  reward: ConflictBattleReward | undefined,
   multiplier: number,
 ): TrashPendingAction[] {
   const requested = (reward?.trashCards ?? 0) * multiplier;
@@ -273,7 +180,7 @@ function pendingActionForSpyReward(
   state: GameState,
   owner: Player,
   conflict: ConflictCard,
-  reward: FirstPlaceBattleReward | undefined,
+  reward: ConflictBattleReward | undefined,
   multiplier: number,
 ): SpyPendingAction | undefined {
   const remaining = (reward?.spies ?? 0) * multiplier;
@@ -296,9 +203,9 @@ function joinRewardParts(parts: string[]) {
   return `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}`;
 }
 
-function applyImmediateFirstPlacePrintedReward(
+function applyImmediatePrintedReward(
   player: Player,
-  reward: FirstPlaceBattleReward | undefined,
+  reward: ConflictBattleReward | undefined,
   multiplier: number,
 ) {
   const resourceGains = resourceIds.reduce<Partial<Record<ResourceId, number>>>((gains, resource) => {
@@ -406,13 +313,200 @@ function scoreBattleIconMatch(player: Player, conflict: ConflictCard) {
   };
 }
 
+type LowerRankRewardAssignment = {
+  playerId: string;
+  rank: 2 | 3;
+};
+
+function conflictRewardRankLabel(rank: ConflictRewardRank) {
+  if (rank === 1) return "first-place";
+  return rank === 2 ? "second-place" : "third-place";
+}
+
+function contenderGroupsByStrength(contenders: Player[]) {
+  const strengths = [...new Set(contenders.map((player) => player.conflict))].sort((a, b) => b - a);
+  return strengths.map((strength) => contenders.filter((player) => player.conflict === strength));
+}
+
+function sameTeamConcessionOpportunity(contenders: Player[]) {
+  const groups = contenderGroupsByStrength(contenders);
+  for (let index = 0; index < Math.min(groups.length, 3); index += 1) {
+    const group = groups[index];
+    if (group.length !== 2 || group[0].team !== group[1].team) continue;
+    return {
+      rank: (index + 1) as ConflictRewardRank,
+      team: group[0].team,
+      tiedPlayerIds: group.map((player) => player.id),
+      strength: group[0].conflict,
+    };
+  }
+  return undefined;
+}
+
+function sameTeamThirdRewardTieAfterFirstTie(contenders: Player[], firstTiePlayerIds: string[]) {
+  const tiedIds = new Set(firstTiePlayerIds);
+  const remainingGroup = contenderGroupsByStrength(contenders.filter((player) => !tiedIds.has(player.id)))[0];
+  return remainingGroup?.length === 2 && remainingGroup[0].team === remainingGroup[1].team
+    ? remainingGroup
+    : undefined;
+}
+
+function pendingActionForCascadingThirdRewardTie(
+  conflict: ConflictCard,
+  group: Player[],
+  conflictWinnerId: string | null,
+  resolvedRankRewards: LowerRankRewardAssignment[],
+): ConflictTiePendingAction {
+  return {
+    kind: "conflict-tie",
+    team: group[0].team,
+    tiedPlayerIds: group.map((player) => player.id),
+    strength: group[0].conflict,
+    rank: 3,
+    conflictWinnerId,
+    resolvedRankRewards,
+    source: conflict.name,
+  };
+}
+
+function lowerRankRewardsAfterUniqueWinner(contenders: Player[], winnerId: string): LowerRankRewardAssignment[] {
+  const groups = contenderGroupsByStrength(contenders);
+  if (groups[0]?.some((player) => player.id !== winnerId)) return [];
+  const secondGroup = groups[1];
+  if (!secondGroup) return [];
+  if (secondGroup.length > 1) {
+    return secondGroup.map((player) => ({ playerId: player.id, rank: 3 }));
+  }
+  const thirdGroup = groups[2];
+  return [
+    { playerId: secondGroup[0].id, rank: 2 },
+    ...(thirdGroup?.length === 1 ? [{ playerId: thirdGroup[0].id, rank: 3 } as const] : []),
+  ];
+}
+
+function rankRewardsForFirstPlaceTie(contenders: Player[]): LowerRankRewardAssignment[] {
+  const groups = contenderGroupsByStrength(contenders);
+  const firstGroup = groups[0] ?? [];
+  const thirdGroup = groups[1];
+  return [
+    ...firstGroup.map((player) => ({ playerId: player.id, rank: 2 as const })),
+    ...(firstGroup.length === 2 && thirdGroup?.length === 1
+      ? [{ playerId: thirdGroup[0].id, rank: 3 as const }]
+      : []),
+  ];
+}
+
+function lowerRankRewardsAfterSameTeamConcession(
+  contenders: Player[],
+  tiedPlayerIds: string[],
+  winnerId: string,
+  rank: ConflictRewardRank,
+): LowerRankRewardAssignment[] {
+  if (rank === 2) {
+    return tiedPlayerIds.map((playerId) => ({
+      playerId,
+      rank: playerId === winnerId ? 2 : 3,
+    }));
+  }
+  if (rank === 3) {
+    const groups = contenderGroupsByStrength(contenders);
+    const secondGroup = groups[1];
+    return [
+      ...(secondGroup?.length === 1 ? [{ playerId: secondGroup[0].id, rank: 2 as const }] : []),
+      { playerId: winnerId, rank: 3 },
+    ];
+  }
+  const tiedIds = new Set(tiedPlayerIds);
+  const remainingGroup = contenderGroupsByStrength(contenders.filter((player) => !tiedIds.has(player.id)))[0];
+  return [
+    ...tiedPlayerIds
+      .filter((playerId) => playerId !== winnerId)
+      .map((playerId) => ({ playerId, rank: 2 as const })),
+    ...(remainingGroup?.length === 1 ? [{ playerId: remainingGroup[0].id, rank: 3 as const }] : []),
+  ];
+}
+
+function applyRankReward(state: GameState, conflict: ConflictCard, assignment: LowerRankRewardAssignment): GameState {
+  const owner = state.players.find((player) => player.id === assignment.playerId);
+  if (!owner) return state;
+  const reward = conflictBattleRewardForSourceId(conflict.sourceId, assignment.rank);
+  const rankLabel = conflictRewardRankLabel(assignment.rank);
+  const multiplier = playerDoublesConflictRewards(owner) ? 2 : 1;
+  const printedVp = (reward?.fixedVp ?? 0) * multiplier;
+  const intrigueDraws = (reward?.intrigues ?? 0) * multiplier;
+  const conversionPending = pendingActionForConflictConversion(state, owner, conflict, reward, multiplier);
+  const influencePendingActions = pendingActionsForConflictInfluence(owner, conflict, reward, multiplier);
+  const contractPendingActions = pendingActionsForContractReward(state, owner, conflict, reward, multiplier);
+  const trashPendingActions = pendingActionsForTrashReward(owner, conflict, reward, multiplier);
+  const spyPending = pendingActionForSpyReward(state, owner, conflict, reward, multiplier);
+  const rewardPendingActions: PendingAction[] = [];
+  rewardPendingActions.push(...influencePendingActions);
+  rewardPendingActions.push(...contractPendingActions);
+  rewardPendingActions.push(...trashPendingActions);
+  if (conversionPending) rewardPendingActions.push(conversionPending);
+  if (spyPending) rewardPendingActions.push(spyPending);
+  const immediatePrintedReward = applyImmediatePrintedReward(owner, reward, multiplier);
+  const immediateRewardText = immediatePrintedRewardDescription(
+    immediatePrintedReward.resourceGains,
+    immediatePrintedReward.influenceGains,
+    immediatePrintedReward.recruitedTroops,
+  );
+  const rewardedPlayer = printedVp > 0
+    ? { ...immediatePrintedReward.player, vp: immediatePrintedReward.player.vp + printedVp }
+    : immediatePrintedReward.player;
+  let rewardedState: GameState = {
+    ...state,
+    ...queuePendingActions(state, rewardPendingActions),
+    players: state.players.map((player) => (player.id === owner.id ? rewardedPlayer : player)),
+    log: [
+      conversionPending
+        ? `${owner.leader} may pay ${conflictConversionDescription(conversionPending)} from the ${rankLabel} reward on ${conflict.name}${conversionPending.remaining > 1 ? ` up to ${conversionPending.remaining} times` : ""}.`
+        : undefined,
+      influencePendingActions.length > 0
+        ? `${owner.leader} may gain ${influencePendingActions.reduce((sum, action) => sum + action.remaining, 0)} Influence from the ${rankLabel} reward on ${conflict.name}${multiplier > 1 ? " with sandworm doubling" : ""}.`
+        : undefined,
+      contractPendingActions.length > 0
+        ? `${owner.leader} may take ${contractPendingActions.length} face-up CHOAM contract${contractPendingActions.length === 1 ? "" : "s"} from the ${rankLabel} reward on ${conflict.name}${multiplier > 1 ? " with sandworm doubling" : ""}.`
+        : undefined,
+      trashPendingActions.length > 0
+        ? `${owner.leader} must trash ${trashPendingActions.length} card${trashPendingActions.length === 1 ? "" : "s"} from the ${rankLabel} reward on ${conflict.name}${multiplier > 1 ? " with sandworm doubling" : ""}.`
+        : undefined,
+      spyPending
+        ? `${owner.leader} may place ${spyPending.remaining} ${spyPending.remaining === 1 ? "spy" : "spies"} from the ${rankLabel} reward on ${conflict.name}${multiplier > 1 ? " with sandworm doubling" : ""}.`
+        : undefined,
+      immediateRewardText
+        ? `${owner.leader} ${immediateRewardText} from the ${rankLabel} reward on ${conflict.name}${multiplier > 1 ? " with sandworm doubling" : ""}.`
+        : undefined,
+      printedVp > 0
+        ? `${owner.leader} gains ${printedVp} printed VP from the ${rankLabel} reward on ${conflict.name}${multiplier > 1 ? " with sandworm doubling" : ""}.`
+        : undefined,
+      ...state.log,
+    ].filter((entry): entry is string => Boolean(entry)),
+  };
+  if (intrigueDraws > 0) {
+    rewardedState = drawIntrigueCards(rewardedState, owner.id, intrigueDraws, `${rankLabel} reward on ${conflict.name}`);
+  }
+  const gainedInfluence = Object.values(immediatePrintedReward.influenceGains).some((amount) => amount > 0);
+  return gainedInfluence
+    ? resolveLeaderInfluenceThresholdRewards(rewardedState, state.players)
+    : rewardedState;
+}
+
+function applyRankRewards(
+  state: GameState,
+  conflict: ConflictCard,
+  assignments: LowerRankRewardAssignment[],
+) {
+  return assignments.reduce((nextState, assignment) => applyRankReward(nextState, conflict, assignment), state);
+}
+
 function awardConflictToWinner(
   state: GameState,
   winner: Player,
   conflict: ConflictCard,
   rewardReminderEntries: string[] = [],
 ): GameState {
-  const firstPlaceReward = conflict.sourceId ? firstPlaceBattleRewardsBySourceId[conflict.sourceId] : undefined;
+  const firstPlaceReward = conflictBattleRewardForSourceId(conflict.sourceId, 1);
   const multiplier = playerDoublesConflictRewards(winner) ? 2 : 1;
   const printedVp = (firstPlaceReward?.fixedVp ?? 0) * multiplier;
   const intrigueDraws = (firstPlaceReward?.intrigues ?? 0) * multiplier;
@@ -435,7 +529,7 @@ function awardConflictToWinner(
   if (spyPending) rewardPendingActions.push(spyPending);
   const [rewardPendingAction, ...queuedRewardActions] = rewardPendingActions;
   const location = criticalLocationForConflict(conflict);
-  const immediatePrintedReward = applyImmediateFirstPlacePrintedReward(winner, firstPlaceReward, multiplier);
+  const immediatePrintedReward = applyImmediatePrintedReward(winner, firstPlaceReward, multiplier);
   const immediateRewardText = immediatePrintedRewardDescription(
     immediatePrintedReward.resourceGains,
     immediatePrintedReward.influenceGains,
@@ -689,39 +783,43 @@ export function resolveCurrentConflict(state: GameState): GameState {
   const rewardReminderEntries = sandwormRewardReminderEntries(contenders);
   const bestStrength = Math.max(0, ...contenders.map((player) => player.conflict));
   const winners = contenders.filter((player) => player.conflict === bestStrength);
+  const concessionOpportunity = sameTeamConcessionOpportunity(contenders);
+
+  if (concessionOpportunity) {
+    return {
+      ...state,
+      pendingAction: {
+        kind: "conflict-tie",
+        team: concessionOpportunity.team,
+        tiedPlayerIds: concessionOpportunity.tiedPlayerIds,
+        strength: concessionOpportunity.strength,
+        rank: concessionOpportunity.rank,
+        source: state.conflict.name,
+      },
+      log: [
+        `${teams[concessionOpportunity.team].name} Allies tie for the ${conflictRewardRankLabel(concessionOpportunity.rank)} reward on ${state.conflict.name}; choose whether one Ally concedes the greater reward.`,
+        ...state.log,
+      ],
+    };
+  }
 
   if (winners.length !== 1) {
-    const tiedTeam = winners[0]?.team;
-    const sameTeamTie = winners.length > 1 && tiedTeam && winners.every((winner) => winner.team === tiedTeam);
-    if (sameTeamTie) {
-      return {
-        ...state,
-        pendingAction: {
-          kind: "conflict-tie",
-          team: tiedTeam,
-          tiedPlayerIds: winners.map((winner) => winner.id),
-          strength: bestStrength,
-          source: state.conflict.name,
-        },
-        log: [
-          `${teams[tiedTeam].name} Allies tie for ${state.conflict.name}; choose whether one Ally concedes first place.`,
-          ...state.log,
-        ],
-      };
-    }
-
     const reason = bestStrength === 0
       ? `${state.conflict.name} resolves with no winner.`
       : `${state.conflict.name} ends tied at ${bestStrength} strength; no one takes the Conflict card.`;
-    return {
+    return applyRankRewards({
       ...state,
       conflict: null,
       conflictDiscard: [...state.conflictDiscard, state.conflict],
       log: [reason, ...rewardReminderEntries, ...state.log],
-    };
+    }, state.conflict, rankRewardsForFirstPlaceTie(contenders));
   }
 
-  return awardConflictToWinner(state, winners[0], state.conflict, rewardReminderEntries);
+  return applyRankRewards(
+    awardConflictToWinner(state, winners[0], state.conflict, rewardReminderEntries),
+    state.conflict,
+    lowerRankRewardsAfterUniqueWinner(contenders, winners[0].id),
+  );
 }
 
 type ConflictTiePendingAction = Extract<PendingAction, { kind: "conflict-tie" }>;
@@ -739,7 +837,69 @@ export function resolveConflictTie(
   const rewardReminderEntries = sandwormRewardReminderEntries(contenders);
 
   if (!winnerId) {
-    return {
+    if (pending.resolvedRankRewards) {
+      const clearedTieState = { ...state, ...advancePendingAction(state) };
+      const conflictWinner = pending.conflictWinnerId
+        ? state.players.find((player) => player.id === pending.conflictWinnerId)
+        : undefined;
+      if (pending.conflictWinnerId && !conflictWinner) return state;
+      const baseAwarded = conflictWinner
+        ? awardConflictToWinner(clearedTieState, conflictWinner, state.conflict, rewardReminderEntries)
+        : {
+            ...clearedTieState,
+            conflict: null,
+            conflictDiscard: [...state.conflictDiscard, state.conflict],
+            log: [
+              `${state.conflict.name} ends without a winner; no one takes the Conflict card.`,
+              ...rewardReminderEntries,
+              ...clearedTieState.log,
+            ],
+          };
+      const awarded = applyRankRewards(baseAwarded, state.conflict, pending.resolvedRankRewards);
+      return {
+        ...awarded,
+        log: [
+          `No Ally concedes the ${conflictRewardRankLabel(pending.rank)} reward on ${state.conflict.name}.`,
+          ...awarded.log,
+        ],
+      };
+    }
+    if (pending.rank > 1) {
+      const winner = contenderGroupsByStrength(contenders)[0]?.[0];
+      if (!winner) return state;
+      const clearedTieState = { ...state, ...advancePendingAction(state) };
+      const awarded = applyRankRewards(
+        awardConflictToWinner(clearedTieState, winner, state.conflict, rewardReminderEntries),
+        state.conflict,
+        lowerRankRewardsAfterUniqueWinner(contenders, winner.id),
+      );
+      return {
+        ...awarded,
+        log: [
+          `No Ally concedes the ${conflictRewardRankLabel(pending.rank)} reward on ${state.conflict.name}.`,
+          ...awarded.log,
+        ],
+      };
+    }
+    const cascadingThirdTie = sameTeamThirdRewardTieAfterFirstTie(contenders, pending.tiedPlayerIds);
+    if (cascadingThirdTie) {
+      return {
+        ...state,
+        ...advancePendingAction(state),
+        pendingAction: pendingActionForCascadingThirdRewardTie(
+          state.conflict,
+          cascadingThirdTie,
+          null,
+          rankRewardsForFirstPlaceTie(contenders),
+        ),
+        log: [
+          `No Ally concedes ${state.conflict.name}; no one takes the Conflict card.`,
+          `${teams[cascadingThirdTie[0].team].name} Allies tie for the third-place reward on ${state.conflict.name}; choose whether one Ally concedes the greater reward.`,
+          ...state.log,
+        ],
+      };
+    }
+    return applyRankRewards({
       ...state,
       conflict: null,
       conflictDiscard: [...state.conflictDiscard, state.conflict],
@@ -749,7 +909,7 @@ export function resolveConflictTie(
         ...rewardReminderEntries,
         ...state.log,
       ],
-    };
+    }, state.conflict, rankRewardsForFirstPlaceTie(contenders));
   }
 
   const winner = state.players.find((player) =>
@@ -759,17 +919,74 @@ export function resolveConflictTie(
     player.role === "Ally"
   );
   if (!winner) return state;
+  if (pending.resolvedRankRewards) {
+    const clearedTieState = { ...state, ...advancePendingAction(state) };
+    const conflictWinner = pending.conflictWinnerId
+      ? state.players.find((player) => player.id === pending.conflictWinnerId)
+      : undefined;
+    if (pending.conflictWinnerId && !conflictWinner) return state;
+    const baseAwarded = conflictWinner
+      ? awardConflictToWinner(clearedTieState, conflictWinner, state.conflict, rewardReminderEntries)
+      : {
+          ...clearedTieState,
+          conflict: null,
+          conflictDiscard: [...state.conflictDiscard, state.conflict],
+          log: [
+            `${state.conflict.name} ends without a winner; no one takes the Conflict card.`,
+            ...rewardReminderEntries,
+            ...clearedTieState.log,
+          ],
+        };
+    const awarded = applyRankRewards(
+      baseAwarded,
+      state.conflict,
+      [...pending.resolvedRankRewards, { playerId: winner.id, rank: pending.rank === 2 ? 2 : 3 }],
+    );
+    return {
+      ...awarded,
+      log: [
+        `${winner.leader} takes the ${conflictRewardRankLabel(pending.rank)} reward after a same-team tie concession.`,
+        ...awarded.log,
+      ],
+    };
+  }
+  if (pending.rank === 1) {
+    const cascadingThirdTie = sameTeamThirdRewardTieAfterFirstTie(contenders, pending.tiedPlayerIds);
+    if (cascadingThirdTie) {
+      return {
+        ...state,
+        ...advancePendingAction(state),
+        pendingAction: pendingActionForCascadingThirdRewardTie(
+          state.conflict,
+          cascadingThirdTie,
+          winner.id,
+          lowerRankRewardsAfterSameTeamConcession(contenders, pending.tiedPlayerIds, winner.id, pending.rank),
+        ),
+        log: [
+          `${winner.leader} takes the ${conflictRewardRankLabel(pending.rank)} reward after a same-team tie concession.`,
+          `${teams[cascadingThirdTie[0].team].name} Allies tie for the third-place reward on ${state.conflict.name}; choose whether one Ally concedes the greater reward.`,
+          ...state.log,
+        ],
+      };
+    }
+  }
   const clearedTieState = { ...state, ...advancePendingAction(state) };
-  const awarded = awardConflictToWinner(
-    clearedTieState,
-    winner,
+  const conflictWinner = pending.rank === 1 ? winner : contenderGroupsByStrength(contenders)[0]?.[0];
+  if (!conflictWinner) return state;
+  const awarded = applyRankRewards(
+    awardConflictToWinner(
+      clearedTieState,
+      conflictWinner,
+      state.conflict,
+      rewardReminderEntries,
+    ),
     state.conflict,
-    rewardReminderEntries,
+    lowerRankRewardsAfterSameTeamConcession(contenders, pending.tiedPlayerIds, winner.id, pending.rank),
   );
   return {
     ...awarded,
     log: [
-      `${winner.leader} takes first place after a same-team tie concession.`,
+      `${winner.leader} takes the ${conflictRewardRankLabel(pending.rank)} reward after a same-team tie concession.`,
       ...awarded.log,
     ],
   };

@@ -157,6 +157,7 @@ async function createTableChoiceStates(server, initialPlayableGame) {
         team: "muaddib",
         tiedPlayerIds: ["p3", "p5"],
         strength: 4,
+        rank: 1,
         source: conflict.name,
       },
     },

@@ -45,7 +45,7 @@ Private web-table implementation for a six-player `Dune: Imperium - Uprising` te
 - Conflict winners keep won Conflict cards and score immediate non-wild battle-icon pairs with Objectives or prior Conflicts.
 - Critical-location Conflict wins set control of Arrakeen, Spice Refinery, or Imperial Basin; controlled spaces pay their visit income, and revealed controlled-location Conflicts queue the optional defensive supply troop.
 - Level I Skirmish Conflicts pay automated first-place fixed rewards for Skirmish (Ornithopter) and Skirmish (Desert Mouse).
-- Level II Conflicts pay automated first-place rewards for CHOAM Security, Secure Imperial Basin, Siege Of Arrakeen, Seize Spice Refinery, Test Of Loyalty, Trade Dispute, Shadow Contest, and Protect The Sietches, and level III Battle conflicts pay first-place printed VP plus optional paid VP conversions, including sandworm-doubled repeats while battle icons and location control stay undoubled.
+- Conflict cards pay automated first-, second-, and third-place printed rewards for the imported Uprising Conflict deck, including tie reward rules, same-team concession rewards, sandworm-doubled repeats, and undoubled battle icons/location control.
 - High Council seats persist and add 2 persuasion on Reveal turns; later High Council visits take the printed repeat rewards.
 - Combat phase opens before Conflict resolution and sequences Combat Intrigue pass/play timing.
 - Endgame phase triggers at 10 VP or an empty Conflict deck and scores battle-icon Endgame Intrigues against matching or wild Conflict cards.

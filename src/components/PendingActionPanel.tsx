@@ -728,6 +728,7 @@ export function PendingActionPanel({
       {pendingAction.kind === "conflict-tie" && (
         <PendingConflictTiePanel
           allies={conflictTieAllies}
+          rank={pendingAction.rank}
           onChooseWinner={chooseConflictTieWinner}
         />
       )}

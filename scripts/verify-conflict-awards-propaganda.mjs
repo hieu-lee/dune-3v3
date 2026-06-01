@@ -35,7 +35,7 @@ export function verifyPropagandaConflictAwards({
       ownerId: "p2",
       remaining: 2,
       source: "Propaganda",
-      choices: ["emperor", "spacing", "bene", "fremen"],
+      choices: ["greatHouses", "spacing", "bene", "fringeWorlds"],
     },
     "Propaganda should pause for two fixed Influence choices",
   );
@@ -62,7 +62,7 @@ export function verifyPropagandaConflictAwards({
       ownerId: "p2",
       remaining: 1,
       source: "Propaganda",
-      choices: ["emperor", "spacing", "fremen"],
+      choices: ["greatHouses", "spacing", "fringeWorlds"],
     },
     "Propaganda should remove a chosen fixed Influence option",
   );
@@ -99,10 +99,10 @@ export function verifyPropagandaConflictAwards({
               deployedSandworms: 1,
               influence: {
                 ...player.influence,
-                emperor: 0,
+                greatHouses: 0,
                 spacing: 0,
                 bene: 0,
-                fremen: 0,
+                fringeWorlds: 0,
               },
               vp: 0,
             }
@@ -117,7 +117,7 @@ export function verifyPropagandaConflictAwards({
     state.gainConflictInfluenceForPending(
       doubledPropagandaPending,
       doubledPropagandaPending.pendingAction,
-      "emperor",
+      "greatHouses",
     ),
   );
   const doubledFirstSpacing = state.startNextRound(
@@ -128,7 +128,7 @@ export function verifyPropagandaConflictAwards({
     ),
   );
   assert.equal(
-    doubledFirstSpacing.pendingAction?.choices?.includes("emperor"),
+    doubledFirstSpacing.pendingAction?.choices?.includes("greatHouses"),
     true,
     "Sandworm-doubled Propaganda should reset fixed choices for the second reward copy",
   );
@@ -136,7 +136,7 @@ export function verifyPropagandaConflictAwards({
     state.gainConflictInfluenceForPending(
       doubledFirstSpacing,
       doubledFirstSpacing.pendingAction,
-      "emperor",
+      "greatHouses",
     ),
   );
   const doubledResolved = state.startNextRound(
@@ -147,9 +147,9 @@ export function verifyPropagandaConflictAwards({
     ),
   );
   const doubledWinner = playerById(doubledResolved, "p3");
-  assert.equal(doubledWinner.influence.emperor, 2);
+  assert.equal(doubledWinner.influence.greatHouses, 2);
   assert.equal(doubledWinner.influence.spacing, 1);
   assert.equal(doubledWinner.influence.bene, 1);
-  assert.equal(doubledWinner.vp, 1, "Doubled Propaganda should score one VP for the doubled Emperor threshold");
+  assert.equal(doubledWinner.vp, 1, "Doubled Propaganda should score one VP for the doubled Great Houses threshold");
   assert.equal(doubledResolved.pendingAction, undefined);
 }

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { createServer } from "vite";
 import { verifyChoamSecurityConflictAwards } from "./verify-conflict-awards-choam-security.mjs";
+import { verifyLowerRankConflictAwards } from "./verify-conflict-awards-lower-ranks.mjs";
 import { verifyPropagandaConflictAwards } from "./verify-conflict-awards-propaganda.mjs";
 import { verifySeizeSpiceRefineryConflictAwards } from "./verify-conflict-awards-seize.mjs";
 import { verifySpiceFreightersConflictAwards } from "./verify-conflict-awards-spice-freighters.mjs";
@@ -383,6 +384,13 @@ try {
     conflictBySourceId,
     playerById,
   });
+  verifyLowerRankConflictAwards({
+    state,
+    data,
+    fixture,
+    conflictBySourceId,
+    playerById,
+  });
 
   const shadowContestReward = fixture(state, data, (players) =>
     players.map((player) =>
@@ -476,7 +484,7 @@ try {
             conflict: 9,
             deployedTroops: 1,
             garrison: 0,
-            influence: { ...player.influence, fremen: 1 },
+            influence: { ...player.influence, fringeWorlds: 1 },
             resources: { ...player.resources, water: 0 },
             vp: 0,
           }
@@ -486,13 +494,13 @@ try {
   const protectSietchesWinner = playerById(protectSietchesResult, "p2");
   assert.equal(protectSietchesWinner.resources.water, 1, "Protect The Sietches should pay first-place water");
   assert.equal(protectSietchesWinner.garrison, 1, "Protect The Sietches should recruit a first-place troop");
-  assert.equal(protectSietchesWinner.influence.fremen, 2, "Protect The Sietches should award Fremen Influence");
+  assert.equal(protectSietchesWinner.influence.fringeWorlds, 2, "Protect The Sietches should award Fringe Worlds Influence");
   assert.equal(protectSietchesWinner.vp, 1, "Protect The Sietches Influence should score the 2-Influence VP");
   assert.equal(protectSietchesResult.pendingAction, undefined, "Protect The Sietches reward should not require choices");
   assert.ok(
     protectSietchesResult.log.some((entry) =>
       entry.includes("gains 1 water") &&
-      entry.includes("1 Fremen Influence") &&
+      entry.includes("1 Fringe Worlds Influence") &&
       entry.includes("recruits 1 troop") &&
       entry.includes("Protect The Sietches")
     ),
@@ -507,7 +515,7 @@ try {
             conflict: 9,
             deployedSandworms: 1,
             garrison: 0,
-            influence: { ...player.influence, fremen: 0 },
+            influence: { ...player.influence, fringeWorlds: 0 },
             resources: { ...player.resources, water: 0 },
             vp: 0,
           }
@@ -517,12 +525,12 @@ try {
   const doubledProtectSietchesWinner = playerById(doubledProtectSietchesResult, "p3");
   assert.equal(doubledProtectSietchesWinner.resources.water, 2, "Sandworms should double Protect The Sietches water");
   assert.equal(doubledProtectSietchesWinner.garrison, 2, "Sandworms should double Protect The Sietches troop recruitment");
-  assert.equal(doubledProtectSietchesWinner.influence.fremen, 2, "Sandworms should double Protect The Sietches Influence");
+  assert.equal(doubledProtectSietchesWinner.influence.fringeWorlds, 2, "Sandworms should double Protect The Sietches Influence");
   assert.equal(doubledProtectSietchesWinner.vp, 1, "Doubled Influence should still score the threshold VP once");
   assert.ok(
     doubledProtectSietchesResult.log.some((entry) =>
       entry.includes("gains 2 water") &&
-      entry.includes("2 Fremen Influence") &&
+      entry.includes("2 Fringe Worlds Influence") &&
       entry.includes("recruits 2 troops") &&
       entry.includes("sandworm doubling")
     ),
@@ -842,6 +850,7 @@ try {
     team: "shaddam",
     tiedPlayerIds: ["p2", "p6"],
     strength: 5,
+    rank: 1,
     source: "Skirmish (Desert Mouse)",
   });
   const conceded = state.startNextRound(state.resolveConflictTie(sameTeamPending, sameTeamPending.pendingAction, "p2"));

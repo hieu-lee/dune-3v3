@@ -15,7 +15,7 @@ export function verifyTestOfLoyaltyConflictAwards({
               ...player,
               conflict: 9,
               deployedTroops: 1,
-              influence: { ...player.influence, emperor: 1 },
+              influence: { ...player.influence, greatHouses: 1 },
               resources: { ...player.resources, solari: 0 },
               vp: 0,
             }
@@ -26,7 +26,7 @@ export function verifyTestOfLoyaltyConflictAwards({
   const testOfLoyaltyResult = state.startNextRound(testOfLoyaltyReward);
   const testOfLoyaltyWinner = playerById(testOfLoyaltyResult, "p2");
   assert.equal(testOfLoyaltyWinner.resources.solari, 2, "Test Of Loyalty should pay first-place Solari");
-  assert.equal(testOfLoyaltyWinner.influence.emperor, 2, "Test Of Loyalty should pay Emperor Influence");
+  assert.equal(testOfLoyaltyWinner.influence.greatHouses, 2, "Test Of Loyalty should pay Great Houses Influence");
   assert.equal(testOfLoyaltyWinner.vp, 1, "Test Of Loyalty Influence should score the 2-Influence VP");
   assert.deepEqual(
     testOfLoyaltyResult.pendingAction,
@@ -36,7 +36,7 @@ export function verifyTestOfLoyaltyConflictAwards({
   assert.ok(
     testOfLoyaltyResult.log.some((entry) =>
       entry.includes("gains 2 solari") &&
-      entry.includes("1 Emperor Influence") &&
+      entry.includes("1 Great Houses Influence") &&
       entry.includes("Test Of Loyalty")
     ),
     "Test Of Loyalty should log the paid printed reward",
@@ -77,7 +77,7 @@ export function verifyTestOfLoyaltyConflictAwards({
               ...player,
               conflict: 9,
               deployedSandworms: 1,
-              influence: { ...player.influence, emperor: 0 },
+              influence: { ...player.influence, greatHouses: 0 },
               resources: { ...player.resources, solari: 0 },
               vp: 0,
             }
@@ -88,7 +88,7 @@ export function verifyTestOfLoyaltyConflictAwards({
   const doubledTestOfLoyaltyResult = state.startNextRound(doubledTestOfLoyaltyReward);
   const doubledTestOfLoyaltyWinner = playerById(doubledTestOfLoyaltyResult, "p3");
   assert.equal(doubledTestOfLoyaltyWinner.resources.solari, 4, "Sandworms should double Test Of Loyalty Solari");
-  assert.equal(doubledTestOfLoyaltyWinner.influence.emperor, 2, "Sandworms should double Test Of Loyalty Emperor Influence");
+  assert.equal(doubledTestOfLoyaltyWinner.influence.greatHouses, 2, "Sandworms should double Test Of Loyalty Great Houses Influence");
   assert.equal(doubledTestOfLoyaltyWinner.vp, 1, "Doubled Test Of Loyalty Influence should score the VP threshold once");
   assert.deepEqual(
     doubledTestOfLoyaltyResult.pendingAction,
@@ -98,7 +98,7 @@ export function verifyTestOfLoyaltyConflictAwards({
   assert.ok(
     doubledTestOfLoyaltyResult.log.some((entry) =>
       entry.includes("gains 4 solari") &&
-      entry.includes("2 Emperor Influence") &&
+      entry.includes("2 Great Houses Influence") &&
       entry.includes("sandworm doubling")
     ),
     "Doubled Test Of Loyalty should log the doubled printed reward",

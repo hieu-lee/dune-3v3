@@ -434,6 +434,9 @@ export type PendingAction =
       team: TeamId;
       tiedPlayerIds: string[];
       strength: number;
+      rank: 1 | 2 | 3;
+      conflictWinnerId?: string | null;
+      resolvedRankRewards?: { playerId: string; rank: 2 | 3 }[];
       source: string;
     };
 

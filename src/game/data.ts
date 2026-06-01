@@ -381,7 +381,67 @@ export const shaddamReservedContracts: ContractCard[] = catalog.cards
 
 const locationCardsByName = new Map(catalog.cards.filter((card) => card.type === "location").map((card) => [card.name, card]));
 
+const sixPlayerBoardSpaceArtById: Record<string, { imagePath: string; thumbnailPath: string; sourceSlug: string }> = {
+  carthag: {
+    imagePath: "/assets/dune-cards-hub/location/uprising-location-carthag.webp",
+    thumbnailPath: "/assets/dune-cards-hub/location/uprising-location-carthag.webp",
+    sourceSlug: "dire-wolf-six-player-board-space-guide-carthag",
+  },
+  "controversial-tech": {
+    imagePath: "/assets/dune-cards-hub/location/uprising-location-controversial-technology.webp",
+    thumbnailPath: "/assets/dune-cards-hub/location/uprising-location-controversial-technology.webp",
+    sourceSlug: "dire-wolf-six-player-board-space-guide-controversial-technology",
+  },
+  "desert-mastery": {
+    imagePath: "/assets/dune-cards-hub/location/uprising-location-desert-mastery.webp",
+    thumbnailPath: "/assets/dune-cards-hub/location/uprising-location-desert-mastery.webp",
+    sourceSlug: "dire-wolf-six-player-board-space-guide-desert-mastery",
+  },
+  "economic-support": {
+    imagePath: "/assets/dune-cards-hub/location/uprising-location-economic-support.webp",
+    thumbnailPath: "/assets/dune-cards-hub/location/uprising-location-economic-support.webp",
+    sourceSlug: "dire-wolf-six-player-board-space-guide-economic-support",
+  },
+  expedition: {
+    imagePath: "/assets/dune-cards-hub/location/uprising-location-expedition.webp",
+    thumbnailPath: "/assets/dune-cards-hub/location/uprising-location-expedition.webp",
+    sourceSlug: "dire-wolf-six-player-board-space-guide-expedition",
+  },
+  "habbanya-erg": {
+    imagePath: "/assets/dune-cards-hub/location/uprising-location-habbanya-erg.webp",
+    thumbnailPath: "/assets/dune-cards-hub/location/uprising-location-habbanya-erg.webp",
+    sourceSlug: "dire-wolf-six-player-board-space-guide-habbanya-erg",
+  },
+  "hardy-warriors": {
+    imagePath: "/assets/dune-cards-hub/location/uprising-location-hardy-warriors.webp",
+    thumbnailPath: "/assets/dune-cards-hub/location/uprising-location-hardy-warriors.webp",
+    sourceSlug: "dire-wolf-six-player-board-space-guide-hardy-warriors",
+  },
+  "military-support": {
+    imagePath: "/assets/dune-cards-hub/location/uprising-location-military-support.webp",
+    thumbnailPath: "/assets/dune-cards-hub/location/uprising-location-military-support.webp",
+    sourceSlug: "dire-wolf-six-player-board-space-guide-military-support",
+  },
+  sardaukar: {
+    imagePath: "/assets/dune-cards-hub/location/uprising-location-sardaukar-6p.webp",
+    thumbnailPath: "/assets/dune-cards-hub/location/uprising-location-sardaukar-6p.webp",
+    sourceSlug: "dire-wolf-design-diary-5-sardaukar-personal-board",
+  },
+  swordmaster: {
+    imagePath: "/assets/dune-cards-hub/location/uprising-location-swordmaster-6p.webp",
+    thumbnailPath: "/assets/dune-cards-hub/location/uprising-location-swordmaster-6p.webp",
+    sourceSlug: "dire-wolf-six-player-board-space-guide-swordmaster",
+  },
+  "vast-wealth": {
+    imagePath: "/assets/dune-cards-hub/location/uprising-location-vast-wealth.webp",
+    thumbnailPath: "/assets/dune-cards-hub/location/uprising-location-vast-wealth.webp",
+    sourceSlug: "dire-wolf-six-player-board-space-guide-vast-wealth",
+  },
+};
+
 function withBoardSpaceArt(space: BoardSpace): BoardSpace {
+  const sixPlayerArt = sixPlayerBoardSpaceArtById[space.id];
+  if (sixPlayerArt) return { ...space, ...sixPlayerArt };
   if (space.personal) return space;
   const card = locationCardsByName.get(space.name);
   if (!card) return space;

@@ -149,3 +149,5 @@ pnpm sync:card-images
 ```
 
 `sync:cards` refreshes the compact Uprising catalog from Dune Cards Hub. `sync:card-images` also downloads referenced images into `public/assets/dune-cards-hub` for private local play.
+
+Six-player-only board-space art is not present in the Dune Cards Hub catalog. Those local overrides are named like the rest of the Uprising location art under `public/assets/dune-cards-hub/location`, and `pnpm run verify:board-spaces` verifies that every 3v3 board space resolves to a real local asset.

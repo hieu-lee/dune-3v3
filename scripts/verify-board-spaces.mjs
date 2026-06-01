@@ -5,7 +5,7 @@ import { createServer } from "vite";
 
 const projectRoot = new URL("..", import.meta.url);
 
-const expectedArtSpaces = [
+const expectedCatalogArtSpaces = [
   "Accept Contract",
   "Arrakeen",
   "Deep Desert",
@@ -22,8 +22,21 @@ const expectedArtSpaces = [
   "Shipping",
   "Sietch Tabr",
   "Spice Refinery",
-  "Swordmaster",
 ];
+
+const expectedSixPlayerArtById = {
+  carthag: "/assets/dune-cards-hub/location/uprising-location-carthag.webp",
+  "controversial-tech": "/assets/dune-cards-hub/location/uprising-location-controversial-technology.webp",
+  "desert-mastery": "/assets/dune-cards-hub/location/uprising-location-desert-mastery.webp",
+  "economic-support": "/assets/dune-cards-hub/location/uprising-location-economic-support.webp",
+  expedition: "/assets/dune-cards-hub/location/uprising-location-expedition.webp",
+  "habbanya-erg": "/assets/dune-cards-hub/location/uprising-location-habbanya-erg.webp",
+  "hardy-warriors": "/assets/dune-cards-hub/location/uprising-location-hardy-warriors.webp",
+  "military-support": "/assets/dune-cards-hub/location/uprising-location-military-support.webp",
+  sardaukar: "/assets/dune-cards-hub/location/uprising-location-sardaukar-6p.webp",
+  swordmaster: "/assets/dune-cards-hub/location/uprising-location-swordmaster-6p.webp",
+  "vast-wealth": "/assets/dune-cards-hub/location/uprising-location-vast-wealth.webp",
+};
 
 function assertLocalArt(space) {
   const artPath = space.thumbnailPath ?? space.imagePath;
@@ -49,11 +62,20 @@ try {
   assert.equal(new Set(names).size, names.length, "Board-space names should be unique");
   assert.equal(new Set(data.boardSpaces.map((space) => space.id)).size, data.boardSpaces.length, "Board-space ids should be unique");
 
-  for (const spaceName of expectedArtSpaces) {
+  for (const spaceName of expectedCatalogArtSpaces) {
     const space = data.boardSpaces.find((candidate) => candidate.name === spaceName);
     assert.ok(space, `${spaceName} should be present in the board-space model`);
     assert.ok(space.sourceId, `${spaceName} should preserve source id`);
     assert.ok(space.sourceSlug, `${spaceName} should preserve source slug`);
+    assertLocalArt(space);
+  }
+
+  for (const [spaceId, artPath] of Object.entries(expectedSixPlayerArtById)) {
+    const space = data.boardSpaces.find((candidate) => candidate.id === spaceId);
+    assert.ok(space, `${spaceId} should be present in the board-space model`);
+    assert.equal(space.imagePath, artPath, `${space.name} should use the exact six-player board-space asset`);
+    assert.equal(space.thumbnailPath, artPath, `${space.name} thumbnail should use the exact six-player board-space asset`);
+    assert.ok(space.sourceSlug?.startsWith("dire-wolf-"), `${space.name} should identify the official six-player art source`);
     assertLocalArt(space);
   }
 
@@ -64,8 +86,7 @@ try {
   assert.equal(sietch.sietchTabr, true);
   assert.deepEqual(sietch.requirement, { faction: "fringeWorlds", amount: 2 });
 
-  for (const space of data.boardSpaces.filter((candidate) => candidate.sourceId || candidate.sourceSlug)) {
-    assert.equal(space.personal, undefined, `${space.name} personal-board space should wait for commander-board art`);
+  for (const space of data.boardSpaces) {
     assertLocalArt(space);
   }
 

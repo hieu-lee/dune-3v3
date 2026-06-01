@@ -2,7 +2,6 @@ import { resolveInfluence } from "./agent-effects";
 import {
   canMoveCardToThroneRow,
   isCommandRespectCommanderCard,
-  isCorrinoMightCommanderCard,
   isDemandResultsCommanderCard,
   isDesertCallCommanderCard,
   isGenericSignetRingCard,
@@ -22,6 +21,7 @@ import {
   resolveCardEffects,
   resolveRevealLoseInfluenceForIntrigues,
   resolveRevealPayResourceForStrengths,
+  resolveRevealPayResourceForTroops,
   resolveRevealRetreatTroopsForStrength,
   resolveRevealTrashCardEffects,
   type SpyPlacementEffectResult,
@@ -59,7 +59,6 @@ import type {
 
 export const stabanUnseenNetworkSource = "Unseen Network";
 export const stabanUnseenNetworkFactionIcons: IconId[] = ["emperor", "spacing", "bene", "fremen"];
-export const corrinoMightCost = 3;
 export const shaddamSignetRingTroopCost = 1;
 export const shaddamSignetRingInfluenceCost = 3;
 export const shaddamSignetRingInfluenceChoices: FactionId[] = [
@@ -519,31 +518,38 @@ export function pendingActionForReverendMotherJessicaRepeat(
   };
 }
 
-export function pendingActionForCorrinoMightReveal(
+export function pendingActionsForRevealPayResourceForTroops(
   card: Card,
   source: Player,
   state: GameState,
-): PendingAction | undefined {
-  if (
-    !isCorrinoMightCommanderCard(card) ||
-    source.team !== "shaddam" ||
-    source.role !== "Commander" ||
-    source.resources.spice < corrinoMightCost ||
-    !source.playArea.some((candidate) => candidate.id === card.id && isCorrinoMightCommanderCard(candidate))
-  ) {
-    return undefined;
-  }
+): PendingAction[] {
+  if (!card.effects || !source.playArea.some((candidate) => candidate.id === card.id)) return [];
 
-  const allies = sameTeamAllies(state.players, source);
-  if (!allies) return undefined;
-  return {
-    kind: "corrino-might",
-    commanderId: source.id,
-    allyIds: [allies[0].id, allies[1].id],
-    cost: corrinoMightCost,
-    cardId: card.id,
-    source: card.name,
-  };
+  const effectState = { ...state, players: playersWithPendingCardEffect(state, source) };
+  return resolveRevealPayResourceForTroops(card.effects, {
+    trigger: "reveal",
+    source,
+    state: effectState,
+  }).flatMap((effect) => {
+    if (effect.selector !== "self" || effect.cost <= 0 || effect.troops <= 0) return [];
+    if (source.resources[effect.resource] < effect.cost) return [];
+    if (effect.recipient !== "same-team-allies" || effect.destination !== "garrison") return [];
+    const allies = sameTeamAllies(effectState.players, source);
+    if (!allies) return [];
+    return [{
+      kind: "pay-resource-for-troops",
+      ownerId: source.id,
+      recipientIds: [allies[0].id, allies[1].id],
+      resource: effect.resource,
+      cost: effect.cost,
+      troops: effect.troops,
+      destination: effect.destination,
+      optional: effect.optional,
+      ...(effect.trashSource ? { trashSource: true } : {}),
+      source: effect.source ?? card.name,
+      cardId: card.id,
+    }];
+  });
 }
 
 export function pendingActionsForRevealPayResourceForStrength(
@@ -606,14 +612,14 @@ export function pendingActionsForReveal(
         source: "Printed reveal",
       }
     : undefined;
-  const corrinoMightPending = revealedCards
-    .map((card) => pendingActionForCorrinoMightReveal(card, source, state))
-    .find((pending): pending is PendingAction => Boolean(pending));
   const revealTrashCardPendings = revealedCards.flatMap((card) =>
     pendingActionsForRevealTrashCards(card, source, state, combatRecipientId)
   );
   const payResourceStrengthPendings = revealedCards.flatMap((card) =>
     pendingActionsForRevealPayResourceForStrength(card, source, state, combatRecipientId)
+  );
+  const payResourceTroopPendings = revealedCards.flatMap((card) =>
+    pendingActionsForRevealPayResourceForTroops(card, source, state)
   );
   const influenceIntriguePendings = revealedCards.flatMap((card) =>
     pendingActionsForRevealInfluenceIntrigues(card, source, state, combatRecipientId)
@@ -628,7 +634,7 @@ export function pendingActionsForReveal(
     revealAdjustPending,
     ...revealTrashCardPendings,
     ...payResourceStrengthPendings,
-    corrinoMightPending,
+    ...payResourceTroopPendings,
     ...influenceIntriguePendings,
     ...retreatTroopStrengthPendings,
     feydDeviousStrengthPending,

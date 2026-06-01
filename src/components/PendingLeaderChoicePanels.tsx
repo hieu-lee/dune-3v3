@@ -272,45 +272,63 @@ export function PendingDemandResultsPanel({
   );
 }
 
-type PendingCorrinoMightPanelProps = {
-  allies: (Player | undefined)[];
-  commander?: Player;
-  cost: number;
-  onChoose: () => void;
-  onSkip: () => void;
-};
-
-export function PendingCorrinoMightPanel({
-  allies,
-  commander,
-  cost,
-  onChoose,
-  onSkip,
-}: PendingCorrinoMightPanelProps) {
-  return (
-    <div className="pending-controls">
-      {allies[0] && allies[1] ? (
-        <button
-          type="button"
-          onClick={onChoose}
-          disabled={!commander || commander.resources.spice < cost}
-        >
-          <Sparkles size={15} />
-          Spend {cost}: both Allies +2 troops, trash
-        </button>
-      ) : (
-        <span>Corrino Might can no longer resolve with the current table state.</span>
-      )}
-      <button type="button" onClick={onSkip}>Skip</button>
-    </div>
-  );
-}
-
 const resourceLabels: Record<ResourceId, string> = {
   solari: "Solari",
   spice: "spice",
   water: "water",
 };
+
+type PendingPayResourceForTroopsPanelProps = {
+  cost: number;
+  onChoose: () => void;
+  onSkip: () => void;
+  owner?: Player;
+  recipients: (Player | undefined)[];
+  resource: ResourceId;
+  source: string;
+  troops: number;
+  trashSource?: boolean;
+};
+
+export function PendingPayResourceForTroopsPanel({
+  cost,
+  onChoose,
+  onSkip,
+  owner,
+  recipients,
+  resource,
+  source,
+  troops,
+  trashSource,
+}: PendingPayResourceForTroopsPanelProps) {
+  const resourceLabel = (resourceLabels as Partial<Record<string, string>>)[resource] ?? String(resource);
+  const availableResource = owner
+    ? (owner.resources as Partial<Record<string, number>>)[resource]
+    : undefined;
+  const resolvedRecipients = recipients.filter((recipient): recipient is Player => Boolean(recipient));
+  const allRecipientsPresent = recipients.length === 2 && resolvedRecipients.length === recipients.length;
+  const canPay = typeof availableResource === "number" && availableResource >= cost;
+  const recipientLabel = resolvedRecipients.length === 2 && resolvedRecipients.every((recipient) => recipient.role === "Ally")
+    ? "both Allies"
+    : resolvedRecipients.map((recipient) => recipient.leader).join(" and ");
+  return (
+    <div className="pending-controls">
+      {allRecipientsPresent ? (
+        <button
+          type="button"
+          onClick={onChoose}
+          disabled={!owner || !canPay}
+        >
+          <Sparkles size={15} />
+          Spend {cost} {resourceLabel}: {recipientLabel} +{troops} troops{trashSource ? ", trash" : ""}
+        </button>
+      ) : (
+        <span>{source} can no longer resolve with the current table state.</span>
+      )}
+      <button type="button" onClick={onSkip}>Skip</button>
+    </div>
+  );
+}
 
 type PendingPayResourceForStrengthPanelProps = {
   cost: number;

@@ -39,6 +39,8 @@ export type PlayerSelector =
   | "combat-participant";
 export type InfluenceEffectFaction = FactionId | "board-space";
 export type InfluenceEffectRecipient = "board-effect-recipient";
+export type TroopEffectRecipient = "same-team-allies";
+export type TroopEffectDestination = "garrison";
 export type EffectAmountSpec =
   | number
   | { kind: "completed-contracts"; multiplier?: number };
@@ -92,6 +94,18 @@ export type GameEffectSpec =
       cost: EffectAmountSpec;
       strength: EffectAmountSpec;
       optional?: true;
+      source?: string;
+    }
+  | {
+      kind: "pay-resource-for-troops";
+      selector: PlayerSelector;
+      resource: ResourceId;
+      cost: EffectAmountSpec;
+      troops: EffectAmountSpec;
+      recipient: TroopEffectRecipient;
+      destination: TroopEffectDestination;
+      optional?: true;
+      trashSource?: boolean;
       source?: string;
     }
   | {
@@ -442,6 +456,19 @@ export type PendingAction =
       cardId?: string;
     }
   | {
+      kind: "pay-resource-for-troops";
+      ownerId: string;
+      recipientIds: string[];
+      resource: ResourceId;
+      cost: number;
+      troops: number;
+      destination: TroopEffectDestination;
+      optional: true;
+      trashSource?: boolean;
+      cardId?: string;
+      source: string;
+    }
+  | {
       kind: "contract";
       ownerId: string;
       source: string;
@@ -534,14 +561,6 @@ export type PendingAction =
       commanderId: string;
       allyIds: [string, string];
       contractIds: [string, string];
-      cardId: string;
-      source: string;
-    }
-  | {
-      kind: "corrino-might";
-      commanderId: string;
-      allyIds: [string, string];
-      cost: number;
       cardId: string;
       source: string;
     }

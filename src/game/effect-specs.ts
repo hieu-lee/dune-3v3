@@ -12,6 +12,8 @@ import type {
   ResourceId,
   Role,
   TeamId,
+  TroopEffectDestination,
+  TroopEffectRecipient,
   TrashCardZone,
 } from "./types";
 
@@ -124,6 +126,35 @@ export function revealPayResourceForStrength(
       strength,
       optional: true,
       ...options,
+    },
+  ], conditions);
+}
+
+export function revealPayResourceForTroops(
+  resource: ResourceId,
+  cost: EffectAmountSpec,
+  troops: EffectAmountSpec,
+  options: {
+    recipient?: TroopEffectRecipient;
+    destination?: TroopEffectDestination;
+    optional?: true;
+    trashSource?: boolean;
+    source?: string;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return revealEffects([
+    {
+      kind: "pay-resource-for-troops",
+      selector: "self",
+      resource,
+      cost,
+      troops,
+      recipient: options.recipient ?? "same-team-allies",
+      destination: options.destination ?? "garrison",
+      optional: true,
+      ...(options.trashSource ? { trashSource: true } : {}),
+      ...(options.source ? { source: options.source } : {}),
     },
   ], conditions);
 }

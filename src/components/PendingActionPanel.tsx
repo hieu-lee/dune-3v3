@@ -40,7 +40,6 @@ import { PendingInfluenceLossPanel } from "./PendingInfluenceLossPanel";
 import { PendingIrulanSignetPanel } from "./PendingIrulanSignetPanel";
 import {
   PendingCommandRespectPanel,
-  PendingCorrinoMightPanel,
   PendingDemandResultsPanel,
   PendingDesertCallPanel,
   PendingJessicaOtherMemoriesPanel,
@@ -50,6 +49,7 @@ import {
   PendingLadyAmberDesertScoutsPanel,
   PendingPayResourceForInfluencePanel,
   PendingPayResourceForStrengthPanel,
+  PendingPayResourceForTroopsPanel,
   PendingStabanUnseenNetworkPanel,
   PendingThreatenSpiceProductionPanel,
 } from "./PendingLeaderChoicePanels";
@@ -82,7 +82,6 @@ type PendingActionPanelProps = {
   chooseConflictTieWinner: (winnerId?: string) => void;
   chooseDiscardCardForInfluenceAndDraw: (discardCardId: string, faction: FactionId) => void;
   chooseLoseInfluenceForIntrigues: (faction: FactionId) => void;
-  chooseCorrinoMight: () => void;
   chooseDemandResults: (optionIndex: number) => void;
   chooseDesertCall: () => void;
   chooseIrulanSignet: (choice: IrulanSignetRingChoice) => void;
@@ -94,6 +93,7 @@ type PendingActionPanelProps = {
   chooseMakerReward: (choice: "spice" | "sandworms") => void;
   choosePayResourceForInfluence: () => void;
   choosePayResourceForStrength: () => void;
+  choosePayResourceForTroops: () => void;
   chooseRetreatTroopsForStrength: () => void;
   chooseShaddamSignet: (choice: ShaddamSignetRingChoice) => void;
   chooseSietchTabr: (choice: "hooks" | "shield-wall") => void;
@@ -118,13 +118,13 @@ type PendingActionPanelProps = {
   skipLoseInfluenceForIntriguesChoice: () => void;
   skipControlDefense: () => void;
   skipConflictVpReward: () => void;
-  skipCorrinoMightChoice: () => void;
   skipDemandResultsChoice: () => void;
   skipDesertCallChoice: () => void;
   skipInfluenceLoss: () => void;
   skipOptionalSpacePaymentChoice: () => void;
   skipPayResourceForInfluenceChoice: () => void;
   skipPayResourceForStrengthChoice: () => void;
+  skipPayResourceForTroopsChoice: () => void;
   skipRecall: () => void;
   skipRetreatTroopsForStrengthChoice: () => void;
   skipThreatenSpiceProductionChoice: () => void;
@@ -148,7 +148,6 @@ export function PendingActionPanel({
   chooseConflictTieWinner,
   chooseDiscardCardForInfluenceAndDraw,
   chooseLoseInfluenceForIntrigues,
-  chooseCorrinoMight,
   chooseDemandResults,
   chooseDesertCall,
   chooseIrulanSignet,
@@ -160,6 +159,7 @@ export function PendingActionPanel({
   chooseMakerReward,
   choosePayResourceForInfluence,
   choosePayResourceForStrength,
+  choosePayResourceForTroops,
   chooseRetreatTroopsForStrength,
   chooseShaddamSignet,
   chooseSietchTabr,
@@ -184,13 +184,13 @@ export function PendingActionPanel({
   skipLoseInfluenceForIntriguesChoice,
   skipControlDefense,
   skipConflictVpReward,
-  skipCorrinoMightChoice,
   skipDemandResultsChoice,
   skipDesertCallChoice,
   skipInfluenceLoss,
   skipOptionalSpacePaymentChoice,
   skipPayResourceForInfluenceChoice,
   skipPayResourceForStrengthChoice,
+  skipPayResourceForTroopsChoice,
   skipRecall,
   skipRetreatTroopsForStrengthChoice,
   skipThreatenSpiceProductionChoice,
@@ -290,14 +290,6 @@ export function PendingActionPanel({
     pendingAction.kind === "demand-results"
       ? pendingAction.contractIds.map((contractId) => game.contractOffer.find((contract) => contract.id === contractId))
       : [];
-  const pendingCorrinoMightCommander =
-    pendingAction.kind === "corrino-might"
-      ? game.players.find((player) => player.id === pendingAction.commanderId)
-      : undefined;
-  const pendingCorrinoMightAllies =
-    pendingAction.kind === "corrino-might"
-      ? pendingAction.allyIds.map((allyId) => game.players.find((player) => player.id === allyId))
-      : [];
   const pendingPayResourceStrengthOwner =
     pendingAction.kind === "pay-resource-for-strength"
       ? game.players.find((player) => player.id === pendingAction.ownerId)
@@ -314,6 +306,15 @@ export function PendingActionPanel({
     pendingAction.kind === "pay-resource-for-influence"
       ? game.players.find((player) => player.id === pendingAction.influenceOwnerId)
       : undefined;
+  const pendingPayResourceTroopsOwner =
+    pendingAction.kind === "pay-resource-for-troops"
+      ? game.players.find((player) => player.id === pendingAction.ownerId)
+      : undefined;
+  const pendingPayResourceTroopsRecipients =
+    pendingAction.kind === "pay-resource-for-troops"
+      ? (Array.isArray(pendingAction.recipientIds) ? pendingAction.recipientIds : [])
+          .map((recipientId) => game.players.find((player) => player.id === recipientId))
+      : [];
   const pendingDesertCallCommander =
     pendingAction.kind === "desert-call"
       ? game.players.find((player) => player.id === pendingAction.commanderId)
@@ -494,9 +495,9 @@ export function PendingActionPanel({
           {pendingAction.kind === "conflict-vp-conversion" && `${pendingConflictVpOwner?.leader ?? "Player"} Conflict reward`}
           {pendingAction.kind === "command-respect" && `${pendingCommandRespectCommander?.leader ?? "Muad'Dib"} Command Respect`}
           {pendingAction.kind === "demand-results" && `${pendingDemandResultsCommander?.leader ?? "Shaddam"} Demand Results`}
-          {pendingAction.kind === "corrino-might" && `${pendingCorrinoMightCommander?.leader ?? "Shaddam"} Corrino Might`}
           {pendingAction.kind === "pay-resource-for-strength" && `${pendingPayResourceStrengthOwner?.leader ?? "Player"} ${pendingAction.source}`}
           {pendingAction.kind === "pay-resource-for-influence" && `${pendingPayResourceInfluenceOwner?.leader ?? "Player"} ${pendingAction.source}`}
+          {pendingAction.kind === "pay-resource-for-troops" && `${pendingPayResourceTroopsOwner?.leader ?? "Player"} ${pendingAction.source}`}
           {pendingAction.kind === "desert-call" && `${pendingDesertCallCommander?.leader ?? "Muad'Dib"} Desert Call`}
           {pendingAction.kind === "threaten-spice-production" && `${pendingThreatenSpiceCommander?.leader ?? "Muad'Dib"} Threaten Spice Production`}
           {pendingAction.kind === "throne-row" && `${pendingThroneOwner?.leader ?? "Shaddam"} Throne Row`}
@@ -738,16 +739,6 @@ export function PendingActionPanel({
         />
       )}
 
-      {pendingAction.kind === "corrino-might" && (
-        <PendingCorrinoMightPanel
-          allies={pendingCorrinoMightAllies}
-          commander={pendingCorrinoMightCommander}
-          cost={pendingAction.cost}
-          onChoose={chooseCorrinoMight}
-          onSkip={skipCorrinoMightChoice}
-        />
-      )}
-
       {pendingAction.kind === "pay-resource-for-strength" && (
         <PendingPayResourceForStrengthPanel
           cost={pendingAction.cost}
@@ -758,6 +749,20 @@ export function PendingActionPanel({
           recipient={pendingPayResourceStrengthRecipient}
           resource={pendingAction.resource}
           strength={pendingAction.strength}
+        />
+      )}
+
+      {pendingAction.kind === "pay-resource-for-troops" && (
+        <PendingPayResourceForTroopsPanel
+          cost={pendingAction.cost}
+          onChoose={choosePayResourceForTroops}
+          onSkip={skipPayResourceForTroopsChoice}
+          owner={pendingPayResourceTroopsOwner}
+          recipients={pendingPayResourceTroopsRecipients}
+          resource={pendingAction.resource}
+          source={pendingAction.source}
+          troops={pendingAction.troops}
+          trashSource={pendingAction.trashSource}
         />
       )}
 

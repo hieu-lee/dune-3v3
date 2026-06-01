@@ -22,7 +22,6 @@ import {
   resolveCommanderResourceSplitChoice,
   resolveCommandRespectTrade,
   resolveConflictTie,
-  resolveCorrinoMightChoice,
   resolveDemandResultsChoice,
   resolveDesertCallChoice,
   resolveDiscardCardForInfluenceAndDrawChoice,
@@ -38,6 +37,7 @@ import {
   resolveOptionalSpacePayment,
   resolvePayResourceForInfluenceChoice,
   resolvePayResourceForStrengthChoice,
+  resolvePayResourceForTroopsChoice,
   resolveRetreatTroopsForStrength,
   resolveShaddamSignetRingChoice,
   resolveSietchTabrChoice,
@@ -47,7 +47,6 @@ import {
   skipCommandRespect,
   skipConflictVpConversion,
   skipControlDefenseTroop,
-  skipCorrinoMight,
   skipDemandResults,
   skipDesertCall,
   skipDiscardCardForInfluenceAndDraw,
@@ -56,6 +55,7 @@ import {
   skipOptionalSpacePayment,
   skipPayResourceForInfluence,
   skipPayResourceForStrength,
+  skipPayResourceForTroops,
   skipRecallSpy,
   skipRetreatTroopsForStrength,
   skipThreatenSpiceProduction,
@@ -198,14 +198,14 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     runPending("demand-results", (current, pending) => maybeStartCombatPhase(resolveDemandResultsChoice(current, pending, optionIndex)));
   const skipDemandResultsChoice = () =>
     runPending("demand-results", (current, pending) => maybeStartCombatPhase(skipDemandResults(current, pending)));
-  const chooseCorrinoMight = () =>
-    runPending("corrino-might", (current, pending) => maybeStartCombatPhase(resolveCorrinoMightChoice(current, pending)));
-  const skipCorrinoMightChoice = () =>
-    runPending("corrino-might", (current, pending) => maybeStartCombatPhase(skipCorrinoMight(current, pending)));
   const choosePayResourceForStrength = () =>
     runPending("pay-resource-for-strength", (current, pending) => maybeStartCombatPhase(resolvePayResourceForStrengthChoice(current, pending)));
   const skipPayResourceForStrengthChoice = () =>
     runPending("pay-resource-for-strength", (current, pending) => maybeStartCombatPhase(skipPayResourceForStrength(current, pending)));
+  const choosePayResourceForTroops = () =>
+    runPending("pay-resource-for-troops", (current, pending) => maybeStartCombatPhase(resolvePayResourceForTroopsChoice(current, pending)));
+  const skipPayResourceForTroopsChoice = () =>
+    runPending("pay-resource-for-troops", (current, pending) => maybeStartCombatPhase(skipPayResourceForTroops(current, pending)));
   const choosePayResourceForInfluence = () =>
     runPending("pay-resource-for-influence", (current, pending) => maybeStartCombatPhase(resolvePayResourceForInfluenceChoice(current, pending)));
   const skipPayResourceForInfluenceChoice = () =>
@@ -285,7 +285,6 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     chooseConflictInfluence,
     chooseBoardInfluence,
     chooseConflictTieWinner,
-    chooseCorrinoMight,
     chooseDemandResults,
     chooseDesertCall,
     chooseDiscardCardForInfluenceAndDraw,
@@ -299,6 +298,7 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     chooseMakerReward,
     choosePayResourceForInfluence,
     choosePayResourceForStrength,
+    choosePayResourceForTroops,
     chooseRetreatTroopsForStrength,
     chooseShaddamSignet,
     chooseSietchTabr,
@@ -321,7 +321,6 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     skipCommandRespectChoice,
     skipControlDefense,
     skipConflictVpReward,
-    skipCorrinoMightChoice,
     skipDemandResultsChoice,
     skipDesertCallChoice,
     skipDiscardCardForInfluenceAndDrawChoice,
@@ -330,6 +329,7 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     skipOptionalSpacePaymentChoice,
     skipPayResourceForInfluenceChoice,
     skipPayResourceForStrengthChoice,
+    skipPayResourceForTroopsChoice,
     skipRecall,
     skipRetreatTroopsForStrengthChoice,
     skipThreatenSpiceProductionChoice,

@@ -25,6 +25,8 @@ import type {
   Resources,
   Role,
   TeamId,
+  TroopEffectDestination,
+  TroopEffectRecipient,
   TrashCardZone,
 } from "./types";
 
@@ -85,6 +87,18 @@ export type RevealPayResourceForStrength = {
   cost: number;
   strength: number;
   optional: true;
+  source?: string;
+};
+
+export type RevealPayResourceForTroops = {
+  selector: PlayerSelector;
+  resource: ResourceId;
+  cost: number;
+  troops: number;
+  recipient: TroopEffectRecipient;
+  destination: TroopEffectDestination;
+  optional: true;
+  trashSource: boolean;
   source?: string;
 };
 
@@ -223,6 +237,18 @@ function validateFixedAmount(label: string, amount: number) {
 
 function validateSourceLabel(label: string, value: unknown) {
   if (value !== undefined && (typeof value !== "string" || value.trim().length === 0)) {
+    invalidSpecField(label, value);
+  }
+}
+
+function validateOptionalBoolean(label: string, value: unknown) {
+  if (value !== undefined && typeof value !== "boolean") {
+    invalidSpecField(label, value);
+  }
+}
+
+function validateOptionalTrue(label: string, value: unknown) {
+  if (value !== undefined && value !== true) {
     invalidSpecField(label, value);
   }
 }
@@ -384,10 +410,32 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     validateSourceLabel("pay-resource-for-strength source", effect.source);
     validateAmount(effect.cost);
     validateAmount(effect.strength);
-    const optional = (effect as { optional?: unknown }).optional;
-    if (optional === false) {
-      invalidSpecField("pay-resource-for-strength optional", optional);
+    validateOptionalTrue("pay-resource-for-strength optional", (effect as { optional?: unknown }).optional);
+    return;
+  }
+  if (effect.kind === "pay-resource-for-troops") {
+    if (trigger !== "reveal") {
+      throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
     }
+    if (effect.selector !== "self") {
+      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
+    if (!supportedResources.has(effect.resource)) {
+      throw new Error(`Unsupported effect resource "${effect.resource}"`);
+    }
+    const recipient = (effect as { recipient?: unknown }).recipient;
+    if (recipient !== "same-team-allies") {
+      invalidSpecField("pay-resource-for-troops recipient", recipient);
+    }
+    const destination = (effect as { destination?: unknown }).destination;
+    if (destination !== "garrison") {
+      invalidSpecField("pay-resource-for-troops destination", destination);
+    }
+    validateSourceLabel("pay-resource-for-troops source", effect.source);
+    validateAmount(effect.cost);
+    validateAmount(effect.troops);
+    validateOptionalTrue("pay-resource-for-troops optional", (effect as { optional?: unknown }).optional);
+    validateOptionalBoolean("pay-resource-for-troops trashSource", (effect as { trashSource?: unknown }).trashSource);
     return;
   }
   if (effect.kind === "discard-card-for-influence-and-draw") {
@@ -414,16 +462,15 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     if (effect.faction !== "board-space" && !supportedFactions.has(effect.faction)) {
       throw new Error(`Unsupported effect faction "${effect.faction}"`);
     }
-    if (effect.recipient !== "board-effect-recipient") {
-      invalidSpecField("pay-resource-for-influence recipient", effect.recipient);
+    const recipient = (effect as { recipient?: unknown }).recipient;
+    if (recipient !== "board-effect-recipient") {
+      invalidSpecField("pay-resource-for-influence recipient", recipient);
     }
     validateSourceLabel("pay-resource-for-influence source", effect.source);
     validateAmount(effect.cost);
     validateAmount(effect.amount);
-    const optional = (effect as { optional?: unknown }).optional;
-    if (optional === false) {
-      invalidSpecField("pay-resource-for-influence optional", optional);
-    }
+    validateOptionalTrue("pay-resource-for-influence optional", (effect as { optional?: unknown }).optional);
+    validateOptionalBoolean("pay-resource-for-influence trashSource", (effect as { trashSource?: unknown }).trashSource);
     return;
   }
   if (effect.kind === "commander-resource-split") {
@@ -757,6 +804,9 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
   if (effect.kind === "pay-resource-for-strength") {
     return result;
   }
+  if (effect.kind === "pay-resource-for-troops") {
+    return result;
+  }
   if (effect.kind === "discard-card-for-influence-and-draw") {
     return result;
   }
@@ -985,6 +1035,30 @@ export function resolveRevealPayResourceForStrengths(
         cost: amountFor(effect.cost, context.source),
         strength: amountFor(effect.strength, context.source),
         optional: true,
+        source: effect.source,
+      }));
+  });
+}
+
+export function resolveRevealPayResourceForTroops(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): RevealPayResourceForTroops[] {
+  specs?.forEach(validateSpec);
+  return (specs ?? []).flatMap((spec) => {
+    if (spec.trigger !== "reveal") return [];
+    if (!specApplies(spec, context)) return [];
+    return spec.effects
+      .filter((effect) => effect.kind === "pay-resource-for-troops")
+      .map((effect) => ({
+        selector: effect.selector,
+        resource: effect.resource,
+        cost: amountFor(effect.cost, context.source),
+        troops: amountFor(effect.troops, context.source),
+        recipient: effect.recipient,
+        destination: effect.destination,
+        optional: true,
+        trashSource: effect.trashSource ?? false,
         source: effect.source,
       }));
   });

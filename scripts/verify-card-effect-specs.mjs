@@ -97,6 +97,7 @@ try {
   const demandAttention = data.muadDibCommanderCards.find((card) => card.name === "Demand Attention");
   const muadDibSignet = data.muadDibCommanderCards.find((card) => card.name === "Signet Ring");
   const usul = data.muadDibCommanderCards.find((card) => card.name === "Usul");
+  const corrinoMight = data.emperorCommanderCards.find((card) => card.name === "Corrino Might");
   const criticalShipments = data.emperorCommanderCards.find((card) => card.name === "Critical Shipments");
   const devastatingAssault = data.emperorCommanderCards.find((card) => card.name === "Devastating Assault");
   const imperialTent = data.emperorCommanderCards.find((card) => card.name === "Imperial Tent");
@@ -123,7 +124,7 @@ try {
     northernWatermaster &&
     paracompass,
   );
-  assert.ok(prepareTheWay && limitedLandsraadAccess && demandAttention && muadDibSignet && usul && criticalShipments && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
+  assert.ok(prepareTheWay && limitedLandsraadAccess && demandAttention && muadDibSignet && usul && corrinoMight && criticalShipments && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
   assert.ok(arrakeen && haggaBasin && imperialBasin && secrets && highCouncil);
   assert.equal(revealSpecCards.length, 34, "Unexpected number of cards with declarative Reveal specs");
   assert.deepEqual(
@@ -456,6 +457,25 @@ try {
       spec.effects.some((effect) => effect.kind === "gain-resource" && effect.resource === "solari" && effect.amount === 2)
     ),
     "Paracompass should carry a Solari Agent spec",
+  );
+  assert.ok(
+    corrinoMight.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.conditions?.some((condition) => condition.kind === "has-team" && condition.team === "shaddam") &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Commander") &&
+      spec.effects.some((effect) =>
+        effect.kind === "pay-resource-for-troops" &&
+        effect.selector === "self" &&
+        effect.resource === "spice" &&
+        effect.cost === 3 &&
+        effect.troops === 2 &&
+        effect.recipient === "same-team-allies" &&
+        effect.destination === "garrison" &&
+        effect.trashSource === true &&
+        effect.source === "Corrino Might"
+      )
+    ),
+    "Corrino Might should carry a typed reveal troop-payment spec",
   );
   assert.ok(
     devastatingAssault.effects?.some((spec) =>
@@ -1071,6 +1091,24 @@ try {
     /Invalid pay-resource-for-strength source ""/,
     "Resource-for-strength specs should reject empty source labels",
   );
+  const invalidPayResourceStrengthOptionalCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-pay-resource-strength-optional-card",
+    name: "Effect Spec Invalid Pay Resource Strength Optional",
+    effects: [revealSpec([{
+      kind: "pay-resource-for-strength",
+      selector: "self",
+      resource: "spice",
+      cost: 1,
+      strength: 2,
+      optional: "false",
+    }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [invalidPayResourceStrengthOptionalCard], highCouncilSeat: false }),
+    /Invalid pay-resource-for-strength optional "false"/,
+    "Resource-for-strength specs should reject non-true optional values",
+  );
   const requiredPayResourceStrengthCard = {
     ...convincingArgument,
     id: "effect-spec-required-pay-resource-strength-card",
@@ -1139,6 +1177,219 @@ try {
   );
   assert.equal(playerById(selfPayResolved, p2.id).resources.spice, 0, "Self resource-for-strength should spend the owner resource");
   assert.equal(playerById(selfPayResolved, p2.id).conflict, 5, "Self resource-for-strength should add strength to the same player");
+  const agentPayResourceTroopsCard = {
+    ...convincingArgument,
+    id: "effect-spec-agent-pay-resource-troops-card",
+    name: "Effect Spec Agent Pay Resource Troops",
+    effects: [agentSpec([{
+      kind: "pay-resource-for-troops",
+      selector: "self",
+      resource: "spice",
+      cost: 1,
+      troops: 2,
+      recipient: "same-team-allies",
+      destination: "garrison",
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(agentPayResourceTroopsCard, p2, p2),
+    /Unsupported effect "pay-resource-for-troops" for agent-play/,
+    "Resource-for-troops specs should stay in Reveal until other trigger resolvers support them",
+  );
+  const invalidPayResourceTroopsSelectorCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-pay-resource-troops-selector-card",
+    name: "Effect Spec Invalid Pay Resource Troops Selector",
+    effects: [revealSpec([{
+      kind: "pay-resource-for-troops",
+      selector: "activated-ally",
+      resource: "spice",
+      cost: 1,
+      troops: 2,
+      recipient: "same-team-allies",
+      destination: "garrison",
+    }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [invalidPayResourceTroopsSelectorCard], highCouncilSeat: false }),
+    /Unsupported effect selector "activated-ally" for reveal/,
+    "Resource-for-troops specs should reject activated Ally reveal selectors",
+  );
+  const invalidPayResourceTroopsResourceCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-pay-resource-troops-resource-card",
+    name: "Effect Spec Invalid Pay Resource Troops Resource",
+    effects: [revealSpec([{
+      kind: "pay-resource-for-troops",
+      selector: "self",
+      resource: "melange",
+      cost: 1,
+      troops: 2,
+      recipient: "same-team-allies",
+      destination: "garrison",
+    }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [invalidPayResourceTroopsResourceCard], highCouncilSeat: false }),
+    /Unsupported effect resource "melange"/,
+    "Resource-for-troops specs should reject unsupported resource ids",
+  );
+  const invalidPayResourceTroopsRecipientCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-pay-resource-troops-recipient-card",
+    name: "Effect Spec Invalid Pay Resource Troops Recipient",
+    effects: [revealSpec([{
+      kind: "pay-resource-for-troops",
+      selector: "self",
+      resource: "spice",
+      cost: 1,
+      troops: 2,
+      recipient: "self",
+      destination: "garrison",
+    }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [invalidPayResourceTroopsRecipientCard], highCouncilSeat: false }),
+    /Invalid pay-resource-for-troops recipient "self"/,
+    "Resource-for-troops specs should reject unsupported recipient routing",
+  );
+  const invalidPayResourceTroopsDestinationCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-pay-resource-troops-destination-card",
+    name: "Effect Spec Invalid Pay Resource Troops Destination",
+    effects: [revealSpec([{
+      kind: "pay-resource-for-troops",
+      selector: "self",
+      resource: "spice",
+      cost: 1,
+      troops: 2,
+      recipient: "same-team-allies",
+      destination: "conflict",
+    }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [invalidPayResourceTroopsDestinationCard], highCouncilSeat: false }),
+    /Invalid pay-resource-for-troops destination "conflict"/,
+    "Resource-for-troops specs should reject unsupported troop destinations",
+  );
+  const invalidPayResourceTroopsCostCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-pay-resource-troops-cost-card",
+    name: "Effect Spec Invalid Pay Resource Troops Cost",
+    effects: [revealSpec([{
+      kind: "pay-resource-for-troops",
+      selector: "self",
+      resource: "spice",
+      cost: -1,
+      troops: 2,
+      recipient: "same-team-allies",
+      destination: "garrison",
+    }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [invalidPayResourceTroopsCostCard], highCouncilSeat: false }),
+    /Invalid effect amount "-1"/,
+    "Resource-for-troops specs should require non-negative costs",
+  );
+  const invalidPayResourceTroopsAmountCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-pay-resource-troops-amount-card",
+    name: "Effect Spec Invalid Pay Resource Troops Amount",
+    effects: [revealSpec([{
+      kind: "pay-resource-for-troops",
+      selector: "self",
+      resource: "spice",
+      cost: 1,
+      troops: -1,
+      recipient: "same-team-allies",
+      destination: "garrison",
+    }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [invalidPayResourceTroopsAmountCard], highCouncilSeat: false }),
+    /Invalid effect amount "-1"/,
+    "Resource-for-troops specs should require non-negative troop amounts",
+  );
+  const invalidPayResourceTroopsSourceCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-pay-resource-troops-source-card",
+    name: "Effect Spec Invalid Pay Resource Troops Source",
+    effects: [revealSpec([{
+      kind: "pay-resource-for-troops",
+      selector: "self",
+      resource: "spice",
+      cost: 1,
+      troops: 2,
+      recipient: "same-team-allies",
+      destination: "garrison",
+      source: "",
+    }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [invalidPayResourceTroopsSourceCard], highCouncilSeat: false }),
+    /Invalid pay-resource-for-troops source ""/,
+    "Resource-for-troops specs should reject empty source labels",
+  );
+  const invalidPayResourceTroopsTrashSourceCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-pay-resource-troops-trash-source-card",
+    name: "Effect Spec Invalid Pay Resource Troops Trash Source",
+    effects: [revealSpec([{
+      kind: "pay-resource-for-troops",
+      selector: "self",
+      resource: "spice",
+      cost: 1,
+      troops: 2,
+      recipient: "same-team-allies",
+      destination: "garrison",
+      trashSource: "false",
+    }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [invalidPayResourceTroopsTrashSourceCard], highCouncilSeat: false }),
+    /Invalid pay-resource-for-troops trashSource "false"/,
+    "Resource-for-troops specs should reject non-boolean trashSource values",
+  );
+  const invalidPayResourceTroopsOptionalCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-pay-resource-troops-optional-card",
+    name: "Effect Spec Invalid Pay Resource Troops Optional",
+    effects: [revealSpec([{
+      kind: "pay-resource-for-troops",
+      selector: "self",
+      resource: "spice",
+      cost: 1,
+      troops: 2,
+      recipient: "same-team-allies",
+      destination: "garrison",
+      optional: "false",
+    }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [invalidPayResourceTroopsOptionalCard], highCouncilSeat: false }),
+    /Invalid pay-resource-for-troops optional "false"/,
+    "Resource-for-troops specs should reject non-true optional values",
+  );
+  const requiredPayResourceTroopsCard = {
+    ...convincingArgument,
+    id: "effect-spec-required-pay-resource-troops-card",
+    name: "Effect Spec Required Pay Resource Troops",
+    effects: [revealSpec([{
+      kind: "pay-resource-for-troops",
+      selector: "self",
+      resource: "spice",
+      cost: 1,
+      troops: 2,
+      recipient: "same-team-allies",
+      destination: "garrison",
+      optional: false,
+    }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [requiredPayResourceTroopsCard], highCouncilSeat: false }),
+    /Invalid pay-resource-for-troops optional "false"/,
+    "Resource-for-troops specs should stay optional so queued payments cannot deadlock if resources change",
+  );
   const revealPayResourceInfluenceCard = {
     ...convincingArgument,
     id: "effect-spec-reveal-pay-resource-influence-card",
@@ -1291,6 +1542,46 @@ try {
     () => state.applyCardAgentEffect(invalidPayResourceInfluenceSourceCard, p2, p2),
     /Invalid pay-resource-for-influence source ""/,
     "Resource-for-Influence specs should reject empty source labels",
+  );
+  const invalidPayResourceInfluenceTrashSourceCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-pay-resource-influence-trash-source-card",
+    name: "Effect Spec Invalid Pay Resource Influence Trash Source",
+    effects: [agentSpec([{
+      kind: "pay-resource-for-influence",
+      selector: "self",
+      resource: "solari",
+      cost: 1,
+      faction: "bene",
+      amount: 1,
+      recipient: "board-effect-recipient",
+      trashSource: "false",
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidPayResourceInfluenceTrashSourceCard, p2, p2),
+    /Invalid pay-resource-for-influence trashSource "false"/,
+    "Resource-for-Influence specs should reject non-boolean trashSource values",
+  );
+  const invalidPayResourceInfluenceOptionalCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-pay-resource-influence-optional-card",
+    name: "Effect Spec Invalid Pay Resource Influence Optional",
+    effects: [agentSpec([{
+      kind: "pay-resource-for-influence",
+      selector: "self",
+      resource: "solari",
+      cost: 1,
+      faction: "bene",
+      amount: 1,
+      recipient: "board-effect-recipient",
+      optional: "false",
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidPayResourceInfluenceOptionalCard, p2, p2),
+    /Invalid pay-resource-for-influence optional "false"/,
+    "Resource-for-Influence specs should reject non-true optional values",
   );
   const requiredPayResourceInfluenceCard = {
     ...convincingArgument,

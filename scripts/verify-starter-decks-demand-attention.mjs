@@ -227,6 +227,78 @@ export function verifyStarterDeckDemandAttention({
     missingRecipientDemandAttentionState,
     "Demand Attention should not resolve if the pending recipient is no longer in the game",
   );
+  const unknownResourceDemandAttentionPending = {
+    ...demandAttentionPending,
+    resource: "melange",
+  };
+  const unknownResourceDemandAttentionState = {
+    ...baseDemandAttentionResolution,
+    pendingAction: unknownResourceDemandAttentionPending,
+  };
+  assert.equal(
+    state.resolvePayResourceForInfluenceChoice(unknownResourceDemandAttentionState, unknownResourceDemandAttentionPending),
+    unknownResourceDemandAttentionState,
+    "Demand Attention should reject malformed pending actions with unsupported resource ids",
+  );
+  assert.equal(
+    state.skipPayResourceForInfluence(unknownResourceDemandAttentionState, unknownResourceDemandAttentionPending),
+    unknownResourceDemandAttentionState,
+    "Demand Attention skip should reject malformed pending actions with unsupported resource ids",
+  );
+  const invalidTrashSourceDemandAttentionPending = {
+    ...demandAttentionPending,
+    trashSource: "false",
+  };
+  const invalidTrashSourceDemandAttentionState = {
+    ...baseDemandAttentionResolution,
+    pendingAction: invalidTrashSourceDemandAttentionPending,
+  };
+  assert.equal(
+    state.resolvePayResourceForInfluenceChoice(invalidTrashSourceDemandAttentionState, invalidTrashSourceDemandAttentionPending),
+    invalidTrashSourceDemandAttentionState,
+    "Demand Attention should reject malformed pending actions with non-boolean trashSource",
+  );
+  assert.equal(
+    state.skipPayResourceForInfluence(invalidTrashSourceDemandAttentionState, invalidTrashSourceDemandAttentionPending),
+    invalidTrashSourceDemandAttentionState,
+    "Demand Attention skip should reject malformed pending actions with non-boolean trashSource",
+  );
+  const missingTrashCardDemandAttentionPending = {
+    ...demandAttentionPending,
+  };
+  delete missingTrashCardDemandAttentionPending.cardId;
+  const missingTrashCardDemandAttentionState = {
+    ...baseDemandAttentionResolution,
+    pendingAction: missingTrashCardDemandAttentionPending,
+  };
+  assert.equal(
+    state.resolvePayResourceForInfluenceChoice(missingTrashCardDemandAttentionState, missingTrashCardDemandAttentionPending),
+    missingTrashCardDemandAttentionState,
+    "Demand Attention should reject malformed pending actions that trash without a source card id",
+  );
+  assert.equal(
+    state.skipPayResourceForInfluence(missingTrashCardDemandAttentionState, missingTrashCardDemandAttentionPending),
+    missingTrashCardDemandAttentionState,
+    "Demand Attention skip should reject malformed pending actions that trash without a source card id",
+  );
+  const requiredDemandAttentionPending = {
+    ...demandAttentionPending,
+    optional: false,
+  };
+  const requiredDemandAttentionState = {
+    ...baseDemandAttentionResolution,
+    pendingAction: requiredDemandAttentionPending,
+  };
+  assert.equal(
+    state.resolvePayResourceForInfluenceChoice(requiredDemandAttentionState, requiredDemandAttentionPending),
+    requiredDemandAttentionState,
+    "Demand Attention should reject malformed required resource-for-Influence pending actions",
+  );
+  assert.equal(
+    state.skipPayResourceForInfluence(requiredDemandAttentionState, requiredDemandAttentionPending),
+    requiredDemandAttentionState,
+    "Demand Attention skip should reject malformed required resource-for-Influence pending actions",
+  );
 
   const personalDemandAttentionSource = {
     ...baseDemandAttentionSource,

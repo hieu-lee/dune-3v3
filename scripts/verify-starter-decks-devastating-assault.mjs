@@ -169,6 +169,21 @@ try {
   assert.equal(playerById(skipped, shaddam.id).resources.solari, 3, "Skipping Devastating Assault should not spend Solari");
   assert.equal(playerById(skipped, ally.id).conflict, 6, "Skipping Devastating Assault should keep only Swordmaster strength");
   assert.equal(skipped.pendingAction, undefined);
+  const requiredStrengthPending = {
+    ...revealed.pendingAction,
+    optional: false,
+  };
+  const requiredStrengthState = { ...revealed, pendingAction: requiredStrengthPending };
+  assert.equal(
+    state.resolvePayResourceForStrengthChoice(requiredStrengthState, requiredStrengthPending),
+    requiredStrengthState,
+    "Devastating Assault should reject malformed required resource-for-strength pending actions",
+  );
+  assert.equal(
+    state.skipPayResourceForStrength(requiredStrengthState, requiredStrengthPending),
+    requiredStrengthState,
+    "Devastating Assault skip should reject malformed required resource-for-strength pending actions",
+  );
 
   const noUnitsReveal = turnActions.revealTurnAction(
     {

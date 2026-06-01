@@ -399,6 +399,26 @@ async function createLeaderCharacterChoiceStates(server, initialPlayableGame) {
     secrets,
   );
   assert.ok(demandAttentionPending, "Expected a derived Demand Attention payment pending action");
+  const debugCorrinoMight = { ...corrinoMight, id: "debug-corrino-might" };
+  const corrinoMightState = {
+    ...base,
+    activeSeat: p4Seat,
+    players: base.players.map((player) =>
+      player.id === "p4"
+        ? {
+            ...player,
+            resources: { ...player.resources, spice: 3 },
+            playArea: [debugCorrinoMight, ...player.playArea],
+          }
+        : player,
+    ),
+  };
+  const corrinoMightPending = state.pendingActionsForRevealPayResourceForTroops(
+    debugCorrinoMight,
+    corrinoMightState.players.find((player) => player.id === "p4"),
+    corrinoMightState,
+  )[0];
+  assert.ok(corrinoMightPending, "Expected a derived Corrino Might troop payment pending action");
 
   return {
     stabanUnseenNetwork: {
@@ -552,25 +572,8 @@ async function createLeaderCharacterChoiceStates(server, initialPlayableGame) {
       },
     },
     corrinoMight: {
-      ...base,
-      activeSeat: p4Seat,
-      players: base.players.map((player) =>
-        player.id === "p4"
-          ? {
-              ...player,
-              resources: { ...player.resources, spice: 3 },
-              playArea: [{ ...corrinoMight, id: "debug-corrino-might" }, ...player.playArea],
-            }
-          : player,
-      ),
-      pendingAction: {
-        kind: "corrino-might",
-        commanderId: "p4",
-        allyIds: ["p2", "p6"],
-        cost: 3,
-        cardId: "debug-corrino-might",
-        source: "Corrino Might",
-      },
+      ...corrinoMightState,
+      pendingAction: corrinoMightPending,
     },
     devastatingAssault: {
       ...devastatingAssaultState,

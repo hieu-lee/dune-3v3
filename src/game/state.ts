@@ -209,28 +209,27 @@ export {
 } from "./intrigue-deck";
 
 export {
-  corrinoMightCost,
   pendingActionForCard,
-  pendingActionForCorrinoMightReveal,
   pendingActionForJessicaOtherMemories,
   pendingActionForReverendMotherJessicaRepeat,
   pendingActionsForRevealPayResourceForStrength,
+  pendingActionsForRevealPayResourceForTroops,
   pendingActionsForReveal,
 } from "./card-pending-rules";
 
 export {
   resolveCommandRespectTrade,
-  resolveCorrinoMightChoice,
   resolveDemandResultsChoice,
   resolveDesertCallChoice,
   resolvePayResourceForInfluenceChoice,
   resolvePayResourceForStrengthChoice,
+  resolvePayResourceForTroopsChoice,
   skipCommandRespect,
-  skipCorrinoMight,
   skipDemandResults,
   skipDesertCall,
   skipPayResourceForInfluence,
   skipPayResourceForStrength,
+  skipPayResourceForTroops,
 } from "./commander-pending-rules";
 
 export {

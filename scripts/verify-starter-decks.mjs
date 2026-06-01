@@ -588,6 +588,7 @@ try {
     name: "Corrino Reveal Adjust Regression",
     sourceId: undefined,
     conditionalSwords: true,
+    effects: [],
   };
   const baseCorrinoMightCommander = {
     ...emperor,
@@ -614,16 +615,21 @@ try {
       return player;
     }),
   };
-  const corrinoMightPending = state.pendingActionForCorrinoMightReveal(
+  const [corrinoMightPending] = state.pendingActionsForRevealPayResourceForTroops(
     corrinoMight,
     baseCorrinoMightCommander,
     baseCorrinoMightGame,
   );
   assert.deepEqual(corrinoMightPending, {
-    kind: "corrino-might",
-    commanderId: emperor.id,
-    allyIds: [shaddamAlly.id, shaddamAllyB.id],
+    kind: "pay-resource-for-troops",
+    ownerId: emperor.id,
+    recipientIds: [shaddamAlly.id, shaddamAllyB.id],
+    resource: "spice",
     cost: 3,
+    troops: 2,
+    destination: "garrison",
+    optional: true,
+    trashSource: true,
     cardId: corrinoMight.id,
     source: "Corrino Might",
   });
@@ -676,8 +682,8 @@ try {
     corrinoMightPending,
     "Finishing printed reveal adjustment should expose queued Corrino Might",
   );
-  assert.equal(
-    state.pendingActionForCorrinoMightReveal(
+  assert.deepEqual(
+    state.pendingActionsForRevealPayResourceForTroops(
       corrinoMight,
       { ...baseCorrinoMightCommander, resources: { solari: 0, spice: 2, water: 0 } },
       {
@@ -689,11 +695,11 @@ try {
         ),
       },
     ),
-    undefined,
+    [],
     "Corrino Might should not queue when Shaddam cannot pay 3 spice",
   );
-  assert.equal(
-    state.pendingActionForCorrinoMightReveal(
+  assert.deepEqual(
+    state.pendingActionsForRevealPayResourceForTroops(
       corrinoMight,
       { ...baseCorrinoMightCommander, playArea: [] },
       {
@@ -703,21 +709,21 @@ try {
         ),
       },
     ),
-    undefined,
+    [],
     "Corrino Might should not queue before the revealed card enters play",
   );
-  assert.equal(
-    state.pendingActionForCorrinoMightReveal(corrinoMight, shaddamAlly, baseCorrinoMightGame),
-    undefined,
+  assert.deepEqual(
+    state.pendingActionsForRevealPayResourceForTroops(corrinoMight, shaddamAlly, baseCorrinoMightGame),
+    [],
     "Corrino Might should not trigger from an Ally starter deck owner",
   );
-  assert.equal(
-    state.pendingActionForCorrinoMightReveal(corrinoMight, muadDib, baseCorrinoMightGame),
-    undefined,
+  assert.deepEqual(
+    state.pendingActionsForRevealPayResourceForTroops(corrinoMight, muadDib, baseCorrinoMightGame),
+    [],
     "Corrino Might should not trigger for the opposing Commander",
   );
-  assert.equal(
-    state.pendingActionForCorrinoMightReveal(
+  assert.deepEqual(
+    state.pendingActionsForRevealPayResourceForTroops(
       corrinoMight,
       baseCorrinoMightCommander,
       {
@@ -725,11 +731,11 @@ try {
         players: baseCorrinoMightGame.players.filter((player) => player.id !== shaddamAllyB.id),
       },
     ),
-    undefined,
+    [],
     "Corrino Might should need both Shaddam Allies",
   );
 
-  const resolvedCorrinoMight = state.resolveCorrinoMightChoice(
+  const resolvedCorrinoMight = state.resolvePayResourceForTroopsChoice(
     {
       ...baseCorrinoMightGame,
       pendingAction: corrinoMightPending,
@@ -771,7 +777,7 @@ try {
   assert.equal(resolvedCorrinoMight.pendingAction, undefined, "Corrino Might resolution should advance pending action");
   assert.match(resolvedCorrinoMight.log[0], /spends 3 spice for Corrino Might/, "Corrino Might should log resolution");
 
-  const skippedCorrinoMight = state.skipCorrinoMight(
+  const skippedCorrinoMight = state.skipPayResourceForTroops(
     {
       ...baseCorrinoMightGame,
       pendingAction: corrinoMightPending,
@@ -802,7 +808,7 @@ try {
     pendingQueue: [],
   };
   assert.equal(
-    state.resolveCorrinoMightChoice(staleCorrinoMightState, corrinoMightPending),
+    state.resolvePayResourceForTroopsChoice(staleCorrinoMightState, corrinoMightPending),
     staleCorrinoMightState,
     "Stale Corrino Might should return the original state",
   );
@@ -815,13 +821,13 @@ try {
     ),
   };
   assert.equal(
-    state.resolveCorrinoMightChoice(noCardCorrinoMightState, corrinoMightPending),
+    state.resolvePayResourceForTroopsChoice(noCardCorrinoMightState, corrinoMightPending),
     noCardCorrinoMightState,
     "Corrino Might should not resolve if the card is no longer in play",
   );
   const duplicateAllyCorrinoMightPending = {
     ...corrinoMightPending,
-    allyIds: [shaddamAlly.id, shaddamAlly.id],
+    recipientIds: [shaddamAlly.id, shaddamAlly.id],
   };
   const duplicateAllyCorrinoMightState = {
     ...baseCorrinoMightGame,
@@ -829,9 +835,113 @@ try {
     pendingQueue: [],
   };
   assert.equal(
-    state.resolveCorrinoMightChoice(duplicateAllyCorrinoMightState, duplicateAllyCorrinoMightPending),
+    state.resolvePayResourceForTroopsChoice(duplicateAllyCorrinoMightState, duplicateAllyCorrinoMightPending),
     duplicateAllyCorrinoMightState,
     "Corrino Might should reject duplicate Ally IDs",
+  );
+  const missingAllyCorrinoMightPending = {
+    ...corrinoMightPending,
+    recipientIds: [shaddamAlly.id],
+  };
+  const missingAllyCorrinoMightState = {
+    ...baseCorrinoMightGame,
+    pendingAction: missingAllyCorrinoMightPending,
+    pendingQueue: [],
+  };
+  assert.equal(
+    state.resolvePayResourceForTroopsChoice(missingAllyCorrinoMightState, missingAllyCorrinoMightPending),
+    missingAllyCorrinoMightState,
+    "Corrino Might should reject malformed pending actions missing the second Ally",
+  );
+  const missingRecipientIdsCorrinoMightPending = {
+    ...corrinoMightPending,
+  };
+  delete missingRecipientIdsCorrinoMightPending.recipientIds;
+  const missingRecipientIdsCorrinoMightState = {
+    ...baseCorrinoMightGame,
+    pendingAction: missingRecipientIdsCorrinoMightPending,
+    pendingQueue: [],
+  };
+  assert.equal(
+    state.resolvePayResourceForTroopsChoice(missingRecipientIdsCorrinoMightState, missingRecipientIdsCorrinoMightPending),
+    missingRecipientIdsCorrinoMightState,
+    "Corrino Might should reject malformed pending actions with missing recipient IDs",
+  );
+  const unknownResourceCorrinoMightPending = {
+    ...corrinoMightPending,
+    resource: "melange",
+  };
+  const unknownResourceCorrinoMightState = {
+    ...baseCorrinoMightGame,
+    pendingAction: unknownResourceCorrinoMightPending,
+    pendingQueue: [],
+  };
+  assert.equal(
+    state.resolvePayResourceForTroopsChoice(unknownResourceCorrinoMightState, unknownResourceCorrinoMightPending),
+    unknownResourceCorrinoMightState,
+    "Corrino Might should reject malformed pending actions with unsupported resource ids",
+  );
+  assert.equal(
+    state.skipPayResourceForTroops(unknownResourceCorrinoMightState, unknownResourceCorrinoMightPending),
+    unknownResourceCorrinoMightState,
+    "Corrino Might skip should reject malformed pending actions with unsupported resource ids",
+  );
+  const invalidTrashSourceCorrinoMightPending = {
+    ...corrinoMightPending,
+    trashSource: "false",
+  };
+  const invalidTrashSourceCorrinoMightState = {
+    ...baseCorrinoMightGame,
+    pendingAction: invalidTrashSourceCorrinoMightPending,
+    pendingQueue: [],
+  };
+  assert.equal(
+    state.resolvePayResourceForTroopsChoice(invalidTrashSourceCorrinoMightState, invalidTrashSourceCorrinoMightPending),
+    invalidTrashSourceCorrinoMightState,
+    "Corrino Might should reject malformed pending actions with non-boolean trashSource",
+  );
+  assert.equal(
+    state.skipPayResourceForTroops(invalidTrashSourceCorrinoMightState, invalidTrashSourceCorrinoMightPending),
+    invalidTrashSourceCorrinoMightState,
+    "Corrino Might skip should reject malformed pending actions with non-boolean trashSource",
+  );
+  const missingTrashCardCorrinoMightPending = {
+    ...corrinoMightPending,
+  };
+  delete missingTrashCardCorrinoMightPending.cardId;
+  const missingTrashCardCorrinoMightState = {
+    ...baseCorrinoMightGame,
+    pendingAction: missingTrashCardCorrinoMightPending,
+    pendingQueue: [],
+  };
+  assert.equal(
+    state.resolvePayResourceForTroopsChoice(missingTrashCardCorrinoMightState, missingTrashCardCorrinoMightPending),
+    missingTrashCardCorrinoMightState,
+    "Corrino Might should reject malformed pending actions that trash without a source card id",
+  );
+  assert.equal(
+    state.skipPayResourceForTroops(missingTrashCardCorrinoMightState, missingTrashCardCorrinoMightPending),
+    missingTrashCardCorrinoMightState,
+    "Corrino Might skip should reject malformed pending actions that trash without a source card id",
+  );
+  const requiredCorrinoMightPending = {
+    ...corrinoMightPending,
+    optional: false,
+  };
+  const requiredCorrinoMightState = {
+    ...baseCorrinoMightGame,
+    pendingAction: requiredCorrinoMightPending,
+    pendingQueue: [],
+  };
+  assert.equal(
+    state.resolvePayResourceForTroopsChoice(requiredCorrinoMightState, requiredCorrinoMightPending),
+    requiredCorrinoMightState,
+    "Corrino Might should reject malformed required troop payment pending actions",
+  );
+  assert.equal(
+    state.skipPayResourceForTroops(requiredCorrinoMightState, requiredCorrinoMightPending),
+    requiredCorrinoMightState,
+    "Corrino Might skip should reject malformed required troop payment pending actions",
   );
   const poorCorrinoMightState = {
     ...baseCorrinoMightGame,
@@ -842,7 +952,7 @@ try {
     ),
   };
   assert.equal(
-    state.resolveCorrinoMightChoice(poorCorrinoMightState, corrinoMightPending),
+    state.resolvePayResourceForTroopsChoice(poorCorrinoMightState, corrinoMightPending),
     poorCorrinoMightState,
     "Corrino Might should not resolve if Shaddam no longer has 3 spice",
   );

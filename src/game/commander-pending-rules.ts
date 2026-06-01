@@ -3,11 +3,9 @@ import {
 } from "./data";
 import {
   isCommandRespectCommanderCard,
-  isCorrinoMightCommanderCard,
   isDemandResultsCommanderCard,
   isDesertCallCommanderCard,
 } from "./card-identifiers";
-import { corrinoMightCost } from "./card-pending-rules";
 import {
   canSummonSandworms,
   conflictDeploymentBlockedFor,
@@ -33,8 +31,8 @@ import type {
 
 type CommandRespectPendingAction = Extract<PendingAction, { kind: "command-respect" }>;
 type DemandResultsPendingAction = Extract<PendingAction, { kind: "demand-results" }>;
-type CorrinoMightPendingAction = Extract<PendingAction, { kind: "corrino-might" }>;
 type PayResourceForStrengthPendingAction = Extract<PendingAction, { kind: "pay-resource-for-strength" }>;
+type PayResourceForTroopsPendingAction = Extract<PendingAction, { kind: "pay-resource-for-troops" }>;
 type PayResourceForInfluencePendingAction = Extract<PendingAction, { kind: "pay-resource-for-influence" }>;
 type DesertCallPendingAction = Extract<PendingAction, { kind: "desert-call" }>;
 
@@ -43,6 +41,16 @@ const resourceLabels: Record<ResourceId, string> = {
   spice: "spice",
   water: "water",
 };
+
+function paymentPendingOptionalIsValid(pending: { optional?: unknown }) {
+  return pending.optional === true;
+}
+
+function paymentPendingTrashSourceIsValid(pending: { cardId?: string; trashSource?: unknown }) {
+  if (pending.trashSource !== undefined && typeof pending.trashSource !== "boolean") return false;
+  if (pending.trashSource === true && pending.cardId === undefined) return false;
+  return true;
+}
 
 export function resolveCommandRespectTrade(
   state: GameState,
@@ -201,65 +209,87 @@ export function skipDemandResults(state: GameState, pending: DemandResultsPendin
   };
 }
 
-export function resolveCorrinoMightChoice(
+export function resolvePayResourceForTroopsChoice(
   state: GameState,
-  pending: CorrinoMightPendingAction,
+  pending: PayResourceForTroopsPendingAction,
 ): GameState {
   if (state.pendingAction !== pending) return state;
-  const commander = state.players.find((player) => player.id === pending.commanderId);
-  const allyA = state.players.find((player) => player.id === pending.allyIds[0]);
-  const allyB = state.players.find((player) => player.id === pending.allyIds[1]);
+  const owner = state.players.find((player) => player.id === pending.ownerId);
+  const ownerResources = owner?.resources as Partial<Record<string, number>> | undefined;
+  const availableResource = ownerResources?.[pending.resource];
+  const resourceLabel = (resourceLabels as Partial<Record<string, string>>)[pending.resource];
+  const recipientIds = Array.isArray(pending.recipientIds) ? pending.recipientIds : [];
+  const recipients = recipientIds.map((recipientId) =>
+    state.players.find((player) => player.id === recipientId)
+  );
   if (
-    !commander ||
-    commander.team !== "shaddam" ||
-    commander.role !== "Commander" ||
-    commander.resources.spice < pending.cost ||
-    pending.cost !== corrinoMightCost ||
-    !commander.playArea.some((card) => card.id === pending.cardId && isCorrinoMightCommanderCard(card)) ||
-    !allyA ||
-    allyA.team !== commander.team ||
-    allyA.role !== "Ally" ||
-    !allyB ||
-    allyB.team !== commander.team ||
-    allyB.role !== "Ally" ||
-    allyA.id === allyB.id
+    !owner ||
+    !resourceLabel ||
+    typeof availableResource !== "number" ||
+    availableResource < pending.cost ||
+    pending.cost <= 0 ||
+    pending.troops <= 0 ||
+    pending.destination !== "garrison" ||
+    !paymentPendingOptionalIsValid(pending) ||
+    !paymentPendingTrashSourceIsValid(pending) ||
+    (pending.cardId !== undefined && !owner.playArea.some((card) => card.id === pending.cardId)) ||
+    recipientIds.length !== 2 ||
+    new Set(recipientIds).size !== recipientIds.length ||
+    recipients.some((recipient) =>
+      !recipient ||
+      recipient.team !== owner.team ||
+      recipient.role !== "Ally"
+    )
   ) {
     return state;
   }
 
+  const recipientSet = new Set(recipientIds);
   const players = state.players.map((player) => {
     let next = player;
-    if (player.id === commander.id) {
+    if (player.id === owner.id) {
       next = {
         ...player,
-        resources: { ...player.resources, spice: player.resources.spice - pending.cost },
-        playArea: player.playArea.filter((card) => card.id !== pending.cardId),
+        resources: { ...player.resources, [pending.resource]: availableResource - pending.cost },
+        ...(pending.trashSource && pending.cardId
+          ? { playArea: player.playArea.filter((card) => card.id !== pending.cardId) }
+          : {}),
       };
     }
-    if (player.id === allyA.id || player.id === allyB.id) {
-      next = { ...next, garrison: next.garrison + 2 };
+    if (recipientSet.has(player.id)) {
+      next = { ...next, garrison: next.garrison + pending.troops };
     }
     return next;
   });
+  const recipientLabel = recipients
+    .filter((recipient): recipient is Player => Boolean(recipient))
+    .map((recipient) => recipient.leader)
+    .join(" and ");
 
   return {
     ...state,
     players,
     ...advancePendingAction(state),
     log: [
-      `${commander.leader} spends 3 spice for ${pending.source}; ${allyA.leader} and ${allyB.leader} each gain 2 troops.`,
+      `${owner.leader} spends ${pending.cost} ${resourceLabel} for ${pending.source}; ${recipientLabel} each gain ${pending.troops} troops.`,
       ...state.log,
     ],
   };
 }
 
-export function skipCorrinoMight(state: GameState, pending: CorrinoMightPendingAction): GameState {
+export function skipPayResourceForTroops(state: GameState, pending: PayResourceForTroopsPendingAction): GameState {
   if (state.pendingAction !== pending) return state;
-  const commander = state.players.find((player) => player.id === pending.commanderId);
+  const owner = state.players.find((player) => player.id === pending.ownerId);
+  const resourceLabel = (resourceLabels as Partial<Record<string, string>>)[pending.resource];
+  if (
+    !resourceLabel ||
+    !paymentPendingOptionalIsValid(pending) ||
+    !paymentPendingTrashSourceIsValid(pending)
+  ) return state;
   return {
     ...state,
     ...advancePendingAction(state),
-    log: [`${commander?.leader ?? "Shaddam"} declines to pay 3 spice for ${pending.source}.`, ...state.log],
+    log: [`${owner?.leader ?? "Player"} declines to pay ${pending.cost} ${resourceLabel} for ${pending.source}.`, ...state.log],
   };
 }
 
@@ -269,12 +299,18 @@ export function resolvePayResourceForStrengthChoice(
 ): GameState {
   if (state.pendingAction !== pending) return state;
   const owner = state.players.find((player) => player.id === pending.ownerId);
+  const ownerResources = owner?.resources as Partial<Record<string, number>> | undefined;
+  const availableResource = ownerResources?.[pending.resource];
+  const resourceLabel = (resourceLabels as Partial<Record<string, string>>)[pending.resource];
   const recipient = state.players.find((player) => player.id === pending.combatRecipientId);
   if (
     !owner ||
-    owner.resources[pending.resource] < pending.cost ||
+    !resourceLabel ||
+    typeof availableResource !== "number" ||
+    availableResource < pending.cost ||
     pending.cost <= 0 ||
     pending.strength <= 0 ||
+    !paymentPendingOptionalIsValid(pending) ||
     (pending.cardId !== undefined && !owner.playArea.some((card) => card.id === pending.cardId)) ||
     !recipient ||
     (owner.role === "Commander" && (recipient.team !== owner.team || recipient.role !== "Ally")) ||
@@ -289,7 +325,7 @@ export function resolvePayResourceForStrengthChoice(
     if (player.id === owner.id) {
       next = {
         ...player,
-        resources: { ...player.resources, [pending.resource]: player.resources[pending.resource] - pending.cost },
+        resources: { ...player.resources, [pending.resource]: availableResource - pending.cost },
       };
     }
     if (player.id === recipient.id) {
@@ -303,7 +339,7 @@ export function resolvePayResourceForStrengthChoice(
     players,
     ...advancePendingAction(state),
     log: [
-      `${owner.leader} spends ${pending.cost} ${resourceLabels[pending.resource]} for ${pending.source}; ${recipient.leader} adds ${pending.strength} strength.`,
+      `${owner.leader} spends ${pending.cost} ${resourceLabel} for ${pending.source}; ${recipient.leader} adds ${pending.strength} strength.`,
       ...state.log,
     ],
   };
@@ -311,12 +347,14 @@ export function resolvePayResourceForStrengthChoice(
 
 export function skipPayResourceForStrength(state: GameState, pending: PayResourceForStrengthPendingAction): GameState {
   if (state.pendingAction !== pending) return state;
-  if (!pending.optional) return state;
+  if (!paymentPendingOptionalIsValid(pending)) return state;
   const owner = state.players.find((player) => player.id === pending.ownerId);
+  const resourceLabel = (resourceLabels as Partial<Record<string, string>>)[pending.resource];
+  if (!resourceLabel) return state;
   return {
     ...state,
     ...advancePendingAction(state),
-    log: [`${owner?.leader ?? "Player"} declines to pay ${pending.cost} ${resourceLabels[pending.resource]} for ${pending.source}.`, ...state.log],
+    log: [`${owner?.leader ?? "Player"} declines to pay ${pending.cost} ${resourceLabel} for ${pending.source}.`, ...state.log],
   };
 }
 
@@ -326,12 +364,19 @@ export function resolvePayResourceForInfluenceChoice(
 ): GameState {
   if (state.pendingAction !== pending) return state;
   const owner = state.players.find((player) => player.id === pending.ownerId);
+  const ownerResources = owner?.resources as Partial<Record<string, number>> | undefined;
+  const availableResource = ownerResources?.[pending.resource];
+  const resourceLabel = (resourceLabels as Partial<Record<string, string>>)[pending.resource];
   const recipient = state.players.find((player) => player.id === pending.influenceOwnerId);
   if (
     !owner ||
-    owner.resources[pending.resource] < pending.cost ||
+    !resourceLabel ||
+    typeof availableResource !== "number" ||
+    availableResource < pending.cost ||
     pending.cost <= 0 ||
     pending.amount <= 0 ||
+    !paymentPendingOptionalIsValid(pending) ||
+    !paymentPendingTrashSourceIsValid(pending) ||
     (pending.cardId !== undefined && !owner.playArea.some((card) => card.id === pending.cardId)) ||
     !recipient ||
     recipient.team !== owner.team ||
@@ -345,7 +390,7 @@ export function resolvePayResourceForInfluenceChoice(
     if (player.id === owner.id) {
       next = {
         ...next,
-        resources: { ...next.resources, [pending.resource]: next.resources[pending.resource] - pending.cost },
+        resources: { ...next.resources, [pending.resource]: availableResource - pending.cost },
         ...(pending.trashSource && pending.cardId
           ? { playArea: next.playArea.filter((card) => card.id !== pending.cardId) }
           : {}),
@@ -362,7 +407,7 @@ export function resolvePayResourceForInfluenceChoice(
     players,
     ...advancePendingAction(state),
     log: [
-      `${owner.leader} spends ${pending.cost} ${resourceLabels[pending.resource]} for ${pending.source}; ${recipient.leader} gains ${pending.amount} ${factionLabels[pending.faction]} Influence.`,
+      `${owner.leader} spends ${pending.cost} ${resourceLabel} for ${pending.source}; ${recipient.leader} gains ${pending.amount} ${factionLabels[pending.faction]} Influence.`,
       ...state.log,
     ],
   };
@@ -372,10 +417,16 @@ export function resolvePayResourceForInfluenceChoice(
 export function skipPayResourceForInfluence(state: GameState, pending: PayResourceForInfluencePendingAction): GameState {
   if (state.pendingAction !== pending) return state;
   const owner = state.players.find((player) => player.id === pending.ownerId);
+  const resourceLabel = (resourceLabels as Partial<Record<string, string>>)[pending.resource];
+  if (
+    !resourceLabel ||
+    !paymentPendingOptionalIsValid(pending) ||
+    !paymentPendingTrashSourceIsValid(pending)
+  ) return state;
   return {
     ...state,
     ...advancePendingAction(state),
-    log: [`${owner?.leader ?? "Player"} declines to pay ${pending.cost} ${resourceLabels[pending.resource]} for ${pending.source}.`, ...state.log],
+    log: [`${owner?.leader ?? "Player"} declines to pay ${pending.cost} ${resourceLabel} for ${pending.source}.`, ...state.log],
   };
 }
 

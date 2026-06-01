@@ -3,13 +3,13 @@ import {
   canMoveCardToThroneRow,
   isCommandRespectCommanderCard,
   isDemandResultsCommanderCard,
-  isDesertCallCommanderCard,
   isGenericSignetRingCard,
   isShaddamSignetRingCard,
   isThreatenSpiceProductionCommanderCard,
 } from "./card-identifiers";
 import {
   canSummonSandworms,
+  conflictDeploymentBlockedFor,
   playerHasConflictUnits,
 } from "./conflict-rules";
 import { playerTroopSupply } from "./deck-utils";
@@ -18,6 +18,7 @@ import {
   resolveAgentDiscardCardForInfluenceAndDraws,
   resolveAgentMoveCardToThroneRows,
   resolveAgentPayResourceForInfluences,
+  resolveAgentPayResourceForSandworms,
   resolveCardEffects,
   resolveRevealLoseInfluenceForIntrigues,
   resolveRevealPayResourceForStrengths,
@@ -256,6 +257,51 @@ function pendingActionForAgentPayResourceForInfluence(
     .find((pending): pending is PendingAction => Boolean(pending));
 }
 
+function pendingActionForAgentPayResourceForSandworms(
+  card: Card,
+  source: Player,
+  state?: GameState,
+  target?: Player,
+  space?: BoardSpace,
+): PendingAction | undefined {
+  if (!card.effects || !source.playArea.some((candidate) => candidate.id === card.id)) return undefined;
+  if (!state || !target || !space) return undefined;
+  const players = playersWithPendingCardEffect(state, source, target);
+  const effectState = { ...state, players };
+  const effects = resolveAgentPayResourceForSandworms(card.effects, {
+    trigger: "agent-play",
+    source,
+    target,
+    state: effectState,
+    space,
+  });
+  return effects
+    .map((effect): PendingAction | undefined => {
+      if (effect.selector !== "self" || effect.cost <= 0 || effect.sandworms <= 0) return undefined;
+      if (source.resources[effect.resource] < effect.cost) return undefined;
+      if (effect.recipient !== "activated-ally" || effect.destination !== "conflict") return undefined;
+      if (source.role !== "Commander" || target.team !== source.team || target.role !== "Ally") return undefined;
+      if (conflictDeploymentBlockedFor(state, source.id, target.id) || !canSummonSandworms(state, target, effect.sandworms)) {
+        return undefined;
+      }
+      return {
+        kind: "pay-resource-for-sandworms",
+        ownerId: source.id,
+        recipientId: target.id,
+        resource: effect.resource,
+        cost: effect.cost,
+        sandworms: effect.sandworms,
+        strength: effect.sandworms * 3,
+        destination: effect.destination,
+        optional: effect.optional,
+        ...(effect.trashSource ? { trashSource: true } : {}),
+        source: effect.source ?? card.name,
+        cardId: card.id,
+      };
+    })
+    .find((pending): pending is PendingAction => Boolean(pending));
+}
+
 function pendingActionForAgentThroneRowMove(
   card: Card,
   source: Player,
@@ -329,6 +375,8 @@ export function pendingActionForCard(
   if (agentDiscardInfluenceDrawPending) return agentDiscardInfluenceDrawPending;
   const agentPayResourceInfluencePending = pendingActionForAgentPayResourceForInfluence(card, source, state, target, space);
   if (agentPayResourceInfluencePending) return agentPayResourceInfluencePending;
+  const agentPayResourceSandwormsPending = pendingActionForAgentPayResourceForSandworms(card, source, state, target, space);
+  if (agentPayResourceSandwormsPending) return agentPayResourceSandwormsPending;
   const agentThroneRowPending = pendingActionForAgentThroneRowMove(card, source, state, target);
   if (agentThroneRowPending) return agentThroneRowPending;
   const agentCommanderResourceSplitPending = pendingActionForAgentCommanderResourceSplit(card, source, state, target);
@@ -392,25 +440,6 @@ export function pendingActionForCard(
       ownerId: source.id,
       cardId: card.id,
       source: "Water of Life",
-    };
-  }
-  if (
-    isDesertCallCommanderCard(card) &&
-    source.team === "muaddib" &&
-    source.role === "Commander" &&
-    source.resources.water >= 1 &&
-    state &&
-    space?.icon === "spice" &&
-    target?.team === source.team &&
-    target.role === "Ally" &&
-    canSummonSandworms(state, target, 1)
-  ) {
-    return {
-      kind: "desert-call",
-      commanderId: source.id,
-      allyId: target.id,
-      cardId: card.id,
-      source: card.name,
     };
   }
   if (

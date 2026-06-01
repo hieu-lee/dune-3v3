@@ -347,6 +347,7 @@ async function createLeaderCharacterChoiceStates(server, initialPlayableGame) {
     turnReverendMotherJessicaRepeats: {},
   };
   const secrets = findSpace(data.boardSpaces, "secrets", "Secrets");
+  const imperialBasin = findSpace(data.boardSpaces, "imperial-basin", "Imperial Basin");
   const debugDevastatingAssault = { ...devastatingAssault, id: "debug-devastating-assault" };
   const devastatingAssaultState = {
     ...base,
@@ -419,6 +420,33 @@ async function createLeaderCharacterChoiceStates(server, initialPlayableGame) {
     corrinoMightState,
   )[0];
   assert.ok(corrinoMightPending, "Expected a derived Corrino Might troop payment pending action");
+  const debugDesertCall = { ...desertCall, id: "debug-desert-call" };
+  const desertCallState = {
+    ...base,
+    activeSeat: p1Seat,
+    shieldWall: false,
+    players: base.players.map((player) => {
+      if (player.id === "p1") {
+        return {
+          ...player,
+          resources: { ...player.resources, water: 1 },
+          playArea: [debugDesertCall, ...player.playArea],
+        };
+      }
+      if (player.id === "p3") {
+        return { ...player, makerHooks: true, conflict: 0, deployedSandworms: 0 };
+      }
+      return player;
+    }),
+  };
+  const desertCallPending = state.pendingActionForCard(
+    debugDesertCall,
+    desertCallState.players.find((player) => player.id === "p1"),
+    desertCallState,
+    desertCallState.players.find((player) => player.id === "p3"),
+    imperialBasin,
+  );
+  assert.ok(desertCallPending, "Expected a derived Desert Call sandworm payment pending action");
 
   return {
     stabanUnseenNetwork: {
@@ -584,27 +612,8 @@ async function createLeaderCharacterChoiceStates(server, initialPlayableGame) {
       pendingAction: demandAttentionPending,
     },
     desertCall: {
-      ...base,
-      activeSeat: p1Seat,
-      shieldWall: false,
-      players: base.players.map((player) =>
-        player.id === "p1"
-          ? {
-              ...player,
-              resources: { ...player.resources, water: 1 },
-              playArea: [{ ...desertCall, id: "debug-desert-call" }, ...player.playArea],
-            }
-          : player.id === "p3"
-            ? { ...player, makerHooks: true, conflict: 0, deployedSandworms: 0 }
-          : player,
-      ),
-      pendingAction: {
-        kind: "desert-call",
-        commanderId: "p1",
-        allyId: "p3",
-        cardId: "debug-desert-call",
-        source: "Desert Call",
-      },
+      ...desertCallState,
+      pendingAction: desertCallPending,
     },
     threatenSpiceProduction: {
       ...base,

@@ -4,7 +4,6 @@ import {
 import {
   isCommandRespectCommanderCard,
   isDemandResultsCommanderCard,
-  isDesertCallCommanderCard,
 } from "./card-identifiers";
 import {
   canSummonSandworms,
@@ -34,7 +33,7 @@ type DemandResultsPendingAction = Extract<PendingAction, { kind: "demand-results
 type PayResourceForStrengthPendingAction = Extract<PendingAction, { kind: "pay-resource-for-strength" }>;
 type PayResourceForTroopsPendingAction = Extract<PendingAction, { kind: "pay-resource-for-troops" }>;
 type PayResourceForInfluencePendingAction = Extract<PendingAction, { kind: "pay-resource-for-influence" }>;
-type DesertCallPendingAction = Extract<PendingAction, { kind: "desert-call" }>;
+type PayResourceForSandwormsPendingAction = Extract<PendingAction, { kind: "pay-resource-for-sandworms" }>;
 
 const resourceLabels: Record<ResourceId, string> = {
   solari: "Solari",
@@ -50,6 +49,10 @@ function paymentPendingTrashSourceIsValid(pending: { cardId?: string; trashSourc
   if (pending.trashSource !== undefined && typeof pending.trashSource !== "boolean") return false;
   if (pending.trashSource === true && pending.cardId === undefined) return false;
   return true;
+}
+
+function paymentPendingAmountIsValid(value: unknown) {
+  return typeof value === "number" && Number.isInteger(value) && value > 0;
 }
 
 export function resolveCommandRespectTrade(
@@ -430,41 +433,55 @@ export function skipPayResourceForInfluence(state: GameState, pending: PayResour
   };
 }
 
-export function resolveDesertCallChoice(
+export function resolvePayResourceForSandwormsChoice(
   state: GameState,
-  pending: DesertCallPendingAction,
+  pending: PayResourceForSandwormsPendingAction,
 ): GameState {
-  const commander = state.players.find((player) => player.id === pending.commanderId);
-  const ally = state.players.find((player) => player.id === pending.allyId);
+  if (state.pendingAction !== pending) return state;
+  const owner = state.players.find((player) => player.id === pending.ownerId);
+  const ownerResources = owner?.resources as Partial<Record<string, number>> | undefined;
+  const availableResource = ownerResources?.[pending.resource];
+  const resourceLabel = (resourceLabels as Partial<Record<string, string>>)[pending.resource];
+  const recipient = state.players.find((player) => player.id === pending.recipientId);
   if (
-    !commander ||
-    commander.team !== "muaddib" ||
-    commander.role !== "Commander" ||
-    commander.resources.water < 1 ||
-    !commander.playArea.some((card) => card.id === pending.cardId && isDesertCallCommanderCard(card)) ||
-    !ally ||
-    ally.team !== commander.team ||
-    ally.role !== "Ally" ||
-    conflictDeploymentBlockedFor(state, commander.id, ally.id) ||
-    !canSummonSandworms(state, ally, 1)
+    !owner ||
+    !resourceLabel ||
+    typeof availableResource !== "number" ||
+    availableResource < pending.cost ||
+    !paymentPendingAmountIsValid(pending.cost) ||
+    !paymentPendingAmountIsValid(pending.sandworms) ||
+    !paymentPendingAmountIsValid(pending.strength) ||
+    pending.strength !== pending.sandworms * 3 ||
+    pending.destination !== "conflict" ||
+    !paymentPendingOptionalIsValid(pending) ||
+    !paymentPendingTrashSourceIsValid(pending) ||
+    (pending.cardId !== undefined && !owner.playArea.some((card) => card.id === pending.cardId)) ||
+    !recipient ||
+    owner.role !== "Commander" ||
+    recipient.team !== owner.team ||
+    recipient.role !== "Ally" ||
+    conflictDeploymentBlockedFor(state, owner.id, recipient.id) ||
+    !canSummonSandworms(state, recipient, pending.sandworms)
   ) {
     return state;
   }
 
   const players = state.players.map((player) => {
     let next = player;
-    if (player.id === commander.id) {
+    if (player.id === owner.id) {
       next = {
         ...next,
-        resources: { ...next.resources, water: next.resources.water - 1 },
-        playArea: next.playArea.filter((card) => card.id !== pending.cardId),
+        resources: { ...next.resources, [pending.resource]: availableResource - pending.cost },
+        ...(pending.trashSource && pending.cardId
+          ? { playArea: next.playArea.filter((card) => card.id !== pending.cardId) }
+          : {}),
       };
     }
-    if (player.id === ally.id) {
+    if (player.id === recipient.id) {
       next = {
         ...next,
-        conflict: next.conflict + 3,
-        deployedSandworms: next.deployedSandworms + 1,
+        conflict: next.conflict + pending.strength,
+        deployedSandworms: next.deployedSandworms + pending.sandworms,
       };
     }
     return next;
@@ -475,18 +492,29 @@ export function resolveDesertCallChoice(
     players,
     ...advancePendingAction(state),
     log: [
-      `${commander.leader} spends 1 water for ${pending.source}; ${ally.leader} summons 1 sandworm.`,
+      `${owner.leader} spends ${pending.cost} ${resourceLabel} for ${pending.source}; ${recipient.leader} summons ${pending.sandworms} sandworm${pending.sandworms === 1 ? "" : "s"}.`,
       ...state.log,
     ],
   };
-  return recordTurnUnitDeployment(nextState, commander.id, 1);
+  return recordTurnUnitDeployment(nextState, owner.id, pending.sandworms);
 }
 
-export function skipDesertCall(state: GameState, pending: DesertCallPendingAction): GameState {
-  const commander = state.players.find((player) => player.id === pending.commanderId);
+export function skipPayResourceForSandworms(state: GameState, pending: PayResourceForSandwormsPendingAction): GameState {
+  if (state.pendingAction !== pending) return state;
+  const owner = state.players.find((player) => player.id === pending.ownerId);
+  const resourceLabel = (resourceLabels as Partial<Record<string, string>>)[pending.resource];
+  if (
+    !resourceLabel ||
+    !paymentPendingAmountIsValid(pending.cost) ||
+    !paymentPendingAmountIsValid(pending.sandworms) ||
+    !paymentPendingAmountIsValid(pending.strength) ||
+    pending.strength !== pending.sandworms * 3 ||
+    !paymentPendingOptionalIsValid(pending) ||
+    !paymentPendingTrashSourceIsValid(pending)
+  ) return state;
   return {
     ...state,
     ...advancePendingAction(state),
-    log: [`${commander?.leader ?? "Muad'Dib"} declines to pay 1 water for ${pending.source}.`, ...state.log],
+    log: [`${owner?.leader ?? "Player"} declines to pay ${pending.cost} ${resourceLabel} for ${pending.source}.`, ...state.log],
   };
 }

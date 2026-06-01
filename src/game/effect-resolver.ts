@@ -7,6 +7,7 @@ import {
 import { playerConflictUnitCount } from "./conflict-rules";
 import { spyPostCount } from "./spy-posts";
 import type {
+  BoardSpace,
   Card,
   CardEffectSpec,
   CommanderResourceSplitOption,
@@ -24,6 +25,8 @@ import type {
   ResourceId,
   Resources,
   Role,
+  SandwormEffectDestination,
+  SandwormEffectRecipient,
   TeamId,
   TroopEffectDestination,
   TroopEffectRecipient,
@@ -48,6 +51,7 @@ export type GameEffectContext = {
   trigger: GameEffectTrigger;
   source: Player;
   target?: Player;
+  space?: Pick<BoardSpace, "icon">;
   state?: EffectResolverState;
 };
 
@@ -121,6 +125,18 @@ export type AgentPayResourceForInfluence = {
   source?: string;
 };
 
+export type AgentPayResourceForSandworms = {
+  selector: PlayerSelector;
+  resource: ResourceId;
+  cost: number;
+  sandworms: number;
+  recipient: SandwormEffectRecipient;
+  destination: SandwormEffectDestination;
+  optional: true;
+  trashSource: boolean;
+  source?: string;
+};
+
 export type AgentMoveCardToThroneRow = {
   selector: PlayerSelector;
   source?: string;
@@ -185,6 +201,7 @@ const supportedTriggers = new Set<GameEffectTrigger>([
 ]);
 
 const supportedResources = new Set<ResourceId>(["solari", "spice", "water"]);
+const supportedIcons = new Set<IconId>(["emperor", "spacing", "bene", "fremen", "landsraad", "city", "spice", "spy"]);
 const supportedTrashZones = new Set<TrashCardZone>(["hand", "discard", "playArea"]);
 const supportedFactions = new Set<FactionId>([
   "emperor",
@@ -267,6 +284,10 @@ function mergeEffectSourceLabel(
 
 function validateCondition(condition: GameEffectConditionSpec) {
   if (condition.kind === "visited-maker-space") return;
+  if (condition.kind === "visited-space-icon") {
+    if (supportedIcons.has(condition.icon)) return;
+    throw new Error(`Unsupported effect icon "${condition.icon}"`);
+  }
   if (condition.kind === "has-spy-posts") {
     if (isNonNegativeInteger(condition.count)) return;
     invalidSpecField("has-spy-posts count", condition.count);
@@ -473,6 +494,31 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     validateOptionalBoolean("pay-resource-for-influence trashSource", (effect as { trashSource?: unknown }).trashSource);
     return;
   }
+  if (effect.kind === "pay-resource-for-sandworms") {
+    if (trigger !== "agent-play") {
+      throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
+    }
+    if (effect.selector !== "self") {
+      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
+    if (!supportedResources.has(effect.resource)) {
+      throw new Error(`Unsupported effect resource "${effect.resource}"`);
+    }
+    const recipient = (effect as { recipient?: unknown }).recipient;
+    if (recipient !== "activated-ally") {
+      invalidSpecField("pay-resource-for-sandworms recipient", recipient);
+    }
+    const destination = (effect as { destination?: unknown }).destination;
+    if (destination !== "conflict") {
+      invalidSpecField("pay-resource-for-sandworms destination", destination);
+    }
+    validateSourceLabel("pay-resource-for-sandworms source", effect.source);
+    validateAmount(effect.cost);
+    validateAmount(effect.sandworms);
+    validateOptionalTrue("pay-resource-for-sandworms optional", (effect as { optional?: unknown }).optional);
+    validateOptionalBoolean("pay-resource-for-sandworms trashSource", (effect as { trashSource?: unknown }).trashSource);
+    return;
+  }
   if (effect.kind === "commander-resource-split") {
     if (trigger !== "agent-play") {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
@@ -566,6 +612,9 @@ function conditionApplies(condition: GameEffectConditionSpec, context: GameEffec
     return context.state?.roundMakerSpaceVisits
       ? hasVisitedMakerSpaceThisRound({ roundMakerSpaceVisits: context.state.roundMakerSpaceVisits }, context.source.id)
       : false;
+  }
+  if (condition.kind === "visited-space-icon") {
+    return context.space?.icon === condition.icon;
   }
   if (condition.kind === "has-spy-posts") {
     return context.state?.spyPosts && context.state.sharedSpyPosts
@@ -811,6 +860,9 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
     return result;
   }
   if (effect.kind === "pay-resource-for-influence") {
+    return result;
+  }
+  if (effect.kind === "pay-resource-for-sandworms") {
     return result;
   }
   if (effect.kind === "commander-resource-split") {
@@ -1100,6 +1152,30 @@ export function resolveAgentPayResourceForInfluences(
         faction: effect.faction,
         amount: amountFor(effect.amount, context.source),
         recipient: effect.recipient,
+        optional: true,
+        trashSource: effect.trashSource ?? false,
+        source: effect.source,
+      }));
+  });
+}
+
+export function resolveAgentPayResourceForSandworms(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): AgentPayResourceForSandworms[] {
+  specs?.forEach(validateSpec);
+  return (specs ?? []).flatMap((spec) => {
+    if (spec.trigger !== "agent-play") return [];
+    if (!specApplies(spec, context)) return [];
+    return spec.effects
+      .filter((effect) => effect.kind === "pay-resource-for-sandworms")
+      .map((effect) => ({
+        selector: effect.selector,
+        resource: effect.resource,
+        cost: amountFor(effect.cost, context.source),
+        sandworms: amountFor(effect.sandworms, context.source),
+        recipient: effect.recipient,
+        destination: effect.destination,
         optional: true,
         trashSource: effect.trashSource ?? false,
         source: effect.source,

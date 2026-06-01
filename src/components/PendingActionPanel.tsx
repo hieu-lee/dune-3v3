@@ -41,13 +41,13 @@ import { PendingIrulanSignetPanel } from "./PendingIrulanSignetPanel";
 import {
   PendingCommandRespectPanel,
   PendingDemandResultsPanel,
-  PendingDesertCallPanel,
   PendingJessicaOtherMemoriesPanel,
   PendingJessicaReverendMotherPanel,
   PendingJessicaSpiceAgonyPanel,
   PendingJessicaWaterOfLifePanel,
   PendingLadyAmberDesertScoutsPanel,
   PendingPayResourceForInfluencePanel,
+  PendingPayResourceForSandwormsPanel,
   PendingPayResourceForStrengthPanel,
   PendingPayResourceForTroopsPanel,
   PendingStabanUnseenNetworkPanel,
@@ -83,7 +83,6 @@ type PendingActionPanelProps = {
   chooseDiscardCardForInfluenceAndDraw: (discardCardId: string, faction: FactionId) => void;
   chooseLoseInfluenceForIntrigues: (faction: FactionId) => void;
   chooseDemandResults: (optionIndex: number) => void;
-  chooseDesertCall: () => void;
   chooseIrulanSignet: (choice: IrulanSignetRingChoice) => void;
   chooseJessicaOtherMemories: (choice: JessicaOtherMemoriesChoice) => void;
   chooseJessicaReverendMother: (choice: JessicaReverendMotherChoice) => void;
@@ -92,6 +91,7 @@ type PendingActionPanelProps = {
   chooseLadyAmberDesertScouts: (choice: LadyAmberDesertScoutsChoice) => void;
   chooseMakerReward: (choice: "spice" | "sandworms") => void;
   choosePayResourceForInfluence: () => void;
+  choosePayResourceForSandworms: () => void;
   choosePayResourceForStrength: () => void;
   choosePayResourceForTroops: () => void;
   chooseRetreatTroopsForStrength: () => void;
@@ -119,10 +119,10 @@ type PendingActionPanelProps = {
   skipControlDefense: () => void;
   skipConflictVpReward: () => void;
   skipDemandResultsChoice: () => void;
-  skipDesertCallChoice: () => void;
   skipInfluenceLoss: () => void;
   skipOptionalSpacePaymentChoice: () => void;
   skipPayResourceForInfluenceChoice: () => void;
+  skipPayResourceForSandwormsChoice: () => void;
   skipPayResourceForStrengthChoice: () => void;
   skipPayResourceForTroopsChoice: () => void;
   skipRecall: () => void;
@@ -149,7 +149,6 @@ export function PendingActionPanel({
   chooseDiscardCardForInfluenceAndDraw,
   chooseLoseInfluenceForIntrigues,
   chooseDemandResults,
-  chooseDesertCall,
   chooseIrulanSignet,
   chooseJessicaOtherMemories,
   chooseJessicaReverendMother,
@@ -158,6 +157,7 @@ export function PendingActionPanel({
   chooseLadyAmberDesertScouts,
   chooseMakerReward,
   choosePayResourceForInfluence,
+  choosePayResourceForSandworms,
   choosePayResourceForStrength,
   choosePayResourceForTroops,
   chooseRetreatTroopsForStrength,
@@ -185,10 +185,10 @@ export function PendingActionPanel({
   skipControlDefense,
   skipConflictVpReward,
   skipDemandResultsChoice,
-  skipDesertCallChoice,
   skipInfluenceLoss,
   skipOptionalSpacePaymentChoice,
   skipPayResourceForInfluenceChoice,
+  skipPayResourceForSandwormsChoice,
   skipPayResourceForStrengthChoice,
   skipPayResourceForTroopsChoice,
   skipRecall,
@@ -315,13 +315,13 @@ export function PendingActionPanel({
       ? (Array.isArray(pendingAction.recipientIds) ? pendingAction.recipientIds : [])
           .map((recipientId) => game.players.find((player) => player.id === recipientId))
       : [];
-  const pendingDesertCallCommander =
-    pendingAction.kind === "desert-call"
-      ? game.players.find((player) => player.id === pendingAction.commanderId)
+  const pendingPayResourceSandwormsOwner =
+    pendingAction.kind === "pay-resource-for-sandworms"
+      ? game.players.find((player) => player.id === pendingAction.ownerId)
       : undefined;
-  const pendingDesertCallAlly =
-    pendingAction.kind === "desert-call"
-      ? game.players.find((player) => player.id === pendingAction.allyId)
+  const pendingPayResourceSandwormsRecipient =
+    pendingAction.kind === "pay-resource-for-sandworms"
+      ? game.players.find((player) => player.id === pendingAction.recipientId)
       : undefined;
   const pendingThreatenSpiceCommander =
     pendingAction.kind === "threaten-spice-production"
@@ -498,7 +498,7 @@ export function PendingActionPanel({
           {pendingAction.kind === "pay-resource-for-strength" && `${pendingPayResourceStrengthOwner?.leader ?? "Player"} ${pendingAction.source}`}
           {pendingAction.kind === "pay-resource-for-influence" && `${pendingPayResourceInfluenceOwner?.leader ?? "Player"} ${pendingAction.source}`}
           {pendingAction.kind === "pay-resource-for-troops" && `${pendingPayResourceTroopsOwner?.leader ?? "Player"} ${pendingAction.source}`}
-          {pendingAction.kind === "desert-call" && `${pendingDesertCallCommander?.leader ?? "Muad'Dib"} Desert Call`}
+          {pendingAction.kind === "pay-resource-for-sandworms" && `${pendingPayResourceSandwormsOwner?.leader ?? "Player"} ${pendingAction.source}`}
           {pendingAction.kind === "threaten-spice-production" && `${pendingThreatenSpiceCommander?.leader ?? "Muad'Dib"} Threaten Spice Production`}
           {pendingAction.kind === "throne-row" && `${pendingThroneOwner?.leader ?? "Shaddam"} Throne Row`}
           {pendingAction.kind === "trash-card" && `${pendingTrashOwner?.leader ?? "Player"} ${pendingAction.optional ? "optional " : ""}trash from ${pendingAction.source}`}
@@ -779,11 +779,18 @@ export function PendingActionPanel({
         />
       )}
 
-      {pendingAction.kind === "desert-call" && (
-        <PendingDesertCallPanel
-          ally={pendingDesertCallAlly}
-          onChoose={chooseDesertCall}
-          onSkip={skipDesertCallChoice}
+      {pendingAction.kind === "pay-resource-for-sandworms" && (
+        <PendingPayResourceForSandwormsPanel
+          cost={pendingAction.cost}
+          onChoose={choosePayResourceForSandworms}
+          onSkip={skipPayResourceForSandwormsChoice}
+          owner={pendingPayResourceSandwormsOwner}
+          recipient={pendingPayResourceSandwormsRecipient}
+          resource={pendingAction.resource}
+          sandworms={pendingAction.sandworms}
+          source={pendingAction.source}
+          strength={pendingAction.strength}
+          trashSource={pendingAction.trashSource}
         />
       )}
 

@@ -220,14 +220,14 @@ export {
 export {
   resolveCommandRespectTrade,
   resolveDemandResultsChoice,
-  resolveDesertCallChoice,
   resolvePayResourceForInfluenceChoice,
+  resolvePayResourceForSandwormsChoice,
   resolvePayResourceForStrengthChoice,
   resolvePayResourceForTroopsChoice,
   skipCommandRespect,
   skipDemandResults,
-  skipDesertCall,
   skipPayResourceForInfluence,
+  skipPayResourceForSandworms,
   skipPayResourceForStrength,
   skipPayResourceForTroops,
 } from "./commander-pending-rules";

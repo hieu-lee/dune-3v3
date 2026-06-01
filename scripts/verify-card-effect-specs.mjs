@@ -95,6 +95,7 @@ try {
   const prepareTheWay = data.reserveMarket.find((card) => card.sourceId === 537);
   const limitedLandsraadAccess = data.muadDibCommanderCards.find((card) => card.name === "Limited Landsraad Access");
   const demandAttention = data.muadDibCommanderCards.find((card) => card.name === "Demand Attention");
+  const desertCall = data.muadDibCommanderCards.find((card) => card.name === "Desert Call");
   const muadDibSignet = data.muadDibCommanderCards.find((card) => card.name === "Signet Ring");
   const usul = data.muadDibCommanderCards.find((card) => card.name === "Usul");
   const corrinoMight = data.emperorCommanderCards.find((card) => card.name === "Corrino Might");
@@ -124,7 +125,7 @@ try {
     northernWatermaster &&
     paracompass,
   );
-  assert.ok(prepareTheWay && limitedLandsraadAccess && demandAttention && muadDibSignet && usul && corrinoMight && criticalShipments && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
+  assert.ok(prepareTheWay && limitedLandsraadAccess && demandAttention && desertCall && muadDibSignet && usul && corrinoMight && criticalShipments && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
   assert.ok(arrakeen && haggaBasin && imperialBasin && secrets && highCouncil);
   assert.equal(revealSpecCards.length, 34, "Unexpected number of cards with declarative Reveal specs");
   assert.deepEqual(
@@ -205,6 +206,26 @@ try {
       )
     ),
     "Demand Attention should carry a declarative Agent resource-for-Influence payment spec",
+  );
+  assert.ok(
+    desertCall.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.conditions?.some((condition) => condition.kind === "has-team" && condition.team === "muaddib") &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Commander") &&
+      spec.conditions?.some((condition) => condition.kind === "visited-space-icon" && condition.icon === "spice") &&
+      spec.effects.some((effect) =>
+        effect.kind === "pay-resource-for-sandworms" &&
+        effect.selector === "self" &&
+        effect.resource === "water" &&
+        effect.cost === 1 &&
+        effect.sandworms === 1 &&
+        effect.recipient === "activated-ally" &&
+        effect.destination === "conflict" &&
+        effect.trashSource === true &&
+        effect.source === "Desert Call"
+      )
+    ),
+    "Desert Call should carry a typed Agent sandworm-payment spec",
   );
   assert.ok(
     usul.effects?.some((spec) =>
@@ -1602,6 +1623,233 @@ try {
     () => state.applyCardAgentEffect(requiredPayResourceInfluenceCard, p2, p2),
     /Invalid pay-resource-for-influence optional "false"/,
     "Resource-for-Influence specs should stay optional so queued payments cannot deadlock if resources change",
+  );
+  const revealPayResourceSandwormsCard = {
+    ...convincingArgument,
+    id: "effect-spec-reveal-pay-resource-sandworms-card",
+    name: "Effect Spec Reveal Pay Resource Sandworms",
+    effects: [revealSpec([{
+      kind: "pay-resource-for-sandworms",
+      selector: "self",
+      resource: "water",
+      cost: 1,
+      sandworms: 1,
+      recipient: "activated-ally",
+      destination: "conflict",
+    }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [revealPayResourceSandwormsCard], highCouncilSeat: false }),
+    /Unsupported effect "pay-resource-for-sandworms" for reveal/,
+    "Resource-for-sandworms specs should stay in Agent play",
+  );
+  const invalidVisitedSpaceIconConditionCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-visited-space-icon-card",
+    name: "Effect Spec Invalid Visited Space Icon",
+    effects: [agentSpec(
+      [{ kind: "draw-cards", selector: "self", amount: 1 }],
+      [{ kind: "visited-space-icon", icon: "desert" }],
+    )],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidVisitedSpaceIconConditionCard, p2, p2),
+    /Unsupported effect icon "desert"/,
+    "Visited-space-icon conditions should reject unsupported icon ids",
+  );
+  const invalidPayResourceSandwormsSelectorCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-pay-resource-sandworms-selector-card",
+    name: "Effect Spec Invalid Pay Resource Sandworms Selector",
+    effects: [agentSpec([{
+      kind: "pay-resource-for-sandworms",
+      selector: "activated-ally",
+      resource: "water",
+      cost: 1,
+      sandworms: 1,
+      recipient: "activated-ally",
+      destination: "conflict",
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidPayResourceSandwormsSelectorCard, p4, p2),
+    /Unsupported effect selector "activated-ally" for pay-resource-for-sandworms/,
+    "Resource-for-sandworms specs should reject activated Ally selectors",
+  );
+  const invalidPayResourceSandwormsResourceCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-pay-resource-sandworms-resource-card",
+    name: "Effect Spec Invalid Pay Resource Sandworms Resource",
+    effects: [agentSpec([{
+      kind: "pay-resource-for-sandworms",
+      selector: "self",
+      resource: "melange",
+      cost: 1,
+      sandworms: 1,
+      recipient: "activated-ally",
+      destination: "conflict",
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidPayResourceSandwormsResourceCard, p2, p2),
+    /Unsupported effect resource "melange"/,
+    "Resource-for-sandworms specs should reject unsupported resource ids",
+  );
+  const invalidPayResourceSandwormsRecipientCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-pay-resource-sandworms-recipient-card",
+    name: "Effect Spec Invalid Pay Resource Sandworms Recipient",
+    effects: [agentSpec([{
+      kind: "pay-resource-for-sandworms",
+      selector: "self",
+      resource: "water",
+      cost: 1,
+      sandworms: 1,
+      recipient: "self",
+      destination: "conflict",
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidPayResourceSandwormsRecipientCard, p2, p2),
+    /Invalid pay-resource-for-sandworms recipient "self"/,
+    "Resource-for-sandworms specs should reject unsupported recipient routing",
+  );
+  const invalidPayResourceSandwormsDestinationCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-pay-resource-sandworms-destination-card",
+    name: "Effect Spec Invalid Pay Resource Sandworms Destination",
+    effects: [agentSpec([{
+      kind: "pay-resource-for-sandworms",
+      selector: "self",
+      resource: "water",
+      cost: 1,
+      sandworms: 1,
+      recipient: "activated-ally",
+      destination: "garrison",
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidPayResourceSandwormsDestinationCard, p2, p2),
+    /Invalid pay-resource-for-sandworms destination "garrison"/,
+    "Resource-for-sandworms specs should reject unsupported destinations",
+  );
+  const invalidPayResourceSandwormsCostCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-pay-resource-sandworms-cost-card",
+    name: "Effect Spec Invalid Pay Resource Sandworms Cost",
+    effects: [agentSpec([{
+      kind: "pay-resource-for-sandworms",
+      selector: "self",
+      resource: "water",
+      cost: -1,
+      sandworms: 1,
+      recipient: "activated-ally",
+      destination: "conflict",
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidPayResourceSandwormsCostCard, p2, p2),
+    /Invalid effect amount "-1"/,
+    "Resource-for-sandworms specs should require non-negative costs",
+  );
+  const invalidPayResourceSandwormsAmountCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-pay-resource-sandworms-amount-card",
+    name: "Effect Spec Invalid Pay Resource Sandworms Amount",
+    effects: [agentSpec([{
+      kind: "pay-resource-for-sandworms",
+      selector: "self",
+      resource: "water",
+      cost: 1,
+      sandworms: -1,
+      recipient: "activated-ally",
+      destination: "conflict",
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidPayResourceSandwormsAmountCard, p2, p2),
+    /Invalid effect amount "-1"/,
+    "Resource-for-sandworms specs should require non-negative sandworm amounts",
+  );
+  const invalidPayResourceSandwormsSourceCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-pay-resource-sandworms-source-card",
+    name: "Effect Spec Invalid Pay Resource Sandworms Source",
+    effects: [agentSpec([{
+      kind: "pay-resource-for-sandworms",
+      selector: "self",
+      resource: "water",
+      cost: 1,
+      sandworms: 1,
+      recipient: "activated-ally",
+      destination: "conflict",
+      source: "",
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidPayResourceSandwormsSourceCard, p2, p2),
+    /Invalid pay-resource-for-sandworms source ""/,
+    "Resource-for-sandworms specs should reject empty source labels",
+  );
+  const invalidPayResourceSandwormsTrashSourceCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-pay-resource-sandworms-trash-source-card",
+    name: "Effect Spec Invalid Pay Resource Sandworms Trash Source",
+    effects: [agentSpec([{
+      kind: "pay-resource-for-sandworms",
+      selector: "self",
+      resource: "water",
+      cost: 1,
+      sandworms: 1,
+      recipient: "activated-ally",
+      destination: "conflict",
+      trashSource: "false",
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidPayResourceSandwormsTrashSourceCard, p2, p2),
+    /Invalid pay-resource-for-sandworms trashSource "false"/,
+    "Resource-for-sandworms specs should reject non-boolean trashSource values",
+  );
+  const invalidPayResourceSandwormsOptionalCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-pay-resource-sandworms-optional-card",
+    name: "Effect Spec Invalid Pay Resource Sandworms Optional",
+    effects: [agentSpec([{
+      kind: "pay-resource-for-sandworms",
+      selector: "self",
+      resource: "water",
+      cost: 1,
+      sandworms: 1,
+      recipient: "activated-ally",
+      destination: "conflict",
+      optional: "false",
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidPayResourceSandwormsOptionalCard, p2, p2),
+    /Invalid pay-resource-for-sandworms optional "false"/,
+    "Resource-for-sandworms specs should reject non-true optional values",
+  );
+  const requiredPayResourceSandwormsCard = {
+    ...convincingArgument,
+    id: "effect-spec-required-pay-resource-sandworms-card",
+    name: "Effect Spec Required Pay Resource Sandworms",
+    effects: [agentSpec([{
+      kind: "pay-resource-for-sandworms",
+      selector: "self",
+      resource: "water",
+      cost: 1,
+      sandworms: 1,
+      recipient: "activated-ally",
+      destination: "conflict",
+      optional: false,
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(requiredPayResourceSandwormsCard, p2, p2),
+    /Invalid pay-resource-for-sandworms optional "false"/,
+    "Resource-for-sandworms specs should stay optional so queued payments cannot deadlock if resources change",
   );
   const revealDiscardInfluenceDrawCard = {
     ...convincingArgument,

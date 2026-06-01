@@ -23,7 +23,6 @@ import {
   resolveCommandRespectTrade,
   resolveConflictTie,
   resolveDemandResultsChoice,
-  resolveDesertCallChoice,
   resolveDiscardCardForInfluenceAndDrawChoice,
   resolveIrulanSignetRingChoice,
   resolveBoardInfluenceChoice,
@@ -36,6 +35,7 @@ import {
   resolveMakerChoice,
   resolveOptionalSpacePayment,
   resolvePayResourceForInfluenceChoice,
+  resolvePayResourceForSandwormsChoice,
   resolvePayResourceForStrengthChoice,
   resolvePayResourceForTroopsChoice,
   resolveRetreatTroopsForStrength,
@@ -48,12 +48,12 @@ import {
   skipConflictVpConversion,
   skipControlDefenseTroop,
   skipDemandResults,
-  skipDesertCall,
   skipDiscardCardForInfluenceAndDraw,
   skipLoseInfluence,
   skipLoseInfluenceForIntrigues,
   skipOptionalSpacePayment,
   skipPayResourceForInfluence,
+  skipPayResourceForSandworms,
   skipPayResourceForStrength,
   skipPayResourceForTroops,
   skipRecallSpy,
@@ -210,10 +210,10 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     runPending("pay-resource-for-influence", (current, pending) => maybeStartCombatPhase(resolvePayResourceForInfluenceChoice(current, pending)));
   const skipPayResourceForInfluenceChoice = () =>
     runPending("pay-resource-for-influence", (current, pending) => maybeStartCombatPhase(skipPayResourceForInfluence(current, pending)));
-  const chooseDesertCall = () =>
-    runPending("desert-call", (current, pending) => maybeStartCombatPhase(resolveDesertCallChoice(current, pending)));
-  const skipDesertCallChoice = () =>
-    runPending("desert-call", (current, pending) => maybeStartCombatPhase(skipDesertCall(current, pending)));
+  const choosePayResourceForSandworms = () =>
+    runPending("pay-resource-for-sandworms", (current, pending) => maybeStartCombatPhase(resolvePayResourceForSandwormsChoice(current, pending)));
+  const skipPayResourceForSandwormsChoice = () =>
+    runPending("pay-resource-for-sandworms", (current, pending) => maybeStartCombatPhase(skipPayResourceForSandworms(current, pending)));
   const adjustThreatenSpiceProduction = (contributorId: string, delta: number) =>
     runPending("threaten-spice-production", (current, pending) => adjustThreatenSpiceProductionContribution(current, pending, contributorId, delta));
   const chooseThreatenSpiceProduction = () =>
@@ -286,7 +286,6 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     chooseBoardInfluence,
     chooseConflictTieWinner,
     chooseDemandResults,
-    chooseDesertCall,
     chooseDiscardCardForInfluenceAndDraw,
     chooseIrulanSignet,
     chooseJessicaOtherMemories,
@@ -297,6 +296,7 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     chooseLoseInfluenceForIntrigues,
     chooseMakerReward,
     choosePayResourceForInfluence,
+    choosePayResourceForSandworms,
     choosePayResourceForStrength,
     choosePayResourceForTroops,
     chooseRetreatTroopsForStrength,
@@ -322,12 +322,12 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     skipControlDefense,
     skipConflictVpReward,
     skipDemandResultsChoice,
-    skipDesertCallChoice,
     skipDiscardCardForInfluenceAndDrawChoice,
     skipInfluenceLoss,
     skipLoseInfluenceForIntriguesChoice,
     skipOptionalSpacePaymentChoice,
     skipPayResourceForInfluenceChoice,
+    skipPayResourceForSandwormsChoice,
     skipPayResourceForStrengthChoice,
     skipPayResourceForTroopsChoice,
     skipRecall,

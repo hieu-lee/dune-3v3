@@ -82,7 +82,7 @@ export function boardSpaceSpiceGainFor(
 export function pendingLocksTableState(action: PendingAction | undefined) {
   return action?.kind === "maker-choice" ||
     action?.kind === "sietch-tabr" ||
-    action?.kind === "desert-call" ||
+    action?.kind === "pay-resource-for-sandworms" ||
     action?.kind === "control-defense";
 }
 

@@ -41,11 +41,14 @@ export type InfluenceEffectFaction = FactionId | "board-space";
 export type InfluenceEffectRecipient = "board-effect-recipient";
 export type TroopEffectRecipient = "same-team-allies";
 export type TroopEffectDestination = "garrison";
+export type SandwormEffectRecipient = "activated-ally";
+export type SandwormEffectDestination = "conflict";
 export type EffectAmountSpec =
   | number
   | { kind: "completed-contracts"; multiplier?: number };
 export type GameEffectConditionSpec =
   | { kind: "visited-maker-space" }
+  | { kind: "visited-space-icon"; icon: IconId }
   | { kind: "has-spy-posts"; count: number }
   | { kind: "has-conflict-units"; count: number }
   | { kind: "has-influence"; faction: FactionId; amount: number }
@@ -104,6 +107,18 @@ export type GameEffectSpec =
       troops: EffectAmountSpec;
       recipient: TroopEffectRecipient;
       destination: TroopEffectDestination;
+      optional?: true;
+      trashSource?: boolean;
+      source?: string;
+    }
+  | {
+      kind: "pay-resource-for-sandworms";
+      selector: PlayerSelector;
+      resource: ResourceId;
+      cost: EffectAmountSpec;
+      sandworms: EffectAmountSpec;
+      recipient: SandwormEffectRecipient;
+      destination: SandwormEffectDestination;
       optional?: true;
       trashSource?: boolean;
       source?: string;
@@ -514,6 +529,20 @@ export type PendingAction =
       source: string;
     }
   | {
+      kind: "pay-resource-for-sandworms";
+      ownerId: string;
+      recipientId: string;
+      resource: ResourceId;
+      cost: number;
+      sandworms: number;
+      strength: number;
+      destination: SandwormEffectDestination;
+      optional: true;
+      trashSource?: boolean;
+      cardId?: string;
+      source: string;
+    }
+  | {
       kind: "maker-choice";
       ownerId: string;
       spiceOwnerId: string;
@@ -561,13 +590,6 @@ export type PendingAction =
       commanderId: string;
       allyIds: [string, string];
       contractIds: [string, string];
-      cardId: string;
-      source: string;
-    }
-  | {
-      kind: "desert-call";
-      commanderId: string;
-      allyId: string;
       cardId: string;
       source: string;
     }

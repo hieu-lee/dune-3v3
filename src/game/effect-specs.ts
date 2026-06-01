@@ -11,6 +11,8 @@ import type {
   PlayerSelector,
   ResourceId,
   Role,
+  SandwormEffectDestination,
+  SandwormEffectRecipient,
   TeamId,
   TroopEffectDestination,
   TroopEffectRecipient,
@@ -208,6 +210,35 @@ export function agentPayResourceForInfluence(
   ], conditions);
 }
 
+export function agentPayResourceForSandworms(
+  resource: ResourceId,
+  cost: EffectAmountSpec,
+  sandworms: EffectAmountSpec,
+  options: {
+    recipient?: SandwormEffectRecipient;
+    destination?: SandwormEffectDestination;
+    optional?: true;
+    trashSource?: boolean;
+    source?: string;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return agentPlayEffects([
+    {
+      kind: "pay-resource-for-sandworms",
+      selector: "self",
+      resource,
+      cost,
+      sandworms,
+      recipient: options.recipient ?? "activated-ally",
+      destination: options.destination ?? "conflict",
+      optional: true,
+      ...(options.trashSource ? { trashSource: true } : {}),
+      ...(options.source ? { source: options.source } : {}),
+    },
+  ], conditions);
+}
+
 export function agentBlockConflictDeployment(
   options: {
     source?: string;
@@ -324,6 +355,10 @@ export function agentPlaceSpies(
 
 export function visitedMakerSpace() {
   return { kind: "visited-maker-space" } as const;
+}
+
+export function visitedSpaceIcon(icon: IconId) {
+  return { kind: "visited-space-icon", icon } as const;
 }
 
 export function hasSpyPosts(count: number) {

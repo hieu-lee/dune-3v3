@@ -6,6 +6,7 @@ import {
   agentGainResource,
   agentMoveCardToThroneRow,
   agentPayResourceForInfluence,
+  agentPayResourceForSandworms,
   agentPlaceSpies,
   agentPlayEffects,
   agentRecruitTroops,
@@ -21,6 +22,7 @@ import {
   hasRole,
   hasSwordmasterBonus,
   hasTeam,
+  visitedSpaceIcon,
 } from "./effect-specs";
 import {
   gurneyHalleckLeaderName,
@@ -290,8 +292,17 @@ const muadDibCommanderSpecs: Array<StarterCardSpec & { sourceId: number }> = [
     icons: ["spice"],
     persuasion: 1,
     swords: 0,
-    effects: [revealGainPersuasion(1)],
-    play: "Resolve the printed water-to-worm trash effect.",
+    effects: [
+      agentPayResourceForSandworms(
+        "water",
+        1,
+        1,
+        { source: "Desert Call", trashSource: true },
+        [hasTeam("muaddib"), hasRole("Commander"), visitedSpaceIcon("spice")],
+      ),
+      revealGainPersuasion(1),
+    ],
+    play: "Pay 1 water to have the activated Ally summon 1 sandworm, then trash this card.",
     reveal: starterRevealText(1, 0),
   },
   {

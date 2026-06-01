@@ -62,7 +62,20 @@ try {
   );
 
   const deployPending = { kind: "deploy", ownerId: "p3", remaining: 1, source: "Hagga Basin" };
-  const desertCallPending = { kind: "desert-call", commanderId: "p1", allyId: "p3", cardId: "desert-call", source: "Desert Call" };
+  const desertCallPending = {
+    kind: "pay-resource-for-sandworms",
+    ownerId: "p1",
+    recipientId: "p3",
+    resource: "water",
+    cost: 1,
+    sandworms: 1,
+    strength: 3,
+    destination: "conflict",
+    optional: true,
+    trashSource: true,
+    cardId: "desert-call",
+    source: "Desert Call",
+  };
   assert.equal(app.pendingLocksTableState(deployPending), false, "Deploy pending alone should not lock table toggles");
   assert.equal(app.pendingLocksTableState(desertCallPending), true, "Desert Call pending should lock table toggles");
   assert.equal(

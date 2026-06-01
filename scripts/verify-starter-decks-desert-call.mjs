@@ -56,9 +56,16 @@ export function verifyStarterDeckDesertCall({
     imperialBasinForDesertCall,
   );
   assert.deepEqual(desertCallPending, {
-    kind: "desert-call",
-    commanderId: muadDib.id,
-    allyId: muadDibAllyA.id,
+    kind: "pay-resource-for-sandworms",
+    ownerId: muadDib.id,
+    recipientId: muadDibAllyA.id,
+    resource: "water",
+    cost: 1,
+    sandworms: 1,
+    strength: 3,
+    destination: "conflict",
+    optional: true,
+    trashSource: true,
     cardId: desertCall.id,
     source: "Desert Call",
   });
@@ -169,7 +176,7 @@ export function verifyStarterDeckDesertCall({
       wetAfterHabbanya.target,
       habbanyaForDesertCall,
     )?.kind,
-    "desert-call",
+    "pay-resource-for-sandworms",
     "Desert Call should queue from post-space water when Muad'Dib can still pay 1 water",
   );
   assert.equal(
@@ -233,14 +240,14 @@ export function verifyStarterDeckDesertCall({
     haggaDesertCallPending,
     "Resolving the queued Maker choice should advance to Desert Call",
   );
-  const resolvedQueuedDesertCall = state.resolveDesertCallChoice(afterHaggaMaker, haggaDesertCallPending);
+  const resolvedQueuedDesertCall = state.resolvePayResourceForSandwormsChoice(afterHaggaMaker, haggaDesertCallPending);
   assert.equal(
     playerById(resolvedQueuedDesertCall, muadDibAllyA.id).deployedSandworms,
     1,
     "Queued Desert Call should still summon after the Maker choice resolves",
   );
 
-  const resolvedDesertCall = state.resolveDesertCallChoice(
+  const resolvedDesertCall = state.resolvePayResourceForSandwormsChoice(
     {
       ...baseDesertCallGame,
       activeSeat: game.players.findIndex((player) => player.id === muadDib.id),
@@ -279,7 +286,7 @@ export function verifyStarterDeckDesertCall({
   assert.equal(resolvedDesertCall.pendingAction, undefined, "Desert Call resolution should advance pending action");
   assert.match(resolvedDesertCall.log[0], /spends 1 water for Desert Call/, "Desert Call should log resolution");
 
-  const skippedDesertCall = state.skipDesertCall(
+  const skippedDesertCall = state.skipPayResourceForSandworms(
     {
       ...baseDesertCallGame,
       pendingAction: desertCallPending,
@@ -313,7 +320,7 @@ export function verifyStarterDeckDesertCall({
     ),
   };
   assert.equal(
-    state.resolveDesertCallChoice(noCardDesertCallState, desertCallPending),
+    state.resolvePayResourceForSandwormsChoice(noCardDesertCallState, desertCallPending),
     noCardDesertCallState,
     "Desert Call should not resolve if the card is no longer in play",
   );
@@ -324,7 +331,7 @@ export function verifyStarterDeckDesertCall({
     players: baseDesertCallGame.players.filter((player) => player.id !== muadDibAllyA.id),
   };
   assert.equal(
-    state.resolveDesertCallChoice(missingAllyDesertCallState, desertCallPending),
+    state.resolvePayResourceForSandwormsChoice(missingAllyDesertCallState, desertCallPending),
     missingAllyDesertCallState,
     "Desert Call should not resolve if the pending Ally is no longer in the game",
   );
@@ -337,7 +344,7 @@ export function verifyStarterDeckDesertCall({
     ),
   };
   assert.equal(
-    state.resolveDesertCallChoice(noHooksDesertCallState, desertCallPending),
+    state.resolvePayResourceForSandwormsChoice(noHooksDesertCallState, desertCallPending),
     noHooksDesertCallState,
     "Desert Call should not resolve if the pending Ally no longer has Maker Hooks",
   );
@@ -349,9 +356,121 @@ export function verifyStarterDeckDesertCall({
     pendingQueue: [],
   };
   assert.equal(
-    state.resolveDesertCallChoice(restoredShieldWallDesertCallState, desertCallPending),
+    state.resolvePayResourceForSandwormsChoice(restoredShieldWallDesertCallState, desertCallPending),
     restoredShieldWallDesertCallState,
     "Desert Call should not resolve if the Shield Wall now protects the current Conflict",
+  );
+  const stringCostDesertCallPending = { ...desertCallPending, cost: "1" };
+  const stringCostDesertCallState = {
+    ...baseDesertCallGame,
+    pendingAction: stringCostDesertCallPending,
+    pendingQueue: [],
+  };
+  assert.equal(
+    state.resolvePayResourceForSandwormsChoice(stringCostDesertCallState, stringCostDesertCallPending),
+    stringCostDesertCallState,
+    "Sandworm payment pending should reject string costs",
+  );
+  assert.equal(
+    state.skipPayResourceForSandworms(stringCostDesertCallState, stringCostDesertCallPending),
+    stringCostDesertCallState,
+    "Skipping a sandworm payment should reject string costs",
+  );
+  const stringSandwormsDesertCallPending = { ...desertCallPending, sandworms: "1" };
+  const stringSandwormsDesertCallState = {
+    ...baseDesertCallGame,
+    pendingAction: stringSandwormsDesertCallPending,
+    pendingQueue: [],
+  };
+  assert.equal(
+    state.resolvePayResourceForSandwormsChoice(stringSandwormsDesertCallState, stringSandwormsDesertCallPending),
+    stringSandwormsDesertCallState,
+    "Sandworm payment pending should reject string sandworm counts",
+  );
+  assert.equal(
+    state.skipPayResourceForSandworms(stringSandwormsDesertCallState, stringSandwormsDesertCallPending),
+    stringSandwormsDesertCallState,
+    "Skipping a sandworm payment should reject string sandworm counts",
+  );
+  const fractionalSandwormsDesertCallPending = { ...desertCallPending, sandworms: 1.5, strength: 4.5 };
+  const fractionalSandwormsDesertCallState = {
+    ...baseDesertCallGame,
+    pendingAction: fractionalSandwormsDesertCallPending,
+    pendingQueue: [],
+  };
+  assert.equal(
+    state.resolvePayResourceForSandwormsChoice(fractionalSandwormsDesertCallState, fractionalSandwormsDesertCallPending),
+    fractionalSandwormsDesertCallState,
+    "Sandworm payment pending should reject fractional sandworm counts",
+  );
+  assert.equal(
+    state.skipPayResourceForSandworms(fractionalSandwormsDesertCallState, fractionalSandwormsDesertCallPending),
+    fractionalSandwormsDesertCallState,
+    "Skipping a sandworm payment should reject fractional sandworm counts",
+  );
+  const badStrengthDesertCallPending = { ...desertCallPending, strength: 99 };
+  const badStrengthDesertCallState = {
+    ...baseDesertCallGame,
+    pendingAction: badStrengthDesertCallPending,
+    pendingQueue: [],
+  };
+  assert.equal(
+    state.resolvePayResourceForSandwormsChoice(badStrengthDesertCallState, badStrengthDesertCallPending),
+    badStrengthDesertCallState,
+    "Sandworm payment pending should not resolve with mismatched strength",
+  );
+  assert.equal(
+    state.skipPayResourceForSandworms(badStrengthDesertCallState, badStrengthDesertCallPending),
+    badStrengthDesertCallState,
+    "Skipping a sandworm payment should reject mismatched strength",
+  );
+  const unknownResourceDesertCallPending = { ...desertCallPending, resource: "melange" };
+  const unknownResourceDesertCallState = {
+    ...baseDesertCallGame,
+    pendingAction: unknownResourceDesertCallPending,
+    pendingQueue: [],
+  };
+  assert.equal(
+    state.resolvePayResourceForSandwormsChoice(unknownResourceDesertCallState, unknownResourceDesertCallPending),
+    unknownResourceDesertCallState,
+    "Sandworm payment pending should reject unknown resources",
+  );
+  assert.equal(
+    state.skipPayResourceForSandworms(unknownResourceDesertCallState, unknownResourceDesertCallPending),
+    unknownResourceDesertCallState,
+    "Skipping a sandworm payment should reject unknown resources",
+  );
+  const invalidTrashSourceDesertCallPending = { ...desertCallPending, trashSource: "true" };
+  const invalidTrashSourceDesertCallState = {
+    ...baseDesertCallGame,
+    pendingAction: invalidTrashSourceDesertCallPending,
+    pendingQueue: [],
+  };
+  assert.equal(
+    state.resolvePayResourceForSandwormsChoice(invalidTrashSourceDesertCallState, invalidTrashSourceDesertCallPending),
+    invalidTrashSourceDesertCallState,
+    "Sandworm payment pending should reject malformed trashSource flags",
+  );
+  assert.equal(
+    state.skipPayResourceForSandworms(invalidTrashSourceDesertCallState, invalidTrashSourceDesertCallPending),
+    invalidTrashSourceDesertCallState,
+    "Skipping a sandworm payment should reject malformed trashSource flags",
+  );
+  const requiredDesertCallPending = { ...desertCallPending, optional: false };
+  const requiredDesertCallState = {
+    ...baseDesertCallGame,
+    pendingAction: requiredDesertCallPending,
+    pendingQueue: [],
+  };
+  assert.equal(
+    state.resolvePayResourceForSandwormsChoice(requiredDesertCallState, requiredDesertCallPending),
+    requiredDesertCallState,
+    "Sandworm payment pending should reject required payment payloads",
+  );
+  assert.equal(
+    state.skipPayResourceForSandworms(requiredDesertCallState, requiredDesertCallPending),
+    requiredDesertCallState,
+    "Skipping a sandworm payment should reject required payment payloads",
   );
 
   return {

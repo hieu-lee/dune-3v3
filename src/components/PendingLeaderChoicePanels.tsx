@@ -408,26 +408,41 @@ export function PendingPayResourceForInfluencePanel({
   );
 }
 
-type PendingDesertCallPanelProps = {
-  ally?: Player;
+type PendingPayResourceForSandwormsPanelProps = {
+  cost: number;
   onChoose: () => void;
   onSkip: () => void;
+  owner?: Player;
+  recipient?: Player;
+  resource: ResourceId;
+  sandworms: number;
+  source: string;
+  strength: number;
+  trashSource?: boolean;
 };
 
-export function PendingDesertCallPanel({
-  ally,
+export function PendingPayResourceForSandwormsPanel({
+  cost,
   onChoose,
   onSkip,
-}: PendingDesertCallPanelProps) {
+  owner,
+  recipient,
+  resource,
+  sandworms,
+  source,
+  strength,
+  trashSource,
+}: PendingPayResourceForSandwormsPanelProps) {
+  const resourceLabel = resourceLabels[resource];
   return (
     <div className="pending-controls">
-      {ally ? (
-        <button type="button" onClick={onChoose}>
+      {recipient ? (
+        <button type="button" onClick={onChoose} disabled={!owner || owner.resources[resource] < cost}>
           <Droplets size={15} />
-          Spend 1 water: {ally.leader} summons 1 sandworm
+          Spend {cost} {resourceLabel}: {recipient.leader} summons {sandworms} sandworm{sandworms === 1 ? "" : "s"} (+{strength} strength{trashSource ? ", trash" : ""})
         </button>
       ) : (
-        <span>Desert Call can no longer resolve with the current table state.</span>
+        <span>{source} can no longer resolve with the current table state.</span>
       )}
       <button type="button" onClick={onSkip}>Skip</button>
     </div>

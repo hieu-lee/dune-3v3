@@ -1,16 +1,15 @@
 import { playerHasAnyAlliance } from "./alliance-rules";
 import {
   boardSpaceRewardApplies,
-  effectiveRequirementInfluence,
 } from "./board-rules";
 import {
   isDevastatingAssaultCommanderCard,
   isGenericSignetRingCard,
   isMuadDibSignetRingCard,
-  isPrepareTheWayCard,
   isShaddamSignetRingCard,
 } from "./card-identifiers";
 import { drawCards } from "./deck-utils";
+import { resolveCardEffects } from "./effect-resolver";
 import {
   gurneyHalleckLeaderName,
   ladyAmberMetulliLeaderName,
@@ -93,24 +92,8 @@ export function applyCardAgentEffect(
   blocksDeploymentsThisTurn?: boolean;
   sourceSpiceGained?: number;
 } {
-  if (state && isPrepareTheWayCard(card)) {
-    const players = state.players.map((player) => {
-      if (player.id === sourcePlayer.id) return sourcePlayer;
-      if (player.id === targetPlayer.id) return targetPlayer;
-      return player;
-    });
-    if (effectiveRequirementInfluence(sourcePlayer, "bene", players) >= 2) {
-      const source = drawCards(sourcePlayer, sourcePlayer.hand.length + 1);
-      const drewCard = source.hand.length > sourcePlayer.hand.length;
-      return {
-        source,
-        target: targetPlayer,
-        log: drewCard
-          ? `${sourcePlayer.leader} resolves Prepare The Way: draws 1 card.`
-          : `${sourcePlayer.leader} resolves Prepare The Way: no card to draw.`,
-      };
-    }
-  }
+  const genericEffect = applyGenericCardAgentEffect(card, sourcePlayer, targetPlayer, state);
+  if (genericEffect) return genericEffect;
 
   if (
     isMuadDibSignetRingCard(card) &&
@@ -204,4 +187,64 @@ export function applyCardAgentEffect(
   }
 
   return { source: sourcePlayer, target: targetPlayer };
+}
+
+function applyGenericCardAgentEffect(
+  card: Card,
+  sourcePlayer: Player,
+  targetPlayer: Player,
+  state?: Pick<GameState, "players"> & Partial<Pick<GameState, "roundMakerSpaceVisits" | "sharedSpyPosts" | "spyPosts">>,
+): {
+  source: Player;
+  target: Player;
+  log?: string;
+  recruitedTroops?: number;
+  blocksDeploymentsThisTurn?: boolean;
+  sourceSpiceGained?: number;
+} | undefined {
+  if (!card.effects) return undefined;
+  const players = state?.players.map((player) => {
+    if (player.id === sourcePlayer.id) return sourcePlayer;
+    if (player.id === targetPlayer.id) return targetPlayer;
+    return player;
+  });
+  const result = resolveCardEffects([card], {
+    trigger: "agent-play",
+    source: sourcePlayer,
+    state: state ? { ...state, players } : undefined,
+  });
+  if (result.persuasion > 0 || result.swords > 0) {
+    throw new Error(`Unsupported Agent effect result for ${card.name}`);
+  }
+  const hasResourceGain = Object.values(result.revealGain).some((amount) => (amount ?? 0) > 0);
+  if (result.cardsToDraw === 0 && !hasResourceGain) return undefined;
+
+  let source = {
+    ...sourcePlayer,
+    resources: {
+      ...sourcePlayer.resources,
+      solari: sourcePlayer.resources.solari + (result.revealGain.solari ?? 0),
+      spice: sourcePlayer.resources.spice + (result.revealGain.spice ?? 0),
+      water: sourcePlayer.resources.water + (result.revealGain.water ?? 0),
+    },
+  };
+  const handBeforeDraw = source.hand.length;
+  if (result.cardsToDraw > 0) {
+    source = drawCards(source, source.hand.length + result.cardsToDraw);
+  }
+  const cardsDrawn = source.hand.length - handBeforeDraw;
+  return {
+    source,
+    target: targetPlayer,
+    log: agentEffectLog(card, sourcePlayer, result.cardsToDraw, cardsDrawn),
+    sourceSpiceGained: result.revealGain.spice ?? 0,
+  };
+}
+
+function agentEffectLog(card: Card, sourcePlayer: Player, cardsToDraw: number, cardsDrawn: number) {
+  if (cardsToDraw === 0) return undefined;
+  if (cardsDrawn === 0) {
+    return `${sourcePlayer.leader} resolves ${card.name}: no card to draw.`;
+  }
+  return `${sourcePlayer.leader} resolves ${card.name}: draws ${cardsDrawn} card${cardsDrawn === 1 ? "" : "s"}.`;
 }

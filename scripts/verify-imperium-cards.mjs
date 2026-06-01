@@ -96,6 +96,10 @@ try {
   assert.deepEqual(prepareTheWay.icons, ["landsraad", "city"], "Prepare The Way should send Agents to Landsraad and City spaces");
   assert.equal(prepareTheWay.persuasion, 2, "Prepare The Way should reveal for 2 persuasion");
   assert.equal(prepareTheWay.conditionalPersuasion, false, "Prepare The Way should not require manual reveal handling");
+  assert.ok(
+    prepareTheWay.effects?.some((spec) => spec.trigger === "agent-play"),
+    "Prepare The Way should use a structured Agent draw effect",
+  );
   assert.deepEqual(prepareTheWay.traits, ["Faction: Bene Gesserit"], "Prepare The Way should keep its Bene Gesserit trait");
   assert.match(prepareTheWay.play, /2 or more Bene Gesserit Influence.*draw 1 card/i);
   assert.match(prepareTheWay.reveal, /\+2 persuasion/i);

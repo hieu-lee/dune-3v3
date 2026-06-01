@@ -95,6 +95,16 @@ try {
       `${card.name} should carry a declarative Reveal effect spec`,
     );
   }
+  assert.ok(
+    prepareTheWay.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.conditions?.some((condition) =>
+        condition.kind === "has-influence" && condition.faction === "bene" && condition.amount === 2
+      ) &&
+      spec.effects.some((effect) => effect.kind === "draw-cards" && effect.amount === 1)
+    ),
+    "Prepare The Way should carry a declarative Agent draw spec gated by Bene Gesserit influence",
+  );
   for (const card of revealSpecCards) {
     assert.deepEqual(
       actualFixedReveal(turnActions, p2, card),
@@ -250,6 +260,34 @@ try {
     /Invalid has-spy-posts count "undefined"/,
     "Spy-count conditions should fail loudly when count is missing",
   );
+  const invalidInfluenceFactionCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-influence-faction-card",
+    name: "Effect Spec Invalid Influence Faction",
+    effects: [revealSpec(
+      [{ kind: "gain-persuasion", selector: "self", amount: 1 }],
+      [{ kind: "has-influence", faction: "guild", amount: 1 }],
+    )],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [invalidInfluenceFactionCard], highCouncilSeat: false }),
+    /Unsupported effect faction "guild"/,
+    "Influence conditions should reject unsupported faction ids",
+  );
+  const invalidInfluenceAmountCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-influence-amount-card",
+    name: "Effect Spec Invalid Influence Amount",
+    effects: [revealSpec(
+      [{ kind: "gain-persuasion", selector: "self", amount: 1 }],
+      [{ kind: "has-influence", faction: "bene", amount: -1 }],
+    )],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [invalidInfluenceAmountCard], highCouncilSeat: false }),
+    /Invalid has-influence amount "-1"/,
+    "Influence conditions should require a non-negative integer threshold",
+  );
   const unsupportedEffectCard = {
     ...convincingArgument,
     id: "effect-spec-unsupported-effect-card",
@@ -342,6 +380,31 @@ try {
     { ...game, spyPosts: { [secrets.id]: p4.id, [highCouncil.id]: "p6" }, sharedSpyPosts: {} },
   );
   assert.equal(teammateSpyReveal.persuasion, 1, "Teammate spy posts should not count for owner-scoped reveal specs");
+
+  const prepareDrawSource = {
+    ...p2,
+    deck: [{ ...dagger, id: "prepare-the-way-draw-fixture" }],
+    discard: [],
+    hand: [],
+    influence: { ...p2.influence, bene: 2 },
+  };
+  const prepared = state.applyCardAgentEffect(
+    prepareTheWay,
+    prepareDrawSource,
+    prepareDrawSource,
+    { ...game, players: game.players.map((player) => player.id === p2.id ? prepareDrawSource : player) },
+  );
+  assert.equal(prepared.source.hand.length, 1, "Prepare The Way Agent spec should draw at 2 Bene Gesserit Influence");
+  assert.match(prepared.log ?? "", /Prepare The Way: draws 1 card/);
+  const unpreparedSource = { ...prepareDrawSource, deck: [{ ...dagger, id: "prepare-the-way-blocked-draw-fixture" }], influence: p2.influence };
+  const unprepared = state.applyCardAgentEffect(
+    prepareTheWay,
+    unpreparedSource,
+    unpreparedSource,
+    { ...game, players: game.players.map((player) => player.id === p2.id ? unpreparedSource : player) },
+  );
+  assert.equal(unprepared.source.hand.length, 0, "Prepare The Way Agent spec should not draw below 2 Bene Gesserit Influence");
+  assert.equal(unprepared.log, undefined, "Prepare The Way Agent spec should not log below its Influence threshold");
 
   const manualCard = {
     ...convincingArgument,

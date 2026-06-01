@@ -12,11 +12,15 @@ These cards currently use typed reveal effect specs:
 - Reserve cards: Prepare The Way.
 - Imperium cards: Smuggler's Harvester, Interstellar Trade, Bene Gesserit Operative.
 
+These cards currently use typed Agent effect specs:
+
+- Reserve cards: Prepare The Way.
+
 ## Bespoke Automated Cards
 
 These cards are automated but still rely on explicit card or leader branches while the shared primitive library grows:
 
-- Imperium / reserve Agent effects: Prepare The Way, Captured Mentat, Bene Gesserit Operative.
+- Imperium / reserve Agent effects: Captured Mentat, Bene Gesserit Operative.
 - Imperium / reserve Reveal choices: Captured Mentat, Calculus of Power.
 - Commander starter cards: Command Respect, Critical Shipments, Demand Attention, Demand Results, Desert Call, Devastating Assault, Imperial Tent, Corrino Might, Threaten Spice Production, Usul, Signet Rings.
 - Ally leader Signet Ring effects: Gurney Halleck, Lady Amber Metulli, Lady Jessica, Lady Margot Fenring, Princess Irulan, Reverend Mother Jessica, Staban Tuek.
@@ -44,5 +48,5 @@ The largest current gaps are Agent and choice primitives:
 
 ## Verification
 
-- `pnpm run verify:card-effect-specs` verifies reveal specs, legacy fallback, no double-counting, conditional Maker/contract/spy behavior, shared spy posts, and manual reveal fallback.
+- `pnpm run verify:card-effect-specs` verifies reveal specs, Agent draw specs, legacy fallback, no double-counting, conditional Maker/contract/spy/influence behavior, shared spy posts, and manual reveal fallback.
 - `pnpm run verify` includes the effect-spec verifier through `package.json`.

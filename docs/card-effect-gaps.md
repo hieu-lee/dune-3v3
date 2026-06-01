@@ -6,19 +6,18 @@ This document records bespoke card behavior that should be replaced by reusable 
 
 Implemented primitives:
 
-- Trigger: `reveal`
-- Effects: gain persuasion, gain strength, gain resource
+- Triggers: `reveal`, `agent-play`
+- Effects: gain persuasion, gain strength, gain resource, draw cards
 - Amounts: fixed non-negative integer, completed contract count with optional non-negative integer multiplier
-- Conditions: visited Maker space this round, has at least N own spy posts
+- Conditions: visited Maker space this round, has at least N own spy posts, has at least N effective Influence
 - Selector: `self`
 
-The reveal resolver treats reveal specs as the full reveal model for a card. If a card has a reveal spec, legacy fields such as `persuasion`, `swords`, and `revealGain` remain available for display and compatibility but are not added again during reveal planning.
+The reveal resolver treats reveal specs as the full reveal model for a card. If a card has a reveal spec, legacy fields such as `persuasion`, `swords`, and `revealGain` remain available for display and compatibility but are not added again during reveal planning. Agent-play specs currently cover immediate self effects such as Influence-gated card draw.
 Unsupported spec shapes, including triggers, intentionally throw instead of falling back silently. Selectors other than `self` are part of the planned type surface but fail until the resolver implements them.
 
 ## Bespoke Handlers To Retire
 
 - `applyCardAgentEffect`
-  - Prepare The Way draw threshold
   - Commander and Ally signet immediate rewards
   - Devastating Assault Agent reward
 - `pendingActionForCard`

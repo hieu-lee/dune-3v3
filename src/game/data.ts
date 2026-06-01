@@ -9,6 +9,8 @@ import {
   spiceMustFlowSourceId,
 } from "./card-identifiers";
 import {
+  agentDrawCards,
+  hasInfluence,
   hasSpyPosts,
   revealGainPersuasion,
   revealGainResource,
@@ -219,7 +221,10 @@ function toImperiumCard(card: HubCard): Card {
       swords: 0,
       conditionalPersuasion: false,
       conditionalSwords: false,
-      effects: [revealGainPersuasion(2)],
+      effects: [
+        agentDrawCards(1, [hasInfluence("bene", 2)]),
+        revealGainPersuasion(2),
+      ],
       play: "If you have 2 or more Bene Gesserit Influence, draw 1 card.",
       reveal: "+2 persuasion.",
       cost: 2,

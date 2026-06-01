@@ -30,7 +30,10 @@ import {
   resolveStabanSmuggleSpice,
   scoreGurneyAlwaysSmiling,
 } from "./game/state";
-import { isSmugglersHarvesterCard } from "./game/card-identifiers";
+import {
+  isInterstellarTradeCard,
+  isSmugglersHarvesterCard,
+} from "./game/card-identifiers";
 import type {
   BoardSpace,
   Card,
@@ -207,7 +210,10 @@ type RevealTurnPlan = {
 };
 
 export function revealTurnPlan(activePlayer: Player, state?: Pick<GameState, "roundMakerSpaceVisits">): RevealTurnPlan {
-  const persuasion = revealPersuasionFor(activePlayer);
+  const interstellarTradePersuasion = activePlayer.hand
+    .filter(isInterstellarTradeCard)
+    .reduce((sum) => sum + activePlayer.contracts.filter((contract) => contract.completed).length, 0);
+  const persuasion = revealPersuasionFor(activePlayer) + interstellarTradePersuasion;
   const swords = activePlayer.hand.reduce((sum, card) => sum + card.swords, 0) + (activePlayer.swordmasterBonus ? 2 : 0);
   const revealGain = activePlayer.hand.reduce<Partial<Resources>>((gain, card) => {
     Object.entries(card.revealGain ?? {}).forEach(([resource, amount]) => {

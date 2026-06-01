@@ -407,6 +407,7 @@ export {
   isImpressIntrigue,
   isInspireAweIntrigue,
   isIntelligenceReportIntrigue,
+  isInterstellarTradeCard,
   isLeverageIntrigue,
   isManipulateIntrigue,
   isMarketOpportunityIntrigue,

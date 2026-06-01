@@ -47,6 +47,15 @@ try {
   assert.ok(smuggler, "Imperium deck should include Smuggler's Harvester");
   assert.equal(state.isSmugglersHarvesterCard(smuggler), true, "Smuggler's Harvester should be recognized");
   assert.match(smuggler.reveal, /Maker board space/, "Smuggler's Harvester should show its conditional Reveal text");
+  const interstellarTrade = data.imperiumDeck.find((card) => card.name === "Interstellar Trade");
+  assert.ok(interstellarTrade, "Imperium deck should include Interstellar Trade");
+  assert.equal(state.isInterstellarTradeCard(interstellarTrade), true, "Interstellar Trade should be recognized");
+  assert.equal(
+    interstellarTrade.conditionalPersuasion,
+    false,
+    "Interstellar Trade should have structured reveal persuasion instead of manual printed reveal handling",
+  );
+  assert.match(interstellarTrade.reveal, /completed contract/, "Interstellar Trade should describe its contract reveal text");
   const imperialBasin = data.boardSpaces.find((space) => space.id === "imperial-basin");
   assert.ok(imperialBasin?.maker, "Imperial Basin should be a Maker board space");
   const p2 = playerById(game, "p2");
@@ -110,6 +119,59 @@ try {
   assert.ok(
     playerById(revealed, p2.id).playArea.some((card) => card.id === smuggler.id),
     "Reveal should put Smuggler's Harvester into play area",
+  );
+
+  const completedContracts = data.standardContracts.slice(0, 2).map((card, index) => ({
+    card,
+    completed: true,
+    takenRound: index + 1,
+  }));
+  const incompleteContract = {
+    card: data.standardContracts[2],
+    completed: false,
+    takenRound: 1,
+  };
+  assert.ok(incompleteContract.card, "Expected a third standard contract for Interstellar Trade coverage");
+  const interstellarFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 0,
+    contracts: [...completedContracts, incompleteContract],
+    discard: [],
+    hand: [interstellarTrade],
+    playArea: [],
+    persuasion: 0,
+    resources: { solari: 0, spice: 0, water: 0 },
+  }));
+  const interstellarPlan = turnActions.revealTurnPlan(playerById(interstellarFixture, p2.id), interstellarFixture);
+  assert.equal(interstellarPlan.persuasion, 2, "Interstellar Trade should reveal for 1 persuasion per completed contract");
+  assert.deepEqual(
+    interstellarPlan.printedRevealCards,
+    [],
+    "Interstellar Trade should not require a manual printed reveal adjustment",
+  );
+  const interstellarRevealed = turnActions.revealTurnAction(interstellarFixture, {
+    commanderTargets: {},
+    revealPlan: interstellarPlan,
+  });
+  assert.equal(playerById(interstellarRevealed, p2.id).persuasion, 2);
+  assert.equal(interstellarRevealed.pendingAction, undefined, "Interstellar Trade reveal should not pause for printed text");
+  const lateCompletedContract = {
+    card: data.standardContracts[3],
+    completed: true,
+    takenRound: 1,
+  };
+  assert.ok(lateCompletedContract.card, "Expected a fourth standard contract for Interstellar Trade one-shot coverage");
+  const afterLateCompletion = {
+    ...interstellarRevealed,
+    players: interstellarRevealed.players.map((player) =>
+      player.id === p2.id
+        ? { ...player, contracts: [...player.contracts, lateCompletedContract] }
+        : player,
+    ),
+  };
+  assert.equal(
+    playerById(afterLateCompletion, p2.id).persuasion,
+    2,
+    "Interstellar Trade persuasion should be fixed by the reveal plan and not re-count later contract completions",
   );
 
   console.log("Imperium card verification passed");

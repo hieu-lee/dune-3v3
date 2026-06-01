@@ -1,5 +1,8 @@
 import catalogJson from "./uprising-catalog.generated.json";
-import { smugglersHarvesterSourceId } from "./card-identifiers";
+import {
+  interstellarTradeSourceId,
+  smugglersHarvesterSourceId,
+} from "./card-identifiers";
 import type {
   BattleIconId,
   BoardSpace,
@@ -157,13 +160,18 @@ function imperiumRevealText(card: HubCard, persuasion: number, swords: number, p
   if (card.id === smugglersHarvesterSourceId) {
     return "If you sent an Agent to a Maker board space this turn, gain 1 spice. +1 persuasion.";
   }
+  if (card.id === interstellarTradeSourceId) {
+    return "+1 persuasion for each completed contract.";
+  }
   return printedReveal ? "Resolve printed reveal text." : revealText(persuasion, swords);
 }
 
 function toImperiumCard(card: HubCard): Card {
   const persuasion = attributeNumber(card, "Persuasion on reveal");
   const swords = attributeNumber(card, "Swords");
-  const conditionalPersuasion = !card.attributes.some(([name]) => name === "Persuasion on reveal");
+  const automatedContractPersuasion = card.id === interstellarTradeSourceId;
+  const conditionalPersuasion =
+    !automatedContractPersuasion && !card.attributes.some(([name]) => name === "Persuasion on reveal");
   const conditionalSwords = hasConditionalAttribute(card, "Swords");
   return {
     id: `hub-${card.id}`,

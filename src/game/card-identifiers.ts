@@ -50,6 +50,7 @@ export const criticalShipmentsSourceId = 557;
 export const demandResultsSourceId = 558;
 export const devastatingAssaultSourceId = 559;
 export const smugglersHarvesterSourceId = 17;
+export const interstellarTradeSourceId = 184;
 
 export const shadowAllianceFactions: FactionId[] = [
   "emperor",
@@ -259,4 +260,8 @@ export function isDevastatingAssaultCommanderCard(card: Card) {
 
 export function isSmugglersHarvesterCard(card: Card) {
   return card.sourceId === smugglersHarvesterSourceId || card.name === "Smuggler's Harvester";
+}
+
+export function isInterstellarTradeCard(card: Card) {
+  return card.sourceId === interstellarTradeSourceId || card.name === "Interstellar Trade";
 }

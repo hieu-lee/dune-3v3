@@ -46,6 +46,14 @@ export function agentDrawCards(amount: EffectAmountSpec, conditions?: GameEffect
   return agentPlayEffects([{ kind: "draw-cards", selector: "self", amount }], conditions);
 }
 
+export function agentGainResource(
+  resource: ResourceId,
+  amount: EffectAmountSpec,
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return agentPlayEffects([{ kind: "gain-resource", selector: "self", resource, amount }], conditions);
+}
+
 export function visitedMakerSpace() {
   return { kind: "visited-maker-space" } as const;
 }

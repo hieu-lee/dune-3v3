@@ -15,6 +15,7 @@ These cards currently use typed reveal effect specs:
 These cards currently use typed Agent effect specs:
 
 - Reserve cards: Prepare The Way.
+- Imperium cards: Maker Keeper, Northern Watermaster, Paracompass.
 
 ## Bespoke Automated Cards
 
@@ -41,9 +42,9 @@ These cards are automated but still rely on explicit card or leader branches whi
 The largest current gaps are Agent and choice primitives:
 
 - Costs: pay resources, discard card, trash card, lose Influence, recall spy, retreat troops.
-- Conditions: Influence threshold, alliance, role/team, completed contracts, Maker visit, spy count, combat participation.
+- Conditions: alliance, role/team, completed contracts outside reveal, combat participation.
 - Selectors: activated Ally, teammate, faction, board space, market card, reserve card, contract, hand/discard/play-area card.
-- Effects: draw card, recruit/deploy/retreat troops, gain/lose Influence, place/recall spy, acquire card, take/complete contract, trash/discard card, gain VP, remove Shield Wall, summon sandworm.
+- Effects: recruit/deploy/retreat troops, gain/lose Influence, place/recall spy, acquire card, take/complete contract, trash/discard card, gain VP, remove Shield Wall, summon sandworm.
 - Choices: optional effect, pay-or-skip, choose one, choose N, split Commander/Ally rewards.
 
 ## Verification

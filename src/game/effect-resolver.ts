@@ -1,5 +1,9 @@
 import { hasVisitedMakerSpaceThisRound } from "./turn-trackers";
-import { effectiveRequirementInfluence } from "./board-rules";
+import {
+  effectiveEmperorIconInfluence,
+  effectiveFremenIconInfluence,
+  effectiveRequirementInfluence,
+} from "./board-rules";
 import { spyPostCount } from "./spy-posts";
 import type {
   Card,
@@ -169,13 +173,15 @@ function conditionApplies(condition: GameEffectConditionSpec, context: GameEffec
       : false;
   }
   if (condition.kind === "has-influence") {
-    return effectiveRequirementInfluence(
-      context.source,
-      condition.faction,
-      context.state?.players ?? [context.source],
-    ) >= condition.amount;
+    return conditionInfluence(context.source, condition.faction, context.state?.players ?? [context.source]) >= condition.amount;
   }
   return unsupportedKind("effect condition", condition);
+}
+
+function conditionInfluence(source: Player, faction: FactionId, players: Player[]) {
+  if (faction === "emperor") return effectiveEmperorIconInfluence(source, players);
+  if (faction === "fremen") return effectiveFremenIconInfluence(source, players);
+  return effectiveRequirementInfluence(source, faction, players);
 }
 
 function specApplies(spec: CardEffectSpec, context: GameEffectContext) {

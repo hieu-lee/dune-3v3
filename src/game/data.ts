@@ -4,12 +4,16 @@ import {
   calculusOfPowerSourceId,
   capturedMentatSourceId,
   interstellarTradeSourceId,
+  makerKeeperSourceId,
+  northernWatermasterSourceId,
+  paracompassSourceId,
   prepareTheWaySourceId,
   smugglersHarvesterSourceId,
   spiceMustFlowSourceId,
 } from "./card-identifiers";
 import {
   agentDrawCards,
+  agentGainResource,
   hasInfluence,
   hasSpyPosts,
   revealGainPersuasion,
@@ -207,6 +211,18 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
       revealGainPersuasion(1),
       revealGainPersuasion(2, [hasSpyPosts(2)]),
     ];
+  }
+  if (card.id === makerKeeperSourceId) {
+    return [
+      agentGainResource("water", 1, [hasInfluence("bene", 2)]),
+      agentGainResource("spice", 1, [hasInfluence("fremen", 2)]),
+    ];
+  }
+  if (card.id === northernWatermasterSourceId) {
+    return [agentGainResource("water", 1)];
+  }
+  if (card.id === paracompassSourceId) {
+    return [agentGainResource("solari", 2)];
   }
   return undefined;
 }

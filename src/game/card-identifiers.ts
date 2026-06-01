@@ -55,6 +55,9 @@ export const interstellarTradeSourceId = 184;
 export const calculusOfPowerSourceId = 42;
 export const capturedMentatSourceId = 61;
 export const beneGesseritOperativeSourceId = 30;
+export const makerKeeperSourceId = 19;
+export const northernWatermasterSourceId = 34;
+export const paracompassSourceId = 49;
 
 export const shadowAllianceFactions: FactionId[] = [
   "emperor",

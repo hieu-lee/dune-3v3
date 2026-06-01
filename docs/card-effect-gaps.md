@@ -12,7 +12,7 @@ Implemented primitives:
 - Conditions: visited Maker space this round, has at least N own spy posts, has at least N effective Influence
 - Selector: `self`
 
-The reveal resolver treats reveal specs as the full reveal model for a card. If a card has a reveal spec, legacy fields such as `persuasion`, `swords`, and `revealGain` remain available for display and compatibility but are not added again during reveal planning. Agent-play specs currently cover immediate self effects such as Influence-gated card draw.
+The reveal resolver treats reveal specs as the full reveal model for a card. If a card has a reveal spec, legacy fields such as `persuasion`, `swords`, and `revealGain` remain available for display and compatibility but are not added again during reveal planning. Agent-play specs currently cover immediate self effects such as Influence-gated card draw and resource gains.
 Unsupported spec shapes, including triggers, intentionally throw instead of falling back silently. Selectors other than `self` are part of the planned type surface but fail until the resolver implements them.
 
 ## Bespoke Handlers To Retire
@@ -33,7 +33,7 @@ Unsupported spec shapes, including triggers, intentionally throw instead of fall
 
 ## Next Primitive Candidates
 
-1. Agent immediate gains: gain resources, draw cards, recruit troops, draw Intrigue.
+1. Agent immediate gains: recruit troops, draw Intrigue, gain resources or draw cards with non-self routing.
 2. Agent spy primitives: place spy, optional place spy, recall-for-supply, shared post placement, restricted post icon.
 3. Costs and choices: pay resource, optional pay, discard/trash selected card, lose Influence.
 4. Routing: self versus activated Ally, Commander personal board influence, team-shared Influence checks.

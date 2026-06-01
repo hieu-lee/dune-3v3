@@ -20,6 +20,10 @@ function hasRevealSpec(card) {
   return card.effects?.some((spec) => spec.trigger === "reveal") ?? false;
 }
 
+function hasAgentPlaySpec(card) {
+  return card.effects?.some((spec) => spec.trigger === "agent-play") ?? false;
+}
+
 function expectedFixedReveal(card) {
   return {
     persuasion: card.persuasion,
@@ -70,16 +74,36 @@ try {
   const smuggler = data.imperiumDeck.find((card) => card.name === "Smuggler's Harvester");
   const interstellarTrade = data.imperiumDeck.find((card) => card.name === "Interstellar Trade");
   const beneGesseritOperative = data.imperiumDeck.find((card) => card.name === "Bene Gesserit Operative");
+  const makerKeeper = data.imperiumDeck.find((card) => card.name === "Maker Keeper");
+  const northernWatermaster = data.imperiumDeck.find((card) => card.name === "Northern Watermaster");
+  const paracompass = data.imperiumDeck.find((card) => card.name === "Paracompass");
   const prepareTheWay = data.reserveMarket.find((card) => card.sourceId === 537);
   const limitedLandsraadAccess = data.muadDibCommanderCards.find((card) => card.name === "Limited Landsraad Access");
   const imperialOrnithopter = data.emperorCommanderCards.find((card) => card.name === "Imperial Ornithopter");
   const imperialBasin = data.boardSpaces.find((space) => space.id === "imperial-basin");
   const secrets = data.boardSpaces.find((space) => space.id === "secrets");
   const highCouncil = data.boardSpaces.find((space) => space.id === "high-council");
-  assert.ok(convincingArgument && dagger && smuggler && interstellarTrade && beneGesseritOperative);
+  assert.ok(
+    convincingArgument &&
+    dagger &&
+    smuggler &&
+    interstellarTrade &&
+    beneGesseritOperative &&
+    makerKeeper &&
+    northernWatermaster &&
+    paracompass,
+  );
   assert.ok(prepareTheWay && limitedLandsraadAccess && imperialOrnithopter);
   assert.ok(imperialBasin && secrets && highCouncil);
   assert.equal(revealSpecCards.length, 31, "Unexpected number of cards with declarative Reveal specs");
+  assert.deepEqual(
+    [
+      ...data.reserveMarket,
+      ...data.imperiumDeck,
+    ].filter(hasAgentPlaySpec).map((card) => card.name).sort(),
+    ["Maker Keeper", "Northern Watermaster", "Paracompass", "Prepare The Way"],
+    "Unexpected cards with declarative Agent-play specs",
+  );
   for (const card of [
     convincingArgument,
     dagger,
@@ -104,6 +128,40 @@ try {
       spec.effects.some((effect) => effect.kind === "draw-cards" && effect.amount === 1)
     ),
     "Prepare The Way should carry a declarative Agent draw spec gated by Bene Gesserit influence",
+  );
+  assert.ok(
+    makerKeeper.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.conditions?.some((condition) =>
+        condition.kind === "has-influence" && condition.faction === "bene" && condition.amount === 2
+      ) &&
+      spec.effects.some((effect) => effect.kind === "gain-resource" && effect.resource === "water" && effect.amount === 1)
+    ),
+    "Maker Keeper should carry a Bene Gesserit Influence-gated water Agent spec",
+  );
+  assert.ok(
+    makerKeeper.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.conditions?.some((condition) =>
+        condition.kind === "has-influence" && condition.faction === "fremen" && condition.amount === 2
+      ) &&
+      spec.effects.some((effect) => effect.kind === "gain-resource" && effect.resource === "spice" && effect.amount === 1)
+    ),
+    "Maker Keeper should carry a Fremen Influence-gated spice Agent spec",
+  );
+  assert.ok(
+    northernWatermaster.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.effects.some((effect) => effect.kind === "gain-resource" && effect.resource === "water" && effect.amount === 1)
+    ),
+    "Northern Watermaster should carry a water Agent spec",
+  );
+  assert.ok(
+    paracompass.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.effects.some((effect) => effect.kind === "gain-resource" && effect.resource === "solari" && effect.amount === 2)
+    ),
+    "Paracompass should carry a Solari Agent spec",
   );
   for (const card of revealSpecCards) {
     assert.deepEqual(
@@ -405,6 +463,51 @@ try {
   );
   assert.equal(unprepared.source.hand.length, 0, "Prepare The Way Agent spec should not draw below 2 Bene Gesserit Influence");
   assert.equal(unprepared.log, undefined, "Prepare The Way Agent spec should not log below its Influence threshold");
+
+  const makerKeeperSource = {
+    ...p2,
+    resources: { solari: 0, spice: 0, water: 0 },
+    influence: { ...p2.influence, bene: 2, fringeWorlds: 2 },
+  };
+  const makerKept = state.applyCardAgentEffect(
+    makerKeeper,
+    makerKeeperSource,
+    makerKeeperSource,
+    { ...game, players: game.players.map((player) => player.id === p2.id ? makerKeeperSource : player) },
+  );
+  assert.deepEqual(
+    makerKept.source.resources,
+    { solari: 0, spice: 1, water: 1 },
+    "Maker Keeper should use Fremen-icon influence for its conditional Agent spice",
+  );
+  assert.equal(makerKept.sourceSpiceGained, 1, "Maker Keeper Agent spice should be trackable");
+  assert.match(makerKept.log ?? "", /Maker Keeper: gains 1 spice and 1 water/);
+  const unqualifiedMakerKeeper = state.applyCardAgentEffect(
+    makerKeeper,
+    { ...makerKeeperSource, influence: p2.influence },
+    { ...makerKeeperSource, influence: p2.influence },
+    { ...game, players: game.players.map((player) => player.id === p2.id ? { ...makerKeeperSource, influence: p2.influence } : player) },
+  );
+  assert.deepEqual(
+    unqualifiedMakerKeeper.source.resources,
+    { solari: 0, spice: 0, water: 0 },
+    "Maker Keeper should not gain Agent resources below Influence thresholds",
+  );
+  assert.equal(unqualifiedMakerKeeper.log, undefined, "Maker Keeper should not log when no Agent spec applies");
+  const northernWatermasterEffect = state.applyCardAgentEffect(
+    northernWatermaster,
+    { ...p2, resources: { solari: 0, spice: 0, water: 0 } },
+    p2,
+  );
+  assert.deepEqual(northernWatermasterEffect.source.resources, { solari: 0, spice: 0, water: 1 }, "Northern Watermaster should gain 1 Agent water");
+  assert.match(northernWatermasterEffect.log ?? "", /Northern Watermaster: gains 1 water/);
+  const paracompassEffect = state.applyCardAgentEffect(
+    paracompass,
+    { ...p2, resources: { solari: 0, spice: 0, water: 0 } },
+    p2,
+  );
+  assert.deepEqual(paracompassEffect.source.resources, { solari: 2, spice: 0, water: 0 }, "Paracompass should gain 2 Agent Solari");
+  assert.match(paracompassEffect.log ?? "", /Paracompass: gains 2 Solari/);
 
   const manualCard = {
     ...convincingArgument,

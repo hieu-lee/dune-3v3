@@ -236,15 +236,44 @@ function applyGenericCardAgentEffect(
   return {
     source,
     target: targetPlayer,
-    log: agentEffectLog(card, sourcePlayer, result.cardsToDraw, cardsDrawn),
+    log: agentEffectLog(card, sourcePlayer, result.revealGain, result.cardsToDraw, cardsDrawn),
     sourceSpiceGained: result.revealGain.spice ?? 0,
   };
 }
 
-function agentEffectLog(card: Card, sourcePlayer: Player, cardsToDraw: number, cardsDrawn: number) {
+function agentEffectLog(
+  card: Card,
+  sourcePlayer: Player,
+  gain: Partial<Resources>,
+  cardsToDraw: number,
+  cardsDrawn: number,
+) {
+  const parts = [
+    resourceGainText(gain),
+    drawText(cardsToDraw, cardsDrawn),
+  ].filter((part): part is string => Boolean(part));
+  if (parts.length === 0) return undefined;
+  return `${sourcePlayer.leader} resolves ${card.name}: ${parts.join("; ")}.`;
+}
+
+function drawText(cardsToDraw: number, cardsDrawn: number) {
   if (cardsToDraw === 0) return undefined;
   if (cardsDrawn === 0) {
-    return `${sourcePlayer.leader} resolves ${card.name}: no card to draw.`;
+    return "no card to draw";
   }
-  return `${sourcePlayer.leader} resolves ${card.name}: draws ${cardsDrawn} card${cardsDrawn === 1 ? "" : "s"}.`;
+  return `draws ${cardsDrawn} card${cardsDrawn === 1 ? "" : "s"}`;
+}
+
+function resourceGainText(gain: Partial<Resources>) {
+  const parts = [
+    resourceAmountText("Solari", gain.solari),
+    resourceAmountText("spice", gain.spice),
+    resourceAmountText("water", gain.water),
+  ].filter((part): part is string => Boolean(part));
+  return parts.length > 0 ? `gains ${parts.join(" and ")}` : undefined;
+}
+
+function resourceAmountText(label: string, amount: number | undefined) {
+  if (!amount) return undefined;
+  return `${amount} ${label}`;
 }

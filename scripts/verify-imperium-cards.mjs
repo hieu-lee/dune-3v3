@@ -103,6 +103,10 @@ try {
   assert.deepEqual(prepareTheWay.traits, ["Faction: Bene Gesserit"], "Prepare The Way should keep its Bene Gesserit trait");
   assert.match(prepareTheWay.play, /2 or more Bene Gesserit Influence.*draw 1 card/i);
   assert.match(prepareTheWay.reveal, /\+2 persuasion/i);
+  for (const name of ["Maker Keeper", "Northern Watermaster", "Paracompass"]) {
+    const card = data.imperiumDeck.find((candidate) => candidate.name === name);
+    assert.ok(card?.effects?.some((spec) => spec.trigger === "agent-play"), `${name} should use a structured Agent resource effect`);
+  }
   const calculusTrashTarget = data.imperiumDeck.find((card) =>
     card.id !== calculus.id && card.traits?.includes("Faction: Emperor")
   );

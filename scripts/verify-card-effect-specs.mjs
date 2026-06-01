@@ -101,6 +101,7 @@ try {
   const usul = data.muadDibCommanderCards.find((card) => card.name === "Usul");
   const corrinoMight = data.emperorCommanderCards.find((card) => card.name === "Corrino Might");
   const criticalShipments = data.emperorCommanderCards.find((card) => card.name === "Critical Shipments");
+  const demandResults = data.emperorCommanderCards.find((card) => card.name === "Demand Results");
   const devastatingAssault = data.emperorCommanderCards.find((card) => card.name === "Devastating Assault");
   const imperialTent = data.emperorCommanderCards.find((card) => card.name === "Imperial Tent");
   const emperorSignet = data.emperorCommanderCards.find((card) => card.name === "Signet Ring");
@@ -126,7 +127,7 @@ try {
     northernWatermaster &&
     paracompass,
   );
-  assert.ok(commandRespect && prepareTheWay && limitedLandsraadAccess && demandAttention && desertCall && muadDibSignet && usul && corrinoMight && criticalShipments && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
+  assert.ok(commandRespect && prepareTheWay && limitedLandsraadAccess && demandAttention && desertCall && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
   assert.ok(arrakeen && haggaBasin && imperialBasin && secrets && highCouncil);
   assert.equal(revealSpecCards.length, 34, "Unexpected number of cards with declarative Reveal specs");
   assert.deepEqual(
@@ -577,6 +578,26 @@ try {
       )
     ),
     "Critical Shipments should carry a declarative Commander resource-split spec",
+  );
+  assert.ok(
+    demandResults.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.conditions?.some((condition) => condition.kind === "has-team" && condition.team === "shaddam") &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Commander") &&
+      spec.effects.some((effect) =>
+        effect.kind === "pay-resource-for-contracts" &&
+        effect.selector === "self" &&
+        effect.resource === "solari" &&
+        effect.cost === 2 &&
+        effect.contractCount === 2 &&
+        effect.recipient === "same-team-allies" &&
+        effect.sourcePool === "public-offer" &&
+        effect.optional === true &&
+        effect.trashSource === true &&
+        effect.source === "Demand Results"
+      )
+    ),
+    "Demand Results should carry a typed Agent public-contract payment spec",
   );
   assert.ok(
     imperialTent.effects?.some((spec) =>

@@ -138,7 +138,9 @@ export {
 } from "./round-transition-rules";
 
 export {
+  resolvePayResourceForContractsChoice,
   setChoamContractCompleted,
+  skipPayResourceForContracts,
 } from "./contract-rules";
 
 export {
@@ -220,12 +222,10 @@ export {
 } from "./card-pending-rules";
 
 export {
-  resolveDemandResultsChoice,
   resolvePayResourceForInfluenceChoice,
   resolvePayResourceForSandwormsChoice,
   resolvePayResourceForStrengthChoice,
   resolvePayResourceForTroopsChoice,
-  skipDemandResults,
   skipPayResourceForInfluence,
   skipPayResourceForSandworms,
   skipPayResourceForStrength,

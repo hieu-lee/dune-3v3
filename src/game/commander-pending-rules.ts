@@ -2,9 +2,6 @@ import {
   factionLabels,
 } from "./data";
 import {
-  isDemandResultsCommanderCard,
-} from "./card-identifiers";
-import {
   canSummonSandworms,
   conflictDeploymentBlockedFor,
   playerHasConflictUnits,
@@ -20,14 +17,12 @@ import {
   recordTurnUnitDeployment,
 } from "./turn-trackers";
 import type {
-  ContractCard,
   GameState,
   PendingAction,
   Player,
   ResourceId,
 } from "./types";
 
-type DemandResultsPendingAction = Extract<PendingAction, { kind: "demand-results" }>;
 type PayResourceForStrengthPendingAction = Extract<PendingAction, { kind: "pay-resource-for-strength" }>;
 type PayResourceForTroopsPendingAction = Extract<PendingAction, { kind: "pay-resource-for-troops" }>;
 type PayResourceForInfluencePendingAction = Extract<PendingAction, { kind: "pay-resource-for-influence" }>;
@@ -51,104 +46,6 @@ function paymentPendingTrashSourceIsValid(pending: { cardId?: string; trashSourc
 
 function paymentPendingAmountIsValid(value: unknown) {
   return typeof value === "number" && Number.isInteger(value) && value > 0;
-}
-
-export function resolveDemandResultsChoice(
-  state: GameState,
-  pending: DemandResultsPendingAction,
-  optionIndex: number,
-): GameState {
-  const commander = state.players.find((player) => player.id === pending.commanderId);
-  const allyA = state.players.find((player) => player.id === pending.allyIds[0]);
-  const allyB = state.players.find((player) => player.id === pending.allyIds[1]);
-  const contractA = state.contractOffer.find((contract) => contract.id === pending.contractIds[0]);
-  const contractB = state.contractOffer.find((contract) => contract.id === pending.contractIds[1]);
-  const choices = optionIndex === 0
-    ? [
-        { ally: allyA, contract: contractA },
-        { ally: allyB, contract: contractB },
-      ]
-    : optionIndex === 1
-      ? [
-          { ally: allyA, contract: contractB },
-          { ally: allyB, contract: contractA },
-        ]
-      : undefined;
-
-  if (
-    !commander ||
-    commander.team !== "shaddam" ||
-    commander.role !== "Commander" ||
-    commander.resources.solari < 2 ||
-    !commander.playArea.some((card) => card.id === pending.cardId && isDemandResultsCommanderCard(card)) ||
-    !allyA ||
-    allyA.team !== commander.team ||
-    allyA.role !== "Ally" ||
-    !allyB ||
-    allyB.team !== commander.team ||
-    allyB.role !== "Ally" ||
-    allyA.id === allyB.id ||
-    !contractA ||
-    !contractB ||
-    contractA.id === contractB.id ||
-    !choices
-  ) {
-    return state;
-  }
-
-  const assigned = choices as Array<{ ally: Player; contract: ContractCard }>;
-  const assignedText = assigned
-    .map(({ ally, contract }) => `${ally.leader} takes ${contract.name}`)
-    .join("; ");
-  const replacementIds = new Set(pending.contractIds);
-  const contractDeck = [...state.contractDeck];
-  const contractOffer = state.contractOffer.flatMap((contract) => {
-    if (!replacementIds.has(contract.id)) return [contract];
-    const replacement = contractDeck.shift();
-    return replacement ? [replacement] : [];
-  });
-  const players = state.players.map((player) => {
-    if (player.id === commander.id) {
-      return {
-        ...player,
-        resources: { ...player.resources, solari: player.resources.solari - 2 },
-        playArea: player.playArea.filter((card) => card.id !== pending.cardId),
-      };
-    }
-    const assignment = assigned.find(({ ally }) => ally.id === player.id);
-    if (assignment) {
-      return {
-        ...player,
-        contracts: [
-          ...player.contracts,
-          {
-            card: assignment.contract,
-            completed: false,
-            takenRound: state.round,
-          },
-        ],
-      };
-    }
-    return player;
-  });
-
-  return {
-    ...state,
-    players,
-    contractOffer,
-    contractDeck,
-    ...advancePendingAction(state),
-    log: [`${commander.leader} spends 2 Solari for ${pending.source}; ${assignedText}.`, ...state.log],
-  };
-}
-
-export function skipDemandResults(state: GameState, pending: DemandResultsPendingAction): GameState {
-  const commander = state.players.find((player) => player.id === pending.commanderId);
-  return {
-    ...state,
-    ...advancePendingAction(state),
-    log: [`${commander?.leader ?? "Shaddam"} declines to pay 2 Solari for ${pending.source}.`, ...state.log],
-  };
 }
 
 export function resolvePayResourceForTroopsChoice(

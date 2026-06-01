@@ -2,15 +2,193 @@ import {
   addAcquiredCard,
   callToArmsRecruitOwner,
 } from "./market-rules";
+import {
+  resolveAgentPayResourceForContracts,
+} from "./effect-resolver";
 import { advancePendingAction } from "./pending-actions";
 import type {
+  ContractCard,
   GameState,
   PendingAction,
+  Player,
+  ResourceId,
 } from "./types";
 
 type ContractPendingAction = Extract<PendingAction, { kind: "contract" }>;
 type AcquireCardPendingAction = Extract<PendingAction, { kind: "acquire-card" }>;
+type PayResourceForContractsPendingAction = Extract<PendingAction, { kind: "pay-resource-for-contracts" }>;
 type FinishPendingResolution = (state: GameState) => GameState;
+
+const resourceLabels: Record<ResourceId, string> = {
+  solari: "Solari",
+  spice: "spice",
+  water: "water",
+};
+
+function contractPaymentOptionalIsValid(pending: { optional?: unknown }) {
+  return pending.optional === true;
+}
+
+function contractPaymentTrashSourceIsValid(pending: { cardId?: string; trashSource?: unknown }) {
+  if (pending.trashSource !== undefined && typeof pending.trashSource !== "boolean") return false;
+  if (pending.trashSource === true && pending.cardId === undefined) return false;
+  return true;
+}
+
+function contractPaymentAmountIsValid(value: unknown) {
+  return typeof value === "number" && Number.isInteger(value) && value > 0;
+}
+
+function contractPaymentSourceIsValid(pending: { source?: unknown }) {
+  return typeof pending.source === "string" && pending.source.trim().length > 0;
+}
+
+function pendingStringIds(value: unknown) {
+  return Array.isArray(value) && value.every((item) => typeof item === "string") ? value : [];
+}
+
+function sourceCardSupportsContractPayment(
+  state: GameState,
+  pending: PayResourceForContractsPendingAction,
+  owner: Player,
+) {
+  const sourceCard = owner.playArea.find((card) => card.id === pending.cardId);
+  if (!sourceCard?.effects) return false;
+  return resolveAgentPayResourceForContracts(sourceCard.effects, {
+    trigger: "agent-play",
+    source: owner,
+    state,
+  }).some((effect) =>
+    effect.selector === "self" &&
+    effect.resource === pending.resource &&
+    effect.cost === pending.cost &&
+    effect.contractCount === pending.contractIds.length &&
+    effect.recipient === "same-team-allies" &&
+    effect.sourcePool === "public-offer" &&
+    effect.optional === pending.optional &&
+    effect.trashSource === (pending.trashSource === true) &&
+    (effect.source ?? sourceCard.name) === pending.source
+  );
+}
+
+export function resolvePayResourceForContractsChoice(
+  state: GameState,
+  pending: PayResourceForContractsPendingAction,
+  optionIndex: number,
+): GameState {
+  if (state.pendingAction !== pending) return state;
+  const owner = state.players.find((player) => player.id === pending.ownerId);
+  const ownerResources = owner?.resources as Partial<Record<string, number>> | undefined;
+  const availableResource = ownerResources?.[pending.resource];
+  const resourceLabel = (resourceLabels as Partial<Record<string, string>>)[pending.resource];
+  const recipientIds = pendingStringIds(pending.recipientIds);
+  const contractIds = pendingStringIds(pending.contractIds);
+  const recipients = recipientIds.map((recipientId) => state.players.find((player) => player.id === recipientId));
+  const contracts = contractIds.map((contractId) => state.contractOffer.find((contract) => contract.id === contractId));
+  const choices = optionIndex === 0
+    ? [
+        { recipient: recipients[0], contract: contracts[0] },
+        { recipient: recipients[1], contract: contracts[1] },
+      ]
+    : optionIndex === 1
+      ? [
+          { recipient: recipients[0], contract: contracts[1] },
+          { recipient: recipients[1], contract: contracts[0] },
+        ]
+      : undefined;
+
+  if (
+    !owner ||
+    owner.role !== "Commander" ||
+    !resourceLabel ||
+    typeof availableResource !== "number" ||
+    availableResource < pending.cost ||
+    !contractPaymentAmountIsValid(pending.cost) ||
+    !contractPaymentOptionalIsValid(pending) ||
+    !contractPaymentTrashSourceIsValid(pending) ||
+    !contractPaymentSourceIsValid(pending) ||
+    recipientIds.length !== 2 ||
+    new Set(recipientIds).size !== recipientIds.length ||
+    recipients.some((recipient) => !recipient || recipient.team !== owner.team || recipient.role !== "Ally") ||
+    contractIds.length !== 2 ||
+    new Set(contractIds).size !== contractIds.length ||
+    contracts.some((contract) => !contract) ||
+    !choices ||
+    !sourceCardSupportsContractPayment(state, pending, owner)
+  ) {
+    return state;
+  }
+
+  const assigned = choices as Array<{ recipient: Player; contract: ContractCard }>;
+  const assignedText = assigned
+    .map(({ recipient, contract }) => `${recipient.leader} takes ${contract.name}`)
+    .join("; ");
+  const replacementIds = new Set(contractIds);
+  const contractDeck = [...state.contractDeck];
+  const contractOffer = state.contractOffer.flatMap((contract) => {
+    if (!replacementIds.has(contract.id)) return [contract];
+    const replacement = contractDeck.shift();
+    return replacement ? [replacement] : [];
+  });
+  const players = state.players.map((player) => {
+    if (player.id === owner.id) {
+      return {
+        ...player,
+        resources: { ...player.resources, [pending.resource]: availableResource - pending.cost },
+        ...(pending.trashSource
+          ? { playArea: player.playArea.filter((card) => card.id !== pending.cardId) }
+          : {}),
+      };
+    }
+    const assignment = assigned.find(({ recipient }) => recipient.id === player.id);
+    if (assignment) {
+      return {
+        ...player,
+        contracts: [
+          ...player.contracts,
+          {
+            card: assignment.contract,
+            completed: false,
+            takenRound: state.round,
+          },
+        ],
+      };
+    }
+    return player;
+  });
+
+  return {
+    ...state,
+    players,
+    contractOffer,
+    contractDeck,
+    ...advancePendingAction(state),
+    log: [`${owner.leader} spends ${pending.cost} ${resourceLabel} for ${pending.source}; ${assignedText}.`, ...state.log],
+  };
+}
+
+export function skipPayResourceForContracts(
+  state: GameState,
+  pending: PayResourceForContractsPendingAction,
+): GameState {
+  if (state.pendingAction !== pending) return state;
+  const owner = state.players.find((player) => player.id === pending.ownerId);
+  const resourceLabel = (resourceLabels as Partial<Record<string, string>>)[pending.resource];
+  if (
+    !resourceLabel ||
+    !contractPaymentAmountIsValid(pending.cost) ||
+    !contractPaymentOptionalIsValid(pending) ||
+    !contractPaymentTrashSourceIsValid(pending) ||
+    !contractPaymentSourceIsValid(pending)
+  ) {
+    return state;
+  }
+  return {
+    ...state,
+    ...advancePendingAction(state),
+    log: [`${owner?.leader ?? "Player"} declines to pay ${pending.cost} ${resourceLabel} for ${pending.source}.`, ...state.log],
+  };
+}
 
 export function resolveTakeChoamContract(
   state: GameState,

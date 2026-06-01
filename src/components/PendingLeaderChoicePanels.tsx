@@ -237,48 +237,64 @@ export function PendingTrashSourceForTradePanel({
   );
 }
 
-type PendingDemandResultsPanelProps = {
-  allies: (Player | undefined)[];
-  contracts: (ContractCard | undefined)[];
-  onChoose: (optionIndex: number) => void;
-  onSkip: () => void;
-};
-
-export function PendingDemandResultsPanel({
-  allies,
-  contracts,
-  onChoose,
-  onSkip,
-}: PendingDemandResultsPanelProps) {
-  const [firstAlly, secondAlly] = allies;
-  const [firstContract, secondContract] = contracts;
-  return (
-    <div className="pending-controls contract-choice">
-      {firstAlly && secondAlly && firstContract && secondContract ? (
-        <>
-          <span>Spend 2 Solari, assign both contracts, then trash Demand Results.</span>
-          <button type="button" onClick={() => onChoose(0)}>
-            <span>{firstContract.name} to {firstAlly.leader}</span>
-            <span>{secondContract.name} to {secondAlly.leader}</span>
-          </button>
-          <button type="button" onClick={() => onChoose(1)}>
-            <span>{secondContract.name} to {firstAlly.leader}</span>
-            <span>{firstContract.name} to {secondAlly.leader}</span>
-          </button>
-        </>
-      ) : (
-        <span>Demand Results can no longer resolve with the current table state.</span>
-      )}
-      <button type="button" onClick={onSkip}>Skip</button>
-    </div>
-  );
-}
-
 const resourceLabels: Record<ResourceId, string> = {
   solari: "Solari",
   spice: "spice",
   water: "water",
 };
+
+type PendingPayResourceForContractsPanelProps = {
+  contracts: (ContractCard | undefined)[];
+  cost: number;
+  owner?: Player;
+  recipients: (Player | undefined)[];
+  resource: ResourceId;
+  source: string;
+  trashSource?: boolean;
+  onChoose: (optionIndex: number) => void;
+  onSkip: () => void;
+};
+
+export function PendingPayResourceForContractsPanel({
+  contracts,
+  cost,
+  owner,
+  recipients,
+  resource,
+  source,
+  trashSource,
+  onChoose,
+  onSkip,
+}: PendingPayResourceForContractsPanelProps) {
+  const [firstRecipient, secondRecipient] = recipients;
+  const [firstContract, secondContract] = contracts;
+  const resourceLabel = (resourceLabels as Partial<Record<string, string>>)[resource] ?? String(resource);
+  const availableResource = owner
+    ? (owner.resources as Partial<Record<string, number>>)[resource]
+    : undefined;
+  const canPay = typeof availableResource === "number" && availableResource >= cost;
+  const resolutionText = `Spend ${cost} ${resourceLabel}, assign both contracts${trashSource ? `, then trash ${source}` : ""}.`;
+  return (
+    <div className="pending-controls contract-choice">
+      {firstRecipient && secondRecipient && firstContract && secondContract ? (
+        <>
+          <span>{resolutionText}</span>
+          <button type="button" onClick={() => onChoose(0)} disabled={!owner || !canPay}>
+            <span>{firstContract.name} to {firstRecipient.leader}</span>
+            <span>{secondContract.name} to {secondRecipient.leader}</span>
+          </button>
+          <button type="button" onClick={() => onChoose(1)} disabled={!owner || !canPay}>
+            <span>{secondContract.name} to {firstRecipient.leader}</span>
+            <span>{firstContract.name} to {secondRecipient.leader}</span>
+          </button>
+        </>
+      ) : (
+        <span>{source} can no longer resolve with the current table state.</span>
+      )}
+      <button type="button" onClick={onSkip}>Skip</button>
+    </div>
+  );
+}
 
 type PendingPayResourceForTroopsPanelProps = {
   cost: number;

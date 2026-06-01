@@ -11,6 +11,8 @@ import type {
   Card,
   CardEffectSpec,
   CommanderResourceSplitOption,
+  ContractEffectRecipient,
+  ContractEffectSourcePool,
   EffectAmountSpec,
   FactionId,
   GameEffectConditionSpec,
@@ -134,6 +136,18 @@ export type AgentPayResourceForSandworms = {
   sandworms: number;
   recipient: SandwormEffectRecipient;
   destination: SandwormEffectDestination;
+  optional: true;
+  trashSource: boolean;
+  source?: string;
+};
+
+export type AgentPayResourceForContracts = {
+  selector: PlayerSelector;
+  resource: ResourceId;
+  cost: number;
+  contractCount: number;
+  recipient: ContractEffectRecipient;
+  sourcePool: ContractEffectSourcePool;
   optional: true;
   trashSource: boolean;
   source?: string;
@@ -531,6 +545,31 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     validateOptionalBoolean("pay-resource-for-sandworms trashSource", (effect as { trashSource?: unknown }).trashSource);
     return;
   }
+  if (effect.kind === "pay-resource-for-contracts") {
+    if (trigger !== "agent-play") {
+      throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
+    }
+    if (effect.selector !== "self") {
+      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
+    if (!supportedResources.has(effect.resource)) {
+      throw new Error(`Unsupported effect resource "${effect.resource}"`);
+    }
+    const recipient = (effect as { recipient?: unknown }).recipient;
+    if (recipient !== "same-team-allies") {
+      invalidSpecField("pay-resource-for-contracts recipient", recipient);
+    }
+    const sourcePool = (effect as { sourcePool?: unknown }).sourcePool;
+    if (sourcePool !== "public-offer") {
+      invalidSpecField("pay-resource-for-contracts sourcePool", sourcePool);
+    }
+    validateSourceLabel("pay-resource-for-contracts source", effect.source);
+    validateAmount(effect.cost);
+    validateAmount(effect.contractCount);
+    validateOptionalTrue("pay-resource-for-contracts optional", (effect as { optional?: unknown }).optional);
+    validateOptionalBoolean("pay-resource-for-contracts trashSource", (effect as { trashSource?: unknown }).trashSource);
+    return;
+  }
   if (effect.kind === "commander-resource-split") {
     if (trigger !== "agent-play") {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
@@ -896,6 +935,9 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
   if (effect.kind === "pay-resource-for-sandworms") {
     return result;
   }
+  if (effect.kind === "pay-resource-for-contracts") {
+    return result;
+  }
   if (effect.kind === "commander-resource-split") {
     return result;
   }
@@ -1210,6 +1252,30 @@ export function resolveAgentPayResourceForSandworms(
         sandworms: amountFor(effect.sandworms, context.source),
         recipient: effect.recipient,
         destination: effect.destination,
+        optional: true,
+        trashSource: effect.trashSource ?? false,
+        source: effect.source,
+      }));
+  });
+}
+
+export function resolveAgentPayResourceForContracts(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): AgentPayResourceForContracts[] {
+  specs?.forEach(validateSpec);
+  return (specs ?? []).flatMap((spec) => {
+    if (spec.trigger !== "agent-play") return [];
+    if (!specApplies(spec, context)) return [];
+    return spec.effects
+      .filter((effect) => effect.kind === "pay-resource-for-contracts")
+      .map((effect) => ({
+        selector: effect.selector,
+        resource: effect.resource,
+        cost: amountFor(effect.cost, context.source),
+        contractCount: amountFor(effect.contractCount, context.source),
+        recipient: effect.recipient,
+        sourcePool: effect.sourcePool,
         optional: true,
         trashSource: effect.trashSource ?? false,
         source: effect.source,

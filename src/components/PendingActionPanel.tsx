@@ -39,12 +39,12 @@ import { PendingConflictVpPanel } from "./PendingConflictVpPanel";
 import { PendingInfluenceLossPanel } from "./PendingInfluenceLossPanel";
 import { PendingIrulanSignetPanel } from "./PendingIrulanSignetPanel";
 import {
-  PendingDemandResultsPanel,
   PendingJessicaOtherMemoriesPanel,
   PendingJessicaReverendMotherPanel,
   PendingJessicaSpiceAgonyPanel,
   PendingJessicaWaterOfLifePanel,
   PendingLadyAmberDesertScoutsPanel,
+  PendingPayResourceForContractsPanel,
   PendingPayResourceForInfluencePanel,
   PendingPayResourceForSandwormsPanel,
   PendingPayResourceForStrengthPanel,
@@ -81,7 +81,6 @@ type PendingActionPanelProps = {
   chooseConflictTieWinner: (winnerId?: string) => void;
   chooseDiscardCardForInfluenceAndDraw: (discardCardId: string, faction: FactionId) => void;
   chooseLoseInfluenceForIntrigues: (faction: FactionId) => void;
-  chooseDemandResults: (optionIndex: number) => void;
   chooseIrulanSignet: (choice: IrulanSignetRingChoice) => void;
   chooseJessicaOtherMemories: (choice: JessicaOtherMemoriesChoice) => void;
   chooseJessicaReverendMother: (choice: JessicaReverendMotherChoice) => void;
@@ -89,6 +88,7 @@ type PendingActionPanelProps = {
   chooseJessicaWaterOfLife: (choice: JessicaWaterOfLifeChoice) => void;
   chooseLadyAmberDesertScouts: (choice: LadyAmberDesertScoutsChoice) => void;
   chooseMakerReward: (choice: "spice" | "sandworms") => void;
+  choosePayResourceForContracts: (optionIndex: number) => void;
   choosePayResourceForInfluence: () => void;
   choosePayResourceForSandworms: () => void;
   choosePayResourceForStrength: () => void;
@@ -117,9 +117,9 @@ type PendingActionPanelProps = {
   skipLoseInfluenceForIntriguesChoice: () => void;
   skipControlDefense: () => void;
   skipConflictVpReward: () => void;
-  skipDemandResultsChoice: () => void;
   skipInfluenceLoss: () => void;
   skipOptionalSpacePaymentChoice: () => void;
+  skipPayResourceForContractsChoice: () => void;
   skipPayResourceForInfluenceChoice: () => void;
   skipPayResourceForSandwormsChoice: () => void;
   skipPayResourceForStrengthChoice: () => void;
@@ -147,7 +147,6 @@ export function PendingActionPanel({
   chooseConflictTieWinner,
   chooseDiscardCardForInfluenceAndDraw,
   chooseLoseInfluenceForIntrigues,
-  chooseDemandResults,
   chooseIrulanSignet,
   chooseJessicaOtherMemories,
   chooseJessicaReverendMother,
@@ -155,6 +154,7 @@ export function PendingActionPanel({
   chooseJessicaWaterOfLife,
   chooseLadyAmberDesertScouts,
   chooseMakerReward,
+  choosePayResourceForContracts,
   choosePayResourceForInfluence,
   choosePayResourceForSandworms,
   choosePayResourceForStrength,
@@ -183,9 +183,9 @@ export function PendingActionPanel({
   skipLoseInfluenceForIntriguesChoice,
   skipControlDefense,
   skipConflictVpReward,
-  skipDemandResultsChoice,
   skipInfluenceLoss,
   skipOptionalSpacePaymentChoice,
+  skipPayResourceForContractsChoice,
   skipPayResourceForInfluenceChoice,
   skipPayResourceForSandwormsChoice,
   skipPayResourceForStrengthChoice,
@@ -278,16 +278,16 @@ export function PendingActionPanel({
           .map((partnerId) => game.players.find((player) => player.id === partnerId))
           .filter((player): player is Player => Boolean(player))
       : [];
-  const pendingDemandResultsCommander =
-    pendingAction.kind === "demand-results"
-      ? game.players.find((player) => player.id === pendingAction.commanderId)
+  const pendingPayResourceContractsOwner =
+    pendingAction.kind === "pay-resource-for-contracts"
+      ? game.players.find((player) => player.id === pendingAction.ownerId)
       : undefined;
-  const pendingDemandResultsAllies =
-    pendingAction.kind === "demand-results"
-      ? pendingAction.allyIds.map((allyId) => game.players.find((player) => player.id === allyId))
+  const pendingPayResourceContractsRecipients =
+    pendingAction.kind === "pay-resource-for-contracts"
+      ? pendingAction.recipientIds.map((recipientId) => game.players.find((player) => player.id === recipientId))
       : [];
-  const pendingDemandResultsContracts =
-    pendingAction.kind === "demand-results"
+  const pendingPayResourceContractsContracts =
+    pendingAction.kind === "pay-resource-for-contracts"
       ? pendingAction.contractIds.map((contractId) => game.contractOffer.find((contract) => contract.id === contractId))
       : [];
   const pendingPayResourceStrengthOwner =
@@ -494,7 +494,7 @@ export function PendingActionPanel({
           {pendingAction.kind === "optional-space-payment" && `${pendingOptionalSpacePaymentOwner?.leader ?? "Player"} ${pendingAction.source}`}
           {pendingAction.kind === "conflict-vp-conversion" && `${pendingConflictVpOwner?.leader ?? "Player"} Conflict reward`}
           {pendingAction.kind === "trash-source-for-trade" && `${pendingTrashSourceTradeOwner?.leader ?? "Player"} ${pendingAction.source}`}
-          {pendingAction.kind === "demand-results" && `${pendingDemandResultsCommander?.leader ?? "Shaddam"} Demand Results`}
+          {pendingAction.kind === "pay-resource-for-contracts" && `${pendingPayResourceContractsOwner?.leader ?? "Player"} ${pendingAction.source}`}
           {pendingAction.kind === "pay-resource-for-strength" && `${pendingPayResourceStrengthOwner?.leader ?? "Player"} ${pendingAction.source}`}
           {pendingAction.kind === "pay-resource-for-influence" && `${pendingPayResourceInfluenceOwner?.leader ?? "Player"} ${pendingAction.source}`}
           {pendingAction.kind === "pay-resource-for-troops" && `${pendingPayResourceTroopsOwner?.leader ?? "Player"} ${pendingAction.source}`}
@@ -731,12 +731,17 @@ export function PendingActionPanel({
         />
       )}
 
-      {pendingAction.kind === "demand-results" && (
-        <PendingDemandResultsPanel
-          allies={pendingDemandResultsAllies}
-          contracts={pendingDemandResultsContracts}
-          onChoose={chooseDemandResults}
-          onSkip={skipDemandResultsChoice}
+      {pendingAction.kind === "pay-resource-for-contracts" && (
+        <PendingPayResourceForContractsPanel
+          contracts={pendingPayResourceContractsContracts}
+          cost={pendingAction.cost}
+          owner={pendingPayResourceContractsOwner}
+          recipients={pendingPayResourceContractsRecipients}
+          resource={pendingAction.resource}
+          source={pendingAction.source}
+          trashSource={pendingAction.trashSource}
+          onChoose={choosePayResourceForContracts}
+          onSkip={skipPayResourceForContractsChoice}
         />
       )}
 

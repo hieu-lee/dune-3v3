@@ -21,7 +21,6 @@ import {
   reinforceTroop,
   resolveCommanderResourceSplitChoice,
   resolveConflictTie,
-  resolveDemandResultsChoice,
   resolveDiscardCardForInfluenceAndDrawChoice,
   resolveIrulanSignetRingChoice,
   resolveBoardInfluenceChoice,
@@ -33,6 +32,7 @@ import {
   resolveLoseInfluenceForIntriguesChoice,
   resolveMakerChoice,
   resolveOptionalSpacePayment,
+  resolvePayResourceForContractsChoice,
   resolvePayResourceForInfluenceChoice,
   resolvePayResourceForSandwormsChoice,
   resolvePayResourceForStrengthChoice,
@@ -46,11 +46,11 @@ import {
   scoreGurneyAlwaysSmiling,
   skipConflictVpConversion,
   skipControlDefenseTroop,
-  skipDemandResults,
   skipDiscardCardForInfluenceAndDraw,
   skipLoseInfluence,
   skipLoseInfluenceForIntrigues,
   skipOptionalSpacePayment,
+  skipPayResourceForContracts,
   skipPayResourceForInfluence,
   skipPayResourceForSandworms,
   skipPayResourceForStrength,
@@ -194,10 +194,12 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     runPending("trash-source-for-trade", (current, pending) => resolveTrashSourceForTradeChoice(current, pending, partnerId));
   const skipTrashSourceForTradeChoice = () =>
     runPending("trash-source-for-trade", (current, pending) => maybeStartCombatPhase(skipTrashSourceForTrade(current, pending)));
-  const chooseDemandResults = (optionIndex: number) =>
-    runPending("demand-results", (current, pending) => maybeStartCombatPhase(resolveDemandResultsChoice(current, pending, optionIndex)));
-  const skipDemandResultsChoice = () =>
-    runPending("demand-results", (current, pending) => maybeStartCombatPhase(skipDemandResults(current, pending)));
+  const choosePayResourceForContracts = (optionIndex: number) =>
+    runPending("pay-resource-for-contracts", (current, pending) =>
+      maybeStartCombatPhase(resolvePayResourceForContractsChoice(current, pending, optionIndex))
+    );
+  const skipPayResourceForContractsChoice = () =>
+    runPending("pay-resource-for-contracts", (current, pending) => maybeStartCombatPhase(skipPayResourceForContracts(current, pending)));
   const choosePayResourceForStrength = () =>
     runPending("pay-resource-for-strength", (current, pending) => maybeStartCombatPhase(resolvePayResourceForStrengthChoice(current, pending)));
   const skipPayResourceForStrengthChoice = () =>
@@ -284,7 +286,6 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     chooseConflictInfluence,
     chooseBoardInfluence,
     chooseConflictTieWinner,
-    chooseDemandResults,
     chooseDiscardCardForInfluenceAndDraw,
     chooseIrulanSignet,
     chooseJessicaOtherMemories,
@@ -294,6 +295,7 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     chooseLadyAmberDesertScouts,
     chooseLoseInfluenceForIntrigues,
     chooseMakerReward,
+    choosePayResourceForContracts,
     choosePayResourceForInfluence,
     choosePayResourceForSandworms,
     choosePayResourceForStrength,
@@ -320,11 +322,11 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     reinforceOne,
     skipControlDefense,
     skipConflictVpReward,
-    skipDemandResultsChoice,
     skipDiscardCardForInfluenceAndDrawChoice,
     skipInfluenceLoss,
     skipLoseInfluenceForIntriguesChoice,
     skipOptionalSpacePaymentChoice,
+    skipPayResourceForContractsChoice,
     skipPayResourceForInfluenceChoice,
     skipPayResourceForSandwormsChoice,
     skipPayResourceForStrengthChoice,

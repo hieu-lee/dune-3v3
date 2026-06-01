@@ -342,20 +342,38 @@ try {
     true,
     "Demand Results should be recognized as its Commander starter card",
   );
-  const demandResultsPending = state.pendingActionForCard(demandResults, emperor, game, shaddamAlly);
+  const demandResultsSource = {
+    ...emperor,
+    resources: { ...emperor.resources, solari: 2 },
+    playArea: [demandResults],
+  };
+  const demandResultsGame = {
+    ...game,
+    players: game.players.map((player) => player.id === emperor.id ? demandResultsSource : player),
+  };
+  const demandResultsPending = state.pendingActionForCard(demandResults, demandResultsSource, demandResultsGame, shaddamAlly);
   assert.deepEqual(demandResultsPending, {
-    kind: "demand-results",
-    commanderId: emperor.id,
-    allyIds: [shaddamAlly.id, shaddamAllyB.id],
+    kind: "pay-resource-for-contracts",
+    ownerId: emperor.id,
+    recipientIds: [shaddamAlly.id, shaddamAllyB.id],
     contractIds: [game.contractOffer[0].id, game.contractOffer[1].id],
+    resource: "solari",
+    cost: 2,
+    optional: true,
+    trashSource: true,
     cardId: demandResults.id,
     source: "Demand Results",
   });
   assert.equal(
+    state.pendingActionForCard(demandResults, emperor, game, shaddamAlly),
+    undefined,
+    "Demand Results should require the played card in Shaddam's play area",
+  );
+  assert.equal(
     state.pendingActionForCard(
       demandResults,
-      { ...emperor, resources: { ...emperor.resources, solari: 1 } },
-      game,
+      { ...demandResultsSource, resources: { ...demandResultsSource.resources, solari: 1 } },
+      demandResultsGame,
       shaddamAlly,
     ),
     undefined,
@@ -364,8 +382,8 @@ try {
   assert.equal(
     state.pendingActionForCard(
       demandResults,
-      emperor,
-      { ...game, contractOffer: [game.contractOffer[0]] },
+      demandResultsSource,
+      { ...demandResultsGame, contractOffer: [game.contractOffer[0]] },
       shaddamAlly,
     ),
     undefined,
@@ -374,8 +392,8 @@ try {
   assert.equal(
     state.pendingActionForCard(
       demandResults,
-      emperor,
-      { ...game, players: game.players.filter((player) => player.id !== shaddamAllyB.id) },
+      demandResultsSource,
+      { ...demandResultsGame, players: demandResultsGame.players.filter((player) => player.id !== shaddamAllyB.id) },
       shaddamAlly,
     ),
     undefined,
@@ -394,7 +412,7 @@ try {
   const highCouncil = data.boardSpaces.find((space) => space.id === "high-council");
   assert.ok(highCouncil, "High Council should exist for Demand Results post-cost regression");
   const poorDemandResultsSource = state.applyBoardEffect(
-    { ...emperor, resources: { solari: 6, spice: 0, water: 0 } },
+    { ...emperor, resources: { solari: 6, spice: 0, water: 0 }, playArea: [demandResults] },
     shaddamAlly,
     highCouncil,
     highCouncil.cost,
@@ -405,14 +423,14 @@ try {
     "Demand Results should not queue if the High Council cost leaves Shaddam without 2 Solari",
   );
   const richDemandResultsSource = state.applyBoardEffect(
-    { ...emperor, resources: { solari: 7, spice: 0, water: 0 } },
+    { ...emperor, resources: { solari: 7, spice: 0, water: 0 }, playArea: [demandResults] },
     shaddamAlly,
     highCouncil,
     highCouncil.cost,
   ).source;
   assert.equal(
     state.pendingActionForCard(demandResults, richDemandResultsSource, game, shaddamAlly)?.kind,
-    "demand-results",
+    "pay-resource-for-contracts",
     "Demand Results should queue from post-space resources when Shaddam can still pay 2 Solari",
   );
 
@@ -438,7 +456,7 @@ try {
     }),
     log: [],
   };
-  const resolvedDemandResults = state.resolveDemandResultsChoice(
+  const resolvedDemandResults = state.resolvePayResourceForContractsChoice(
     baseDemandResultsResolution,
     demandResultsPending,
     0,
@@ -481,7 +499,7 @@ try {
   assert.equal(resolvedDemandResults.pendingAction, undefined, "Demand Results resolution should advance pending action");
   assert.match(resolvedDemandResults.log[0], /spends 2 Solari for Demand Results/, "Demand Results should log resolution");
 
-  const oneReplacementDemandResults = state.resolveDemandResultsChoice(
+  const oneReplacementDemandResults = state.resolvePayResourceForContractsChoice(
     { ...baseDemandResultsResolution, contractDeck: [replacementA] },
     demandResultsPending,
     0,
@@ -492,7 +510,7 @@ try {
     "Demand Results should refill only as many public contracts as remain in the deck",
   );
 
-  const swappedDemandResults = state.resolveDemandResultsChoice(
+  const swappedDemandResults = state.resolvePayResourceForContractsChoice(
     baseDemandResultsResolution,
     demandResultsPending,
     1,
@@ -508,7 +526,7 @@ try {
     "Demand Results second option gives the first contract to the second Shaddam Ally",
   );
 
-  const skippedDemandResults = state.skipDemandResults(baseDemandResultsResolution, demandResultsPending);
+  const skippedDemandResults = state.skipPayResourceForContracts(baseDemandResultsResolution, demandResultsPending);
   assert.equal(
     playerById(skippedDemandResults, emperor.id).resources.solari,
     2,
@@ -532,7 +550,7 @@ try {
   assert.equal(skippedDemandResults.pendingAction, undefined, "Skipping Demand Results should advance pending action");
 
   const staleDemandResultsState = { ...baseDemandResultsResolution, contractOffer: [replacementA, replacementB] };
-  const staleDemandResults = state.resolveDemandResultsChoice(
+  const staleDemandResults = state.resolvePayResourceForContractsChoice(
     staleDemandResultsState,
     demandResultsPending,
     0,
@@ -551,21 +569,77 @@ try {
     ),
   };
   assert.equal(
-    state.resolveDemandResultsChoice(noCardDemandResultsState, demandResultsPending, 0),
+    state.resolvePayResourceForContractsChoice(noCardDemandResultsState, demandResultsPending, 0),
     noCardDemandResultsState,
     "Demand Results should not resolve if the card is no longer in play",
   );
-  const duplicateAllyDemandResultsPending = {
+  const forgedDemandResultsSource = {
+    ...demandResults,
+    id: "forged-demand-results-source",
+    effects: [],
+  };
+  const forgedDemandResultsPending = {
     ...demandResultsPending,
-    allyIds: [shaddamAlly.id, shaddamAlly.id],
+    cardId: forgedDemandResultsSource.id,
+  };
+  const forgedDemandResultsState = {
+    ...baseDemandResultsResolution,
+    pendingAction: forgedDemandResultsPending,
+    players: baseDemandResultsResolution.players.map((player) =>
+      player.id === emperor.id ? { ...player, playArea: [forgedDemandResultsSource] } : player,
+    ),
   };
   assert.equal(
-    state.resolveDemandResultsChoice(baseDemandResultsResolution, duplicateAllyDemandResultsPending, 0),
-    baseDemandResultsResolution,
+    state.resolvePayResourceForContractsChoice(forgedDemandResultsState, forgedDemandResultsPending, 0),
+    forgedDemandResultsState,
+    "Demand Results should not resolve when a forged pending points at a card without the contract-payment effect",
+  );
+  const duplicateRecipientDemandResultsPending = {
+    ...demandResultsPending,
+    recipientIds: [shaddamAlly.id, shaddamAlly.id],
+  };
+  const duplicateRecipientDemandResultsState = {
+    ...baseDemandResultsResolution,
+    pendingAction: duplicateRecipientDemandResultsPending,
+  };
+  assert.equal(
+    state.resolvePayResourceForContractsChoice(duplicateRecipientDemandResultsState, duplicateRecipientDemandResultsPending, 0),
+    duplicateRecipientDemandResultsState,
     "Demand Results should not resolve a malformed pending action with duplicate Ally IDs",
   );
+  const duplicateContractDemandResultsPending = {
+    ...demandResultsPending,
+    contractIds: [contractA.id, contractA.id],
+  };
+  const duplicateContractDemandResultsState = {
+    ...baseDemandResultsResolution,
+    pendingAction: duplicateContractDemandResultsPending,
+  };
   assert.equal(
-    state.resolveDemandResultsChoice(baseDemandResultsResolution, demandResultsPending, 2),
+    state.resolvePayResourceForContractsChoice(duplicateContractDemandResultsState, duplicateContractDemandResultsPending, 0),
+    duplicateContractDemandResultsState,
+    "Demand Results should not resolve a malformed pending action with duplicate contract IDs",
+  );
+  const malformedOptionalDemandResultsPending = {
+    ...demandResultsPending,
+    optional: false,
+  };
+  const malformedOptionalDemandResultsState = {
+    ...baseDemandResultsResolution,
+    pendingAction: malformedOptionalDemandResultsPending,
+  };
+  assert.equal(
+    state.resolvePayResourceForContractsChoice(malformedOptionalDemandResultsState, malformedOptionalDemandResultsPending, 0),
+    malformedOptionalDemandResultsState,
+    "Demand Results should not resolve a malformed pending action with a non-optional payment",
+  );
+  assert.equal(
+    state.skipPayResourceForContracts(malformedOptionalDemandResultsState, malformedOptionalDemandResultsPending),
+    malformedOptionalDemandResultsState,
+    "Demand Results should not skip a malformed pending action with a non-optional payment",
+  );
+  assert.equal(
+    state.resolvePayResourceForContractsChoice(baseDemandResultsResolution, demandResultsPending, 2),
     baseDemandResultsResolution,
     "Demand Results should ignore invalid assignment choices",
   );

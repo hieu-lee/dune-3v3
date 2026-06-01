@@ -44,6 +44,8 @@ export type TroopEffectDestination = "garrison";
 export type SandwormEffectRecipient = "activated-ally";
 export type SandwormEffectDestination = "conflict";
 export type TradeEffectPartner = "same-team-allies";
+export type ContractEffectRecipient = "same-team-allies";
+export type ContractEffectSourcePool = "public-offer";
 export type EffectAmountSpec =
   | number
   | { kind: "completed-contracts"; multiplier?: number };
@@ -139,6 +141,18 @@ export type GameEffectSpec =
       faction: InfluenceEffectFaction;
       amount: EffectAmountSpec;
       recipient: InfluenceEffectRecipient;
+      optional?: true;
+      trashSource?: boolean;
+      source?: string;
+    }
+  | {
+      kind: "pay-resource-for-contracts";
+      selector: PlayerSelector;
+      resource: ResourceId;
+      cost: EffectAmountSpec;
+      contractCount: EffectAmountSpec;
+      recipient: ContractEffectRecipient;
+      sourcePool: ContractEffectSourcePool;
       optional?: true;
       trashSource?: boolean;
       source?: string;
@@ -599,10 +613,14 @@ export type PendingAction =
       source: string;
     }
   | {
-      kind: "demand-results";
-      commanderId: string;
-      allyIds: [string, string];
+      kind: "pay-resource-for-contracts";
+      ownerId: string;
+      recipientIds: [string, string];
       contractIds: [string, string];
+      resource: ResourceId;
+      cost: number;
+      optional: true;
+      trashSource?: boolean;
       cardId: string;
       source: string;
     }

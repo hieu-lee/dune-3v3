@@ -6,6 +6,7 @@ import {
   agentGainResource,
   agentMoveCardToThroneRow,
   agentPayResourceForInfluence,
+  agentPayResourceForContracts,
   agentPayResourceForSandworms,
   agentPlaceSpies,
   agentPlayEffects,
@@ -448,8 +449,17 @@ const emperorCommanderSpecs: Array<StarterCardSpec & { sourceId: number }> = [
     icons: ["landsraad"],
     persuasion: 0,
     swords: 1,
-    effects: [revealGainStrength(1)],
-    play: "Resolve the printed contract-distribution trash effect.",
+    effects: [
+      agentPayResourceForContracts(
+        "solari",
+        2,
+        2,
+        { source: "Demand Results", trashSource: true },
+        [hasTeam("shaddam"), hasRole("Commander")],
+      ),
+      revealGainStrength(1),
+    ],
+    play: "Pay 2 Solari to assign both face-up CHOAM contracts to your Allies, then trash this card.",
     reveal: starterRevealText(0, 1),
   },
   {

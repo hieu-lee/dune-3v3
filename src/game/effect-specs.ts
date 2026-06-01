@@ -1,6 +1,8 @@
 import type {
   CardEffectSpec,
   CommanderResourceSplitOption,
+  ContractEffectRecipient,
+  ContractEffectSourcePool,
   EffectAmountSpec,
   FactionId,
   GameEffectConditionSpec,
@@ -234,6 +236,35 @@ export function agentPayResourceForSandworms(
       sandworms,
       recipient: options.recipient ?? "activated-ally",
       destination: options.destination ?? "conflict",
+      optional: true,
+      ...(options.trashSource ? { trashSource: true } : {}),
+      ...(options.source ? { source: options.source } : {}),
+    },
+  ], conditions);
+}
+
+export function agentPayResourceForContracts(
+  resource: ResourceId,
+  cost: EffectAmountSpec,
+  contractCount: EffectAmountSpec,
+  options: {
+    recipient?: ContractEffectRecipient;
+    sourcePool?: ContractEffectSourcePool;
+    optional?: true;
+    trashSource?: boolean;
+    source?: string;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return agentPlayEffects([
+    {
+      kind: "pay-resource-for-contracts",
+      selector: "self",
+      resource,
+      cost,
+      contractCount,
+      recipient: options.recipient ?? "same-team-allies",
+      sourcePool: options.sourcePool ?? "public-offer",
       optional: true,
       ...(options.trashSource ? { trashSource: true } : {}),
       ...(options.source ? { source: options.source } : {}),

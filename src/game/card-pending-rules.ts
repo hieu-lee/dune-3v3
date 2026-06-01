@@ -1,7 +1,6 @@
 import { resolveInfluence } from "./agent-effects";
 import {
   canMoveCardToThroneRow,
-  isDemandResultsCommanderCard,
   isGenericSignetRingCard,
   isShaddamSignetRingCard,
   isThreatenSpiceProductionCommanderCard,
@@ -16,6 +15,7 @@ import {
   resolveAgentCommanderResourceSplits,
   resolveAgentDiscardCardForInfluenceAndDraws,
   resolveAgentMoveCardToThroneRows,
+  resolveAgentPayResourceForContracts,
   resolveAgentPayResourceForInfluences,
   resolveAgentPayResourceForSandworms,
   resolveAgentTrashSourceForTrades,
@@ -76,12 +76,6 @@ function sameTeamAllies(players: Player[], source: Player): [Player, Player] | u
   const allies = players.filter((player) => player.team === source.team && player.role === "Ally");
   if (allies.length < 2) return undefined;
   return [allies[0], allies[1]];
-}
-
-function shaddamAllyIds(state: GameState, source: Player): [string, string] | undefined {
-  const allies = sameTeamAllies(state.players, source);
-  if (!allies) return undefined;
-  return [allies[0].id, allies[1].id];
 }
 
 function playersWithPendingCardEffect(state: GameState, source: Player, target?: Player) {
@@ -302,6 +296,47 @@ function pendingActionForAgentPayResourceForSandworms(
     .find((pending): pending is PendingAction => Boolean(pending));
 }
 
+function pendingActionForAgentPayResourceForContracts(
+  card: Card,
+  source: Player,
+  state?: GameState,
+  target?: Player,
+): PendingAction | undefined {
+  if (!card.effects || !source.playArea.some((candidate) => candidate.id === card.id)) return undefined;
+  if (!state || source.role !== "Commander") return undefined;
+  const players = playersWithPendingCardEffect(state, source, target);
+  const effectState = { ...state, players };
+  const effects = resolveAgentPayResourceForContracts(card.effects, {
+    trigger: "agent-play",
+    source,
+    target,
+    state: effectState,
+  });
+  return effects
+    .map((effect): PendingAction | undefined => {
+      if (effect.selector !== "self" || effect.recipient !== "same-team-allies" || effect.sourcePool !== "public-offer") {
+        return undefined;
+      }
+      if (effect.cost <= 0 || effect.contractCount !== 2 || source.resources[effect.resource] < effect.cost) return undefined;
+      if (state.contractOffer.length < effect.contractCount) return undefined;
+      const allies = sameTeamAllies(effectState.players, source);
+      if (!allies) return undefined;
+      return {
+        kind: "pay-resource-for-contracts",
+        ownerId: source.id,
+        recipientIds: [allies[0].id, allies[1].id],
+        contractIds: [state.contractOffer[0].id, state.contractOffer[1].id],
+        resource: effect.resource,
+        cost: effect.cost,
+        optional: effect.optional,
+        ...(effect.trashSource ? { trashSource: true } : {}),
+        cardId: card.id,
+        source: effect.source ?? card.name,
+      };
+    })
+    .find((pending): pending is PendingAction => Boolean(pending));
+}
+
 function pendingActionForAgentThroneRowMove(
   card: Card,
   source: Player,
@@ -412,6 +447,8 @@ export function pendingActionForCard(
   if (agentPayResourceInfluencePending) return agentPayResourceInfluencePending;
   const agentPayResourceSandwormsPending = pendingActionForAgentPayResourceForSandworms(card, source, state, target, space);
   if (agentPayResourceSandwormsPending) return agentPayResourceSandwormsPending;
+  const agentPayResourceContractsPending = pendingActionForAgentPayResourceForContracts(card, source, state, target);
+  if (agentPayResourceContractsPending) return agentPayResourceContractsPending;
   const agentThroneRowPending = pendingActionForAgentThroneRowMove(card, source, state, target);
   if (agentThroneRowPending) return agentThroneRowPending;
   const agentCommanderResourceSplitPending = pendingActionForAgentCommanderResourceSplit(card, source, state, target);
@@ -503,25 +540,6 @@ export function pendingActionForCard(
       contributorIds: contributors.map((contributor) => contributor.id),
       contributions: Object.fromEntries(contributors.map((contributor) => [contributor.id, 0])),
       cost: threatenSpiceProductionCost,
-      cardId: card.id,
-      source: card.name,
-    };
-  }
-  if (
-    isDemandResultsCommanderCard(card) &&
-    source.team === "shaddam" &&
-    source.role === "Commander" &&
-    source.resources.solari >= 2 &&
-    state &&
-    state.contractOffer.length >= 2
-  ) {
-    const allyIds = shaddamAllyIds(state, source);
-    if (!allyIds) return undefined;
-    return {
-      kind: "demand-results",
-      commanderId: source.id,
-      allyIds,
-      contractIds: [state.contractOffer[0].id, state.contractOffer[1].id],
       cardId: card.id,
       source: card.name,
     };

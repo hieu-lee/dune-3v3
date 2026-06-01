@@ -470,6 +470,27 @@ async function createLeaderCharacterChoiceStates(server, initialPlayableGame) {
     arrakeen,
   );
   assert.ok(commandRespectPending, "Expected a derived Command Respect trash-source trade pending action");
+  const debugDemandResults = { ...demandResults, id: "debug-demand-results" };
+  const demandResultsState = {
+    ...base,
+    activeSeat: p4Seat,
+    players: base.players.map((player) =>
+      player.id === "p4"
+        ? {
+            ...player,
+            resources: { ...player.resources, solari: 2 },
+            playArea: [debugDemandResults, ...player.playArea],
+          }
+        : player,
+    ),
+  };
+  const demandResultsPending = state.pendingActionForCard(
+    debugDemandResults,
+    demandResultsState.players.find((player) => player.id === "p4"),
+    demandResultsState,
+    demandResultsState.players.find((player) => player.id === "p2"),
+  );
+  assert.ok(demandResultsPending, "Expected a derived Demand Results contract payment pending action");
 
   return {
     stabanUnseenNetwork: {
@@ -586,25 +607,8 @@ async function createLeaderCharacterChoiceStates(server, initialPlayableGame) {
       pendingAction: commandRespectPending,
     },
     demandResults: {
-      ...base,
-      activeSeat: p4Seat,
-      players: base.players.map((player) =>
-        player.id === "p4"
-          ? {
-              ...player,
-              resources: { ...player.resources, solari: 2 },
-              playArea: [{ ...demandResults, id: "debug-demand-results" }, ...player.playArea],
-            }
-          : player,
-      ),
-      pendingAction: {
-        kind: "demand-results",
-        commanderId: "p4",
-        allyIds: ["p2", "p6"],
-        contractIds: [game.contractOffer[0].id, game.contractOffer[1].id],
-        cardId: "debug-demand-results",
-        source: "Demand Results",
-      },
+      ...demandResultsState,
+      pendingAction: demandResultsPending,
     },
     corrinoMight: {
       ...corrinoMightState,

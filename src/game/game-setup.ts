@@ -50,6 +50,7 @@ export function initialGame(): GameState {
     activeSeat: firstSeat,
     firstSeat,
     agentTurnComplete: false,
+    roundMakerSpaceVisits: {},
     turnSpiceGains: {},
     turnReverendMotherJessicaRepeats: {},
     turnUnitDeployments: {},

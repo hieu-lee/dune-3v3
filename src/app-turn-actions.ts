@@ -22,12 +22,15 @@ import {
   pendingActionsForReveal,
   playerHasConflictUnits,
   queuePendingActions,
+  hasVisitedMakerSpaceThisRound,
+  recordRoundMakerSpaceVisit,
   recordTurnSpiceGain,
   resolveLeaderInfluenceThresholdRewards,
   resolveLocationControlIncome,
   resolveStabanSmuggleSpice,
   scoreGurneyAlwaysSmiling,
 } from "./game/state";
+import { isSmugglersHarvesterCard } from "./game/card-identifiers";
 import type {
   BoardSpace,
   Card,
@@ -189,8 +192,11 @@ export function placeAgentAction(
     : influenceThresholdState;
   // Commanders send the Agent; activated Allies only receive routed board effects.
   const resolvedState = resolveStabanSmuggleSpice(intrigueState, player.id, selectedSpace.id);
+  const makerTrackedState = selectedSpace.maker
+    ? recordRoundMakerSpaceVisit(resolvedState, player.id)
+    : resolvedState;
   const totalSpiceGain = spiceGain + (cardAgentEffect.sourceSpiceGained ?? 0);
-  return totalSpiceGain > 0 ? recordTurnSpiceGain(resolvedState, source.id, totalSpiceGain) : resolvedState;
+  return totalSpiceGain > 0 ? recordTurnSpiceGain(makerTrackedState, source.id, totalSpiceGain) : makerTrackedState;
 }
 
 type RevealTurnPlan = {
@@ -200,7 +206,7 @@ type RevealTurnPlan = {
   swords: number;
 };
 
-export function revealTurnPlan(activePlayer: Player): RevealTurnPlan {
+export function revealTurnPlan(activePlayer: Player, state?: Pick<GameState, "roundMakerSpaceVisits">): RevealTurnPlan {
   const persuasion = revealPersuasionFor(activePlayer);
   const swords = activePlayer.hand.reduce((sum, card) => sum + card.swords, 0) + (activePlayer.swordmasterBonus ? 2 : 0);
   const revealGain = activePlayer.hand.reduce<Partial<Resources>>((gain, card) => {
@@ -209,6 +215,12 @@ export function revealTurnPlan(activePlayer: Player): RevealTurnPlan {
     });
     return gain;
   }, {});
+  const smugglersHarvesterCount = state && hasVisitedMakerSpaceThisRound(state, activePlayer.id)
+    ? activePlayer.hand.filter(isSmugglersHarvesterCard).length
+    : 0;
+  if (smugglersHarvesterCount > 0) {
+    revealGain.spice = (revealGain.spice ?? 0) + smugglersHarvesterCount;
+  }
   const printedRevealCards = activePlayer.hand
     .filter((card) => card.conditionalPersuasion || card.conditionalSwords)
     .map((card) => card.name);

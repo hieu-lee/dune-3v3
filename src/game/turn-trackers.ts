@@ -4,6 +4,21 @@ export function hasGainedSpiceThisTurn(state: Pick<GameState, "turnSpiceGains">,
   return (state.turnSpiceGains[playerId] ?? 0) > 0;
 }
 
+export function hasVisitedMakerSpaceThisRound(state: Pick<GameState, "roundMakerSpaceVisits">, playerId: string) {
+  return Boolean(state.roundMakerSpaceVisits?.[playerId]);
+}
+
+export function recordRoundMakerSpaceVisit(state: GameState, playerId: string): GameState {
+  if (state.phase !== "playing") return state;
+  return {
+    ...state,
+    roundMakerSpaceVisits: {
+      ...state.roundMakerSpaceVisits,
+      [playerId]: true,
+    },
+  };
+}
+
 export function recordTurnSpiceGain(state: GameState, playerId: string, amount: number): GameState {
   if (state.phase !== "playing" || amount <= 0) return state;
   return {

@@ -454,6 +454,7 @@ export type GameState = {
   activeSeat: number;
   firstSeat: number;
   agentTurnComplete: boolean;
+  roundMakerSpaceVisits?: Record<string, boolean>;
   turnSpiceGains: Record<string, number>;
   turnReverendMotherJessicaRepeats: Record<string, boolean>;
   players: Player[];

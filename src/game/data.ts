@@ -1,4 +1,5 @@
 import catalogJson from "./uprising-catalog.generated.json";
+import { smugglersHarvesterSourceId } from "./card-identifiers";
 import type {
   BattleIconId,
   BoardSpace,
@@ -515,6 +516,13 @@ function revealText(persuasion: number, swords: number) {
   return `${parts.join(" and ")}.`;
 }
 
+function imperiumRevealText(card: HubCard, persuasion: number, swords: number, printedReveal: boolean) {
+  if (card.id === smugglersHarvesterSourceId) {
+    return "If you sent an Agent to a Maker board space this turn, gain 1 spice. +1 persuasion.";
+  }
+  return printedReveal ? "Resolve printed reveal text." : revealText(persuasion, swords);
+}
+
 function toImperiumCard(card: HubCard): Card {
   const persuasion = attributeNumber(card, "Persuasion on reveal");
   const swords = attributeNumber(card, "Swords");
@@ -530,7 +538,7 @@ function toImperiumCard(card: HubCard): Card {
     conditionalPersuasion,
     conditionalSwords,
     play: summarizeAttributes(card),
-    reveal: conditionalPersuasion || conditionalSwords ? "Resolve printed reveal text." : revealText(persuasion, swords),
+    reveal: imperiumRevealText(card, persuasion, swords, conditionalPersuasion || conditionalSwords),
     cost: attributeNumber(card, "Persuasion cost"),
     imagePath: card.localImagePath ?? card.fullImageUrl ?? undefined,
     thumbnailPath: card.localThumbnailPath ?? card.thumbnailImageUrl ?? undefined,

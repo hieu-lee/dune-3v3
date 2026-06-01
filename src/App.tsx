@@ -235,7 +235,7 @@ export default function App() {
     if (game.pendingAction) return;
     if (game.agentTurnComplete) return;
     if (activePlayer.revealed) return;
-    const revealPlan = revealTurnPlan(activePlayer);
+    const revealPlan = revealTurnPlan(activePlayer, game);
     setGame((current) => revealTurnAction(current, { commanderTargets, revealPlan }));
   }
 

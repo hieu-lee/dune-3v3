@@ -205,6 +205,18 @@ try {
     ),
 	    "Chani should carry a conflict-unit-gated Agent Intrigue draw spec",
 	  );
+  assert.ok(
+    chani.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.conditions?.some((condition) =>
+        condition.kind === "has-card-trait-in-play" &&
+        condition.trait === "Faction: Fremen" &&
+        condition.count === 2
+      ) &&
+      spec.effects.some((effect) => effect.kind === "gain-persuasion" && effect.amount === 2)
+    ),
+    "Chani should carry a declarative Fremen Bond Reveal persuasion spec",
+  );
 	  assert.ok(
 	    chani.effects?.some((spec) =>
 	      spec.trigger === "reveal" &&
@@ -284,6 +296,40 @@ try {
   });
   assert.equal(specReveal.persuasion, 2, "Spec starter cards should reveal for their printed persuasion");
   assert.equal(specReveal.swords, 1, "Spec starter cards should reveal for their printed strength");
+  const fremenSupportCard = {
+    ...convincingArgument,
+    id: "effect-spec-fremen-bond-support",
+    name: "Effect Spec Fremen Bond Support",
+    persuasion: 0,
+    swords: 0,
+    revealGain: undefined,
+    effects: undefined,
+    conditionalPersuasion: false,
+    conditionalSwords: false,
+    traits: ["Faction: Fremen"],
+  };
+  const chaniSoloReveal = turnActions.revealTurnPlan({
+    ...p2,
+    hand: [chani],
+    playArea: [],
+    highCouncilSeat: false,
+  });
+  assert.equal(chaniSoloReveal.persuasion, 0, "Fremen Bond should not trigger from Chani alone");
+  assert.deepEqual(chaniSoloReveal.printedRevealCards, [], "Chani Fremen Bond should not need manual reveal fallback");
+  const chaniHandBondReveal = turnActions.revealTurnPlan({
+    ...p2,
+    hand: [chani, fremenSupportCard],
+    playArea: [],
+    highCouncilSeat: false,
+  });
+  assert.equal(chaniHandBondReveal.persuasion, 2, "Fremen Bond should count another Fremen card revealed from hand");
+  const chaniPlayAreaBondReveal = turnActions.revealTurnPlan({
+    ...p2,
+    hand: [chani],
+    playArea: [fremenSupportCard],
+    highCouncilSeat: false,
+  });
+  assert.equal(chaniPlayAreaBondReveal.persuasion, 2, "Fremen Bond should count another Fremen card already in play");
 
   const overrideCard = {
     ...convincingArgument,
@@ -457,6 +503,34 @@ try {
     () => turnActions.revealTurnPlan({ ...p2, hand: [invalidCompletedContractsCountCard], highCouncilSeat: false }),
     /Invalid has-completed-contracts count "-1"/,
     "Completed-contract conditions should require a non-negative integer threshold",
+  );
+  const invalidCardTraitCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-card-trait-card",
+    name: "Effect Spec Invalid Card Trait",
+    effects: [revealSpec(
+      [{ kind: "gain-persuasion", selector: "self", amount: 1 }],
+      [{ kind: "has-card-trait-in-play", trait: "" }],
+    )],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [invalidCardTraitCard], highCouncilSeat: false }),
+    /Invalid has-card-trait-in-play trait ""/,
+    "Card-trait conditions should require a non-empty trait",
+  );
+  const invalidCardTraitCountCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-card-trait-count-card",
+    name: "Effect Spec Invalid Card Trait Count",
+    effects: [revealSpec(
+      [{ kind: "gain-persuasion", selector: "self", amount: 1 }],
+      [{ kind: "has-card-trait-in-play", trait: "Faction: Fremen", count: -1 }],
+    )],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [invalidCardTraitCountCard], highCouncilSeat: false }),
+    /Invalid has-card-trait-in-play count "-1"/,
+    "Card-trait conditions should require a non-negative integer threshold",
   );
   const invalidSpyPlacementAmountCard = {
     ...convincingArgument,

@@ -36,7 +36,6 @@ These cards are automated but still rely on explicit card or leader branches whi
 ## Manual / Printed Fallback
 
 - `reveal-adjust` remains available for cards with `conditionalPersuasion` or `conditionalSwords`.
-- Chani, Clever Tactician uses structured Agent Intrigue draw and Reveal troop-retreat strength specs; Fremen Bond persuasion remains manual.
 - Imported Imperium Agent text that is only summarized in `play` remains manual until migrated into Agent effect specs.
 
 ## Missing Primitives
@@ -51,5 +50,5 @@ The largest current gaps are Agent and choice primitives:
 
 ## Verification
 
-- `pnpm run verify:card-effect-specs` verifies reveal specs, Agent card draw/resource/recruit/spy-placement/Intrigue draw specs, Reveal troop-retreat strength specs, legacy fallback, no double-counting, conditional Maker/contract/spy/influence/conflict-unit behavior, shared spy posts, and manual reveal fallback.
+- `pnpm run verify:card-effect-specs` verifies reveal specs, Agent card draw/resource/recruit/spy-placement/Intrigue draw specs, Reveal Fremen Bond trait checks, Reveal troop-retreat strength specs, legacy fallback, no double-counting, conditional Maker/contract/spy/influence/conflict-unit behavior, shared spy posts, and manual reveal fallback.
 - `pnpm run verify` includes the effect-spec verifier through `package.json`.

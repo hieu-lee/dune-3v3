@@ -163,6 +163,13 @@ function validateCondition(condition: GameEffectConditionSpec) {
     if (isNonNegativeInteger(condition.count)) return;
     invalidSpecField("has-completed-contracts count", condition.count);
   }
+  if (condition.kind === "has-card-trait-in-play") {
+    if (typeof condition.trait !== "string" || condition.trait.trim().length === 0) {
+      invalidSpecField("has-card-trait-in-play trait", condition.trait);
+    }
+    if (condition.count === undefined || isNonNegativeInteger(condition.count)) return;
+    invalidSpecField("has-card-trait-in-play count", condition.count);
+  }
   unsupportedKind("effect condition", condition);
 }
 
@@ -270,6 +277,10 @@ function conditionApplies(condition: GameEffectConditionSpec, context: GameEffec
   }
   if (condition.kind === "has-completed-contracts") {
     return context.source.contracts.filter((contract) => contract.completed).length >= condition.count;
+  }
+  if (condition.kind === "has-card-trait-in-play") {
+    const count = condition.count ?? 1;
+    return context.source.playArea.filter((card) => card.traits?.includes(condition.trait)).length >= count;
   }
   return unsupportedKind("effect condition", condition);
 }
@@ -542,11 +553,14 @@ export function resolveCardRevealEffects(
   source: Player,
   state?: EffectResolverState,
 ): GameEffectResult {
+  const revealSource = cards.length > 0
+    ? { ...source, playArea: [...source.playArea, ...cards] }
+    : source;
   return cards.reduce((result, card) => {
     card.effects?.forEach(validateSpec);
     const revealSpecs = card.effects?.filter((spec) => spec.trigger === "reveal");
     const cardResult = revealSpecs && revealSpecs.length > 0
-      ? resolveGameEffects(revealSpecs, { trigger: "reveal", source, state })
+      ? resolveGameEffects(revealSpecs, { trigger: "reveal", source: revealSource, state })
       : legacyRevealResult(card);
     return mergeEffectResult(result, cardResult);
   }, emptyEffectResult);

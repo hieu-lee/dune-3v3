@@ -20,6 +20,7 @@ import {
   agentGainResource,
   agentPlaceSpies,
   hasCompletedContracts,
+  hasCardTraitInPlay,
   hasConflictUnits,
   hasInfluence,
   hasSpyPosts,
@@ -239,6 +240,7 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
   if (card.id === chaniCleverTacticianSourceId) {
     return [
       agentDrawIntrigues(1, [hasConflictUnits(3)]),
+      revealGainPersuasion(2, [hasCardTraitInPlay("Faction: Fremen", 2)]),
       revealRetreatTroopsForStrength(2, 4),
     ];
   }
@@ -327,7 +329,7 @@ function toImperiumCard(card: HubCard): Card {
       icons: card.attributes.flatMap(([name]) => iconAttributeMap[name] ?? []),
       persuasion: 0,
       swords: 0,
-      conditionalPersuasion: true,
+      conditionalPersuasion: false,
       conditionalSwords: false,
       effects: imperiumCardEffects(card),
       play: "If you have three or more units in the Conflict, draw 1 Intrigue.",

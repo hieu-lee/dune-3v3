@@ -121,6 +121,10 @@ export function hasCompletedContracts(count: number) {
   return { kind: "has-completed-contracts", count } as const;
 }
 
+export function hasCardTraitInPlay(trait: string, count = 1) {
+  return { kind: "has-card-trait-in-play", trait, count } as const;
+}
+
 export function cloneCardEffects(effects: CardEffectSpec[] | undefined): CardEffectSpec[] | undefined {
   return effects?.map((spec) => ({
     ...spec,

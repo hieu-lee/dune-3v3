@@ -45,7 +45,8 @@ export type GameEffectConditionSpec =
   | { kind: "has-spy-posts"; count: number }
   | { kind: "has-conflict-units"; count: number }
   | { kind: "has-influence"; faction: FactionId; amount: number }
-  | { kind: "has-completed-contracts"; count: number };
+  | { kind: "has-completed-contracts"; count: number }
+  | { kind: "has-card-trait-in-play"; trait: string; count?: number };
 export type GameEffectSpec =
   | { kind: "gain-resource"; selector: PlayerSelector; resource: ResourceId; amount: EffectAmountSpec }
   | { kind: "gain-persuasion"; selector: PlayerSelector; amount: EffectAmountSpec }

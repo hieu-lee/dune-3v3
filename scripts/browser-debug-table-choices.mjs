@@ -66,6 +66,26 @@ export async function runTableChoicesSmoke({
   assert.equal(retreatOwnerAfter.garrison, retreatOwnerBefore.garrison + 2);
   assert.equal(retreatOwnerAfter.conflict, retreatOwnerBefore.conflict);
 
+  await setDebugGameAndWait(page, states.chaniFremenBondReveal);
+  await screenshot(page, captures, "chani-fremen-bond-ready.png");
+  await page.getByTestId("reveal-turn").click();
+  await page.waitForFunction(() => {
+    const game = window.__DUNE_DEBUG__?.getGame();
+    const player = game?.players.find((candidate) => candidate.id === "p2");
+    return Boolean(
+      player?.revealed &&
+        player.persuasion === 2 &&
+        !game.pendingAction &&
+        game.pendingQueue.length === 0,
+    );
+  });
+  const chaniBondAfter = await currentGame(page);
+  const chaniBondPlayer = chaniBondAfter.players.find((player) => player.id === "p2");
+  assert.ok(chaniBondPlayer, "Expected Feyd after Chani Fremen Bond reveal");
+  assert.equal(chaniBondPlayer.persuasion, 2, "Chani should gain automated Fremen Bond persuasion in the browser flow");
+  assert.equal(chaniBondAfter.pendingAction, undefined, "Chani Fremen Bond should not create a reveal-adjust pending action");
+  await screenshot(page, captures, "chani-fremen-bond-after-reveal.png");
+
   await setDebugGameAndWait(page, states.throneRow);
   pendingText = await page.locator(".pending-panel").innerText();
   assert.match(pendingText, /Throne Row/i);
@@ -108,6 +128,7 @@ export async function runTableChoicesSmoke({
 }
 
 async function createTableChoiceStates(server, initialPlayableGame) {
+  const data = await server.ssrLoadModule("/src/game/data.ts");
   const state = await server.ssrLoadModule("/src/game/state.ts");
   const game = initialPlayableGame(state);
   const shaddamSeat = game.players.findIndex((player) => player.id === "p4");
@@ -119,6 +140,23 @@ async function createTableChoiceStates(server, initialPlayableGame) {
   assert.ok(throneRowCard, "Expected an eligible Imperium Row card for Throne Row");
   const conflict = game.conflict ?? game.conflictDeck[0];
   assert.ok(conflict, "Expected a conflict card for same-team tie debug state");
+  const chani = data.imperiumDeck.find((card) => card.name === "Chani, Clever Tactician");
+  assert.ok(chani, "Expected Chani for Fremen Bond browser debug state");
+  const fremenSupport = data.imperiumDeck.find((card) =>
+    card.id !== chani.id && card.traits?.includes("Faction: Fremen")
+  );
+  assert.ok(fremenSupport, "Expected another Fremen card for Fremen Bond browser debug state");
+  const chaniFremenSupport = {
+    ...cloneCard(fremenSupport),
+    id: "debug-chani-fremen-bond-support",
+    name: "Debug Fremen Bond Support",
+    persuasion: 0,
+    swords: 0,
+    revealGain: undefined,
+    effects: undefined,
+    conditionalPersuasion: false,
+    conditionalSwords: false,
+  };
 
   const base = {
     ...game,
@@ -164,6 +202,26 @@ async function createTableChoiceStates(server, initialPlayableGame) {
         source: "Browser debug retreat",
       },
     },
+    chaniFremenBondReveal: {
+      ...base,
+      activeSeat: feydSeat,
+      players: base.players.map((player) =>
+        player.id === "p2"
+          ? {
+              ...player,
+              agentsReady: 0,
+              conflict: 0,
+              deployedTroops: 0,
+              discard: [],
+              hand: [cloneCard(chani), chaniFremenSupport],
+              highCouncilSeat: false,
+              persuasion: 0,
+              playArea: [],
+              revealed: false,
+            }
+          : { ...player, conflict: 0, deployedTroops: 0 }
+      ),
+    },
     throneRow: {
       ...base,
       activeSeat: shaddamSeat,
@@ -198,6 +256,10 @@ async function createTableChoiceStates(server, initialPlayableGame) {
       },
     },
   };
+}
+
+function cloneCard(card) {
+  return { ...card, traits: card.traits ? [...card.traits] : undefined };
 }
 
 function escapeRegExp(value) {

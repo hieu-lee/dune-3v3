@@ -94,11 +94,23 @@ try {
   assert.deepEqual(chani.icons, ["city", "fremen", "spice"], "Chani should reach City, Fremen, and Spice Trade spaces");
   assert.equal(chani.persuasion, 0, "Chani's Fremen Bond persuasion should not be granted automatically");
   assert.equal(chani.swords, 0, "Chani's troop-retreat strength should not be granted automatically");
-  assert.equal(chani.conditionalPersuasion, true, "Chani should require manual Fremen Bond reveal handling");
+  assert.equal(chani.conditionalPersuasion, false, "Chani should use automated Fremen Bond reveal handling");
   assert.equal(chani.conditionalSwords, false, "Chani troop-retreat strength should use automated retreat handling");
   assert.ok(
     chani.effects?.some((spec) => spec.trigger === "agent-play"),
     "Chani should use a structured Agent Intrigue draw effect",
+  );
+  assert.ok(
+    chani.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.conditions?.some((condition) =>
+        condition.kind === "has-card-trait-in-play" &&
+        condition.trait === "Faction: Fremen" &&
+        condition.count === 2
+      ) &&
+      spec.effects.some((effect) => effect.kind === "gain-persuasion" && effect.amount === 2)
+    ),
+    "Chani should use a structured Fremen Bond persuasion effect",
   );
   assert.ok(
     chani.effects?.some((spec) =>
@@ -145,6 +157,10 @@ try {
     card.id !== calculus.id && !card.traits?.includes("Faction: Emperor")
   );
   assert.ok(calculusBlockedTarget, "Expected a non-Emperor Imperium card for Calculus of Power filtering coverage");
+  const fremenBondSupport = data.imperiumDeck.find((card) =>
+    card.id !== chani.id && card.traits?.includes("Faction: Fremen")
+  );
+  assert.ok(fremenBondSupport, "Expected another Fremen Imperium card for Fremen Bond coverage");
   const imperialBasin = data.boardSpaces.find((space) => space.id === "imperial-basin");
   assert.ok(imperialBasin?.maker, "Imperial Basin should be a Maker board space");
   const carthag = data.boardSpaces.find((space) => space.id === "carthag");
@@ -172,29 +188,45 @@ try {
   assert.equal(chaniRevealPlan.swords, 0, "Chani should not automatically grant troop-retreat strength");
   assert.deepEqual(
     chaniRevealPlan.printedRevealCards,
-    [chani.name],
-    "Chani should queue manual printed reveal adjustment",
+    [],
+    "Chani should not queue manual printed reveal adjustment",
   );
   const chaniRevealed = turnActions.revealTurnAction(chaniRevealFixture, {
     commanderTargets: {},
     revealPlan: chaniRevealPlan,
   });
-  assert.equal(chaniRevealed.pendingAction?.kind, "reveal-adjust", "Chani reveal should pause for printed text");
-  assert.equal(
-    chaniRevealed.pendingAction?.kind === "reveal-adjust"
-      ? chaniRevealed.pendingAction.allowPersuasionAdjustment
-      : undefined,
-    true,
-    "Chani reveal adjustment should allow Fremen Bond persuasion",
+  assert.equal(chaniRevealed.pendingAction, undefined, "Chani reveal should not pause for printed text");
+  assert.equal(chaniRevealed.pendingQueue.length, 0, "Chani should not queue troop retreat without two deployed troops");
+  const chaniFremenSupport = {
+    ...fremenBondSupport,
+    id: "chani-fremen-bond-support",
+    persuasion: 0,
+    swords: 0,
+    revealGain: undefined,
+    effects: undefined,
+    conditionalPersuasion: false,
+    conditionalSwords: false,
+  };
+  const chaniHandBondPlan = turnActions.revealTurnPlan(
+    {
+      ...playerById(chaniRevealFixture, p2.id),
+      hand: [chani, chaniFremenSupport],
+      playArea: [],
+      highCouncilSeat: false,
+    },
+    chaniRevealFixture,
   );
-	  assert.equal(
-	    chaniRevealed.pendingAction?.kind === "reveal-adjust"
-	      ? chaniRevealed.pendingAction.allowStrengthAdjustment
-	      : undefined,
-	    false,
-	    "Chani reveal adjustment should not allow manual troop-retreat strength",
-	  );
-	  assert.equal(chaniRevealed.pendingQueue.length, 0, "Chani should not queue troop retreat without two deployed troops");
+  assert.equal(chaniHandBondPlan.persuasion, 2, "Chani Fremen Bond should count another revealed Fremen card");
+  const chaniPlayAreaBondPlan = turnActions.revealTurnPlan(
+    {
+      ...playerById(chaniRevealFixture, p2.id),
+      hand: [chani],
+      playArea: [chaniFremenSupport],
+      highCouncilSeat: false,
+    },
+    chaniRevealFixture,
+  );
+  assert.equal(chaniPlayAreaBondPlan.persuasion, 2, "Chani Fremen Bond should count another Fremen card already in play");
 
   const chaniOneTroopFixture = withActivePlayer(game, p2.id, () => ({
     agentsReady: 0,
@@ -230,33 +262,27 @@ try {
     commanderTargets: {},
     revealPlan: chaniRetreatPlan,
   });
-  assert.equal(chaniRetreatRevealed.pendingAction?.kind, "reveal-adjust", "Chani Fremen Bond should still resolve first");
+  assert.equal(chaniRetreatRevealed.pendingAction?.kind, "retreat-troops-for-strength", "Chani troop retreat should be the active reveal pending action");
   assert.equal(
-    chaniRetreatRevealed.pendingQueue[0]?.kind,
-    "retreat-troops-for-strength",
-    "Chani should queue automated troop-retreat strength after Fremen Bond adjustment",
+    chaniRetreatRevealed.pendingQueue.length,
+    0,
+    "Chani should not queue manual Fremen Bond before troop retreat",
   );
   assert.equal(
-    chaniRetreatRevealed.pendingQueue[0]?.kind === "retreat-troops-for-strength"
-      ? chaniRetreatRevealed.pendingQueue[0].troopCount
+    chaniRetreatRevealed.pendingAction?.kind === "retreat-troops-for-strength"
+      ? chaniRetreatRevealed.pendingAction.troopCount
       : undefined,
     2,
     "Chani retreat pending action should require two troops",
   );
   assert.equal(
-    chaniRetreatRevealed.pendingQueue[0]?.kind === "retreat-troops-for-strength"
-      ? chaniRetreatRevealed.pendingQueue[0].strength
+    chaniRetreatRevealed.pendingAction?.kind === "retreat-troops-for-strength"
+      ? chaniRetreatRevealed.pendingAction.strength
       : undefined,
     4,
     "Chani retreat pending action should add four strength",
   );
-  const chaniRetreatReady = state.finishRevealAdjustment(chaniRetreatRevealed, chaniRetreatRevealed.pendingAction);
-  assert.equal(
-    chaniRetreatReady.pendingAction?.kind,
-    "retreat-troops-for-strength",
-    "Finishing Fremen Bond adjustment should advance to Chani troop retreat",
-  );
-  const chaniRetreated = state.resolveRetreatTroopsForStrength(chaniRetreatReady, chaniRetreatReady.pendingAction);
+  const chaniRetreated = state.resolveRetreatTroopsForStrength(chaniRetreatRevealed, chaniRetreatRevealed.pendingAction);
   assert.equal(playerById(chaniRetreated, p2.id).deployedTroops, 0, "Chani should retreat the two selected troops");
   assert.equal(playerById(chaniRetreated, p2.id).garrison, 2, "Chani should return retreated troops to garrison");
   assert.equal(playerById(chaniRetreated, p2.id).conflict, 4, "Chani should replace the troops' strength with four Reveal strength");
@@ -316,19 +342,15 @@ try {
     revealPlan: chaniCommanderRetreatPlan,
   });
   assert.equal(
-    chaniCommanderRevealed.pendingQueue[0]?.kind === "retreat-troops-for-strength"
-      ? chaniCommanderRevealed.pendingQueue[0].combatRecipientId
+    chaniCommanderRevealed.pendingAction?.kind === "retreat-troops-for-strength"
+      ? chaniCommanderRevealed.pendingAction.combatRecipientId
       : undefined,
     p2.id,
     "Commander Chani reveal should route troop retreat to the activated Ally",
   );
-  const chaniCommanderRetreatReady = state.finishRevealAdjustment(
+  const chaniCommanderRetreated = state.resolveRetreatTroopsForStrength(
     chaniCommanderRevealed,
     chaniCommanderRevealed.pendingAction,
-  );
-  const chaniCommanderRetreated = state.resolveRetreatTroopsForStrength(
-    chaniCommanderRetreatReady,
-    chaniCommanderRetreatReady.pendingAction,
   );
   assert.equal(playerById(chaniCommanderRetreated, p2.id).deployedTroops, 0, "Commander Chani should retreat the activated Ally's troops");
   assert.equal(playerById(chaniCommanderRetreated, p2.id).garrison, 2, "Commander Chani should return activated Ally troops to garrison");

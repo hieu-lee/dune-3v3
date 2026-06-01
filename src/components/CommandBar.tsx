@@ -1,14 +1,15 @@
-import { RotateCcw } from "lucide-react";
+import { Camera, RotateCcw } from "lucide-react";
 import { teams } from "../game/data";
 import type { GameState, Player } from "../game/types";
 
 type CommandBarProps = {
   activePlayer: Player;
   game: GameState;
+  onCaptureDebug?: () => void;
   onResetGame: () => void;
 };
 
-export function CommandBar({ activePlayer, game, onResetGame }: CommandBarProps) {
+export function CommandBar({ activePlayer, game, onCaptureDebug, onResetGame }: CommandBarProps) {
   return (
     <section className="command-bar">
       <div>
@@ -34,9 +35,23 @@ export function CommandBar({ activePlayer, game, onResetGame }: CommandBarProps)
               : game.endgameReason}
         </small>
       </div>
-      <button className="icon-button" type="button" onClick={onResetGame} title="Reset table">
-        <RotateCcw size={18} />
-      </button>
+      <div className="command-actions">
+        {onCaptureDebug && (
+          <button
+            aria-label="Capture debug screenshot"
+            className="icon-button"
+            data-testid="debug-capture"
+            type="button"
+            onClick={onCaptureDebug}
+            title="Capture debug screenshot"
+          >
+            <Camera size={18} />
+          </button>
+        )}
+        <button className="icon-button" type="button" onClick={onResetGame} title="Reset table">
+          <RotateCcw size={18} />
+        </button>
+      </div>
     </section>
   );
 }

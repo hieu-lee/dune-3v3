@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
+import { access } from "node:fs/promises";
 import path from "node:path";
 import { chromium } from "playwright";
 import { createServer } from "vite";
@@ -524,6 +525,7 @@ const startedAt = Date.now();
 const captures = [];
 let manualCaptureCount = 0;
 let manualCaptureQueue = Promise.resolve();
+let manualCaptureRequestCount = 0;
 const consoleMessages = [];
 const requestFailures = [];
 const artifactStore = createBrowserDebugArtifactStore({
@@ -564,6 +566,7 @@ function nextManualCaptureName(label) {
 }
 
 function captureFromDebugBridge(request = {}) {
+  manualCaptureRequestCount += 1;
   manualCaptureQueue = manualCaptureQueue
     .catch(() => undefined)
     .then(async () => {
@@ -572,6 +575,25 @@ function captureFromDebugBridge(request = {}) {
       return capture;
     });
   return manualCaptureQueue;
+}
+
+async function waitForManualCaptureRequest(expectedCount, timeoutMs = 5000) {
+  const deadline = Date.now() + timeoutMs;
+  while (manualCaptureRequestCount < expectedCount) {
+    if (Date.now() >= deadline) {
+      throw new Error(
+        `Timed out waiting for ${expectedCount} browser debug capture requests; found ${manualCaptureRequestCount}`,
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+}
+
+async function assertCaptureArtifacts(capture, label) {
+  assert.ok(capture?.screenshot, `${label} should include a screenshot artifact`);
+  assert.ok(capture?.state, `${label} should include a game-state artifact`);
+  await access(capture.screenshot);
+  await access(capture.state);
 }
 
 try {
@@ -822,9 +844,18 @@ try {
     if (scenario === "manual") {
       await interruptible(runManual(page, url, server, captures));
       if (captureSmoke) {
-        await interruptible(page.evaluate(() => window.__DUNE_DEBUG__?.capture(
-          "smoke label with punctuation and enough length to trim safely",
-        )));
+        const captureCountBeforeClick = captures.length;
+        const captureRequestsBeforeClick = manualCaptureRequestCount;
+        const captureButton = page.getByTestId("debug-capture");
+        assert.equal(await captureButton.count(), 1, "Manual debug should expose the screenshot capture button");
+        await interruptible(captureButton.click());
+        await interruptible(waitForManualCaptureRequest(captureRequestsBeforeClick + 1));
+        await interruptible(manualCaptureQueue);
+        assert.equal(captures.length, captureCountBeforeClick + 1, "Manual debug capture button should write one capture");
+        const buttonCapture = captures.at(-1);
+        await interruptible(assertCaptureArtifacts(buttonCapture, "Manual debug capture button"));
+        assert.equal(path.basename(buttonCapture.screenshot), "manual-capture-001-button.png");
+        assert.equal(path.basename(buttonCapture.state), "manual-capture-001-button.state.json");
       }
     }
 

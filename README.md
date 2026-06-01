@@ -127,9 +127,9 @@ The default debug run starts a local Vite server, drives scripted Playwright sce
 
 The Codex in-app browser (`iab`) is optional. If it is not exposed in the current Codex session, use the repo-owned Playwright pipeline: `pnpm run debug:game` starts a headed Chromium session with a deterministic playable game and writes artifacts under `artifacts/qa/browser-debug-manual`.
 
-Use `pnpm run debug:game` or `pnpm run debug:browser:manual` when you need to play the table in a browser. While it is running, press `Ctrl+Shift+S` or `Cmd+Shift+S` to capture the current full-page screenshot and game state, or run `window.__DUNE_DEBUG__.capture("descriptive-label")` from the browser console. The harness writes `manual-ready.png` and `manual-ready.state.json` at startup, hotkey captures as `manual-capture-###[-label].png` with matching `.state.json` files, and `manual-final.png`, `manual-final.state.json`, `console.json`, `request-failures.json`, `manual-trace.zip`, and `summary.json` after `Ctrl+C`.
+Use `pnpm run debug:game` or `pnpm run debug:browser:manual` when you need to play the table in a browser. While it is running, use the camera button in the top bar, press `Ctrl+Shift+S` or `Cmd+Shift+S`, or run `window.__DUNE_DEBUG__.capture("descriptive-label")` from the browser console to capture the current full-page screenshot and game state. The harness writes `manual-ready.png` and `manual-ready.state.json` at startup, captures as `manual-capture-###[-label].png` with matching `.state.json` files, and `manual-final.png`, `manual-final.state.json`, `console.json`, `request-failures.json`, `manual-trace.zip`, and `summary.json` after `Ctrl+C`.
 
-Use `pnpm run debug:game:smoke` to verify the manual capture bridge without keeping a browser open. It exits after writing `manual-ready.png`, `manual-ready.state.json`, `manual-capture-001-smoke-label-with-punctuation-and-enough-length-t.png`, its matching `.state.json`, `console.json`, `request-failures.json`, and `summary.json`.
+Use `pnpm run debug:game:smoke` to verify the manual capture bridge without keeping a browser open. It exits after writing `manual-ready.png`, `manual-ready.state.json`, `manual-capture-001-button.png`, its matching `.state.json`, `console.json`, `request-failures.json`, and `summary.json`.
 
 ## Asset Policy
 

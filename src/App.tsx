@@ -800,6 +800,7 @@ export default function App() {
   const playingPhase = game.phase === "playing";
   const pendingLocked = Boolean(game.pendingAction) || game.pendingQueue.length > 0;
   const plotIntrigueLocked = !playingPhase || pendingLocked;
+  const debugCaptureAvailable = browserDebugEnabled && typeof window.__DUNE_DEBUG_CAPTURE__ === "function";
   const plotActionHandlers = createPlotActionHandlers({
     commanderTargets,
     setChangeAllegiancesSelections,
@@ -808,7 +809,12 @@ export default function App() {
 
   return (
     <main className="app-shell">
-      <CommandBar activePlayer={activePlayer} game={game} onResetGame={resetGame} />
+      <CommandBar
+        activePlayer={activePlayer}
+        game={game}
+        onCaptureDebug={debugCaptureAvailable ? () => void window.__DUNE_DEBUG__?.capture("button") : undefined}
+        onResetGame={resetGame}
+      />
 
       <section className="table-grid">
         <TableSidebar

@@ -1,5 +1,6 @@
 import catalogJson from "./uprising-catalog.generated.json";
 import {
+  calculusOfPowerSourceId,
   interstellarTradeSourceId,
   smugglersHarvesterSourceId,
 } from "./card-identifiers";
@@ -163,6 +164,9 @@ function imperiumRevealText(card: HubCard, persuasion: number, swords: number, p
   if (card.id === interstellarTradeSourceId) {
     return "+1 persuasion for each completed contract.";
   }
+  if (card.id === calculusOfPowerSourceId) {
+    return "+2 persuasion. You may trash another Emperor card you have in play to add 3 strength.";
+  }
   return printedReveal ? "Resolve printed reveal text." : revealText(persuasion, swords);
 }
 
@@ -170,9 +174,10 @@ function toImperiumCard(card: HubCard): Card {
   const persuasion = attributeNumber(card, "Persuasion on reveal");
   const swords = attributeNumber(card, "Swords");
   const automatedContractPersuasion = card.id === interstellarTradeSourceId;
+  const automatedConditionalSwords = card.id === calculusOfPowerSourceId;
   const conditionalPersuasion =
     !automatedContractPersuasion && !card.attributes.some(([name]) => name === "Persuasion on reveal");
-  const conditionalSwords = hasConditionalAttribute(card, "Swords");
+  const conditionalSwords = !automatedConditionalSwords && hasConditionalAttribute(card, "Swords");
   return {
     id: `hub-${card.id}`,
     name: card.name,

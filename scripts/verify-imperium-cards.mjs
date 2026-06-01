@@ -56,9 +56,27 @@ try {
     "Interstellar Trade should have structured reveal persuasion instead of manual printed reveal handling",
   );
   assert.match(interstellarTrade.reveal, /completed contract/, "Interstellar Trade should describe its contract reveal text");
+  const calculus = data.imperiumDeck.find((card) => card.name === "Calculus of Power");
+  assert.ok(calculus, "Imperium deck should include Calculus of Power");
+  assert.equal(state.isCalculusOfPowerCard(calculus), true, "Calculus of Power should be recognized");
+  assert.equal(
+    calculus.conditionalSwords,
+    false,
+    "Calculus of Power should use structured optional trash strength instead of manual printed reveal handling",
+  );
+  assert.match(calculus.reveal, /another Emperor card/, "Calculus of Power should describe its structured Reveal trash text");
+  const calculusTrashTarget = data.imperiumDeck.find((card) =>
+    card.id !== calculus.id && card.traits?.includes("Faction: Emperor")
+  );
+  assert.ok(calculusTrashTarget, "Expected an Emperor Imperium card for Calculus of Power trash coverage");
+  const calculusBlockedTarget = data.imperiumDeck.find((card) =>
+    card.id !== calculus.id && !card.traits?.includes("Faction: Emperor")
+  );
+  assert.ok(calculusBlockedTarget, "Expected a non-Emperor Imperium card for Calculus of Power filtering coverage");
   const imperialBasin = data.boardSpaces.find((space) => space.id === "imperial-basin");
   assert.ok(imperialBasin?.maker, "Imperial Basin should be a Maker board space");
   const p2 = playerById(game, "p2");
+  const p4 = playerById(game, "p4");
   const dune = [...p2.hand, ...p2.deck, ...p2.discard].find((card) => card.name === "Dune, The Desert Planet");
   assert.ok(dune, "Feyd should have Dune, The Desert Planet available for a Spice Trade Agent turn");
 
@@ -173,6 +191,112 @@ try {
     2,
     "Interstellar Trade persuasion should be fixed by the reveal plan and not re-count later contract completions",
   );
+
+  const calculusFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 0,
+    conflict: 4,
+    deployedSandworms: 0,
+    deployedTroops: 1,
+    discard: [],
+    hand: [calculus],
+    playArea: [calculusTrashTarget, calculusBlockedTarget],
+    persuasion: 0,
+    resources: { solari: 0, spice: 0, water: 0 },
+  }));
+  const calculusPlan = turnActions.revealTurnPlan(playerById(calculusFixture, p2.id), calculusFixture);
+  assert.equal(calculusPlan.persuasion, 2, "Calculus of Power should keep its printed 2 persuasion");
+  assert.equal(calculusPlan.swords, 0, "Calculus of Power optional swords should not be added before trashing");
+  assert.deepEqual(
+    calculusPlan.printedRevealCards,
+    [],
+    "Calculus of Power should not require a manual printed reveal adjustment",
+  );
+  const calculusRevealed = turnActions.revealTurnAction(calculusFixture, {
+    commanderTargets: {},
+    revealPlan: calculusPlan,
+  });
+  assert.equal(calculusRevealed.pendingAction?.kind, "trash-card", "Calculus of Power should queue optional trash");
+  const calculusPending = calculusRevealed.pendingAction;
+  assert.equal(calculusPending.source, "Calculus of Power");
+  assert.equal(calculusPending.optional, true);
+  assert.deepEqual(calculusPending.zones, ["playArea"]);
+  assert.equal(calculusPending.excludeCardId, calculus.id);
+  assert.equal(calculusPending.requiredTrait, "Faction: Emperor");
+  assert.equal(calculusPending.combatRecipientId, p2.id);
+  assert.equal(calculusPending.strengthReward, 3);
+  assert.deepEqual(
+    state.trashableCardsForPending(playerById(calculusRevealed, p2.id), calculusPending).map(({ card }) => card.id),
+    [calculusTrashTarget.id],
+    "Calculus of Power should only allow another Emperor card in play",
+  );
+  const blockedCalculusTrash = state.trashPlayerCard(
+    calculusRevealed,
+    calculusPending,
+    "playArea",
+    calculusBlockedTarget.id,
+  );
+  assert.equal(
+    blockedCalculusTrash.pendingAction?.kind,
+    "trash-card",
+    "Calculus of Power should reject non-Emperor trash choices",
+  );
+  assert.equal(playerById(blockedCalculusTrash, p2.id).conflict, 4);
+  const afterCalculusTrash = state.trashPlayerCard(calculusRevealed, calculusPending, "playArea", calculusTrashTarget.id);
+  assert.equal(playerById(afterCalculusTrash, p2.id).conflict, 7, "Calculus of Power trash should add 3 strength");
+  assert.equal(afterCalculusTrash.pendingAction, undefined);
+  assert.ok(
+    playerById(afterCalculusTrash, p2.id).playArea.some((card) => card.id === calculus.id),
+    "Calculus of Power should not trash itself",
+  );
+  assert.equal(
+    playerById(afterCalculusTrash, p2.id).playArea.some((card) => card.id === calculusTrashTarget.id),
+    false,
+    "Calculus of Power should trash the selected Emperor card",
+  );
+  const afterCalculusSkip = state.skipTrashCard(calculusRevealed, calculusPending);
+  assert.equal(playerById(afterCalculusSkip, p2.id).conflict, 4, "Skipping Calculus of Power should not add strength");
+  assert.equal(afterCalculusSkip.pendingAction, undefined);
+  assert.ok(
+    playerById(afterCalculusSkip, p2.id).playArea.some((card) => card.id === calculusTrashTarget.id),
+    "Skipping Calculus of Power should leave eligible cards in play",
+  );
+  const baseCommanderCalculusFixture = withActivePlayer(game, p4.id, () => ({
+    agentsReady: 0,
+    conflict: 0,
+    discard: [],
+    hand: [calculus],
+    playArea: [calculusTrashTarget],
+    persuasion: 0,
+    resources: { solari: 0, spice: 0, water: 0 },
+  }));
+  const commanderCalculusFixture = {
+    ...baseCommanderCalculusFixture,
+    players: baseCommanderCalculusFixture.players.map((player) =>
+      player.id === p2.id
+        ? { ...player, conflict: 5, deployedSandworms: 0, deployedTroops: 1 }
+        : player,
+    ),
+  };
+  const commanderCalculusPlan = turnActions.revealTurnPlan(playerById(commanderCalculusFixture, p4.id), commanderCalculusFixture);
+  const commanderCalculusRevealed = turnActions.revealTurnAction(commanderCalculusFixture, {
+    commanderTargets: { [p4.id]: p2.id },
+    revealPlan: commanderCalculusPlan,
+  });
+  assert.equal(
+    commanderCalculusRevealed.pendingAction?.kind,
+    "trash-card",
+    "Commander Calculus of Power should queue trash from the Commander's play area",
+  );
+  assert.equal(commanderCalculusRevealed.pendingAction.ownerId, p4.id);
+  assert.equal(commanderCalculusRevealed.pendingAction.combatRecipientId, p2.id);
+  const afterCommanderCalculusTrash = state.trashPlayerCard(
+    commanderCalculusRevealed,
+    commanderCalculusRevealed.pendingAction,
+    "playArea",
+    calculusTrashTarget.id,
+  );
+  assert.equal(playerById(afterCommanderCalculusTrash, p4.id).conflict, 0, "Commander should not receive Calculus strength");
+  assert.equal(playerById(afterCommanderCalculusTrash, p2.id).conflict, 8, "Activated Ally should receive Calculus strength");
 
   console.log("Imperium card verification passed");
 } finally {

@@ -383,6 +383,7 @@ export {
   canMoveCardToThroneRow,
   isBackedByChoamIntrigue,
   isBuyAccessIntrigue,
+  isCalculusOfPowerCard,
   isCallToArmsIntrigue,
   isChangeAllegiancesIntrigue,
   isCommandRespectCommanderCard,

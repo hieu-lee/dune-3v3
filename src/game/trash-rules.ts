@@ -1,4 +1,5 @@
 import { advancePendingAction } from "./pending-actions";
+import { playerHasConflictUnits } from "./conflict-rules";
 import { recordTurnSpiceGain } from "./turn-trackers";
 import type { Card, GameState, PendingAction, Player, TrashCardZone } from "./types";
 
@@ -24,7 +25,11 @@ export function trashableCards(player: Player) {
 
 export function trashableCardsForPending(player: Player, pending: TrashCardPendingAction) {
   const zones = pending.zones ?? (["hand", "discard", "playArea"] as TrashCardZone[]);
-  return trashableCards(player).filter(({ zone }) => zones.includes(zone));
+  return trashableCards(player).filter(({ card, zone }) =>
+    zones.includes(zone) &&
+    card.id !== pending.excludeCardId &&
+    (!pending.requiredTrait || card.traits?.includes(pending.requiredTrait))
+  );
 }
 
 export function trashPlayerCard(
@@ -35,32 +40,45 @@ export function trashPlayerCard(
 ): GameState {
   const owner = state.players.find((player) => player.id === pending.ownerId);
   if (!owner) return { ...state, ...advancePendingAction(state) };
-  if (pending.zones && !pending.zones.includes(zone)) return state;
+  if (!trashableCardsForPending(owner, pending).some((choice) => choice.zone === zone && choice.card.id === cardId)) {
+    return state;
+  }
   const cards = cardsForTrashZone(owner, zone);
   const card = cards.find((candidate) => candidate.id === cardId);
   if (!card) return state;
+  const combatRecipient = pending.combatRecipientId
+    ? state.players.find((player) => player.id === pending.combatRecipientId)
+    : undefined;
+  const strengthReward = pending.strengthReward && combatRecipient && playerHasConflictUnits(combatRecipient)
+    ? pending.strengthReward
+    : 0;
   const spiceReward =
     pending.spiceReward &&
     (card.cost ?? 0) >= (pending.spiceRewardCostThreshold ?? 0)
       ? pending.spiceReward
       : 0;
-  const players = state.players.map((player) =>
-    player.id === owner.id
-      ? {
-          ...updateTrashZone(player, zone, cards.filter((candidate) => candidate.id !== card.id)),
-          resources: {
-            ...player.resources,
-            spice: player.resources.spice + spiceReward,
-          },
-        }
-      : player,
-  );
+  const players = state.players.map((player) => {
+    let nextPlayer = player;
+    if (player.id === owner.id) {
+      nextPlayer = {
+        ...updateTrashZone(player, zone, cards.filter((candidate) => candidate.id !== card.id)),
+        resources: {
+          ...player.resources,
+          spice: player.resources.spice + spiceReward,
+        },
+      };
+    }
+    if (player.id === combatRecipient?.id && strengthReward > 0) {
+      nextPlayer = { ...nextPlayer, conflict: nextPlayer.conflict + strengthReward };
+    }
+    return nextPlayer;
+  });
   const nextState = {
     ...state,
     players,
     ...advancePendingAction(state),
     log: [
-      `${owner.leader} trashes ${card.name} from ${pending.source}${spiceReward > 0 ? ` and gains ${spiceReward} spice` : ""}.`,
+      `${owner.leader} trashes ${card.name} from ${pending.source}${spiceReward > 0 ? ` and gains ${spiceReward} spice` : ""}${strengthReward > 0 ? ` and adds ${strengthReward} strength` : ""}.`,
       ...state.log,
     ],
   };

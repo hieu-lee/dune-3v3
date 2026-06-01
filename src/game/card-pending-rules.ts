@@ -2,6 +2,7 @@ import { resolveInfluence } from "./agent-effects";
 import {
   canMoveCardToThroneRow,
   isCommandRespectCommanderCard,
+  isCalculusOfPowerCard,
   isCorrinoMightCommanderCard,
   isCriticalShipmentsCommanderCard,
   isDemandAttentionCommanderCard,
@@ -52,6 +53,7 @@ import type {
 export const stabanUnseenNetworkSource = "Unseen Network";
 export const stabanUnseenNetworkFactionIcons: IconId[] = ["emperor", "spacing", "bene", "fremen"];
 export const corrinoMightCost = 3;
+export const emperorCardTrait = "Faction: Emperor";
 export const shaddamSignetRingTroopCost = 1;
 export const shaddamSignetRingInfluenceCost = 3;
 export const shaddamSignetRingInfluenceChoices: FactionId[] = [
@@ -426,6 +428,37 @@ export function pendingActionForCorrinoMightReveal(
   };
 }
 
+export function pendingActionForCalculusOfPowerReveal(
+  card: Card,
+  source: Player,
+  state: GameState,
+  combatRecipientId: string,
+): PendingAction | undefined {
+  const combatRecipient = state.players.find((player) => player.id === combatRecipientId);
+  if (
+    !isCalculusOfPowerCard(card) ||
+    !combatRecipient ||
+    !playerHasConflictUnits(combatRecipient) ||
+    !source.playArea.some((candidate) =>
+      candidate.id !== card.id && candidate.traits?.includes(emperorCardTrait)
+    )
+  ) {
+    return undefined;
+  }
+
+  return {
+    kind: "trash-card",
+    ownerId: source.id,
+    source: card.name,
+    optional: true,
+    zones: ["playArea"],
+    excludeCardId: card.id,
+    requiredTrait: emperorCardTrait,
+    combatRecipientId,
+    strengthReward: 3,
+  };
+}
+
 export function pendingActionsForReveal(
   source: Player,
   state: GameState,
@@ -449,10 +482,13 @@ export function pendingActionsForReveal(
   const corrinoMightPending = revealedCards
     .map((card) => pendingActionForCorrinoMightReveal(card, source, state))
     .find((pending): pending is PendingAction => Boolean(pending));
+  const calculusOfPowerPending = revealedCards
+    .map((card) => pendingActionForCalculusOfPowerReveal(card, source, state, combatRecipientId))
+    .find((pending): pending is PendingAction => Boolean(pending));
   const feydDeviousStrengthPending = pendingActionForFeydDeviousStrength(source, state, combatRecipientId);
   const amberDesertScoutsPending = pendingActionForLadyAmberDesertScouts(source);
 
-  return [revealAdjustPending, corrinoMightPending, feydDeviousStrengthPending, amberDesertScoutsPending].filter((action): action is PendingAction => Boolean(action));
+  return [revealAdjustPending, calculusOfPowerPending, corrinoMightPending, feydDeviousStrengthPending, amberDesertScoutsPending].filter((action): action is PendingAction => Boolean(action));
 }
 
 function pendingActionForFeydDeviousStrength(

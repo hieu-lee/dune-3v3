@@ -261,8 +261,12 @@ export type PendingAction =
       source: string;
       optional: boolean;
       zones?: TrashCardZone[];
+      excludeCardId?: string;
+      requiredTrait?: string;
       spiceRewardCostThreshold?: number;
       spiceReward?: number;
+      combatRecipientId?: string;
+      strengthReward?: number;
     }
   | {
       kind: "reveal-adjust";

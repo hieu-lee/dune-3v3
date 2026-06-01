@@ -75,6 +75,10 @@ export function hasInfluence(faction: FactionId, amount: number) {
   return { kind: "has-influence", faction, amount } as const;
 }
 
+export function hasCompletedContracts(count: number) {
+  return { kind: "has-completed-contracts", count } as const;
+}
+
 export function cloneCardEffects(effects: CardEffectSpec[] | undefined): CardEffectSpec[] | undefined {
   return effects?.map((spec) => ({
     ...spec,

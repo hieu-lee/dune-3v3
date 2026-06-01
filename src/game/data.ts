@@ -2,9 +2,11 @@ import catalogJson from "./uprising-catalog.generated.json";
 import {
   beneGesseritOperativeSourceId,
   calculusOfPowerSourceId,
+  cargoRunnerSourceId,
   capturedMentatSourceId,
   interstellarTradeSourceId,
   makerKeeperSourceId,
+  maulaPistolSourceId,
   northernWatermasterSourceId,
   paracompassSourceId,
   prepareTheWaySourceId,
@@ -14,6 +16,7 @@ import {
 import {
   agentDrawCards,
   agentGainResource,
+  hasCompletedContracts,
   hasInfluence,
   hasSpyPosts,
   revealGainPersuasion,
@@ -217,6 +220,15 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
       agentGainResource("water", 1, [hasInfluence("bene", 2)]),
       agentGainResource("spice", 1, [hasInfluence("fremen", 2)]),
     ];
+  }
+  if (card.id === cargoRunnerSourceId) {
+    return [
+      agentDrawCards(1, [hasCompletedContracts(2)]),
+      agentDrawCards(1, [hasCompletedContracts(4)]),
+    ];
+  }
+  if (card.id === maulaPistolSourceId) {
+    return [agentDrawCards(1)];
   }
   if (card.id === northernWatermasterSourceId) {
     return [agentGainResource("water", 1)];

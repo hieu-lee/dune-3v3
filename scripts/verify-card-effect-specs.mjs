@@ -74,7 +74,9 @@ try {
   const smuggler = data.imperiumDeck.find((card) => card.name === "Smuggler's Harvester");
   const interstellarTrade = data.imperiumDeck.find((card) => card.name === "Interstellar Trade");
   const beneGesseritOperative = data.imperiumDeck.find((card) => card.name === "Bene Gesserit Operative");
+  const cargoRunner = data.imperiumDeck.find((card) => card.name === "Cargo Runner");
   const makerKeeper = data.imperiumDeck.find((card) => card.name === "Maker Keeper");
+  const maulaPistol = data.imperiumDeck.find((card) => card.name === "Maula Pistol");
   const northernWatermaster = data.imperiumDeck.find((card) => card.name === "Northern Watermaster");
   const paracompass = data.imperiumDeck.find((card) => card.name === "Paracompass");
   const prepareTheWay = data.reserveMarket.find((card) => card.sourceId === 537);
@@ -90,7 +92,9 @@ try {
     smuggler &&
     interstellarTrade &&
     beneGesseritOperative &&
+    cargoRunner &&
     makerKeeper &&
+    maulaPistol &&
     northernWatermaster &&
     paracompass,
   );
@@ -102,7 +106,7 @@ try {
       ...data.reserveMarket,
       ...data.imperiumDeck,
     ].filter(hasAgentPlaySpec).map((card) => card.name).sort(),
-    ["Maker Keeper", "Northern Watermaster", "Paracompass", "Prepare The Way"],
+    ["Cargo Runner", "Maker Keeper", "Maula Pistol", "Northern Watermaster", "Paracompass", "Prepare The Way"],
     "Unexpected cards with declarative Agent-play specs",
   );
   for (const card of [
@@ -149,6 +153,26 @@ try {
       spec.effects.some((effect) => effect.kind === "gain-resource" && effect.resource === "spice" && effect.amount === 1)
     ),
     "Maker Keeper should carry a Fremen Influence-gated spice Agent spec",
+  );
+  assert.ok(
+    cargoRunner.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.conditions?.some((condition) => condition.kind === "has-completed-contracts" && condition.count === 2) &&
+      spec.effects.some((effect) => effect.kind === "draw-cards" && effect.amount === 1)
+    ) &&
+    cargoRunner.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.conditions?.some((condition) => condition.kind === "has-completed-contracts" && condition.count === 4) &&
+      spec.effects.some((effect) => effect.kind === "draw-cards" && effect.amount === 1)
+    ),
+    "Cargo Runner should carry stacked completed-contract Agent draw specs",
+  );
+  assert.ok(
+    maulaPistol.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.effects.some((effect) => effect.kind === "draw-cards" && effect.amount === 1)
+    ),
+    "Maula Pistol should carry an unconditional Agent draw spec",
   );
   assert.ok(
     northernWatermaster.effects?.some((spec) =>
@@ -364,6 +388,20 @@ try {
     /Invalid has-influence amount "-1"/,
     "Influence conditions should require a non-negative integer threshold",
   );
+  const invalidCompletedContractsCountCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-completed-contracts-count-card",
+    name: "Effect Spec Invalid Completed Contracts Count",
+    effects: [revealSpec(
+      [{ kind: "gain-persuasion", selector: "self", amount: 1 }],
+      [{ kind: "has-completed-contracts", count: -1 }],
+    )],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [invalidCompletedContractsCountCard], highCouncilSeat: false }),
+    /Invalid has-completed-contracts count "-1"/,
+    "Completed-contract conditions should require a non-negative integer threshold",
+  );
   const unsupportedEffectCard = {
     ...convincingArgument,
     id: "effect-spec-unsupported-effect-card",
@@ -481,6 +519,46 @@ try {
   );
   assert.equal(unprepared.source.hand.length, 0, "Prepare The Way Agent spec should not draw below 2 Bene Gesserit Influence");
   assert.equal(unprepared.log, undefined, "Prepare The Way Agent spec should not log below its Influence threshold");
+
+  const maulaDraw = { ...dagger, id: "maula-pistol-agent-draw-fixture" };
+  const maulaPistolEffect = state.applyCardAgentEffect(
+    maulaPistol,
+    { ...p2, deck: [maulaDraw], discard: [], hand: [] },
+    p2,
+  );
+  assert.equal(maulaPistolEffect.source.hand[0]?.id, maulaDraw.id, "Maula Pistol Agent spec should draw 1 card");
+  assert.match(maulaPistolEffect.log ?? "", /Maula Pistol: draws 1 card/);
+
+  const cargoRunnerDeck = [
+    { ...dagger, id: "cargo-runner-agent-draw-1" },
+    { ...convincingArgument, id: "cargo-runner-agent-draw-2" },
+  ];
+  const cargoRunnerUncontracted = state.applyCardAgentEffect(
+    cargoRunner,
+    { ...p2, contracts: [], deck: cargoRunnerDeck, discard: [], hand: [] },
+    p2,
+  );
+  assert.equal(cargoRunnerUncontracted.source.hand.length, 0, "Cargo Runner should not draw below two completed contracts");
+  assert.equal(cargoRunnerUncontracted.log, undefined, "Cargo Runner should not log below its completed-contract threshold");
+  const cargoRunnerTwoContracts = state.applyCardAgentEffect(
+    cargoRunner,
+    { ...p2, contracts: completedContracts, deck: cargoRunnerDeck, discard: [], hand: [] },
+    p2,
+  );
+  assert.equal(cargoRunnerTwoContracts.source.hand.length, 1, "Cargo Runner should draw 1 card with two completed contracts");
+  assert.match(cargoRunnerTwoContracts.log ?? "", /Cargo Runner: draws 1 card/);
+  const fourCompletedContracts = data.standardContracts.slice(0, 4).map((card, index) => ({
+    card,
+    completed: true,
+    takenRound: index + 1,
+  }));
+  const cargoRunnerFourContracts = state.applyCardAgentEffect(
+    cargoRunner,
+    { ...p2, contracts: fourCompletedContracts, deck: cargoRunnerDeck, discard: [], hand: [] },
+    p2,
+  );
+  assert.equal(cargoRunnerFourContracts.source.hand.length, 2, "Cargo Runner should draw 2 cards with four completed contracts");
+  assert.match(cargoRunnerFourContracts.log ?? "", /Cargo Runner: draws 2 cards/);
 
   const makerKeeperSource = {
     ...p2,

@@ -126,6 +126,10 @@ function validateCondition(condition: GameEffectConditionSpec) {
     if (isNonNegativeInteger(condition.amount)) return;
     invalidSpecField("has-influence amount", condition.amount);
   }
+  if (condition.kind === "has-completed-contracts") {
+    if (isNonNegativeInteger(condition.count)) return;
+    invalidSpecField("has-completed-contracts count", condition.count);
+  }
   unsupportedKind("effect condition", condition);
 }
 
@@ -202,6 +206,9 @@ function conditionApplies(condition: GameEffectConditionSpec, context: GameEffec
   }
   if (condition.kind === "has-influence") {
     return conditionInfluence(context.source, condition.faction, context.state?.players ?? [context.source]) >= condition.amount;
+  }
+  if (condition.kind === "has-completed-contracts") {
+    return context.source.contracts.filter((contract) => contract.completed).length >= condition.count;
   }
   return unsupportedKind("effect condition", condition);
 }

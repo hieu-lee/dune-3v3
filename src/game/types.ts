@@ -43,7 +43,8 @@ export type EffectAmountSpec =
 export type GameEffectConditionSpec =
   | { kind: "visited-maker-space" }
   | { kind: "has-spy-posts"; count: number }
-  | { kind: "has-influence"; faction: FactionId; amount: number };
+  | { kind: "has-influence"; faction: FactionId; amount: number }
+  | { kind: "has-completed-contracts"; count: number };
 export type GameEffectSpec =
   | { kind: "gain-resource"; selector: PlayerSelector; resource: ResourceId; amount: EffectAmountSpec }
   | { kind: "gain-persuasion"; selector: PlayerSelector; amount: EffectAmountSpec }

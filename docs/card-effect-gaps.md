@@ -9,10 +9,10 @@ Implemented primitives:
 - Triggers: `reveal`, `agent-play`
 - Effects: gain persuasion, gain strength, gain resource, draw cards, recruit troops
 - Amounts: fixed non-negative integer, completed contract count with optional non-negative integer multiplier
-- Conditions: visited Maker space this round, has at least N own spy posts, has at least N effective Influence
+- Conditions: visited Maker space this round, has at least N own spy posts, has at least N effective Influence, has at least N completed contracts
 - Selectors: `self`, `activated-ally` for Agent routed troop recruitment
 
-The reveal resolver treats reveal specs as the full reveal model for a card. If a card has a reveal spec, legacy fields such as `persuasion`, `swords`, and `revealGain` remain available for display and compatibility but are not added again during reveal planning. Agent-play specs currently cover immediate self effects such as Influence-gated card draw and resource gains, plus routed activated-Ally troop recruitment.
+The reveal resolver treats reveal specs as the full reveal model for a card. If a card has a reveal spec, legacy fields such as `persuasion`, `swords`, and `revealGain` remain available for display and compatibility but are not added again during reveal planning. Agent-play specs currently cover immediate self effects such as Influence- and contract-gated card draw and resource gains, plus routed activated-Ally troop recruitment.
 Unsupported spec shapes, including triggers, intentionally throw instead of falling back silently. Selectors beyond `self` and the currently supported `activated-ally` Agent routing are part of the planned type surface but fail until the resolver implements them.
 
 ## Bespoke Handlers To Retire

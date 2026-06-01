@@ -346,6 +346,7 @@ async function createLeaderCharacterChoiceStates(server, initialPlayableGame) {
     pendingQueue: [],
     turnReverendMotherJessicaRepeats: {},
   };
+  const arrakeen = findSpace(data.boardSpaces, "arrakeen", "Arrakeen");
   const secrets = findSpace(data.boardSpaces, "secrets", "Secrets");
   const imperialBasin = findSpace(data.boardSpaces, "imperial-basin", "Imperial Basin");
   const debugDevastatingAssault = { ...devastatingAssault, id: "debug-devastating-assault" };
@@ -447,6 +448,28 @@ async function createLeaderCharacterChoiceStates(server, initialPlayableGame) {
     imperialBasin,
   );
   assert.ok(desertCallPending, "Expected a derived Desert Call sandworm payment pending action");
+  const debugCommandRespect = { ...commandRespect, id: "debug-command-respect" };
+  const commandRespectState = {
+    ...base,
+    activeSeat: p1Seat,
+    players: base.players.map((player) =>
+      player.id === "p1"
+        ? {
+            ...player,
+            swordmasterBonus: true,
+            playArea: [debugCommandRespect, ...player.playArea],
+          }
+        : player,
+    ),
+  };
+  const commandRespectPending = state.pendingActionForCard(
+    debugCommandRespect,
+    commandRespectState.players.find((player) => player.id === "p1"),
+    commandRespectState,
+    commandRespectState.players.find((player) => player.id === "p3"),
+    arrakeen,
+  );
+  assert.ok(commandRespectPending, "Expected a derived Command Respect trash-source trade pending action");
 
   return {
     stabanUnseenNetwork: {
@@ -559,24 +582,8 @@ async function createLeaderCharacterChoiceStates(server, initialPlayableGame) {
       },
     },
     commandRespect: {
-      ...base,
-      activeSeat: p1Seat,
-      players: base.players.map((player) =>
-        player.id === "p1"
-          ? {
-              ...player,
-              swordmasterBonus: true,
-              playArea: [{ ...commandRespect, id: "debug-command-respect" }, ...player.playArea],
-            }
-          : player,
-      ),
-      pendingAction: {
-        kind: "command-respect",
-        commanderId: "p1",
-        partnerIds: ["p3", "p5"],
-        cardId: "debug-command-respect",
-        source: "Command Respect",
-      },
+      ...commandRespectState,
+      pendingAction: commandRespectPending,
     },
     demandResults: {
       ...base,

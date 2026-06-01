@@ -2,7 +2,6 @@ import {
   factionLabels,
 } from "./data";
 import {
-  isCommandRespectCommanderCard,
   isDemandResultsCommanderCard,
 } from "./card-identifiers";
 import {
@@ -28,7 +27,6 @@ import type {
   ResourceId,
 } from "./types";
 
-type CommandRespectPendingAction = Extract<PendingAction, { kind: "command-respect" }>;
 type DemandResultsPendingAction = Extract<PendingAction, { kind: "demand-results" }>;
 type PayResourceForStrengthPendingAction = Extract<PendingAction, { kind: "pay-resource-for-strength" }>;
 type PayResourceForTroopsPendingAction = Extract<PendingAction, { kind: "pay-resource-for-troops" }>;
@@ -53,65 +51,6 @@ function paymentPendingTrashSourceIsValid(pending: { cardId?: string; trashSourc
 
 function paymentPendingAmountIsValid(value: unknown) {
   return typeof value === "number" && Number.isInteger(value) && value > 0;
-}
-
-export function resolveCommandRespectTrade(
-  state: GameState,
-  pending: CommandRespectPendingAction,
-  partnerId: string,
-): GameState {
-  if (state.pendingAction !== pending) return state;
-  const commander = state.players.find((player) => player.id === pending.commanderId);
-  const partner = state.players.find((player) => player.id === partnerId);
-  if (
-    !commander ||
-    commander.team !== "muaddib" ||
-    commander.role !== "Commander" ||
-    !commander.swordmasterBonus ||
-    !commander.playArea.some((card) => card.id === pending.cardId && isCommandRespectCommanderCard(card)) ||
-    !partner ||
-    partner.team !== commander.team ||
-    partner.role !== "Ally" ||
-    !pending.partnerIds.includes(partner.id)
-  ) {
-    return state;
-  }
-
-  const players = state.players.map((player) =>
-    player.id === commander.id
-      ? { ...player, playArea: player.playArea.filter((card) => card.id !== pending.cardId) }
-      : player,
-  );
-  const tradePending: PendingAction = {
-    kind: "trade",
-    actorId: commander.id,
-    partnerId: partner.id,
-    resource: "intrigue",
-    actorGiven: 0,
-    partnerGiven: 0,
-    partnerLocked: true,
-    source: pending.source,
-  };
-
-  return {
-    ...state,
-    players,
-    pendingAction: tradePending,
-    log: [
-      `${commander.leader} trashes ${pending.source} to trade with ${partner.leader}.`,
-      ...state.log,
-    ],
-  };
-}
-
-export function skipCommandRespect(state: GameState, pending: CommandRespectPendingAction): GameState {
-  if (state.pendingAction !== pending) return state;
-  const commander = state.players.find((player) => player.id === pending.commanderId);
-  return {
-    ...state,
-    ...advancePendingAction(state),
-    log: [`${commander?.leader ?? "Muad'Dib"} keeps ${pending.source} and declines to trade.`, ...state.log],
-  };
 }
 
 export function resolveDemandResultsChoice(

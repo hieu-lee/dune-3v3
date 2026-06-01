@@ -39,7 +39,6 @@ import { PendingConflictVpPanel } from "./PendingConflictVpPanel";
 import { PendingInfluenceLossPanel } from "./PendingInfluenceLossPanel";
 import { PendingIrulanSignetPanel } from "./PendingIrulanSignetPanel";
 import {
-  PendingCommandRespectPanel,
   PendingDemandResultsPanel,
   PendingJessicaOtherMemoriesPanel,
   PendingJessicaReverendMotherPanel,
@@ -52,6 +51,7 @@ import {
   PendingPayResourceForTroopsPanel,
   PendingStabanUnseenNetworkPanel,
   PendingThreatenSpiceProductionPanel,
+  PendingTrashSourceForTradePanel,
 } from "./PendingLeaderChoicePanels";
 import { PendingMakerChoicePanel } from "./PendingMakerChoicePanel";
 import {
@@ -75,7 +75,6 @@ type PendingActionPanelProps = {
   acquirePendingCard: (cardId: string) => void;
   adjustRevealReward: (persuasionDelta: number, strengthDelta: number) => void;
   adjustThreatenSpiceProduction: (contributorId: string, delta: number) => void;
-  chooseCommandRespectTrade: (partnerId: string) => void;
   chooseCommanderResourceSplit: (optionIndex: number) => void;
   chooseConflictInfluence: (faction: FactionId) => void;
   chooseBoardInfluence: (ownerId: string, faction: FactionId) => void;
@@ -100,6 +99,7 @@ type PendingActionPanelProps = {
   chooseStabanUnseenNetwork: (choice: StabanUnseenNetworkChoice) => void;
   chooseThreatenSpiceProduction: () => void;
   chooseThroneRowCard: (cardId: string) => void;
+  chooseTrashSourceForTrade: (partnerId: string) => void;
   clearPendingAction: () => void;
   collectContractFallback: () => void;
   deployControlDefense: () => void;
@@ -113,7 +113,6 @@ type PendingActionPanelProps = {
   recallSpy: (spaceId: string) => void;
   recallSpyForSupply: (spaceId: string) => void;
   reinforceOne: (playerId: string, destination: "garrison" | "conflict") => void;
-  skipCommandRespectChoice: () => void;
   skipDiscardCardForInfluenceAndDrawChoice: () => void;
   skipLoseInfluenceForIntriguesChoice: () => void;
   skipControlDefense: () => void;
@@ -129,6 +128,7 @@ type PendingActionPanelProps = {
   skipRetreatTroopsForStrengthChoice: () => void;
   skipThreatenSpiceProductionChoice: () => void;
   skipTrash: () => void;
+  skipTrashSourceForTradeChoice: () => void;
   takeContract: (contractId: string) => void;
   transferTrade: (fromId: string, toId: string, intrigueId?: string) => void;
   trashCard: (zone: TrashCardZone, cardId: string) => void;
@@ -141,7 +141,6 @@ export function PendingActionPanel({
   acquirePendingCard,
   adjustRevealReward,
   adjustThreatenSpiceProduction,
-  chooseCommandRespectTrade,
   chooseCommanderResourceSplit,
   chooseConflictInfluence,
   chooseBoardInfluence,
@@ -166,6 +165,7 @@ export function PendingActionPanel({
   chooseStabanUnseenNetwork,
   chooseThreatenSpiceProduction,
   chooseThroneRowCard,
+  chooseTrashSourceForTrade,
   clearPendingAction,
   collectContractFallback,
   deployControlDefense,
@@ -179,7 +179,6 @@ export function PendingActionPanel({
   recallSpy,
   recallSpyForSupply,
   reinforceOne,
-  skipCommandRespectChoice,
   skipDiscardCardForInfluenceAndDrawChoice,
   skipLoseInfluenceForIntriguesChoice,
   skipControlDefense,
@@ -195,6 +194,7 @@ export function PendingActionPanel({
   skipRetreatTroopsForStrengthChoice,
   skipThreatenSpiceProductionChoice,
   skipTrash,
+  skipTrashSourceForTradeChoice,
   takeContract,
   transferTrade,
   trashCard,
@@ -268,12 +268,12 @@ export function PendingActionPanel({
     pendingAction.kind === "shaddam-signet-ring"
       ? game.players.find((player) => player.id === pendingAction.allyId)
       : undefined;
-  const pendingCommandRespectCommander =
-    pendingAction.kind === "command-respect"
-      ? game.players.find((player) => player.id === pendingAction.commanderId)
+  const pendingTrashSourceTradeOwner =
+    pendingAction.kind === "trash-source-for-trade"
+      ? game.players.find((player) => player.id === pendingAction.ownerId)
       : undefined;
-  const pendingCommandRespectPartners =
-    pendingAction.kind === "command-respect"
+  const pendingTrashSourceTradePartners =
+    pendingAction.kind === "trash-source-for-trade"
       ? pendingAction.partnerIds
           .map((partnerId) => game.players.find((player) => player.id === partnerId))
           .filter((player): player is Player => Boolean(player))
@@ -493,7 +493,7 @@ export function PendingActionPanel({
           {pendingAction.kind === "board-influence-choice" && `${pendingAction.source} Influence`}
           {pendingAction.kind === "optional-space-payment" && `${pendingOptionalSpacePaymentOwner?.leader ?? "Player"} ${pendingAction.source}`}
           {pendingAction.kind === "conflict-vp-conversion" && `${pendingConflictVpOwner?.leader ?? "Player"} Conflict reward`}
-          {pendingAction.kind === "command-respect" && `${pendingCommandRespectCommander?.leader ?? "Muad'Dib"} Command Respect`}
+          {pendingAction.kind === "trash-source-for-trade" && `${pendingTrashSourceTradeOwner?.leader ?? "Player"} ${pendingAction.source}`}
           {pendingAction.kind === "demand-results" && `${pendingDemandResultsCommander?.leader ?? "Shaddam"} Demand Results`}
           {pendingAction.kind === "pay-resource-for-strength" && `${pendingPayResourceStrengthOwner?.leader ?? "Player"} ${pendingAction.source}`}
           {pendingAction.kind === "pay-resource-for-influence" && `${pendingPayResourceInfluenceOwner?.leader ?? "Player"} ${pendingAction.source}`}
@@ -721,12 +721,13 @@ export function PendingActionPanel({
         />
       )}
 
-      {pendingAction.kind === "command-respect" && (
-        <PendingCommandRespectPanel
-          commander={pendingCommandRespectCommander}
-          partners={pendingCommandRespectPartners}
-          onSkip={skipCommandRespectChoice}
-          onTrade={chooseCommandRespectTrade}
+      {pendingAction.kind === "trash-source-for-trade" && (
+        <PendingTrashSourceForTradePanel
+          owner={pendingTrashSourceTradeOwner}
+          partners={pendingTrashSourceTradePartners}
+          source={pendingAction.source}
+          onSkip={skipTrashSourceForTradeChoice}
+          onTrade={chooseTrashSourceForTrade}
         />
       )}
 

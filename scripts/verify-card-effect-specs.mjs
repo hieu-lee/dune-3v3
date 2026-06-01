@@ -93,6 +93,7 @@ try {
   const northernWatermaster = data.imperiumDeck.find((card) => card.name === "Northern Watermaster");
   const paracompass = data.imperiumDeck.find((card) => card.name === "Paracompass");
   const prepareTheWay = data.reserveMarket.find((card) => card.sourceId === 537);
+  const commandRespect = data.muadDibCommanderCards.find((card) => card.name === "Command Respect");
   const limitedLandsraadAccess = data.muadDibCommanderCards.find((card) => card.name === "Limited Landsraad Access");
   const demandAttention = data.muadDibCommanderCards.find((card) => card.name === "Demand Attention");
   const desertCall = data.muadDibCommanderCards.find((card) => card.name === "Desert Call");
@@ -125,7 +126,7 @@ try {
     northernWatermaster &&
     paracompass,
   );
-  assert.ok(prepareTheWay && limitedLandsraadAccess && demandAttention && desertCall && muadDibSignet && usul && corrinoMight && criticalShipments && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
+  assert.ok(commandRespect && prepareTheWay && limitedLandsraadAccess && demandAttention && desertCall && muadDibSignet && usul && corrinoMight && criticalShipments && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
   assert.ok(arrakeen && haggaBasin && imperialBasin && secrets && highCouncil);
   assert.equal(revealSpecCards.length, 34, "Unexpected number of cards with declarative Reveal specs");
   assert.deepEqual(
@@ -206,6 +207,24 @@ try {
       )
     ),
     "Demand Attention should carry a declarative Agent resource-for-Influence payment spec",
+  );
+  assert.ok(
+    commandRespect.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.conditions?.some((condition) => condition.kind === "has-team" && condition.team === "muaddib") &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Commander") &&
+      spec.conditions?.some((condition) => condition.kind === "has-swordmaster-bonus") &&
+      spec.effects.some((effect) =>
+        effect.kind === "trash-source-for-trade" &&
+        effect.selector === "self" &&
+        effect.partner === "same-team-allies" &&
+        effect.resource === "intrigue" &&
+        effect.optional === true &&
+        effect.partnerLocked === true &&
+        effect.source === "Command Respect"
+      )
+    ),
+    "Command Respect should carry a declarative Agent trash-source-for-trade spec",
   );
   assert.ok(
     desertCall.effects?.some((spec) =>

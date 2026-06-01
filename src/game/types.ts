@@ -43,6 +43,7 @@ export type TroopEffectRecipient = "same-team-allies";
 export type TroopEffectDestination = "garrison";
 export type SandwormEffectRecipient = "activated-ally";
 export type SandwormEffectDestination = "conflict";
+export type TradeEffectPartner = "same-team-allies";
 export type EffectAmountSpec =
   | number
   | { kind: "completed-contracts"; multiplier?: number };
@@ -146,6 +147,15 @@ export type GameEffectSpec =
       kind: "commander-resource-split";
       selector: PlayerSelector;
       options: CommanderResourceSplitOption[];
+      source?: string;
+    }
+  | {
+      kind: "trash-source-for-trade";
+      selector: PlayerSelector;
+      partner: TradeEffectPartner;
+      resource: TradeGoodId;
+      optional?: true;
+      partnerLocked?: boolean;
       source?: string;
     }
   | { kind: "block-conflict-deployment"; selector: PlayerSelector; source?: string }
@@ -579,10 +589,13 @@ export type PendingAction =
       options: CommanderResourceSplitOption[];
     }
   | {
-      kind: "command-respect";
-      commanderId: string;
+      kind: "trash-source-for-trade";
+      ownerId: string;
       partnerIds: [string, string];
       cardId: string;
+      resource: TradeGoodId;
+      optional: true;
+      partnerLocked?: boolean;
       source: string;
     }
   | {

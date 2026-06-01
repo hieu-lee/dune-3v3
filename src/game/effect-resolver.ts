@@ -28,6 +28,8 @@ import type {
   SandwormEffectDestination,
   SandwormEffectRecipient,
   TeamId,
+  TradeEffectPartner,
+  TradeGoodId,
   TroopEffectDestination,
   TroopEffectRecipient,
   TrashCardZone,
@@ -148,6 +150,15 @@ export type AgentCommanderResourceSplit = {
   source?: string;
 };
 
+export type AgentTrashSourceForTrade = {
+  selector: PlayerSelector;
+  partner: TradeEffectPartner;
+  resource: TradeGoodId;
+  optional: true;
+  partnerLocked: boolean;
+  source?: string;
+};
+
 type PlayerEffectResult = {
   cardsToDraw: number;
   drawCardsSource?: string;
@@ -201,6 +212,7 @@ const supportedTriggers = new Set<GameEffectTrigger>([
 ]);
 
 const supportedResources = new Set<ResourceId>(["solari", "spice", "water"]);
+const supportedTradeGoods = new Set<TradeGoodId>(["solari", "spice", "water", "intrigue"]);
 const supportedIcons = new Set<IconId>(["emperor", "spacing", "bene", "fremen", "landsraad", "city", "spice", "spy"]);
 const supportedTrashZones = new Set<TrashCardZone>(["hand", "discard", "playArea"]);
 const supportedFactions = new Set<FactionId>([
@@ -531,6 +543,25 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
       invalidSpecField("commander-resource-split options", effect.options);
     }
     effect.options.forEach(validateCommanderResourceSplitOption);
+    return;
+  }
+  if (effect.kind === "trash-source-for-trade") {
+    if (trigger !== "agent-play") {
+      throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
+    }
+    if (effect.selector !== "self") {
+      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
+    const partner = (effect as { partner?: unknown }).partner;
+    if (partner !== "same-team-allies") {
+      invalidSpecField("trash-source-for-trade partner", partner);
+    }
+    if (!supportedTradeGoods.has(effect.resource)) {
+      throw new Error(`Unsupported effect trade resource "${effect.resource}"`);
+    }
+    validateOptionalTrue("trash-source-for-trade optional", (effect as { optional?: unknown }).optional);
+    validateOptionalBoolean("trash-source-for-trade partnerLocked", (effect as { partnerLocked?: unknown }).partnerLocked);
+    validateSourceLabel("trash-source-for-trade source", effect.source);
     return;
   }
   if (effect.kind === "block-conflict-deployment") {
@@ -866,6 +897,9 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
     return result;
   }
   if (effect.kind === "commander-resource-split") {
+    return result;
+  }
+  if (effect.kind === "trash-source-for-trade") {
     return result;
   }
   if (effect.kind === "block-conflict-deployment") {
@@ -1213,6 +1247,27 @@ export function resolveAgentCommanderResourceSplits(
       .map((effect) => ({
         selector: effect.selector,
         options: effect.options.map((option) => ({ ...option })),
+        source: effect.source,
+      }));
+  });
+}
+
+export function resolveAgentTrashSourceForTrades(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): AgentTrashSourceForTrade[] {
+  specs?.forEach(validateSpec);
+  return (specs ?? []).flatMap((spec) => {
+    if (spec.trigger !== "agent-play") return [];
+    if (!specApplies(spec, context)) return [];
+    return spec.effects
+      .filter((effect) => effect.kind === "trash-source-for-trade")
+      .map((effect) => ({
+        selector: effect.selector,
+        partner: effect.partner,
+        resource: effect.resource,
+        optional: true,
+        partnerLocked: effect.partnerLocked ?? true,
         source: effect.source,
       }));
   });

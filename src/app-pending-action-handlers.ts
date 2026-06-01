@@ -20,7 +20,6 @@ import {
   recallSpyForSupplyForPending,
   reinforceTroop,
   resolveCommanderResourceSplitChoice,
-  resolveCommandRespectTrade,
   resolveConflictTie,
   resolveDemandResultsChoice,
   resolveDiscardCardForInfluenceAndDrawChoice,
@@ -43,8 +42,8 @@ import {
   resolveSietchTabrChoice,
   resolveStabanUnseenNetworkChoice,
   resolveThreatenSpiceProductionChoice,
+  resolveTrashSourceForTradeChoice,
   scoreGurneyAlwaysSmiling,
-  skipCommandRespect,
   skipConflictVpConversion,
   skipControlDefenseTroop,
   skipDemandResults,
@@ -60,6 +59,7 @@ import {
   skipRetreatTroopsForStrength,
   skipThreatenSpiceProduction,
   skipTrashCard,
+  skipTrashSourceForTrade,
   startNextRound,
   takeChoamContract,
   trashPlayerCard,
@@ -190,10 +190,10 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     runPending("jessica-reverend-mother", (current, pending) => maybeStartCombatPhase(resolveJessicaReverendMotherChoice(current, pending, choice)));
   const chooseJessicaOtherMemories = (choice: JessicaOtherMemoriesChoice) =>
     runPending("jessica-other-memories", (current, pending) => maybeStartCombatPhase(resolveJessicaOtherMemoriesChoice(current, pending, choice)));
-  const chooseCommandRespectTrade = (partnerId: string) =>
-    runPending("command-respect", (current, pending) => resolveCommandRespectTrade(current, pending, partnerId));
-  const skipCommandRespectChoice = () =>
-    runPending("command-respect", (current, pending) => maybeStartCombatPhase(skipCommandRespect(current, pending)));
+  const chooseTrashSourceForTrade = (partnerId: string) =>
+    runPending("trash-source-for-trade", (current, pending) => resolveTrashSourceForTradeChoice(current, pending, partnerId));
+  const skipTrashSourceForTradeChoice = () =>
+    runPending("trash-source-for-trade", (current, pending) => maybeStartCombatPhase(skipTrashSourceForTrade(current, pending)));
   const chooseDemandResults = (optionIndex: number) =>
     runPending("demand-results", (current, pending) => maybeStartCombatPhase(resolveDemandResultsChoice(current, pending, optionIndex)));
   const skipDemandResultsChoice = () =>
@@ -280,7 +280,6 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     acquirePendingCard,
     adjustRevealReward,
     adjustThreatenSpiceProduction,
-    chooseCommandRespectTrade,
     chooseCommanderResourceSplit,
     chooseConflictInfluence,
     chooseBoardInfluence,
@@ -304,6 +303,7 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     chooseSietchTabr,
     chooseStabanUnseenNetwork,
     chooseThreatenSpiceProduction,
+    chooseTrashSourceForTrade,
     chooseThroneRowCard,
     clearPendingAction,
     collectContractFallback,
@@ -318,7 +318,6 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     recallSpy,
     recallSpyForSupply,
     reinforceOne,
-    skipCommandRespectChoice,
     skipControlDefense,
     skipConflictVpReward,
     skipDemandResultsChoice,
@@ -334,6 +333,7 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     skipRetreatTroopsForStrengthChoice,
     skipThreatenSpiceProductionChoice,
     skipTrash,
+    skipTrashSourceForTradeChoice,
     takeContract,
     transferTrade,
     trashCard,

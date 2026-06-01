@@ -9,6 +9,8 @@ export function verifyStarterDeckCommandRespect({
 }) {
   const commandRespect = data.muadDibCommanderCards.find((card) => card.name === "Command Respect");
   assert.ok(commandRespect, "Muad'Dib Commander deck should include Command Respect");
+  const nonTradeCommanderCard = data.muadDibCommanderCards.find((card) => card.name === "Convincing Argument");
+  assert.ok(nonTradeCommanderCard, "Verifier needs a non-trade Muad'Dib Commander card");
   assert.equal(
     state.isCommandRespectCommanderCard(commandRespect),
     true,
@@ -43,10 +45,13 @@ export function verifyStarterDeckCommandRespect({
     arrakeenForCommandRespect,
   );
   assert.deepEqual(commandRespectPending, {
-    kind: "command-respect",
-    commanderId: muadDib.id,
+    kind: "trash-source-for-trade",
+    ownerId: muadDib.id,
     partnerIds: [muadDibAllyA.id, muadDibAllyB.id],
     cardId: commandRespect.id,
+    resource: "intrigue",
+    optional: true,
+    partnerLocked: true,
     source: "Command Respect",
   });
   assert.equal(
@@ -96,7 +101,7 @@ export function verifyStarterDeckCommandRespect({
     "Command Respect should need both Muad'Dib Allies available as trade partners",
   );
   const commandRespectState = { ...baseCommandRespectGame, pendingAction: commandRespectPending, pendingQueue: [] };
-  const resolvedCommandRespect = state.resolveCommandRespectTrade(
+  const resolvedCommandRespect = state.resolveTrashSourceForTradeChoice(
     commandRespectState,
     commandRespectPending,
     muadDibAllyA.id,
@@ -136,7 +141,7 @@ export function verifyStarterDeckCommandRespect({
     remaining: 1,
     source: "Queued Command Respect regression",
   };
-  const queuedCommandRespectTrade = state.resolveCommandRespectTrade(
+  const queuedCommandRespectTrade = state.resolveTrashSourceForTradeChoice(
     { ...commandRespectState, pendingQueue: [queuedCommandRespectSpy] },
     commandRespectPending,
     muadDibAllyA.id,
@@ -170,14 +175,14 @@ export function verifyStarterDeckCommandRespect({
   );
   const finishedCommandRespectTrade = state.finishPendingAction(afterCommandRespectIntrigueTrade);
   assert.equal(finishedCommandRespectTrade.pendingAction, undefined, "Command Respect trade should finish through the normal trade flow");
-  const skippedCommandRespect = state.skipCommandRespect(commandRespectState, commandRespectPending);
+  const skippedCommandRespect = state.skipTrashSourceForTrade(commandRespectState, commandRespectPending);
   assert.equal(
     playerById(skippedCommandRespect, muadDib.id).playArea.length,
     1,
     "Skipping Command Respect should leave the card in play",
   );
   assert.equal(skippedCommandRespect.pendingAction, undefined, "Skipping Command Respect should advance pending action");
-  const invalidCommandRespectPartner = state.resolveCommandRespectTrade(
+  const invalidCommandRespectPartner = state.resolveTrashSourceForTradeChoice(
     commandRespectState,
     commandRespectPending,
     shaddamAlly.id,
@@ -192,4 +197,79 @@ export function verifyStarterDeckCommandRespect({
     commandRespectPending,
     "Command Respect should keep waiting after an invalid partner choice",
   );
+  const forgedCardPending = { ...commandRespectPending, cardId: nonTradeCommanderCard.id };
+  const forgedCardCommander = { ...baseCommandRespectCommander, playArea: [nonTradeCommanderCard] };
+  const forgedCardState = {
+    ...baseCommandRespectGame,
+    pendingAction: forgedCardPending,
+    players: baseCommandRespectGame.players.map((player) =>
+      player.id === muadDib.id ? forgedCardCommander : player
+    ),
+  };
+  const forgedCardResolve = state.resolveTrashSourceForTradeChoice(
+    forgedCardState,
+    forgedCardPending,
+    muadDibAllyA.id,
+  );
+  assert.deepEqual(
+    forgedCardResolve.pendingAction,
+    forgedCardPending,
+    "Command Respect should not let a forged pending trash a non-trade source card",
+  );
+  assert.equal(
+    playerById(forgedCardResolve, muadDib.id).playArea[0]?.id,
+    nonTradeCommanderCard.id,
+    "Forged Command Respect pending should keep the unrelated card in play",
+  );
+  const staleSwordmasterCommander = { ...baseCommandRespectCommander, swordmasterBonus: false };
+  const staleSwordmasterState = {
+    ...baseCommandRespectGame,
+    pendingAction: commandRespectPending,
+    players: baseCommandRespectGame.players.map((player) =>
+      player.id === muadDib.id ? staleSwordmasterCommander : player
+    ),
+  };
+  assert.equal(
+    state.resolveTrashSourceForTradeChoice(
+      staleSwordmasterState,
+      commandRespectPending,
+      muadDibAllyA.id,
+    ).pendingAction,
+    commandRespectPending,
+    "Command Respect should recheck its declarative Swordmaster condition before resolving",
+  );
+  for (const [patch, message] of [
+    [{ optional: false }, "Command Respect should reject malformed optional flags"],
+    [{ partnerLocked: "yes" }, "Command Respect should reject malformed partner lock flags"],
+    [{ resource: "contracts" }, "Command Respect should reject unsupported trade resources"],
+    [{ partnerIds: [muadDibAllyA.id] }, "Command Respect should reject incomplete partner choices"],
+    [{ partnerIds: [muadDibAllyA.id, muadDibAllyA.id] }, "Command Respect should reject duplicate partner choices"],
+  ]) {
+    const malformedPending = { ...commandRespectPending, ...patch };
+    assert.equal(
+      state.resolveTrashSourceForTradeChoice(
+        { ...baseCommandRespectGame, pendingAction: malformedPending, pendingQueue: [] },
+        malformedPending,
+        muadDibAllyA.id,
+      ).pendingAction,
+      malformedPending,
+      message,
+    );
+  }
+  for (const [patch, message] of [
+    [{ optional: false }, "Skipping Command Respect should reject malformed optional flags"],
+    [{ partnerLocked: "yes" }, "Skipping Command Respect should reject malformed partner lock flags"],
+    [{ resource: "contracts" }, "Skipping Command Respect should reject unsupported trade resources"],
+    [{ source: "" }, "Skipping Command Respect should reject empty source labels"],
+  ]) {
+    const malformedPending = { ...commandRespectPending, ...patch };
+    assert.equal(
+      state.skipTrashSourceForTrade(
+        { ...baseCommandRespectGame, pendingAction: malformedPending, pendingQueue: [] },
+        malformedPending,
+      ).pendingAction,
+      malformedPending,
+      message,
+    );
+  }
 }

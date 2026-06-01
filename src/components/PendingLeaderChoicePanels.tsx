@@ -198,24 +198,26 @@ export function PendingJessicaOtherMemoriesPanel({
   );
 }
 
-type PendingCommandRespectPanelProps = {
-  commander?: Player;
+type PendingTrashSourceForTradePanelProps = {
+  owner?: Player;
   partners: Player[];
+  source: string;
   onSkip: () => void;
   onTrade: (partnerId: string) => void;
 };
 
-export function PendingCommandRespectPanel({
-  commander,
+export function PendingTrashSourceForTradePanel({
+  owner,
   partners,
+  source,
   onSkip,
   onTrade,
-}: PendingCommandRespectPanelProps) {
+}: PendingTrashSourceForTradePanelProps) {
   return (
     <div className="pending-controls">
-      {commander && partners.length > 0 ? (
+      {owner && partners.length > 0 ? (
         <>
-          <span>Trash Command Respect to trade with one teammate.</span>
+          <span>Trash {source} to trade with one teammate.</span>
           {partners.map((partner) => (
             <button
               type="button"
@@ -228,7 +230,7 @@ export function PendingCommandRespectPanel({
           ))}
         </>
       ) : (
-        <span>Command Respect can no longer resolve with the current table state.</span>
+        <span>{source} can no longer resolve with the current table state.</span>
       )}
       <button type="button" onClick={onSkip}>Skip</button>
     </div>

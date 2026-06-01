@@ -64,6 +64,8 @@ import {
   recordTurnUnitDeployment,
 } from "./turn-trackers";
 import {
+  resolveTrashSourceForTradeChoice,
+  skipTrashSourceForTrade,
   transferTradeGood,
   updateTradeSelection,
 } from "./trade-rules";
@@ -218,13 +220,11 @@ export {
 } from "./card-pending-rules";
 
 export {
-  resolveCommandRespectTrade,
   resolveDemandResultsChoice,
   resolvePayResourceForInfluenceChoice,
   resolvePayResourceForSandwormsChoice,
   resolvePayResourceForStrengthChoice,
   resolvePayResourceForTroopsChoice,
-  skipCommandRespect,
   skipDemandResults,
   skipPayResourceForInfluence,
   skipPayResourceForSandworms,
@@ -397,6 +397,8 @@ export {
 } from "./turn-trackers";
 
 export {
+  resolveTrashSourceForTradeChoice,
+  skipTrashSourceForTrade,
   transferTradeGood,
   updateTradeSelection,
 } from "./trade-rules";

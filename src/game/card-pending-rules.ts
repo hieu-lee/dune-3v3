@@ -1,7 +1,6 @@
 import { resolveInfluence } from "./agent-effects";
 import {
   canMoveCardToThroneRow,
-  isCommandRespectCommanderCard,
   isDemandResultsCommanderCard,
   isGenericSignetRingCard,
   isShaddamSignetRingCard,
@@ -19,6 +18,7 @@ import {
   resolveAgentMoveCardToThroneRows,
   resolveAgentPayResourceForInfluences,
   resolveAgentPayResourceForSandworms,
+  resolveAgentTrashSourceForTrades,
   resolveCardEffects,
   resolveRevealLoseInfluenceForIntrigues,
   resolveRevealPayResourceForStrengths,
@@ -362,6 +362,41 @@ function pendingActionForAgentCommanderResourceSplit(
     .find((pending): pending is PendingAction => Boolean(pending));
 }
 
+function pendingActionForAgentTrashSourceForTrade(
+  card: Card,
+  source: Player,
+  state?: GameState,
+  target?: Player,
+): PendingAction | undefined {
+  if (!card.effects || !source.playArea.some((candidate) => candidate.id === card.id)) return undefined;
+  if (!state || source.role !== "Commander") return undefined;
+  const players = playersWithPendingCardEffect(state, source, target);
+  const effectState = { ...state, players };
+  const effects = resolveAgentTrashSourceForTrades(card.effects, {
+    trigger: "agent-play",
+    source,
+    target,
+    state: effectState,
+  });
+  return effects
+    .map((effect): PendingAction | undefined => {
+      if (effect.selector !== "self" || effect.partner !== "same-team-allies") return undefined;
+      const partners = sameTeamAllies(effectState.players, source);
+      if (!partners) return undefined;
+      return {
+        kind: "trash-source-for-trade",
+        ownerId: source.id,
+        partnerIds: [partners[0].id, partners[1].id],
+        cardId: card.id,
+        resource: effect.resource,
+        optional: effect.optional,
+        ...(effect.partnerLocked ? { partnerLocked: true } : {}),
+        source: effect.source ?? card.name,
+      };
+    })
+    .find((pending): pending is PendingAction => Boolean(pending));
+}
+
 export function pendingActionForCard(
   card: Card,
   source: Player,
@@ -381,6 +416,8 @@ export function pendingActionForCard(
   if (agentThroneRowPending) return agentThroneRowPending;
   const agentCommanderResourceSplitPending = pendingActionForAgentCommanderResourceSplit(card, source, state, target);
   if (agentCommanderResourceSplitPending) return agentCommanderResourceSplitPending;
+  const agentTrashSourceForTradePending = pendingActionForAgentTrashSourceForTrade(card, source, state, target);
+  if (agentTrashSourceForTradePending) return agentTrashSourceForTradePending;
   if (
     isShaddamSignetRingCard(card) &&
     source.team === "shaddam" &&
@@ -466,24 +503,6 @@ export function pendingActionForCard(
       contributorIds: contributors.map((contributor) => contributor.id),
       contributions: Object.fromEntries(contributors.map((contributor) => [contributor.id, 0])),
       cost: threatenSpiceProductionCost,
-      cardId: card.id,
-      source: card.name,
-    };
-  }
-  if (
-    isCommandRespectCommanderCard(card) &&
-    source.team === "muaddib" &&
-    source.role === "Commander" &&
-    source.swordmasterBonus &&
-    state &&
-    source.playArea.some((candidate) => candidate.id === card.id && isCommandRespectCommanderCard(candidate))
-  ) {
-    const partners = sameTeamAllies(state.players, source);
-    if (!partners) return undefined;
-    return {
-      kind: "command-respect",
-      commanderId: source.id,
-      partnerIds: [partners[0].id, partners[1].id],
       cardId: card.id,
       source: card.name,
     };

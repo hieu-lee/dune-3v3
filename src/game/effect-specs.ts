@@ -14,6 +14,8 @@ import type {
   SandwormEffectDestination,
   SandwormEffectRecipient,
   TeamId,
+  TradeEffectPartner,
+  TradeGoodId,
   TroopEffectDestination,
   TroopEffectRecipient,
   TrashCardZone,
@@ -256,6 +258,29 @@ export function agentCommanderResourceSplit(
   conditions?: GameEffectConditionSpec[],
 ): CardEffectSpec {
   return agentPlayEffects([{ kind: "commander-resource-split", selector: "self", options: splitOptions, ...options }], conditions);
+}
+
+export function agentTrashSourceForTrade(
+  resource: TradeGoodId,
+  options: {
+    partner?: TradeEffectPartner;
+    optional?: true;
+    partnerLocked?: boolean;
+    source?: string;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return agentPlayEffects([
+    {
+      kind: "trash-source-for-trade",
+      selector: "self",
+      partner: options.partner ?? "same-team-allies",
+      resource,
+      optional: true,
+      partnerLocked: options.partnerLocked ?? true,
+      ...(options.source ? { source: options.source } : {}),
+    },
+  ], conditions);
 }
 
 export function agentMoveCardToThroneRow(

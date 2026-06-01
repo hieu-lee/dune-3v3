@@ -10,6 +10,7 @@ import {
   agentPlaceSpies,
   agentPlayEffects,
   agentRecruitTroops,
+  agentTrashSourceForTrade,
   cloneCardEffects,
   hasAlliance,
   hasConflictUnits,
@@ -249,7 +250,14 @@ const muadDibCommanderSpecs: Array<StarterCardSpec & { sourceId: number }> = [
     icons: ["city"],
     persuasion: 1,
     swords: 0,
-    effects: [revealGainPersuasion(1)],
+    effects: [
+      agentTrashSourceForTrade(
+        "intrigue",
+        { source: "Command Respect", partnerLocked: true },
+        [hasTeam("muaddib"), hasRole("Commander"), hasSwordmasterBonus()],
+      ),
+      revealGainPersuasion(1),
+    ],
     play: "If you have a Swordmaster Bonus token, you may trash this card to trade.",
     reveal: starterRevealText(1, 0),
   },

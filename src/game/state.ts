@@ -420,6 +420,7 @@ export {
   isMercenariesIntrigue,
   isMuadDibSignetRingCard,
   isOpportunismIntrigue,
+  isPrepareTheWayCard,
   isQuestionableMethodsIntrigue,
   isReachAgreementIntrigue,
   isShaddamsFavorIntrigue,

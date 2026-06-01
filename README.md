@@ -35,7 +35,7 @@ Private web-table implementation for a six-player `Dune: Imperium - Uprising` te
 - Usul queues Muad'Dib's Commander/activated-Ally water-or-spice split when played.
 - Critical Shipments queues Shaddam's Commander/activated-Ally water-or-2-Solari split when played.
 - Corrino Might reveals for 1 strength and lets Shaddam spend 3 spice for 2 troops to each Shaddam Ally, then self-trash.
-- Devastating Assault gives Shaddam 1 Solari and recruits 1 troop for the activated Ally before deployment choices.
+- Devastating Assault gives Shaddam 1 Solari and recruits 1 troop for the activated Ally before deployment choices, then can spend 3 Solari for +5 Reveal strength with the Swordmaster bonus token.
 - Demand Results lets Shaddam spend 2 Solari to assign the two face-up public contracts one to each Shaddam Ally.
 - Maker-space bonus spice tracks and pays out on the four six-player Maker desert spaces.
 - Shipping enforces its 2 Spacing Guild Influence requirement, including Commander shared team influence.
@@ -85,12 +85,13 @@ Private web-table implementation for a six-player `Dune: Imperium - Uprising` te
 - Tactical Option can be played as a Combat Intrigue for 2 strength or to retreat any chosen number of recipient troops.
 - Reach Agreement can be played as a Combat Intrigue to retreat one or two recipient troops, then take a CHOAM contract for that recipient.
 - Devour can be played as a Combat Intrigue for 2 strength, or 4 plus optional card trashing when the recipient has a sandworm in the Conflict.
+- Prepare The Way is available from the Reserve, costs 2 persuasion, reveals for 2 persuasion, and draws 1 card on Agent turns with 2+ Bene Gesserit Influence using 3v3 shared Influence.
 - Smuggler's Harvester adds its conditional Reveal spice after that player sent an Agent to a Maker board space earlier in the round.
 - Detonation can be played as a Plot Intrigue to remove the Shield Wall or deploy up to four troops.
 - Unexpected Allies can be played as a Plot Intrigue to spend 2 water, optionally remove the Shield Wall, and summon a sandworm for the active Ally or activated Ally.
 - Catalog-backed board-space art on matching placement tiles.
 - Printed reveal adjustments and spy-post targeting for cards whose text is not reducible to a fixed number.
-- Printed Combat Intrigue costs, choices, and strength effects remain manual until each card is fully modeled.
+- Remaining printed edge cases are being reduced into structured card, Conflict, and reserve effects as they are modeled.
 - Asset pipeline conventions for owned scans or public reference images.
 
 ## Run

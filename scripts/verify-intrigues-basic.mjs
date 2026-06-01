@@ -404,7 +404,7 @@ export function verifyBasicCardEffectIntrigues({ cards, data, game, state }) {
   assert.equal(playerById(inspireAweHandAcquired, "p2").hand.at(-1).id, inspireAweAcquireCard.id);
   assert.equal(playerById(inspireAweHandAcquired, "p2").discard.length, 0);
   const noCardInspireAwe = state.playInspireAwePlotIntrigue(
-    { ...inspireAweFixture, imperiumRow: [], marketDeck: [] },
+    { ...inspireAweFixture, imperiumRow: [], marketDeck: [], reserveMarket: [] },
     "p2",
     inspireAwe.id,
   );

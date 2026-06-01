@@ -2,7 +2,9 @@ import catalogJson from "./uprising-catalog.generated.json";
 import {
   calculusOfPowerSourceId,
   interstellarTradeSourceId,
+  prepareTheWaySourceId,
   smugglersHarvesterSourceId,
+  spiceMustFlowSourceId,
 } from "./card-identifiers";
 import type {
   BattleIconId,
@@ -158,6 +160,9 @@ function revealText(persuasion: number, swords: number) {
 }
 
 function imperiumRevealText(card: HubCard, persuasion: number, swords: number, printedReveal: boolean) {
+  if (card.id === prepareTheWaySourceId) {
+    return "+2 persuasion.";
+  }
   if (card.id === smugglersHarvesterSourceId) {
     return "If you sent an Agent to a Maker board space this turn, gain 1 spice. +1 persuasion.";
   }
@@ -171,6 +176,26 @@ function imperiumRevealText(card: HubCard, persuasion: number, swords: number, p
 }
 
 function toImperiumCard(card: HubCard): Card {
+  if (card.id === prepareTheWaySourceId) {
+    return {
+      id: `hub-${card.id}`,
+      name: card.name,
+      icons: ["landsraad", "city"],
+      persuasion: 2,
+      swords: 0,
+      conditionalPersuasion: false,
+      conditionalSwords: false,
+      play: "If you have 2 or more Bene Gesserit Influence, draw 1 card.",
+      reveal: "+2 persuasion.",
+      cost: 2,
+      imagePath: card.localImagePath ?? card.fullImageUrl ?? undefined,
+      thumbnailPath: card.localThumbnailPath ?? card.thumbnailImageUrl ?? undefined,
+      sourceId: card.id,
+      sourceSlug: card.slug,
+      sourceType: card.type,
+      traits: ["Faction: Bene Gesserit"],
+    };
+  }
   const persuasion = attributeNumber(card, "Persuasion on reveal");
   const swords = attributeNumber(card, "Swords");
   const automatedContractPersuasion = card.id === interstellarTradeSourceId;
@@ -613,6 +638,9 @@ const boardSpaceSpecs: BoardSpace[] = [
 
 export const boardSpaces: BoardSpace[] = boardSpaceSpecs.map(withBoardSpaceArt);
 
+const reserveMarketSourceIds = [prepareTheWaySourceId, spiceMustFlowSourceId];
+
 export const reserveMarket: Card[] = catalog.cards
-  .filter((card) => card.name === "The Spice Must Flow")
+  .filter((card) => reserveMarketSourceIds.includes(card.id))
+  .sort((first, second) => reserveMarketSourceIds.indexOf(first.id) - reserveMarketSourceIds.indexOf(second.id))
   .map(toImperiumCard);

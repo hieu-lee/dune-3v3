@@ -36,6 +36,7 @@ export const tacticalOptionSourceId = 155;
 export const questionableMethodsSourceId = 156;
 export const backedByChoamSourceId = 448;
 export const spiceMustFlowSourceId = 538;
+export const prepareTheWaySourceId = 537;
 export const shadowAllianceSourceId = 160;
 export const genericSignetRingSourceId = 531;
 export const muadDibSignetRingSourceId = 545;
@@ -196,6 +197,10 @@ export function isMarketOpportunityIntrigue(intrigue: IntrigueCard) {
 
 export function isFremenCard(card: Card) {
   return card.traits?.includes("Faction: Fremen") ?? false;
+}
+
+export function isPrepareTheWayCard(card: Card) {
+  return card.sourceId === prepareTheWaySourceId || card.name === "Prepare The Way";
 }
 
 export function canMoveCardToThroneRow(card: Card) {

@@ -65,6 +65,21 @@ try {
     "Calculus of Power should use structured optional trash strength instead of manual printed reveal handling",
   );
   assert.match(calculus.reveal, /another Emperor card/, "Calculus of Power should describe its structured Reveal trash text");
+  const prepareTheWay = data.reserveMarket.find((card) => card.sourceId === 537);
+  assert.ok(prepareTheWay, "Reserve market should include Prepare The Way");
+  assert.equal(state.isPrepareTheWayCard(prepareTheWay), true, "Prepare The Way should be recognized");
+  assert.deepEqual(
+    data.reserveMarket.map((card) => card.sourceId),
+    [537, 538],
+    "Reserve market should expose Prepare The Way and The Spice Must Flow",
+  );
+  assert.equal(prepareTheWay.cost, 2, "Prepare The Way should cost 2 persuasion");
+  assert.deepEqual(prepareTheWay.icons, ["landsraad", "city"], "Prepare The Way should send Agents to Landsraad and City spaces");
+  assert.equal(prepareTheWay.persuasion, 2, "Prepare The Way should reveal for 2 persuasion");
+  assert.equal(prepareTheWay.conditionalPersuasion, false, "Prepare The Way should not require manual reveal handling");
+  assert.deepEqual(prepareTheWay.traits, ["Faction: Bene Gesserit"], "Prepare The Way should keep its Bene Gesserit trait");
+  assert.match(prepareTheWay.play, /2 or more Bene Gesserit Influence.*draw 1 card/i);
+  assert.match(prepareTheWay.reveal, /\+2 persuasion/i);
   const calculusTrashTarget = data.imperiumDeck.find((card) =>
     card.id !== calculus.id && card.traits?.includes("Faction: Emperor")
   );
@@ -75,10 +90,103 @@ try {
   assert.ok(calculusBlockedTarget, "Expected a non-Emperor Imperium card for Calculus of Power filtering coverage");
   const imperialBasin = data.boardSpaces.find((space) => space.id === "imperial-basin");
   assert.ok(imperialBasin?.maker, "Imperial Basin should be a Maker board space");
+  const carthag = data.boardSpaces.find((space) => space.id === "carthag");
+  assert.ok(carthag, "Carthag should exist for Prepare The Way Agent coverage");
   const p2 = playerById(game, "p2");
   const p4 = playerById(game, "p4");
   const dune = [...p2.hand, ...p2.deck, ...p2.discard].find((card) => card.name === "Dune, The Desert Planet");
   assert.ok(dune, "Feyd should have Dune, The Desert Planet available for a Spice Trade Agent turn");
+
+  const prepareBuyFixture = withActivePlayer(game, p2.id, () => ({
+    revealed: true,
+    persuasion: 2,
+  }));
+  const prepareBought = state.acquireMarketCard(prepareBuyFixture, p2.id, prepareTheWay.id);
+  assert.equal(playerById(prepareBought, p2.id).persuasion, 0, "Prepare The Way should spend 2 persuasion");
+  assert.equal(playerById(prepareBought, p2.id).vp, p2.vp, "Prepare The Way should not award acquisition VP");
+  assert.equal(playerById(prepareBought, p2.id).discard.at(-1).sourceId, 537, "Prepare The Way should go to discard");
+  assert.notEqual(
+    playerById(prepareBought, p2.id).discard.at(-1).id,
+    prepareTheWay.id,
+    "Reserve acquisitions should create a physical card copy",
+  );
+  assert.deepEqual(
+    prepareBought.reserveMarket.map((card) => card.sourceId),
+    [537, 538],
+    "Buying Prepare The Way should leave the reserve stack available",
+  );
+
+  const prepareDrawCard = { ...calculusTrashTarget, id: "prepare-way-draw-target" };
+  const prepareAgentFixture = withActivePlayer(game, p2.id, (player) => ({
+    agentsReady: 1,
+    deck: [prepareDrawCard],
+    discard: [],
+    garrison: 0,
+    hand: [prepareTheWay],
+    influence: { ...player.influence, bene: 2 },
+    playArea: [],
+    resources: { solari: 0, spice: 0, water: 0 },
+  }));
+  const prepared = turnActions.placeAgentAction(prepareAgentFixture, {
+    commanderTargets: {},
+    selectedCard: prepareTheWay,
+    selectedSpace: carthag,
+  });
+  assert.equal(playerById(prepared, p2.id).hand.length, 1, "Prepare The Way should draw 1 card at 2 Bene Gesserit Influence");
+  assert.equal(playerById(prepared, p2.id).hand[0].id, prepareDrawCard.id);
+  assert.ok(playerById(prepared, p2.id).playArea.some((card) => card.id === prepareTheWay.id));
+  assert.ok(prepared.log.some((entry) => /Prepare The Way: draws 1 card/.test(entry)));
+
+  const unprepared = turnActions.placeAgentAction(
+    withActivePlayer(game, p2.id, (player) => ({
+      agentsReady: 1,
+      deck: [prepareDrawCard],
+      discard: [],
+      garrison: 0,
+      hand: [prepareTheWay],
+      influence: { ...player.influence, bene: 1 },
+      playArea: [],
+      resources: { solari: 0, spice: 0, water: 0 },
+    })),
+    { commanderTargets: {}, selectedCard: prepareTheWay, selectedSpace: carthag },
+  );
+  assert.equal(playerById(unprepared, p2.id).hand.length, 0, "Prepare The Way should not draw below 2 Bene Gesserit Influence");
+  assert.equal(
+    unprepared.log.some((entry) => /Prepare The Way: draws 1 card/.test(entry)),
+    false,
+    "Prepare The Way should not log a draw when the threshold is unmet",
+  );
+
+  const commanderPrepareDrawCard = { ...calculusTrashTarget, id: "commander-prepare-way-draw-target" };
+  const commanderPrepareBase = withActivePlayer(game, p4.id, (player) => ({
+    agentsReady: 1,
+    deck: [commanderPrepareDrawCard],
+    discard: [],
+    hand: [prepareTheWay],
+    influence: { ...player.influence, bene: 0 },
+    playArea: [],
+    resources: { solari: 0, spice: 0, water: 0 },
+  }));
+  const commanderPrepareFixture = {
+    ...commanderPrepareBase,
+    players: commanderPrepareBase.players.map((player) => {
+      if (player.id === p2.id) return { ...player, garrison: 0, hand: [], influence: { ...player.influence, bene: 0 } };
+      if (player.id === "p6") return { ...player, influence: { ...player.influence, bene: 2 } };
+      return player;
+    }),
+  };
+  const commanderPrepared = turnActions.placeAgentAction(commanderPrepareFixture, {
+    commanderTargets: { [p4.id]: p2.id },
+    selectedCard: prepareTheWay,
+    selectedSpace: carthag,
+  });
+  assert.equal(
+    playerById(commanderPrepared, p4.id).hand[0].id,
+    commanderPrepareDrawCard.id,
+    "Commander Prepare The Way should draw for the Commander through shared Bene Gesserit Influence",
+  );
+  assert.equal(playerById(commanderPrepared, p2.id).hand.length, 0, "Activated Ally should not receive the drawn card");
+  assert.ok(commanderPrepared.log.some((entry) => /Prepare The Way: draws 1 card/.test(entry)));
 
   const noMakerReveal = withActivePlayer(game, p2.id, () => ({
     agentsReady: 0,

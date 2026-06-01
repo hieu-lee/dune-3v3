@@ -1,9 +1,13 @@
 import { playerHasAnyAlliance } from "./alliance-rules";
-import { boardSpaceRewardApplies } from "./board-rules";
+import {
+  boardSpaceRewardApplies,
+  effectiveRequirementInfluence,
+} from "./board-rules";
 import {
   isDevastatingAssaultCommanderCard,
   isGenericSignetRingCard,
   isMuadDibSignetRingCard,
+  isPrepareTheWayCard,
   isShaddamSignetRingCard,
 } from "./card-identifiers";
 import { drawCards } from "./deck-utils";
@@ -80,7 +84,7 @@ export function applyCardAgentEffect(
   card: Card,
   sourcePlayer: Player,
   targetPlayer: Player,
-  state?: Pick<GameState, "alliances">,
+  state?: Pick<GameState, "alliances" | "players">,
 ): {
   source: Player;
   target: Player;
@@ -89,6 +93,25 @@ export function applyCardAgentEffect(
   blocksDeploymentsThisTurn?: boolean;
   sourceSpiceGained?: number;
 } {
+  if (state && isPrepareTheWayCard(card)) {
+    const players = state.players.map((player) => {
+      if (player.id === sourcePlayer.id) return sourcePlayer;
+      if (player.id === targetPlayer.id) return targetPlayer;
+      return player;
+    });
+    if (effectiveRequirementInfluence(sourcePlayer, "bene", players) >= 2) {
+      const source = drawCards(sourcePlayer, sourcePlayer.hand.length + 1);
+      const drewCard = source.hand.length > sourcePlayer.hand.length;
+      return {
+        source,
+        target: targetPlayer,
+        log: drewCard
+          ? `${sourcePlayer.leader} resolves Prepare The Way: draws 1 card.`
+          : `${sourcePlayer.leader} resolves Prepare The Way: no card to draw.`,
+      };
+    }
+  }
+
   if (
     isMuadDibSignetRingCard(card) &&
     sourcePlayer.team === "muaddib" &&

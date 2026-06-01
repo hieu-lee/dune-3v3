@@ -40,6 +40,7 @@ const generatedScreenshotNames = [
   "pending-contract-public.png",
   "pending-contract-fallback.png",
   "pending-acquire-card.png",
+  "pending-acquire-prepare-the-way.png",
   "pending-acquire-card-empty.png",
   "control-defense-pending-desktop.png",
   "control-defense-after-deploy.png",

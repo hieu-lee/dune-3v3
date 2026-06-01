@@ -63,6 +63,22 @@ export async function runCardChoicesSmoke({
   assert.equal(ownerAfter.discard.length, ownerBefore.discard.length + 1, "Acquire choice should add one discard card");
   assert.equal(ownerAfter.discard.at(-1).name, acquireName, "Acquire choice should take the selected card");
 
+  await setDebugGameAndWait(page, states.acquireReserve);
+  pendingText = await page.locator(".pending-panel").innerText();
+  assert.match(pendingText, /acquisition/i);
+  assert.match(pendingText, /Prepare The Way/i);
+  await screenshot(page, captures, "pending-acquire-prepare-the-way.png");
+
+  before = await currentGame(page);
+  ownerBefore = before.players.find((player) => player.id === "p2");
+  await page.locator(".pending-panel").getByRole("button", { name: /Prepare The Way/ }).click();
+  await waitForNoPending(page);
+  after = await currentGame(page);
+  ownerAfter = after.players.find((player) => player.id === "p2");
+  assert.equal(ownerAfter.discard.length, ownerBefore.discard.length + 1, "Reserve acquire should add one discard card");
+  assert.equal(ownerAfter.discard.at(-1).sourceId, 537, "Reserve acquire should take Prepare The Way");
+  assert.ok(after.reserveMarket.some((card) => card.sourceId === 537), "Prepare The Way reserve should remain available");
+
   await setDebugGameAndWait(page, states.acquireEmpty);
   pendingText = await page.locator(".pending-panel").innerText();
   assert.match(pendingText, /No eligible cards cost 99 or less/i);
@@ -77,6 +93,8 @@ async function createCardChoiceStates(server, initialPlayableGame) {
   assert.ok(activeSeat >= 0, "Expected p2 in browser debug game");
   assert.ok(game.contractOffer[0], "Expected at least one public contract");
   assert.ok(game.imperiumRow[0], "Expected at least one Imperium Row card");
+  const prepareTheWay = game.reserveMarket.find((card) => card.sourceId === 537);
+  assert.ok(prepareTheWay, "Expected Prepare The Way reserve card");
 
   const base = {
     ...game,
@@ -115,6 +133,18 @@ async function createCardChoiceStates(server, initialPlayableGame) {
         ownerId,
         source: "Browser debug acquire",
         maxCost: 99,
+        destination: "discard",
+      },
+    },
+    acquireReserve: {
+      ...base,
+      imperiumRow: [],
+      pendingAction: {
+        kind: "acquire-card",
+        ownerId,
+        source: "Browser debug reserve acquire",
+        minCost: prepareTheWay.cost,
+        maxCost: prepareTheWay.cost,
         destination: "discard",
       },
     },

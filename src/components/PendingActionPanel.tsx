@@ -1,7 +1,6 @@
 import { memoryCountLabel, troopSupplyLabel } from "../app-helpers";
 import { criticalLocationNames } from "../game/critical-locations";
 import { boardSpaces, factionLabels, iconLabels, teams } from "../game/data";
-import { resolveAgentPayTeamResourceForVps } from "../game/effect-resolver";
 import {
   acquirableCardsForPending,
   canResolveRetreatTroopsForStrength,
@@ -30,7 +29,7 @@ import type {
   ShaddamSignetRingChoice,
   StabanUnseenNetworkChoice,
 } from "../game/state";
-import type { FactionId, GameState, PendingAction, Player, ResourceId, TradeGoodId, TrashCardZone } from "../game/types";
+import type { FactionId, GameState, PendingAction, Player, TradeGoodId, TrashCardZone } from "../game/types";
 import { PendingBoardInfluenceChoicePanel, PendingOptionalSpacePaymentPanel } from "./PendingBoardChoicePanels";
 import { PendingAcquireCardPanel, PendingContractPanel } from "./PendingCardChoicePanels";
 import { PendingDiscardInfluenceDrawPanel, PendingInfluenceIntriguePanel } from "./PendingCapturedMentatPanel";
@@ -50,7 +49,6 @@ import {
   PendingPayResourceForStrengthPanel,
   PendingPayResourceForTroopsPanel,
   PendingStabanUnseenNetworkPanel,
-  PendingTeamResourcePaymentPanel,
   PendingTrashSourceForTradePanel,
 } from "./PendingLeaderChoicePanels";
 import { PendingMakerChoicePanel } from "./PendingMakerChoicePanel";
@@ -66,6 +64,7 @@ import { PendingShaddamSignetPanel } from "./PendingShaddamSignetPanel";
 import { PendingSietchTabrPanel } from "./PendingSietchTabrPanel";
 import { PendingSpyPanel } from "./PendingSpyPanel";
 import { PendingConflictTiePanel, PendingRevealAdjustPanel, PendingThroneRowPanel } from "./PendingTableChoicePanels";
+import { PendingTeamResourcePaymentSection } from "./PendingTeamResourcePaymentSection";
 import { PendingTradePanel } from "./PendingTradePanel";
 import { PendingTrashPanel } from "./PendingTrashPanel";
 
@@ -134,139 +133,6 @@ type PendingActionPanelProps = {
   trashCard: (zone: TrashCardZone, cardId: string) => void;
   updateTrade: (resource: TradeGoodId, partnerId?: string) => void;
 };
-
-const teamResourcePaymentResourceIds: ResourceId[] = ["solari", "spice", "water"];
-
-function isTeamResourcePaymentResource(value: unknown): value is ResourceId {
-  return teamResourcePaymentResourceIds.includes(value as ResourceId);
-}
-
-function isPositiveInteger(value: unknown): value is number {
-  return typeof value === "number" && Number.isInteger(value) && value > 0;
-}
-
-function teamResourcePaymentRuntimeShape(pendingAction: PendingAction, game: GameState): {
-  contributorIds: string[];
-  contributions: Record<string, number>;
-  contributors: Player[];
-  cost: number;
-  owner?: Player;
-  resource: ResourceId;
-  source: string;
-  total: number;
-  valid: boolean;
-  vp: number;
-} {
-  const fallback = {
-    contributorIds: [],
-    contributions: {},
-    contributors: [],
-    cost: 0,
-    resource: "spice" as ResourceId,
-    source: "Team resource payment",
-    total: 0,
-    valid: false,
-    vp: 0,
-  };
-  if (pendingAction.kind !== "team-resource-payment") {
-    return fallback;
-  }
-
-  const rawPending = pendingAction as unknown as Record<string, unknown>;
-  let valid = true;
-  const resource = isTeamResourcePaymentResource(rawPending.resource) ? rawPending.resource : fallback.resource;
-  if (!isTeamResourcePaymentResource(rawPending.resource)) valid = false;
-  const cost = isPositiveInteger(rawPending.cost) ? rawPending.cost : 0;
-  if (!isPositiveInteger(rawPending.cost)) valid = false;
-  const vp = isPositiveInteger(rawPending.vp) ? rawPending.vp : 0;
-  if (!isPositiveInteger(rawPending.vp)) valid = false;
-  const source = typeof rawPending.source === "string" && rawPending.source.trim() ? rawPending.source : fallback.source;
-  if (typeof rawPending.source !== "string" || !rawPending.source.trim()) valid = false;
-  if (rawPending.optional !== true) valid = false;
-  if (rawPending.trashSource !== undefined && typeof rawPending.trashSource !== "boolean") valid = false;
-  const cardId = typeof rawPending.cardId === "string" && rawPending.cardId ? rawPending.cardId : undefined;
-  if (!cardId) valid = false;
-  const owner = typeof rawPending.ownerId === "string"
-    ? game.players.find((player) => player.id === rawPending.ownerId)
-    : undefined;
-  if (!owner || owner.role !== "Commander") valid = false;
-  const sourceCard = owner && cardId ? owner.playArea.find((card) => card.id === cardId) : undefined;
-  if (!sourceCard?.effects) valid = false;
-
-  const rawContributorIds = rawPending.contributorIds;
-  const contributorIds = Array.isArray(rawContributorIds)
-    ? rawContributorIds.filter((contributorId): contributorId is string => typeof contributorId === "string")
-    : [];
-  if (
-    !Array.isArray(rawContributorIds) ||
-    contributorIds.length !== rawContributorIds.length ||
-    contributorIds.length !== 3 ||
-    new Set(contributorIds).size !== contributorIds.length ||
-    (owner && contributorIds[0] !== owner.id)
-  ) {
-    valid = false;
-  }
-  const contributors = contributorIds
-    .map((contributorId) => game.players.find((player) => player.id === contributorId))
-    .filter((player): player is Player => Boolean(player));
-  if (contributors.length !== contributorIds.length) valid = false;
-  if (
-    owner &&
-    contributors.slice(1).some((contributor) => contributor.team !== owner.team || contributor.role !== "Ally")
-  ) {
-    valid = false;
-  }
-
-  const rawContributions = rawPending.contributions;
-  if (!rawContributions || typeof rawContributions !== "object" || Array.isArray(rawContributions)) {
-    return { ...fallback, contributorIds, contributors, cost, owner, resource, source, vp };
-  }
-  const contributorIdSet = new Set(contributorIds);
-  const contributions: Record<string, number> = {};
-  for (const [contributorId, amount] of Object.entries(rawContributions)) {
-    if (!contributorIdSet.has(contributorId) && amount !== 0) valid = false;
-    if (typeof amount !== "number" || !Number.isFinite(amount) || !Number.isInteger(amount) || amount < 0) {
-      valid = false;
-      continue;
-    }
-    contributions[contributorId] = amount;
-  }
-  let total = 0;
-  for (const contributorId of contributorIds) {
-    total += contributions[contributorId] ?? 0;
-  }
-  if (cost <= 0 || total > cost) valid = false;
-  for (const contributor of contributors) {
-    if ((contributions[contributor.id] ?? 0) > contributor.resources[resource]) valid = false;
-  }
-  if (owner && sourceCard?.effects) {
-    const space = typeof rawPending.spaceId === "string"
-      ? boardSpaces.find((candidate) => candidate.id === rawPending.spaceId)
-      : undefined;
-    try {
-      const sourceCardSupportsPending = resolveAgentPayTeamResourceForVps(sourceCard.effects, {
-        trigger: "agent-play",
-        source: owner,
-        ...(space ? { space } : {}),
-        state: game,
-      }).some((effect) =>
-        effect.selector === "self" &&
-        effect.resource === resource &&
-        effect.cost === cost &&
-        effect.vp === vp &&
-        effect.contributors === "self-and-same-team-allies" &&
-        effect.recipient === "self" &&
-        effect.optional === true &&
-        effect.trashSource === (rawPending.trashSource === true) &&
-        (effect.source ?? sourceCard.name) === source
-      );
-      if (!sourceCardSupportsPending) valid = false;
-    } catch {
-      valid = false;
-    }
-  }
-  return { contributorIds, contributions, contributors, cost, owner, resource, source, total, valid, vp };
-}
 
 export function PendingActionPanel({
   game,
@@ -456,26 +322,10 @@ export function PendingActionPanel({
     pendingAction.kind === "pay-resource-for-sandworms"
       ? game.players.find((player) => player.id === pendingAction.recipientId)
       : undefined;
-  const pendingTeamResourcePaymentShape = teamResourcePaymentRuntimeShape(pendingAction, game);
-  const pendingTeamResourcePaymentOwner = pendingTeamResourcePaymentShape.owner;
-  const pendingTeamResourcePaymentContributors =
-    pendingAction.kind === "team-resource-payment" && pendingTeamResourcePaymentShape.valid
-      ? pendingTeamResourcePaymentShape.contributors
-      : [];
-  const pendingTeamResourcePaymentTotal = pendingTeamResourcePaymentShape.total;
-  const pendingTeamResourcePaymentCanPay =
-    pendingAction.kind === "team-resource-payment" &&
-    pendingTeamResourcePaymentShape.valid &&
-    pendingTeamResourcePaymentContributors.length === pendingTeamResourcePaymentShape.contributorIds.length &&
-    pendingTeamResourcePaymentTotal === pendingTeamResourcePaymentShape.cost &&
-    Object.entries(pendingTeamResourcePaymentShape.contributions).every(
-      ([contributorId, amount]) => pendingTeamResourcePaymentShape.contributorIds.includes(contributorId) || amount === 0,
-    ) &&
-    pendingTeamResourcePaymentContributors.every(
-      (contributor) =>
-        (pendingTeamResourcePaymentShape.contributions[contributor.id] ?? 0) <=
-          contributor.resources[pendingTeamResourcePaymentShape.resource],
-    );
+  const pendingTeamResourcePaymentOwner =
+    pendingAction.kind === "team-resource-payment"
+      ? game.players.find((player) => player.id === pendingAction.ownerId)
+      : undefined;
   const pendingThroneOwner =
     pendingAction.kind === "throne-row" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const eligibleThroneRowCards = pendingAction.kind === "throne-row"
@@ -933,17 +783,9 @@ export function PendingActionPanel({
       )}
 
       {pendingAction.kind === "team-resource-payment" && (
-        <PendingTeamResourcePaymentPanel
-          canPay={pendingTeamResourcePaymentCanPay}
-          contributorIds={pendingTeamResourcePaymentShape.contributorIds}
-          contributions={pendingTeamResourcePaymentShape.contributions}
-          contributors={pendingTeamResourcePaymentContributors}
-          cost={pendingTeamResourcePaymentShape.cost}
-          owner={pendingTeamResourcePaymentShape.valid ? pendingTeamResourcePaymentOwner : undefined}
-          resource={pendingTeamResourcePaymentShape.resource}
-          source={pendingTeamResourcePaymentShape.source}
-          total={pendingTeamResourcePaymentTotal}
-          vp={pendingTeamResourcePaymentShape.vp}
+        <PendingTeamResourcePaymentSection
+          game={game}
+          pendingAction={pendingAction}
           onAdjust={adjustTeamResourcePayment}
           onPay={chooseTeamResourcePayment}
           onSkip={skipTeamResourcePaymentChoice}

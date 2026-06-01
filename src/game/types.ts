@@ -49,6 +49,7 @@ export type GameEffectConditionSpec =
   | { kind: "has-card-trait-in-play"; trait: string; count?: number }
   | { kind: "has-team"; team: TeamId }
   | { kind: "has-role"; role: Role }
+  | { kind: "has-swordmaster-bonus" }
   | { kind: "has-leader"; leader: string }
   | { kind: "has-alliance"; faction?: FactionId };
 export type GameEffectSpec =
@@ -81,6 +82,15 @@ export type GameEffectSpec =
       selector: PlayerSelector;
       amount: EffectAmountSpec;
       optional?: boolean;
+    }
+  | {
+      kind: "pay-resource-for-strength";
+      selector: PlayerSelector;
+      resource: ResourceId;
+      cost: EffectAmountSpec;
+      strength: EffectAmountSpec;
+      optional?: true;
+      source?: string;
     }
   | {
       kind: "discard-card-for-influence-and-draw";
@@ -407,6 +417,17 @@ export type PendingAction =
       optional: boolean;
     }
   | {
+      kind: "pay-resource-for-strength";
+      ownerId: string;
+      combatRecipientId: string;
+      resource: ResourceId;
+      cost: number;
+      strength: number;
+      source: string;
+      optional: true;
+      cardId?: string;
+    }
+  | {
       kind: "contract";
       ownerId: string;
       source: string;
@@ -494,15 +515,6 @@ export type PendingAction =
       commanderId: string;
       allyIds: [string, string];
       cost: number;
-      cardId: string;
-      source: string;
-    }
-  | {
-      kind: "devastating-assault";
-      commanderId: string;
-      combatRecipientId: string;
-      cost: number;
-      strength: number;
       cardId: string;
       source: string;
     }

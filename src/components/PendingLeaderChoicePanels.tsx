@@ -1,5 +1,5 @@
 import { BookOpen, CircleDollarSign, Droplets, Eye, HandCoins, Minus, Plus, RotateCcw, Sparkles } from "lucide-react";
-import type { BoardSpace, ContractCard, PendingAction, Player } from "../game/types";
+import type { BoardSpace, ContractCard, PendingAction, Player, ResourceId } from "../game/types";
 
 type StabanUnseenNetworkPendingAction = Extract<PendingAction, { kind: "staban-unseen-network" }>;
 
@@ -306,38 +306,49 @@ export function PendingCorrinoMightPanel({
   );
 }
 
-type PendingDevastatingAssaultPanelProps = {
-  commander?: Player;
+const resourceLabels: Record<ResourceId, string> = {
+  solari: "Solari",
+  spice: "spice",
+  water: "water",
+};
+
+type PendingPayResourceForStrengthPanelProps = {
   cost: number;
   onChoose: () => void;
   onSkip: () => void;
+  owner?: Player;
   recipient?: Player;
+  resource: ResourceId;
+  optional: boolean;
   strength: number;
 };
 
-export function PendingDevastatingAssaultPanel({
-  commander,
+export function PendingPayResourceForStrengthPanel({
   cost,
   onChoose,
   onSkip,
+  owner,
   recipient,
+  resource,
+  optional,
   strength,
-}: PendingDevastatingAssaultPanelProps) {
+}: PendingPayResourceForStrengthPanelProps) {
+  const resourceLabel = resourceLabels[resource];
   return (
     <div className="pending-controls">
       {recipient ? (
         <button
           type="button"
           onClick={onChoose}
-          disabled={!commander || commander.resources.solari < cost}
+          disabled={!owner || owner.resources[resource] < cost}
         >
           <Sparkles size={15} />
-          Spend {cost} Solari: {recipient.leader} +{strength} strength
+          Spend {cost} {resourceLabel}: {recipient.leader} +{strength} strength
         </button>
       ) : (
-        <span>Devastating Assault can no longer resolve with the current table state.</span>
+        <span>{owner?.leader ?? "Player"} can no longer add strength with the current table state.</span>
       )}
-      <button type="button" onClick={onSkip}>Skip</button>
+      {optional && <button type="button" onClick={onSkip}>Skip</button>}
     </div>
   );
 }

@@ -77,6 +77,15 @@ export type RevealLoseInfluenceForIntrigues = {
   optional: boolean;
 };
 
+export type RevealPayResourceForStrength = {
+  selector: PlayerSelector;
+  resource: ResourceId;
+  cost: number;
+  strength: number;
+  optional: true;
+  source?: string;
+};
+
 export type AgentDiscardCardForInfluenceAndDraw = {
   selector: PlayerSelector;
   drawCards: number;
@@ -252,6 +261,7 @@ function validateCondition(condition: GameEffectConditionSpec) {
     if (supportedRoles.has(condition.role)) return;
     throw new Error(`Unsupported effect role "${condition.role}"`);
   }
+  if (condition.kind === "has-swordmaster-bonus") return;
   if (condition.kind === "has-leader") {
     if (typeof condition.leader === "string" && condition.leader.trim().length > 0) return;
     invalidSpecField("has-leader leader", condition.leader);
@@ -345,6 +355,25 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
       throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
     }
     validateAmount(effect.amount);
+    return;
+  }
+  if (effect.kind === "pay-resource-for-strength") {
+    if (trigger !== "reveal") {
+      throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
+    }
+    if (effect.selector !== "self") {
+      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
+    if (!supportedResources.has(effect.resource)) {
+      throw new Error(`Unsupported effect resource "${effect.resource}"`);
+    }
+    validateSourceLabel("pay-resource-for-strength source", effect.source);
+    validateAmount(effect.cost);
+    validateAmount(effect.strength);
+    const optional = (effect as { optional?: unknown }).optional;
+    if (optional === false) {
+      invalidSpecField("pay-resource-for-strength optional", optional);
+    }
     return;
   }
   if (effect.kind === "discard-card-for-influence-and-draw") {
@@ -478,6 +507,9 @@ function conditionApplies(condition: GameEffectConditionSpec, context: GameEffec
   }
   if (condition.kind === "has-role") {
     return context.source.role === condition.role;
+  }
+  if (condition.kind === "has-swordmaster-bonus") {
+    return context.source.swordmasterBonus;
   }
   if (condition.kind === "has-leader") {
     return context.source.leader === condition.leader;
@@ -681,6 +713,9 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
     return result;
   }
   if (effect.kind === "lose-influence-for-intrigues") {
+    return result;
+  }
+  if (effect.kind === "pay-resource-for-strength") {
     return result;
   }
   if (effect.kind === "discard-card-for-influence-and-draw") {
@@ -888,6 +923,27 @@ export function resolveRevealLoseInfluenceForIntrigues(
         selector: effect.selector,
         amount: amountFor(effect.amount, context.source),
         optional: effect.optional ?? true,
+      }));
+  });
+}
+
+export function resolveRevealPayResourceForStrengths(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): RevealPayResourceForStrength[] {
+  specs?.forEach(validateSpec);
+  return (specs ?? []).flatMap((spec) => {
+    if (spec.trigger !== "reveal") return [];
+    if (!specApplies(spec, context)) return [];
+    return spec.effects
+      .filter((effect) => effect.kind === "pay-resource-for-strength")
+      .map((effect) => ({
+        selector: effect.selector,
+        resource: effect.resource,
+        cost: amountFor(effect.cost, context.source),
+        strength: amountFor(effect.strength, context.source),
+        optional: true,
+        source: effect.source,
       }));
   });
 }

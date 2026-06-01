@@ -210,13 +210,11 @@ export {
 
 export {
   corrinoMightCost,
-  devastatingAssaultCost,
-  devastatingAssaultStrength,
   pendingActionForCard,
   pendingActionForCorrinoMightReveal,
-  pendingActionForDevastatingAssaultReveal,
   pendingActionForJessicaOtherMemories,
   pendingActionForReverendMotherJessicaRepeat,
+  pendingActionsForRevealPayResourceForStrength,
   pendingActionsForReveal,
 } from "./card-pending-rules";
 
@@ -225,14 +223,14 @@ export {
   resolveCorrinoMightChoice,
   resolveDemandAttentionChoice,
   resolveDemandResultsChoice,
-  resolveDevastatingAssaultChoice,
   resolveDesertCallChoice,
+  resolvePayResourceForStrengthChoice,
   skipCommandRespect,
   skipCorrinoMight,
   skipDemandAttention,
   skipDemandResults,
-  skipDevastatingAssault,
   skipDesertCall,
+  skipPayResourceForStrength,
 } from "./commander-pending-rules";
 
 export {

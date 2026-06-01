@@ -43,6 +43,23 @@ try {
     "Devastating Assault should use structured reveal payment instead of manual printed reveal handling",
   );
   assert.match(devastatingAssault.reveal, /spend 3 Solari/i);
+  assert.ok(
+    devastatingAssault.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.conditions?.some((condition) => condition.kind === "has-team" && condition.team === "shaddam") &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Commander") &&
+      spec.conditions?.some((condition) => condition.kind === "has-swordmaster-bonus") &&
+      spec.conditions?.some((condition) => condition.kind === "has-conflict-units" && condition.count === 1) &&
+      spec.effects.some((effect) =>
+        effect.kind === "pay-resource-for-strength" &&
+        effect.resource === "solari" &&
+        effect.cost === 3 &&
+        effect.strength === 5 &&
+        effect.source === "Devastating Assault"
+      )
+    ),
+    "Devastating Assault should carry a declarative reveal payment spec",
+  );
 
   const shaddam = playerById(game, "p4");
   const ally = playerById(game, "p2");
@@ -59,54 +76,56 @@ try {
     deployedTroops: 1,
   };
   const pendingFixture = withPlayers(game, { [commander.id]: commander, [recipient.id]: recipient });
-  const pending = state.pendingActionForDevastatingAssaultReveal(
+  const [pending] = state.pendingActionsForRevealPayResourceForStrength(
     devastatingAssault,
     commander,
     pendingFixture,
     recipient.id,
   );
   assert.deepEqual(pending, {
-    kind: "devastating-assault",
-    commanderId: commander.id,
+    kind: "pay-resource-for-strength",
+    ownerId: commander.id,
     combatRecipientId: recipient.id,
+    resource: "solari",
     cost: 3,
     strength: 5,
+    optional: true,
     cardId: devastatingAssault.id,
     source: "Devastating Assault",
   });
   assert.equal(
-    state.pendingActionForDevastatingAssaultReveal(devastatingAssault, { ...commander, swordmasterBonus: false }, pendingFixture, recipient.id),
-    undefined,
+    state.pendingActionsForRevealPayResourceForStrength(devastatingAssault, { ...commander, swordmasterBonus: false }, pendingFixture, recipient.id).length,
+    0,
     "Devastating Assault should require the Swordmaster bonus token",
   );
   assert.equal(
-    state.pendingActionForDevastatingAssaultReveal(
+    state.pendingActionsForRevealPayResourceForStrength(
       devastatingAssault,
       { ...commander, resources: { solari: 2, spice: 0, water: 0 } },
       pendingFixture,
       recipient.id,
-    ),
-    undefined,
+    ).length,
+    0,
     "Devastating Assault should require 3 Solari",
   );
   assert.equal(
-    state.pendingActionForDevastatingAssaultReveal(devastatingAssault, { ...commander, playArea: [] }, pendingFixture, recipient.id),
-    undefined,
+    state.pendingActionsForRevealPayResourceForStrength(devastatingAssault, { ...commander, playArea: [] }, pendingFixture, recipient.id).length,
+    0,
     "Devastating Assault should require the revealed card in play",
   );
   assert.equal(
-    state.pendingActionForDevastatingAssaultReveal(
+    state.pendingActionsForRevealPayResourceForStrength(
       devastatingAssault,
       commander,
       withPlayers(game, { [commander.id]: commander, [recipient.id]: { ...recipient, deployedTroops: 0 } }),
       recipient.id,
-    ),
-    undefined,
+    ).length,
+    0,
     "Devastating Assault should not queue when the activated Ally has no conflict units",
   );
   assert.equal(
-    state.pendingActionForDevastatingAssaultReveal(devastatingAssault, recipient, pendingFixture, recipient.id),
-    undefined,
+    state.pendingActionsForRevealPayResourceForStrength(devastatingAssault, recipient, pendingFixture, recipient.id).length,
+    0,
     "Devastating Assault should not trigger from an Ally owner",
   );
 
@@ -136,8 +155,8 @@ try {
     revealPlan: plan,
   });
   assert.equal(playerById(revealed, ally.id).conflict, 6, "Reveal should route Swordmaster strength to the activated Ally");
-  assert.equal(revealed.pendingAction?.kind, "devastating-assault");
-  const resolved = state.resolveDevastatingAssaultChoice(revealed, revealed.pendingAction);
+  assert.equal(revealed.pendingAction?.kind, "pay-resource-for-strength");
+  const resolved = state.resolvePayResourceForStrengthChoice(revealed, revealed.pendingAction);
   assert.equal(playerById(resolved, shaddam.id).resources.solari, 0, "Devastating Assault should spend 3 Solari");
   assert.equal(playerById(resolved, ally.id).conflict, 11, "Devastating Assault should add 5 strength to the activated Ally");
   assert.ok(
@@ -146,7 +165,7 @@ try {
   );
   assert.equal(resolved.pendingAction, undefined);
 
-  const skipped = state.skipDevastatingAssault(revealed, revealed.pendingAction);
+  const skipped = state.skipPayResourceForStrength(revealed, revealed.pendingAction);
   assert.equal(playerById(skipped, shaddam.id).resources.solari, 3, "Skipping Devastating Assault should not spend Solari");
   assert.equal(playerById(skipped, ally.id).conflict, 6, "Skipping Devastating Assault should keep only Swordmaster strength");
   assert.equal(skipped.pendingAction, undefined);
@@ -179,7 +198,7 @@ try {
   );
   assert.equal(mixedPending[0].kind, "reveal-adjust", "Unrelated printed reveal cards should still queue manual adjustment");
   assert.deepEqual(mixedPending[0].cards, ["Verifier printed reveal"]);
-  assert.equal(mixedPending[1].kind, "devastating-assault");
+  assert.equal(mixedPending[1].kind, "pay-resource-for-strength");
 
   console.log("Devastating Assault starter deck verification passed");
 } finally {

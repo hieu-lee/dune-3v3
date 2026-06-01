@@ -25,7 +25,6 @@ import {
   resolveCorrinoMightChoice,
   resolveDemandAttentionChoice,
   resolveDemandResultsChoice,
-  resolveDevastatingAssaultChoice,
   resolveDesertCallChoice,
   resolveDiscardCardForInfluenceAndDrawChoice,
   resolveIrulanSignetRingChoice,
@@ -38,6 +37,7 @@ import {
   resolveLoseInfluenceForIntriguesChoice,
   resolveMakerChoice,
   resolveOptionalSpacePayment,
+  resolvePayResourceForStrengthChoice,
   resolveRetreatTroopsForStrength,
   resolveShaddamSignetRingChoice,
   resolveSietchTabrChoice,
@@ -50,12 +50,12 @@ import {
   skipCorrinoMight,
   skipDemandAttention,
   skipDemandResults,
-  skipDevastatingAssault,
   skipDesertCall,
   skipDiscardCardForInfluenceAndDraw,
   skipLoseInfluence,
   skipLoseInfluenceForIntrigues,
   skipOptionalSpacePayment,
+  skipPayResourceForStrength,
   skipRecallSpy,
   skipRetreatTroopsForStrength,
   skipThreatenSpiceProduction,
@@ -202,10 +202,10 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     runPending("corrino-might", (current, pending) => maybeStartCombatPhase(resolveCorrinoMightChoice(current, pending)));
   const skipCorrinoMightChoice = () =>
     runPending("corrino-might", (current, pending) => maybeStartCombatPhase(skipCorrinoMight(current, pending)));
-  const chooseDevastatingAssault = () =>
-    runPending("devastating-assault", (current, pending) => maybeStartCombatPhase(resolveDevastatingAssaultChoice(current, pending)));
-  const skipDevastatingAssaultChoice = () =>
-    runPending("devastating-assault", (current, pending) => maybeStartCombatPhase(skipDevastatingAssault(current, pending)));
+  const choosePayResourceForStrength = () =>
+    runPending("pay-resource-for-strength", (current, pending) => maybeStartCombatPhase(resolvePayResourceForStrengthChoice(current, pending)));
+  const skipPayResourceForStrengthChoice = () =>
+    runPending("pay-resource-for-strength", (current, pending) => maybeStartCombatPhase(skipPayResourceForStrength(current, pending)));
   const chooseDemandAttention = () =>
     runPending("demand-attention", (current, pending) => maybeStartCombatPhase(resolveDemandAttentionChoice(current, pending)));
   const skipDemandAttentionChoice = () =>
@@ -286,7 +286,6 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     chooseBoardInfluence,
     chooseConflictTieWinner,
     chooseCorrinoMight,
-    chooseDevastatingAssault,
     chooseDemandAttention,
     chooseDemandResults,
     chooseDesertCall,
@@ -299,6 +298,7 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     chooseLadyAmberDesertScouts,
     chooseLoseInfluenceForIntrigues,
     chooseMakerReward,
+    choosePayResourceForStrength,
     chooseRetreatTroopsForStrength,
     chooseShaddamSignet,
     chooseSietchTabr,
@@ -322,7 +322,6 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     skipControlDefense,
     skipConflictVpReward,
     skipCorrinoMightChoice,
-    skipDevastatingAssaultChoice,
     skipDemandAttentionChoice,
     skipDemandResultsChoice,
     skipDesertCallChoice,
@@ -330,6 +329,7 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     skipInfluenceLoss,
     skipLoseInfluenceForIntriguesChoice,
     skipOptionalSpacePaymentChoice,
+    skipPayResourceForStrengthChoice,
     skipRecall,
     skipRetreatTroopsForStrengthChoice,
     skipThreatenSpiceProductionChoice,

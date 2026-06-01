@@ -103,6 +103,29 @@ export function revealLoseInfluenceForIntrigues(
   ], conditions);
 }
 
+export function revealPayResourceForStrength(
+  resource: ResourceId,
+  cost: EffectAmountSpec,
+  strength: EffectAmountSpec,
+  options: {
+    optional?: true;
+    source?: string;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return revealEffects([
+    {
+      kind: "pay-resource-for-strength",
+      selector: "self",
+      resource,
+      cost,
+      strength,
+      optional: true,
+      ...options,
+    },
+  ], conditions);
+}
+
 export function agentDiscardCardForInfluenceAndDraw(
   drawCards: EffectAmountSpec,
   influenceAmount: EffectAmountSpec,
@@ -269,6 +292,10 @@ export function hasRole(role: Role) {
   return { kind: "has-role", role } as const;
 }
 
+export function hasSwordmasterBonus() {
+  return { kind: "has-swordmaster-bonus" } as const;
+}
+
 export function hasLeader(leader: string) {
   return { kind: "has-leader", leader } as const;
 }
@@ -284,6 +311,9 @@ export function cloneCardEffects(effects: CardEffectSpec[] | undefined): CardEff
     effects: spec.effects.map((effect) => ({
       ...effect,
       ...("amount" in effect ? { amount: cloneAmount(effect.amount) } : {}),
+      ...("cost" in effect
+        ? { cost: cloneAmount(effect.cost) }
+        : {}),
       ...("strength" in effect
         ? { strength: cloneAmount(effect.strength) }
         : {}),

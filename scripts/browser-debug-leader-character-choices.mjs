@@ -346,6 +346,32 @@ async function createLeaderCharacterChoiceStates(server, initialPlayableGame) {
     pendingQueue: [],
     turnReverendMotherJessicaRepeats: {},
   };
+  const debugDevastatingAssault = { ...devastatingAssault, id: "debug-devastating-assault" };
+  const devastatingAssaultState = {
+    ...base,
+    activeSeat: p4Seat,
+    players: base.players.map((player) => {
+      if (player.id === "p4") {
+        return {
+          ...player,
+          resources: { ...player.resources, solari: 3 },
+          swordmasterBonus: true,
+          playArea: [debugDevastatingAssault, ...player.playArea],
+        };
+      }
+      if (player.id === "p2") {
+        return { ...player, conflict: 4, deployedSandworms: 0, deployedTroops: 1 };
+      }
+      return player;
+    }),
+  };
+  const devastatingAssaultPending = state.pendingActionsForRevealPayResourceForStrength(
+    debugDevastatingAssault,
+    devastatingAssaultState.players.find((player) => player.id === "p4"),
+    devastatingAssaultState,
+    "p2",
+  )[0];
+  assert.ok(devastatingAssaultPending, "Expected a derived Devastating Assault payment pending action");
 
   return {
     stabanUnseenNetwork: {
@@ -520,31 +546,8 @@ async function createLeaderCharacterChoiceStates(server, initialPlayableGame) {
       },
     },
     devastatingAssault: {
-      ...base,
-      activeSeat: p4Seat,
-      players: base.players.map((player) => {
-        if (player.id === "p4") {
-          return {
-            ...player,
-            resources: { ...player.resources, solari: 3 },
-            swordmasterBonus: true,
-            playArea: [{ ...devastatingAssault, id: "debug-devastating-assault" }, ...player.playArea],
-          };
-        }
-        if (player.id === "p2") {
-          return { ...player, conflict: 4, deployedSandworms: 0, deployedTroops: 1 };
-        }
-        return player;
-      }),
-      pendingAction: {
-        kind: "devastating-assault",
-        commanderId: "p4",
-        combatRecipientId: "p2",
-        cost: 3,
-        strength: 5,
-        cardId: "debug-devastating-assault",
-        source: "Devastating Assault",
-      },
+      ...devastatingAssaultState,
+      pendingAction: devastatingAssaultPending,
     },
     demandAttention: {
       ...base,

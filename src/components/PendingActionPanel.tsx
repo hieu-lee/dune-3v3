@@ -43,13 +43,13 @@ import {
   PendingCorrinoMightPanel,
   PendingDemandAttentionPanel,
   PendingDemandResultsPanel,
-  PendingDevastatingAssaultPanel,
   PendingDesertCallPanel,
   PendingJessicaOtherMemoriesPanel,
   PendingJessicaReverendMotherPanel,
   PendingJessicaSpiceAgonyPanel,
   PendingJessicaWaterOfLifePanel,
   PendingLadyAmberDesertScoutsPanel,
+  PendingPayResourceForStrengthPanel,
   PendingStabanUnseenNetworkPanel,
   PendingThreatenSpiceProductionPanel,
 } from "./PendingLeaderChoicePanels";
@@ -83,7 +83,6 @@ type PendingActionPanelProps = {
   chooseDiscardCardForInfluenceAndDraw: (discardCardId: string, faction: FactionId) => void;
   chooseLoseInfluenceForIntrigues: (faction: FactionId) => void;
   chooseCorrinoMight: () => void;
-  chooseDevastatingAssault: () => void;
   chooseDemandAttention: () => void;
   chooseDemandResults: (optionIndex: number) => void;
   chooseDesertCall: () => void;
@@ -94,6 +93,7 @@ type PendingActionPanelProps = {
   chooseJessicaWaterOfLife: (choice: JessicaWaterOfLifeChoice) => void;
   chooseLadyAmberDesertScouts: (choice: LadyAmberDesertScoutsChoice) => void;
   chooseMakerReward: (choice: "spice" | "sandworms") => void;
+  choosePayResourceForStrength: () => void;
   chooseRetreatTroopsForStrength: () => void;
   chooseShaddamSignet: (choice: ShaddamSignetRingChoice) => void;
   chooseSietchTabr: (choice: "hooks" | "shield-wall") => void;
@@ -119,12 +119,12 @@ type PendingActionPanelProps = {
   skipControlDefense: () => void;
   skipConflictVpReward: () => void;
   skipCorrinoMightChoice: () => void;
-  skipDevastatingAssaultChoice: () => void;
   skipDemandAttentionChoice: () => void;
   skipDemandResultsChoice: () => void;
   skipDesertCallChoice: () => void;
   skipInfluenceLoss: () => void;
   skipOptionalSpacePaymentChoice: () => void;
+  skipPayResourceForStrengthChoice: () => void;
   skipRecall: () => void;
   skipRetreatTroopsForStrengthChoice: () => void;
   skipThreatenSpiceProductionChoice: () => void;
@@ -149,7 +149,6 @@ export function PendingActionPanel({
   chooseDiscardCardForInfluenceAndDraw,
   chooseLoseInfluenceForIntrigues,
   chooseCorrinoMight,
-  chooseDevastatingAssault,
   chooseDemandAttention,
   chooseDemandResults,
   chooseDesertCall,
@@ -160,6 +159,7 @@ export function PendingActionPanel({
   chooseJessicaWaterOfLife,
   chooseLadyAmberDesertScouts,
   chooseMakerReward,
+  choosePayResourceForStrength,
   chooseRetreatTroopsForStrength,
   chooseShaddamSignet,
   chooseSietchTabr,
@@ -185,12 +185,12 @@ export function PendingActionPanel({
   skipControlDefense,
   skipConflictVpReward,
   skipCorrinoMightChoice,
-  skipDevastatingAssaultChoice,
   skipDemandAttentionChoice,
   skipDemandResultsChoice,
   skipDesertCallChoice,
   skipInfluenceLoss,
   skipOptionalSpacePaymentChoice,
+  skipPayResourceForStrengthChoice,
   skipRecall,
   skipRetreatTroopsForStrengthChoice,
   skipThreatenSpiceProductionChoice,
@@ -298,12 +298,12 @@ export function PendingActionPanel({
     pendingAction.kind === "corrino-might"
       ? pendingAction.allyIds.map((allyId) => game.players.find((player) => player.id === allyId))
       : [];
-  const pendingDevastatingAssaultCommander =
-    pendingAction.kind === "devastating-assault"
-      ? game.players.find((player) => player.id === pendingAction.commanderId)
+  const pendingPayResourceStrengthOwner =
+    pendingAction.kind === "pay-resource-for-strength"
+      ? game.players.find((player) => player.id === pendingAction.ownerId)
       : undefined;
-  const pendingDevastatingAssaultRecipient =
-    pendingAction.kind === "devastating-assault"
+  const pendingPayResourceStrengthRecipient =
+    pendingAction.kind === "pay-resource-for-strength"
       ? game.players.find((player) => player.id === pendingAction.combatRecipientId)
       : undefined;
   const pendingDemandAttentionCommander =
@@ -495,7 +495,7 @@ export function PendingActionPanel({
           {pendingAction.kind === "command-respect" && `${pendingCommandRespectCommander?.leader ?? "Muad'Dib"} Command Respect`}
           {pendingAction.kind === "demand-results" && `${pendingDemandResultsCommander?.leader ?? "Shaddam"} Demand Results`}
           {pendingAction.kind === "corrino-might" && `${pendingCorrinoMightCommander?.leader ?? "Shaddam"} Corrino Might`}
-          {pendingAction.kind === "devastating-assault" && `${pendingDevastatingAssaultCommander?.leader ?? "Shaddam"} Devastating Assault`}
+          {pendingAction.kind === "pay-resource-for-strength" && `${pendingPayResourceStrengthOwner?.leader ?? "Player"} ${pendingAction.source}`}
           {pendingAction.kind === "demand-attention" && `${pendingDemandAttentionCommander?.leader ?? "Muad'Dib"} Demand Attention`}
           {pendingAction.kind === "desert-call" && `${pendingDesertCallCommander?.leader ?? "Muad'Dib"} Desert Call`}
           {pendingAction.kind === "threaten-spice-production" && `${pendingThreatenSpiceCommander?.leader ?? "Muad'Dib"} Threaten Spice Production`}
@@ -748,13 +748,15 @@ export function PendingActionPanel({
         />
       )}
 
-      {pendingAction.kind === "devastating-assault" && (
-        <PendingDevastatingAssaultPanel
-          commander={pendingDevastatingAssaultCommander}
+      {pendingAction.kind === "pay-resource-for-strength" && (
+        <PendingPayResourceForStrengthPanel
           cost={pendingAction.cost}
-          onChoose={chooseDevastatingAssault}
-          onSkip={skipDevastatingAssaultChoice}
-          recipient={pendingDevastatingAssaultRecipient}
+          onChoose={choosePayResourceForStrength}
+          onSkip={skipPayResourceForStrengthChoice}
+          optional={pendingAction.optional}
+          owner={pendingPayResourceStrengthOwner}
+          recipient={pendingPayResourceStrengthRecipient}
+          resource={pendingAction.resource}
           strength={pendingAction.strength}
         />
       )}

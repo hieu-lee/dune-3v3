@@ -6,7 +6,6 @@ import {
   isDemandAttentionCommanderCard,
   isDemandResultsCommanderCard,
   isDesertCallCommanderCard,
-  isDevastatingAssaultCommanderCard,
   isGenericSignetRingCard,
   isShaddamSignetRingCard,
   isThreatenSpiceProductionCommanderCard,
@@ -22,6 +21,7 @@ import {
   resolveAgentMoveCardToThroneRows,
   resolveCardEffects,
   resolveRevealLoseInfluenceForIntrigues,
+  resolveRevealPayResourceForStrengths,
   resolveRevealRetreatTroopsForStrength,
   resolveRevealTrashCardEffects,
   type SpyPlacementEffectResult,
@@ -60,8 +60,6 @@ import type {
 export const stabanUnseenNetworkSource = "Unseen Network";
 export const stabanUnseenNetworkFactionIcons: IconId[] = ["emperor", "spacing", "bene", "fremen"];
 export const corrinoMightCost = 3;
-export const devastatingAssaultCost = 3;
-export const devastatingAssaultStrength = 5;
 export const shaddamSignetRingTroopCost = 1;
 export const shaddamSignetRingInfluenceCost = 3;
 export const shaddamSignetRingInfluenceChoices: FactionId[] = [
@@ -527,37 +525,40 @@ export function pendingActionForCorrinoMightReveal(
   };
 }
 
-export function pendingActionForDevastatingAssaultReveal(
+export function pendingActionsForRevealPayResourceForStrength(
   card: Card,
   source: Player,
   state: GameState,
   combatRecipientId: string,
-): PendingAction | undefined {
+): PendingAction[] {
   const combatRecipient = state.players.find((player) => player.id === combatRecipientId);
-  if (
-    !isDevastatingAssaultCommanderCard(card) ||
-    source.team !== "shaddam" ||
-    source.role !== "Commander" ||
-    !source.swordmasterBonus ||
-    source.resources.solari < devastatingAssaultCost ||
-    !source.playArea.some((candidate) => candidate.id === card.id && isDevastatingAssaultCommanderCard(candidate)) ||
-    !combatRecipient ||
-    combatRecipient.team !== source.team ||
-    combatRecipient.role !== "Ally" ||
-    !playerHasConflictUnits(combatRecipient)
-  ) {
-    return undefined;
-  }
+  if (!card.effects || !source.playArea.some((candidate) => candidate.id === card.id) || !combatRecipient) return [];
+  if (source.role === "Commander" && (combatRecipient.team !== source.team || combatRecipient.role !== "Ally")) return [];
+  if (source.role !== "Commander" && combatRecipient.id !== source.id) return [];
+  if (!playerHasConflictUnits(combatRecipient)) return [];
 
-  return {
-    kind: "devastating-assault",
-    commanderId: source.id,
-    combatRecipientId,
-    cost: devastatingAssaultCost,
-    strength: devastatingAssaultStrength,
-    cardId: card.id,
-    source: card.name,
-  };
+  const players = playersWithPendingCardEffect(state, source, combatRecipient);
+  const effectState = { ...state, players };
+  return resolveRevealPayResourceForStrengths(card.effects, {
+    trigger: "reveal",
+    source,
+    target: combatRecipient,
+    state: effectState,
+  }).flatMap((effect) => {
+    if (effect.selector !== "self" || effect.cost <= 0 || effect.strength <= 0) return [];
+    if (source.resources[effect.resource] < effect.cost) return [];
+    return [{
+      kind: "pay-resource-for-strength",
+      ownerId: source.id,
+      combatRecipientId,
+      resource: effect.resource,
+      cost: effect.cost,
+      strength: effect.strength,
+      optional: effect.optional,
+      source: effect.source ?? card.name,
+      cardId: card.id,
+    }];
+  });
 }
 
 export function pendingActionsForReveal(
@@ -590,9 +591,9 @@ export function pendingActionsForReveal(
   const revealTrashCardPendings = revealedCards.flatMap((card) =>
     pendingActionsForRevealTrashCards(card, source, state, combatRecipientId)
   );
-  const devastatingAssaultPending = revealedCards
-    .map((card) => pendingActionForDevastatingAssaultReveal(card, source, state, combatRecipientId))
-    .find((pending): pending is PendingAction => Boolean(pending));
+  const payResourceStrengthPendings = revealedCards.flatMap((card) =>
+    pendingActionsForRevealPayResourceForStrength(card, source, state, combatRecipientId)
+  );
   const influenceIntriguePendings = revealedCards.flatMap((card) =>
     pendingActionsForRevealInfluenceIntrigues(card, source, state, combatRecipientId)
   );
@@ -605,7 +606,7 @@ export function pendingActionsForReveal(
   return [
     revealAdjustPending,
     ...revealTrashCardPendings,
-    devastatingAssaultPending,
+    ...payResourceStrengthPendings,
     corrinoMightPending,
     ...influenceIntriguePendings,
     ...retreatTroopStrengthPendings,

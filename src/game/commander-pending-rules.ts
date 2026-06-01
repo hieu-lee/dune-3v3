@@ -7,13 +7,8 @@ import {
   isDemandAttentionCommanderCard,
   isDemandResultsCommanderCard,
   isDesertCallCommanderCard,
-  isDevastatingAssaultCommanderCard,
 } from "./card-identifiers";
-import {
-  corrinoMightCost,
-  devastatingAssaultCost,
-  devastatingAssaultStrength,
-} from "./card-pending-rules";
+import { corrinoMightCost } from "./card-pending-rules";
 import {
   canSummonSandworms,
   conflictDeploymentBlockedFor,
@@ -34,14 +29,21 @@ import type {
   GameState,
   PendingAction,
   Player,
+  ResourceId,
 } from "./types";
 
 type CommandRespectPendingAction = Extract<PendingAction, { kind: "command-respect" }>;
 type DemandResultsPendingAction = Extract<PendingAction, { kind: "demand-results" }>;
 type CorrinoMightPendingAction = Extract<PendingAction, { kind: "corrino-might" }>;
-type DevastatingAssaultPendingAction = Extract<PendingAction, { kind: "devastating-assault" }>;
+type PayResourceForStrengthPendingAction = Extract<PendingAction, { kind: "pay-resource-for-strength" }>;
 type DemandAttentionPendingAction = Extract<PendingAction, { kind: "demand-attention" }>;
 type DesertCallPendingAction = Extract<PendingAction, { kind: "desert-call" }>;
+
+const resourceLabels: Record<ResourceId, string> = {
+  solari: "Solari",
+  spice: "spice",
+  water: "water",
+};
 
 export function resolveCommandRespectTrade(
   state: GameState,
@@ -262,41 +264,39 @@ export function skipCorrinoMight(state: GameState, pending: CorrinoMightPendingA
   };
 }
 
-export function resolveDevastatingAssaultChoice(
+export function resolvePayResourceForStrengthChoice(
   state: GameState,
-  pending: DevastatingAssaultPendingAction,
+  pending: PayResourceForStrengthPendingAction,
 ): GameState {
   if (state.pendingAction !== pending) return state;
-  const commander = state.players.find((player) => player.id === pending.commanderId);
+  const owner = state.players.find((player) => player.id === pending.ownerId);
   const recipient = state.players.find((player) => player.id === pending.combatRecipientId);
   if (
-    !commander ||
-    commander.team !== "shaddam" ||
-    commander.role !== "Commander" ||
-    !commander.swordmasterBonus ||
-    commander.resources.solari < pending.cost ||
-    pending.cost !== devastatingAssaultCost ||
-    pending.strength !== devastatingAssaultStrength ||
-    !commander.playArea.some((card) => card.id === pending.cardId && isDevastatingAssaultCommanderCard(card)) ||
+    !owner ||
+    owner.resources[pending.resource] < pending.cost ||
+    pending.cost <= 0 ||
+    pending.strength <= 0 ||
+    (pending.cardId !== undefined && !owner.playArea.some((card) => card.id === pending.cardId)) ||
     !recipient ||
-    recipient.team !== commander.team ||
-    recipient.role !== "Ally" ||
+    (owner.role === "Commander" && (recipient.team !== owner.team || recipient.role !== "Ally")) ||
+    (owner.role !== "Commander" && recipient.id !== owner.id) ||
     !playerHasConflictUnits(recipient)
   ) {
     return state;
   }
 
   const players = state.players.map((player) => {
-    if (player.id === commander.id) {
-      return {
+    let next = player;
+    if (player.id === owner.id) {
+      next = {
         ...player,
-        resources: { ...player.resources, solari: player.resources.solari - pending.cost },
+        resources: { ...player.resources, [pending.resource]: player.resources[pending.resource] - pending.cost },
       };
     }
     if (player.id === recipient.id) {
-      return { ...player, conflict: player.conflict + pending.strength };
+      next = { ...next, conflict: next.conflict + pending.strength };
     }
-    return player;
+    return next;
   });
 
   return {
@@ -304,19 +304,20 @@ export function resolveDevastatingAssaultChoice(
     players,
     ...advancePendingAction(state),
     log: [
-      `${commander.leader} spends 3 Solari for ${pending.source}; ${recipient.leader} adds 5 strength.`,
+      `${owner.leader} spends ${pending.cost} ${resourceLabels[pending.resource]} for ${pending.source}; ${recipient.leader} adds ${pending.strength} strength.`,
       ...state.log,
     ],
   };
 }
 
-export function skipDevastatingAssault(state: GameState, pending: DevastatingAssaultPendingAction): GameState {
+export function skipPayResourceForStrength(state: GameState, pending: PayResourceForStrengthPendingAction): GameState {
   if (state.pendingAction !== pending) return state;
-  const commander = state.players.find((player) => player.id === pending.commanderId);
+  if (!pending.optional) return state;
+  const owner = state.players.find((player) => player.id === pending.ownerId);
   return {
     ...state,
     ...advancePendingAction(state),
-    log: [`${commander?.leader ?? "Shaddam"} declines to pay 3 Solari for ${pending.source}.`, ...state.log],
+    log: [`${owner?.leader ?? "Player"} declines to pay ${pending.cost} ${resourceLabels[pending.resource]} for ${pending.source}.`, ...state.log],
   };
 }
 

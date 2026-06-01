@@ -455,6 +455,24 @@ try {
     "Devastating Assault should carry a routed Agent recruit spec",
   );
   assert.ok(
+    devastatingAssault.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.conditions?.some((condition) => condition.kind === "has-team" && condition.team === "shaddam") &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Commander") &&
+      spec.conditions?.some((condition) => condition.kind === "has-swordmaster-bonus") &&
+      spec.conditions?.some((condition) => condition.kind === "has-conflict-units" && condition.count === 1) &&
+      spec.effects.some((effect) =>
+        effect.kind === "pay-resource-for-strength" &&
+        effect.selector === "self" &&
+        effect.resource === "solari" &&
+        effect.cost === 3 &&
+        effect.strength === 5 &&
+        effect.source === "Devastating Assault"
+      )
+    ),
+    "Devastating Assault should carry a typed reveal payment spec",
+  );
+  assert.ok(
     criticalShipments.effects?.some((spec) =>
       spec.trigger === "agent-play" &&
       spec.conditions?.some((condition) => condition.kind === "has-team" && condition.team === "shaddam") &&
@@ -978,6 +996,129 @@ try {
     /Invalid effect amount "-1"/,
     "Influence-for-Intrigue specs should require non-negative integer amounts",
   );
+  const agentPayResourceStrengthCard = {
+    ...convincingArgument,
+    id: "effect-spec-agent-pay-resource-strength-card",
+    name: "Effect Spec Agent Pay Resource Strength",
+    effects: [agentSpec([{ kind: "pay-resource-for-strength", selector: "self", resource: "spice", cost: 1, strength: 2 }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(agentPayResourceStrengthCard, p2, p2),
+    /Unsupported effect "pay-resource-for-strength" for agent-play/,
+    "Resource-for-strength specs should stay in Reveal until other trigger resolvers support them",
+  );
+  const invalidPayResourceStrengthSelectorCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-pay-resource-strength-selector-card",
+    name: "Effect Spec Invalid Pay Resource Strength Selector",
+    effects: [revealSpec([{ kind: "pay-resource-for-strength", selector: "activated-ally", resource: "spice", cost: 1, strength: 2 }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [invalidPayResourceStrengthSelectorCard], highCouncilSeat: false }),
+    /Unsupported effect selector "activated-ally" for reveal/,
+    "Resource-for-strength specs should reject activated Ally reveal selectors",
+  );
+  const invalidPayResourceStrengthResourceCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-pay-resource-strength-resource-card",
+    name: "Effect Spec Invalid Pay Resource Strength Resource",
+    effects: [revealSpec([{ kind: "pay-resource-for-strength", selector: "self", resource: "melange", cost: 1, strength: 2 }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [invalidPayResourceStrengthResourceCard], highCouncilSeat: false }),
+    /Unsupported effect resource "melange"/,
+    "Resource-for-strength specs should reject unsupported resource ids",
+  );
+  const invalidPayResourceStrengthCostCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-pay-resource-strength-cost-card",
+    name: "Effect Spec Invalid Pay Resource Strength Cost",
+    effects: [revealSpec([{ kind: "pay-resource-for-strength", selector: "self", resource: "spice", cost: -1, strength: 2 }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [invalidPayResourceStrengthCostCard], highCouncilSeat: false }),
+    /Invalid effect amount "-1"/,
+    "Resource-for-strength specs should require non-negative costs",
+  );
+  const invalidPayResourceStrengthSourceCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-pay-resource-strength-source-card",
+    name: "Effect Spec Invalid Pay Resource Strength Source",
+    effects: [revealSpec([{ kind: "pay-resource-for-strength", selector: "self", resource: "spice", cost: 1, strength: 2, source: "" }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [invalidPayResourceStrengthSourceCard], highCouncilSeat: false }),
+    /Invalid pay-resource-for-strength source ""/,
+    "Resource-for-strength specs should reject empty source labels",
+  );
+  const requiredPayResourceStrengthCard = {
+    ...convincingArgument,
+    id: "effect-spec-required-pay-resource-strength-card",
+    name: "Effect Spec Required Pay Resource Strength",
+    effects: [revealSpec([{
+      kind: "pay-resource-for-strength",
+      selector: "self",
+      resource: "spice",
+      cost: 1,
+      strength: 2,
+      optional: false,
+    }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [requiredPayResourceStrengthCard], highCouncilSeat: false }),
+    /Invalid pay-resource-for-strength optional "false"/,
+    "Resource-for-strength specs should stay optional so queued payments cannot deadlock if resources change",
+  );
+  const selfPayResourceStrengthCard = {
+    ...convincingArgument,
+    id: "effect-spec-self-pay-resource-strength-card",
+    name: "Effect Spec Self Pay Resource Strength",
+    effects: [revealSpec([{
+      kind: "pay-resource-for-strength",
+      selector: "self",
+      resource: "spice",
+      cost: 1,
+      strength: 2,
+      source: "Self Pay Strength",
+    }])],
+  };
+  const selfPayOwner = {
+    ...p2,
+    resources: { ...p2.resources, spice: 1 },
+    playArea: [selfPayResourceStrengthCard],
+    conflict: 3,
+    deployedSandworms: 0,
+    deployedTroops: 1,
+  };
+  const selfPayState = {
+    ...game,
+    pendingAction: undefined,
+    pendingQueue: [],
+    players: game.players.map((player) => player.id === p2.id ? selfPayOwner : player),
+  };
+  const [selfPayPending] = state.pendingActionsForRevealPayResourceForStrength(
+    selfPayResourceStrengthCard,
+    selfPayOwner,
+    selfPayState,
+    p2.id,
+  );
+  assert.deepEqual(selfPayPending, {
+    kind: "pay-resource-for-strength",
+    ownerId: p2.id,
+    combatRecipientId: p2.id,
+    resource: "spice",
+    cost: 1,
+    strength: 2,
+    optional: true,
+    source: "Self Pay Strength",
+    cardId: selfPayResourceStrengthCard.id,
+  });
+  const selfPayResolved = state.resolvePayResourceForStrengthChoice(
+    { ...selfPayState, pendingAction: selfPayPending },
+    selfPayPending,
+  );
+  assert.equal(playerById(selfPayResolved, p2.id).resources.spice, 0, "Self resource-for-strength should spend the owner resource");
+  assert.equal(playerById(selfPayResolved, p2.id).conflict, 5, "Self resource-for-strength should add strength to the same player");
   const revealDiscardInfluenceDrawCard = {
     ...convincingArgument,
     id: "effect-spec-reveal-discard-influence-draw-card",

@@ -10,11 +10,14 @@ import {
   agentRecruitTroops,
   cloneCardEffects,
   hasAlliance,
+  hasConflictUnits,
   hasLeader,
   revealEffects,
   revealGainPersuasion,
   revealGainStrength,
+  revealPayResourceForStrength,
   hasRole,
+  hasSwordmasterBonus,
   hasTeam,
 } from "./effect-specs";
 import {
@@ -422,6 +425,13 @@ const emperorCommanderSpecs: Array<StarterCardSpec & { sourceId: number }> = [
         { kind: "recruit-troops", selector: "activated-ally", amount: 1 },
       ]),
       revealGainPersuasion(1),
+      revealPayResourceForStrength(
+        "solari",
+        3,
+        5,
+        { source: "Devastating Assault" },
+        [hasTeam("shaddam"), hasRole("Commander"), hasSwordmasterBonus(), hasConflictUnits(1)],
+      ),
     ],
     play: "Gain 1 Solari; the activated Ally recruits 1 troop.",
     reveal: "+1 persuasion. If you have a Swordmaster bonus token, you may spend 3 Solari to add 5 strength.",

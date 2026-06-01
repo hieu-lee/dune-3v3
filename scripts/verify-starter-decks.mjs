@@ -828,9 +828,10 @@ try {
   assert.equal(devastatingAssault.swords, 0, "Devastating Assault should not have unconditional reveal swords");
   assert.equal(
     devastatingAssault.conditionalSwords,
-    true,
-    "Devastating Assault should keep its Swordmaster bonus reveal flag",
+    undefined,
+    "Devastating Assault should use structured reveal payment instead of manual printed reveal handling",
   );
+  assert.match(devastatingAssault.reveal, /spend 3 Solari/i, "Devastating Assault should expose its automated reveal payment");
   assert.equal(
     state.isDevastatingAssaultCommanderCard(devastatingAssault),
     true,

@@ -8,6 +8,7 @@ import {
   isDemandAttentionCommanderCard,
   isDemandResultsCommanderCard,
   isDesertCallCommanderCard,
+  isDevastatingAssaultCommanderCard,
   isGenericSignetRingCard,
   isShaddamSignetRingCard,
   isThreatenSpiceProductionCommanderCard,
@@ -53,6 +54,8 @@ import type {
 export const stabanUnseenNetworkSource = "Unseen Network";
 export const stabanUnseenNetworkFactionIcons: IconId[] = ["emperor", "spacing", "bene", "fremen"];
 export const corrinoMightCost = 3;
+export const devastatingAssaultCost = 3;
+export const devastatingAssaultStrength = 5;
 export const emperorCardTrait = "Faction: Emperor";
 export const shaddamSignetRingTroopCost = 1;
 export const shaddamSignetRingInfluenceCost = 3;
@@ -459,6 +462,39 @@ export function pendingActionForCalculusOfPowerReveal(
   };
 }
 
+export function pendingActionForDevastatingAssaultReveal(
+  card: Card,
+  source: Player,
+  state: GameState,
+  combatRecipientId: string,
+): PendingAction | undefined {
+  const combatRecipient = state.players.find((player) => player.id === combatRecipientId);
+  if (
+    !isDevastatingAssaultCommanderCard(card) ||
+    source.team !== "shaddam" ||
+    source.role !== "Commander" ||
+    !source.swordmasterBonus ||
+    source.resources.solari < devastatingAssaultCost ||
+    !source.playArea.some((candidate) => candidate.id === card.id && isDevastatingAssaultCommanderCard(candidate)) ||
+    !combatRecipient ||
+    combatRecipient.team !== source.team ||
+    combatRecipient.role !== "Ally" ||
+    !playerHasConflictUnits(combatRecipient)
+  ) {
+    return undefined;
+  }
+
+  return {
+    kind: "devastating-assault",
+    commanderId: source.id,
+    combatRecipientId,
+    cost: devastatingAssaultCost,
+    strength: devastatingAssaultStrength,
+    cardId: card.id,
+    source: card.name,
+  };
+}
+
 export function pendingActionsForReveal(
   source: Player,
   state: GameState,
@@ -485,10 +521,13 @@ export function pendingActionsForReveal(
   const calculusOfPowerPending = revealedCards
     .map((card) => pendingActionForCalculusOfPowerReveal(card, source, state, combatRecipientId))
     .find((pending): pending is PendingAction => Boolean(pending));
+  const devastatingAssaultPending = revealedCards
+    .map((card) => pendingActionForDevastatingAssaultReveal(card, source, state, combatRecipientId))
+    .find((pending): pending is PendingAction => Boolean(pending));
   const feydDeviousStrengthPending = pendingActionForFeydDeviousStrength(source, state, combatRecipientId);
   const amberDesertScoutsPending = pendingActionForLadyAmberDesertScouts(source);
 
-  return [revealAdjustPending, calculusOfPowerPending, corrinoMightPending, feydDeviousStrengthPending, amberDesertScoutsPending].filter((action): action is PendingAction => Boolean(action));
+  return [revealAdjustPending, calculusOfPowerPending, devastatingAssaultPending, corrinoMightPending, feydDeviousStrengthPending, amberDesertScoutsPending].filter((action): action is PendingAction => Boolean(action));
 }
 
 function pendingActionForFeydDeviousStrength(

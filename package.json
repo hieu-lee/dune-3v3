@@ -40,6 +40,7 @@
     "verify:sietch-tabr": "node scripts/verify-sietch-tabr.mjs",
     "verify:spy-posts": "node scripts/verify-spy-posts.mjs",
     "verify:starter-decks": "node scripts/verify-starter-decks.mjs",
+    "verify:starter-decks-devastating-assault": "node scripts/verify-starter-decks-devastating-assault.mjs",
     "verify:team-trade": "node scripts/verify-team-trade.mjs",
     "verify:throne-row": "node scripts/verify-throne-row.mjs"
   },

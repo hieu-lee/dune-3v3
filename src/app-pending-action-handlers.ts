@@ -25,6 +25,7 @@ import {
   resolveCorrinoMightChoice,
   resolveDemandAttentionChoice,
   resolveDemandResultsChoice,
+  resolveDevastatingAssaultChoice,
   resolveDesertCallChoice,
   resolveIrulanSignetRingChoice,
   resolveJessicaOtherMemoriesChoice,
@@ -44,6 +45,7 @@ import {
   skipCorrinoMight,
   skipDemandAttention,
   skipDemandResults,
+  skipDevastatingAssault,
   skipDesertCall,
   skipLoseInfluence,
   skipRecallSpy,
@@ -181,6 +183,10 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     runPending("corrino-might", (current, pending) => maybeStartCombatPhase(resolveCorrinoMightChoice(current, pending)));
   const skipCorrinoMightChoice = () =>
     runPending("corrino-might", (current, pending) => maybeStartCombatPhase(skipCorrinoMight(current, pending)));
+  const chooseDevastatingAssault = () =>
+    runPending("devastating-assault", (current, pending) => maybeStartCombatPhase(resolveDevastatingAssaultChoice(current, pending)));
+  const skipDevastatingAssaultChoice = () =>
+    runPending("devastating-assault", (current, pending) => maybeStartCombatPhase(skipDevastatingAssault(current, pending)));
   const chooseDemandAttention = () =>
     runPending("demand-attention", (current, pending) => maybeStartCombatPhase(resolveDemandAttentionChoice(current, pending)));
   const skipDemandAttentionChoice = () =>
@@ -240,6 +246,7 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     chooseConflictInfluence,
     chooseConflictTieWinner,
     chooseCorrinoMight,
+    chooseDevastatingAssault,
     chooseDemandAttention,
     chooseDemandResults,
     chooseDesertCall,
@@ -271,6 +278,7 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     skipControlDefense,
     skipConflictVpReward,
     skipCorrinoMightChoice,
+    skipDevastatingAssaultChoice,
     skipDemandAttentionChoice,
     skipDemandResultsChoice,
     skipDesertCallChoice,

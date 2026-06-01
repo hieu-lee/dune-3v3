@@ -315,9 +315,8 @@ const emperorCommanderSpecs: Array<StarterCardSpec & { sourceId: number }> = [
     icons: ["spice"],
     persuasion: 1,
     swords: 0,
-    conditionalSwords: true,
     play: "Resolve the printed agent reward.",
-    reveal: "Resolve printed reveal text.",
+    reveal: "+1 persuasion. If you have a Swordmaster bonus token, you may spend 3 Solari to add 5 strength.",
   },
   {
     id: "starter-emperor-imperial-ornithopter",

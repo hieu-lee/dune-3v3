@@ -7,13 +7,17 @@ import {
   isDemandAttentionCommanderCard,
   isDemandResultsCommanderCard,
   isDesertCallCommanderCard,
+  isDevastatingAssaultCommanderCard,
 } from "./card-identifiers";
 import {
   corrinoMightCost,
+  devastatingAssaultCost,
+  devastatingAssaultStrength,
 } from "./card-pending-rules";
 import {
   canSummonSandworms,
   conflictDeploymentBlockedFor,
+  playerHasConflictUnits,
 } from "./conflict-rules";
 import {
   adjustInfluence,
@@ -35,6 +39,7 @@ import type {
 type CommandRespectPendingAction = Extract<PendingAction, { kind: "command-respect" }>;
 type DemandResultsPendingAction = Extract<PendingAction, { kind: "demand-results" }>;
 type CorrinoMightPendingAction = Extract<PendingAction, { kind: "corrino-might" }>;
+type DevastatingAssaultPendingAction = Extract<PendingAction, { kind: "devastating-assault" }>;
 type DemandAttentionPendingAction = Extract<PendingAction, { kind: "demand-attention" }>;
 type DesertCallPendingAction = Extract<PendingAction, { kind: "desert-call" }>;
 
@@ -254,6 +259,64 @@ export function skipCorrinoMight(state: GameState, pending: CorrinoMightPendingA
     ...state,
     ...advancePendingAction(state),
     log: [`${commander?.leader ?? "Shaddam"} declines to pay 3 spice for ${pending.source}.`, ...state.log],
+  };
+}
+
+export function resolveDevastatingAssaultChoice(
+  state: GameState,
+  pending: DevastatingAssaultPendingAction,
+): GameState {
+  if (state.pendingAction !== pending) return state;
+  const commander = state.players.find((player) => player.id === pending.commanderId);
+  const recipient = state.players.find((player) => player.id === pending.combatRecipientId);
+  if (
+    !commander ||
+    commander.team !== "shaddam" ||
+    commander.role !== "Commander" ||
+    !commander.swordmasterBonus ||
+    commander.resources.solari < pending.cost ||
+    pending.cost !== devastatingAssaultCost ||
+    pending.strength !== devastatingAssaultStrength ||
+    !commander.playArea.some((card) => card.id === pending.cardId && isDevastatingAssaultCommanderCard(card)) ||
+    !recipient ||
+    recipient.team !== commander.team ||
+    recipient.role !== "Ally" ||
+    !playerHasConflictUnits(recipient)
+  ) {
+    return state;
+  }
+
+  const players = state.players.map((player) => {
+    if (player.id === commander.id) {
+      return {
+        ...player,
+        resources: { ...player.resources, solari: player.resources.solari - pending.cost },
+      };
+    }
+    if (player.id === recipient.id) {
+      return { ...player, conflict: player.conflict + pending.strength };
+    }
+    return player;
+  });
+
+  return {
+    ...state,
+    players,
+    ...advancePendingAction(state),
+    log: [
+      `${commander.leader} spends 3 Solari for ${pending.source}; ${recipient.leader} adds 5 strength.`,
+      ...state.log,
+    ],
+  };
+}
+
+export function skipDevastatingAssault(state: GameState, pending: DevastatingAssaultPendingAction): GameState {
+  if (state.pendingAction !== pending) return state;
+  const commander = state.players.find((player) => player.id === pending.commanderId);
+  return {
+    ...state,
+    ...advancePendingAction(state),
+    log: [`${commander?.leader ?? "Shaddam"} declines to pay 3 Solari for ${pending.source}.`, ...state.log],
   };
 }
 

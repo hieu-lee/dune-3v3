@@ -178,8 +178,11 @@ export {
 
 export {
   corrinoMightCost,
+  devastatingAssaultCost,
+  devastatingAssaultStrength,
   pendingActionForCard,
   pendingActionForCorrinoMightReveal,
+  pendingActionForDevastatingAssaultReveal,
   pendingActionForJessicaOtherMemories,
   pendingActionForReverendMotherJessicaRepeat,
   pendingActionsForReveal,
@@ -190,11 +193,13 @@ export {
   resolveCorrinoMightChoice,
   resolveDemandAttentionChoice,
   resolveDemandResultsChoice,
+  resolveDevastatingAssaultChoice,
   resolveDesertCallChoice,
   skipCommandRespect,
   skipCorrinoMight,
   skipDemandAttention,
   skipDemandResults,
+  skipDevastatingAssault,
   skipDesertCall,
 } from "./commander-pending-rules";
 

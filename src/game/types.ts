@@ -351,6 +351,15 @@ export type PendingAction =
       source: string;
     }
   | {
+      kind: "devastating-assault";
+      commanderId: string;
+      combatRecipientId: string;
+      cost: number;
+      strength: number;
+      cardId: string;
+      source: string;
+    }
+  | {
       kind: "demand-attention";
       commanderId: string;
       recipientId: string;

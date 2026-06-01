@@ -37,6 +37,7 @@ import {
   PendingCorrinoMightPanel,
   PendingDemandAttentionPanel,
   PendingDemandResultsPanel,
+  PendingDevastatingAssaultPanel,
   PendingDesertCallPanel,
   PendingJessicaOtherMemoriesPanel,
   PendingJessicaReverendMotherPanel,
@@ -68,6 +69,7 @@ type PendingActionPanelProps = {
   chooseConflictInfluence: (faction: FactionId) => void;
   chooseConflictTieWinner: (winnerId?: string) => void;
   chooseCorrinoMight: () => void;
+  chooseDevastatingAssault: () => void;
   chooseDemandAttention: () => void;
   chooseDemandResults: (optionIndex: number) => void;
   chooseDesertCall: () => void;
@@ -99,6 +101,7 @@ type PendingActionPanelProps = {
   skipControlDefense: () => void;
   skipConflictVpReward: () => void;
   skipCorrinoMightChoice: () => void;
+  skipDevastatingAssaultChoice: () => void;
   skipDemandAttentionChoice: () => void;
   skipDemandResultsChoice: () => void;
   skipDesertCallChoice: () => void;
@@ -123,6 +126,7 @@ export function PendingActionPanel({
   chooseConflictInfluence,
   chooseConflictTieWinner,
   chooseCorrinoMight,
+  chooseDevastatingAssault,
   chooseDemandAttention,
   chooseDemandResults,
   chooseDesertCall,
@@ -154,6 +158,7 @@ export function PendingActionPanel({
   skipControlDefense,
   skipConflictVpReward,
   skipCorrinoMightChoice,
+  skipDevastatingAssaultChoice,
   skipDemandAttentionChoice,
   skipDemandResultsChoice,
   skipDesertCallChoice,
@@ -248,6 +253,14 @@ export function PendingActionPanel({
     pendingAction.kind === "corrino-might"
       ? pendingAction.allyIds.map((allyId) => game.players.find((player) => player.id === allyId))
       : [];
+  const pendingDevastatingAssaultCommander =
+    pendingAction.kind === "devastating-assault"
+      ? game.players.find((player) => player.id === pendingAction.commanderId)
+      : undefined;
+  const pendingDevastatingAssaultRecipient =
+    pendingAction.kind === "devastating-assault"
+      ? game.players.find((player) => player.id === pendingAction.combatRecipientId)
+      : undefined;
   const pendingDemandAttentionCommander =
     pendingAction.kind === "demand-attention"
       ? game.players.find((player) => player.id === pendingAction.commanderId)
@@ -418,6 +431,7 @@ export function PendingActionPanel({
           {pendingAction.kind === "command-respect" && `${pendingCommandRespectCommander?.leader ?? "Muad'Dib"} Command Respect`}
           {pendingAction.kind === "demand-results" && `${pendingDemandResultsCommander?.leader ?? "Shaddam"} Demand Results`}
           {pendingAction.kind === "corrino-might" && `${pendingCorrinoMightCommander?.leader ?? "Shaddam"} Corrino Might`}
+          {pendingAction.kind === "devastating-assault" && `${pendingDevastatingAssaultCommander?.leader ?? "Shaddam"} Devastating Assault`}
           {pendingAction.kind === "demand-attention" && `${pendingDemandAttentionCommander?.leader ?? "Muad'Dib"} Demand Attention`}
           {pendingAction.kind === "desert-call" && `${pendingDesertCallCommander?.leader ?? "Muad'Dib"} Desert Call`}
           {pendingAction.kind === "threaten-spice-production" && `${pendingThreatenSpiceCommander?.leader ?? "Muad'Dib"} Threaten Spice Production`}
@@ -641,6 +655,17 @@ export function PendingActionPanel({
           cost={pendingAction.cost}
           onChoose={chooseCorrinoMight}
           onSkip={skipCorrinoMightChoice}
+        />
+      )}
+
+      {pendingAction.kind === "devastating-assault" && (
+        <PendingDevastatingAssaultPanel
+          commander={pendingDevastatingAssaultCommander}
+          cost={pendingAction.cost}
+          onChoose={chooseDevastatingAssault}
+          onSkip={skipDevastatingAssaultChoice}
+          recipient={pendingDevastatingAssaultRecipient}
+          strength={pendingAction.strength}
         />
       )}
 

@@ -306,6 +306,42 @@ export function PendingCorrinoMightPanel({
   );
 }
 
+type PendingDevastatingAssaultPanelProps = {
+  commander?: Player;
+  cost: number;
+  onChoose: () => void;
+  onSkip: () => void;
+  recipient?: Player;
+  strength: number;
+};
+
+export function PendingDevastatingAssaultPanel({
+  commander,
+  cost,
+  onChoose,
+  onSkip,
+  recipient,
+  strength,
+}: PendingDevastatingAssaultPanelProps) {
+  return (
+    <div className="pending-controls">
+      {recipient ? (
+        <button
+          type="button"
+          onClick={onChoose}
+          disabled={!commander || commander.resources.solari < cost}
+        >
+          <Sparkles size={15} />
+          Spend {cost} Solari: {recipient.leader} +{strength} strength
+        </button>
+      ) : (
+        <span>Devastating Assault can no longer resolve with the current table state.</span>
+      )}
+      <button type="button" onClick={onSkip}>Skip</button>
+    </div>
+  );
+}
+
 type PendingDemandAttentionPanelProps = {
   factionLabel: string;
   recipient?: Player;

@@ -212,6 +212,22 @@ export async function runLeaderCharacterChoicesSmoke({
     "Corrino Might should trash the card",
   );
 
+  await setDebugGameAndWait(page, states.devastatingAssault);
+  pendingText = await page.locator(".pending-panel").innerText();
+  assert.match(pendingText, /Devastating Assault/i);
+  assert.match(pendingText, /Spend 3 Solari: .+ \+5 strength/i);
+  await screenshot(page, captures, "pending-devastating-assault.png");
+  before = await currentGame(page);
+  const assaultCommanderBefore = before.players.find((player) => player.id === "p4");
+  const assaultRecipientBefore = before.players.find((player) => player.id === "p2");
+  await page.locator(".pending-panel").getByRole("button", { name: /Spend 3 Solari: .+ \+5 strength/ }).click();
+  await waitForNoPending(page);
+  after = await currentGame(page);
+  const assaultCommanderAfter = after.players.find((player) => player.id === "p4");
+  const assaultRecipientAfter = after.players.find((player) => player.id === "p2");
+  assert.equal(assaultCommanderAfter.resources.solari, assaultCommanderBefore.resources.solari - 3, "Devastating Assault should spend 3 Solari");
+  assert.equal(assaultRecipientAfter.conflict, assaultRecipientBefore.conflict + 5, "Devastating Assault should add strength to the activated Ally");
+
   await setDebugGameAndWait(page, states.demandAttention);
   pendingText = await page.locator(".pending-panel").innerText();
   assert.match(pendingText, /Demand Attention/i);
@@ -311,6 +327,7 @@ async function createLeaderCharacterChoiceStates(server, initialPlayableGame) {
   const threatenSpice = findCard(data.commanderStarterDecks.muaddib, 553, "Threaten Spice Production");
   const corrinoMight = findCard(data.commanderStarterDecks.shaddam, 556, "Corrino Might");
   const demandResults = findCard(data.commanderStarterDecks.shaddam, 558, "Demand Results");
+  const devastatingAssault = findCard(data.commanderStarterDecks.shaddam, 559, "Devastating Assault");
   assert.ok(game.contractOffer[0] && game.contractOffer[1], "Expected two public contracts");
 
   const p1Seat = seatFor(game, "p1");
@@ -497,6 +514,33 @@ async function createLeaderCharacterChoiceStates(server, initialPlayableGame) {
         cost: 3,
         cardId: "debug-corrino-might",
         source: "Corrino Might",
+      },
+    },
+    devastatingAssault: {
+      ...base,
+      activeSeat: p4Seat,
+      players: base.players.map((player) => {
+        if (player.id === "p4") {
+          return {
+            ...player,
+            resources: { ...player.resources, solari: 3 },
+            swordmasterBonus: true,
+            playArea: [{ ...devastatingAssault, id: "debug-devastating-assault" }, ...player.playArea],
+          };
+        }
+        if (player.id === "p2") {
+          return { ...player, conflict: 4, deployedSandworms: 0, deployedTroops: 1 };
+        }
+        return player;
+      }),
+      pendingAction: {
+        kind: "devastating-assault",
+        commanderId: "p4",
+        combatRecipientId: "p2",
+        cost: 3,
+        strength: 5,
+        cardId: "debug-devastating-assault",
+        source: "Devastating Assault",
       },
     },
     demandAttention: {

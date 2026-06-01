@@ -74,6 +74,6 @@ export function verifyCombatIntriguePhaseFlow({ data, state }) {
   assert.equal(allPassed.phase, "playing", "Consecutive passes from every Combat actor should resolve the conflict");
   assert.equal(allPassed.round, twoTeamConflict.round + 1);
   assert.equal(playerById(allPassed, "p3").wonConflicts.length, 1, "Highest eligible Ally should take the Conflict after passes");
-  assert.equal(playerById(allPassed, "p3").wonConflicts[0].sourceId, 454);
+  assert.equal(playerById(allPassed, "p3").wonConflicts[0].sourceId, 453);
   assert.equal(playerById(allPassed, "p3").conflict, 0, "Round advancement should clear conflict strength");
 }

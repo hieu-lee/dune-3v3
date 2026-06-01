@@ -48,7 +48,7 @@ try {
     "Shaddam Allies should not be able to gain Maker Hooks",
   );
 
-  const nonProtectedConflict = conflictByName(data, "CHOAM Security");
+  const nonProtectedConflict = conflictByName(data, "Skirmish (Desert Mouse)");
   const wormReady = {
     ...hooked,
     conflict: nonProtectedConflict,

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { createServer } from "vite";
+import { verifyChoamSecurityConflictAwards } from "./verify-conflict-awards-choam-security.mjs";
 import { verifyPropagandaConflictAwards } from "./verify-conflict-awards-propaganda.mjs";
 import { verifySeizeSpiceRefineryConflictAwards } from "./verify-conflict-awards-seize.mjs";
 import { verifySpiceFreightersConflictAwards } from "./verify-conflict-awards-spice-freighters.mjs";
@@ -30,7 +31,7 @@ function objectiveById(data, objectiveId) {
   return { ...objective };
 }
 
-function fixture(state, data, setupPlayers, conflictSourceId = 454) {
+function fixture(state, data, setupPlayers, conflictSourceId = 453) {
   const game = state.initialGame();
   return {
     ...game,
@@ -75,7 +76,6 @@ try {
   const data = await server.ssrLoadModule("/src/game/data.ts");
   const state = await server.ssrLoadModule("/src/game/state.ts");
 
-  const crysknifeObjective = objectiveById(data, "objective-crysknife-1");
   const desertMouseObjective = objectiveById(data, "objective-desert-mouse-first");
 
   const deployFixture = fixture(state, data, (players) =>
@@ -212,28 +212,26 @@ try {
   const objectiveMatch = fixture(state, data, (players) =>
     players.map((player) =>
       player.id === "p2"
-        ? { ...player, conflict: 7, deployedTroops: 1, objectives: [crysknifeObjective] }
+        ? { ...player, conflict: 7, deployedTroops: 1, objectives: [desertMouseObjective] }
         : player,
-    ),
-  );
+    ), 453);
   const objectiveMatched = state.startNextRound(objectiveMatch);
   const objectiveWinner = playerById(objectiveMatched, "p2");
   assert.equal(objectiveWinner.wonConflicts.length, 1, "Winner should keep the Conflict card");
-  assert.equal(objectiveWinner.wonConflicts[0].sourceId, 454);
+  assert.equal(objectiveWinner.wonConflicts[0].sourceId, 453);
   assert.equal(objectiveWinner.wonConflicts[0].scored, true, "Matched won Conflict should flip face down");
   assert.equal(objectiveWinner.objectives[0].scored, true, "Matched Objective should flip face down");
   assert.equal(objectiveWinner.vp, playerById(objectiveMatch, "p2").vp + 1, "Battle icon match should score 1 VP");
   assert.equal(objectiveWinner.deployedTroops, 0, "Round advancement should recall deployed troops");
   assert.equal(objectiveWinner.conflict, 0, "Round advancement should clear strength");
-  assert.equal(objectiveMatched.conflictDiscard.some((conflict) => conflict.sourceId === 454), false);
+  assert.equal(objectiveMatched.conflictDiscard.some((conflict) => conflict.sourceId === 453), false);
 
   const sandwormObjectiveMatch = fixture(state, data, (players) =>
     players.map((player) =>
       player.id === "p3"
-        ? { ...player, conflict: 7, deployedSandworms: 1, objectives: [crysknifeObjective] }
+        ? { ...player, conflict: 7, deployedSandworms: 1, objectives: [desertMouseObjective] }
         : player,
-    ),
-  );
+    ), 453);
   const sandwormLeader = playerById(sandwormObjectiveMatch, "p3").leader;
   assert.equal(
     state.playerDoublesConflictRewards(playerById(sandwormObjectiveMatch, "p3")),
@@ -262,8 +260,7 @@ try {
       player.id === "p2"
         ? { ...player, conflict: 7, deployedTroops: 1, objectives: [desertMouseObjective] }
         : player,
-    ),
-  );
+    ), 456);
   const unmatchedResult = state.startNextRound(unmatched);
   const unmatchedWinner = playerById(unmatchedResult, "p2");
   assert.equal(unmatchedWinner.vp, playerById(unmatched, "p2").vp, "Unmatched Conflict should not score VP");
@@ -271,6 +268,13 @@ try {
   assert.equal(unmatchedWinner.wonConflicts[0].scored, false);
 
   verifySkirmishConflictAwards({
+    state,
+    data,
+    fixture,
+    conflictBySourceId,
+    playerById,
+  });
+  verifyChoamSecurityConflictAwards({
     state,
     data,
     fixture,
@@ -755,11 +759,11 @@ try {
   });
   assert.equal(playerById(skippedPartialSecond, "p3").vp, 3, "First doubled printed VP plus one completed spy conversion should remain");
 
-  const previousCrysknife = { ...conflictBySourceId(data, 455), scored: false };
+  const previousDesertMouse = { ...conflictBySourceId(data, 460), scored: false };
   const conflictMatch = fixture(state, data, (players) =>
     players.map((player) =>
       player.id === "p2"
-        ? { ...player, conflict: 8, deployedTroops: 1, wonConflicts: [previousCrysknife] }
+        ? { ...player, conflict: 8, deployedTroops: 1, wonConflicts: [previousDesertMouse] }
         : player,
     ),
   );
@@ -776,12 +780,12 @@ try {
     }),
   );
   const opposingTied = state.startNextRound(opposingTie);
-  assert.equal(opposingTied.conflictDiscard.some((conflict) => conflict.sourceId === 454), true);
+  assert.equal(opposingTied.conflictDiscard.some((conflict) => conflict.sourceId === 453), true);
   assert.equal(opposingTied.players.every((player) => player.wonConflicts.length === 0), true);
 
   const zeroStrength = fixture(state, data, (players) => players);
   const zeroResult = state.startNextRound(zeroStrength);
-  assert.equal(zeroResult.conflictDiscard.some((conflict) => conflict.sourceId === 454), true);
+  assert.equal(zeroResult.conflictDiscard.some((conflict) => conflict.sourceId === 453), true);
   assert.equal(zeroResult.players.every((player) => player.wonConflicts.length === 0), true);
 
   const swordsOnly = fixture(state, data, (players) =>
@@ -790,13 +794,13 @@ try {
     ),
   );
   const swordsOnlyResult = state.startNextRound(swordsOnly);
-  assert.equal(swordsOnlyResult.conflictDiscard.some((conflict) => conflict.sourceId === 454), true);
+  assert.equal(swordsOnlyResult.conflictDiscard.some((conflict) => conflict.sourceId === 453), true);
   assert.equal(playerById(swordsOnlyResult, "p2").wonConflicts.length, 0, "Strength without units should not win");
 
   const scoredObjectiveIgnored = fixture(state, data, (players) =>
     players.map((player) =>
       player.id === "p2"
-        ? { ...player, conflict: 7, deployedTroops: 1, objectives: [{ ...crysknifeObjective, scored: true }] }
+        ? { ...player, conflict: 7, deployedTroops: 1, objectives: [{ ...desertMouseObjective, scored: true }] }
         : player,
     ),
   );
@@ -808,7 +812,7 @@ try {
   const scoredConflictIgnored = fixture(state, data, (players) =>
     players.map((player) =>
       player.id === "p2"
-        ? { ...player, conflict: 7, deployedTroops: 1, wonConflicts: [{ ...previousCrysknife, scored: true }] }
+        ? { ...player, conflict: 7, deployedTroops: 1, wonConflicts: [{ ...previousDesertMouse, scored: true }] }
         : player,
     ),
   );
@@ -830,15 +834,15 @@ try {
     team: "shaddam",
     tiedPlayerIds: ["p2", "p6"],
     strength: 5,
-    source: "CHOAM Security",
+    source: "Skirmish (Desert Mouse)",
   });
   const conceded = state.startNextRound(state.resolveConflictTie(sameTeamPending, sameTeamPending.pendingAction, "p2"));
   assert.equal(playerById(conceded, "p2").wonConflicts.length, 1, "Chosen Ally should take the tied Conflict");
   assert.equal(playerById(conceded, "p6").wonConflicts.length, 0);
-  assert.equal(conceded.conflictDiscard.some((conflict) => conflict.sourceId === 454), false);
+  assert.equal(conceded.conflictDiscard.some((conflict) => conflict.sourceId === 453), false);
 
   const noConcession = state.startNextRound(state.resolveConflictTie(sameTeamPending, sameTeamPending.pendingAction));
-  assert.equal(noConcession.conflictDiscard.some((conflict) => conflict.sourceId === 454), true);
+  assert.equal(noConcession.conflictDiscard.some((conflict) => conflict.sourceId === 453), true);
   assert.equal(noConcession.players.every((player) => player.wonConflicts.length === 0), true);
 
   const sameTeamBattleTie = fixture(state, data, (players) =>

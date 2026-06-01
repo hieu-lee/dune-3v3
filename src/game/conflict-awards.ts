@@ -46,6 +46,7 @@ function isStandardBattleIcon(icon: ConflictCard["battleIcon"]): icon is BattleI
 
 type FirstPlaceBattleReward = {
   fixedVp: number;
+  contracts?: number;
   influence?: Partial<Record<FactionId, number>>;
   intrigues?: number;
   resources?: Partial<Record<ResourceId, number>>;
@@ -59,6 +60,7 @@ type FirstPlaceBattleReward = {
 };
 type ConflictVpConversionPendingAction = Extract<PendingAction, { kind: "conflict-vp-conversion" }>;
 type ConflictInfluencePendingAction = Extract<PendingAction, { kind: "conflict-influence" }>;
+type ContractPendingAction = Extract<PendingAction, { kind: "contract" }>;
 type SpyPendingAction = Extract<PendingAction, { kind: "spy" }>;
 
 const resourceIds: ResourceId[] = ["solari", "spice", "water"];
@@ -77,6 +79,12 @@ const firstPlaceBattleRewardsBySourceId: Record<number, FirstPlaceBattleReward> 
   453: {
     fixedVp: 0,
     resources: { solari: 2 },
+  },
+  454: {
+    fixedVp: 0,
+    contracts: 1,
+    influence: { spacing: 1 },
+    troops: 1,
   },
   455: {
     fixedVp: 0,
@@ -207,6 +215,26 @@ function pendingActionForConflictConversion(
       recalled: 0,
     },
   };
+}
+
+function pendingActionsForContractReward(
+  state: GameState,
+  owner: Player,
+  conflict: ConflictCard,
+  reward: FirstPlaceBattleReward | undefined,
+  multiplier: number,
+): ContractPendingAction[] {
+  const requested = (reward?.contracts ?? 0) * multiplier;
+  const availablePublicContracts = state.contractOffer.length > 0
+    ? state.contractOffer.length + state.contractDeck.length
+    : 0;
+  const count = Math.min(requested, availablePublicContracts);
+  return Array.from({ length: count }, () => ({
+    kind: "contract",
+    ownerId: owner.id,
+    publicOnly: true,
+    source: conflict.name,
+  }));
 }
 
 function conflictConversionDescription(pending: ConflictVpConversionPendingAction) {
@@ -371,9 +399,11 @@ function awardConflictToWinner(
     multiplier,
   );
   const influencePendingActions = pendingActionsForConflictInfluence(winner, conflict, firstPlaceReward, multiplier);
+  const contractPendingActions = pendingActionsForContractReward(state, winner, conflict, firstPlaceReward, multiplier);
   const spyPending = pendingActionForSpyReward(state, winner, conflict, firstPlaceReward, multiplier);
   const rewardPendingActions: PendingAction[] = [];
   rewardPendingActions.push(...influencePendingActions);
+  rewardPendingActions.push(...contractPendingActions);
   if (conversionPending) rewardPendingActions.push(conversionPending);
   if (spyPending) rewardPendingActions.push(spyPending);
   const [rewardPendingAction, ...queuedRewardActions] = rewardPendingActions;
@@ -412,6 +442,9 @@ function awardConflictToWinner(
         : undefined,
       influencePendingActions.length > 0
         ? `${winner.leader} may gain ${influencePendingActions.reduce((sum, action) => sum + action.remaining, 0)} Influence from ${conflict.name}${multiplier > 1 ? " with sandworm doubling" : ""}.`
+        : undefined,
+      contractPendingActions.length > 0
+        ? `${winner.leader} may take ${contractPendingActions.length} face-up CHOAM contract${contractPendingActions.length === 1 ? "" : "s"} from ${conflict.name}${multiplier > 1 ? " with sandworm doubling" : ""}.`
         : undefined,
       spyPending
         ? `${winner.leader} may place ${spyPending.remaining} ${spyPending.remaining === 1 ? "spy" : "spies"} from ${conflict.name}${multiplier > 1 ? " with sandworm doubling" : ""}.`

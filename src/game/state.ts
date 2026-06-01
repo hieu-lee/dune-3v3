@@ -476,7 +476,9 @@ type RevealAdjustPendingAction = Extract<PendingAction, { kind: "reveal-adjust" 
 type CommanderResourceSplitPendingAction = Extract<PendingAction, { kind: "commander-resource-split" }>;
 
 export function takeChoamContract(state: GameState, pending: ContractPendingAction, contractId: string): GameState {
-  return resolveTakeChoamContract(state, pending, contractId, finishCombatIfNoActors);
+  return continueAfterResolvedConflictReward(
+    resolveTakeChoamContract(state, pending, contractId, finishCombatIfNoActors),
+  );
 }
 
 export function acquireCardForPending(
@@ -489,7 +491,9 @@ export function acquireCardForPending(
 }
 
 export function collectChoamContractFallback(state: GameState, pending: ContractPendingAction): GameState {
-  return resolveChoamContractFallback(state, pending, finishCombatIfNoActors);
+  return continueAfterResolvedConflictReward(
+    resolveChoamContractFallback(state, pending, finishCombatIfNoActors),
+  );
 }
 
 export function placeSpyForPending(

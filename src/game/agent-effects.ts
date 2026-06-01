@@ -6,7 +6,6 @@ import {
 import {
   isGenericSignetRingCard,
   isMuadDibSignetRingCard,
-  isShaddamSignetRingCard,
 } from "./card-identifiers";
 import { drawCards } from "./deck-utils";
 import { resolveCardEffects, type GameEffectResult } from "./effect-resolver";
@@ -114,19 +113,6 @@ export function applyCardAgentEffect(
   }
 
   if (
-    isShaddamSignetRingCard(card) &&
-    sourcePlayer.team === "shaddam" &&
-    sourcePlayer.role === "Commander"
-  ) {
-    return {
-      source: sourcePlayer,
-      target: targetPlayer,
-      blocksDeploymentsThisTurn: true,
-      log: `${sourcePlayer.leader} resolves Emperor of the Known Universe: units can't be deployed to the Conflict this turn.`,
-    };
-  }
-
-  if (
     isGenericSignetRingCard(card) &&
     sourcePlayer.leader === gurneyHalleckLeaderName &&
     sourcePlayer.role === "Ally"
@@ -202,12 +188,14 @@ function applyGenericCardAgentEffect(
   }
   const recruitedTroops = result.recruitedTroops + result.activatedAlly.recruitedTroops;
   const intriguesToDraw = result.intriguesToDraw + result.activatedAlly.intriguesToDraw;
+  const blocksDeploymentsThisTurn = result.blocksDeploymentsThisTurn;
   const hasSourceResourceGain = hasResourceGain(result.revealGain);
   const hasTargetResourceGain = hasResourceGain(result.activatedAlly.revealGain);
   if (
     result.cardsToDraw === 0 &&
     recruitedTroops === 0 &&
     intriguesToDraw === 0 &&
+    !blocksDeploymentsThisTurn &&
     !hasSourceResourceGain &&
     !hasTargetResourceGain
   ) {
@@ -235,6 +223,7 @@ function applyGenericCardAgentEffect(
     target,
     log: agentEffectLog(card, sourcePlayer, targetPlayer, result, cardsDrawn),
     recruitedTroops,
+    blocksDeploymentsThisTurn,
     sourceSpiceGained: result.revealGain.spice ?? 0,
     sourceIntriguesToDraw: result.intriguesToDraw,
     targetIntriguesToDraw: result.activatedAlly.intriguesToDraw,
@@ -265,11 +254,16 @@ function agentEffectLog(
     resourceGainText(result.revealGain),
     recruitText(undefined, result.recruitedTroops),
     drawText(result.cardsToDraw, cardsDrawn),
+    deploymentBlockText(result.blocksDeploymentsThisTurn),
     playerResourceGainText(targetPlayer, result.activatedAlly.revealGain),
     recruitText(targetPlayer.leader, result.activatedAlly.recruitedTroops),
   ].filter((part): part is string => Boolean(part));
   if (parts.length === 0) return undefined;
-  return `${sourcePlayer.leader} resolves ${card.name}: ${parts.join("; ")}.`;
+  const sourceLabel =
+    result.blocksDeploymentsThisTurn && result.deploymentBlockSource && parts.length === 1
+      ? result.deploymentBlockSource
+      : card.name;
+  return `${sourcePlayer.leader} resolves ${sourceLabel}: ${parts.join("; ")}.`;
 }
 
 function drawText(cardsToDraw: number, cardsDrawn: number) {
@@ -278,6 +272,10 @@ function drawText(cardsToDraw: number, cardsDrawn: number) {
     return "no card to draw";
   }
   return `draws ${cardsDrawn} card${cardsDrawn === 1 ? "" : "s"}`;
+}
+
+function deploymentBlockText(blocksDeploymentsThisTurn: boolean) {
+  return blocksDeploymentsThisTurn ? "units can't be deployed to the Conflict this turn" : undefined;
 }
 
 function resourceGainText(gain: Partial<Resources>) {

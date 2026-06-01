@@ -198,6 +198,11 @@ export function verifyLeaderCatalogAndSignets({ data, state }) {
     muadDibAllyA,
   );
   assert.equal(emperorSignetResult.source.hand.length, 0, "Emperor Signet Ring should not trigger Lead the Way");
+  assert.equal(
+    emperorSignetResult.blocksDeploymentsThisTurn,
+    undefined,
+    "Emperor Signet Ring deployment block should require Shaddam Commander ownership",
+  );
 
   const arrakeen = data.boardSpaces.find((space) => space.id === "arrakeen");
   assert.ok(arrakeen, "Arrakeen should exist for Signet deployment regression");

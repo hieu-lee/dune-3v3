@@ -549,7 +549,11 @@ try {
     "Emperor of the Known Universe should block same-turn Conflict deployment",
   );
   assert.equal(shaddamSignetEffect.target.id, shaddamAlly.id, "Shaddam Signet should keep the activated Ally target");
-  assert.match(shaddamSignetEffect.log ?? "", /can't be deployed/, "Shaddam Signet should log the deployment block");
+  assert.match(
+    shaddamSignetEffect.log ?? "",
+    /Emperor of the Known Universe: units can't be deployed/,
+    "Shaddam Signet should log the deployment block under the ability name",
+  );
   assert.equal(
     state.pendingActionForSpace(
       arrakeen,

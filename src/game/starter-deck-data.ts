@@ -1,10 +1,13 @@
 import catalogJson from "./uprising-catalog.generated.json";
 import {
+  agentBlockConflictDeployment,
   agentPlayEffects,
   cloneCardEffects,
   revealEffects,
   revealGainPersuasion,
   revealGainStrength,
+  hasRole,
+  hasTeam,
 } from "./effect-specs";
 import type { Card, TeamId } from "./types";
 
@@ -399,7 +402,13 @@ const emperorCommanderSpecs: Array<StarterCardSpec & { sourceId: number }> = [
     icons: ["landsraad", "city", "spice"],
     persuasion: 1,
     swords: 0,
-    effects: [revealGainPersuasion(1)],
+    effects: [
+      agentBlockConflictDeployment(
+        { source: "Emperor of the Known Universe" },
+        [hasTeam("shaddam"), hasRole("Commander")],
+      ),
+      revealGainPersuasion(1),
+    ],
     play: "Emperor of the Known Universe: no Conflict deployment this turn; pay 1 Solari for 1 Ally troop or 3 Solari for 1 Influence.",
     reveal: starterRevealText(1, 0),
   },

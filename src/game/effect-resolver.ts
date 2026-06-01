@@ -20,6 +20,8 @@ import type {
   PlayerSelector,
   ResourceId,
   Resources,
+  Role,
+  TeamId,
   TrashCardZone,
 } from "./types";
 
@@ -81,6 +83,8 @@ export type AgentDiscardCardForInfluenceAndDraw = {
 
 type PlayerEffectResult = {
   cardsToDraw: number;
+  blocksDeploymentsThisTurn: boolean;
+  deploymentBlockSource?: string;
   intriguesToDraw: number;
   recruitedTroops: number;
   revealGain: Partial<Resources>;
@@ -95,6 +99,7 @@ export type GameEffectResult = PlayerEffectResult & {
 
 const emptyPlayerEffectResult: PlayerEffectResult = {
   cardsToDraw: 0,
+  blocksDeploymentsThisTurn: false,
   intriguesToDraw: 0,
   recruitedTroops: 0,
   revealGain: {},
@@ -103,6 +108,7 @@ const emptyPlayerEffectResult: PlayerEffectResult = {
 
 const emptyEffectResult: GameEffectResult = {
   cardsToDraw: 0,
+  blocksDeploymentsThisTurn: false,
   intriguesToDraw: 0,
   recruitedTroops: 0,
   persuasion: 0,
@@ -134,6 +140,8 @@ const supportedFactions = new Set<FactionId>([
   "greatHouses",
   "fringeWorlds",
 ]);
+const supportedTeams = new Set<TeamId>(["muaddib", "shaddam"]);
+const supportedRoles = new Set<Role>(["Commander", "Ally"]);
 
 function unsupportedKind(label: string, value: unknown): never {
   const kind = typeof value === "object" && value !== null && "kind" in value
@@ -195,6 +203,14 @@ function validateCondition(condition: GameEffectConditionSpec) {
     }
     if (condition.count === undefined || isNonNegativeInteger(condition.count)) return;
     invalidSpecField("has-card-trait-in-play count", condition.count);
+  }
+  if (condition.kind === "has-team") {
+    if (supportedTeams.has(condition.team)) return;
+    throw new Error(`Unsupported effect team "${condition.team}"`);
+  }
+  if (condition.kind === "has-role") {
+    if (supportedRoles.has(condition.role)) return;
+    throw new Error(`Unsupported effect role "${condition.role}"`);
   }
   unsupportedKind("effect condition", condition);
 }
@@ -291,6 +307,18 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     validateAmount(effect.influenceAmount);
     return;
   }
+  if (effect.kind === "block-conflict-deployment") {
+    if (trigger !== "agent-play") {
+      throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
+    }
+    if (effect.selector !== "self") {
+      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
+    if (effect.source !== undefined && (typeof effect.source !== "string" || effect.source.trim().length === 0)) {
+      invalidSpecField("block-conflict-deployment source", effect.source);
+    }
+    return;
+  }
   if (effect.kind === "place-spies") {
     if (trigger !== "agent-play") {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
@@ -349,6 +377,12 @@ function conditionApplies(condition: GameEffectConditionSpec, context: GameEffec
   if (condition.kind === "has-card-trait-in-play") {
     const count = condition.count ?? 1;
     return context.source.playArea.filter((card) => card.traits?.includes(condition.trait)).length >= count;
+  }
+  if (condition.kind === "has-team") {
+    return context.source.team === condition.team;
+  }
+  if (condition.kind === "has-role") {
+    return context.source.role === condition.role;
   }
   return unsupportedKind("effect condition", condition);
 }
@@ -504,6 +538,13 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
   if (effect.kind === "discard-card-for-influence-and-draw") {
     return result;
   }
+  if (effect.kind === "block-conflict-deployment") {
+    return {
+      ...result,
+      blocksDeploymentsThisTurn: true,
+      deploymentBlockSource: effect.source ?? result.deploymentBlockSource,
+    };
+  }
   if (effect.kind === "place-spies") {
     const amount = amountFor(effect.amount, context.source);
     return addSelectedSpyPlacement(result, effect.selector, {
@@ -528,6 +569,8 @@ export function resolveGameEffects(specs: CardEffectSpec[] | undefined, context:
 function mergeEffectResult(result: GameEffectResult, next: GameEffectResult): GameEffectResult {
   return {
     cardsToDraw: result.cardsToDraw + next.cardsToDraw,
+    blocksDeploymentsThisTurn: result.blocksDeploymentsThisTurn || next.blocksDeploymentsThisTurn,
+    deploymentBlockSource: result.deploymentBlockSource ?? next.deploymentBlockSource,
     intriguesToDraw: result.intriguesToDraw + next.intriguesToDraw,
     recruitedTroops: result.recruitedTroops + next.recruitedTroops,
     persuasion: result.persuasion + next.persuasion,
@@ -544,6 +587,8 @@ function mergeEffectResult(result: GameEffectResult, next: GameEffectResult): Ga
 function mergePlayerEffectResult(result: PlayerEffectResult, next: PlayerEffectResult): PlayerEffectResult {
   return {
     cardsToDraw: result.cardsToDraw + next.cardsToDraw,
+    blocksDeploymentsThisTurn: result.blocksDeploymentsThisTurn || next.blocksDeploymentsThisTurn,
+    deploymentBlockSource: result.deploymentBlockSource ?? next.deploymentBlockSource,
     intriguesToDraw: result.intriguesToDraw + next.intriguesToDraw,
     recruitedTroops: result.recruitedTroops + next.recruitedTroops,
     revealGain: Object.entries(next.revealGain).reduce(
@@ -677,6 +722,7 @@ export function resolveAgentDiscardCardForInfluenceAndDraws(
 function legacyRevealResult(card: Card): GameEffectResult {
   return {
     cardsToDraw: 0,
+    blocksDeploymentsThisTurn: false,
     intriguesToDraw: 0,
     recruitedTroops: 0,
     persuasion: card.persuasion,

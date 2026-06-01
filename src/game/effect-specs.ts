@@ -7,6 +7,8 @@ import type {
   IconId,
   PlayerSelector,
   ResourceId,
+  Role,
+  TeamId,
   TrashCardZone,
 } from "./types";
 
@@ -120,6 +122,15 @@ export function agentDiscardCardForInfluenceAndDraw(
   ], conditions);
 }
 
+export function agentBlockConflictDeployment(
+  options: {
+    source?: string;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return agentPlayEffects([{ kind: "block-conflict-deployment", selector: "self", ...options }], conditions);
+}
+
 export function agentDrawCards(amount: EffectAmountSpec, conditions?: GameEffectConditionSpec[]): CardEffectSpec {
   return agentPlayEffects([{ kind: "draw-cards", selector: "self", amount }], conditions);
 }
@@ -183,6 +194,14 @@ export function hasCompletedContracts(count: number) {
 
 export function hasCardTraitInPlay(trait: string, count = 1) {
   return { kind: "has-card-trait-in-play", trait, count } as const;
+}
+
+export function hasTeam(team: TeamId) {
+  return { kind: "has-team", team } as const;
+}
+
+export function hasRole(role: Role) {
+  return { kind: "has-role", role } as const;
 }
 
 export function cloneCardEffects(effects: CardEffectSpec[] | undefined): CardEffectSpec[] | undefined {

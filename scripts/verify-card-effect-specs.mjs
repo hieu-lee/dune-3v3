@@ -94,6 +94,7 @@ try {
   const prepareTheWay = data.reserveMarket.find((card) => card.sourceId === 537);
   const limitedLandsraadAccess = data.muadDibCommanderCards.find((card) => card.name === "Limited Landsraad Access");
   const devastatingAssault = data.emperorCommanderCards.find((card) => card.name === "Devastating Assault");
+  const emperorSignet = data.emperorCommanderCards.find((card) => card.name === "Signet Ring");
   const imperialOrnithopter = data.emperorCommanderCards.find((card) => card.name === "Imperial Ornithopter");
   const arrakeen = data.boardSpaces.find((space) => space.id === "arrakeen");
   const haggaBasin = data.boardSpaces.find((space) => space.id === "hagga-basin");
@@ -115,7 +116,7 @@ try {
     northernWatermaster &&
     paracompass,
   );
-  assert.ok(prepareTheWay && limitedLandsraadAccess && devastatingAssault && imperialOrnithopter);
+  assert.ok(prepareTheWay && limitedLandsraadAccess && devastatingAssault && emperorSignet && imperialOrnithopter);
   assert.ok(arrakeen && haggaBasin && imperialBasin && secrets && highCouncil);
   assert.equal(revealSpecCards.length, 34, "Unexpected number of cards with declarative Reveal specs");
   assert.deepEqual(
@@ -332,6 +333,19 @@ try {
       )
     ),
     "Devastating Assault should carry a routed Agent recruit spec",
+  );
+  assert.ok(
+    emperorSignet.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.conditions?.some((condition) => condition.kind === "has-team" && condition.team === "shaddam") &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Commander") &&
+      spec.effects.some((effect) =>
+        effect.kind === "block-conflict-deployment" &&
+        effect.selector === "self" &&
+        effect.source === "Emperor of the Known Universe"
+      )
+    ),
+    "Shaddam Signet Ring should carry a declarative Agent deployment-block spec",
   );
   for (const card of revealSpecCards) {
     assert.deepEqual(
@@ -592,6 +606,34 @@ try {
     /Invalid has-card-trait-in-play count "-1"/,
     "Card-trait conditions should require a non-negative integer threshold",
   );
+  const invalidTeamConditionCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-team-condition-card",
+    name: "Effect Spec Invalid Team Condition",
+    effects: [agentSpec(
+      [{ kind: "draw-cards", selector: "self", amount: 1 }],
+      [{ kind: "has-team", team: "atreides" }],
+    )],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidTeamConditionCard, p2, p2),
+    /Unsupported effect team "atreides"/,
+    "Team conditions should reject unsupported team ids",
+  );
+  const invalidRoleConditionCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-role-condition-card",
+    name: "Effect Spec Invalid Role Condition",
+    effects: [agentSpec(
+      [{ kind: "draw-cards", selector: "self", amount: 1 }],
+      [{ kind: "has-role", role: "Captain" }],
+    )],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidRoleConditionCard, p2, p2),
+    /Unsupported effect role "Captain"/,
+    "Role conditions should reject unsupported role ids",
+  );
   const invalidSpyPlacementAmountCard = {
     ...convincingArgument,
     id: "effect-spec-invalid-spy-placement-amount-card",
@@ -757,6 +799,39 @@ try {
     () => state.applyCardAgentEffect(invalidDiscardInfluenceAmountCard, p2, p2),
     /Invalid effect amount "-1"/,
     "Discard-for-Influence-and-draw specs should require non-negative Influence amounts",
+  );
+  const revealDeploymentBlockCard = {
+    ...convincingArgument,
+    id: "effect-spec-reveal-deployment-block-card",
+    name: "Effect Spec Reveal Deployment Block",
+    effects: [revealSpec([{ kind: "block-conflict-deployment", selector: "self" }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [revealDeploymentBlockCard], highCouncilSeat: false }),
+    /Unsupported effect "block-conflict-deployment" for reveal/,
+    "Deployment-block specs should stay in Agent play until other trigger resolvers support them",
+  );
+  const invalidDeploymentBlockSelectorCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-deployment-block-selector-card",
+    name: "Effect Spec Invalid Deployment Block Selector",
+    effects: [agentSpec([{ kind: "block-conflict-deployment", selector: "activated-ally" }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidDeploymentBlockSelectorCard, p4, p2),
+    /Unsupported effect selector "activated-ally" for block-conflict-deployment/,
+    "Deployment-block specs should reject activated Ally selectors",
+  );
+  const invalidDeploymentBlockSourceCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-deployment-block-source-card",
+    name: "Effect Spec Invalid Deployment Block Source",
+    effects: [agentSpec([{ kind: "block-conflict-deployment", selector: "self", source: "" }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidDeploymentBlockSourceCard, p2, p2),
+    /Invalid block-conflict-deployment source ""/,
+    "Deployment-block specs should reject empty source labels",
   );
 	  const conditionalRevealRetreatCard = {
 	    ...convincingArgument,

@@ -63,10 +63,7 @@ import {
   transferTradeGood,
   updateTradeSelection,
 } from "./trade-rules";
-import {
-  skipTrashCard,
-  trashPlayerCard,
-} from "./trash-rules";
+import { skipTrashCard as resolveSkipTrashCard, trashPlayerCard as resolveTrashPlayerCard } from "./trash-rules";
 import {
   advanceMakerSpice,
   advanceSeat,
@@ -84,6 +81,7 @@ import type {
   PendingAction,
   ResourceId,
   Resources,
+  TrashCardZone,
 } from "./types";
 
 export {
@@ -372,12 +370,7 @@ export {
   threatenSpiceProductionCost,
 } from "./threaten-spice-production";
 
-export {
-  skipTrashCard,
-  trashableCards,
-  trashableCardsForPending,
-  trashPlayerCard,
-} from "./trash-rules";
+export { trashableCards, trashableCardsForPending } from "./trash-rules";
 
 export {
   advanceMakerSpice,
@@ -474,6 +467,7 @@ type SpyPendingAction = Extract<PendingAction, { kind: "spy" }>;
 type StabanUnseenNetworkPendingAction = Extract<PendingAction, { kind: "staban-unseen-network" }>;
 type RevealAdjustPendingAction = Extract<PendingAction, { kind: "reveal-adjust" }>;
 type CommanderResourceSplitPendingAction = Extract<PendingAction, { kind: "commander-resource-split" }>;
+type TrashCardPendingAction = Extract<PendingAction, { kind: "trash-card" }>;
 
 export function takeChoamContract(state: GameState, pending: ContractPendingAction, contractId: string): GameState {
   return continueAfterResolvedConflictReward(
@@ -494,6 +488,19 @@ export function collectChoamContractFallback(state: GameState, pending: Contract
   return continueAfterResolvedConflictReward(
     resolveChoamContractFallback(state, pending, finishCombatIfNoActors),
   );
+}
+
+export function trashPlayerCard(
+  state: GameState,
+  pending: TrashCardPendingAction,
+  zone: TrashCardZone,
+  cardId: string,
+): GameState {
+  return continueAfterResolvedConflictReward(resolveTrashPlayerCard(state, pending, zone, cardId));
+}
+
+export function skipTrashCard(state: GameState, pending: TrashCardPendingAction): GameState {
+  return continueAfterResolvedConflictReward(resolveSkipTrashCard(state, pending));
 }
 
 export function placeSpyForPending(

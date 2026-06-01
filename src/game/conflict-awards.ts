@@ -30,6 +30,7 @@ import {
   resolveLeaderInfluenceThresholdRewards,
 } from "./leader-rewards";
 import { mainBoardInfluenceChoices } from "./influence-choices";
+import { trashableCards } from "./trash-rules";
 import type {
   BattleIconId,
   ConflictCard,
@@ -53,6 +54,7 @@ type FirstPlaceBattleReward = {
   influenceChoices?: number;
   influenceChoiceOptions?: FactionId[];
   spies?: number;
+  trashCards?: number;
   troops?: number;
   conversion?:
     | { kind: "resource"; resource: ResourceId; amount: number; vp: number }
@@ -62,6 +64,7 @@ type ConflictVpConversionPendingAction = Extract<PendingAction, { kind: "conflic
 type ConflictInfluencePendingAction = Extract<PendingAction, { kind: "conflict-influence" }>;
 type ContractPendingAction = Extract<PendingAction, { kind: "contract" }>;
 type SpyPendingAction = Extract<PendingAction, { kind: "spy" }>;
+type TrashPendingAction = Extract<PendingAction, { kind: "trash-card" }>;
 
 const resourceIds: ResourceId[] = ["solari", "spice", "water"];
 const propagandaInfluenceChoices: FactionId[] = ["emperor", "spacing", "bene", "fremen"];
@@ -122,6 +125,12 @@ const firstPlaceBattleRewardsBySourceId: Record<number, FirstPlaceBattleReward> 
     influence: { fremen: 1 },
     resources: { water: 1 },
     troops: 1,
+  },
+  462: {
+    fixedVp: 0,
+    contracts: 1,
+    resources: { water: 1 },
+    trashCards: 1,
   },
   463: {
     fixedVp: 0,
@@ -233,6 +242,22 @@ function pendingActionsForContractReward(
     kind: "contract",
     ownerId: owner.id,
     publicOnly: true,
+    source: conflict.name,
+  }));
+}
+
+function pendingActionsForTrashReward(
+  owner: Player,
+  conflict: ConflictCard,
+  reward: FirstPlaceBattleReward | undefined,
+  multiplier: number,
+): TrashPendingAction[] {
+  const requested = (reward?.trashCards ?? 0) * multiplier;
+  const count = Math.min(requested, trashableCards(owner).length);
+  return Array.from({ length: count }, () => ({
+    kind: "trash-card",
+    ownerId: owner.id,
+    optional: false,
     source: conflict.name,
   }));
 }
@@ -400,10 +425,12 @@ function awardConflictToWinner(
   );
   const influencePendingActions = pendingActionsForConflictInfluence(winner, conflict, firstPlaceReward, multiplier);
   const contractPendingActions = pendingActionsForContractReward(state, winner, conflict, firstPlaceReward, multiplier);
+  const trashPendingActions = pendingActionsForTrashReward(winner, conflict, firstPlaceReward, multiplier);
   const spyPending = pendingActionForSpyReward(state, winner, conflict, firstPlaceReward, multiplier);
   const rewardPendingActions: PendingAction[] = [];
   rewardPendingActions.push(...influencePendingActions);
   rewardPendingActions.push(...contractPendingActions);
+  rewardPendingActions.push(...trashPendingActions);
   if (conversionPending) rewardPendingActions.push(conversionPending);
   if (spyPending) rewardPendingActions.push(spyPending);
   const [rewardPendingAction, ...queuedRewardActions] = rewardPendingActions;
@@ -445,6 +472,9 @@ function awardConflictToWinner(
         : undefined,
       contractPendingActions.length > 0
         ? `${winner.leader} may take ${contractPendingActions.length} face-up CHOAM contract${contractPendingActions.length === 1 ? "" : "s"} from ${conflict.name}${multiplier > 1 ? " with sandworm doubling" : ""}.`
+        : undefined,
+      trashPendingActions.length > 0
+        ? `${winner.leader} must trash ${trashPendingActions.length} card${trashPendingActions.length === 1 ? "" : "s"} from ${conflict.name}${multiplier > 1 ? " with sandworm doubling" : ""}.`
         : undefined,
       spyPending
         ? `${winner.leader} may place ${spyPending.remaining} ${spyPending.remaining === 1 ? "spy" : "spies"} from ${conflict.name}${multiplier > 1 ? " with sandworm doubling" : ""}.`

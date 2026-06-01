@@ -6,6 +6,7 @@ import { verifySeizeSpiceRefineryConflictAwards } from "./verify-conflict-awards
 import { verifySpiceFreightersConflictAwards } from "./verify-conflict-awards-spice-freighters.mjs";
 import { verifySkirmishConflictAwards } from "./verify-conflict-awards-skirmish.mjs";
 import { verifyTestOfLoyaltyConflictAwards } from "./verify-conflict-awards-test-of-loyalty.mjs";
+import { verifyTradeDisputeConflictAwards } from "./verify-conflict-awards-trade-dispute.mjs";
 
 const server = await createServer({
   appType: "custom",
@@ -369,6 +370,13 @@ try {
     playerById,
   });
   verifyTestOfLoyaltyConflictAwards({
+    state,
+    data,
+    fixture,
+    conflictBySourceId,
+    playerById,
+  });
+  verifyTradeDisputeConflictAwards({
     state,
     data,
     fixture,

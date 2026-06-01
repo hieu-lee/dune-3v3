@@ -8,10 +8,11 @@ import {
   drawCards,
   shuffleCards,
 } from "./deck-utils";
+import { stabanTuekLeaderName } from "./leader-constants";
 import { buildShaddamContractReserve } from "./setup-utils";
 import type { Influence, Player, Role, TeamId } from "./types";
 
-export const stabanTuekLeaderName = "Staban Tuek";
+export { stabanTuekLeaderName };
 
 export const emptyInfluence = (): Influence => ({
   emperor: 0,

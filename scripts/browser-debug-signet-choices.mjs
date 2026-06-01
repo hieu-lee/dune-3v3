@@ -46,8 +46,20 @@ export async function runSignetChoicesSmoke({
   assert.equal(amber.resources.spice, 1, "Amber Signet should gain the scripted spice");
   await screenshot(page, captures, "amber-signet-fill-coffers.png");
 
-  await setDebugGameAndWait(page, states.shaddam);
+  await setDebugGameAndWait(page, states.margot);
   let pendingText = await page.locator(".pending-panel").innerText();
+  assert.match(pendingText, /Arrakis Informant/i);
+  assert.match(pendingText, /Bene Gesserit/i);
+  await screenshot(page, captures, "pending-margot-arrakis-informant.png");
+
+  await setDebugGameAndWait(page, states.staban);
+  pendingText = await page.locator(".pending-panel").innerText();
+  assert.match(pendingText, /Unseen Network/i);
+  assert.match(pendingText, /spy placement/i);
+  await screenshot(page, captures, "pending-staban-signet-spy.png");
+
+  await setDebugGameAndWait(page, states.shaddam);
+  pendingText = await page.locator(".pending-panel").innerText();
   assert.match(pendingText, /Emperor of the Known Universe/i);
   assert.match(pendingText, /Spend 1: Feyd-Rautha Harkonnen recruits 1 troop/i);
   await screenshot(page, captures, "pending-shaddam-signet.png");
@@ -130,6 +142,43 @@ async function createSignetChoiceStates(server, initialPlayableGame) {
     players: game.players.map((player) => player.id === amberSource.id ? amberSource : player),
   };
   const amberEffect = state.applyCardAgentEffect(amberCard, amberSource, amberSource, amberBase);
+  const margotCard = { ...allySignet, id: "debug-margot-signet-ring" };
+  const margotSource = {
+    ...muadDibTarget,
+    leader: "Lady Margot Fenring",
+    leaderCard: data.leaderCardByName("Lady Margot Fenring"),
+    spies: 1,
+    playArea: [margotCard],
+  };
+  const margotBase = {
+    ...game,
+    players: game.players.map((player) => player.id === margotSource.id ? margotSource : player),
+  };
+  const margotPending = state.pendingActionForCard(margotCard, margotSource, margotBase, margotSource);
+  assert.equal(margotPending?.kind, "spy", "Expected Margot Signet spy pending action");
+  assert.equal(margotPending.source, "Arrakis Informant", "Margot Signet should use the ability source label");
+  assert.equal(margotPending.placementIcon, "bene", "Margot Signet should restrict placement to Bene posts");
+
+  const stabanCard = { ...allySignet, id: "debug-staban-signet-ring" };
+  const stabanSource = {
+    ...muadDibTarget,
+    leader: "Staban Tuek",
+    leaderCard: data.leaderCardByName("Staban Tuek"),
+    spies: 1,
+    playArea: [stabanCard],
+  };
+  const stabanBase = {
+    ...game,
+    players: game.players.map((player) => player.id === stabanSource.id ? stabanSource : player),
+  };
+  const stabanPending = state.pendingActionForCard(stabanCard, stabanSource, stabanBase, stabanSource);
+  assert.equal(stabanPending?.kind, "spy", "Expected Staban Signet spy pending action");
+  assert.equal(stabanPending.source, "Unseen Network", "Staban Signet should use the ability source label");
+  assert.equal(
+    stabanPending.postPlacementAction,
+    "staban-unseen-network",
+    "Staban Signet should queue the Unseen Network follow-up",
+  );
 
   const muadDib = {
     ...game,
@@ -163,6 +212,22 @@ async function createSignetChoiceStates(server, initialPlayableGame) {
     pendingQueue: [],
     players: amberBase.players.map((player) => player.id === amberEffect.source.id ? amberEffect.source : player),
     log: [amberEffect.log, ...game.log].filter(Boolean),
+  };
+
+  const margot = {
+    ...margotBase,
+    activeSeat: 2,
+    phase: "playing",
+    pendingAction: margotPending,
+    pendingQueue: [],
+  };
+
+  const staban = {
+    ...stabanBase,
+    activeSeat: 2,
+    phase: "playing",
+    pendingAction: stabanPending,
+    pendingQueue: [],
   };
 
   const shaddam = {
@@ -208,5 +273,5 @@ async function createSignetChoiceStates(server, initialPlayableGame) {
     },
   };
 
-  return { muadDib, gurney, amber, shaddam, irulan };
+  return { muadDib, gurney, amber, margot, staban, shaddam, irulan };
 }

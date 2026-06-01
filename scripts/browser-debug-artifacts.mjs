@@ -66,6 +66,8 @@ const generatedScreenshotNames = [
   "muaddib-signet-draw.png",
   "gurney-signet-warmaster.png",
   "amber-signet-fill-coffers.png",
+  "pending-margot-arrakis-informant.png",
+  "pending-staban-signet-spy.png",
   "pending-shaddam-signet.png",
   "pending-irulan-signet.png",
   "pending-staban-unseen-network.png",

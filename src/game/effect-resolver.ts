@@ -31,6 +31,8 @@ export type SpyPlacementEffectResult = {
   mustPlace?: boolean;
   placementIcon?: IconId;
   allowSharedPost?: boolean;
+  source?: string;
+  postPlacementAction?: "staban-unseen-network";
 };
 
 export type EffectResolverState = Partial<
@@ -353,6 +355,13 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     if (trigger !== "agent-play") {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
     }
+    validateSourceLabel("place-spies source", effect.source);
+    if (
+      effect.postPlacementAction !== undefined &&
+      effect.postPlacementAction !== "staban-unseen-network"
+    ) {
+      invalidSpecField("place-spies postPlacementAction", effect.postPlacementAction);
+    }
     validateAmount(effect.amount);
     return;
   }
@@ -640,6 +649,8 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
       mustPlace: effect.mustPlace,
       placementIcon: effect.placementIcon,
       allowSharedPost: effect.allowSharedPost,
+      source: effect.source,
+      postPlacementAction: effect.postPlacementAction,
     });
   }
   return unsupportedKind("effect", effect);

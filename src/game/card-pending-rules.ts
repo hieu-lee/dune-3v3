@@ -32,7 +32,6 @@ import {
   feydRauthaLeaderName,
   ladyAmberMetulliLeaderName,
   ladyJessicaLeaderName,
-  ladyMargotFenringLeaderName,
   princessIrulanLeaderName,
   reverendMotherJessicaLeaderName,
 } from "./leader-constants";
@@ -40,7 +39,6 @@ import {
   irulanSignetAcquireCards,
   irulanSignetTrashableCards,
 } from "./market-rules";
-import { stabanTuekLeaderName } from "./player-setup";
 import {
   placeableSpySpaces,
   recallableSpySpaces,
@@ -141,7 +139,9 @@ function sameSpyPlacementDetails(first: SpyPlacementEffectResult, second: SpyPla
   return first.recallForSupply === second.recallForSupply &&
     first.mustPlace === second.mustPlace &&
     first.placementIcon === second.placementIcon &&
-    first.allowSharedPost === second.allowSharedPost;
+    first.allowSharedPost === second.allowSharedPost &&
+    first.source === second.source &&
+    first.postPlacementAction === second.postPlacementAction;
 }
 
 function mergedSpyPlacement(card: Card, placements: SpyPlacementEffectResult[]) {
@@ -171,7 +171,8 @@ function spyPendingForPlacement(
     ...(placement.mustPlace ? { mustPlaceSpy: true } : {}),
     ...(placement.placementIcon ? { placementIcon: placement.placementIcon } : {}),
     ...(placement.allowSharedPost ? { allowSharedPost: true } : {}),
-    source: card.name,
+    ...(placement.postPlacementAction ? { postPlacementAction: placement.postPlacementAction } : {}),
+    source: placement.source ?? card.name,
   };
   const canPlace = state
     ? placeableSpySpaces(state, pending).length > 0 || recallableSpySupplySpaces(state, pending).length > 0
@@ -302,44 +303,6 @@ export function pendingActionForCard(
     const canAcquire = state ? irulanSignetAcquireCards(state, pending).length > 0 : false;
     const canTrash = state ? irulanSignetTrashableCards(state, pending).length > 0 : source.hand.length > 0;
     return canAcquire || canTrash ? pending : undefined;
-  }
-  if (
-    isGenericSignetRingCard(card) &&
-    source.leader === ladyMargotFenringLeaderName &&
-    source.role === "Ally" &&
-    source.playArea.some((candidate) => candidate.id === card.id && isGenericSignetRingCard(candidate))
-  ) {
-    const pending: PendingAction = {
-      kind: "spy",
-      ownerId: source.id,
-      remaining: 1,
-      source: "Arrakis Informant",
-      placementIcon: "bene",
-      recallForSupply: true,
-    };
-    const canPlace = state
-      ? placeableSpySpaces(state, pending).length > 0 || recallableSpySupplySpaces(state, pending).length > 0
-      : source.spies > 0;
-    return canPlace ? pending : undefined;
-  }
-  if (
-    isGenericSignetRingCard(card) &&
-    source.leader === stabanTuekLeaderName &&
-    source.role === "Ally" &&
-    source.playArea.some((candidate) => candidate.id === card.id && isGenericSignetRingCard(candidate))
-  ) {
-    const pending: PendingAction = {
-      kind: "spy",
-      ownerId: source.id,
-      remaining: 1,
-      source: stabanUnseenNetworkSource,
-      recallForSupply: true,
-      postPlacementAction: "staban-unseen-network",
-    };
-    const canPlace = state
-      ? placeableSpySpaces(state, pending).length > 0 || recallableSpySupplySpaces(state, pending).length > 0
-      : source.spies > 0;
-    return canPlace ? pending : undefined;
   }
   if (
     isGenericSignetRingCard(card) &&

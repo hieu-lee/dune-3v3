@@ -225,6 +225,38 @@ try {
     "Generic Ally Signet Ring should carry declarative Amber Fill Coffers resource specs",
   );
   assert.ok(
+    allySignet.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.conditions?.some((condition) => condition.kind === "has-leader" && condition.leader === "Lady Margot Fenring") &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Ally") &&
+      spec.effects.some((effect) =>
+        effect.kind === "place-spies" &&
+        effect.selector === "self" &&
+        effect.amount === 1 &&
+        effect.source === "Arrakis Informant" &&
+        effect.placementIcon === "bene" &&
+        effect.recallForSupply === true
+      )
+    ),
+    "Generic Ally Signet Ring should carry declarative Margot Arrakis Informant spy spec",
+  );
+  assert.ok(
+    allySignet.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.conditions?.some((condition) => condition.kind === "has-leader" && condition.leader === "Staban Tuek") &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Ally") &&
+      spec.effects.some((effect) =>
+        effect.kind === "place-spies" &&
+        effect.selector === "self" &&
+        effect.amount === 1 &&
+        effect.source === "Unseen Network" &&
+        effect.recallForSupply === true &&
+        effect.postPlacementAction === "staban-unseen-network"
+      )
+    ),
+    "Generic Ally Signet Ring should carry declarative Staban Unseen Network spy spec",
+  );
+  assert.ok(
     makerKeeper.effects?.some((spec) =>
       spec.trigger === "agent-play" &&
       spec.conditions?.some((condition) =>
@@ -767,6 +799,28 @@ try {
     () => turnActions.revealTurnPlan({ ...p2, hand: [invalidSpyPlacementAmountCard], highCouncilSeat: false }),
     /Invalid effect amount "-1"/,
     "Spy placement effect amounts should require a non-negative integer amount",
+  );
+  const invalidSpyPlacementSourceCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-spy-placement-source-card",
+    name: "Effect Spec Invalid Spy Placement Source",
+    effects: [agentSpec([{ kind: "place-spies", selector: "self", amount: 1, source: "" }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidSpyPlacementSourceCard, p2, p2),
+    /Invalid place-spies source ""/,
+    "Spy placement specs should reject empty source labels",
+  );
+  const invalidSpyPlacementPostActionCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-spy-placement-post-action-card",
+    name: "Effect Spec Invalid Spy Placement Post Action",
+    effects: [agentSpec([{ kind: "place-spies", selector: "self", amount: 1, postPlacementAction: "draw-card" }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidSpyPlacementPostActionCard, p2, p2),
+    /Invalid place-spies postPlacementAction "draw-card"/,
+    "Spy placement specs should reject unsupported post-placement actions",
   );
 	  const revealSpyPlacementCard = {
 	    ...convincingArgument,

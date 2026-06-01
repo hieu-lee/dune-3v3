@@ -5,3 +5,4 @@ export const ladyJessicaLeaderName = "Lady Jessica";
 export const ladyMargotFenringLeaderName = "Lady Margot Fenring";
 export const princessIrulanLeaderName = "Princess Irulan";
 export const reverendMotherJessicaLeaderName = "Reverend Mother Jessica";
+export const stabanTuekLeaderName = "Staban Tuek";

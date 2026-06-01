@@ -3,6 +3,7 @@ import {
   agentBlockConflictDeployment,
   agentDrawCards,
   agentGainResource,
+  agentPlaceSpies,
   agentPlayEffects,
   agentRecruitTroops,
   cloneCardEffects,
@@ -17,6 +18,8 @@ import {
 import {
   gurneyHalleckLeaderName,
   ladyAmberMetulliLeaderName,
+  ladyMargotFenringLeaderName,
+  stabanTuekLeaderName,
 } from "./leader-constants";
 import type { Card, TeamId } from "./types";
 
@@ -204,6 +207,18 @@ const allyStarterSpecs: StarterCardSpec[] = [
         1,
         { source: "Fill Coffers" },
         [hasLeader(ladyAmberMetulliLeaderName), hasRole("Ally"), hasAlliance()],
+      ),
+      agentPlaceSpies(
+        "self",
+        1,
+        { source: "Arrakis Informant", placementIcon: "bene", recallForSupply: true },
+        [hasLeader(ladyMargotFenringLeaderName), hasRole("Ally")],
+      ),
+      agentPlaceSpies(
+        "self",
+        1,
+        { source: "Unseen Network", recallForSupply: true, postPlacementAction: "staban-unseen-network" },
+        [hasLeader(stabanTuekLeaderName), hasRole("Ally")],
       ),
       revealGainPersuasion(1),
     ],

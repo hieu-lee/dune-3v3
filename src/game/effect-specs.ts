@@ -209,6 +209,8 @@ export function agentPlaceSpies(
     mustPlace?: boolean;
     placementIcon?: IconId;
     allowSharedPost?: boolean;
+    source?: string;
+    postPlacementAction?: "staban-unseen-network";
   } = {},
   conditions?: GameEffectConditionSpec[],
 ): CardEffectSpec {

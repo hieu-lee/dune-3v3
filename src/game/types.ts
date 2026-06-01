@@ -98,6 +98,8 @@ export type GameEffectSpec =
       mustPlace?: boolean;
       placementIcon?: IconId;
       allowSharedPost?: boolean;
+      source?: string;
+      postPlacementAction?: "staban-unseen-network";
     };
 export type CardEffectSpec = {
   trigger: GameEffectTrigger;

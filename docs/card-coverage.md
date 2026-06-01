@@ -14,7 +14,7 @@ These cards currently use typed reveal effect specs:
 
 These cards currently use typed Agent effect specs:
 
-- Ally starter cards: Signet Ring leader-gated immediate rewards for Gurney Halleck and Lady Amber Metulli.
+- Ally starter cards: Signet Ring leader-gated immediate rewards for Gurney Halleck and Lady Amber Metulli, plus spy placement pending rewards for Lady Margot Fenring and Staban Tuek.
 - Reserve cards: Prepare The Way.
 - Muad'Dib Commander cards: Signet Ring.
 - Emperor Commander cards: Devastating Assault, Signet Ring.
@@ -25,7 +25,7 @@ These cards currently use typed Agent effect specs:
 These cards are automated but still rely on explicit card or leader branches while the shared primitive library grows:
 
 - Commander starter cards: Command Respect, Critical Shipments, Demand Attention, Demand Results, Desert Call, Devastating Assault Reveal payment, Imperial Tent, Corrino Might, Threaten Spice Production, Usul, Shaddam Signet Ring choices.
-- Ally leader Signet Ring effects: Lady Jessica, Lady Margot Fenring, Princess Irulan, Reverend Mother Jessica, Staban Tuek.
+- Ally leader Signet Ring pay/choice effects: Lady Jessica, Princess Irulan, Reverend Mother Jessica.
 - Plot and Combat Intrigues: currently automated through pattern modules and card-specific branches, not effect specs.
 
 ## Data-Driven Non-Card Islands
@@ -50,5 +50,5 @@ The largest current gaps are Agent and choice primitives:
 
 ## Verification
 
-- `pnpm run verify:card-effect-specs` verifies reveal specs, Agent card draw/source-label/resource/recruit/spy-placement/Intrigue draw/discard-for-Influence/deployment-block specs, Reveal Fremen Bond trait checks, Reveal troop-retreat strength specs, Reveal trash-card strength specs, Reveal Influence-for-Intrigue specs, legacy fallback, no double-counting, conditional Maker/contract/spy/influence/conflict-unit/leader/alliance behavior, shared spy posts, and manual reveal fallback.
+- `pnpm run verify:card-effect-specs` verifies reveal specs, Agent card draw/source-label/resource/recruit/spy-placement/post-placement/Intrigue draw/discard-for-Influence/deployment-block specs, Reveal Fremen Bond trait checks, Reveal troop-retreat strength specs, Reveal trash-card strength specs, Reveal Influence-for-Intrigue specs, legacy fallback, no double-counting, conditional Maker/contract/spy/influence/conflict-unit/leader/alliance behavior, shared spy posts, and manual reveal fallback.
 - `pnpm run verify` includes the effect-spec verifier through `package.json`.

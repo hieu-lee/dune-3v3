@@ -9,6 +9,7 @@ import {
   artifactStem,
   generatedArtifactNames,
   isGeneratedArtifactName,
+  scenarioNames,
   scenarios,
 } from "./browser-debug-artifacts.mjs";
 import { runCardChoicesSmoke } from "./browser-debug-card-choices.mjs";
@@ -83,7 +84,9 @@ const booleanOptions = new Set([
   "--allow-request-failures",
   "--capture-smoke",
   "--headed",
+  "--help",
   "--keep-open",
+  "--list-scenarios",
   "--no-trace",
   "--preserve-out",
 ]);
@@ -115,6 +118,44 @@ function validateKnownOptions(argv) {
 }
 
 validateKnownOptions(process.argv);
+
+function printUsage() {
+  console.log(`Usage: pnpm run debug:browser -- [options]
+
+Options:
+  --help                         Show this help.
+  --list-scenarios               Print supported scenario names and exit.
+  --scenario <name>              Scenario to run. Default: all.
+  --out <dir>                    Artifact directory. Default: artifacts/qa/browser-debug.
+  --port <number>                Requested starting Vite port. Default: 5178.
+  --headed                       Show Chromium instead of running headless.
+  --keep-open                    Keep browser open until Ctrl+C, then write final artifacts.
+  --capture-smoke                In manual mode, click the debug capture button and exit.
+  --no-trace                     Skip Playwright trace capture.
+  --preserve-out                 Do not clean generated artifacts before the run.
+  --slow-mo <ms>                 Delay browser actions for headed debugging.
+  --allow-console-errors         Do not fail on browser console/page errors.
+  --allow-request-failures       Do not fail on request failures or same-origin 4xx/5xx responses.
+
+Examples:
+  pnpm run debug:browser:scenarios
+  pnpm run debug:game:smoke
+  pnpm run debug:browser -- --scenario commander-reveal
+  pnpm run debug:browser:headed -- --scenario all --port 5181
+`);
+}
+
+const showHelp = hasFlag("--help");
+if (showHelp && !optionError) {
+  printUsage();
+  process.exit(0);
+}
+
+const listScenarios = hasFlag("--list-scenarios");
+if (listScenarios && !optionError) {
+  console.log(scenarioNames.join("\n"));
+  process.exit(0);
+}
 
 const headed = hasFlag("--headed");
 const keepOpen = hasFlag("--keep-open");

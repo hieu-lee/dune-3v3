@@ -11,6 +11,8 @@
     "verify": "node scripts/verify-all.mjs",
     "verify:all": "node scripts/verify-all.mjs",
     "debug:browser": "node scripts/browser-debug.mjs",
+    "debug:browser:help": "node scripts/browser-debug.mjs --help",
+    "debug:browser:scenarios": "node scripts/browser-debug.mjs --list-scenarios",
     "debug:browser:headed": "node scripts/browser-debug.mjs --headed --keep-open",
     "debug:browser:manual": "node scripts/browser-debug.mjs --headed --keep-open --scenario manual",
     "debug:game": "node scripts/browser-debug.mjs --headed --keep-open --scenario manual --out artifacts/qa/browser-debug-manual",

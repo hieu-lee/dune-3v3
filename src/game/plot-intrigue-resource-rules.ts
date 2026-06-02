@@ -28,6 +28,7 @@ import {
 import {
   activatedAllyEffectOwner,
 } from "./market-rules";
+import { playTypedPlotIntrigue } from "./plot-intrigue-effect-rules";
 import {
   recordTurnSpiceGain,
 } from "./turn-trackers";
@@ -110,27 +111,13 @@ export function playCouncilorsAmbitionPlotIntrigue(
   playerId: string,
   intrigueId: string,
 ): GameState {
-  if (state.phase !== "playing" || state.pendingAction || state.pendingQueue.length > 0) return state;
-  const player = state.players[state.activeSeat];
-  if (!player || player.id !== playerId) return state;
-  const intrigue = player.intrigues.find((card) => card.id === intrigueId);
-  if (!intrigue || !isCouncilorsAmbitionIntrigue(intrigue) || !player.highCouncilSeat) return state;
-
-  const players = state.players.map((candidate) =>
-    candidate.id === player.id
-      ? {
-          ...candidate,
-          resources: { ...candidate.resources, water: candidate.resources.water + 2 },
-          intrigues: candidate.intrigues.filter((card) => card.id !== intrigue.id),
-        }
-      : candidate,
+  return playTypedPlotIntrigue(
+    state,
+    playerId,
+    intrigueId,
+    isCouncilorsAmbitionIntrigue,
+    (player) => `${player.leader} plays Councilor's Ambition and gains 2 water.`,
   );
-  return {
-    ...state,
-    players,
-    intrigueDiscard: [...state.intrigueDiscard, intrigue],
-    log: [`${player.leader} plays Councilor's Ambition and gains 2 water.`, ...state.log],
-  };
 }
 
 export function playMercenariesPlotIntrigue(

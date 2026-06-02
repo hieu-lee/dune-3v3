@@ -157,6 +157,7 @@ try {
   const wheelsWithinWheels = data.imperiumDeck.find((card) => card.name === "Wheels Within Wheels");
   const prepareTheWay = data.reserveMarket.find((card) => card.sourceId === 537);
   const spiceMustFlow = data.reserveMarket.find((card) => card.sourceId === 538);
+  const councilorsAmbition = data.intrigueCards.find((card) => card.name === "Councilor's Ambition");
   const contingencyPlan = data.intrigueCards.find((card) => card.name === "Contingency Plan");
   const leverage = data.intrigueCards.find((card) => card.name === "Leverage");
   const commandRespect = data.muadDibCommanderCards.find((card) => card.name === "Command Respect");
@@ -226,7 +227,7 @@ try {
     wheelsWithinWheels,
   );
   assert.ok(commandRespect && prepareTheWay && spiceMustFlow && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
-  assert.ok(contingencyPlan && leverage);
+  assert.ok(councilorsAmbition && contingencyPlan && leverage);
   assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && dutifulService && deliverSupplies && sietchTabr && spiceRefinery);
   assert.equal(revealSpecCards.length, 79, "Unexpected number of cards with declarative Reveal specs");
   assert.equal(
@@ -268,6 +269,39 @@ try {
       "The Spice Must Flow",
     ],
     "Only implemented acquisition reward cards should currently carry declarative Acquire specs",
+  );
+  assert.ok(
+    councilorsAmbition.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.conditions?.some((condition) => condition.kind === "has-high-council-seat") &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-resource" &&
+        effect.selector === "self" &&
+        effect.resource === "water" &&
+        effect.amount === 2
+      )
+    ),
+    "Councilor's Ambition should carry a typed High Council-gated Plot Intrigue water gain spec",
+  );
+  const councilorsAmbitionPlotResolved = effectResolver.resolveGameEffects(councilorsAmbition.effects, {
+    trigger: "plot-intrigue",
+    source: { ...p2, highCouncilSeat: true },
+    state: game,
+  });
+  assert.equal(
+    councilorsAmbitionPlotResolved.revealGain.water,
+    2,
+    "Councilor's Ambition Plot spec should resolve its water gain with a High Council seat",
+  );
+  const councilorsAmbitionNoSeatResolved = effectResolver.resolveGameEffects(councilorsAmbition.effects, {
+    trigger: "plot-intrigue",
+    source: { ...p2, highCouncilSeat: false },
+    state: game,
+  });
+  assert.equal(
+    councilorsAmbitionNoSeatResolved.revealGain.water,
+    undefined,
+    "Councilor's Ambition Plot spec should not resolve without a High Council seat",
   );
   assert.ok(
     hasPlotEffect(contingencyPlan, (effect) =>

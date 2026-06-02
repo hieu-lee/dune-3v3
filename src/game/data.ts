@@ -6,6 +6,7 @@ import {
   capturedMentatSourceId,
   chaniCleverTacticianSourceId,
   contingencyPlanSourceId,
+  councilorsAmbitionSourceId,
   covertOperationSourceId,
   dangerousRhetoricSourceId,
   desertPowerSourceId,
@@ -822,6 +823,9 @@ export const conflictCards: ConflictCard[] = catalog.cards
   .map(toConflictCard);
 
 function intrigueCardEffects(card: HubCard): CardEffectSpec[] | undefined {
+  if (card.id === councilorsAmbitionSourceId) {
+    return [plotGainResource("water", 2, [hasHighCouncilSeat()])];
+  }
   if (card.id === contingencyPlanSourceId) {
     return [plotGainResource("solari", 2)];
   }

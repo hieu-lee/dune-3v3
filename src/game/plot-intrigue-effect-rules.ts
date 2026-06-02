@@ -2,6 +2,7 @@ import { drawCards } from "./deck-utils";
 import {
   type InfluenceAdjustmentEffect,
   resolveAcquireCards,
+  resolveDiscardCardEffects,
   resolveGameEffects,
   resolveManipulateRowCards,
   resolveTakeContracts,
@@ -30,6 +31,7 @@ const resourceIds = ["solari", "spice", "water"] as const;
 type PlayTypedPlotIntrigueOptions = {
   activatedAllyOwnerId?: string;
   choiceId?: string;
+  discardCardId?: string;
   requireActivatedAlly?: boolean;
   targetCardId?: string;
 };
@@ -38,6 +40,7 @@ type TypedPlotIntrigueOutcome = {
   acquireDestination?: AcquireCardDestination;
   acquirePending?: AcquireCardPendingAction;
   cardsDrawn: number;
+  discardedCard?: Card;
   manipulatedCard?: Card;
 };
 
@@ -140,6 +143,17 @@ function trashCardPendingFor(
   };
 }
 
+function selectedDiscardCardFor(
+  player: Player,
+  effect: ReturnType<typeof resolveDiscardCardEffects>[number] | undefined,
+  cardId: string | undefined,
+): Card | undefined {
+  if (!effect || effect.selector !== "self") return undefined;
+  if (effect.amount !== 1) throw new Error(`Unsupported Plot Intrigue discard-card amount ${effect.amount}`);
+  if (!cardId) return undefined;
+  return player.hand.find((card) => card.id === cardId);
+}
+
 function rowManipulationFor(
   state: GameState,
   targetCardId: string | undefined,
@@ -232,16 +246,21 @@ export function playTypedPlotIntrigue(
   const resolved = resolveGameEffects(intrigue.effects, context);
   const acquireEffects = resolveAcquireCards(intrigue.effects, context);
   const contractEffects = resolveTakeContracts(intrigue.effects, context);
+  const discardEffects = resolveDiscardCardEffects(intrigue.effects, context);
   const trashEffects = resolveTrashCardEffects(intrigue.effects, context);
   const rowManipulationEffects = resolveManipulateRowCards(intrigue.effects, context);
   if (acquireEffects.length > 1) throw new Error("Unsupported multiple Plot Intrigue acquire-card effects");
   if (contractEffects.length > 1) throw new Error("Unsupported multiple Plot Intrigue take-contracts effects");
+  if (discardEffects.length > 1) throw new Error("Unsupported multiple Plot Intrigue discard-card effects");
   if (trashEffects.length > 1) throw new Error("Unsupported multiple Plot Intrigue trash-card effects");
   if (rowManipulationEffects.length > 1) throw new Error("Unsupported multiple Plot Intrigue row manipulation effects");
   const [acquireEffect] = acquireEffects;
   const [contractEffect] = contractEffects;
+  const [discardEffect] = discardEffects;
   const [trashEffect] = trashEffects;
   const [rowManipulationEffect] = rowManipulationEffects;
+  const discardedCard = selectedDiscardCardFor(player, discardEffect, options.discardCardId);
+  if (discardEffect && !discardedCard) return state;
   const acquirePending = acquireCardPendingFor(state, player, intrigue, acquireEffect);
   const contractPending = publicContractPendingFor(state, player, intrigue, contractEffect);
   const spyPending = pendingActionForSpyPlacements(intrigue.name, player, resolved.spyPlacements, state);
@@ -273,6 +292,7 @@ export function playTypedPlotIntrigue(
     !hasAcquireRecruitBonus &&
     !acquireEffect &&
     !contractPending &&
+    !discardEffect &&
     !spyPending &&
     !trashEffect &&
     !rowManipulation
@@ -284,6 +304,7 @@ export function playTypedPlotIntrigue(
     acquireDestination: acquireEffect?.destination,
     acquirePending,
     cardsDrawn: 0,
+    discardedCard,
     manipulatedCard: rowManipulation?.card,
   };
   let sourceAfterEffects: Player | undefined;
@@ -293,7 +314,9 @@ export function playTypedPlotIntrigue(
         ...candidate,
         resources: applyResourceChanges(candidate.resources, resolved.revealGain, resolved.spentResources),
         callToArmsActive: hasAcquireRecruitBonus ? true : candidate.callToArmsActive,
+        discard: discardedCard ? [...candidate.discard, discardedCard] : candidate.discard,
         garrison: candidate.garrison + resolved.recruitedTroops,
+        hand: discardedCard ? candidate.hand.filter((card) => card.id !== discardedCard.id) : candidate.hand,
         manipulatedCards: rowManipulation
           ? [...candidate.manipulatedCards, rowManipulation.card]
           : candidate.manipulatedCards,

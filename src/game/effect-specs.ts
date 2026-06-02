@@ -138,6 +138,30 @@ export function plotTrashCard(
   return plotIntrigueEffects([{ kind: "trash-card", selector: "self", ...options }], conditions, specOptions);
 }
 
+export function plotDiscardCard(
+  amount: EffectAmountSpec,
+  options: {
+    optional?: boolean;
+    source?: string;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+  specOptions?: CardEffectSpecOptions,
+): CardEffectSpec {
+  return plotIntrigueEffects([{ kind: "discard-card", selector: "self", amount, ...options }], conditions, specOptions);
+}
+
+export function plotDiscardCardForInfluence(
+  choiceId: string,
+  faction: FactionId,
+  selector: PlayerSelector,
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return plotIntrigueEffects([
+    { kind: "discard-card", selector: "self", amount: 1 },
+    { kind: "gain-influence", selector, faction, amount: 1 },
+  ], conditions, { choiceId });
+}
+
 export function plotManipulateRowCard(
   options: {
     source?: string;

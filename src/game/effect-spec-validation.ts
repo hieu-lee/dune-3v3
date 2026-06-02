@@ -257,6 +257,18 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     validateAmount(effect.amount);
     return;
   }
+  if (effect.kind === "discard-card") {
+    if (trigger !== "plot-intrigue") {
+      throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
+    }
+    if (effect.selector !== "self") {
+      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
+    validateAmount(effect.amount);
+    validateOptionalBoolean("discard-card optional", (effect as { optional?: unknown }).optional);
+    validateSourceLabel("discard-card source", effect.source);
+    return;
+  }
   if (effect.kind === "activate-acquire-recruit-bonus") {
     if (trigger !== "plot-intrigue") {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);

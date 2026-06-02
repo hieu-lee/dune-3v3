@@ -28,11 +28,8 @@ import type {
   SietchRitualChoice,
 } from "./influence-choices";
 import {
-  adjustInfluence,
   adjustInfluenceAndResolveThresholdRewards,
-  resolveLeaderInfluenceThresholdRewards,
 } from "./leader-rewards";
-import { activatedAllyEffectOwner } from "./market-rules";
 import { playTypedPlotIntrigue } from "./plot-intrigue-effect-rules";
 import type {
   FactionId,
@@ -53,50 +50,29 @@ export function playSietchRitualPlotIntrigue(
   faction: SietchRitualChoice,
   influenceOwnerId?: string,
 ): GameState {
-  if (state.phase !== "playing" || state.pendingAction || state.pendingQueue.length > 0) return state;
   const player = state.players[state.activeSeat];
   if (!player || player.id !== playerId) return state;
-  const intrigue = player.intrigues.find((card) => card.id === intrigueId);
-  if (!intrigue || !isSietchRitualIntrigue(intrigue)) return state;
-  const discardedCard = player.hand.find((card) => card.id === discardCardId);
-  if (!discardedCard || !validSietchRitualChoice(player, faction)) return state;
+  if (!validSietchRitualChoice(player, faction)) return state;
   const personalFaction = commanderPersonalFaction(player);
-  const influenceOwnerResult =
-    player.role === "Commander" && faction !== personalFaction
-      ? activatedAllyEffectOwner(state, player, influenceOwnerId)
-      : { valid: true, owner: player };
-  if (!influenceOwnerResult.valid || !influenceOwnerResult.owner) return state;
-  const influenceOwner = influenceOwnerResult.owner;
-
-  const players = state.players.map((candidate) => {
-    let next = candidate;
-    if (candidate.id === player.id) {
-      next = {
-        ...next,
-        hand: next.hand.filter((card) => card.id !== discardedCard.id),
-        discard: [...next.discard, discardedCard],
-        intrigues: next.intrigues.filter((card) => card.id !== intrigue.id),
-      };
-    }
-    if (candidate.id === influenceOwner.id) {
-      next = adjustInfluence(next, faction, 1);
-    }
-    return next;
-  });
-  const influenceText = influenceOwner.id === player.id
-    ? `gains 1 ${factionLabels[faction]} Influence`
-    : `${influenceOwner.leader} gains 1 ${factionLabels[faction]} Influence`;
-
-  const nextState = {
-    ...state,
-    players,
-    intrigueDiscard: [...state.intrigueDiscard, intrigue],
-    log: [
-      `${player.leader} plays Sietch Ritual, discards ${discardedCard.name}, and ${influenceText}.`,
-      ...state.log,
-    ],
-  };
-  return resolveLeaderInfluenceThresholdRewards(nextState, state.players);
+  const requiresActivatedAlly = player.role === "Commander" && faction !== personalFaction;
+  return playTypedPlotIntrigue(
+    state,
+    playerId,
+    intrigueId,
+    isSietchRitualIntrigue,
+    (actor, _contractPending, activatedAlly, _resolved, outcome) => {
+      const influenceOwner = activatedAlly && activatedAlly.id !== actor.id ? activatedAlly : actor;
+      const influenceText = influenceOwner.id === actor.id
+        ? `gains 1 ${factionLabels[faction]} Influence`
+        : `${influenceOwner.leader} gains 1 ${factionLabels[faction]} Influence`;
+      return `${actor.leader} plays Sietch Ritual, discards ${outcome.discardedCard?.name ?? "a card"}, and ${influenceText}.`;
+    },
+    {
+      choiceId: faction,
+      discardCardId,
+      ...(requiresActivatedAlly ? { activatedAllyOwnerId: influenceOwnerId, requireActivatedAlly: true } : {}),
+    },
+  );
 }
 
 function changeAllegiancesChoiceValid(

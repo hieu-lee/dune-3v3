@@ -46,6 +46,7 @@ import {
   reliableInformantSourceId,
   sardaukarSoldierSourceId,
   shaddamsFavorSourceId,
+  sietchRitualSourceId,
   southernEldersSourceId,
   spaceTimeFoldingSourceId,
   spyNetworkSourceId,
@@ -88,6 +89,7 @@ import {
   gainedSpiceThisTurn,
   plotAcquireCard,
   plotActivateAcquireRecruitBonus,
+  plotDiscardCardForInfluence,
   plotDrawCards,
   plotDrawIntrigues,
   plotGainResource,
@@ -921,6 +923,15 @@ function intrigueCardEffects(card: HubCard): CardEffectSpec[] | undefined {
     return [
       plotAcquireCard("to-discard", "discard", 3, { source: "Inspire Awe" }),
       plotAcquireCard("to-hand", "hand", 3, { source: "Inspire Awe" }),
+    ];
+  }
+  if (card.id === sietchRitualSourceId) {
+    return [
+      plotDiscardCardForInfluence("bene", "bene", "self", [hasRole("Ally")]),
+      plotDiscardCardForInfluence("fringeWorlds", "fringeWorlds", "self", [hasRole("Ally")]),
+      plotDiscardCardForInfluence("bene", "bene", "activated-ally", [hasRole("Commander")]),
+      plotDiscardCardForInfluence("fringeWorlds", "fringeWorlds", "activated-ally", [hasRole("Commander")]),
+      plotDiscardCardForInfluence("fremen", "fremen", "self", [hasRole("Commander"), hasTeam("muaddib")]),
     ];
   }
   if (card.id === cunningSourceId) {

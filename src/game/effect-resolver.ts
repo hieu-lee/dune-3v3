@@ -161,6 +161,13 @@ export type AgentAcquireCard = {
   source?: string;
 };
 
+export type DiscardCardEffect = {
+  selector: PlayerSelector;
+  amount: number;
+  optional: boolean;
+  source?: string;
+};
+
 export type AgentGainInfluenceChoice = {
   selector: PlayerSelector;
   amount: number;
@@ -715,6 +722,9 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
     const amount = amountFor(effect.amount, context.source);
     return addSelectedIntriguesToDraw(result, effect.selector, amount);
   }
+  if (effect.kind === "discard-card") {
+    return result;
+  }
   if (effect.kind === "activate-acquire-recruit-bonus") {
     if (effect.selector !== "self") {
       throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
@@ -1193,6 +1203,25 @@ export function resolveAcquireCards(
         ...(effect.maxCost !== undefined ? { maxCost: amountFor(effect.maxCost, context.source) } : {}),
         destination: effect.destination,
         paymentResource: effect.paymentResource,
+        optional: effect.optional ?? false,
+        source: effect.source,
+      }));
+  });
+}
+
+export function resolveDiscardCardEffects(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): DiscardCardEffect[] {
+  specs?.forEach(validateSpec);
+  return (specs ?? []).flatMap((spec) => {
+    if (spec.trigger !== context.trigger) return [];
+    if (!specApplies(spec, context)) return [];
+    return spec.effects
+      .filter((effect) => effect.kind === "discard-card")
+      .map((effect) => ({
+        selector: effect.selector,
+        amount: amountFor(effect.amount, context.source),
         optional: effect.optional ?? false,
         source: effect.source,
       }));

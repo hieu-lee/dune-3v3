@@ -178,6 +178,7 @@ try {
   const mercenaries = data.intrigueCards.find((card) => card.name === "Mercenaries");
   const opportunism = data.intrigueCards.find((card) => card.name === "Opportunism");
   const shaddamsFavor = data.intrigueCards.find((card) => card.name === "Shaddam's Favor");
+  const sietchRitual = data.intrigueCards.find((card) => card.name === "Sietch Ritual");
   const strategicStockpiling = data.intrigueCards.find((card) => card.name === "Strategic Stockpiling");
   const commandRespect = data.muadDibCommanderCards.find((card) => card.name === "Command Respect");
   const limitedLandsraadAccess = data.muadDibCommanderCards.find((card) => card.name === "Limited Landsraad Access");
@@ -246,7 +247,7 @@ try {
     wheelsWithinWheels,
   );
   assert.ok(commandRespect && prepareTheWay && spiceMustFlow && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
-  assert.ok(backedByChoam && buyAccess && callToArms && councilorsAmbition && contingencyPlan && cunning && departForArrakis && distraction && imperiumPolitics && inspireAwe && intelligenceReport && leverage && manipulate && marketOpportunity && mercenaries && opportunism && shaddamsFavor && strategicStockpiling);
+  assert.ok(backedByChoam && buyAccess && callToArms && councilorsAmbition && contingencyPlan && cunning && departForArrakis && distraction && imperiumPolitics && inspireAwe && intelligenceReport && leverage && manipulate && marketOpportunity && mercenaries && opportunism && shaddamsFavor && sietchRitual && strategicStockpiling);
   assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && dutifulService && deliverSupplies && sietchTabr && spiceRefinery);
   assert.equal(revealSpecCards.length, 79, "Unexpected number of cards with declarative Reveal specs");
   assert.equal(
@@ -402,6 +403,123 @@ try {
   assert.equal(inspireAweHandEffects[0]?.destination, "hand", "Inspire Awe hand choice should acquire to hand");
   assert.equal(inspireAweHandEffects[0]?.optional, false, "Inspire Awe hand acquisition should be mandatory when available");
   assert.equal(inspireAweHandEffects[0]?.source, "Inspire Awe", "Inspire Awe hand acquire-card effect should preserve its source");
+  assert.ok(
+    sietchRitual.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.choiceId === "bene" &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Ally") &&
+      spec.effects.some((effect) =>
+        effect.kind === "discard-card" &&
+        effect.selector === "self" &&
+        effect.amount === 1
+      ) &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-influence" &&
+        effect.selector === "self" &&
+        effect.faction === "bene" &&
+        effect.amount === 1
+      )
+    ),
+    "Sietch Ritual should carry a typed Ally discard-for-Bene Influence spec",
+  );
+  assert.ok(
+    sietchRitual.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.choiceId === "fringeWorlds" &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Commander") &&
+      spec.effects.some((effect) =>
+        effect.kind === "discard-card" &&
+        effect.selector === "self" &&
+        effect.amount === 1
+      ) &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-influence" &&
+        effect.selector === "activated-ally" &&
+        effect.faction === "fringeWorlds" &&
+        effect.amount === 1
+      )
+    ),
+    "Sietch Ritual should carry a typed Commander routed discard-for-Fringe Worlds Influence spec",
+  );
+  assert.ok(
+    sietchRitual.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.choiceId === "fremen" &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Commander") &&
+      spec.conditions?.some((condition) => condition.kind === "has-team" && condition.team === "muaddib") &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-influence" &&
+        effect.selector === "self" &&
+        effect.faction === "fremen" &&
+        effect.amount === 1
+      )
+    ),
+    "Sietch Ritual should carry a typed Muad'Dib personal Fremen Influence spec",
+  );
+  assert.deepEqual(
+    effectResolver.resolveDiscardCardEffects(sietchRitual.effects, {
+      trigger: "plot-intrigue",
+      source: p2,
+      state: game,
+    }),
+    [],
+    "Sietch Ritual should not resolve a discard-card effect without a selected choice",
+  );
+  const sietchDiscardEffects = effectResolver.resolveDiscardCardEffects(sietchRitual.effects, {
+    trigger: "plot-intrigue",
+    choiceId: "bene",
+    source: p2,
+    state: game,
+  });
+  assert.equal(sietchDiscardEffects.length, 1, "Sietch Ritual should resolve one selected discard effect");
+  assert.equal(sietchDiscardEffects[0]?.selector, "self", "Sietch Ritual selected discard should target self");
+  assert.equal(sietchDiscardEffects[0]?.amount, 1, "Sietch Ritual selected discard should discard one card");
+  assert.equal(sietchDiscardEffects[0]?.optional, false, "Sietch Ritual selected discard should be mandatory");
+  const sietchAllyResolved = effectResolver.resolveGameEffects(sietchRitual.effects, {
+    trigger: "plot-intrigue",
+    choiceId: "bene",
+    source: p2,
+    state: game,
+  });
+  assert.equal(sietchAllyResolved.influenceGains.bene, 1, "Ally Sietch Ritual should gain Bene Influence");
+  assert.deepEqual(
+    sietchAllyResolved.activatedAlly.influenceGains,
+    {},
+    "Ally Sietch Ritual should not route Influence to an activated Ally",
+  );
+  const sietchCommanderResolved = effectResolver.resolveGameEffects(sietchRitual.effects, {
+    trigger: "plot-intrigue",
+    choiceId: "bene",
+    source: p4,
+    target: p6,
+    state: game,
+  });
+  assert.deepEqual(
+    sietchCommanderResolved.influenceGains,
+    {},
+    "Commander Sietch Ritual should not gain main-board Bene Influence personally",
+  );
+  assert.equal(
+    sietchCommanderResolved.activatedAlly.influenceGains.bene,
+    1,
+    "Commander Sietch Ritual should route main-board Bene Influence to the activated Ally",
+  );
+  const sietchMuadDibResolved = effectResolver.resolveGameEffects(sietchRitual.effects, {
+    trigger: "plot-intrigue",
+    choiceId: "fremen",
+    source: p1,
+    state: game,
+  });
+  assert.equal(
+    sietchMuadDibResolved.influenceGains.fremen,
+    1,
+    "Muad'Dib Sietch Ritual should gain personal Fremen Influence",
+  );
+  assert.deepEqual(
+    sietchMuadDibResolved.activatedAlly.influenceGains,
+    {},
+    "Muad'Dib personal Fremen Sietch Ritual should not route to an activated Ally",
+  );
   assert.ok(
     cunning.effects?.some((spec) =>
       spec.trigger === "plot-intrigue" &&

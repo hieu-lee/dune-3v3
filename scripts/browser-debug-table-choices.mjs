@@ -237,6 +237,96 @@ export async function runTableChoicesSmoke({
   assert.match(commanderInspireAweAfter.log[1], /through Princess Irulan's sandworm/);
   await screenshot(page, captures, "inspire-awe-commander-after-acquire.png");
 
+  await setDebugGameAndWait(page, states.sietchRitualAlly);
+  await waitForActiveIntrigue(page, "Sietch Ritual");
+  const allySietchCard = page.locator(".intrigue-card").filter({ hasText: "Sietch Ritual" });
+  const allySietchButton = allySietchCard.getByRole("button", {
+    name: new RegExp(`Discard ${escapeRegExp(states.sietchRitualDiscardCardName)} -> BG`),
+  });
+  assert.equal(await allySietchButton.count(), 1, "Expected one Ally Sietch Ritual Bene button");
+  assert.equal(await allySietchButton.isEnabled(), true, "Ally Sietch Ritual should be playable with a hand card");
+  await screenshot(page, captures, "sietch-ritual-ally-ready.png");
+
+  const allySietchBefore = await currentGame(page);
+  const allySietchOwnerBefore = allySietchBefore.players.find((player) => player.id === "p2");
+  assert.ok(allySietchOwnerBefore, "Expected Feyd before Ally Sietch Ritual");
+  await allySietchButton.click();
+  await page.waitForFunction(({ discardCardId }) => {
+    const game = window.__DUNE_DEBUG__?.getGame();
+    const player = game?.players.find((candidate) => candidate.id === "p2");
+    return Boolean(
+      player &&
+        !game.pendingAction &&
+        game.pendingQueue.length === 0 &&
+        player.influence.bene === 2 &&
+        player.discard.at(-1)?.id === discardCardId &&
+        !player.hand.some((card) => card.id === discardCardId) &&
+        !player.intrigues.some((card) => card.name === "Sietch Ritual") &&
+        game?.intrigueDiscard.at(-1)?.name === "Sietch Ritual",
+    );
+  }, { discardCardId: states.sietchRitualDiscardCardId });
+  const allySietchAfter = await currentGame(page);
+  const allySietchOwnerAfter = allySietchAfter.players.find((player) => player.id === "p2");
+  assert.ok(allySietchOwnerAfter, "Expected Feyd after Ally Sietch Ritual");
+  assert.equal(
+    allySietchOwnerAfter.vp,
+    allySietchOwnerBefore.vp + 1,
+    "Ally Sietch Ritual should award the Bene Gesserit threshold VP",
+  );
+  assert.match(allySietchAfter.log[0], /Sietch Ritual, discards .* and gains 1 Bene Gesserit Influence/);
+  await screenshot(page, captures, "sietch-ritual-ally-after.png");
+
+  await setDebugGameAndWait(page, states.sietchRitualCommander);
+  await waitForActiveIntrigue(page, "Sietch Ritual");
+  const commanderSietchCard = page.locator(".intrigue-card").filter({ hasText: "Sietch Ritual" });
+  const commanderSietchButton = commanderSietchCard.getByRole("button", {
+    name: new RegExp(`Discard ${escapeRegExp(states.sietchRitualDiscardCardName)} -> BG: Princess Irulan`),
+  });
+  assert.equal(await commanderSietchButton.count(), 1, "Expected one Commander routed Sietch Ritual Bene button");
+  assert.equal(await commanderSietchButton.isEnabled(), true, "Commander Sietch Ritual should be playable with a hand card");
+  await screenshot(page, captures, "sietch-ritual-commander-ready.png");
+
+  const commanderSietchBefore = await currentGame(page);
+  const commanderSietchSourceBefore = commanderSietchBefore.players.find((player) => player.id === "p4");
+  const commanderSietchOwnerBefore = commanderSietchBefore.players.find((player) => player.id === "p6");
+  assert.ok(commanderSietchSourceBefore, "Expected Shaddam before Commander Sietch Ritual");
+  assert.ok(commanderSietchOwnerBefore, "Expected Princess Irulan before Commander Sietch Ritual");
+  await commanderSietchButton.click();
+  await page.waitForFunction(({ discardCardId }) => {
+    const game = window.__DUNE_DEBUG__?.getGame();
+    const commander = game?.players.find((candidate) => candidate.id === "p4");
+    const ally = game?.players.find((candidate) => candidate.id === "p6");
+    return Boolean(
+      commander &&
+        ally &&
+        !game.pendingAction &&
+        game.pendingQueue.length === 0 &&
+        commander.influence.bene === 0 &&
+        ally.influence.bene === 2 &&
+        commander.discard.at(-1)?.id === discardCardId &&
+        !commander.hand.some((card) => card.id === discardCardId) &&
+        !commander.intrigues.some((card) => card.name === "Sietch Ritual") &&
+        game?.intrigueDiscard.at(-1)?.name === "Sietch Ritual",
+    );
+  }, { discardCardId: states.sietchRitualDiscardCardId });
+  const commanderSietchAfter = await currentGame(page);
+  const commanderSietchSourceAfter = commanderSietchAfter.players.find((player) => player.id === "p4");
+  const commanderSietchOwnerAfter = commanderSietchAfter.players.find((player) => player.id === "p6");
+  assert.ok(commanderSietchSourceAfter, "Expected Shaddam after Commander Sietch Ritual");
+  assert.ok(commanderSietchOwnerAfter, "Expected Princess Irulan after Commander Sietch Ritual");
+  assert.equal(
+    commanderSietchSourceAfter.vp,
+    commanderSietchSourceBefore.vp,
+    "Commander Sietch Ritual should not award the routed Bene threshold VP to Shaddam",
+  );
+  assert.equal(
+    commanderSietchOwnerAfter.vp,
+    commanderSietchOwnerBefore.vp + 1,
+    "Commander Sietch Ritual should award the routed Bene threshold VP to the activated Ally",
+  );
+  assert.match(commanderSietchAfter.log[0], /Princess Irulan gains 1 Bene Gesserit Influence/);
+  await screenshot(page, captures, "sietch-ritual-commander-after.png");
+
   await setDebugGameAndWait(page, states.buyAccessAlly);
   await waitForActiveIntrigue(page, "Buy Access");
   const allyBuyAccessCard = page.locator(".intrigue-card").filter({ hasText: "Buy Access" });
@@ -582,6 +672,8 @@ async function createTableChoiceStates(server, initialPlayableGame) {
   assert.ok(manipulate, "Expected Manipulate for Plot row-manipulation browser debug state");
   const inspireAwe = data.intrigueCards.find((card) => card.name === "Inspire Awe");
   assert.ok(inspireAwe, "Expected Inspire Awe for Plot acquisition browser debug state");
+  const sietchRitual = data.intrigueCards.find((card) => card.name === "Sietch Ritual");
+  assert.ok(sietchRitual, "Expected Sietch Ritual for Plot discard-for-Influence browser debug state");
   const buyAccess = data.intrigueCards.find((card) => card.name === "Buy Access");
   assert.ok(buyAccess, "Expected Buy Access for Plot Influence browser debug state");
   const imperiumPolitics = data.intrigueCards.find((card) => card.name === "Imperium Politics");
@@ -594,6 +686,13 @@ async function createTableChoiceStates(server, initialPlayableGame) {
   assert.ok(inspireAweAcquireCard, "Expected a low-cost Imperium Row card for Inspire Awe browser debug state");
   const inspireAweReplacement = data.imperiumDeck.find((card) => card.id !== inspireAweAcquireCard.id);
   assert.ok(inspireAweReplacement, "Expected an Inspire Awe replacement row card for browser debug state");
+  const baseSietchRitualDiscardCard = data.allyStarterCards.find((card) => card.name === "Dagger");
+  assert.ok(baseSietchRitualDiscardCard, "Expected a hand card for Sietch Ritual browser debug state");
+  const sietchRitualDiscardCard = {
+    ...cloneCard(baseSietchRitualDiscardCard),
+    id: "debug-sietch-ritual-discard-card",
+    name: "Debug Sietch Card",
+  };
 
   const base = {
     ...game,
@@ -808,6 +907,51 @@ async function createTableChoiceStates(server, initialPlayableGame) {
     inspireAweAcquireCardId: inspireAweAcquireCard.id,
     inspireAweAcquireCardName: inspireAweAcquireCard.name,
     inspireAweReplacementCardId: inspireAweReplacement.id,
+    sietchRitualAlly: {
+      ...base,
+      activeSeat: feydSeat,
+      intrigueDiscard: [],
+      players: base.players.map((player) =>
+        player.id === "p2"
+          ? {
+              ...player,
+              discard: [],
+              hand: [cloneCard(sietchRitualDiscardCard)],
+              influence: { ...player.influence, bene: 1, fringeWorlds: 1 },
+              intrigues: [cloneCard(sietchRitual)],
+              revealed: false,
+            }
+          : { ...player, intrigues: [] }
+      ),
+    },
+    sietchRitualCommander: {
+      ...base,
+      activeSeat: shaddamSeat,
+      intrigueDiscard: [],
+      players: base.players.map((player) => {
+        if (player.id === "p4") {
+          return {
+            ...player,
+            discard: [],
+            hand: [cloneCard(sietchRitualDiscardCard)],
+            influence: { ...player.influence, bene: 0 },
+            intrigues: [cloneCard(sietchRitual)],
+            revealActivatedAllyId: "p6",
+            revealed: true,
+          };
+        }
+        if (player.id === "p6") {
+          return {
+            ...player,
+            influence: { ...player.influence, bene: 1 },
+            intrigues: [],
+          };
+        }
+        return { ...player, intrigues: [] };
+      }),
+    },
+    sietchRitualDiscardCardId: sietchRitualDiscardCard.id,
+    sietchRitualDiscardCardName: sietchRitualDiscardCard.name,
     buyAccessAlly: {
       ...base,
       activeSeat: feydSeat,

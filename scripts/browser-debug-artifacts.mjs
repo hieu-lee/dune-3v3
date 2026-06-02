@@ -47,6 +47,7 @@ const generatedScreenshotNames = [
   "pending-captured-mentat.png",
   "pending-space-time-folding-discard-draw.png",
   "pending-guild-envoy-discard-draw.png",
+  "pending-ecological-testing-station-pay-draw.png",
   "pending-captured-mentat-reveal.png",
   "pending-acquire-card-empty.png",
   "control-defense-pending-desktop.png",

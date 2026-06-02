@@ -276,6 +276,22 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     validateOptionalBoolean("pay-resource-for-troops trashSource", (effect as { trashSource?: unknown }).trashSource);
     return;
   }
+  if (effect.kind === "pay-resource-for-draw-cards") {
+    if (trigger !== "agent-play") {
+      throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
+    }
+    if (effect.selector !== "self") {
+      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
+    if (!supportedResources.has(effect.resource)) {
+      throw new Error(`Unsupported effect resource "${effect.resource}"`);
+    }
+    validateSourceLabel("pay-resource-for-draw-cards source", effect.source);
+    validateAmount(effect.cost);
+    validateAmount(effect.drawCards);
+    validateOptionalTrue("pay-resource-for-draw-cards optional", (effect as { optional?: unknown }).optional);
+    return;
+  }
   if (effect.kind === "discard-card-for-influence-and-draw") {
     if (trigger !== "agent-play") {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);

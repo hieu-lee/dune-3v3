@@ -203,6 +203,27 @@ export async function runCardChoicesSmoke({
     "Guild Envoy should draw two cards after discarding a Spacing Guild card",
   );
 
+  await setDebugGameAndWait(page, states.ecologicalTestingStation);
+  pendingText = await page.locator(".pending-panel").innerText();
+  const ecologicalTestingStationDrawOneId = states.ecologicalTestingStation.ecologicalTestingStationDrawOneId;
+  const ecologicalTestingStationDrawTwoId = states.ecologicalTestingStation.ecologicalTestingStationDrawTwoId;
+  assert.match(pendingText, /Ecological Testing Station/i);
+  assert.match(pendingText, /Spend 2 water: draw 2 cards/i);
+  await screenshot(page, captures, "pending-ecological-testing-station-pay-draw.png");
+
+  before = await currentGame(page);
+  ownerBefore = before.players.find((player) => player.id === "p2");
+  await page.locator(".pending-panel").getByRole("button", { name: /Spend 2 water: draw 2 cards/ }).click();
+  await waitForNoPending(page);
+  after = await currentGame(page);
+  ownerAfter = after.players.find((player) => player.id === "p2");
+  assert.equal(ownerAfter.resources.water, ownerBefore.resources.water - 2, "Ecological Testing Station should spend 2 water");
+  assert.ok(
+    ownerAfter.hand.some((card) => card.id === ecologicalTestingStationDrawOneId) &&
+      ownerAfter.hand.some((card) => card.id === ecologicalTestingStationDrawTwoId),
+    "Ecological Testing Station should draw two cards after payment",
+  );
+
   await setDebugGameAndWait(page, states.capturedMentatReveal);
   pendingText = await page.locator(".pending-panel").innerText();
   const capturedMentatIntrigueId = states.capturedMentatReveal.capturedMentatIntrigueId;
@@ -245,12 +266,16 @@ async function createCardChoiceStates(server, initialPlayableGame) {
   assert.ok(spaceTimeFolding, "Expected Space-time Folding Imperium card");
   const guildEnvoy = data.imperiumDeck.find((card) => card.sourceId === 38);
   assert.ok(guildEnvoy, "Expected Guild Envoy Imperium card");
+  const ecologicalTestingStation = data.imperiumDeck.find((card) => card.sourceId === 46);
+  assert.ok(ecologicalTestingStation, "Expected Ecological Testing Station Imperium card");
   const spySpace = data.boardSpaces.find((space) => space.id === "high-council");
   assert.ok(spySpace, "Expected High Council spy placement space");
   const spyPlaceAfterRecallSpace = data.boardSpaces.find((space) => space.id === "secrets");
   assert.ok(spyPlaceAfterRecallSpace, "Expected Secrets spy placement space");
   const deliverSupplies = data.boardSpaces.find((space) => space.id === "deliver-supplies");
   assert.ok(deliverSupplies, "Expected Deliver Supplies board space");
+  const spiceRefinery = data.boardSpaces.find((space) => space.id === "spice-refinery");
+  assert.ok(spiceRefinery, "Expected Spice Refinery board space");
   const capturedMentat = data.imperiumDeck.find((card) => card.sourceId === 61);
   assert.ok(capturedMentat, "Expected Captured Mentat Imperium card");
   const capturedMentatDiscard = { ...data.allyStarterCards[0], id: "browser-captured-mentat-discard-card" };
@@ -272,6 +297,14 @@ async function createCardChoiceStates(server, initialPlayableGame) {
   };
   const guildEnvoyDrawOne = { ...data.allyStarterCards[3], id: "browser-guild-envoy-draw-one-card" };
   const guildEnvoyDrawTwo = { ...data.allyStarterCards[4], id: "browser-guild-envoy-draw-two-card" };
+  const ecologicalTestingStationDrawOne = {
+    ...data.allyStarterCards[0],
+    id: "browser-ecological-testing-station-draw-one-card",
+  };
+  const ecologicalTestingStationDrawTwo = {
+    ...data.allyStarterCards[1],
+    id: "browser-ecological-testing-station-draw-two-card",
+  };
 
   const base = {
     ...game,
@@ -387,6 +420,35 @@ async function createCardChoiceStates(server, initialPlayableGame) {
     },
   );
   assert.equal(guildEnvoyState.pendingAction?.kind, "discard-card-for-draw", "Expected Guild Envoy discard-draw pending action");
+  const ecologicalTestingStationState = turnActions.placeAgentAction(
+    {
+      ...base,
+      players: base.players.map((player) =>
+        player.id === ownerId
+          ? {
+              ...player,
+              agentsReady: 1,
+              deck: [ecologicalTestingStationDrawOne, ecologicalTestingStationDrawTwo],
+              discard: [],
+              garrison: 0,
+              hand: [ecologicalTestingStation],
+              playArea: [],
+              resources: { solari: 0, spice: 0, water: 2 },
+            }
+          : player,
+      ),
+    },
+    {
+      commanderTargets: {},
+      selectedCard: ecologicalTestingStation,
+      selectedSpace: spiceRefinery,
+    },
+  );
+  assert.equal(
+    ecologicalTestingStationState.pendingAction?.kind,
+    "pay-resource-for-draw-cards",
+    "Expected Ecological Testing Station resource-for-draw pending action",
+  );
 
   return {
     contractPublic: {
@@ -488,6 +550,11 @@ async function createCardChoiceStates(server, initialPlayableGame) {
       guildEnvoyDiscardName: guildEnvoyDiscard.name,
       guildEnvoyDrawOneId: guildEnvoyDrawOne.id,
       guildEnvoyDrawTwoId: guildEnvoyDrawTwo.id,
+    },
+    ecologicalTestingStation: {
+      ...ecologicalTestingStationState,
+      ecologicalTestingStationDrawOneId: ecologicalTestingStationDrawOne.id,
+      ecologicalTestingStationDrawTwoId: ecologicalTestingStationDrawTwo.id,
     },
     capturedMentatReveal: {
       ...base,

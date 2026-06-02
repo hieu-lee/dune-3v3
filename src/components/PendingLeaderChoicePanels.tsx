@@ -348,6 +348,49 @@ export function PendingPayResourceForTroopsPanel({
   );
 }
 
+type PendingPayResourceForDrawCardsPanelProps = {
+  cost: number;
+  drawCards: number;
+  onChoose: () => void;
+  onSkip: () => void;
+  owner?: Player;
+  resource: ResourceId;
+  source: string;
+};
+
+export function PendingPayResourceForDrawCardsPanel({
+  cost,
+  drawCards,
+  onChoose,
+  onSkip,
+  owner,
+  resource,
+  source,
+}: PendingPayResourceForDrawCardsPanelProps) {
+  const resourceLabel = (resourceLabels as Partial<Record<string, string>>)[resource] ?? String(resource);
+  const availableResource = owner
+    ? (owner.resources as Partial<Record<string, number>>)[resource]
+    : undefined;
+  const canPay = typeof availableResource === "number" && availableResource >= cost;
+  return (
+    <div className="pending-controls">
+      {owner ? (
+        <button
+          type="button"
+          onClick={onChoose}
+          disabled={!canPay}
+        >
+          <BookOpen size={15} />
+          Spend {cost} {resourceLabel}: draw {drawCards} card{drawCards === 1 ? "" : "s"}
+        </button>
+      ) : (
+        <span>{source} can no longer resolve with the current table state.</span>
+      )}
+      <button type="button" onClick={onSkip}>Skip</button>
+    </div>
+  );
+}
+
 type PendingPayResourceForStrengthPanelProps = {
   cost: number;
   onChoose: () => void;

@@ -7,6 +7,7 @@ import {
   chaniCleverTacticianSourceId,
   covertOperationSourceId,
   doubleAgentSourceId,
+  ecologicalTestingStationSourceId,
   fedaykinStilltentSourceId,
   guildEnvoySourceId,
   hiddenMissiveSourceId,
@@ -28,6 +29,7 @@ import {
   agentDrawCards,
   agentDrawIntrigues,
   agentGainResource,
+  agentPayResourceForDrawCards,
   agentPlaceSpies,
   agentRecruitTroops,
   hasCompletedContracts,
@@ -226,6 +228,9 @@ function imperiumRevealText(card: HubCard, persuasion: number, swords: number, p
   if (card.id === chaniCleverTacticianSourceId) {
     return "Fremen Bond: +2 persuasion. You may retreat two troops to add 4 strength.";
   }
+  if (card.id === ecologicalTestingStationSourceId) {
+    return "+1 persuasion. Fremen Bond: gain 1 water.";
+  }
   if (card.id === fedaykinStilltentSourceId) {
     return "Gain 1 water.";
   }
@@ -292,6 +297,13 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
       revealGainResource("water", 1),
       agentRecruitTroops("self", 1, [visitedMakerSpace(), hasRole("Ally")]),
       agentRecruitTroops("activated-ally", 1, [visitedMakerSpace(), hasRole("Commander")]),
+    ];
+  }
+  if (card.id === ecologicalTestingStationSourceId) {
+    return [
+      agentPayResourceForDrawCards("water", 2, 2),
+      revealGainPersuasion(1),
+      revealGainResource("water", 1, [hasCardTraitInPlay("Faction: Fremen", 2)]),
     ];
   }
   if (card.id === doubleAgentSourceId) {
@@ -417,6 +429,9 @@ function fixedRevealEffects(
 function imperiumPlayText(card: HubCard) {
   if (card.id === doubleAgentSourceId) {
     return "If you have a spy on the board space you sent an Agent to this turn, you may place a spy on the same observation post as another player's spy.";
+  }
+  if (card.id === ecologicalTestingStationSourceId) {
+    return "Pay 2 water to draw 2 cards.";
   }
   if (card.id === fedaykinStilltentSourceId) {
     return "If you sent an Agent to a Maker board space this turn, recruit 1 troop.";

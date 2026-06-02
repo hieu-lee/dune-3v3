@@ -119,6 +119,15 @@ export type GameEffectSpec =
       source?: string;
     }
   | {
+      kind: "pay-resource-for-draw-cards";
+      selector: PlayerSelector;
+      resource: ResourceId;
+      cost: EffectAmountSpec;
+      drawCards: EffectAmountSpec;
+      optional?: true;
+      source?: string;
+    }
+  | {
       kind: "pay-resource-for-sandworms";
       selector: PlayerSelector;
       resource: ResourceId;
@@ -532,6 +541,16 @@ export type PendingAction =
       trashSource?: boolean;
       cardId?: string;
       source: string;
+    }
+  | {
+      kind: "pay-resource-for-draw-cards";
+      ownerId: string;
+      resource: ResourceId;
+      cost: number;
+      drawCards: number;
+      optional: true;
+      source: string;
+      cardId?: string;
     }
   | {
       kind: "contract";

@@ -34,6 +34,7 @@ import {
   resolveMakerChoice,
   resolveOptionalSpacePayment,
   resolvePayResourceForContractsChoice,
+  resolvePayResourceForDrawCardsChoice,
   resolvePayResourceForInfluenceChoice,
   resolvePayResourceForSandwormsChoice,
   resolvePayResourceForStrengthChoice,
@@ -53,6 +54,7 @@ import {
   skipLoseInfluenceForIntrigues,
   skipOptionalSpacePayment,
   skipPayResourceForContracts,
+  skipPayResourceForDrawCards,
   skipPayResourceForInfluence,
   skipPayResourceForSandworms,
   skipPayResourceForStrength,
@@ -210,6 +212,14 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     runPending("pay-resource-for-troops", (current, pending) => maybeStartCombatPhase(resolvePayResourceForTroopsChoice(current, pending)));
   const skipPayResourceForTroopsChoice = () =>
     runPending("pay-resource-for-troops", (current, pending) => maybeStartCombatPhase(skipPayResourceForTroops(current, pending)));
+  const choosePayResourceForDrawCards = () =>
+    runPending("pay-resource-for-draw-cards", (current, pending) =>
+      maybeStartCombatPhase(resolvePayResourceForDrawCardsChoice(current, pending))
+    );
+  const skipPayResourceForDrawCardsChoice = () =>
+    runPending("pay-resource-for-draw-cards", (current, pending) =>
+      maybeStartCombatPhase(skipPayResourceForDrawCards(current, pending))
+    );
   const choosePayResourceForInfluence = () =>
     runPending("pay-resource-for-influence", (current, pending) => maybeStartCombatPhase(resolvePayResourceForInfluenceChoice(current, pending)));
   const skipPayResourceForInfluenceChoice = () =>
@@ -307,6 +317,7 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     chooseLoseInfluenceForIntrigues,
     chooseMakerReward,
     choosePayResourceForContracts,
+    choosePayResourceForDrawCards,
     choosePayResourceForInfluence,
     choosePayResourceForSandworms,
     choosePayResourceForStrength,
@@ -339,6 +350,7 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     skipLoseInfluenceForIntriguesChoice,
     skipOptionalSpacePaymentChoice,
     skipPayResourceForContractsChoice,
+    skipPayResourceForDrawCardsChoice,
     skipPayResourceForInfluenceChoice,
     skipPayResourceForSandwormsChoice,
     skipPayResourceForStrengthChoice,

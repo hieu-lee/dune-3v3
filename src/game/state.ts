@@ -231,9 +231,11 @@ export {
 
 export {
   resolvePayResourceForInfluenceChoice,
+  resolvePayResourceForDrawCardsChoice,
   resolvePayResourceForSandwormsChoice,
   resolvePayResourceForStrengthChoice,
   resolvePayResourceForTroopsChoice,
+  skipPayResourceForDrawCards,
   skipPayResourceForInfluence,
   skipPayResourceForSandworms,
   skipPayResourceForStrength,

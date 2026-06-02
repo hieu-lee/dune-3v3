@@ -164,6 +164,15 @@ export type AgentPayResourceForContracts = {
   source?: string;
 };
 
+export type AgentPayResourceForDrawCards = {
+  selector: PlayerSelector;
+  resource: ResourceId;
+  cost: number;
+  drawCards: number;
+  optional: true;
+  source?: string;
+};
+
 export type AgentPayTeamResourceForVp = {
   selector: PlayerSelector;
   resource: ResourceId;
@@ -538,6 +547,9 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
     return result;
   }
   if (effect.kind === "pay-resource-for-troops") {
+    return result;
+  }
+  if (effect.kind === "pay-resource-for-draw-cards") {
     return result;
   }
   if (effect.kind === "discard-card-for-influence-and-draw") {
@@ -924,6 +936,27 @@ export function resolveAgentPayResourceForContracts(
         sourcePool: effect.sourcePool,
         optional: true,
         trashSource: effect.trashSource ?? false,
+        source: effect.source,
+      }));
+  });
+}
+
+export function resolveAgentPayResourceForDrawCards(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): AgentPayResourceForDrawCards[] {
+  specs?.forEach(validateSpec);
+  return (specs ?? []).flatMap((spec) => {
+    if (spec.trigger !== "agent-play") return [];
+    if (!specApplies(spec, context)) return [];
+    return spec.effects
+      .filter((effect) => effect.kind === "pay-resource-for-draw-cards")
+      .map((effect) => ({
+        selector: effect.selector,
+        resource: effect.resource,
+        cost: amountFor(effect.cost, context.source),
+        drawCards: amountFor(effect.drawCards, context.source),
+        optional: true,
         source: effect.source,
       }));
   });

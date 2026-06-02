@@ -32,6 +32,10 @@ function hasAgentPlaySpec(card) {
   return card.effects?.some((spec) => spec.trigger === "agent-play") ?? false;
 }
 
+function hasAgentEffect(card, predicate) {
+  return card.effects?.some((spec) => spec.trigger === "agent-play" && spec.effects.some(predicate)) ?? false;
+}
+
 function hasRevealEffect(card, predicate) {
   return card.effects?.some((spec) => spec.trigger === "reveal" && spec.effects.some(predicate)) ?? false;
 }
@@ -104,6 +108,7 @@ try {
   const doubleAgent = data.imperiumDeck.find((card) => card.name === "Double Agent");
   const fedaykinStilltent = data.imperiumDeck.find((card) => card.name === "Fedaykin Stilltent");
   const hiddenMissive = data.imperiumDeck.find((card) => card.name === "Hidden Missive");
+  const ecologicalTestingStation = data.imperiumDeck.find((card) => card.name === "Ecological Testing Station");
   const cargoRunner = data.imperiumDeck.find((card) => card.name === "Cargo Runner");
   const chani = data.imperiumDeck.find((card) => card.name === "Chani, Clever Tactician");
   const makerKeeper = data.imperiumDeck.find((card) => card.name === "Maker Keeper");
@@ -137,6 +142,8 @@ try {
   const highCouncil = data.boardSpaces.find((space) => space.id === "high-council");
   const dutifulService = data.boardSpaces.find((space) => space.id === "dutiful-service");
   const deliverSupplies = data.boardSpaces.find((space) => space.id === "deliver-supplies");
+  const sietchTabr = data.boardSpaces.find((space) => space.id === "sietch-tabr");
+  const spiceRefinery = data.boardSpaces.find((space) => space.id === "spice-refinery");
   assert.ok(
     convincingArgument &&
     dagger &&
@@ -150,6 +157,7 @@ try {
     doubleAgent &&
     fedaykinStilltent &&
     hiddenMissive &&
+    ecologicalTestingStation &&
     cargoRunner &&
     chani &&
     makerKeeper &&
@@ -162,7 +170,7 @@ try {
     wheelsWithinWheels,
   );
   assert.ok(commandRespect && prepareTheWay && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
-  assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && dutifulService && deliverSupplies);
+  assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && dutifulService && deliverSupplies && sietchTabr && spiceRefinery);
   assert.equal(revealSpecCards.length, 79, "Unexpected number of cards with declarative Reveal specs");
   assert.equal(
     marketAndImperiumCards.filter(hasFixedRevealReward).length,
@@ -198,6 +206,7 @@ try {
       "Cargo Runner",
       "Chani, Clever Tactician",
       "Double Agent",
+      "Ecological Testing Station",
       "Fedaykin Stilltent",
       "Guild Envoy",
       "Hidden Missive",
@@ -874,6 +883,48 @@ try {
     hasRevealEffect(hiddenMissive, (effect) => effect.kind === "gain-persuasion" && effect.amount === 1) &&
       hasRevealEffect(hiddenMissive, (effect) => effect.kind === "gain-strength" && effect.amount === 1),
     "Hidden Missive should carry fixed Reveal persuasion and strength specs",
+  );
+  assert.ok(
+    hasAgentEffect(ecologicalTestingStation, (effect) =>
+      effect.kind === "pay-resource-for-draw-cards" &&
+        effect.selector === "self" &&
+        effect.resource === "water" &&
+        effect.cost === 2 &&
+        effect.drawCards === 2 &&
+        effect.optional === true
+    ),
+    "Ecological Testing Station should carry its Agent water-payment draw spec",
+  );
+  assert.ok(
+    hasRevealEffect(ecologicalTestingStation, (effect) => effect.kind === "gain-persuasion" && effect.amount === 1),
+    "Ecological Testing Station should carry its fixed +1 persuasion reveal spec",
+  );
+  assert.ok(
+    ecologicalTestingStation.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.conditions?.some((condition) =>
+        condition.kind === "has-card-trait-in-play" &&
+          condition.trait === "Faction: Fremen" &&
+          condition.count === 2
+      ) &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-resource" &&
+          effect.selector === "self" &&
+          effect.resource === "water" &&
+          effect.amount === 1
+      )
+    ),
+    "Ecological Testing Station should carry its Fremen Bond reveal water spec",
+  );
+  assert.equal(
+    ecologicalTestingStation.play,
+    "Pay 2 water to draw 2 cards.",
+    "Ecological Testing Station play text should describe its payment choice",
+  );
+  assert.equal(
+    ecologicalTestingStation.reveal,
+    "+1 persuasion. Fremen Bond: gain 1 water.",
+    "Ecological Testing Station reveal text should describe its Fremen Bond reward",
   );
   assert.ok(
     wheelsWithinWheels.effects?.some((spec) =>
@@ -1875,6 +1926,127 @@ try {
     /Invalid pay-resource-for-troops optional "false"/,
     "Resource-for-troops specs should stay optional so queued payments cannot deadlock if resources change",
   );
+  const revealPayResourceDrawCardsCard = {
+    ...convincingArgument,
+    id: "effect-spec-reveal-pay-resource-draw-cards-card",
+    name: "Effect Spec Reveal Pay Resource Draw Cards",
+    effects: [revealSpec([{
+      kind: "pay-resource-for-draw-cards",
+      selector: "self",
+      resource: "water",
+      cost: 2,
+      drawCards: 2,
+    }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [revealPayResourceDrawCardsCard], highCouncilSeat: false }),
+    /Unsupported effect "pay-resource-for-draw-cards" for reveal/,
+    "Resource-for-draw specs should stay in Agent play",
+  );
+  const invalidPayResourceDrawCardsSelectorCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-pay-resource-draw-cards-selector-card",
+    name: "Effect Spec Invalid Pay Resource Draw Cards Selector",
+    effects: [agentSpec([{
+      kind: "pay-resource-for-draw-cards",
+      selector: "activated-ally",
+      resource: "water",
+      cost: 2,
+      drawCards: 2,
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidPayResourceDrawCardsSelectorCard, p2, p2),
+    /Unsupported effect selector "activated-ally" for pay-resource-for-draw-cards/,
+    "Resource-for-draw specs should reject activated Ally selectors",
+  );
+  const invalidPayResourceDrawCardsResourceCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-pay-resource-draw-cards-resource-card",
+    name: "Effect Spec Invalid Pay Resource Draw Cards Resource",
+    effects: [agentSpec([{
+      kind: "pay-resource-for-draw-cards",
+      selector: "self",
+      resource: "melange",
+      cost: 2,
+      drawCards: 2,
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidPayResourceDrawCardsResourceCard, p2, p2),
+    /Unsupported effect resource "melange"/,
+    "Resource-for-draw specs should reject unsupported resource ids",
+  );
+  const invalidPayResourceDrawCardsCostCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-pay-resource-draw-cards-cost-card",
+    name: "Effect Spec Invalid Pay Resource Draw Cards Cost",
+    effects: [agentSpec([{
+      kind: "pay-resource-for-draw-cards",
+      selector: "self",
+      resource: "water",
+      cost: -1,
+      drawCards: 2,
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidPayResourceDrawCardsCostCard, p2, p2),
+    /Invalid effect amount "-1"/,
+    "Resource-for-draw specs should require non-negative costs",
+  );
+  const invalidPayResourceDrawCardsAmountCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-pay-resource-draw-cards-amount-card",
+    name: "Effect Spec Invalid Pay Resource Draw Cards Amount",
+    effects: [agentSpec([{
+      kind: "pay-resource-for-draw-cards",
+      selector: "self",
+      resource: "water",
+      cost: 2,
+      drawCards: -1,
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidPayResourceDrawCardsAmountCard, p2, p2),
+    /Invalid effect amount "-1"/,
+    "Resource-for-draw specs should require non-negative draw amounts",
+  );
+  const invalidPayResourceDrawCardsSourceCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-pay-resource-draw-cards-source-card",
+    name: "Effect Spec Invalid Pay Resource Draw Cards Source",
+    effects: [agentSpec([{
+      kind: "pay-resource-for-draw-cards",
+      selector: "self",
+      resource: "water",
+      cost: 2,
+      drawCards: 2,
+      source: "",
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidPayResourceDrawCardsSourceCard, p2, p2),
+    /Invalid pay-resource-for-draw-cards source ""/,
+    "Resource-for-draw specs should reject empty source labels",
+  );
+  const invalidPayResourceDrawCardsOptionalCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-pay-resource-draw-cards-optional-card",
+    name: "Effect Spec Invalid Pay Resource Draw Cards Optional",
+    effects: [agentSpec([{
+      kind: "pay-resource-for-draw-cards",
+      selector: "self",
+      resource: "water",
+      cost: 2,
+      drawCards: 2,
+      optional: "false",
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidPayResourceDrawCardsOptionalCard, p2, p2),
+    /Invalid pay-resource-for-draw-cards optional "false"/,
+    "Resource-for-draw specs should reject non-true optional values",
+  );
   const revealPayResourceInfluenceCard = {
     ...convincingArgument,
     id: "effect-spec-reveal-pay-resource-influence-card",
@@ -2852,6 +3024,151 @@ try {
   );
   assert.equal(maulaPistolEffect.source.hand[0]?.id, maulaDraw.id, "Maula Pistol Agent spec should draw 1 card");
   assert.match(maulaPistolEffect.log ?? "", /Maula Pistol: draws 1 card/);
+
+  const ecologicalSoloReveal = turnActions.revealTurnPlan(
+    { ...p2, hand: [ecologicalTestingStation], playArea: [], highCouncilSeat: false },
+    game,
+  );
+  assert.equal(ecologicalSoloReveal.persuasion, 1, "Ecological Testing Station should reveal for 1 persuasion");
+  assert.equal(ecologicalSoloReveal.revealGain.water ?? 0, 0, "Ecological Testing Station should not gain water without Fremen Bond");
+  const ecologicalFremenBondFixture = {
+    ...convincingArgument,
+    id: "ecological-testing-station-fremen-bond-fixture",
+    name: "Ecological Testing Station Fremen Bond Fixture",
+    effects: undefined,
+    persuasion: 0,
+    revealGain: undefined,
+    swords: 0,
+    traits: ["Faction: Fremen"],
+  };
+  const ecologicalBondReveal = turnActions.revealTurnPlan(
+    {
+      ...p2,
+      hand: [ecologicalTestingStation, ecologicalFremenBondFixture],
+      playArea: [],
+      highCouncilSeat: false,
+    },
+    game,
+  );
+  assert.equal(ecologicalBondReveal.persuasion, 1, "Ecological Testing Station Fremen Bond helper should not add persuasion");
+  assert.equal(ecologicalBondReveal.revealGain.water, 1, "Ecological Testing Station should gain water with Fremen Bond");
+  const ecologicalPaymentDraws = [
+    { ...dagger, id: "ecological-testing-station-payment-draw-1" },
+    { ...convincingArgument, id: "ecological-testing-station-payment-draw-2" },
+  ];
+  const ecologicalPaymentFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 1,
+    deck: ecologicalPaymentDraws,
+    discard: [],
+    garrison: 0,
+    hand: [ecologicalTestingStation],
+    playArea: [],
+    resources: { solari: 0, spice: 0, water: 2 },
+  }));
+  const ecologicalPlaced = turnActions.placeAgentAction(
+    { ...ecologicalPaymentFixture, spaces: {} },
+    { commanderTargets: {}, selectedCard: ecologicalTestingStation, selectedSpace: spiceRefinery },
+  );
+  assert.deepEqual(
+    ecologicalPlaced.pendingAction,
+    {
+      kind: "pay-resource-for-draw-cards",
+      ownerId: p2.id,
+      resource: "water",
+      cost: 2,
+      drawCards: 2,
+      optional: true,
+      source: "Ecological Testing Station",
+      cardId: ecologicalTestingStation.id,
+    },
+    "Ecological Testing Station Agent placement should queue the water-payment draw choice",
+  );
+  const ecologicalResolved = state.resolvePayResourceForDrawCardsChoice(ecologicalPlaced, ecologicalPlaced.pendingAction);
+  assert.equal(playerById(ecologicalResolved, p2.id).resources.water, 0, "Ecological Testing Station should spend 2 water");
+  assert.deepEqual(
+    playerById(ecologicalResolved, p2.id).hand.map((card) => card.id),
+    ecologicalPaymentDraws.map((card) => card.id),
+    "Ecological Testing Station payment should draw 2 cards",
+  );
+  assert.equal(ecologicalResolved.pendingAction, undefined, "Ecological Testing Station payment should clear the pending action");
+  assert.match(ecologicalResolved.log[0], /spends 2 water for Ecological Testing Station; draws 2 cards/);
+  const ecologicalSkipFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 1,
+    deck: ecologicalPaymentDraws,
+    discard: [],
+    garrison: 0,
+    hand: [ecologicalTestingStation],
+    playArea: [],
+    resources: { solari: 0, spice: 0, water: 2 },
+  }));
+  const ecologicalSkippedPlaced = turnActions.placeAgentAction(
+    { ...ecologicalSkipFixture, spaces: {} },
+    { commanderTargets: {}, selectedCard: ecologicalTestingStation, selectedSpace: spiceRefinery },
+  );
+  const ecologicalSkipped = state.skipPayResourceForDrawCards(ecologicalSkippedPlaced, ecologicalSkippedPlaced.pendingAction);
+  assert.equal(playerById(ecologicalSkipped, p2.id).resources.water, 2, "Skipping Ecological Testing Station should preserve water");
+  assert.equal(playerById(ecologicalSkipped, p2.id).hand.length, 0, "Skipping Ecological Testing Station should not draw cards");
+  assert.equal(ecologicalSkipped.pendingAction, undefined, "Skipping Ecological Testing Station should clear the pending action");
+  assert.match(ecologicalSkipped.log[0], /declines to pay 2 water for Ecological Testing Station/);
+  const ecologicalSietchTabrFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 1,
+    deck: ecologicalPaymentDraws,
+    discard: [],
+    garrison: 0,
+    hand: [ecologicalTestingStation],
+    influence: { ...p2.influence, fringeWorlds: 2 },
+    playArea: [],
+    resources: { solari: 0, spice: 0, water: 1 },
+  }));
+  const ecologicalSietchTabrPlaced = turnActions.placeAgentAction(
+    { ...ecologicalSietchTabrFixture, spaces: {} },
+    { commanderTargets: {}, selectedCard: ecologicalTestingStation, selectedSpace: sietchTabr },
+  );
+  assert.equal(ecologicalSietchTabrPlaced.pendingAction?.kind, "sietch-tabr", "Sietch Tabr should resolve before Ecological payment");
+  assert.equal(
+    ecologicalSietchTabrPlaced.pendingQueue[0]?.kind,
+    "pay-resource-for-draw-cards",
+    "Ecological Testing Station should queue when Sietch Tabr water makes the payment affordable",
+  );
+  const ecologicalAfterSietch = state.resolveSietchTabrChoice(
+    ecologicalSietchTabrPlaced,
+    ecologicalSietchTabrPlaced.pendingAction,
+    "shield-wall",
+  );
+  assert.equal(playerById(ecologicalAfterSietch, p2.id).resources.water, 2, "Sietch Tabr should provide the second payment water");
+  assert.equal(
+    ecologicalAfterSietch.pendingAction?.kind,
+    "pay-resource-for-draw-cards",
+    "Ecological Testing Station payment should surface after Sietch Tabr resolves",
+  );
+  const ecologicalAfterSietchPayment = state.resolvePayResourceForDrawCardsChoice(
+    ecologicalAfterSietch,
+    ecologicalAfterSietch.pendingAction,
+  );
+  assert.equal(playerById(ecologicalAfterSietchPayment, p2.id).resources.water, 0, "Deferred Sietch Tabr payment should spend both water");
+  assert.deepEqual(
+    playerById(ecologicalAfterSietchPayment, p2.id).hand.map((card) => card.id),
+    ecologicalPaymentDraws.map((card) => card.id),
+    "Deferred Sietch Tabr payment should draw 2 cards",
+  );
+  const ecologicalNoWaterFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 1,
+    deck: ecologicalPaymentDraws,
+    discard: [],
+    garrison: 0,
+    hand: [ecologicalTestingStation],
+    playArea: [],
+    resources: { solari: 0, spice: 0, water: 1 },
+  }));
+  const ecologicalNoWaterPlaced = turnActions.placeAgentAction(
+    { ...ecologicalNoWaterFixture, spaces: {} },
+    { commanderTargets: {}, selectedCard: ecologicalTestingStation, selectedSpace: spiceRefinery },
+  );
+  assert.equal(
+    ecologicalNoWaterPlaced.pendingAction,
+    undefined,
+    "Ecological Testing Station should not queue a payment choice without 2 water",
+  );
 
   const cargoRunnerDeck = [
     { ...dagger, id: "cargo-runner-agent-draw-1" },

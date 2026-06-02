@@ -45,6 +45,7 @@ import {
   PendingJessicaWaterOfLifePanel,
   PendingLadyAmberDesertScoutsPanel,
   PendingPayResourceForContractsPanel,
+  PendingPayResourceForDrawCardsPanel,
   PendingPayResourceForInfluencePanel,
   PendingPayResourceForSandwormsPanel,
   PendingPayResourceForStrengthPanel,
@@ -90,6 +91,7 @@ type PendingActionPanelProps = {
   chooseLadyAmberDesertScouts: (choice: LadyAmberDesertScoutsChoice) => void;
   chooseMakerReward: (choice: "spice" | "sandworms") => void;
   choosePayResourceForContracts: (optionIndex: number) => void;
+  choosePayResourceForDrawCards: () => void;
   choosePayResourceForInfluence: () => void;
   choosePayResourceForSandworms: () => void;
   choosePayResourceForStrength: () => void;
@@ -122,6 +124,7 @@ type PendingActionPanelProps = {
   skipInfluenceLoss: () => void;
   skipOptionalSpacePaymentChoice: () => void;
   skipPayResourceForContractsChoice: () => void;
+  skipPayResourceForDrawCardsChoice: () => void;
   skipPayResourceForInfluenceChoice: () => void;
   skipPayResourceForSandwormsChoice: () => void;
   skipPayResourceForStrengthChoice: () => void;
@@ -158,6 +161,7 @@ export function PendingActionPanel({
   chooseLadyAmberDesertScouts,
   chooseMakerReward,
   choosePayResourceForContracts,
+  choosePayResourceForDrawCards,
   choosePayResourceForInfluence,
   choosePayResourceForSandworms,
   choosePayResourceForStrength,
@@ -190,6 +194,7 @@ export function PendingActionPanel({
   skipInfluenceLoss,
   skipOptionalSpacePaymentChoice,
   skipPayResourceForContractsChoice,
+  skipPayResourceForDrawCardsChoice,
   skipPayResourceForInfluenceChoice,
   skipPayResourceForSandwormsChoice,
   skipPayResourceForStrengthChoice,
@@ -325,6 +330,10 @@ export function PendingActionPanel({
       ? (Array.isArray(pendingAction.recipientIds) ? pendingAction.recipientIds : [])
           .map((recipientId) => game.players.find((player) => player.id === recipientId))
       : [];
+  const pendingPayResourceDrawCardsOwner =
+    pendingAction.kind === "pay-resource-for-draw-cards"
+      ? game.players.find((player) => player.id === pendingAction.ownerId)
+      : undefined;
   const pendingPayResourceSandwormsOwner =
     pendingAction.kind === "pay-resource-for-sandworms"
       ? game.players.find((player) => player.id === pendingAction.ownerId)
@@ -492,6 +501,7 @@ export function PendingActionPanel({
           {pendingAction.kind === "pay-resource-for-strength" && `${pendingPayResourceStrengthOwner?.leader ?? "Player"} ${pendingAction.source}`}
           {pendingAction.kind === "pay-resource-for-influence" && `${pendingPayResourceInfluenceOwner?.leader ?? "Player"} ${pendingAction.source}`}
           {pendingAction.kind === "pay-resource-for-troops" && `${pendingPayResourceTroopsOwner?.leader ?? "Player"} ${pendingAction.source}`}
+          {pendingAction.kind === "pay-resource-for-draw-cards" && `${pendingPayResourceDrawCardsOwner?.leader ?? "Player"} ${pendingAction.source}`}
           {pendingAction.kind === "pay-resource-for-sandworms" && `${pendingPayResourceSandwormsOwner?.leader ?? "Player"} ${pendingAction.source}`}
           {pendingAction.kind === "team-resource-payment" && `${pendingTeamResourcePaymentOwner?.leader ?? "Player"} ${pendingAction.source}`}
           {pendingAction.kind === "throne-row" && `${pendingThroneOwner?.leader ?? "Shaddam"} Throne Row`}
@@ -763,6 +773,18 @@ export function PendingActionPanel({
           source={pendingAction.source}
           troops={pendingAction.troops}
           trashSource={pendingAction.trashSource}
+        />
+      )}
+
+      {pendingAction.kind === "pay-resource-for-draw-cards" && (
+        <PendingPayResourceForDrawCardsPanel
+          cost={pendingAction.cost}
+          drawCards={pendingAction.drawCards}
+          onChoose={choosePayResourceForDrawCards}
+          onSkip={skipPayResourceForDrawCardsChoice}
+          owner={pendingPayResourceDrawCardsOwner}
+          resource={pendingAction.resource}
+          source={pendingAction.source}
         />
       )}
 

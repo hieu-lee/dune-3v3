@@ -7,6 +7,9 @@ import {
   playerHasConflictUnits,
 } from "./conflict-rules";
 import {
+  drawCards,
+} from "./deck-utils";
+import {
   adjustInfluence,
   resolveLeaderInfluenceThresholdRewards,
 } from "./leader-rewards";
@@ -25,6 +28,7 @@ import type {
 
 type PayResourceForStrengthPendingAction = Extract<PendingAction, { kind: "pay-resource-for-strength" }>;
 type PayResourceForTroopsPendingAction = Extract<PendingAction, { kind: "pay-resource-for-troops" }>;
+type PayResourceForDrawCardsPendingAction = Extract<PendingAction, { kind: "pay-resource-for-draw-cards" }>;
 type PayResourceForInfluencePendingAction = Extract<PendingAction, { kind: "pay-resource-for-influence" }>;
 type PayResourceForSandwormsPendingAction = Extract<PendingAction, { kind: "pay-resource-for-sandworms" }>;
 
@@ -46,6 +50,12 @@ function paymentPendingTrashSourceIsValid(pending: { cardId?: string; trashSourc
 
 function paymentPendingAmountIsValid(value: unknown) {
   return typeof value === "number" && Number.isInteger(value) && value > 0;
+}
+
+function drawnCardsText(requested: number, actual: number) {
+  if (actual === 0) return requested === 1 ? "has no card to draw" : "has no cards to draw";
+  if (actual === requested) return `draws ${actual} card${actual === 1 ? "" : "s"}`;
+  return `draws ${actual} of ${requested} cards`;
 }
 
 export function resolvePayResourceForTroopsChoice(
@@ -124,6 +134,66 @@ export function skipPayResourceForTroops(state: GameState, pending: PayResourceF
     !resourceLabel ||
     !paymentPendingOptionalIsValid(pending) ||
     !paymentPendingTrashSourceIsValid(pending)
+  ) return state;
+  return {
+    ...state,
+    ...advancePendingAction(state),
+    log: [`${owner?.leader ?? "Player"} declines to pay ${pending.cost} ${resourceLabel} for ${pending.source}.`, ...state.log],
+  };
+}
+
+export function resolvePayResourceForDrawCardsChoice(
+  state: GameState,
+  pending: PayResourceForDrawCardsPendingAction,
+): GameState {
+  if (state.pendingAction !== pending) return state;
+  const owner = state.players.find((player) => player.id === pending.ownerId);
+  const ownerResources = owner?.resources as Partial<Record<string, number>> | undefined;
+  const availableResource = ownerResources?.[pending.resource];
+  const resourceLabel = (resourceLabels as Partial<Record<string, string>>)[pending.resource];
+  if (
+    !owner ||
+    !resourceLabel ||
+    typeof availableResource !== "number" ||
+    availableResource < pending.cost ||
+    !paymentPendingAmountIsValid(pending.cost) ||
+    !paymentPendingAmountIsValid(pending.drawCards) ||
+    !paymentPendingOptionalIsValid(pending) ||
+    (pending.cardId !== undefined && !owner.playArea.some((card) => card.id === pending.cardId))
+  ) {
+    return state;
+  }
+
+  const ownerAfterPayment = {
+    ...owner,
+    resources: { ...owner.resources, [pending.resource]: availableResource - pending.cost },
+  };
+  const ownerAfterDraw = drawCards(ownerAfterPayment, ownerAfterPayment.hand.length + pending.drawCards);
+  const actualDrawn = ownerAfterDraw.hand.length - ownerAfterPayment.hand.length;
+
+  return {
+    ...state,
+    players: state.players.map((player) => player.id === owner.id ? ownerAfterDraw : player),
+    ...advancePendingAction(state),
+    log: [
+      `${owner.leader} spends ${pending.cost} ${resourceLabel} for ${pending.source}; ${drawnCardsText(pending.drawCards, actualDrawn)}.`,
+      ...state.log,
+    ],
+  };
+}
+
+export function skipPayResourceForDrawCards(
+  state: GameState,
+  pending: PayResourceForDrawCardsPendingAction,
+): GameState {
+  if (state.pendingAction !== pending) return state;
+  const owner = state.players.find((player) => player.id === pending.ownerId);
+  const resourceLabel = (resourceLabels as Partial<Record<string, string>>)[pending.resource];
+  if (
+    !resourceLabel ||
+    !paymentPendingAmountIsValid(pending.cost) ||
+    !paymentPendingAmountIsValid(pending.drawCards) ||
+    !paymentPendingOptionalIsValid(pending)
   ) return state;
   return {
     ...state,

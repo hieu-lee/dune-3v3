@@ -182,6 +182,29 @@ export function revealPayResourceForTroops(
   ], conditions);
 }
 
+export function agentPayResourceForDrawCards(
+  resource: ResourceId,
+  cost: EffectAmountSpec,
+  drawCards: EffectAmountSpec,
+  options: {
+    optional?: true;
+    source?: string;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return agentPlayEffects([
+    {
+      kind: "pay-resource-for-draw-cards",
+      selector: "self",
+      resource,
+      cost,
+      drawCards,
+      optional: true,
+      ...options,
+    },
+  ], conditions);
+}
+
 export function agentDiscardCardForInfluenceAndDraw(
   drawCards: EffectAmountSpec,
   influenceAmount: EffectAmountSpec,

@@ -22,6 +22,7 @@ import {
   guildSpySourceId,
   hiddenMissiveSourceId,
   inHighPlacesSourceId,
+  imperiumPoliticsSourceId,
   imperialSpymasterSourceId,
   intelligenceReportSourceId,
   leadershipSourceId,
@@ -81,6 +82,7 @@ import {
   hasRole,
   hasSpyPosts,
   hasSwordmasterBonus,
+  hasTeam,
   gainedSpiceThisTurn,
   plotActivateAcquireRecruitBonus,
   plotDrawCards,
@@ -90,6 +92,7 @@ import {
   plotManipulateRowCard,
   plotPayResourcesAndLoseInfluenceForVp,
   plotPayResourcesForVp,
+  plotPayResourceForInfluence,
   plotPlaceSpies,
   plotRecruitTroops,
   plotResourceExchange,
@@ -941,6 +944,22 @@ function intrigueCardEffects(card: HubCard): CardEffectSpec[] | undefined {
     return [
       plotResourceExchange("spice-to-solari", "spice", 2, "solari", 5),
       plotResourceExchange("solari-to-spice", "solari", 5, "spice", 5),
+    ];
+  }
+  if (card.id === imperiumPoliticsSourceId) {
+    return [
+      plotPayResourceForInfluence("emperor", "solari", 1, "self", "emperor", 1, [
+        hasRole("Commander"),
+        hasTeam("shaddam"),
+      ]),
+      plotPayResourceForInfluence("greatHouses", "solari", 1, "self", "greatHouses", 1, [hasRole("Ally")]),
+      plotPayResourceForInfluence("spacing", "solari", 1, "self", "spacing", 1, [hasRole("Ally")]),
+      plotPayResourceForInfluence("greatHouses", "solari", 1, "activated-ally", "greatHouses", 1, [
+        hasRole("Commander"),
+      ]),
+      plotPayResourceForInfluence("spacing", "solari", 1, "activated-ally", "spacing", 1, [
+        hasRole("Commander"),
+      ]),
     ];
   }
   if (card.id === strategicStockpilingSourceId) {

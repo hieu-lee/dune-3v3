@@ -1,12 +1,15 @@
 import { drawCards } from "./deck-utils";
 import {
+  type InfluenceAdjustmentEffect,
   resolveGameEffects,
   resolveManipulateRowCards,
   resolveTakeContracts,
   resolveTrashCardEffects,
 } from "./effect-resolver";
 import { drawIntrigueCards } from "./intrigue-deck";
-import { adjustInfluence } from "./leader-rewards";
+import {
+  adjustInfluenceAndResolveThresholdRewards,
+} from "./leader-rewards";
 import { activatedAllyEffectOwner } from "./market-rules";
 import { pendingActionForSpyPlacements } from "./spy-effect-pending-rules";
 import { trashableCardsForPending } from "./trash-rules";
@@ -44,16 +47,12 @@ function hasResourceSpends(spent: Partial<Resources>) {
   return resourceIds.some((resource) => (spent[resource] ?? 0) > 0);
 }
 
-function hasInfluenceLosses(losses: Partial<Record<FactionId, number>>) {
-  return Object.values(losses).some((amount) => (amount ?? 0) > 0);
+function hasInfluenceAdjustments(adjustments: InfluenceAdjustmentEffect[]) {
+  return adjustments.some((adjustment) => adjustment.amount !== 0);
 }
 
 function canSpendResources(resources: Resources, spent: Partial<Resources>) {
   return resourceIds.every((resource) => resources[resource] >= (spent[resource] ?? 0));
-}
-
-function canLoseInfluence(player: Player, losses: Partial<Record<FactionId, number>>) {
-  return Object.entries(losses).every(([faction, amount]) => player.influence[faction as FactionId] >= (amount ?? 0));
 }
 
 function applyResourceChanges(resources: Resources, gain: Partial<Resources>, spent: Partial<Resources>): Resources {
@@ -63,13 +62,6 @@ function applyResourceChanges(resources: Resources, gain: Partial<Resources>, sp
       [resource]: next[resource] + (gain[resource] ?? 0) - (spent[resource] ?? 0),
     }),
     { ...resources },
-  );
-}
-
-function applyInfluenceLosses(player: Player, losses: Partial<Record<FactionId, number>>) {
-  return Object.entries(losses).reduce(
-    (next, [faction, amount]) => adjustInfluence(next, faction as FactionId, -(amount ?? 0)),
-    player,
   );
 }
 
@@ -125,6 +117,46 @@ function rowManipulationFor(
   return { card: manipulatedCard, imperiumRow, marketDeck };
 }
 
+function canApplyInfluenceAdjustments(
+  source: Player,
+  activatedAlly: Player | undefined,
+  adjustments: InfluenceAdjustmentEffect[],
+) {
+  const influenceByOwner = new Map<string, Partial<Record<FactionId, number>>>();
+  const influenceFor = (owner: Player) => {
+    const existing = influenceByOwner.get(owner.id);
+    if (existing) return existing;
+    const influence = { ...owner.influence };
+    influenceByOwner.set(owner.id, influence);
+    return influence;
+  };
+
+  return adjustments.every((adjustment) => {
+    if (adjustment.amount === 0) return true;
+    const owner = adjustment.selector === "activated-ally" ? activatedAlly : source;
+    if (!owner) return false;
+    const influence = influenceFor(owner);
+    const nextAmount = (influence[adjustment.faction] ?? 0) + adjustment.amount;
+    if (nextAmount < 0) return false;
+    influence[adjustment.faction] = nextAmount;
+    return true;
+  });
+}
+
+function applyInfluenceAdjustments(
+  state: GameState,
+  sourceId: string,
+  activatedAllyId: string | undefined,
+  adjustments: InfluenceAdjustmentEffect[],
+) {
+  return adjustments.reduce((next, adjustment) => {
+    const ownerId = adjustment.selector === "activated-ally" ? activatedAllyId : sourceId;
+    return ownerId
+      ? adjustInfluenceAndResolveThresholdRewards(next, ownerId, adjustment.faction, adjustment.amount)
+      : next;
+  }, state);
+}
+
 export function playTypedPlotIntrigue(
   state: GameState,
   playerId: string,
@@ -178,18 +210,18 @@ export function playTypedPlotIntrigue(
   const hasCardDraw = resolved.cardsToDraw > 0;
   const hasIntrigueDraw = resolved.intriguesToDraw > 0;
   const hasResourceSpend = hasResourceSpends(resolved.spentResources);
-  const hasInfluenceLoss = hasInfluenceLosses(resolved.influenceLosses);
+  const hasInfluenceAdjustment = hasInfluenceAdjustments(resolved.influenceAdjustments);
   const hasVpGain = resolved.vp > 0;
   const hasAcquireRecruitBonus = resolved.acquireRecruitBonus > 0;
   if (resolved.acquireRecruitBonus > 1) {
     throw new Error(`Unsupported Plot Intrigue acquire-recruit bonus amount ${resolved.acquireRecruitBonus}`);
   }
   if (!canSpendResources(player.resources, resolved.spentResources)) return state;
-  if (!canLoseInfluence(player, resolved.influenceLosses)) return state;
+  if (!canApplyInfluenceAdjustments(player, activatedAlly, resolved.influenceAdjustments)) return state;
   if (
     !hasResourceGains(resolved.revealGain) &&
     !hasResourceSpend &&
-    !hasInfluenceLoss &&
+    !hasInfluenceAdjustment &&
     !hasVpGain &&
     !hasTroopRecruits &&
     !hasCardDraw &&
@@ -217,9 +249,6 @@ export function playTypedPlotIntrigue(
           : candidate.manipulatedCards,
         intrigues: candidate.intrigues.filter((card) => card.id !== intrigue.id),
       };
-      if (hasInfluenceLoss) {
-        next = applyInfluenceLosses(next, resolved.influenceLosses);
-      }
       if (resolved.vp > 0) {
         next = { ...next, vp: next.vp + resolved.vp };
       }
@@ -231,12 +260,11 @@ export function playTypedPlotIntrigue(
       sourceAfterEffects = next;
       return next;
     }
-    return activatedAlly && candidate.id === activatedAlly.id
-      ? {
-          ...candidate,
-          garrison: candidate.garrison + resolved.activatedAlly.recruitedTroops,
-        }
-      : candidate;
+    if (!activatedAlly || candidate.id !== activatedAlly.id) return candidate;
+    return {
+      ...candidate,
+      garrison: candidate.garrison + resolved.activatedAlly.recruitedTroops,
+    };
   });
   const trashPending = trashCardPendingFor(sourceAfterEffects ?? player, intrigue, trashEffect);
   const canResolveTrash = trashPending && trashableCardsForPending(sourceAfterEffects ?? player, trashPending).length > 0;
@@ -257,9 +285,12 @@ export function playTypedPlotIntrigue(
   const drawnState = hasIntrigueDraw
     ? drawIntrigueCards(immediateState, player.id, resolved.intriguesToDraw, intrigue.name)
     : immediateState;
-  return {
+  const playedState = {
     ...drawnState,
     intrigueDiscard: [...drawnState.intrigueDiscard, intrigue],
     log: [logFor(player, contractPending, activatedAlly, resolved, outcome), ...drawnState.log],
   };
+  return hasInfluenceAdjustment
+    ? applyInfluenceAdjustments(playedState, player.id, activatedAlly?.id, resolved.influenceAdjustments)
+    : playedState;
 }

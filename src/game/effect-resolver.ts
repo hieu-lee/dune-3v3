@@ -213,6 +213,12 @@ export type TakeContractsEffect = {
   source?: string;
 };
 
+export type InfluenceAdjustmentEffect = {
+  selector: PlayerSelector;
+  faction: FactionId;
+  amount: number;
+};
+
 export type ManipulateRowCardEffect = {
   selector: PlayerSelector;
   source?: string;
@@ -264,6 +270,7 @@ type PlayerEffectResult = {
   drawCardsSource?: string;
   blocksDeploymentsThisTurn: boolean;
   deploymentBlockSource?: string;
+  influenceGains: Partial<Record<FactionId, number>>;
   intriguesToDraw: number;
   recruitedTroops: number;
   recruitedTroopsSource?: string;
@@ -276,6 +283,7 @@ type PlayerEffectResult = {
 export type GameEffectResult = PlayerEffectResult & {
   acquireRecruitBonus: number;
   activatedAlly: PlayerEffectResult;
+  influenceAdjustments: InfluenceAdjustmentEffect[];
   influenceLosses: Partial<Record<FactionId, number>>;
   persuasion: number;
   swords: number;
@@ -285,6 +293,7 @@ export type GameEffectResult = PlayerEffectResult & {
 const emptyPlayerEffectResult: PlayerEffectResult = {
   cardsToDraw: 0,
   blocksDeploymentsThisTurn: false,
+  influenceGains: {},
   intriguesToDraw: 0,
   recruitedTroops: 0,
   revealGain: {},
@@ -296,6 +305,8 @@ const emptyEffectResult: GameEffectResult = {
   acquireRecruitBonus: 0,
   cardsToDraw: 0,
   blocksDeploymentsThisTurn: false,
+  influenceGains: {},
+  influenceAdjustments: [],
   influenceLosses: {},
   intriguesToDraw: 0,
   recruitedTroops: 0,
@@ -343,11 +354,12 @@ function addResourceSpend(spent: Partial<Resources>, resource: ResourceId, amoun
   };
 }
 
-function addInfluenceLoss(losses: Partial<Record<FactionId, number>>, faction: FactionId, amount: number) {
-  if (amount === 0) return losses;
+function addInfluenceAmount(amounts: Partial<Record<FactionId, number>>, faction: FactionId, amount: number) {
+  if (amount === 0) return amounts;
+  const current = amounts ?? {};
   return {
-    ...losses,
-    [faction]: (losses[faction] ?? 0) + amount,
+    ...current,
+    [faction]: (current[faction] ?? 0) + amount,
   };
 }
 
@@ -571,6 +583,32 @@ function addSelectedRecruitedTroops(
   return unsupportedKind("effect selector", selector);
 }
 
+function addSelectedInfluenceGain(
+  result: GameEffectResult,
+  selector: PlayerSelector,
+  faction: FactionId,
+  amount: number,
+) {
+  if (selector === "self") {
+    return {
+      ...result,
+      influenceGains: addInfluenceAmount(result.influenceGains, faction, amount),
+      influenceAdjustments: [...result.influenceAdjustments, { selector, faction, amount }],
+    };
+  }
+  if (selector === "activated-ally") {
+    return {
+      ...result,
+      influenceAdjustments: [...result.influenceAdjustments, { selector, faction, amount }],
+      activatedAlly: {
+        ...result.activatedAlly,
+        influenceGains: addInfluenceAmount(result.activatedAlly.influenceGains, faction, amount),
+      },
+    };
+  }
+  return unsupportedKind("effect selector", selector);
+}
+
 function addSelectedIntriguesToDraw(result: GameEffectResult, selector: PlayerSelector, amount: number) {
   if (selector === "self") {
     return { ...result, intriguesToDraw: result.intriguesToDraw + amount };
@@ -625,8 +663,16 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
     const amount = amountFor(effect.amount, context.source);
     return {
       ...result,
-      influenceLosses: addInfluenceLoss(result.influenceLosses, effect.faction, amount),
+      influenceLosses: addInfluenceAmount(result.influenceLosses, effect.faction, amount),
+      influenceAdjustments: [
+        ...result.influenceAdjustments,
+        { selector: effect.selector, faction: effect.faction, amount: -amount },
+      ],
     };
+  }
+  if (effect.kind === "gain-influence") {
+    const amount = amountFor(effect.amount, context.source);
+    return addSelectedInfluenceGain(result, effect.selector, effect.faction, amount);
   }
   if (effect.kind === "gain-persuasion") {
     if (effect.selector !== "self") {
@@ -782,9 +828,14 @@ function mergeEffectResult(result: GameEffectResult, next: GameEffectResult): Ga
     ),
     blocksDeploymentsThisTurn: result.blocksDeploymentsThisTurn || next.blocksDeploymentsThisTurn,
     deploymentBlockSource: result.deploymentBlockSource ?? next.deploymentBlockSource,
+    influenceGains: Object.entries(next.influenceGains ?? {}).reduce(
+      (gains, [faction, amount]) => addInfluenceAmount(gains, faction as FactionId, amount ?? 0),
+      result.influenceGains,
+    ),
+    influenceAdjustments: [...result.influenceAdjustments, ...next.influenceAdjustments],
     intriguesToDraw: result.intriguesToDraw + next.intriguesToDraw,
     influenceLosses: Object.entries(next.influenceLosses ?? {}).reduce(
-      (losses, [faction, amount]) => addInfluenceLoss(losses, faction as FactionId, amount ?? 0),
+      (losses, [faction, amount]) => addInfluenceAmount(losses, faction as FactionId, amount ?? 0),
       result.influenceLosses,
     ),
     recruitedTroops: result.recruitedTroops + next.recruitedTroops,
@@ -827,6 +878,10 @@ function mergePlayerEffectResult(result: PlayerEffectResult, next: PlayerEffectR
     ),
     blocksDeploymentsThisTurn: result.blocksDeploymentsThisTurn || next.blocksDeploymentsThisTurn,
     deploymentBlockSource: result.deploymentBlockSource ?? next.deploymentBlockSource,
+    influenceGains: Object.entries(next.influenceGains ?? {}).reduce(
+      (gains, [faction, amount]) => addInfluenceAmount(gains, faction as FactionId, amount ?? 0),
+      result.influenceGains,
+    ),
     intriguesToDraw: result.intriguesToDraw + next.intriguesToDraw,
     recruitedTroops: result.recruitedTroops + next.recruitedTroops,
     recruitedTroopsSource: mergeEffectSourceLabel(
@@ -1353,6 +1408,8 @@ function legacyRevealResult(card: Card): GameEffectResult {
     cardsToDraw: 0,
     blocksDeploymentsThisTurn: false,
     influenceLosses: {},
+    influenceGains: {},
+    influenceAdjustments: [],
     intriguesToDraw: 0,
     recruitedTroops: 0,
     persuasion: card.persuasion,
@@ -1389,6 +1446,8 @@ function legacyAcquireResult(card: Card): GameEffectResult {
     cardsToDraw: 0,
     blocksDeploymentsThisTurn: false,
     influenceLosses: {},
+    influenceGains: {},
+    influenceAdjustments: [],
     intriguesToDraw: 0,
     recruitedTroops: 0,
     persuasion: 0,

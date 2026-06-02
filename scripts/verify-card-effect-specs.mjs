@@ -97,6 +97,7 @@ try {
   const deckUtils = await server.ssrLoadModule("/src/game/deck-utils.ts");
   const state = await server.ssrLoadModule("/src/game/state.ts");
   const effectResolver = await server.ssrLoadModule("/src/game/effect-resolver.ts");
+  const plotIntrigueEffectRules = await server.ssrLoadModule("/src/game/plot-intrigue-effect-rules.ts");
   const turnActions = await server.ssrLoadModule("/src/app-turn-actions.ts");
 
   const game = state.initialGame();
@@ -166,6 +167,7 @@ try {
   const cunning = data.intrigueCards.find((card) => card.name === "Cunning");
   const departForArrakis = data.intrigueCards.find((card) => card.name === "Depart For Arrakis");
   const distraction = data.intrigueCards.find((card) => card.name === "Distraction");
+  const imperiumPolitics = data.intrigueCards.find((card) => card.name === "Imperium Politics");
   const intelligenceReport = data.intrigueCards.find((card) => card.name === "Intelligence Report");
   const leverage = data.intrigueCards.find((card) => card.name === "Leverage");
   const manipulate = data.intrigueCards.find((card) => card.name === "Manipulate");
@@ -241,7 +243,7 @@ try {
     wheelsWithinWheels,
   );
   assert.ok(commandRespect && prepareTheWay && spiceMustFlow && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
-  assert.ok(backedByChoam && callToArms && councilorsAmbition && contingencyPlan && cunning && departForArrakis && distraction && intelligenceReport && leverage && manipulate && marketOpportunity && mercenaries && opportunism && shaddamsFavor && strategicStockpiling);
+  assert.ok(backedByChoam && callToArms && councilorsAmbition && contingencyPlan && cunning && departForArrakis && distraction && imperiumPolitics && intelligenceReport && leverage && manipulate && marketOpportunity && mercenaries && opportunism && shaddamsFavor && strategicStockpiling);
   assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && dutifulService && deliverSupplies && sietchTabr && spiceRefinery);
   assert.equal(revealSpecCards.length, 79, "Unexpected number of cards with declarative Reveal specs");
   assert.equal(
@@ -780,6 +782,220 @@ try {
   assert.equal(opportunismBeneBeneResolved.spentResources.solari, 2, "Opportunism same-Faction choice should spend 2 Solari");
   assert.equal(opportunismBeneBeneResolved.influenceLosses.bene, 2, "Opportunism same-Faction choice should aggregate two Influence losses");
   assert.equal(opportunismBeneBeneResolved.vp, 1, "Opportunism same-Faction choice should gain 1 VP");
+  assert.ok(
+    imperiumPolitics.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.choiceId === "greatHouses" &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Ally") &&
+      spec.effects.some((effect) =>
+        effect.kind === "spend-resource" &&
+        effect.selector === "self" &&
+        effect.resource === "solari" &&
+        effect.amount === 1
+      ) &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-influence" &&
+        effect.selector === "self" &&
+        effect.faction === "greatHouses" &&
+        effect.amount === 1
+      )
+    ),
+    "Imperium Politics should carry a typed Ally Great Houses Plot choice spec",
+  );
+  assert.ok(
+    imperiumPolitics.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.choiceId === "greatHouses" &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Commander") &&
+      spec.effects.some((effect) =>
+        effect.kind === "spend-resource" &&
+        effect.selector === "self" &&
+        effect.resource === "solari" &&
+        effect.amount === 1
+      ) &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-influence" &&
+        effect.selector === "activated-ally" &&
+        effect.faction === "greatHouses" &&
+        effect.amount === 1
+      )
+    ),
+    "Imperium Politics should carry a typed Commander routed Great Houses Plot choice spec",
+  );
+  assert.ok(
+    imperiumPolitics.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.choiceId === "emperor" &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Commander") &&
+      spec.conditions?.some((condition) => condition.kind === "has-team" && condition.team === "shaddam") &&
+      spec.effects.some((effect) =>
+        effect.kind === "spend-resource" &&
+        effect.selector === "self" &&
+        effect.resource === "solari" &&
+        effect.amount === 1
+      ) &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-influence" &&
+        effect.selector === "self" &&
+        effect.faction === "emperor" &&
+        effect.amount === 1
+      )
+    ),
+    "Imperium Politics should carry a typed Shaddam personal Emperor Plot choice spec",
+  );
+  const imperiumPoliticsAllyResolved = effectResolver.resolveGameEffects(imperiumPolitics.effects, {
+    trigger: "plot-intrigue",
+    choiceId: "greatHouses",
+    source: p2,
+    state: game,
+  });
+  assert.equal(imperiumPoliticsAllyResolved.spentResources.solari, 1, "Ally Imperium Politics should spend 1 Solari");
+  assert.equal(imperiumPoliticsAllyResolved.influenceGains.greatHouses, 1, "Ally Imperium Politics should gain Great Houses Influence");
+  assert.deepEqual(
+    imperiumPoliticsAllyResolved.activatedAlly.influenceGains,
+    {},
+    "Ally Imperium Politics should not route Influence to an activated Ally",
+  );
+  const imperiumPoliticsCommanderResolved = effectResolver.resolveGameEffects(imperiumPolitics.effects, {
+    trigger: "plot-intrigue",
+    choiceId: "greatHouses",
+    source: p4,
+    target: p6,
+    state: game,
+  });
+  assert.equal(
+    imperiumPoliticsCommanderResolved.spentResources.solari,
+    1,
+    "Commander Imperium Politics should spend Commander Solari",
+  );
+  assert.deepEqual(
+    imperiumPoliticsCommanderResolved.influenceGains,
+    {},
+    "Commander main-board Imperium Politics should not put game-board Influence on the Commander",
+  );
+  assert.equal(
+    imperiumPoliticsCommanderResolved.activatedAlly.influenceGains.greatHouses,
+    1,
+    "Commander main-board Imperium Politics should route Influence to the activated Ally",
+  );
+  const imperiumPoliticsShaddamResolved = effectResolver.resolveGameEffects(imperiumPolitics.effects, {
+    trigger: "plot-intrigue",
+    choiceId: "emperor",
+    source: p4,
+    state: game,
+  });
+  assert.equal(imperiumPoliticsShaddamResolved.spentResources.solari, 1, "Shaddam Imperium Politics should spend 1 Solari");
+  assert.equal(imperiumPoliticsShaddamResolved.influenceGains.emperor, 1, "Shaddam Imperium Politics should gain personal Emperor Influence");
+  const imperiumPoliticsMuadDibEmperorResolved = effectResolver.resolveGameEffects(imperiumPolitics.effects, {
+    trigger: "plot-intrigue",
+    choiceId: "emperor",
+    source: p1,
+    state: game,
+  });
+  assert.deepEqual(
+    imperiumPoliticsMuadDibEmperorResolved.spentResources,
+    {},
+    "Muad'Dib Imperium Politics should not resolve the Shaddam-only Emperor choice",
+  );
+  assert.deepEqual(
+    imperiumPoliticsMuadDibEmperorResolved.influenceGains,
+    {},
+    "Muad'Dib Imperium Politics should not gain Emperor Influence",
+  );
+  const typedSequentialInfluence = {
+    ...imperiumPolitics,
+    id: "intrigue-typed-sequential-influence",
+    name: "Typed Sequential Influence",
+    effects: [plotSpec([
+      { kind: "lose-influence", selector: "self", faction: "bene", amount: 1 },
+      { kind: "gain-influence", selector: "self", faction: "bene", amount: 1 },
+    ])],
+  };
+  const typedSequentialInfluenceFixture = {
+    ...withActivePlayer(game, "p2", (player) => ({
+      leader: "Lady Margot Fenring",
+      resources: { ...player.resources, spice: 0 },
+      influence: { ...player.influence, bene: 2 },
+      intrigues: [typedSequentialInfluence],
+    })),
+    intrigueDiscard: [],
+    turnSpiceGains: {},
+  };
+  const typedSequentialInfluencePlayed = plotIntrigueEffectRules.playTypedPlotIntrigue(
+    typedSequentialInfluenceFixture,
+    "p2",
+    typedSequentialInfluence.id,
+    (intrigue) => intrigue.id === typedSequentialInfluence.id,
+    (player) => `${player.leader} plays Typed Sequential Influence.`,
+  );
+  assert.equal(
+    playerById(typedSequentialInfluencePlayed, "p2").influence.bene,
+    2,
+    "Typed Plot ordered Influence adjustments should preserve final same-Faction Influence",
+  );
+  assert.equal(
+    playerById(typedSequentialInfluencePlayed, "p2").resources.spice,
+    2,
+    "Typed Plot ordered Influence adjustments should trigger Margot Loyalty after dropping and regaining Bene Gesserit 2",
+  );
+  assert.equal(
+    typedSequentialInfluencePlayed.turnSpiceGains.p2,
+    2,
+    "Typed Plot ordered Influence adjustment Loyalty spice should be tracked",
+  );
+  assert.match(
+    typedSequentialInfluencePlayed.log[1],
+    /Loyalty/,
+    "Typed Plot ordered Influence adjustment rewards should log after the played Intrigue",
+  );
+  const typedGainThenLoseInfluence = {
+    ...imperiumPolitics,
+    id: "intrigue-typed-gain-then-lose-influence",
+    name: "Typed Gain Then Lose Influence",
+    effects: [plotSpec([
+      { kind: "gain-influence", selector: "self", faction: "bene", amount: 1 },
+      { kind: "lose-influence", selector: "self", faction: "bene", amount: 1 },
+    ])],
+  };
+  const typedGainThenLoseFixture = {
+    ...withActivePlayer(game, "p2", (player) => ({
+      influence: { ...player.influence, bene: 0 },
+      intrigues: [typedGainThenLoseInfluence],
+    })),
+    intrigueDiscard: [],
+  };
+  const typedGainThenLosePlayed = plotIntrigueEffectRules.playTypedPlotIntrigue(
+    typedGainThenLoseFixture,
+    "p2",
+    typedGainThenLoseInfluence.id,
+    (intrigue) => intrigue.id === typedGainThenLoseInfluence.id,
+    (player) => `${player.leader} plays Typed Gain Then Lose Influence.`,
+  );
+  assert.equal(
+    typedGainThenLosePlayed.intrigueDiscard.at(-1)?.id,
+    typedGainThenLoseInfluence.id,
+    "Typed Plot Influence affordability should allow spending Influence gained earlier in the same effect list",
+  );
+  assert.equal(playerById(typedGainThenLosePlayed, "p2").influence.bene, 0);
+  const typedLoseThenGainBlockedFixture = {
+    ...withActivePlayer(game, "p2", (player) => ({
+      influence: { ...player.influence, bene: 0 },
+      intrigues: [typedSequentialInfluence],
+    })),
+    intrigueDiscard: [],
+  };
+  const typedLoseThenGainBlocked = plotIntrigueEffectRules.playTypedPlotIntrigue(
+    typedLoseThenGainBlockedFixture,
+    "p2",
+    typedSequentialInfluence.id,
+    (intrigue) => intrigue.id === typedSequentialInfluence.id,
+    (player) => `${player.leader} plays Typed Sequential Influence.`,
+  );
+  assert.equal(
+    typedLoseThenGainBlocked,
+    typedLoseThenGainBlockedFixture,
+    "Typed Plot Influence affordability should reject losing Influence before it is gained",
+  );
   assert.ok(
     backedByChoam.effects?.some((spec) =>
       spec.trigger === "plot-intrigue" &&
@@ -3172,6 +3388,30 @@ try {
     ),
     /Invalid effect amount "-1"/,
     "Lose-influence specs should validate effect amounts",
+  );
+  assert.throws(
+    () => effectResolver.resolveGameEffects(
+      [agentSpec([{ kind: "gain-influence", selector: "self", faction: "bene", amount: 1 }])],
+      { trigger: "agent-play", source: p2, state: game },
+    ),
+    /Unsupported effect "gain-influence" for agent-play/,
+    "Gain-influence specs should stay on Plot Intrigue until other trigger resolvers support them",
+  );
+  assert.throws(
+    () => effectResolver.resolveGameEffects(
+      [plotSpec([{ kind: "gain-influence", selector: "self", faction: "guild", amount: 1 }])],
+      { trigger: "plot-intrigue", source: p2, state: game },
+    ),
+    /Unsupported effect faction "guild"/,
+    "Gain-influence specs should reject unsupported faction ids",
+  );
+  assert.throws(
+    () => effectResolver.resolveGameEffects(
+      [plotSpec([{ kind: "gain-influence", selector: "self", faction: "bene", amount: -1 }])],
+      { trigger: "plot-intrigue", source: p2, state: game },
+    ),
+    /Invalid effect amount "-1"/,
+    "Gain-influence specs should validate effect amounts",
   );
   assert.throws(
     () => effectResolver.resolveGameEffects(

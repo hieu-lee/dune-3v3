@@ -274,47 +274,26 @@ export function playImperiumPoliticsPlotIntrigue(
   faction: ImperiumPoliticsChoice,
   influenceOwnerId?: string,
 ): GameState {
-  if (state.phase !== "playing" || state.pendingAction || state.pendingQueue.length > 0) return state;
   const player = state.players[state.activeSeat];
   if (!player || player.id !== playerId) return state;
-  const intrigue = player.intrigues.find((card) => card.id === intrigueId);
-  if (!intrigue || !isImperiumPoliticsIntrigue(intrigue)) return state;
   if (!imperiumPoliticsFactionChoices(player).includes(faction)) return state;
-  if (player.resources.solari < 1) return state;
-
-  const influenceOwnerResult = player.role === "Commander" && faction !== "emperor"
-    ? activatedAllyEffectOwner(state, player, influenceOwnerId)
-    : { valid: true, owner: player };
-  if (!influenceOwnerResult.valid || !influenceOwnerResult.owner) return state;
-  const influenceOwner = influenceOwnerResult.owner;
-
-  const players = state.players.map((candidate) => {
-    let next = candidate;
-    if (candidate.id === player.id) {
-      next = {
-        ...next,
-        resources: { ...next.resources, solari: next.resources.solari - 1 },
-        intrigues: next.intrigues.filter((card) => card.id !== intrigue.id),
-      };
-    }
-    if (candidate.id === influenceOwner.id) {
-      next = adjustInfluence(next, faction, 1);
-    }
-    return next;
-  });
-  const influenceText = influenceOwner.id === player.id
-    ? "gains"
-    : `${influenceOwner.leader} gains`;
-  const nextState = {
-    ...state,
-    players,
-    intrigueDiscard: [...state.intrigueDiscard, intrigue],
-    log: [
-      `${player.leader} plays Imperium Politics, spends 1 Solari, and ${influenceText} 1 ${factionLabels[faction]} Influence.`,
-      ...state.log,
-    ],
-  };
-  return resolveLeaderInfluenceThresholdRewards(nextState, state.players);
+  const requiresActivatedAlly = player.role === "Commander" && faction !== "emperor";
+  return playTypedPlotIntrigue(
+    state,
+    playerId,
+    intrigueId,
+    isImperiumPoliticsIntrigue,
+    (actor, _contractPending, activatedAlly) => {
+      const influenceText = activatedAlly && activatedAlly.id !== actor.id
+        ? `${activatedAlly.leader} gains`
+        : "gains";
+      return `${actor.leader} plays Imperium Politics, spends 1 Solari, and ${influenceText} 1 ${factionLabels[faction]} Influence.`;
+    },
+    {
+      choiceId: faction,
+      ...(requiresActivatedAlly ? { activatedAllyOwnerId: influenceOwnerId, requireActivatedAlly: true } : {}),
+    },
+  );
 }
 
 export function playBuyAccessPlotIntrigue(

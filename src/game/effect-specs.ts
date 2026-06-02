@@ -176,6 +176,31 @@ export function plotLoseInfluenceForResource(
   ], conditions, { choiceId });
 }
 
+export function plotGainInfluence(
+  selector: PlayerSelector,
+  faction: FactionId,
+  amount: EffectAmountSpec,
+  conditions?: GameEffectConditionSpec[],
+  options?: CardEffectSpecOptions,
+): CardEffectSpec {
+  return plotIntrigueEffects([{ kind: "gain-influence", selector, faction, amount }], conditions, options);
+}
+
+export function plotPayResourceForInfluence(
+  choiceId: string,
+  resource: ResourceId,
+  resourceAmount: EffectAmountSpec,
+  selector: PlayerSelector,
+  faction: FactionId,
+  influenceAmount: EffectAmountSpec,
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return plotIntrigueEffects([
+    { kind: "spend-resource", selector: "self", resource, amount: resourceAmount },
+    { kind: "gain-influence", selector, faction, amount: influenceAmount },
+  ], conditions, { choiceId });
+}
+
 export function plotPayResourcesForVp(
   choiceId: string,
   costs: Array<{ resource: ResourceId; amount: EffectAmountSpec }>,

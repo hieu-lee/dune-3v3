@@ -103,6 +103,7 @@ try {
   const p2 = playerById(game, "p2");
   const p3 = playerById(game, "p3");
   const p4 = playerById(game, "p4");
+  const p6 = playerById(game, "p6");
   const revealSpecCards = [
     ...data.allyStarterCards,
     ...data.muadDibCommanderCards,
@@ -160,6 +161,7 @@ try {
   const councilorsAmbition = data.intrigueCards.find((card) => card.name === "Councilor's Ambition");
   const contingencyPlan = data.intrigueCards.find((card) => card.name === "Contingency Plan");
   const leverage = data.intrigueCards.find((card) => card.name === "Leverage");
+  const shaddamsFavor = data.intrigueCards.find((card) => card.name === "Shaddam's Favor");
   const commandRespect = data.muadDibCommanderCards.find((card) => card.name === "Command Respect");
   const limitedLandsraadAccess = data.muadDibCommanderCards.find((card) => card.name === "Limited Landsraad Access");
   const demandAttention = data.muadDibCommanderCards.find((card) => card.name === "Demand Attention");
@@ -227,7 +229,7 @@ try {
     wheelsWithinWheels,
   );
   assert.ok(commandRespect && prepareTheWay && spiceMustFlow && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
-  assert.ok(councilorsAmbition && contingencyPlan && leverage);
+  assert.ok(councilorsAmbition && contingencyPlan && leverage && shaddamsFavor);
   assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && dutifulService && deliverSupplies && sietchTabr && spiceRefinery);
   assert.equal(revealSpecCards.length, 79, "Unexpected number of cards with declarative Reveal specs");
   assert.equal(
@@ -370,6 +372,78 @@ try {
     }),
     [],
     "Leverage Plot contract spec should not resolve without a turn spice gain",
+  );
+  assert.ok(
+    shaddamsFavor.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Ally") &&
+      spec.effects.some((effect) =>
+        effect.kind === "recruit-troops" &&
+        effect.selector === "self" &&
+        effect.amount === 1
+      )
+    ),
+    "Shaddam's Favor should carry a typed Plot self troop recruit spec for Allies",
+  );
+  assert.ok(
+    shaddamsFavor.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Commander") &&
+      spec.effects.some((effect) =>
+        effect.kind === "recruit-troops" &&
+        effect.selector === "activated-ally" &&
+        effect.amount === 1
+      )
+    ),
+    "Shaddam's Favor should carry a typed Plot activated-Ally troop recruit spec for Commanders",
+  );
+  assert.ok(
+    shaddamsFavor.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.conditions?.some((condition) =>
+        condition.kind === "has-influence" &&
+        condition.faction === "emperor" &&
+        condition.amount === 3
+      ) &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-resource" &&
+        effect.selector === "self" &&
+        effect.resource === "solari" &&
+        effect.amount === 3
+      )
+    ),
+    "Shaddam's Favor should carry a typed Emperor-icon-gated Plot Solari gain spec",
+  );
+  const shaddamsFavorAllyResolved = effectResolver.resolveGameEffects(shaddamsFavor.effects, {
+    trigger: "plot-intrigue",
+    source: { ...p2, influence: { ...p2.influence, greatHouses: 3, emperor: 0 } },
+    state: {
+      players: game.players.map((player) =>
+        player.id === p2.id ? { ...player, influence: { ...player.influence, greatHouses: 3, emperor: 0 } } : player,
+      ),
+    },
+  });
+  assert.equal(shaddamsFavorAllyResolved.recruitedTroops, 1, "Shaddam's Favor Plot spec should recruit for Ally actors");
+  assert.equal(shaddamsFavorAllyResolved.revealGain.solari, 3, "Shaddam's Favor Plot spec should pay Solari with 3 Great Houses Influence");
+  const shaddamsFavorCommanderResolved = effectResolver.resolveGameEffects(shaddamsFavor.effects, {
+    trigger: "plot-intrigue",
+    source: { ...p4, influence: { ...p4.influence, emperor: 3, greatHouses: 0 } },
+    target: p6,
+    state: {
+      players: game.players.map((player) =>
+        player.id === p4.id ? { ...player, influence: { ...player.influence, emperor: 3, greatHouses: 0 } } : player,
+      ),
+    },
+  });
+  assert.equal(
+    shaddamsFavorCommanderResolved.activatedAlly.recruitedTroops,
+    1,
+    "Shaddam's Favor Plot spec should route Commander troop recruitment to the activated Ally",
+  );
+  assert.equal(
+    shaddamsFavorCommanderResolved.revealGain.solari,
+    3,
+    "Shaddam's Favor Plot spec should count Shaddam personal Emperor Influence for Solari",
   );
   for (const card of [guildSpy, inHighPlaces, spyNetwork, strikeFleet, subversiveAdvisor]) {
     assert.ok(

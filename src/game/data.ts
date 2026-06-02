@@ -32,6 +32,7 @@ import {
   rebelSupplierSourceId,
   reliableInformantSourceId,
   sardaukarSoldierSourceId,
+  shaddamsFavorSourceId,
   southernEldersSourceId,
   spaceTimeFoldingSourceId,
   spyNetworkSourceId,
@@ -70,6 +71,7 @@ import {
   hasSwordmasterBonus,
   gainedSpiceThisTurn,
   plotGainResource,
+  plotRecruitTroops,
   plotTakeContracts,
   revealGainPersuasion,
   revealPlaceSpies,
@@ -833,6 +835,13 @@ function intrigueCardEffects(card: HubCard): CardEffectSpec[] | undefined {
     return [
       plotGainResource("solari", 1, [gainedSpiceThisTurn()]),
       plotTakeContracts(1, { optional: true, source: "Leverage" }, [gainedSpiceThisTurn()]),
+    ];
+  }
+  if (card.id === shaddamsFavorSourceId) {
+    return [
+      plotRecruitTroops("self", 1, [hasRole("Ally")]),
+      plotRecruitTroops("activated-ally", 1, [hasRole("Commander")]),
+      plotGainResource("solari", 3, [hasInfluence("emperor", 3)]),
     ];
   }
   return undefined;

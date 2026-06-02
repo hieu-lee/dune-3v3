@@ -1,4 +1,5 @@
 import { resolveGameEffects, resolveTakeContracts } from "./effect-resolver";
+import { activatedAllyEffectOwner } from "./market-rules";
 import type {
   GameState,
   IntrigueCard,
@@ -8,6 +9,11 @@ import type {
 } from "./types";
 
 const resourceIds = ["solari", "spice", "water"] as const;
+
+type PlayTypedPlotIntrigueOptions = {
+  activatedAllyOwnerId?: string;
+  requireActivatedAlly?: boolean;
+};
 
 function hasResourceGains(gain: Partial<Resources>) {
   return resourceIds.some((resource) => (gain[resource] ?? 0) > 0);
@@ -46,7 +52,13 @@ export function playTypedPlotIntrigue(
   playerId: string,
   intrigueId: string,
   isExpectedIntrigue: (intrigue: IntrigueCard) => boolean,
-  logFor: (player: Player, contractPending: PendingAction | undefined) => string,
+  logFor: (
+    player: Player,
+    contractPending: PendingAction | undefined,
+    activatedAlly: Player | undefined,
+    resolved: ReturnType<typeof resolveGameEffects>,
+  ) => string,
+  options: PlayTypedPlotIntrigueOptions = {},
 ): GameState {
   if (state.phase !== "playing" || state.pendingAction || state.pendingQueue.length > 0) return state;
   const player = state.players[state.activeSeat];
@@ -54,9 +66,15 @@ export function playTypedPlotIntrigue(
   const intrigue = player.intrigues.find((card) => card.id === intrigueId);
   if (!intrigue || !isExpectedIntrigue(intrigue)) return state;
 
+  const activatedAllyResult = options.requireActivatedAlly || options.activatedAllyOwnerId
+    ? activatedAllyEffectOwner(state, player, options.activatedAllyOwnerId)
+    : { valid: true, owner: undefined };
+  if (!activatedAllyResult.valid) return state;
+  const activatedAlly = activatedAllyResult.owner;
   const context = {
     trigger: "plot-intrigue" as const,
     source: player,
+    target: activatedAlly,
     state,
   };
   const resolved = resolveGameEffects(intrigue.effects, context);
@@ -64,15 +82,22 @@ export function playTypedPlotIntrigue(
   if (contractEffects.length > 1) throw new Error("Unsupported multiple Plot Intrigue take-contracts effects");
   const [contractEffect] = contractEffects;
   const contractPending = publicContractPendingFor(state, player, intrigue, contractEffect);
-  if (!hasResourceGains(resolved.revealGain) && !contractPending) return state;
+  const hasTroopRecruits = resolved.recruitedTroops > 0 || resolved.activatedAlly.recruitedTroops > 0;
+  if (!hasResourceGains(resolved.revealGain) && !hasTroopRecruits && !contractPending) return state;
 
   const players = state.players.map((candidate) =>
     candidate.id === player.id
       ? {
           ...candidate,
           resources: addResourceGains(candidate.resources, resolved.revealGain),
+          garrison: candidate.garrison + resolved.recruitedTroops,
           intrigues: candidate.intrigues.filter((card) => card.id !== intrigue.id),
         }
+      : activatedAlly && candidate.id === activatedAlly.id
+        ? {
+            ...candidate,
+            garrison: candidate.garrison + resolved.activatedAlly.recruitedTroops,
+          }
       : candidate,
   );
   return {
@@ -80,6 +105,6 @@ export function playTypedPlotIntrigue(
     players,
     pendingAction: contractPending,
     intrigueDiscard: [...state.intrigueDiscard, intrigue],
-    log: [logFor(player, contractPending), ...state.log],
+    log: [logFor(player, contractPending, activatedAlly, resolved), ...state.log],
   };
 }

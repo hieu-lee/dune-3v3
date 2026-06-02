@@ -2,7 +2,6 @@ import {
   factionLabels,
 } from "./data";
 import {
-  effectiveEmperorIconInfluence,
   effectiveFremenIconInfluence,
   effectiveRequirementInfluence,
 } from "./board-rules";
@@ -230,45 +229,19 @@ export function playShaddamsFavorPlotIntrigue(
   intrigueId: string,
   troopOwnerId?: string,
 ): GameState {
-  if (state.phase !== "playing" || state.pendingAction || state.pendingQueue.length > 0) return state;
-  const player = state.players[state.activeSeat];
-  if (!player || player.id !== playerId) return state;
-  const intrigue = player.intrigues.find((card) => card.id === intrigueId);
-  if (!intrigue || !isShaddamsFavorIntrigue(intrigue)) return state;
-
-  const troopOwnerResult = activatedAllyEffectOwner(state, player, troopOwnerId);
-  if (!troopOwnerResult.valid || !troopOwnerResult.owner) return state;
-  const troopOwner = troopOwnerResult.owner;
-
-  const gainsSolari = effectiveEmperorIconInfluence(player, state.players) >= 3;
-  const players = state.players.map((candidate) => {
-    let next = candidate;
-    if (candidate.id === player.id) {
-      next = {
-        ...next,
-        resources: {
-          ...next.resources,
-          solari: next.resources.solari + (gainsSolari ? 3 : 0),
-        },
-        intrigues: next.intrigues.filter((card) => card.id !== intrigue.id),
-      };
-    }
-    if (candidate.id === troopOwner.id) {
-      next = { ...next, garrison: next.garrison + 1 };
-    }
-    return next;
-  });
-  const troopLabel = troopOwner.id !== player.id ? ` for ${troopOwner.leader}` : "";
-  const solariLabel = gainsSolari ? " and gains 3 Solari" : "";
-  return {
-    ...state,
-    players,
-    intrigueDiscard: [...state.intrigueDiscard, intrigue],
-    log: [
-      `${player.leader} plays Shaddam's Favor${troopLabel}, recruits 1 troop${solariLabel}.`,
-      ...state.log,
-    ],
-  };
+  return playTypedPlotIntrigue(
+    state,
+    playerId,
+    intrigueId,
+    isShaddamsFavorIntrigue,
+    (player, _contractPending, activatedAlly, resolved) => {
+      const troopLabel = activatedAlly && activatedAlly.id !== player.id ? ` for ${activatedAlly.leader}` : "";
+      const gainsSolari = (resolved.revealGain.solari ?? 0) >= 3;
+      const solariLabel = gainsSolari ? " and gains 3 Solari" : "";
+      return `${player.leader} plays Shaddam's Favor${troopLabel}, recruits 1 troop${solariLabel}.`;
+    },
+    { activatedAllyOwnerId: troopOwnerId, requireActivatedAlly: true },
+  );
 }
 
 export function playMarketOpportunityPlotIntrigue(

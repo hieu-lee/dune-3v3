@@ -157,7 +157,11 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
   if (effect.selector !== "self" && effect.selector !== "activated-ally") {
     throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
   }
-  if (effect.selector === "activated-ally" && trigger !== "agent-play") {
+  if (
+    effect.selector === "activated-ally" &&
+    trigger !== "agent-play" &&
+    !(trigger === "plot-intrigue" && effect.kind === "recruit-troops")
+  ) {
     throw new Error(`Unsupported effect selector "${effect.selector}" for ${trigger}`);
   }
   if (

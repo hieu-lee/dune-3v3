@@ -76,6 +76,14 @@ export function plotGainResource(
   return plotIntrigueEffects([{ kind: "gain-resource", selector: "self", resource, amount }], conditions);
 }
 
+export function plotRecruitTroops(
+  selector: PlayerSelector,
+  amount: EffectAmountSpec,
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return plotIntrigueEffects([{ kind: "recruit-troops", selector, amount }], conditions);
+}
+
 export function plotTakeContracts(
   amount: EffectAmountSpec,
   options: {

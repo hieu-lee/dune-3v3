@@ -56,7 +56,7 @@ export type GameEffectContext = {
   trigger: GameEffectTrigger;
   source: Player;
   target?: Player;
-  space?: Pick<BoardSpace, "icon">;
+  space?: Pick<BoardSpace, "icon" | "maker">;
   state?: EffectResolverState;
 };
 
@@ -267,6 +267,7 @@ function amountFor(amount: EffectAmountSpec, source: Player) {
 
 function conditionApplies(condition: GameEffectConditionSpec, context: GameEffectContext) {
   if (condition.kind === "visited-maker-space") {
+    if (context.trigger === "agent-play") return Boolean(context.space?.maker);
     return context.state?.roundMakerSpaceVisits
       ? hasVisitedMakerSpaceThisRound({ roundMakerSpaceVisits: context.state.roundMakerSpaceVisits }, context.source.id)
       : false;

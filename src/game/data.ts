@@ -5,6 +5,7 @@ import {
   cargoRunnerSourceId,
   capturedMentatSourceId,
   chaniCleverTacticianSourceId,
+  fedaykinStilltentSourceId,
   hiddenMissiveSourceId,
   interstellarTradeSourceId,
   makerKeeperSourceId,
@@ -212,6 +213,9 @@ function imperiumRevealText(card: HubCard, persuasion: number, swords: number, p
   if (card.id === chaniCleverTacticianSourceId) {
     return "Fremen Bond: +2 persuasion. You may retreat two troops to add 4 strength.";
   }
+  if (card.id === fedaykinStilltentSourceId) {
+    return "Gain 1 water.";
+  }
   if (card.id === wheelsWithinWheelsSourceId) {
     return "+1 persuasion. Place 1 spy.";
   }
@@ -250,6 +254,13 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
       agentPlaceSpies("self", 1, { recallForSupply: true, mustPlace: true }),
       revealGainPersuasion(1),
       revealGainPersuasion(2, [hasSpyPosts(2)]),
+    ];
+  }
+  if (card.id === fedaykinStilltentSourceId) {
+    return [
+      revealGainResource("water", 1),
+      agentRecruitTroops("self", 1, [visitedMakerSpace(), hasRole("Ally")]),
+      agentRecruitTroops("activated-ally", 1, [visitedMakerSpace(), hasRole("Commander")]),
     ];
   }
   if (card.id === hiddenMissiveSourceId) {
@@ -297,6 +308,9 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
 }
 
 function imperiumPlayText(card: HubCard) {
+  if (card.id === fedaykinStilltentSourceId) {
+    return "If you sent an Agent to a Maker board space this turn, recruit 1 troop.";
+  }
   if (card.id === hiddenMissiveSourceId) {
     return "If you have 2 or more Bene Gesserit Influence, recruit 1 troop and draw 1 card.";
   }
@@ -397,6 +411,7 @@ function toImperiumCard(card: HubCard): Card {
   const persuasion = attributeNumber(card, "Persuasion on reveal");
   const swords = attributeNumber(card, "Swords");
   const effects = imperiumCardEffects(card);
+  const revealGain = card.id === fedaykinStilltentSourceId ? { water: 1 } : undefined;
   const automatedContractPersuasion = card.id === interstellarTradeSourceId;
   const automatedConditionalSwords = card.id === calculusOfPowerSourceId;
   const conditionalPersuasion =
@@ -411,6 +426,7 @@ function toImperiumCard(card: HubCard): Card {
     swords,
     conditionalPersuasion,
     conditionalSwords,
+    revealGain,
     effects,
     play: imperiumPlayText(card),
     reveal: imperiumRevealText(card, persuasion, swords, conditionalPersuasion || conditionalSwords),

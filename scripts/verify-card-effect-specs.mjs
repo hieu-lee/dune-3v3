@@ -86,6 +86,7 @@ try {
   const calculus = data.imperiumDeck.find((card) => card.name === "Calculus of Power");
   const capturedMentat = data.imperiumDeck.find((card) => card.name === "Captured Mentat");
   const beneGesseritOperative = data.imperiumDeck.find((card) => card.name === "Bene Gesserit Operative");
+  const fedaykinStilltent = data.imperiumDeck.find((card) => card.name === "Fedaykin Stilltent");
   const hiddenMissive = data.imperiumDeck.find((card) => card.name === "Hidden Missive");
   const cargoRunner = data.imperiumDeck.find((card) => card.name === "Cargo Runner");
   const chani = data.imperiumDeck.find((card) => card.name === "Chani, Clever Tactician");
@@ -110,6 +111,7 @@ try {
   const emperorSignet = data.emperorCommanderCards.find((card) => card.name === "Signet Ring");
   const imperialOrnithopter = data.emperorCommanderCards.find((card) => card.name === "Imperial Ornithopter");
   const arrakeen = data.boardSpaces.find((space) => space.id === "arrakeen");
+  const acceptContract = data.boardSpaces.find((space) => space.id === "accept-contract");
   const haggaBasin = data.boardSpaces.find((space) => space.id === "hagga-basin");
   const imperialBasin = data.boardSpaces.find((space) => space.id === "imperial-basin");
   const secrets = data.boardSpaces.find((space) => space.id === "secrets");
@@ -123,6 +125,7 @@ try {
     calculus &&
     capturedMentat &&
     beneGesseritOperative &&
+    fedaykinStilltent &&
     hiddenMissive &&
     cargoRunner &&
     chani &&
@@ -133,8 +136,8 @@ try {
     wheelsWithinWheels,
   );
   assert.ok(commandRespect && prepareTheWay && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
-  assert.ok(arrakeen && haggaBasin && imperialBasin && secrets && highCouncil);
-  assert.equal(revealSpecCards.length, 34, "Unexpected number of cards with declarative Reveal specs");
+  assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil);
+  assert.equal(revealSpecCards.length, 35, "Unexpected number of cards with declarative Reveal specs");
   assert.deepEqual(
     [
       ...data.reserveMarket,
@@ -145,6 +148,7 @@ try {
       "Captured Mentat",
       "Cargo Runner",
       "Chani, Clever Tactician",
+      "Fedaykin Stilltent",
       "Hidden Missive",
       "Maker Keeper",
       "Maula Pistol",
@@ -165,6 +169,7 @@ try {
 	    interstellarTrade,
       calculus,
       capturedMentat,
+      fedaykinStilltent,
 	    beneGesseritOperative,
 	    chani,
 	  ]) {
@@ -526,6 +531,41 @@ try {
       spec.effects.some((effect) => effect.kind === "gain-resource" && effect.resource === "solari" && effect.amount === 2)
     ),
     "Paracompass should carry a Solari Agent spec",
+  );
+  assert.ok(
+    fedaykinStilltent.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.effects.some((effect) => effect.kind === "gain-resource" && effect.resource === "water" && effect.amount === 1)
+    ),
+    "Fedaykin Stilltent should carry a reveal water spec",
+  );
+  assert.equal(fedaykinStilltent.reveal, "Gain 1 water.", "Fedaykin Stilltent reveal text should preserve its water reveal");
+  assert.equal(
+    fedaykinStilltent.play,
+    "If you sent an Agent to a Maker board space this turn, recruit 1 troop.",
+    "Fedaykin Stilltent play text should include its Maker-space condition",
+  );
+  assert.ok(
+    fedaykinStilltent.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.conditions?.some((condition) => condition.kind === "visited-maker-space") &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Ally") &&
+      spec.effects.some((effect) =>
+        effect.kind === "recruit-troops" && effect.selector === "self" && effect.amount === 1
+      )
+    ),
+    "Fedaykin Stilltent should carry an Ally routed Maker-space troop spec",
+  );
+  assert.ok(
+    fedaykinStilltent.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.conditions?.some((condition) => condition.kind === "visited-maker-space") &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Commander") &&
+      spec.effects.some((effect) =>
+        effect.kind === "recruit-troops" && effect.selector === "activated-ally" && effect.amount === 1
+      )
+    ),
+    "Fedaykin Stilltent should carry a Commander-to-activated-Ally Maker-space troop spec",
   );
   assert.ok(
     hiddenMissive.effects?.some((spec) =>
@@ -2777,6 +2817,72 @@ try {
   );
   assert.deepEqual(paracompassEffect.source.resources, { solari: 2, spice: 0, water: 0 }, "Paracompass should gain 2 Agent Solari");
   assert.match(paracompassEffect.log ?? "", /Paracompass: gains 2 Solari/);
+  const fedaykinMakerEffect = state.applyCardAgentEffect(
+    fedaykinStilltent,
+    { ...p2, garrison: 0 },
+    p2,
+    game,
+    imperialBasin,
+  );
+  assert.equal(fedaykinMakerEffect.source.garrison, 1, "Fedaykin Stilltent should recruit 1 troop on a Maker Agent space");
+  assert.equal(fedaykinMakerEffect.recruitedTroops, 1, "Fedaykin Stilltent recruit should count for deployment limits");
+  assert.match(fedaykinMakerEffect.log ?? "", /Fedaykin Stilltent: recruits 1 troop/);
+  const fedaykinNonMakerEffect = state.applyCardAgentEffect(
+    fedaykinStilltent,
+    { ...p2, garrison: 0 },
+    p2,
+    { ...game, roundMakerSpaceVisits: { [p2.id]: true } },
+    acceptContract,
+  );
+  assert.equal(
+    fedaykinNonMakerEffect.source.garrison,
+    0,
+    "Fedaykin Stilltent should not use prior round Maker visits during a non-Maker Agent placement",
+  );
+  assert.equal(fedaykinNonMakerEffect.log, undefined, "Fedaykin Stilltent should not log on non-Maker Agent spaces");
+  const fedaykinNoSpaceEffect = state.applyCardAgentEffect(
+    fedaykinStilltent,
+    { ...p2, garrison: 0 },
+    p2,
+    { ...game, roundMakerSpaceVisits: { [p2.id]: true } },
+  );
+  assert.equal(
+    fedaykinNoSpaceEffect.source.garrison,
+    0,
+    "Fedaykin Stilltent Agent specs should require current board-space context",
+  );
+  const fedaykinCommanderEffect = state.applyCardAgentEffect(
+    fedaykinStilltent,
+    { ...p4, garrison: 0 },
+    { ...p2, garrison: 0 },
+    game,
+    imperialBasin,
+  );
+  assert.equal(fedaykinCommanderEffect.source.garrison, 0, "Fedaykin Stilltent should not recruit troops to the Commander");
+  assert.equal(fedaykinCommanderEffect.target.garrison, 1, "Fedaykin Stilltent should recruit to the activated Ally for Commander plays");
+  assert.equal(fedaykinCommanderEffect.recruitedTroops, 1, "Fedaykin Stilltent Commander recruit should count for deployment limits");
+  const fedaykinReveal = turnActions.revealTurnPlan({ ...p2, hand: [fedaykinStilltent], highCouncilSeat: false }, game);
+  assert.equal(fedaykinReveal.persuasion, 0, "Fedaykin Stilltent should not reveal for persuasion");
+  assert.deepEqual(fedaykinReveal.revealGain, { water: 1 }, "Fedaykin Stilltent should reveal for 1 water");
+  const fedaykinPlacementFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 1,
+    garrison: 0,
+    hand: [fedaykinStilltent],
+    playArea: [],
+    resources: { solari: 0, spice: 0, water: 0 },
+  }));
+  const fedaykinPlaced = turnActions.placeAgentAction(fedaykinPlacementFixture, {
+    commanderTargets: {},
+    selectedCard: fedaykinStilltent,
+    selectedSpace: imperialBasin,
+  });
+  assert.equal(
+    playerById(fedaykinPlaced, p2.id).garrison,
+    1,
+    "Fedaykin Stilltent should receive current Maker space context through placeAgentAction",
+  );
+  assert.equal(fedaykinPlaced.pendingAction?.kind, "deploy", "Fedaykin Stilltent's recruited troop should be deployable");
+  assert.match(fedaykinPlaced.log.join("\n"), /Fedaykin Stilltent: recruits 1 troop/);
   const hiddenMissiveDraw = { ...dagger, id: "hidden-missive-agent-draw-fixture" };
   const hiddenMissiveEffect = state.applyCardAgentEffect(
     hiddenMissive,

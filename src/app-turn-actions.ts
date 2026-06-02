@@ -137,6 +137,7 @@ export function placeAgentAction(
     source,
     player.role === "Commander" ? effectedTarget : source,
     current,
+    selectedSpace,
   );
   source = cardAgentEffect.source;
   effectedTarget = cardAgentEffect.target;

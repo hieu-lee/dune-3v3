@@ -74,6 +74,7 @@ export function applyCardAgentEffect(
   sourcePlayer: Player,
   targetPlayer: Player,
   state?: Pick<GameState, "alliances" | "players">,
+  space?: Pick<BoardSpace, "icon" | "maker">,
 ): {
   source: Player;
   target: Player;
@@ -84,7 +85,7 @@ export function applyCardAgentEffect(
   sourceIntriguesToDraw?: number;
   targetIntriguesToDraw?: number;
 } {
-  const genericEffect = applyGenericCardAgentEffect(card, sourcePlayer, targetPlayer, state);
+  const genericEffect = applyGenericCardAgentEffect(card, sourcePlayer, targetPlayer, state, space);
   if (genericEffect) return genericEffect;
 
   return { source: sourcePlayer, target: targetPlayer };
@@ -96,6 +97,7 @@ function applyGenericCardAgentEffect(
   targetPlayer: Player,
   state?: Pick<GameState, "players"> &
     Partial<Pick<GameState, "alliances" | "roundMakerSpaceVisits" | "sharedSpyPosts" | "spyPosts">>,
+  space?: Pick<BoardSpace, "icon" | "maker">,
 ): {
   source: Player;
   target: Player;
@@ -116,6 +118,7 @@ function applyGenericCardAgentEffect(
     trigger: "agent-play",
     source: sourcePlayer,
     target: targetPlayer,
+    space,
     state: state ? { ...state, players } : undefined,
   });
   if (result.persuasion > 0 || result.swords > 0) {

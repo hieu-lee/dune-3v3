@@ -5,6 +5,7 @@ import {
   agentDrawCards,
   agentGainResource,
   agentMoveCardToThroneRow,
+  agentPaidRewardChoice,
   agentPayResourceForInfluence,
   agentPayResourceForContracts,
   agentPayResourceForSandworms,
@@ -547,6 +548,45 @@ const emperorCommanderSpecs: Array<StarterCardSpec & { sourceId: number }> = [
     effects: [
       agentBlockConflictDeployment(
         { source: "Emperor of the Known Universe" },
+        [hasTeam("shaddam"), hasRole("Commander")],
+      ),
+      agentPaidRewardChoice(
+        [
+          {
+            id: "troop",
+            resource: "solari",
+            cost: 1,
+            reward: {
+              kind: "recruit-troops",
+              selector: "activated-ally",
+              amount: 1,
+              destination: "garrison",
+            },
+          },
+          {
+            id: "emperor",
+            resource: "solari",
+            cost: 3,
+            reward: {
+              kind: "gain-influence",
+              selector: "self",
+              faction: "emperor",
+              amount: 1,
+            },
+          },
+          ...(["greatHouses", "spacing", "bene", "fringeWorlds"] as const).map((faction) => ({
+            id: faction,
+            resource: "solari" as const,
+            cost: 3,
+            reward: {
+              kind: "gain-influence" as const,
+              selector: "activated-ally" as const,
+              faction,
+              amount: 1,
+            },
+          })),
+        ],
+        { requiredRecipient: "activated-ally", source: "Emperor of the Known Universe" },
         [hasTeam("shaddam"), hasRole("Commander")],
       ),
       revealGainPersuasion(1),

@@ -244,11 +244,30 @@ async function createSignetChoiceStates(server, initialPlayableGame) {
       };
     }),
     pendingAction: {
-      kind: "shaddam-signet-ring",
-      commanderId: "p4",
-      allyId: "p2",
+      kind: "paid-reward-choice",
+      ownerId: "p4",
       cardId: shaddamCard.id,
       source: "Emperor of the Known Universe",
+      options: [
+        {
+          id: "troop",
+          resource: "solari",
+          cost: 1,
+          reward: { kind: "recruit-troops", recipientId: "p2", amount: 1, destination: "garrison" },
+        },
+        {
+          id: "emperor",
+          resource: "solari",
+          cost: 3,
+          reward: { kind: "gain-influence", recipientId: "p4", faction: "emperor", amount: 1 },
+        },
+        ...["greatHouses", "spacing", "bene", "fringeWorlds"].map((faction) => ({
+          id: faction,
+          resource: "solari",
+          cost: 3,
+          reward: { kind: "gain-influence", recipientId: "p2", faction, amount: 1 },
+        })),
+      ],
     },
   };
 

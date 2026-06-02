@@ -2,7 +2,6 @@ import { resolveInfluence } from "./agent-effects";
 import {
   canMoveCardToThroneRow,
   isGenericSignetRingCard,
-  isShaddamSignetRingCard,
 } from "./card-identifiers";
 import {
   canSummonSandworms,
@@ -17,6 +16,7 @@ import {
   resolveAgentGainInfluenceChoices,
   resolveAgentMoveCardToThroneRows,
   resolveAgentOpponentsDiscardCards,
+  resolveAgentPaidRewardChoices,
   resolveAgentPayResourceForContracts,
   resolveAgentPayResourceForDrawCards,
   resolveAgentPayResourceForInfluences,
@@ -64,22 +64,13 @@ import type {
   FactionId,
   GameState,
   IconId,
+  PaidRewardChoicePendingOption,
   PendingAction,
   Player,
 } from "./types";
 
 export const stabanUnseenNetworkSource = "Unseen Network";
 export const stabanUnseenNetworkFactionIcons: IconId[] = ["emperor", "spacing", "bene", "fremen"];
-export const shaddamSignetRingTroopCost = 1;
-export const shaddamSignetRingInfluenceCost = 3;
-export const shaddamSignetRingInfluenceChoices: FactionId[] = [
-  "emperor",
-  "greatHouses",
-  "spacing",
-  "bene",
-  "fringeWorlds",
-];
-
 type IrulanSignetRingPendingAction = Extract<PendingAction, { kind: "irulan-signet-ring" }>;
 
 function sameTeamAllies(players: Player[], source: Player): [Player, Player] | undefined {
@@ -261,6 +252,86 @@ function pendingActionForAgentGainInfluenceChoice(
       };
     })
     .find((pending): pending is PendingAction => Boolean(pending));
+}
+
+function paidRewardChoiceRecipientFor(source: Player, target: Player | undefined, selector: "self" | "activated-ally") {
+  if (selector === "self") return source;
+  if (
+    source.role === "Commander" &&
+    target?.role === "Ally" &&
+    target.team === source.team
+  ) {
+    return target;
+  }
+  return undefined;
+}
+
+function pendingActionForAgentPaidRewardChoice(
+  card: Card,
+  source: Player,
+  state?: GameState,
+  target?: Player,
+): PendingAction | undefined {
+  if (!card.effects || !source.playArea.some((candidate) => candidate.id === card.id)) return undefined;
+  const players = state ? playersWithPendingCardEffect(state, source, target) : undefined;
+  const effectState = state && players ? { ...state, players } : undefined;
+  const effects = resolveAgentPaidRewardChoices(card.effects, {
+    trigger: "agent-play",
+    source,
+    target,
+    state: effectState,
+  });
+  if (effects.length > 1) throw new Error(`Unsupported multiple paid reward choices for ${card.name}`);
+  const [effect] = effects;
+  if (!effect || effect.selector !== "self") return undefined;
+  if (effect.requiredRecipient && !paidRewardChoiceRecipientFor(source, target, effect.requiredRecipient)) {
+    return undefined;
+  }
+  const options = effect.options.flatMap((option): PaidRewardChoicePendingOption[] => {
+    const recipient = paidRewardChoiceRecipientFor(source, target, option.reward.selector);
+    if (!recipient || option.cost <= 0) return [];
+    switch (option.reward.kind) {
+      case "recruit-troops":
+        if (option.reward.amount <= 0 || option.reward.destination !== "garrison") return [];
+        return [{
+          id: option.id,
+          resource: option.resource,
+          cost: option.cost,
+          reward: {
+            kind: "recruit-troops",
+            recipientId: recipient.id,
+            amount: option.reward.amount,
+            destination: option.reward.destination,
+          },
+        }];
+      case "gain-influence":
+        if (option.reward.amount <= 0) return [];
+        return [{
+          id: option.id,
+          resource: option.resource,
+          cost: option.cost,
+          reward: {
+            kind: "gain-influence",
+            recipientId: recipient.id,
+            faction: option.reward.faction,
+            amount: option.reward.amount,
+          },
+        }];
+      default: {
+        const reward = option.reward as { kind?: unknown };
+        throw new Error(`Unsupported paid-reward-choice reward "${String(reward.kind)}"`);
+      }
+    }
+  });
+  return options.length > 0
+    ? {
+        kind: "paid-reward-choice",
+        ownerId: source.id,
+        cardId: card.id,
+        source: effect.source ?? card.name,
+        options,
+      }
+    : undefined;
 }
 
 function pendingActionsForAgentOpponentsDiscardCards(
@@ -687,6 +758,8 @@ export function pendingActionsForCard(
   if (agentDiscardDrawPending) typedPendings.push(agentDiscardDrawPending);
   const agentGainInfluencePending = pendingActionForAgentGainInfluenceChoice(card, source, state, target);
   if (agentGainInfluencePending) typedPendings.push(agentGainInfluencePending);
+  const agentPaidRewardChoicePending = pendingActionForAgentPaidRewardChoice(card, source, state, target);
+  if (agentPaidRewardChoicePending) typedPendings.push(agentPaidRewardChoicePending);
   const agentOpponentDiscardPendings = pendingActionsForAgentOpponentsDiscardCards(card, source, state, target);
   typedPendings.push(...agentOpponentDiscardPendings);
   const agentAcquireCardPending = pendingActionForAgentAcquireCard(card, source, state, target, space);
@@ -708,22 +781,6 @@ export function pendingActionsForCard(
   const agentTrashSourceForTradePending = pendingActionForAgentTrashSourceForTrade(card, source, state, target);
   if (agentTrashSourceForTradePending) typedPendings.push(agentTrashSourceForTradePending);
   if (typedPendings.length > 0) return typedPendings;
-  if (
-    isShaddamSignetRingCard(card) &&
-    source.team === "shaddam" &&
-    source.role === "Commander" &&
-    target?.team === source.team &&
-    target.role === "Ally" &&
-    source.playArea.some((candidate) => candidate.id === card.id && isShaddamSignetRingCard(candidate))
-  ) {
-    return [{
-      kind: "shaddam-signet-ring",
-      commanderId: source.id,
-      allyId: target.id,
-      cardId: card.id,
-      source: "Emperor of the Known Universe",
-    }];
-  }
   if (
     isGenericSignetRingCard(card) &&
     source.leader === princessIrulanLeaderName &&

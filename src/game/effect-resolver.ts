@@ -26,6 +26,7 @@ import type {
   InfluenceLossForStrengthOwner,
   InfluenceEffectFaction,
   InfluenceEffectRecipient,
+  PaidRewardChoiceEffectOption,
   Player,
   PlayerSelector,
   ResourceId,
@@ -183,6 +184,36 @@ export type AgentDiscardCardForDraw = {
 export type AgentOpponentsDiscardCards = {
   selector: PlayerSelector;
   amount: number;
+  source?: string;
+};
+
+export type AgentPaidRewardChoice = {
+  selector: "self";
+  options: Array<
+    | {
+        id: string;
+        resource: ResourceId;
+        cost: number;
+        reward: {
+          kind: "recruit-troops";
+          selector: "self" | "activated-ally";
+          amount: number;
+          destination: "garrison";
+        };
+      }
+    | {
+        id: string;
+        resource: ResourceId;
+        cost: number;
+        reward: {
+          kind: "gain-influence";
+          selector: "self" | "activated-ally";
+          faction: FactionId;
+          amount: number;
+        };
+      }
+  >;
+  requiredRecipient?: "activated-ally";
   source?: string;
 };
 
@@ -807,6 +838,9 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
   if (effect.kind === "gain-influence-choice") {
     return result;
   }
+  if (effect.kind === "paid-reward-choice") {
+    return result;
+  }
   if (effect.kind === "acquire-card") {
     return result;
   }
@@ -1263,6 +1297,61 @@ export function resolveAgentGainInfluenceChoices(
         selector: effect.selector,
         amount: amountFor(effect.amount, context.source),
         trashSource: effect.trashSource ?? false,
+        source: effect.source,
+      }));
+  });
+}
+
+function resolvePaidRewardChoiceOption(
+  option: PaidRewardChoiceEffectOption,
+  context: GameEffectContext,
+): AgentPaidRewardChoice["options"][number] {
+  switch (option.reward.kind) {
+    case "recruit-troops":
+      return {
+        id: option.id,
+        resource: option.resource,
+        cost: amountFor(option.cost, context.source),
+        reward: {
+          kind: "recruit-troops",
+          selector: option.reward.selector,
+          amount: amountFor(option.reward.amount, context.source),
+          destination: option.reward.destination,
+        },
+      };
+    case "gain-influence":
+      return {
+        id: option.id,
+        resource: option.resource,
+        cost: amountFor(option.cost, context.source),
+        reward: {
+          kind: "gain-influence",
+          selector: option.reward.selector,
+          faction: option.reward.faction,
+          amount: amountFor(option.reward.amount, context.source),
+        },
+      };
+    default: {
+      const reward = option.reward as { kind?: unknown };
+      throw new Error(`Unsupported paid-reward-choice reward "${String(reward.kind)}"`);
+    }
+  }
+}
+
+export function resolveAgentPaidRewardChoices(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): AgentPaidRewardChoice[] {
+  specs?.forEach(validateSpec);
+  return (specs ?? []).flatMap((spec) => {
+    if (spec.trigger !== "agent-play") return [];
+    if (!specApplies(spec, context)) return [];
+    return spec.effects
+      .filter((effect) => effect.kind === "paid-reward-choice")
+      .map((effect) => ({
+        selector: effect.selector,
+        options: effect.options.map((option) => resolvePaidRewardChoiceOption(option, context)),
+        ...(effect.requiredRecipient ? { requiredRecipient: effect.requiredRecipient } : {}),
         source: effect.source,
       }));
   });

@@ -240,11 +240,13 @@ export {
 } from "./card-pending-rules";
 
 export {
+  resolvePaidRewardChoice,
   resolvePayResourceForInfluenceChoice,
   resolvePayResourceForDrawCardsChoice,
   resolvePayResourceForSandwormsChoice,
   resolvePayResourceForStrengthChoice,
   resolvePayResourceForTroopsChoice,
+  skipPaidRewardChoice,
   skipPayResourceForDrawCards,
   skipPayResourceForInfluence,
   skipPayResourceForSandworms,
@@ -259,7 +261,6 @@ export {
   resolveJessicaSpiceAgonyChoice,
   resolveJessicaWaterOfLifeChoice,
   resolveLadyAmberDesertScoutsChoice,
-  resolveShaddamSignetRingChoice,
 } from "./leader-pending-rules";
 
 export type {
@@ -269,7 +270,6 @@ export type {
   JessicaSpiceAgonyChoice,
   JessicaWaterOfLifeChoice,
   LadyAmberDesertScoutsChoice,
-  ShaddamSignetRingChoice,
 } from "./leader-pending-rules";
 
 export {

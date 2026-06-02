@@ -357,6 +357,56 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     validateSourceLabel("gain-influence-choice source", effect.source);
     return;
   }
+  if (effect.kind === "paid-reward-choice") {
+    if (trigger !== "agent-play") {
+      throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
+    }
+    const selector = (effect as { selector?: unknown }).selector;
+    if (selector !== "self") {
+      throw new Error(`Unsupported effect selector "${String(selector)}" for ${effect.kind}`);
+    }
+    validateSourceLabel("paid-reward-choice source", effect.source);
+    const requiredRecipient = (effect as { requiredRecipient?: unknown }).requiredRecipient;
+    if (requiredRecipient !== undefined && requiredRecipient !== "activated-ally") {
+      invalidSpecField("paid-reward-choice requiredRecipient", requiredRecipient);
+    }
+    if (!Array.isArray(effect.options) || effect.options.length === 0) {
+      invalidSpecField("paid-reward-choice options", effect.options);
+    }
+    const optionIds = new Set<string>();
+    effect.options.forEach((option) => {
+      if (typeof option.id !== "string" || option.id.trim().length === 0) {
+        invalidSpecField("paid-reward-choice option id", option.id);
+      }
+      if (optionIds.has(option.id)) {
+        invalidSpecField("paid-reward-choice duplicate option id", option.id);
+      }
+      optionIds.add(option.id);
+      if (!supportedResources.has(option.resource)) {
+        throw new Error(`Unsupported effect resource "${option.resource}"`);
+      }
+      validatePositiveAmount("paid-reward-choice cost", option.cost);
+      if (option.reward.selector !== "self" && option.reward.selector !== "activated-ally") {
+        throw new Error(`Unsupported paid-reward-choice selector "${option.reward.selector}"`);
+      }
+      if (option.reward.kind === "recruit-troops") {
+        validatePositiveAmount("paid-reward-choice troops", option.reward.amount);
+        if (option.reward.destination !== "garrison") {
+          invalidSpecField("paid-reward-choice troop destination", option.reward.destination);
+        }
+        return;
+      }
+      if (option.reward.kind === "gain-influence") {
+        if (!supportedFactions.has(option.reward.faction)) {
+          throw new Error(`Unsupported effect faction "${option.reward.faction}"`);
+        }
+        validatePositiveAmount("paid-reward-choice influence", option.reward.amount);
+        return;
+      }
+      unsupportedKind("paid-reward-choice reward", option.reward);
+    });
+    return;
+  }
   if (effect.kind === "acquire-card") {
     if (trigger !== "agent-play" && trigger !== "plot-intrigue" && trigger !== "combat-intrigue") {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);

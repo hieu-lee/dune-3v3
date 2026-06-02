@@ -710,11 +710,48 @@ try {
     arrakeen,
   );
   assert.deepEqual(shaddamSignetPending, {
-    kind: "shaddam-signet-ring",
-    commanderId: emperor.id,
-    allyId: shaddamAlly.id,
+    kind: "paid-reward-choice",
+    ownerId: emperor.id,
     cardId: emperorSignet.id,
     source: "Emperor of the Known Universe",
+    options: [
+      {
+        id: "troop",
+        resource: "solari",
+        cost: 1,
+        reward: { kind: "recruit-troops", recipientId: shaddamAlly.id, amount: 1, destination: "garrison" },
+      },
+      {
+        id: "emperor",
+        resource: "solari",
+        cost: 3,
+        reward: { kind: "gain-influence", recipientId: emperor.id, faction: "emperor", amount: 1 },
+      },
+      {
+        id: "greatHouses",
+        resource: "solari",
+        cost: 3,
+        reward: { kind: "gain-influence", recipientId: shaddamAlly.id, faction: "greatHouses", amount: 1 },
+      },
+      {
+        id: "spacing",
+        resource: "solari",
+        cost: 3,
+        reward: { kind: "gain-influence", recipientId: shaddamAlly.id, faction: "spacing", amount: 1 },
+      },
+      {
+        id: "bene",
+        resource: "solari",
+        cost: 3,
+        reward: { kind: "gain-influence", recipientId: shaddamAlly.id, faction: "bene", amount: 1 },
+      },
+      {
+        id: "fringeWorlds",
+        resource: "solari",
+        cost: 3,
+        reward: { kind: "gain-influence", recipientId: shaddamAlly.id, faction: "fringeWorlds", amount: 1 },
+      },
+    ],
   });
   assert.equal(
     state.pendingActionForCard(emperorSignet, { ...shaddamSignetSource, playArea: [] }, game, shaddamAlly, arrakeen),
@@ -751,17 +788,17 @@ try {
       return player;
     }),
   };
-  const troopChoice = state.resolveShaddamSignetRingChoice(signetResolutionBase, shaddamSignetPending, "troop");
+  const troopChoice = state.resolvePaidRewardChoice(signetResolutionBase, shaddamSignetPending, "troop");
   assert.equal(playerById(troopChoice, emperor.id).resources.solari, 2, "Shaddam Signet troop branch should cost Shaddam 1 Solari");
   assert.equal(playerById(troopChoice, shaddamAlly.id).garrison, 1, "Shaddam Signet troop branch should recruit for the activated Ally");
   assert.equal(playerById(troopChoice, shaddamAlly.id).conflict, 0, "Shaddam Signet troop branch should not deploy the recruited troop");
   assert.equal(troopChoice.pendingAction, undefined, "Shaddam Signet troop branch should clear the pending action");
   assert.equal(troopChoice.conflictDeploymentBlock, undefined, "Shaddam Signet block should clear when the Signet pending choice resolves");
 
-  const greatHousesChoice = state.resolveShaddamSignetRingChoice(
+  const greatHousesChoice = state.resolvePaidRewardChoice(
     signetResolutionBase,
     shaddamSignetPending,
-    { kind: "influence", faction: "greatHouses" },
+    "greatHouses",
   );
   assert.equal(playerById(greatHousesChoice, emperor.id).resources.solari, 0, "Shaddam Signet Influence branch should cost Shaddam 3 Solari");
   assert.equal(
@@ -772,10 +809,10 @@ try {
   assert.equal(playerById(greatHousesChoice, shaddamAlly.id).vp, shaddamAlly.vp + 1, "Shaddam Signet Ally Influence can score the 2-Influence VP");
   assert.equal(playerById(greatHousesChoice, emperor.id).influence.greatHouses, 0, "Shaddam should not take main-board Great Houses Influence");
 
-  const personalEmperorChoice = state.resolveShaddamSignetRingChoice(
+  const personalEmperorChoice = state.resolvePaidRewardChoice(
     signetResolutionBase,
     shaddamSignetPending,
-    { kind: "influence", faction: "emperor" },
+    "emperor",
   );
   assert.equal(
     playerById(personalEmperorChoice, emperor.id).influence.emperor,
@@ -784,12 +821,32 @@ try {
   );
   assert.equal(playerById(personalEmperorChoice, emperor.id).vp, emperor.vp + 1, "Shaddam personal Influence can score the 2-Influence VP");
   assert.equal(playerById(personalEmperorChoice, shaddamAlly.id).influence.emperor, 0, "Activated Ally should not take personal Emperor Influence");
+  const malformedPaidRewardPending = {
+    ...shaddamSignetPending,
+    options: [{
+      id: "vp",
+      resource: "solari",
+      cost: 1,
+      reward: { kind: "gain-vp", recipientId: emperor.id, amount: 1 },
+    }],
+  };
+  const malformedPaidRewardState = { ...signetResolutionBase, pendingAction: malformedPaidRewardPending };
+  assert.equal(
+    state.resolvePaidRewardChoice(malformedPaidRewardState, malformedPaidRewardPending, "vp"),
+    malformedPaidRewardState,
+    "Paid reward choice resolution should reject unsupported restored pending reward kinds",
+  );
   const irulanShaddamSignetPending = {
-    kind: "shaddam-signet-ring",
-    commanderId: emperor.id,
-    allyId: irulan.id,
+    ...shaddamSignetPending,
+    kind: "paid-reward-choice",
+    ownerId: emperor.id,
     cardId: emperorSignet.id,
     source: "Emperor of the Known Universe",
+    options: shaddamSignetPending.options.map((option) =>
+      option.reward.kind === "gain-influence" && option.reward.recipientId === shaddamAlly.id
+        ? { ...option, reward: { ...option.reward, recipientId: irulan.id } }
+        : option
+    ),
   };
   const irulanShaddamSignetBase = {
     ...signetResolutionBase,
@@ -806,10 +863,10 @@ try {
       return player;
     }),
   };
-  const irulanShaddamSignetBirthright = state.resolveShaddamSignetRingChoice(
+  const irulanShaddamSignetBirthright = state.resolvePaidRewardChoice(
     irulanShaddamSignetBase,
     irulanShaddamSignetPending,
-    { kind: "influence", faction: "greatHouses" },
+    "greatHouses",
   );
   assert.equal(
     playerById(irulanShaddamSignetBirthright, irulan.id).influence.greatHouses,
@@ -821,7 +878,7 @@ try {
     1,
     "Commander-routed Great Houses Influence should trigger Irulan's Imperial Birthright",
   );
-  const skippedSignet = state.resolveShaddamSignetRingChoice(signetResolutionBase, shaddamSignetPending, "skip");
+  const skippedSignet = state.skipPaidRewardChoice(signetResolutionBase, shaddamSignetPending);
   assert.equal(playerById(skippedSignet, emperor.id).resources.solari, 3, "Skipping Shaddam Signet should not spend Solari");
   assert.equal(playerById(skippedSignet, shaddamAlly.id).garrison, 0, "Skipping Shaddam Signet should not recruit troops");
   assert.equal(skippedSignet.conflictDeploymentBlock, undefined, "Skipping Shaddam Signet should clear the one-turn deployment block");

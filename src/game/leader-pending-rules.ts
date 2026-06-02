@@ -1,6 +1,5 @@
 import {
   boardSpaces,
-  factionLabels,
   leaderCardByName,
 } from "./data";
 import {
@@ -11,9 +10,6 @@ import {
 } from "./board-rules";
 import {
   pendingActionForReverendMotherJessicaRepeat,
-  shaddamSignetRingInfluenceChoices,
-  shaddamSignetRingInfluenceCost,
-  shaddamSignetRingTroopCost,
 } from "./card-pending-rules";
 import {
   drawCards,
@@ -52,15 +48,12 @@ import {
 } from "./turn-trackers";
 import {
   isGenericSignetRingCard,
-  isShaddamSignetRingCard,
 } from "./card-identifiers";
 import type {
-  FactionId,
   GameState,
   PendingAction,
 } from "./types";
 
-export type ShaddamSignetRingChoice = "skip" | "troop" | { kind: "influence"; faction: FactionId };
 export type IrulanSignetRingChoice = "skip" | "acquire" | "trash";
 export type LadyAmberDesertScoutsChoice = "retreat" | "skip";
 export type JessicaSpiceAgonyChoice = "pay" | "skip";
@@ -68,7 +61,6 @@ export type JessicaWaterOfLifeChoice = "pay" | "skip";
 export type JessicaReverendMotherChoice = "repeat" | "skip";
 export type JessicaOtherMemoriesChoice = "flip" | "skip";
 
-type ShaddamSignetRingPendingAction = Extract<PendingAction, { kind: "shaddam-signet-ring" }>;
 type IrulanSignetRingPendingAction = Extract<PendingAction, { kind: "irulan-signet-ring" }>;
 type LadyAmberDesertScoutsPendingAction = Extract<PendingAction, { kind: "amber-desert-scouts" }>;
 type JessicaSpiceAgonyPendingAction = Extract<PendingAction, { kind: "jessica-spice-agony" }>;
@@ -108,92 +100,6 @@ export function resolveLadyAmberDesertScoutsChoice(
     ...advancePendingAction(state),
     log: [`${owner.leader} resolves ${pending.source}: retreats 1 troop.`, ...state.log],
   };
-}
-
-export function resolveShaddamSignetRingChoice(
-  state: GameState,
-  pending: ShaddamSignetRingPendingAction,
-  choice: ShaddamSignetRingChoice,
-): GameState {
-  const commander = state.players.find((player) => player.id === pending.commanderId);
-  const ally = state.players.find((player) => player.id === pending.allyId);
-  if (
-    !commander ||
-    commander.team !== "shaddam" ||
-    commander.role !== "Commander" ||
-    !commander.playArea.some((card) => card.id === pending.cardId && isShaddamSignetRingCard(card)) ||
-    !ally ||
-    ally.team !== commander.team ||
-    ally.role !== "Ally"
-  ) {
-    return state;
-  }
-
-  if (choice === "skip") {
-    return {
-      ...state,
-      ...advancePendingAction(state),
-      log: [`${commander.leader} declines to pay for ${pending.source}.`, ...state.log],
-    };
-  }
-
-  if (choice === "troop") {
-    if (commander.resources.solari < shaddamSignetRingTroopCost) return state;
-    return {
-      ...state,
-      players: state.players.map((player) => {
-        if (player.id === commander.id) {
-          return {
-            ...player,
-            resources: {
-              ...player.resources,
-              solari: player.resources.solari - shaddamSignetRingTroopCost,
-            },
-          };
-        }
-        if (player.id === ally.id) return { ...player, garrison: player.garrison + 1 };
-        return player;
-      }),
-      ...advancePendingAction(state),
-      log: [
-        `${commander.leader} spends 1 Solari for ${pending.source}: ${ally.leader} recruits 1 troop.`,
-        ...state.log,
-      ],
-    };
-  }
-
-  if (
-    commander.resources.solari < shaddamSignetRingInfluenceCost ||
-    !shaddamSignetRingInfluenceChoices.includes(choice.faction)
-  ) {
-    return state;
-  }
-  const influenceOwnerId = choice.faction === "emperor" ? commander.id : ally.id;
-  const influenceOwner = influenceOwnerId === commander.id ? commander : ally;
-  const nextState = {
-    ...state,
-    players: state.players.map((player) => {
-      if (player.id === commander.id) {
-        const paid = {
-          ...player,
-          resources: { ...player.resources, solari: player.resources.solari - shaddamSignetRingInfluenceCost },
-        };
-        return influenceOwnerId === commander.id ? adjustInfluence(paid, choice.faction, 1) : paid;
-      }
-      if (player.id !== influenceOwnerId) return player;
-      return adjustInfluence(
-        player,
-        choice.faction,
-        1,
-      );
-    }),
-    ...advancePendingAction(state),
-    log: [
-      `${commander.leader} spends 3 Solari for ${pending.source}: ${influenceOwner.leader} gains 1 ${factionLabels[choice.faction]} Influence.`,
-      ...state.log,
-    ],
-  };
-  return resolveLeaderInfluenceThresholdRewards(nextState, state.players);
 }
 
 export function resolveIrulanSignetRingChoice(

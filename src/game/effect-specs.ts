@@ -12,6 +12,7 @@ import type {
   InfluenceLossForStrengthAlternateOwner,
   InfluenceEffectFaction,
   InfluenceEffectRecipient,
+  PaidRewardChoiceEffectOption,
   PlayerSelector,
   ResourceId,
   Role,
@@ -862,6 +863,25 @@ export function agentPayResourceForDrawCards(
   ], conditions);
 }
 
+export function agentPaidRewardChoice(
+  options: PaidRewardChoiceEffectOption[],
+  specOptions: {
+    requiredRecipient?: "activated-ally";
+    source?: string;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return agentPlayEffects([
+    {
+      kind: "paid-reward-choice",
+      selector: "self",
+      options: clonePaidRewardChoiceOptions(options),
+      ...(specOptions.requiredRecipient ? { requiredRecipient: specOptions.requiredRecipient } : {}),
+      ...(specOptions.source ? { source: specOptions.source } : {}),
+    },
+  ], conditions);
+}
+
 export function agentDiscardCardForInfluenceAndDraw(
   drawCards: EffectAmountSpec,
   influenceAmount: EffectAmountSpec,
@@ -1270,6 +1290,12 @@ export function cloneCardEffects(effects: CardEffectSpec[] | undefined): CardEff
     conditions: spec.conditions?.map((condition) => ({ ...condition })),
     effects: spec.effects.map((effect): GameEffectSpec => {
       if (effect.kind === "summon-sandworms") return { ...effect };
+      if (effect.kind === "paid-reward-choice") {
+        return {
+          ...effect,
+          options: clonePaidRewardChoiceOptions(effect.options),
+        };
+      }
       return {
         ...effect,
         ...("amount" in effect && effect.amount !== undefined
@@ -1305,6 +1331,35 @@ export function cloneCardEffects(effects: CardEffectSpec[] | undefined): CardEff
       };
     }),
   }));
+}
+
+function clonePaidRewardChoiceOptions(options: PaidRewardChoiceEffectOption[]): PaidRewardChoiceEffectOption[] {
+  return options.map((option) => {
+    switch (option.reward.kind) {
+      case "recruit-troops":
+        return {
+          ...option,
+          cost: cloneAmount(option.cost),
+          reward: {
+            ...option.reward,
+            amount: cloneAmount(option.reward.amount),
+          },
+        };
+      case "gain-influence":
+        return {
+          ...option,
+          cost: cloneAmount(option.cost),
+          reward: {
+            ...option.reward,
+            amount: cloneAmount(option.reward.amount),
+          },
+        };
+      default: {
+        const reward = option.reward as { kind?: unknown };
+        throw new Error(`Unsupported paid-reward-choice reward "${String(reward.kind)}"`);
+      }
+    }
+  });
 }
 
 function cloneAmount(amount: EffectAmountSpec): EffectAmountSpec {

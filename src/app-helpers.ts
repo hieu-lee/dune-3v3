@@ -32,14 +32,6 @@ export const factionShortLabels: Record<FactionId, string> = {
   fringeWorlds: "FW",
 };
 
-export const shaddamSignetInfluenceFactions: FactionId[] = [
-  "emperor",
-  "greatHouses",
-  "spacing",
-  "bene",
-  "fringeWorlds",
-];
-
 export type ChangeAllegiancesSelection = Partial<{
   loseFaction: FactionId;
   shiftGainFaction: FactionId;

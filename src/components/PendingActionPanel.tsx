@@ -28,7 +28,6 @@ import type {
   JessicaSpiceAgonyChoice,
   JessicaWaterOfLifeChoice,
   LadyAmberDesertScoutsChoice,
-  ShaddamSignetRingChoice,
   StabanUnseenNetworkChoice,
 } from "../game/state";
 import type { FactionId, GameState, PendingAction, Player, TradeGoodId, TrashCardZone } from "../game/types";
@@ -60,6 +59,7 @@ import {
   PendingTrashSourceForTradePanel,
 } from "./PendingLeaderChoicePanels";
 import { PendingMakerChoicePanel } from "./PendingMakerChoicePanel";
+import { PendingPaidRewardChoicePanel } from "./PendingPaidRewardChoicePanel";
 import {
   PendingControlDefensePanel,
   PendingDeployPanel,
@@ -68,7 +68,6 @@ import {
 } from "./PendingMilitaryPanels";
 import { PendingRecallSpyPanel } from "./PendingRecallSpyPanel";
 import { PendingResourceSplitPanel } from "./PendingResourceSplitPanel";
-import { PendingShaddamSignetPanel } from "./PendingShaddamSignetPanel";
 import { PendingSietchTabrPanel } from "./PendingSietchTabrPanel";
 import { PendingSpyPanel } from "./PendingSpyPanel";
 import { PendingConflictTiePanel, PendingRevealAdjustPanel, PendingThroneRowPanel } from "./PendingTableChoicePanels";
@@ -103,8 +102,8 @@ type PendingActionPanelProps = {
   choosePayResourceForSandworms: () => void;
   choosePayResourceForStrength: () => void;
   choosePayResourceForTroops: () => void;
+  choosePaidReward: (optionId: string) => void;
   chooseRetreatTroopsForStrength: () => void;
-  chooseShaddamSignet: (choice: ShaddamSignetRingChoice) => void;
   chooseSietchTabr: (choice: "hooks" | "shield-wall") => void;
   chooseStabanUnseenNetwork: (choice: StabanUnseenNetworkChoice) => void;
   chooseTeamResourcePayment: () => void;
@@ -130,6 +129,7 @@ type PendingActionPanelProps = {
   skipConflictVpReward: () => void;
   skipInfluenceLoss: () => void;
   skipOptionalSpacePaymentChoice: () => void;
+  skipPaidReward: () => void;
   skipPayResourceForContractsChoice: () => void;
   skipPayResourceForDrawCardsChoice: () => void;
   skipPayResourceForInfluenceChoice: () => void;
@@ -174,8 +174,8 @@ export function PendingActionPanel({
   choosePayResourceForSandworms,
   choosePayResourceForStrength,
   choosePayResourceForTroops,
+  choosePaidReward,
   chooseRetreatTroopsForStrength,
-  chooseShaddamSignet,
   chooseSietchTabr,
   chooseStabanUnseenNetwork,
   chooseTeamResourcePayment,
@@ -201,6 +201,7 @@ export function PendingActionPanel({
   skipConflictVpReward,
   skipInfluenceLoss,
   skipOptionalSpacePaymentChoice,
+  skipPaidReward,
   skipPayResourceForContractsChoice,
   skipPayResourceForDrawCardsChoice,
   skipPayResourceForInfluenceChoice,
@@ -289,13 +290,9 @@ export function PendingActionPanel({
     pendingAction.kind === "commander-resource-split"
       ? game.players.find((player) => player.id === pendingAction.allyId)
       : undefined;
-  const pendingShaddamSignetCommander =
-    pendingAction.kind === "shaddam-signet-ring"
-      ? game.players.find((player) => player.id === pendingAction.commanderId)
-      : undefined;
-  const pendingShaddamSignetAlly =
-    pendingAction.kind === "shaddam-signet-ring"
-      ? game.players.find((player) => player.id === pendingAction.allyId)
+  const pendingPaidRewardOwner =
+    pendingAction.kind === "paid-reward-choice"
+      ? game.players.find((player) => player.id === pendingAction.ownerId)
       : undefined;
   const pendingTrashSourceTradeOwner =
     pendingAction.kind === "trash-source-for-trade"
@@ -499,7 +496,7 @@ export function PendingActionPanel({
           {pendingAction.kind === "maker-choice" && `${pendingMakerLabel ?? "Player"} Maker space`}
           {pendingAction.kind === "sietch-tabr" && `${pendingSietchLabel ?? "Player"} Sietch Tabr`}
           {pendingAction.kind === "commander-resource-split" && `${pendingResourceSplitCommander?.leader ?? "Commander"} ${pendingAction.source}`}
-          {pendingAction.kind === "shaddam-signet-ring" && `${pendingShaddamSignetCommander?.leader ?? "Shaddam"} Emperor of the Known Universe`}
+          {pendingAction.kind === "paid-reward-choice" && `${pendingPaidRewardOwner?.leader ?? "Player"} ${pendingAction.source}`}
           {pendingAction.kind === "irulan-signet-ring" && `${pendingIrulanSignetOwner?.leader ?? "Princess Irulan"} Chronicler's Insight`}
           {pendingAction.kind === "staban-unseen-network" && `${pendingStabanUnseenNetworkOwner?.leader ?? "Staban Tuek"} Unseen Network`}
           {pendingAction.kind === "amber-desert-scouts" && `${pendingLadyAmberDesertScoutsOwner?.leader ?? "Lady Amber"} Desert Scouts`}
@@ -639,11 +636,13 @@ export function PendingActionPanel({
         />
       )}
 
-      {pendingAction.kind === "shaddam-signet-ring" && (
-        <PendingShaddamSignetPanel
-          ally={pendingShaddamSignetAlly}
-          commander={pendingShaddamSignetCommander}
-          onChoose={chooseShaddamSignet}
+      {pendingAction.kind === "paid-reward-choice" && (
+        <PendingPaidRewardChoicePanel
+          owner={pendingPaidRewardOwner}
+          pending={pendingAction}
+          players={game.players}
+          onChoose={choosePaidReward}
+          onSkip={skipPaidReward}
         />
       )}
 

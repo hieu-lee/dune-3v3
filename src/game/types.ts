@@ -47,6 +47,53 @@ export type TroopEffectRecipient = "same-team-allies";
 export type TroopEffectDestination = "garrison";
 export type SandwormEffectRecipient = "activated-ally" | "combat-recipient";
 export type SandwormEffectDestination = "conflict";
+export type PaidRewardChoiceSelector = "self" | "activated-ally";
+export type PaidRewardChoiceEffectOption =
+  | {
+      id: string;
+      resource: ResourceId;
+      cost: EffectAmountSpec;
+      reward: {
+        kind: "recruit-troops";
+        selector: PaidRewardChoiceSelector;
+        amount: EffectAmountSpec;
+        destination: TroopEffectDestination;
+      };
+    }
+  | {
+      id: string;
+      resource: ResourceId;
+      cost: EffectAmountSpec;
+      reward: {
+        kind: "gain-influence";
+        selector: PaidRewardChoiceSelector;
+        faction: FactionId;
+        amount: EffectAmountSpec;
+      };
+    };
+export type PaidRewardChoicePendingOption =
+  | {
+      id: string;
+      resource: ResourceId;
+      cost: number;
+      reward: {
+        kind: "recruit-troops";
+        recipientId: string;
+        amount: number;
+        destination: TroopEffectDestination;
+      };
+    }
+  | {
+      id: string;
+      resource: ResourceId;
+      cost: number;
+      reward: {
+        kind: "gain-influence";
+        recipientId: string;
+        faction: FactionId;
+        amount: number;
+      };
+    };
 export type TradeEffectPartner = "same-team-allies";
 export type ContractEffectRecipient = "same-team-allies";
 export type ContractEffectSourcePool = "public-offer";
@@ -103,6 +150,13 @@ export type GameEffectSpec =
       selector: PlayerSelector;
       amount: EffectAmountSpec;
       trashSource?: boolean;
+      source?: string;
+    }
+  | {
+      kind: "paid-reward-choice";
+      selector: "self";
+      options: PaidRewardChoiceEffectOption[];
+      requiredRecipient?: "activated-ally";
       source?: string;
     }
   | {
@@ -790,6 +844,13 @@ export type PendingAction =
       source: string;
     }
   | {
+      kind: "paid-reward-choice";
+      ownerId: string;
+      cardId?: string;
+      source: string;
+      options: PaidRewardChoicePendingOption[];
+    }
+  | {
       kind: "team-resource-payment";
       ownerId: string;
       contributorIds: string[];
@@ -801,13 +862,6 @@ export type PendingAction =
       trashSource?: boolean;
       cardId: string;
       spaceId?: string;
-      source: string;
-    }
-  | {
-      kind: "shaddam-signet-ring";
-      commanderId: string;
-      allyId: string;
-      cardId: string;
       source: string;
     }
   | {

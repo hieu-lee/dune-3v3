@@ -34,6 +34,7 @@ import {
   resolveLoseInfluenceForIntriguesChoice,
   resolveMakerChoice,
   resolveOptionalSpacePayment,
+  resolvePaidRewardChoice,
   resolvePayResourceForContractsChoice,
   resolvePayResourceForDrawCardsChoice,
   resolvePayResourceForInfluenceChoice,
@@ -41,7 +42,6 @@ import {
   resolvePayResourceForStrengthChoice,
   resolvePayResourceForTroopsChoice,
   resolveRetreatTroopsForStrength,
-  resolveShaddamSignetRingChoice,
   resolveSietchTabrChoice,
   resolveStabanUnseenNetworkChoice,
   resolveTeamResourcePaymentChoice,
@@ -54,6 +54,7 @@ import {
   skipLoseInfluence,
   skipLoseInfluenceForIntrigues,
   skipOptionalSpacePayment,
+  skipPaidRewardChoice,
   skipPayResourceForContracts,
   skipPayResourceForDrawCards,
   skipPayResourceForInfluence,
@@ -85,7 +86,6 @@ import type {
   JessicaSpiceAgonyChoice,
   JessicaWaterOfLifeChoice,
   LadyAmberDesertScoutsChoice,
-  ShaddamSignetRingChoice,
   StabanUnseenNetworkChoice,
 } from "./game/state";
 
@@ -179,8 +179,10 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     runPending("sietch-tabr", (current, pending) => maybeStartCombatPhase(resolveSietchTabrChoice(current, pending, choice)));
   const chooseCommanderResourceSplit = (optionIndex: number) =>
     runPending("commander-resource-split", (current, pending) => maybeStartCombatPhase(resolveCommanderResourceSplitChoice(current, pending, optionIndex)));
-  const chooseShaddamSignet = (choice: ShaddamSignetRingChoice) =>
-    runPending("shaddam-signet-ring", (current, pending) => maybeStartCombatPhase(resolveShaddamSignetRingChoice(current, pending, choice)));
+  const choosePaidReward = (optionId: string) =>
+    runPending("paid-reward-choice", (current, pending) => maybeStartCombatPhase(resolvePaidRewardChoice(current, pending, optionId)));
+  const skipPaidReward = () =>
+    runPending("paid-reward-choice", (current, pending) => maybeStartCombatPhase(skipPaidRewardChoice(current, pending)));
   const chooseIrulanSignet = (choice: IrulanSignetRingChoice) =>
     runPending("irulan-signet-ring", (current, pending) => maybeStartCombatPhase(resolveIrulanSignetRingChoice(current, pending, choice)));
   const chooseStabanUnseenNetwork = (choice: StabanUnseenNetworkChoice) =>
@@ -328,8 +330,8 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     choosePayResourceForSandworms,
     choosePayResourceForStrength,
     choosePayResourceForTroops,
+    choosePaidReward,
     chooseRetreatTroopsForStrength,
-    chooseShaddamSignet,
     chooseSietchTabr,
     chooseStabanUnseenNetwork,
     chooseTeamResourcePayment,
@@ -355,6 +357,7 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     skipInfluenceLoss,
     skipLoseInfluenceForIntriguesChoice,
     skipOptionalSpacePaymentChoice,
+    skipPaidReward,
     skipPayResourceForContractsChoice,
     skipPayResourceForDrawCardsChoice,
     skipPayResourceForInfluenceChoice,

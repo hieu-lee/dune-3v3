@@ -4330,6 +4330,88 @@ try {
     ),
     "Shaddam Signet Ring should carry a declarative Agent deployment-block spec",
   );
+  const shaddamSignetPaidRewardOptions = [
+    {
+      id: "troop",
+      resource: "solari",
+      cost: 1,
+      reward: { kind: "recruit-troops", selector: "activated-ally", amount: 1, destination: "garrison" },
+    },
+    {
+      id: "emperor",
+      resource: "solari",
+      cost: 3,
+      reward: { kind: "gain-influence", selector: "self", faction: "emperor", amount: 1 },
+    },
+    {
+      id: "greatHouses",
+      resource: "solari",
+      cost: 3,
+      reward: { kind: "gain-influence", selector: "activated-ally", faction: "greatHouses", amount: 1 },
+    },
+    {
+      id: "spacing",
+      resource: "solari",
+      cost: 3,
+      reward: { kind: "gain-influence", selector: "activated-ally", faction: "spacing", amount: 1 },
+    },
+    {
+      id: "bene",
+      resource: "solari",
+      cost: 3,
+      reward: { kind: "gain-influence", selector: "activated-ally", faction: "bene", amount: 1 },
+    },
+    {
+      id: "fringeWorlds",
+      resource: "solari",
+      cost: 3,
+      reward: { kind: "gain-influence", selector: "activated-ally", faction: "fringeWorlds", amount: 1 },
+    },
+  ];
+  const shaddamSignetPaidRewardSpec = emperorSignet.effects?.find((spec) =>
+    spec.trigger === "agent-play" &&
+    spec.conditions?.some((condition) => condition.kind === "has-team" && condition.team === "shaddam") &&
+    spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Commander") &&
+    spec.effects.some((effect) => effect.kind === "paid-reward-choice")
+  );
+  assert.ok(shaddamSignetPaidRewardSpec, "Shaddam Signet Ring should carry a typed paid reward choice spec");
+  const shaddamSignetPaidReward = shaddamSignetPaidRewardSpec.effects.find((effect) => effect.kind === "paid-reward-choice");
+  assert.deepEqual(
+    shaddamSignetPaidReward,
+    {
+      kind: "paid-reward-choice",
+      selector: "self",
+      source: "Emperor of the Known Universe",
+      requiredRecipient: "activated-ally",
+      options: shaddamSignetPaidRewardOptions,
+    },
+    "Shaddam Signet Ring paid reward spec should encode troop and Influence payment branches",
+  );
+  assert.deepEqual(
+    effectResolver.resolveAgentPaidRewardChoices(emperorSignet.effects, {
+      trigger: "agent-play",
+      source: p4,
+      target: p6,
+      state: game,
+    }),
+    [{
+      selector: "self",
+      source: "Emperor of the Known Universe",
+      requiredRecipient: "activated-ally",
+      options: shaddamSignetPaidRewardOptions,
+    }],
+    "Shaddam Signet Ring paid reward resolver should expose all Solari payment branches",
+  );
+  assert.deepEqual(
+    effectResolver.resolveAgentPaidRewardChoices(emperorSignet.effects, {
+      trigger: "agent-play",
+      source: p2,
+      target: p1,
+      state: game,
+    }),
+    [],
+    "Shaddam Signet Ring paid reward spec should be Shaddam Commander gated",
+  );
   for (const card of revealSpecCards) {
     assert.deepEqual(
       actualFixedReveal(turnActions, p2, card),
@@ -6406,6 +6488,245 @@ try {
     /Invalid gain-influence-choice trashSource "true"/,
     "Gain-Influence choice specs should reject non-boolean trashSource values",
   );
+  const paidRewardChoiceBaseOption = {
+    id: "troop",
+    resource: "solari",
+    cost: 1,
+    reward: { kind: "recruit-troops", selector: "activated-ally", amount: 1, destination: "garrison" },
+  };
+  const paidRewardChoiceEffect = (overrides = {}) => ({
+    kind: "paid-reward-choice",
+    selector: "self",
+    source: "Test Paid Reward",
+    options: [paidRewardChoiceBaseOption],
+    ...overrides,
+  });
+  const paidRewardChoiceCard = (id, effect) => ({
+    ...convincingArgument,
+    id,
+    name: id,
+    effects: [agentSpec([effect])],
+  });
+  const revealPaidRewardChoiceCard = {
+    ...convincingArgument,
+    id: "effect-spec-reveal-paid-reward-choice-card",
+    name: "Effect Spec Reveal Paid Reward Choice",
+    effects: [revealSpec([paidRewardChoiceEffect()])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [revealPaidRewardChoiceCard], highCouncilSeat: false }),
+    /Unsupported effect "paid-reward-choice" for reveal/,
+    "Paid reward choice specs should stay in Agent play",
+  );
+  assert.throws(
+    () => state.applyCardAgentEffect(
+      paidRewardChoiceCard(
+        "effect-spec-invalid-paid-reward-choice-selector-card",
+        paidRewardChoiceEffect({ selector: "activated-ally" }),
+      ),
+      p4,
+      p6,
+    ),
+    /Unsupported effect selector "activated-ally" for paid-reward-choice/,
+    "Paid reward choice specs should reject activated Ally top-level selectors",
+  );
+  assert.throws(
+    () => state.applyCardAgentEffect(
+      paidRewardChoiceCard(
+        "effect-spec-invalid-paid-reward-choice-source-card",
+        paidRewardChoiceEffect({ source: "" }),
+      ),
+      p4,
+      p6,
+    ),
+    /Invalid paid-reward-choice source ""/,
+    "Paid reward choice specs should reject empty source labels",
+  );
+  assert.throws(
+    () => state.applyCardAgentEffect(
+      paidRewardChoiceCard(
+        "effect-spec-invalid-paid-reward-choice-required-recipient-card",
+        paidRewardChoiceEffect({ requiredRecipient: "self" }),
+      ),
+      p4,
+      p6,
+    ),
+    /Invalid paid-reward-choice requiredRecipient "self"/,
+    "Paid reward choice specs should reject unsupported required recipient values",
+  );
+  assert.throws(
+    () => state.applyCardAgentEffect(
+      paidRewardChoiceCard(
+        "effect-spec-invalid-paid-reward-choice-empty-options-card",
+        paidRewardChoiceEffect({ options: [] }),
+      ),
+      p4,
+      p6,
+    ),
+    /Invalid paid-reward-choice options ""/,
+    "Paid reward choice specs should require at least one option",
+  );
+  assert.throws(
+    () => state.applyCardAgentEffect(
+      paidRewardChoiceCard(
+        "effect-spec-invalid-paid-reward-choice-option-id-card",
+        paidRewardChoiceEffect({ options: [{ ...paidRewardChoiceBaseOption, id: "" }] }),
+      ),
+      p4,
+      p6,
+    ),
+    /Invalid paid-reward-choice option id ""/,
+    "Paid reward choice specs should reject empty option ids",
+  );
+  assert.throws(
+    () => state.applyCardAgentEffect(
+      paidRewardChoiceCard(
+        "effect-spec-invalid-paid-reward-choice-duplicate-option-card",
+        paidRewardChoiceEffect({
+          options: [
+            paidRewardChoiceBaseOption,
+            { ...paidRewardChoiceBaseOption },
+          ],
+        }),
+      ),
+      p4,
+      p6,
+    ),
+    /Invalid paid-reward-choice duplicate option id "troop"/,
+    "Paid reward choice specs should reject duplicate option ids",
+  );
+  assert.throws(
+    () => state.applyCardAgentEffect(
+      paidRewardChoiceCard(
+        "effect-spec-invalid-paid-reward-choice-resource-card",
+        paidRewardChoiceEffect({ options: [{ ...paidRewardChoiceBaseOption, resource: "melange" }] }),
+      ),
+      p4,
+      p6,
+    ),
+    /Unsupported effect resource "melange"/,
+    "Paid reward choice specs should reject unsupported payment resources",
+  );
+  assert.throws(
+    () => state.applyCardAgentEffect(
+      paidRewardChoiceCard(
+        "effect-spec-invalid-paid-reward-choice-cost-card",
+        paidRewardChoiceEffect({ options: [{ ...paidRewardChoiceBaseOption, cost: 0 }] }),
+      ),
+      p4,
+      p6,
+    ),
+    /Invalid paid-reward-choice cost "0"/,
+    "Paid reward choice specs should require positive costs",
+  );
+  assert.throws(
+    () => state.applyCardAgentEffect(
+      paidRewardChoiceCard(
+        "effect-spec-invalid-paid-reward-choice-reward-selector-card",
+        paidRewardChoiceEffect({
+          options: [{
+            ...paidRewardChoiceBaseOption,
+            reward: { ...paidRewardChoiceBaseOption.reward, selector: "opponent" },
+          }],
+        }),
+      ),
+      p4,
+      p6,
+    ),
+    /Unsupported paid-reward-choice selector "opponent"/,
+    "Paid reward choice specs should reject unsupported nested reward selectors",
+  );
+  assert.throws(
+    () => state.applyCardAgentEffect(
+      paidRewardChoiceCard(
+        "effect-spec-invalid-paid-reward-choice-troop-amount-card",
+        paidRewardChoiceEffect({
+          options: [{
+            ...paidRewardChoiceBaseOption,
+            reward: { ...paidRewardChoiceBaseOption.reward, amount: 0 },
+          }],
+        }),
+      ),
+      p4,
+      p6,
+    ),
+    /Invalid paid-reward-choice troops "0"/,
+    "Paid reward choice troop branches should require positive reward amounts",
+  );
+  assert.throws(
+    () => state.applyCardAgentEffect(
+      paidRewardChoiceCard(
+        "effect-spec-invalid-paid-reward-choice-troop-destination-card",
+        paidRewardChoiceEffect({
+          options: [{
+            ...paidRewardChoiceBaseOption,
+            reward: { ...paidRewardChoiceBaseOption.reward, destination: "conflict" },
+          }],
+        }),
+      ),
+      p4,
+      p6,
+    ),
+    /Invalid paid-reward-choice troop destination "conflict"/,
+    "Paid reward choice troop branches should only recruit to garrison",
+  );
+  assert.throws(
+    () => state.applyCardAgentEffect(
+      paidRewardChoiceCard(
+        "effect-spec-invalid-paid-reward-choice-influence-faction-card",
+        paidRewardChoiceEffect({
+          options: [{
+            id: "influence",
+            resource: "solari",
+            cost: 3,
+            reward: { kind: "gain-influence", selector: "self", faction: "guild", amount: 1 },
+          }],
+        }),
+      ),
+      p4,
+      p6,
+    ),
+    /Unsupported effect faction "guild"/,
+    "Paid reward choice Influence branches should reject unsupported faction ids",
+  );
+  assert.throws(
+    () => state.applyCardAgentEffect(
+      paidRewardChoiceCard(
+        "effect-spec-invalid-paid-reward-choice-influence-amount-card",
+        paidRewardChoiceEffect({
+          options: [{
+            id: "influence",
+            resource: "solari",
+            cost: 3,
+            reward: { kind: "gain-influence", selector: "self", faction: "emperor", amount: 0 },
+          }],
+        }),
+      ),
+      p4,
+      p6,
+    ),
+    /Invalid paid-reward-choice influence "0"/,
+    "Paid reward choice Influence branches should require positive reward amounts",
+  );
+  assert.throws(
+    () => state.applyCardAgentEffect(
+      paidRewardChoiceCard(
+        "effect-spec-invalid-paid-reward-choice-reward-kind-card",
+        paidRewardChoiceEffect({
+          options: [{
+            id: "vp",
+            resource: "solari",
+            cost: 3,
+            reward: { kind: "gain-vp", selector: "self", amount: 1 },
+          }],
+        }),
+      ),
+      p4,
+      p6,
+    ),
+    /Unsupported paid-reward-choice reward "gain-vp"/,
+    "Paid reward choice specs should reject unsupported reward kinds",
+  );
   const revealPayResourceInfluenceCard = {
     ...convincingArgument,
     id: "effect-spec-reveal-pay-resource-influence-card",
@@ -7707,6 +8028,128 @@ try {
   assert.equal(theacherousManeuverPendings[0].cardId, theacherousManeuver.id);
   assert.equal(theacherousManeuverPendings[0].cardOwnerId, p2.id);
   assert.ok(theacherousManeuverPendings[0].choices.length > 0, "Theacherous Maneuver should expose Influence choices");
+
+  const shaddamSignetPaidRewardSource = {
+    ...p4,
+    playArea: [emperorSignet],
+    resources: { ...p4.resources, solari: 3 },
+  };
+  const shaddamSignetPaidRewardTarget = { ...p6, garrison: 0 };
+  const shaddamSignetPaidRewardFixture = {
+    ...game,
+    pendingAction: undefined,
+    pendingQueue: [],
+    players: game.players.map((player) => {
+      if (player.id === shaddamSignetPaidRewardSource.id) return shaddamSignetPaidRewardSource;
+      if (player.id === shaddamSignetPaidRewardTarget.id) return shaddamSignetPaidRewardTarget;
+      return player;
+    }),
+  };
+  const shaddamSignetPaidRewardPendingOptions = shaddamSignetPaidRewardOptions.map((option) => {
+    if (option.reward.kind === "recruit-troops") {
+      return {
+        id: option.id,
+        resource: option.resource,
+        cost: option.cost,
+        reward: {
+          kind: "recruit-troops",
+          recipientId: shaddamSignetPaidRewardTarget.id,
+          amount: option.reward.amount,
+          destination: option.reward.destination,
+        },
+      };
+    }
+    return {
+      id: option.id,
+      resource: option.resource,
+      cost: option.cost,
+      reward: {
+        kind: "gain-influence",
+        recipientId: option.reward.selector === "self"
+          ? shaddamSignetPaidRewardSource.id
+          : shaddamSignetPaidRewardTarget.id,
+        faction: option.reward.faction,
+        amount: option.reward.amount,
+      },
+    };
+  });
+  assert.deepEqual(
+    state.pendingActionsForCard(
+      emperorSignet,
+      shaddamSignetPaidRewardSource,
+      shaddamSignetPaidRewardFixture,
+      shaddamSignetPaidRewardTarget,
+    ),
+    [{
+      kind: "paid-reward-choice",
+      ownerId: shaddamSignetPaidRewardSource.id,
+      cardId: emperorSignet.id,
+      source: "Emperor of the Known Universe",
+      options: shaddamSignetPaidRewardPendingOptions,
+    }],
+    "Shaddam Signet Ring should queue a generic paid reward choice pending action",
+  );
+  assert.deepEqual(
+    state.pendingActionsForCard(emperorSignet, shaddamSignetPaidRewardSource, shaddamSignetPaidRewardFixture),
+    [],
+    "Shaddam Signet Ring paid reward choice should require a valid activated Ally target",
+  );
+  const mixedPaidRewardCard = {
+    ...convincingArgument,
+    id: "effect-spec-mixed-paid-reward-card",
+    name: "Effect Spec Mixed Paid Reward",
+    effects: [agentSpec([{
+      kind: "paid-reward-choice",
+      selector: "self",
+      source: "Mixed Paid Reward",
+      options: [
+        {
+          id: "self-emperor",
+          resource: "solari",
+          cost: 2,
+          reward: { kind: "gain-influence", selector: "self", faction: "emperor", amount: 1 },
+        },
+        {
+          id: "ally-troop",
+          resource: "solari",
+          cost: 1,
+          reward: { kind: "recruit-troops", selector: "activated-ally", amount: 1, destination: "garrison" },
+        },
+      ],
+    }])],
+  };
+  const mixedPaidRewardSource = {
+    ...p4,
+    playArea: [mixedPaidRewardCard],
+    resources: { ...p4.resources, solari: 2 },
+  };
+  const mixedPaidRewardFixture = {
+    ...game,
+    pendingAction: undefined,
+    pendingQueue: [],
+    players: game.players.map((player) => player.id === mixedPaidRewardSource.id ? mixedPaidRewardSource : player),
+  };
+  assert.deepEqual(
+    state.pendingActionsForCard(mixedPaidRewardCard, mixedPaidRewardSource, mixedPaidRewardFixture),
+    [{
+      kind: "paid-reward-choice",
+      ownerId: mixedPaidRewardSource.id,
+      cardId: mixedPaidRewardCard.id,
+      source: "Mixed Paid Reward",
+      options: [{
+        id: "self-emperor",
+        resource: "solari",
+        cost: 2,
+        reward: {
+          kind: "gain-influence",
+          recipientId: mixedPaidRewardSource.id,
+          faction: "emperor",
+          amount: 1,
+        },
+      }],
+    }],
+    "Generic paid reward choices should keep valid self options when no activated Ally recipient is required",
+  );
 
   const rebelSupplierEffect = state.applyCardAgentEffect(
     rebelSupplier,

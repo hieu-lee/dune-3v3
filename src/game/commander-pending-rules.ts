@@ -22,6 +22,7 @@ import {
 import type {
   GameState,
   PendingAction,
+  PaidRewardChoicePendingOption,
   Player,
   ResourceId,
 } from "./types";
@@ -31,6 +32,7 @@ type PayResourceForTroopsPendingAction = Extract<PendingAction, { kind: "pay-res
 type PayResourceForDrawCardsPendingAction = Extract<PendingAction, { kind: "pay-resource-for-draw-cards" }>;
 type PayResourceForInfluencePendingAction = Extract<PendingAction, { kind: "pay-resource-for-influence" }>;
 type PayResourceForSandwormsPendingAction = Extract<PendingAction, { kind: "pay-resource-for-sandworms" }>;
+type PaidRewardChoicePendingAction = Extract<PendingAction, { kind: "paid-reward-choice" }>;
 
 const resourceLabels: Record<ResourceId, string> = {
   solari: "Solari",
@@ -56,6 +58,118 @@ function drawnCardsText(requested: number, actual: number) {
   if (actual === 0) return requested === 1 ? "has no card to draw" : "has no cards to draw";
   if (actual === requested) return `draws ${actual} card${actual === 1 ? "" : "s"}`;
   return `draws ${actual} of ${requested} cards`;
+}
+
+function paidRewardChoiceOptionIsValid(option: PaidRewardChoicePendingOption) {
+  if (typeof option.id !== "string" || option.id.trim().length === 0) return false;
+  if (!resourceLabels[option.resource]) return false;
+  if (!paymentPendingAmountIsValid(option.cost)) return false;
+  switch (option.reward.kind) {
+    case "recruit-troops":
+      return paymentPendingAmountIsValid(option.reward.amount) && option.reward.destination === "garrison";
+    case "gain-influence":
+      return Boolean(factionLabels[option.reward.faction]) && paymentPendingAmountIsValid(option.reward.amount);
+    default:
+      return false;
+  }
+}
+
+function paidRewardChoiceRecipientIsValid(owner: Player, recipient: Player | undefined) {
+  return Boolean(
+    recipient &&
+      recipient.team === owner.team &&
+      (
+        recipient.id === owner.id ||
+        recipient.role === "Ally"
+      ),
+  );
+}
+
+export function resolvePaidRewardChoice(
+  state: GameState,
+  pending: PaidRewardChoicePendingAction,
+  optionId: string,
+): GameState {
+  if (state.pendingAction !== pending) return state;
+  const owner = state.players.find((player) => player.id === pending.ownerId);
+  const option = pending.options.find((candidate) => candidate.id === optionId);
+  const ownerResources = owner?.resources as Partial<Record<string, number>> | undefined;
+  const availableResource = option ? ownerResources?.[option.resource] : undefined;
+  if (
+    !owner ||
+    !option ||
+    typeof availableResource !== "number" ||
+    availableResource < option.cost ||
+    !paidRewardChoiceOptionIsValid(option) ||
+    (pending.cardId !== undefined && !owner.playArea.some((card) => card.id === pending.cardId))
+  ) {
+    return state;
+  }
+
+  const recipient = state.players.find((player) => player.id === option.reward.recipientId);
+  if (!recipient || !paidRewardChoiceRecipientIsValid(owner, recipient)) return state;
+  const resourceLabel = resourceLabels[option.resource];
+  const players = state.players.map((player) => {
+    let next = player;
+    if (player.id === owner.id) {
+      next = {
+        ...next,
+        resources: { ...next.resources, [option.resource]: availableResource - option.cost },
+      };
+    }
+    if (player.id === recipient.id) {
+      switch (option.reward.kind) {
+        case "recruit-troops":
+          next = { ...next, garrison: next.garrison + option.reward.amount };
+          break;
+        case "gain-influence":
+          next = adjustInfluence(next, option.reward.faction, option.reward.amount);
+          break;
+        default:
+          return next;
+      }
+    }
+    return next;
+  });
+
+  const rewardText = (() => {
+    switch (option.reward.kind) {
+      case "recruit-troops":
+        return `${recipient.leader} recruits ${option.reward.amount} troop${option.reward.amount === 1 ? "" : "s"}`;
+      case "gain-influence":
+        return `${recipient.leader} gains ${option.reward.amount} ${factionLabels[option.reward.faction]} Influence`;
+      default:
+        return undefined;
+    }
+  })();
+  if (!rewardText) return state;
+  const nextState = {
+    ...state,
+    players,
+    ...advancePendingAction(state),
+    log: [
+      `${owner.leader} spends ${option.cost} ${resourceLabel} for ${pending.source}: ${rewardText}.`,
+      ...state.log,
+    ],
+  };
+  switch (option.reward.kind) {
+    case "recruit-troops":
+      return nextState;
+    case "gain-influence":
+      return resolveLeaderInfluenceThresholdRewards(nextState, state.players);
+    default:
+      return state;
+  }
+}
+
+export function skipPaidRewardChoice(state: GameState, pending: PaidRewardChoicePendingAction): GameState {
+  if (state.pendingAction !== pending) return state;
+  const owner = state.players.find((player) => player.id === pending.ownerId);
+  return {
+    ...state,
+    ...advancePendingAction(state),
+    log: [`${owner?.leader ?? "Player"} declines to pay for ${pending.source}.`, ...state.log],
+  };
 }
 
 export function resolvePayResourceForTroopsChoice(

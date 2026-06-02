@@ -187,6 +187,21 @@ export function plotTakeContracts(
   ], conditions);
 }
 
+export function plotPlaceSpies(
+  amount: EffectAmountSpec,
+  options: {
+    recallForSupply?: boolean;
+    mustPlace?: boolean;
+    placementIcon?: IconId;
+    allowSharedPost?: boolean;
+    source?: string;
+    postPlacementAction?: "staban-unseen-network";
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return plotIntrigueEffects([{ kind: "place-spies", selector: "self", amount, ...options }], conditions);
+}
+
 export function acquireGainResource(
   resource: ResourceId,
   amount: EffectAmountSpec,
@@ -800,6 +815,10 @@ export function hasLeader(leader: string) {
 
 export function hasAlliance(faction?: FactionId) {
   return faction ? ({ kind: "has-alliance", faction } as const) : ({ kind: "has-alliance" } as const);
+}
+
+export function deployedUnitsThisTurn(count: number) {
+  return { kind: "deployed-units-this-turn", count } as const;
 }
 
 export function gainedSpiceThisTurn() {

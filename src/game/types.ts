@@ -70,6 +70,7 @@ export type GameEffectConditionSpec =
   | { kind: "has-swordmaster-bonus" }
   | { kind: "has-leader"; leader: string }
   | { kind: "has-alliance"; faction?: FactionId }
+  | { kind: "deployed-units-this-turn"; count: number }
   | { kind: "gained-spice-this-turn" };
 export type GameEffectSpec =
   | { kind: "gain-resource"; selector: PlayerSelector; resource: ResourceId; amount: EffectAmountSpec; source?: string }

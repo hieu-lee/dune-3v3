@@ -11,6 +11,7 @@ import {
   covertOperationSourceId,
   dangerousRhetoricSourceId,
   desertPowerSourceId,
+  distractionSourceId,
   doubleAgentSourceId,
   departForArrakisSourceId,
   ecologicalTestingStationSourceId,
@@ -67,6 +68,7 @@ import {
   agentPayResourceForDrawCards,
   agentPlaceSpies,
   agentRecruitTroops,
+  deployedUnitsThisTurn,
   hasCompletedContracts,
   hasCardTraitInPlay,
   hasConflictUnits,
@@ -81,6 +83,7 @@ import {
   plotGainResource,
   plotLoseInfluenceForResource,
   plotPayResourcesForVp,
+  plotPlaceSpies,
   plotRecruitTroops,
   plotResourceExchange,
   plotSpendResource,
@@ -858,6 +861,13 @@ function intrigueCardEffects(card: HubCard): CardEffectSpec[] | undefined {
   }
   if (card.id === contingencyPlanSourceId) {
     return [plotGainResource("solari", 2)];
+  }
+  if (card.id === distractionSourceId) {
+    return [
+      plotPlaceSpies(1, { recallForSupply: true, allowSharedPost: true, source: "Distraction" }, [
+        deployedUnitsThisTurn(3),
+      ]),
+    ];
   }
   if (card.id === leverageSourceId) {
     return [

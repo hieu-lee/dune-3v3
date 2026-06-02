@@ -1,4 +1,4 @@
-import { hasGainedSpiceThisTurn, hasVisitedMakerSpaceThisRound } from "./turn-trackers";
+import { hasDeployedUnitsThisTurn, hasGainedSpiceThisTurn, hasVisitedMakerSpaceThisRound } from "./turn-trackers";
 import {
   effectiveEmperorIconInfluence,
   effectiveFremenIconInfluence,
@@ -50,7 +50,7 @@ export type SpyPlacementEffectResult = {
 };
 
 export type EffectResolverState = Partial<
-  Pick<GameState, "alliances" | "players" | "roundMakerSpaceVisits" | "sharedSpyPosts" | "spyPosts" | "turnSpiceGains">
+  Pick<GameState, "alliances" | "players" | "roundMakerSpaceVisits" | "sharedSpyPosts" | "spyPosts" | "turnSpiceGains" | "turnUnitDeployments">
 >;
 
 export type GameEffectContext = {
@@ -416,6 +416,15 @@ function conditionApplies(condition: GameEffectConditionSpec, context: GameEffec
     if (!context.state?.alliances) return false;
     if (condition.faction) return context.state.alliances[condition.faction] === context.source.id;
     return Object.values(context.state.alliances).includes(context.source.id);
+  }
+  if (condition.kind === "deployed-units-this-turn") {
+    return context.state?.turnUnitDeployments
+      ? hasDeployedUnitsThisTurn(
+          { turnUnitDeployments: context.state.turnUnitDeployments },
+          context.source.id,
+          condition.count,
+        )
+      : false;
   }
   if (condition.kind === "gained-spice-this-turn") {
     return context.state?.turnSpiceGains

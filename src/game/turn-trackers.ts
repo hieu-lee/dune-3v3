@@ -52,7 +52,15 @@ export function hasDeployedThreeOrMoreUnitsThisTurn(
   state: Pick<GameState, "turnUnitDeployments">,
   playerId: string,
 ) {
-  return (state.turnUnitDeployments[playerId] ?? 0) >= 3;
+  return hasDeployedUnitsThisTurn(state, playerId, 3);
+}
+
+export function hasDeployedUnitsThisTurn(
+  state: Pick<GameState, "turnUnitDeployments">,
+  playerId: string,
+  count: number,
+) {
+  return (state.turnUnitDeployments[playerId] ?? 0) >= count;
 }
 
 export function recordTurnUnitDeployment(state: GameState, playerId: string, amount: number): GameState {

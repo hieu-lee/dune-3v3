@@ -163,6 +163,7 @@ try {
   const councilorsAmbition = data.intrigueCards.find((card) => card.name === "Councilor's Ambition");
   const contingencyPlan = data.intrigueCards.find((card) => card.name === "Contingency Plan");
   const departForArrakis = data.intrigueCards.find((card) => card.name === "Depart For Arrakis");
+  const distraction = data.intrigueCards.find((card) => card.name === "Distraction");
   const intelligenceReport = data.intrigueCards.find((card) => card.name === "Intelligence Report");
   const leverage = data.intrigueCards.find((card) => card.name === "Leverage");
   const marketOpportunity = data.intrigueCards.find((card) => card.name === "Market Opportunity");
@@ -236,7 +237,7 @@ try {
     wheelsWithinWheels,
   );
   assert.ok(commandRespect && prepareTheWay && spiceMustFlow && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
-  assert.ok(backedByChoam && councilorsAmbition && contingencyPlan && departForArrakis && intelligenceReport && leverage && marketOpportunity && mercenaries && shaddamsFavor && strategicStockpiling);
+  assert.ok(backedByChoam && councilorsAmbition && contingencyPlan && departForArrakis && distraction && intelligenceReport && leverage && marketOpportunity && mercenaries && shaddamsFavor && strategicStockpiling);
   assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && dutifulService && deliverSupplies && sietchTabr && spiceRefinery);
   assert.equal(revealSpecCards.length, 79, "Unexpected number of cards with declarative Reveal specs");
   assert.equal(
@@ -330,6 +331,54 @@ try {
     contingencyPlanPlotResolved.revealGain.solari,
     2,
     "Contingency Plan Plot spec should resolve its Solari gain",
+  );
+  assert.ok(
+    distraction.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.conditions?.some((condition) => condition.kind === "deployed-units-this-turn" && condition.count === 3) &&
+      spec.effects.some((effect) =>
+        effect.kind === "place-spies" &&
+        effect.selector === "self" &&
+        effect.amount === 1 &&
+        effect.recallForSupply === true &&
+        effect.allowSharedPost === true &&
+        effect.source === "Distraction"
+      )
+    ),
+    "Distraction should carry a typed Plot shared spy placement spec gated by turn deployments",
+  );
+  const distractionPlotResolved = effectResolver.resolveGameEffects(distraction.effects, {
+    trigger: "plot-intrigue",
+    source: p2,
+    state: { turnUnitDeployments: { [p2.id]: 3 } },
+  });
+  assert.equal(
+    distractionPlotResolved.spyPlacements.length,
+    1,
+    "Distraction Plot spec should resolve a spy placement after three deployed units this turn",
+  );
+  assert.deepEqual(
+    distractionPlotResolved.spyPlacements[0],
+    {
+      count: 1,
+      recallForSupply: true,
+      mustPlace: undefined,
+      placementIcon: undefined,
+      allowSharedPost: true,
+      source: "Distraction",
+      postPlacementAction: undefined,
+    },
+    "Distraction Plot spec should resolve the shared spy placement details",
+  );
+  const distractionBeforeDeployResolved = effectResolver.resolveGameEffects(distraction.effects, {
+    trigger: "plot-intrigue",
+    source: p2,
+    state: { turnUnitDeployments: { [p2.id]: 2 } },
+  });
+  assert.deepEqual(
+    distractionBeforeDeployResolved.spyPlacements,
+    [],
+    "Distraction Plot spec should not resolve before three deployed units this turn",
   );
   assert.ok(
     hasPlotEffect(leverage, (effect) =>
@@ -2646,6 +2695,20 @@ try {
     () => turnActions.revealTurnPlan({ ...p2, hand: [invalidSpyCountCard], highCouncilSeat: false }),
     /Invalid has-spy-posts count "undefined"/,
     "Spy-count conditions should fail loudly when count is missing",
+  );
+  const invalidDeployedUnitsCountCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-deployed-units-count-card",
+    name: "Effect Spec Invalid Deployed Units Count",
+    effects: [revealSpec(
+      [{ kind: "gain-persuasion", selector: "self", amount: 1 }],
+      [{ kind: "deployed-units-this-turn", count: -1 }],
+    )],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [invalidDeployedUnitsCountCard], highCouncilSeat: false }),
+    /Invalid deployed-units-this-turn count "-1"/,
+    "Deployed-unit conditions should require a non-negative integer threshold",
   );
   const invalidInfluenceFactionCard = {
     ...convincingArgument,

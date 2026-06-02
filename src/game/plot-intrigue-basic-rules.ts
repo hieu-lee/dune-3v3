@@ -14,10 +14,6 @@ import {
   acquirableCardsForPending,
   activatedAllyEffectOwner,
 } from "./market-rules";
-import {
-  canPlayDistractionPlotIntrigue,
-  distractionSpyPending,
-} from "./spy-pending-rules";
 import { playTypedPlotIntrigue } from "./plot-intrigue-effect-rules";
 import { trashableCards } from "./trash-rules";
 import type {
@@ -107,26 +103,13 @@ export function playDistractionPlotIntrigue(
   playerId: string,
   intrigueId: string,
 ): GameState {
-  if (state.phase !== "playing" || state.pendingAction || state.pendingQueue.length > 0) return state;
-  const player = state.players[state.activeSeat];
-  if (!player || player.id !== playerId || !canPlayDistractionPlotIntrigue(state, player)) return state;
-  const intrigue = player.intrigues.find((card) => card.id === intrigueId);
-  if (!intrigue || !isDistractionIntrigue(intrigue)) return state;
-
-  return {
-    ...state,
-    players: state.players.map((candidate) =>
-      candidate.id === player.id
-        ? { ...candidate, intrigues: candidate.intrigues.filter((card) => card.id !== intrigue.id) }
-        : candidate,
-    ),
-    pendingAction: distractionSpyPending(player),
-    intrigueDiscard: [...state.intrigueDiscard, intrigue],
-    log: [
-      `${player.leader} plays Distraction and may place a spy on another player's observation post.`,
-      ...state.log,
-    ],
-  };
+  return playTypedPlotIntrigue(
+    state,
+    playerId,
+    intrigueId,
+    isDistractionIntrigue,
+    (player) => `${player.leader} plays Distraction and may place a spy on another player's observation post.`,
+  );
 }
 
 export function playInspireAwePlotIntrigue(

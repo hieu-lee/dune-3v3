@@ -3,6 +3,7 @@ import { resolveGameEffects, resolveTakeContracts } from "./effect-resolver";
 import { drawIntrigueCards } from "./intrigue-deck";
 import { adjustInfluence } from "./leader-rewards";
 import { activatedAllyEffectOwner } from "./market-rules";
+import { pendingActionForSpyPlacements } from "./spy-effect-pending-rules";
 import type {
   FactionId,
   GameState,
@@ -116,6 +117,10 @@ export function playTypedPlotIntrigue(
   if (contractEffects.length > 1) throw new Error("Unsupported multiple Plot Intrigue take-contracts effects");
   const [contractEffect] = contractEffects;
   const contractPending = publicContractPendingFor(state, player, intrigue, contractEffect);
+  const spyPending = pendingActionForSpyPlacements(intrigue.name, player, resolved.spyPlacements, state);
+  if (resolved.activatedAlly.spyPlacements.length > 0) {
+    throw new Error(`Unsupported activated Ally Plot Intrigue spy placement for ${intrigue.name}`);
+  }
   const hasTroopRecruits = resolved.recruitedTroops > 0 || resolved.activatedAlly.recruitedTroops > 0;
   const hasCardDraw = resolved.cardsToDraw > 0;
   const hasIntrigueDraw = resolved.intriguesToDraw > 0;
@@ -132,10 +137,12 @@ export function playTypedPlotIntrigue(
     !hasTroopRecruits &&
     !hasCardDraw &&
     !hasIntrigueDraw &&
-    !contractPending
+    !contractPending &&
+    !spyPending
   ) {
     return state;
   }
+  const pendingActions = [contractPending, spyPending].filter((action): action is PendingAction => Boolean(action));
 
   const outcome: TypedPlotIntrigueOutcome = { cardsDrawn: 0 };
   const players = state.players.map((candidate) => {
@@ -169,7 +176,8 @@ export function playTypedPlotIntrigue(
   const immediateState = {
     ...state,
     players,
-    pendingAction: contractPending,
+    pendingAction: pendingActions[0],
+    pendingQueue: pendingActions.slice(1),
   };
   const drawnState = hasIntrigueDraw
     ? drawIntrigueCards(immediateState, player.id, resolved.intriguesToDraw, intrigue.name)

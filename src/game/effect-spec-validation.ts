@@ -149,6 +149,10 @@ function validateCondition(condition: GameEffectConditionSpec) {
     if (condition.faction === undefined || supportedFactions.has(condition.faction)) return;
     throw new Error(`Unsupported effect faction "${condition.faction}"`);
   }
+  if (condition.kind === "deployed-units-this-turn") {
+    if (isNonNegativeInteger(condition.count)) return;
+    invalidSpecField("deployed-units-this-turn count", condition.count);
+  }
   if (condition.kind === "gained-spice-this-turn") return;
   unsupportedKind("effect condition", condition);
 }
@@ -606,7 +610,7 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     return;
   }
   if (effect.kind === "place-spies") {
-    if (trigger !== "agent-play" && trigger !== "reveal" && trigger !== "acquire") {
+    if (trigger !== "agent-play" && trigger !== "reveal" && trigger !== "acquire" && trigger !== "plot-intrigue") {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
     }
     validateSourceLabel("place-spies source", effect.source);

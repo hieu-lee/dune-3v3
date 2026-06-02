@@ -29,6 +29,7 @@ import {
   rebelSupplierSourceId,
   reliableInformantSourceId,
   sardaukarSoldierSourceId,
+  shishakliSourceId,
   smugglersHavenSourceId,
   smugglersHarvesterSourceId,
   southernEldersSourceId,
@@ -239,6 +240,12 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
       agentTrashSourceForDrawCards(1, {}, [hasCardTraitInPlay("Faction: Bene Gesserit", 2)]),
       revealGainPersuasion(2),
       revealGainStrength(1),
+    ];
+  }
+  if (card.id === shishakliSourceId) {
+    return [
+      agentTrashSourceForDrawCards(1),
+      revealGainStrength(2),
     ];
   }
   if (card.id === beneGesseritOperativeSourceId) {
@@ -568,6 +575,9 @@ function imperiumPlayText(card: HubCard) {
   }
   if (card.id === treadInDarknessSourceId) {
     return "If you have another Bene Gesserit card in play, you may trash this card to draw 1 card.";
+  }
+  if (card.id === shishakliSourceId) {
+    return "You may trash this card to draw 1 card.";
   }
   if (card.id === inHighPlacesSourceId) {
     return "If you have another Bene Gesserit card in play, draw 1 card and place 1 spy.";

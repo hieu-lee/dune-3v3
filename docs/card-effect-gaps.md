@@ -26,7 +26,7 @@ Unsupported spec shapes, including triggers, intentionally throw instead of fall
 
 1. Agent immediate gains: add card-specific specs only after printed costs, choices, and timing are modeled; avoid catalog-only generation for Agent text.
 2. Agent spy primitives: restricted post icon, recall spy costs, post-placement rewards.
-3. Costs and choices: remaining Agent pay-resource shapes beyond current paid reward/payment primitives, optional pay, Agent discard/trash selected card beyond current typed hand-discard and source-trash shapes, discard triggers beyond immediate resource gains, lose Influence outside typed Plot branches and the typed Combat Influence-loss strength path.
+3. Costs and choices: remaining Agent pay-resource shapes beyond current paid reward/payment primitives, optional pay, Agent discard/trash selected card beyond current typed hand-discard and source-trash shapes, discard triggers beyond immediate resource gains, Reveal Influence-gain icons such as Shishakli's Fremen Bond, lose Influence outside typed Plot branches and the typed Combat Influence-loss strength path.
 4. Routing: self versus activated Ally outside current typed routes, remaining Commander personal-board influence cases, team-shared Influence checks.
 5. Market/contract effects: discounted and targeted acquire-card variants, remaining take face-up CHOAM contract variants beyond typed acquire/Plot/Combat public-offer pending actions, complete contract.
 

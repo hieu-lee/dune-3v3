@@ -255,6 +255,8 @@ try {
   assert.ok(priceIsNoObject, "Imperium deck should include Price is No Object");
   const spyNetwork = data.imperiumDeck.find((card) => card.name === "Spy Network");
   assert.ok(spyNetwork, "Imperium deck should include Spy Network");
+  const shishakli = data.imperiumDeck.find((card) => card.name === "Shishakli");
+  assert.ok(shishakli, "Imperium deck should include Shishakli");
   assert.equal(state.isPrepareTheWayCard(prepareTheWay), true, "Prepare The Way should be recognized");
   assert.deepEqual(
     data.reserveMarket.map((card) => card.sourceId),
@@ -348,7 +350,34 @@ try {
     /acquire a card to your hand using Solari instead of persuasion/i,
     "Price is No Object should expose its automated Agent acquire text in hand",
   );
-  for (const name of ["Bene Gesserit Operative", "Cargo Runner", "Chani, Clever Tactician", "In High Places", "Maker Keeper", "Maula Pistol", "Northern Watermaster", "Overthrow", "Paracompass", "Price is No Object"]) {
+  assert.deepEqual(
+    shishakli.effects?.filter((spec) => spec.trigger === "agent-play"),
+    [
+      {
+        trigger: "agent-play",
+        effects: [
+          {
+            kind: "trash-card",
+            selector: "self",
+            optional: true,
+            zones: ["playArea"],
+            sourceOnly: true,
+            drawCardsReward: 1,
+          },
+        ],
+      },
+    ],
+    "Shishakli should model its Agent source-trash draw as a typed effect",
+  );
+  assert.match(shishakli.play, /trash this card to draw 1 card/i);
+  assert.ok(
+    shishakli.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.effects.some((effect) => effect.kind === "gain-strength" && effect.amount === 2)
+    ),
+    "Shishakli should keep its fixed Reveal strength spec",
+  );
+  for (const name of ["Bene Gesserit Operative", "Cargo Runner", "Chani, Clever Tactician", "In High Places", "Maker Keeper", "Maula Pistol", "Northern Watermaster", "Overthrow", "Paracompass", "Price is No Object", "Shishakli"]) {
     const card = data.imperiumDeck.find((candidate) => candidate.name === name);
     assert.ok(card?.effects?.some((spec) => spec.trigger === "agent-play"), `${name} should use a structured Agent effect`);
   }

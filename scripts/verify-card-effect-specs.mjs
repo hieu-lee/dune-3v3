@@ -179,6 +179,7 @@ try {
   const rebelSupplier = data.imperiumDeck.find((card) => card.name === "Rebel Supplier");
   const reliableInformant = data.imperiumDeck.find((card) => card.name === "Reliable Informant");
   const sardaukarSoldier = data.imperiumDeck.find((card) => card.name === "Sardaukar Soldier");
+  const shishakli = data.imperiumDeck.find((card) => card.name === "Shishakli");
   const smugglersHaven = data.imperiumDeck.find((card) => card.name === "Smuggler's Haven");
   const southernElders = data.imperiumDeck.find((card) => card.name === "Southern Elders");
   const spacingGuildFavor = data.imperiumDeck.find((card) => card.name === "Spacing Guild's Favor");
@@ -284,6 +285,7 @@ try {
     rebelSupplier &&
     reliableInformant &&
     sardaukarSoldier &&
+    shishakli &&
     smugglersHaven &&
     southernElders &&
     spacingGuildFavor &&
@@ -3418,6 +3420,7 @@ try {
       "Rebel Supplier",
       "Reliable Informant",
       "Sardaukar Soldier",
+      "Shishakli",
       "Smuggler's Harvester",
       "Smuggler's Haven",
       "Southern Elders",
@@ -4346,6 +4349,28 @@ try {
     "Tread in Darkness play text should expose source trash for draw",
   );
   assert.equal(treadInDarkness.reveal, "+2 persuasion and +1 strength.", "Tread in Darkness reveal text should stay fixed");
+  assert.deepEqual(
+    shishakli.effects?.filter((spec) => spec.trigger === "agent-play"),
+    [
+      agentSpec([
+        {
+          kind: "trash-card",
+          selector: "self",
+          optional: true,
+          zones: ["playArea"],
+          sourceOnly: true,
+          drawCardsReward: 1,
+        },
+      ]),
+    ],
+    "Shishakli should only carry a typed Agent source-trash draw spec",
+  );
+  assert.ok(
+    hasRevealEffect(shishakli, (effect) => effect.kind === "gain-strength" && effect.amount === 2),
+    "Shishakli should carry its fixed Reveal strength spec",
+  );
+  assert.equal(shishakli.play, "You may trash this card to draw 1 card.", "Shishakli play text should expose source trash for draw");
+  assert.equal(shishakli.reveal, "+0 persuasion and +2 strength.", "Shishakli reveal text should keep the fixed strength text");
   assert.deepEqual(
     hiddenMissive.traits?.filter((trait) => trait.startsWith("Faction:")),
     ["Faction: Bene Gesserit"],
@@ -11362,6 +11387,118 @@ try {
   );
   assert.equal(treadEmptyDeckOwner.hand.length, 0, "Unsatisfied Tread in Darkness draw should not add cards");
   assert.match(treadEmptyDeckTrashed.log[0], /trashes Tread in Darkness from Tread in Darkness and has no card to draw/);
+  const shishakliDrawCard = { ...dagger, id: "shishakli-draw-card", name: "Shishakli Draw Probe" };
+  const shishakliExtraDeckCard = {
+    ...convincingArgument,
+    id: "shishakli-extra-deck-card",
+    name: "Shishakli Extra Deck Probe",
+  };
+  const shishakliOtherPlayCard = {
+    ...dagger,
+    id: "shishakli-other-play-card",
+    name: "Shishakli Other Play Card",
+  };
+  const shishakliFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 1,
+    deck: [shishakliDrawCard, shishakliExtraDeckCard],
+    discard: [],
+    garrison: 0,
+    hand: [shishakli],
+    playArea: [shishakliOtherPlayCard],
+    resources: { solari: 0, spice: 0, water: 0 },
+  }));
+  assert.equal(
+    state.pendingActionForCard(shishakli, playerById(shishakliFixture, p2.id), shishakliFixture),
+    undefined,
+    "Shishakli should only queue its source-trash draw choice from play",
+  );
+  const shishakliPlaced = turnActions.placeAgentAction(shishakliFixture, {
+    commanderTargets: {},
+    selectedCard: shishakli,
+    selectedSpace: imperialBasin,
+  });
+  assert.equal(
+    shishakliPlaced.pendingAction?.kind,
+    "trash-card",
+    "Shishakli should queue a source-trash draw pending action",
+  );
+  assert.equal(shishakliPlaced.pendingAction.source, "Shishakli");
+  assert.equal(shishakliPlaced.pendingAction.optional, true);
+  assert.equal(shishakliPlaced.pendingAction.drawCardsReward, 1);
+  assert.deepEqual(shishakliPlaced.pendingAction.zones, ["playArea"]);
+  assert.equal(shishakliPlaced.pendingAction.requiredCardId, shishakli.id);
+  assert.equal(shishakliPlaced.pendingAction.requiredAgentPlacementSpaceId, imperialBasin.id);
+  assert.equal(shishakliPlaced.pendingAction.requiredAgentPlacementTargetOwnerId, p2.id);
+  assert.deepEqual(
+    state.trashableCardsForPending(playerById(shishakliPlaced, p2.id), shishakliPlaced.pendingAction)
+      .map(({ zone, card }) => ({ zone, id: card.id })),
+    [{ zone: "playArea", id: shishakli.id }],
+    "Shishakli source-trash draw should only offer its source card",
+  );
+  const shishakliOtherTrashAttempt = state.trashPlayerCard(
+    shishakliPlaced,
+    shishakliPlaced.pendingAction,
+    "playArea",
+    shishakliOtherPlayCard.id,
+  );
+  assert.equal(
+    shishakliOtherTrashAttempt.pendingAction?.kind,
+    "trash-card",
+    "Rejected Shishakli trash attempts should leave the pending action unresolved",
+  );
+  assert.equal(
+    playerById(shishakliOtherTrashAttempt, p2.id).playArea.some((card) => card.id === shishakliOtherPlayCard.id),
+    true,
+    "Shishakli should reject trashing other in-play cards",
+  );
+  const shishakliTrashed = state.trashPlayerCard(
+    shishakliPlaced,
+    shishakliPlaced.pendingAction,
+    "playArea",
+    shishakli.id,
+  );
+  const shishakliOwner = playerById(shishakliTrashed, p2.id);
+  assert.equal(
+    shishakliOwner.playArea.some((card) => card.id === shishakli.id),
+    false,
+    "Resolving Shishakli trash should remove the source card from play",
+  );
+  assert.equal(
+    shishakliOwner.playArea.some((card) => card.id === shishakliOtherPlayCard.id),
+    true,
+    "Resolving Shishakli trash should leave other cards in play",
+  );
+  assert.deepEqual(
+    shishakliOwner.hand.map((card) => card.id),
+    [shishakliDrawCard.id],
+    "Resolving Shishakli trash should draw exactly 1 card",
+  );
+  assert.deepEqual(
+    shishakliOwner.deck.map((card) => card.id),
+    [shishakliExtraDeckCard.id],
+    "Resolving Shishakli trash should leave the second deck card undrawn",
+  );
+  assert.equal(shishakliTrashed.pendingAction, undefined);
+  assert.match(shishakliTrashed.log[0], /trashes Shishakli from Shishakli and draws 1 card/);
+  const shishakliSkipped = state.skipTrashCard(shishakliPlaced, shishakliPlaced.pendingAction);
+  const shishakliSkippedOwner = playerById(shishakliSkipped, p2.id);
+  assert.equal(
+    shishakliSkippedOwner.playArea.some((card) => card.id === shishakli.id),
+    true,
+    "Skipping Shishakli trash should leave the source card in play",
+  );
+  assert.equal(
+    shishakliSkippedOwner.hand.some((card) => card.id === shishakliDrawCard.id),
+    false,
+    "Skipping Shishakli trash should not draw the reward card",
+  );
+  assert.deepEqual(
+    shishakliSkippedOwner.deck.map((card) => card.id),
+    [shishakliDrawCard.id, shishakliExtraDeckCard.id],
+    "Skipping Shishakli trash should leave the deck untouched",
+  );
+  assert.equal(shishakliSkipped.pendingAction, undefined);
+  assert.match(shishakliSkipped.log[0], /declines to trash a card from Shishakli/);
   const inHighPlacesDrawCard = {
     ...dagger,
     id: "in-high-places-draw-card",

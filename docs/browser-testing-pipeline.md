@@ -112,7 +112,7 @@ Current scenarios:
 | --- | --- |
 | `home` | Desktop/mobile first-load layout. |
 | `agent-placement` | Legal card/space selection and placed Agent state transition. |
-| `card-choices` | Contract, acquire, Price is No Object Solari acquire, Interstellar Trade acquire Influence/contract bonuses, Dangerous Rhetoric Influence choice, Subversive Advisor and Overthrow board-space Influence, Desert Survival and Tread in Darkness source trash, Captured Mentat, Space-time Folding, Guild Envoy, Covert Operation, Ecological Testing Station, In High Places and Bene Gesserit Operative spy, and empty acquire pending surfaces. |
+| `card-choices` | Contract, acquire, Price is No Object Solari acquire, Interstellar Trade acquire Influence/contract bonuses, Dangerous Rhetoric Influence choice, Subversive Advisor and Overthrow board-space Influence, Desert Survival, Tread in Darkness, and Shishakli source trash, Captured Mentat, Space-time Folding, Guild Envoy, Covert Operation, Ecological Testing Station, In High Places and Bene Gesserit Operative spy, and empty acquire pending surfaces. |
 | `combat-intrigues` | Combat Intrigue targeting/play flow, Go To Ground retreat plus optional spy placement, Spice is Power spend branch, Impress pending acquisition, Find Weakness optional spy recall, Spring The Trap required spy recall, Devour optional trash, Questionable Methods optional Influence loss, Reach Agreement retreat plus contract pending, Tactical Option dynamic retreat and strength branches, plus a mobile layout screenshot. |
 | `commander-reveal` | Commander reveal targeting, Call to Arms, and acquire follow-up. |
 | `control-defense` | Critical-location control defense on desktop/mobile. |

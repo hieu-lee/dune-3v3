@@ -69,6 +69,7 @@ export const leadershipSourceId = 63;
 export const publicSpectacleSourceId = 55;
 export const rebelSupplierSourceId = 40;
 export const sardaukarSoldierSourceId = 15;
+export const shishakliSourceId = 48;
 export const southernEldersSourceId = 56;
 export const stilgarDevotedSourceId = 70;
 export const theacherousManeuverSourceId = 66;

@@ -244,6 +244,40 @@ export async function runCardChoicesSmoke({
     "Tread in Darkness should leave the second deck card undrawn",
   );
 
+  await setDebugGameAndWait(page, states.shishakli);
+  pendingText = await page.locator(".pending-panel").innerText();
+  assert.match(pendingText, /Shishakli/i);
+  assert.match(pendingText, /Trash reward: draw 1 card/i);
+  assert.match(pendingText, /Skip/i);
+  assert.doesNotMatch(pendingText, /Shishakli Debug Other/i);
+  await screenshot(page, captures, "pending-shishakli-trash-draw.png");
+
+  before = await currentGame(page);
+  await page.locator(".pending-panel").getByRole("button", { name: /Shishakli \(in play\)/ }).click();
+  await waitForNoPending(page);
+  after = await currentGame(page);
+  ownerAfter = after.players.find((player) => player.id === "p2");
+  assert.equal(
+    ownerAfter.playArea.some((card) => card.id === before.pendingAction.requiredCardId),
+    false,
+    "Shishakli should trash the source card from play",
+  );
+  assert.equal(
+    ownerAfter.playArea.some((card) => card.id === states.shishakli.shishakliOtherPlayCardId),
+    true,
+    "Shishakli should leave other in-play cards alone",
+  );
+  assert.equal(
+    ownerAfter.hand.some((card) => card.id === states.shishakli.shishakliDrawCardId),
+    true,
+    "Shishakli should draw the reward card after trashing itself",
+  );
+  assert.equal(
+    ownerAfter.deck.some((card) => card.id === states.shishakli.shishakliExtraDeckCardId),
+    true,
+    "Shishakli should leave the second deck card undrawn",
+  );
+
   await setDebugGameAndWait(page, states.acquireSpyNetwork);
   pendingText = await page.locator(".pending-panel").innerText();
   assert.match(pendingText, /Spy Network/i);
@@ -539,6 +573,8 @@ async function createCardChoiceStates(server, initialPlayableGame) {
   assert.ok(desertSurvival, "Expected Desert Survival Imperium card");
   const treadInDarkness = data.imperiumDeck.find((card) => card.sourceId === 58);
   assert.ok(treadInDarkness, "Expected Tread in Darkness Imperium card");
+  const shishakli = data.imperiumDeck.find((card) => card.sourceId === 48);
+  assert.ok(shishakli, "Expected Shishakli Imperium card");
   const hiddenMissive = data.imperiumDeck.find((card) => card.sourceId === 21);
   assert.ok(hiddenMissive, "Expected Hidden Missive Imperium card");
   const priceIsNoObject = data.imperiumDeck.find((card) => card.sourceId === 73);
@@ -618,6 +654,21 @@ async function createCardChoiceStates(server, initialPlayableGame) {
     ...data.allyStarterCards[2],
     id: "browser-tread-in-darkness-extra-deck-card",
     name: "Tread in Darkness Debug Extra Deck",
+  };
+  const shishakliOtherPlayCard = {
+    ...data.allyStarterCards[0],
+    id: "browser-shishakli-other-play-card",
+    name: "Shishakli Debug Other",
+  };
+  const shishakliDrawCard = {
+    ...data.allyStarterCards[1],
+    id: "browser-shishakli-draw-card",
+    name: "Shishakli Debug Draw",
+  };
+  const shishakliExtraDeckCard = {
+    ...data.allyStarterCards[2],
+    id: "browser-shishakli-extra-deck-card",
+    name: "Shishakli Debug Extra Deck",
   };
   const inHighPlacesOtherBeneCard = {
     ...hiddenMissive,
@@ -1030,6 +1081,50 @@ async function createCardChoiceStates(server, initialPlayableGame) {
     [treadInDarkness.id],
     "Tread in Darkness browser state should only offer its source card",
   );
+  const shishakliState = turnActions.placeAgentAction(
+    {
+      ...base,
+      spaces: {},
+      players: base.players.map((player) =>
+        player.id === ownerId
+          ? {
+              ...player,
+              agentsReady: 1,
+              deck: [shishakliDrawCard, shishakliExtraDeckCard],
+              discard: [],
+              garrison: 0,
+              hand: [shishakli],
+              playArea: [shishakliOtherPlayCard],
+              resources: { solari: 0, spice: 0, water: 0 },
+            }
+          : player,
+      ),
+    },
+    {
+      commanderTargets: {},
+      selectedCard: shishakli,
+      selectedSpace: imperialBasin,
+    },
+  );
+  assert.equal(
+    shishakliState.pendingAction?.kind,
+    "trash-card",
+    "Expected Shishakli source-trash draw pending action",
+  );
+  assert.equal(shishakliState.pendingAction.requiredCardId, shishakli.id);
+  assert.equal(shishakliState.pendingAction.requiredAgentPlacementSpaceId, imperialBasin.id);
+  assert.equal(shishakliState.pendingAction.requiredAgentPlacementTargetOwnerId, ownerId);
+  assert.equal(shishakliState.pendingAction.drawCardsReward, 1);
+  const shishakliOwner = shishakliState.players.find((player) => player.id === ownerId);
+  assert.ok(shishakliOwner, "Expected Shishakli owner in browser debug state");
+  assert.deepEqual(
+    state.trashableCardsForPending(
+      shishakliOwner,
+      shishakliState.pendingAction,
+    ).map(({ card }) => card.id),
+    [shishakli.id],
+    "Shishakli browser state should only offer its source card",
+  );
   const covertOperationOwner = base.players.find((player) => player.id === ownerId);
   assert.ok(covertOperationOwner, "Expected Covert Operation owner");
   const covertOperationSource = {
@@ -1209,6 +1304,12 @@ async function createCardChoiceStates(server, initialPlayableGame) {
       treadInDarknessDrawCardId: treadInDarknessDrawCard.id,
       treadInDarknessExtraDeckCardId: treadInDarknessExtraDeckCard.id,
       treadInDarknessOtherBeneCardId: treadInDarknessOtherBeneCard.id,
+    },
+    shishakli: {
+      ...shishakliState,
+      shishakliDrawCardId: shishakliDrawCard.id,
+      shishakliExtraDeckCardId: shishakliExtraDeckCard.id,
+      shishakliOtherPlayCardId: shishakliOtherPlayCard.id,
     },
     acquireSpyNetwork: {
       ...acquireSpyNetworkState,

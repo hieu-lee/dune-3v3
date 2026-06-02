@@ -57,6 +57,7 @@ const generatedScreenshotNames = [
   "pending-overthrow-board-influence.png",
   "pending-desert-survival-trash.png",
   "pending-tread-in-darkness-trash-draw.png",
+  "pending-shishakli-trash-draw.png",
   "pending-acquire-spy-network-spy.png",
   "pending-acquire-interstellar-trade-influence.png",
   "pending-acquire-interstellar-trade-contract.png",

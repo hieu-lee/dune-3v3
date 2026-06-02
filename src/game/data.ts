@@ -60,6 +60,7 @@ import type {
   IntrigueCard,
   LeaderCard,
   CardEffectSpec,
+  ResourceId,
 } from "./types";
 export {
   battleIconLabels,
@@ -398,6 +399,21 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
   return undefined;
 }
 
+function fixedRevealEffects(
+  persuasion: number,
+  swords: number,
+  revealGain?: Partial<Record<ResourceId, number>>,
+): CardEffectSpec[] | undefined {
+  const effects: CardEffectSpec[] = [];
+  if (persuasion > 0) effects.push(revealGainPersuasion(persuasion));
+  if (swords > 0) effects.push(revealGainStrength(swords));
+  for (const resource of ["solari", "spice", "water"] as const) {
+    const amount = revealGain?.[resource] ?? 0;
+    if (amount > 0) effects.push(revealGainResource(resource, amount));
+  }
+  return effects.length > 0 ? effects : undefined;
+}
+
 function imperiumPlayText(card: HubCard) {
   if (card.id === doubleAgentSourceId) {
     return "If you have a spy on the board space you sent an Agent to this turn, you may place a spy on the same observation post as another player's spy.";
@@ -516,7 +532,6 @@ function toImperiumCard(card: HubCard): Card {
   }
   const persuasion = card.id === paracompassSourceId ? 0 : attributeNumber(card, "Persuasion on reveal");
   const swords = attributeNumber(card, "Swords");
-  const effects = imperiumCardEffects(card);
   const revealGain =
     card.id === fedaykinStilltentSourceId
       ? { water: 1 }
@@ -524,7 +539,8 @@ function toImperiumCard(card: HubCard): Card {
         ? { solari: 1 }
         : card.id === covertOperationSourceId
           ? { solari: 2 }
-        : undefined;
+          : undefined;
+  const effects = imperiumCardEffects(card) ?? fixedRevealEffects(persuasion, swords, revealGain);
   const automatedConditionalPersuasion = card.id === interstellarTradeSourceId || card.id === paracompassSourceId;
   const automatedConditionalSwords = card.id === calculusOfPowerSourceId;
   const conditionalPersuasion =

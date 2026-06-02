@@ -44,6 +44,12 @@ function expectedFixedReveal(card) {
   };
 }
 
+function hasFixedRevealReward(card) {
+  return card.persuasion > 0 ||
+    card.swords > 0 ||
+    Object.values(card.revealGain ?? {}).some((amount) => (amount ?? 0) > 0);
+}
+
 function actualFixedReveal(turnActions, player, card) {
   const plan = turnActions.revealTurnPlan({ ...player, hand: [card], highCouncilSeat: false });
   return {
@@ -82,6 +88,10 @@ try {
     ...data.reserveMarket,
     ...data.imperiumDeck,
   ].filter(hasRevealSpec);
+  const marketAndImperiumCards = [
+    ...data.reserveMarket,
+    ...data.imperiumDeck,
+  ];
   const convincingArgument = data.allyStarterCards.find((card) => card.name === "Convincing Argument");
   const dagger = data.allyStarterCards.find((card) => card.name === "Dagger");
   const allySignet = data.allyStarterCards.find((card) => card.name === "Signet Ring");
@@ -153,12 +163,35 @@ try {
   );
   assert.ok(commandRespect && prepareTheWay && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
   assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && dutifulService && deliverSupplies);
-  assert.equal(revealSpecCards.length, 47, "Unexpected number of cards with declarative Reveal specs");
+  assert.equal(revealSpecCards.length, 79, "Unexpected number of cards with declarative Reveal specs");
+  assert.equal(
+    marketAndImperiumCards.filter(hasFixedRevealReward).length,
+    49,
+    "Unexpected number of reserve/Imperium cards with fixed reveal rewards",
+  );
   assert.deepEqual(
+    marketAndImperiumCards
+      .filter((card) => hasFixedRevealReward(card) && !hasRevealSpec(card))
+      .map((card) => card.name)
+      .sort(),
+    [],
+    "Every reserve/Imperium fixed reveal reward should have a declarative Reveal spec",
+  );
+  assert.deepEqual(
+    marketAndImperiumCards
+      .filter((card) => !hasRevealSpec(card))
+      .map((card) => card.name)
+      .sort(),
     [
-      ...data.reserveMarket,
-      ...data.imperiumDeck,
-    ].filter(hasAgentPlaySpec).map((card) => card.name).sort(),
+      "Corrinth City",
+      "Delivery Agreement",
+      "Priority Contracts",
+      "The Spice Must Flow",
+    ],
+    "Only zero-reveal reserve/Imperium cards should lack declarative Reveal specs",
+  );
+  assert.deepEqual(
+    marketAndImperiumCards.filter(hasAgentPlaySpec).map((card) => card.name).sort(),
     [
       "Bene Gesserit Operative",
       "Captured Mentat",

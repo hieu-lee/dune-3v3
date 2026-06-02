@@ -1,6 +1,7 @@
 import { drawCards } from "./deck-utils";
 import {
   type InfluenceAdjustmentEffect,
+  resolveAcquireCards,
   resolveGameEffects,
   resolveManipulateRowCards,
   resolveTakeContracts,
@@ -10,10 +11,11 @@ import { drawIntrigueCards } from "./intrigue-deck";
 import {
   adjustInfluenceAndResolveThresholdRewards,
 } from "./leader-rewards";
-import { activatedAllyEffectOwner } from "./market-rules";
+import { acquirableCardsForPending, activatedAllyEffectOwner } from "./market-rules";
 import { pendingActionForSpyPlacements } from "./spy-effect-pending-rules";
 import { trashableCardsForPending } from "./trash-rules";
 import type {
+  AcquireCardDestination,
   Card,
   FactionId,
   GameState,
@@ -33,10 +35,13 @@ type PlayTypedPlotIntrigueOptions = {
 };
 
 type TypedPlotIntrigueOutcome = {
+  acquireDestination?: AcquireCardDestination;
+  acquirePending?: AcquireCardPendingAction;
   cardsDrawn: number;
   manipulatedCard?: Card;
 };
 
+type AcquireCardPendingAction = Extract<PendingAction, { kind: "acquire-card" }>;
 type TrashCardPendingAction = Extract<PendingAction, { kind: "trash-card" }>;
 
 function hasResourceGains(gain: Partial<Resources>) {
@@ -81,6 +86,41 @@ function publicContractPendingFor(
     publicOnly: true,
     ...(effect.optional ? { optional: true } : {}),
   };
+}
+
+function acquireCardPendingFor(
+  state: GameState,
+  player: Player,
+  intrigue: IntrigueCard,
+  effect: ReturnType<typeof resolveAcquireCards>[number] | undefined,
+): AcquireCardPendingAction | undefined {
+  if (!effect || effect.selector !== "self") return undefined;
+  const base = {
+    kind: "acquire-card" as const,
+    ownerId: player.id,
+    source: effect.source ?? intrigue.name,
+    ...(effect.minCost !== undefined ? { minCost: effect.minCost } : {}),
+    destination: effect.destination,
+    ...(effect.optional ? { optional: true as const } : {}),
+  };
+  let pending: AcquireCardPendingAction;
+  if (effect.maxCost !== undefined) {
+    pending = {
+      ...base,
+      maxCost: effect.maxCost,
+      ...(effect.paymentResource ? { paymentResource: effect.paymentResource } : {}),
+    };
+  } else {
+    const paymentResource = effect.paymentResource;
+    if (!paymentResource) {
+      throw new Error("Invalid Plot Intrigue acquire-card effect without maxCost or paymentResource");
+    }
+    pending = {
+      ...base,
+      paymentResource,
+    };
+  }
+  return acquirableCardsForPending(state, pending).length > 0 ? pending : undefined;
 }
 
 function trashCardPendingFor(
@@ -190,15 +230,19 @@ export function playTypedPlotIntrigue(
     state,
   };
   const resolved = resolveGameEffects(intrigue.effects, context);
+  const acquireEffects = resolveAcquireCards(intrigue.effects, context);
   const contractEffects = resolveTakeContracts(intrigue.effects, context);
   const trashEffects = resolveTrashCardEffects(intrigue.effects, context);
   const rowManipulationEffects = resolveManipulateRowCards(intrigue.effects, context);
+  if (acquireEffects.length > 1) throw new Error("Unsupported multiple Plot Intrigue acquire-card effects");
   if (contractEffects.length > 1) throw new Error("Unsupported multiple Plot Intrigue take-contracts effects");
   if (trashEffects.length > 1) throw new Error("Unsupported multiple Plot Intrigue trash-card effects");
   if (rowManipulationEffects.length > 1) throw new Error("Unsupported multiple Plot Intrigue row manipulation effects");
+  const [acquireEffect] = acquireEffects;
   const [contractEffect] = contractEffects;
   const [trashEffect] = trashEffects;
   const [rowManipulationEffect] = rowManipulationEffects;
+  const acquirePending = acquireCardPendingFor(state, player, intrigue, acquireEffect);
   const contractPending = publicContractPendingFor(state, player, intrigue, contractEffect);
   const spyPending = pendingActionForSpyPlacements(intrigue.name, player, resolved.spyPlacements, state);
   const rowManipulation = rowManipulationFor(state, options.targetCardId, rowManipulationEffect);
@@ -227,6 +271,7 @@ export function playTypedPlotIntrigue(
     !hasCardDraw &&
     !hasIntrigueDraw &&
     !hasAcquireRecruitBonus &&
+    !acquireEffect &&
     !contractPending &&
     !spyPending &&
     !trashEffect &&
@@ -235,7 +280,12 @@ export function playTypedPlotIntrigue(
     return state;
   }
 
-  const outcome: TypedPlotIntrigueOutcome = { cardsDrawn: 0, manipulatedCard: rowManipulation?.card };
+  const outcome: TypedPlotIntrigueOutcome = {
+    acquireDestination: acquireEffect?.destination,
+    acquirePending,
+    cardsDrawn: 0,
+    manipulatedCard: rowManipulation?.card,
+  };
   let sourceAfterEffects: Player | undefined;
   const players = state.players.map((candidate) => {
     if (candidate.id === player.id) {
@@ -271,6 +321,7 @@ export function playTypedPlotIntrigue(
   if (trashPending && !canResolveTrash && !trashPending.optional) return state;
   const pendingActions = [
     contractPending,
+    acquirePending,
     spyPending,
     canResolveTrash ? trashPending : undefined,
   ].filter((action): action is PendingAction => Boolean(action));

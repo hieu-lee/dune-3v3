@@ -154,6 +154,89 @@ export async function runTableChoicesSmoke({
     "Calculus should trash the selected Emperor card",
   );
 
+  await setDebugGameAndWait(page, states.inspireAweAlly);
+  await waitForActiveIntrigue(page, "Inspire Awe");
+  const allyInspireAweCard = page.locator(".intrigue-card").filter({ hasText: "Inspire Awe" });
+  const allyInspireAweButton = allyInspireAweCard.getByRole("button", { name: /Acquire <=3/ });
+  assert.equal(await allyInspireAweButton.count(), 1, "Expected one Ally Inspire Awe acquisition button");
+  assert.equal(await allyInspireAweButton.isEnabled(), true, "Ally Inspire Awe should be playable");
+  await screenshot(page, captures, "inspire-awe-ally-ready.png");
+
+  await allyInspireAweButton.click();
+  await page.waitForFunction(() => {
+    const game = window.__DUNE_DEBUG__?.getGame();
+    return game?.pendingAction?.kind === "acquire-card" &&
+      game.pendingAction.source === "Inspire Awe" &&
+      game.pendingAction.destination === "discard";
+  });
+  pendingText = await page.locator(".pending-panel").innerText();
+  assert.match(pendingText, /Inspire Awe/i);
+  assert.match(pendingText, new RegExp(escapeRegExp(states.inspireAweAcquireCardName)));
+  await screenshot(page, captures, "pending-inspire-awe-ally-acquire.png");
+
+  await page.locator(".pending-panel").getByRole("button", { name: states.inspireAweAcquireCardName }).click();
+  await waitForNoPending(page);
+  const allyInspireAweAfter = await currentGame(page);
+  const allyInspireAweOwnerAfter = allyInspireAweAfter.players.find((player) => player.id === "p2");
+  assert.ok(allyInspireAweOwnerAfter, "Expected Feyd after Ally Inspire Awe");
+  assert.equal(
+    allyInspireAweOwnerAfter.discard.at(-1)?.id,
+    states.inspireAweAcquireCardId,
+    "Ally Inspire Awe should acquire the selected card to discard",
+  );
+  assert.equal(
+    allyInspireAweOwnerAfter.hand.some((card) => card.id === states.inspireAweAcquireCardId),
+    false,
+    "Ally Inspire Awe without a sandworm should not acquire the selected card to hand",
+  );
+  assert.equal(
+    allyInspireAweAfter.imperiumRow.some((card) => card.id === states.inspireAweReplacementCardId),
+    true,
+    "Ally Inspire Awe should refill the Imperium Row",
+  );
+  assert.match(allyInspireAweAfter.log[0], /acquires .* to their discard pile/);
+  await screenshot(page, captures, "inspire-awe-ally-after-acquire.png");
+
+  await setDebugGameAndWait(page, states.inspireAweCommander);
+  await waitForActiveIntrigue(page, "Inspire Awe");
+  const commanderInspireAweCard = page.locator(".intrigue-card").filter({ hasText: "Inspire Awe" });
+  const commanderInspireAweButton = commanderInspireAweCard.getByRole("button", { name: /Acquire <=3 to Hand/ });
+  assert.equal(await commanderInspireAweButton.count(), 1, "Expected one Commander Inspire Awe hand acquisition button");
+  assert.equal(await commanderInspireAweButton.isEnabled(), true, "Commander Inspire Awe should be playable");
+  await screenshot(page, captures, "inspire-awe-commander-ready.png");
+
+  await commanderInspireAweButton.click();
+  await page.waitForFunction(() => {
+    const game = window.__DUNE_DEBUG__?.getGame();
+    return game?.pendingAction?.kind === "acquire-card" &&
+      game.pendingAction.source === "Inspire Awe" &&
+      game.pendingAction.destination === "hand";
+  });
+  pendingText = await page.locator(".pending-panel").innerText();
+  assert.match(pendingText, /Inspire Awe/i);
+  assert.match(pendingText, new RegExp(escapeRegExp(states.inspireAweAcquireCardName)));
+  await screenshot(page, captures, "pending-inspire-awe-commander-acquire.png");
+
+  await page.locator(".pending-panel").getByRole("button", { name: states.inspireAweAcquireCardName }).click();
+  await waitForNoPending(page);
+  const commanderInspireAweAfter = await currentGame(page);
+  const commanderInspireAweSourceAfter = commanderInspireAweAfter.players.find((player) => player.id === "p4");
+  const commanderInspireAweOwnerAfter = commanderInspireAweAfter.players.find((player) => player.id === "p6");
+  assert.ok(commanderInspireAweSourceAfter, "Expected Shaddam after Commander Inspire Awe");
+  assert.ok(commanderInspireAweOwnerAfter, "Expected Princess Irulan after Commander Inspire Awe");
+  assert.equal(
+    commanderInspireAweSourceAfter.hand.at(-1)?.id,
+    states.inspireAweAcquireCardId,
+    "Commander Inspire Awe should acquire the selected card to the Commander's hand",
+  );
+  assert.equal(
+    commanderInspireAweOwnerAfter.hand.some((card) => card.id === states.inspireAweAcquireCardId),
+    false,
+    "Commander Inspire Awe should not give the acquired card to the activated Ally",
+  );
+  assert.match(commanderInspireAweAfter.log[1], /through Princess Irulan's sandworm/);
+  await screenshot(page, captures, "inspire-awe-commander-after-acquire.png");
+
   await setDebugGameAndWait(page, states.buyAccessAlly);
   await waitForActiveIntrigue(page, "Buy Access");
   const allyBuyAccessCard = page.locator(".intrigue-card").filter({ hasText: "Buy Access" });
@@ -497,6 +580,8 @@ async function createTableChoiceStates(server, initialPlayableGame) {
   assert.ok(imperialTent, "Expected Imperial Tent for declarative Throne Row browser debug state");
   const manipulate = data.intrigueCards.find((card) => card.name === "Manipulate");
   assert.ok(manipulate, "Expected Manipulate for Plot row-manipulation browser debug state");
+  const inspireAwe = data.intrigueCards.find((card) => card.name === "Inspire Awe");
+  assert.ok(inspireAwe, "Expected Inspire Awe for Plot acquisition browser debug state");
   const buyAccess = data.intrigueCards.find((card) => card.name === "Buy Access");
   assert.ok(buyAccess, "Expected Buy Access for Plot Influence browser debug state");
   const imperiumPolitics = data.intrigueCards.find((card) => card.name === "Imperium Politics");
@@ -505,6 +590,10 @@ async function createTableChoiceStates(server, initialPlayableGame) {
   assert.ok(manipulateRowCard, "Expected a priced Imperium Row card for Manipulate browser debug state");
   const manipulateReplacement = data.imperiumDeck.find((card) => card.id !== manipulateRowCard.id);
   assert.ok(manipulateReplacement, "Expected a Manipulate replacement row card for browser debug state");
+  const inspireAweAcquireCard = data.imperiumDeck.find((card) => (card.cost ?? 0) <= 3);
+  assert.ok(inspireAweAcquireCard, "Expected a low-cost Imperium Row card for Inspire Awe browser debug state");
+  const inspireAweReplacement = data.imperiumDeck.find((card) => card.id !== inspireAweAcquireCard.id);
+  assert.ok(inspireAweReplacement, "Expected an Inspire Awe replacement row card for browser debug state");
 
   const base = {
     ...game,
@@ -668,6 +757,57 @@ async function createTableChoiceStates(server, initialPlayableGame) {
     },
     calculusTrashTargetId: calculusTrashTarget.id,
     calculusTrashTargetName: calculusTrashTarget.name,
+    inspireAweAlly: {
+      ...base,
+      activeSeat: feydSeat,
+      imperiumRow: [cloneCard(inspireAweAcquireCard)],
+      intrigueDiscard: [],
+      marketDeck: [cloneCard(inspireAweReplacement)],
+      players: base.players.map((player) =>
+        player.id === "p2"
+          ? {
+              ...player,
+              deployedSandworms: 0,
+              discard: [],
+              hand: [],
+              intrigues: [cloneCard(inspireAwe)],
+              revealed: false,
+            }
+          : { ...player, intrigues: [] }
+      ),
+    },
+    inspireAweCommander: {
+      ...base,
+      activeSeat: shaddamSeat,
+      imperiumRow: [cloneCard(inspireAweAcquireCard)],
+      intrigueDiscard: [],
+      marketDeck: [cloneCard(inspireAweReplacement)],
+      players: base.players.map((player) => {
+        if (player.id === "p4") {
+          return {
+            ...player,
+            deployedSandworms: 0,
+            discard: [],
+            hand: [],
+            intrigues: [cloneCard(inspireAwe)],
+            revealActivatedAllyId: "p6",
+            revealed: true,
+          };
+        }
+        if (player.id === "p6") {
+          return {
+            ...player,
+            deployedSandworms: 1,
+            hand: [],
+            intrigues: [],
+          };
+        }
+        return { ...player, deployedSandworms: 0, intrigues: [] };
+      }),
+    },
+    inspireAweAcquireCardId: inspireAweAcquireCard.id,
+    inspireAweAcquireCardName: inspireAweAcquireCard.name,
+    inspireAweReplacementCardId: inspireAweReplacement.id,
     buyAccessAlly: {
       ...base,
       activeSeat: feydSeat,

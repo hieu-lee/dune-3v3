@@ -170,6 +170,7 @@ try {
   const departForArrakis = data.intrigueCards.find((card) => card.name === "Depart For Arrakis");
   const distraction = data.intrigueCards.find((card) => card.name === "Distraction");
   const imperiumPolitics = data.intrigueCards.find((card) => card.name === "Imperium Politics");
+  const inspireAwe = data.intrigueCards.find((card) => card.name === "Inspire Awe");
   const intelligenceReport = data.intrigueCards.find((card) => card.name === "Intelligence Report");
   const leverage = data.intrigueCards.find((card) => card.name === "Leverage");
   const manipulate = data.intrigueCards.find((card) => card.name === "Manipulate");
@@ -245,7 +246,7 @@ try {
     wheelsWithinWheels,
   );
   assert.ok(commandRespect && prepareTheWay && spiceMustFlow && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
-  assert.ok(backedByChoam && buyAccess && callToArms && councilorsAmbition && contingencyPlan && cunning && departForArrakis && distraction && imperiumPolitics && intelligenceReport && leverage && manipulate && marketOpportunity && mercenaries && opportunism && shaddamsFavor && strategicStockpiling);
+  assert.ok(backedByChoam && buyAccess && callToArms && councilorsAmbition && contingencyPlan && cunning && departForArrakis && distraction && imperiumPolitics && inspireAwe && intelligenceReport && leverage && manipulate && marketOpportunity && mercenaries && opportunism && shaddamsFavor && strategicStockpiling);
   assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && dutifulService && deliverSupplies && sietchTabr && spiceRefinery);
   assert.equal(revealSpecCards.length, 79, "Unexpected number of cards with declarative Reveal specs");
   assert.equal(
@@ -340,6 +341,67 @@ try {
     2,
     "Contingency Plan Plot spec should resolve its Solari gain",
   );
+  assert.ok(
+    inspireAwe.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.choiceId === "to-discard" &&
+      spec.effects.some((effect) =>
+        effect.kind === "acquire-card" &&
+        effect.selector === "self" &&
+        effect.maxCost === 3 &&
+        effect.destination === "discard" &&
+        effect.source === "Inspire Awe"
+      )
+    ),
+    "Inspire Awe should carry a typed Plot acquire-card-to-discard spec",
+  );
+  assert.ok(
+    inspireAwe.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.choiceId === "to-hand" &&
+      spec.effects.some((effect) =>
+        effect.kind === "acquire-card" &&
+        effect.selector === "self" &&
+        effect.maxCost === 3 &&
+        effect.destination === "hand" &&
+        effect.source === "Inspire Awe"
+      )
+    ),
+    "Inspire Awe should carry a typed Plot acquire-card-to-hand spec",
+  );
+  assert.deepEqual(
+    effectResolver.resolveAcquireCards(inspireAwe.effects, {
+      trigger: "plot-intrigue",
+      source: p2,
+      state: game,
+    }),
+    [],
+    "Inspire Awe should not resolve a Plot acquire-card effect without a selected choice",
+  );
+  const inspireAweDiscardEffects = effectResolver.resolveAcquireCards(inspireAwe.effects, {
+    trigger: "plot-intrigue",
+    choiceId: "to-discard",
+    source: p2,
+    state: game,
+  });
+  assert.equal(inspireAweDiscardEffects.length, 1, "Inspire Awe discard choice should resolve one acquire-card effect");
+  assert.equal(inspireAweDiscardEffects[0]?.selector, "self", "Inspire Awe discard acquisition should target self");
+  assert.equal(inspireAweDiscardEffects[0]?.maxCost, 3, "Inspire Awe discard acquisition should cap card cost at 3");
+  assert.equal(inspireAweDiscardEffects[0]?.destination, "discard", "Inspire Awe discard choice should acquire to discard");
+  assert.equal(inspireAweDiscardEffects[0]?.optional, false, "Inspire Awe acquisition should be mandatory when available");
+  assert.equal(inspireAweDiscardEffects[0]?.source, "Inspire Awe", "Inspire Awe acquire-card effect should preserve its source");
+  const inspireAweHandEffects = effectResolver.resolveAcquireCards(inspireAwe.effects, {
+    trigger: "plot-intrigue",
+    choiceId: "to-hand",
+    source: p2,
+    state: game,
+  });
+  assert.equal(inspireAweHandEffects.length, 1, "Inspire Awe hand choice should resolve one acquire-card effect");
+  assert.equal(inspireAweHandEffects[0]?.selector, "self", "Inspire Awe hand acquisition should target self");
+  assert.equal(inspireAweHandEffects[0]?.maxCost, 3, "Inspire Awe hand acquisition should cap card cost at 3");
+  assert.equal(inspireAweHandEffects[0]?.destination, "hand", "Inspire Awe hand choice should acquire to hand");
+  assert.equal(inspireAweHandEffects[0]?.optional, false, "Inspire Awe hand acquisition should be mandatory when available");
+  assert.equal(inspireAweHandEffects[0]?.source, "Inspire Awe", "Inspire Awe hand acquire-card effect should preserve its source");
   assert.ok(
     cunning.effects?.some((spec) =>
       spec.trigger === "plot-intrigue" &&
@@ -4274,7 +4336,7 @@ try {
   assert.throws(
     () => turnActions.revealTurnPlan({ ...p2, hand: [revealAcquireCardCard], highCouncilSeat: false }),
     /Unsupported effect "acquire-card" for reveal/,
-    "Acquire-card specs should stay in Agent play",
+    "Acquire-card specs should stay out of Reveal effects",
   );
   const invalidAcquireCardSelectorCard = {
     ...convincingArgument,

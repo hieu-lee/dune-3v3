@@ -270,6 +270,26 @@ export function plotTakeContracts(
   ], conditions);
 }
 
+export function plotAcquireCard(
+  choiceId: string,
+  destination: AcquireCardDestination,
+  maxCost: EffectAmountSpec,
+  options: {
+    source?: string;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return plotIntrigueEffects([
+    {
+      kind: "acquire-card",
+      selector: "self",
+      maxCost,
+      destination,
+      ...(options.source ? { source: options.source } : {}),
+    },
+  ], conditions, { choiceId });
+}
+
 export function plotPlaceSpies(
   amount: EffectAmountSpec,
   options: {

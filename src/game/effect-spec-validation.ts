@@ -282,7 +282,7 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     return;
   }
   if (effect.kind === "acquire-card") {
-    if (trigger !== "agent-play") {
+    if (trigger !== "agent-play" && trigger !== "plot-intrigue") {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
     }
     if (effect.selector !== "self") {

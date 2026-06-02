@@ -25,6 +25,7 @@ import {
   inHighPlacesSourceId,
   imperiumPoliticsSourceId,
   imperialSpymasterSourceId,
+  inspireAweSourceId,
   intelligenceReportSourceId,
   leadershipSourceId,
   leverageSourceId,
@@ -85,6 +86,7 @@ import {
   hasSwordmasterBonus,
   hasTeam,
   gainedSpiceThisTurn,
+  plotAcquireCard,
   plotActivateAcquireRecruitBonus,
   plotDrawCards,
   plotDrawIntrigues,
@@ -914,6 +916,12 @@ function intrigueCardEffects(card: HubCard): CardEffectSpec[] | undefined {
   }
   if (card.id === contingencyPlanSourceId) {
     return [plotGainResource("solari", 2)];
+  }
+  if (card.id === inspireAweSourceId) {
+    return [
+      plotAcquireCard("to-discard", "discard", 3, { source: "Inspire Awe" }),
+      plotAcquireCard("to-hand", "hand", 3, { source: "Inspire Awe" }),
+    ];
   }
   if (card.id === cunningSourceId) {
     return [

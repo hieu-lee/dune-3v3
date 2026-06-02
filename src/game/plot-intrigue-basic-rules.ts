@@ -8,16 +8,13 @@ import {
   isManipulateIntrigue,
 } from "./card-identifiers";
 import {
-  acquirableCardsForPending,
   activatedAllyEffectOwner,
 } from "./market-rules";
 import { playTypedPlotIntrigue } from "./plot-intrigue-effect-rules";
 import type {
   GameState,
-  PendingAction,
 } from "./types";
 
-type AcquireCardPendingAction = Extract<PendingAction, { kind: "acquire-card" }>;
 type CunningPlotChoice = "draw" | "paid-trash";
 
 export function playContingencyPlanPlotIntrigue(
@@ -93,7 +90,6 @@ export function playInspireAwePlotIntrigue(
   if (!player || player.id !== playerId) return state;
   const intrigue = player.intrigues.find((card) => card.id === intrigueId);
   if (!intrigue || !isInspireAweIntrigue(intrigue)) return state;
-
   const sandwormOwnerResult =
     player.role === "Commander"
       ? activatedAllyEffectOwner(state, player, sandwormOwnerId)
@@ -103,35 +99,28 @@ export function playInspireAwePlotIntrigue(
   const hasSharedSandworm =
     player.deployedSandworms > 0 ||
     (player.role === "Commander" && sandwormOwner.deployedSandworms > 0);
-  const acquirePending: AcquireCardPendingAction = {
-    kind: "acquire-card",
-    ownerId: player.id,
-    source: "Inspire Awe",
-    maxCost: 3,
-    destination: hasSharedSandworm ? "hand" : "discard",
-  };
-  const canAcquire = acquirableCardsForPending(state, acquirePending).length > 0;
-  const players = state.players.map((candidate) =>
-    candidate.id === player.id
-      ? { ...candidate, intrigues: candidate.intrigues.filter((card) => card.id !== intrigue.id) }
-      : candidate,
+  const choiceId = hasSharedSandworm ? "to-hand" : "to-discard";
+  return playTypedPlotIntrigue(
+    state,
+    playerId,
+    intrigueId,
+    isInspireAweIntrigue,
+    (actor, _contractPending, activatedAlly, _resolved, outcome) => {
+      const destinationText = outcome.acquireDestination === "hand" ? "hand" : "discard pile";
+      const acquireText = outcome.acquirePending
+        ? ` and must acquire a card that costs 3 or less to their ${destinationText}`
+        : ", but no eligible card is available";
+      const sandwormText =
+        actor.role === "Commander" && activatedAlly && activatedAlly.deployedSandworms > 0
+          ? ` through ${activatedAlly.leader}'s sandworm`
+          : "";
+      return `${actor.leader} plays Inspire Awe${sandwormText}${acquireText}.`;
+    },
+    {
+      choiceId,
+      ...(player.role === "Commander" ? { activatedAllyOwnerId: sandwormOwnerId, requireActivatedAlly: true } : {}),
+    },
   );
-  const destinationText = hasSharedSandworm ? "hand" : "discard pile";
-  const acquireText = canAcquire
-    ? ` and must acquire a card that costs 3 or less to their ${destinationText}`
-    : ", but no eligible card is available";
-  const sandwormText =
-    player.role === "Commander" && sandwormOwner.id !== player.id && sandwormOwner.deployedSandworms > 0
-      ? ` through ${sandwormOwner.leader}'s sandworm`
-      : "";
-
-  return {
-    ...state,
-    players,
-    pendingAction: canAcquire ? acquirePending : undefined,
-    intrigueDiscard: [...state.intrigueDiscard, intrigue],
-    log: [`${player.leader} plays Inspire Awe${sandwormText}${acquireText}.`, ...state.log],
-  };
 }
 
 export function playIntelligenceReportPlotIntrigue(

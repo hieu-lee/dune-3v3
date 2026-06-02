@@ -1173,9 +1173,17 @@ export function resolveAgentAcquireCards(
   specs: CardEffectSpec[] | undefined,
   context: GameEffectContext,
 ): AgentAcquireCard[] {
+  if (context.trigger !== "agent-play") return [];
+  return resolveAcquireCards(specs, context);
+}
+
+export function resolveAcquireCards(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): AgentAcquireCard[] {
   specs?.forEach(validateSpec);
   return (specs ?? []).flatMap((spec) => {
-    if (spec.trigger !== "agent-play") return [];
+    if (spec.trigger !== context.trigger) return [];
     if (!specApplies(spec, context)) return [];
     return spec.effects
       .filter((effect) => effect.kind === "acquire-card")

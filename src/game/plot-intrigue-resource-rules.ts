@@ -10,12 +10,6 @@ import {
   isShaddamsFavorIntrigue,
   isStrategicStockpilingIntrigue,
 } from "./card-identifiers";
-import {
-  influenceLossChoices,
-} from "./influence-choices";
-import {
-  adjustInfluence,
-} from "./leader-rewards";
 import { playTypedPlotIntrigue } from "./plot-intrigue-effect-rules";
 import {
   recordTurnSpiceGain,
@@ -168,28 +162,13 @@ export function playBackedByChoamPlotIntrigue(
   intrigueId: string,
   faction: FactionId,
 ): GameState {
-  if (state.phase !== "playing" || state.pendingAction || state.pendingQueue.length > 0) return state;
-  const player = state.players[state.activeSeat];
-  if (!player || player.id !== playerId) return state;
-  const intrigue = player.intrigues.find((card) => card.id === intrigueId);
-  if (!intrigue || !isBackedByChoamIntrigue(intrigue) || !influenceLossChoices(player).includes(faction)) return state;
-
-  const players = state.players.map((candidate) => {
-    if (candidate.id !== player.id) return candidate;
-    const influenced = adjustInfluence(candidate, faction, -1);
-    return {
-      ...influenced,
-      resources: { ...influenced.resources, solari: influenced.resources.solari + 4 },
-      intrigues: influenced.intrigues.filter((card) => card.id !== intrigue.id),
-    };
-  });
-  return {
-    ...state,
-    players,
-    intrigueDiscard: [...state.intrigueDiscard, intrigue],
-    log: [
+  return playTypedPlotIntrigue(
+    state,
+    playerId,
+    intrigueId,
+    isBackedByChoamIntrigue,
+    (player) =>
       `${player.leader} plays Backed by CHOAM as a Plot Intrigue, loses 1 ${factionLabels[faction]} Influence, and gains 4 Solari.`,
-      ...state.log,
-    ],
-  };
+    { choiceId: faction },
+  );
 }

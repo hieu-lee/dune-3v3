@@ -1,5 +1,6 @@
 import catalogJson from "./uprising-catalog.generated.json";
 import {
+  backedByChoamSourceId,
   beneGesseritOperativeSourceId,
   calculusOfPowerSourceId,
   cargoRunnerSourceId,
@@ -78,6 +79,7 @@ import {
   plotDrawCards,
   plotDrawIntrigues,
   plotGainResource,
+  plotLoseInfluenceForResource,
   plotPayResourcesForVp,
   plotRecruitTroops,
   plotResourceExchange,
@@ -102,6 +104,7 @@ import type {
   ConflictCard,
   ConflictBattleIconId,
   ContractCard,
+  FactionId,
   IconId,
   IntrigueCard,
   LeaderCard,
@@ -109,6 +112,16 @@ import type {
   GameEffectConditionSpec,
   ResourceId,
 } from "./types";
+
+const influenceLossFactions: FactionId[] = [
+  "emperor",
+  "spacing",
+  "bene",
+  "fremen",
+  "greatHouses",
+  "fringeWorlds",
+];
+
 export {
   battleIconLabels,
   factionIds,
@@ -835,6 +848,11 @@ export const conflictCards: ConflictCard[] = catalog.cards
   .map(toConflictCard);
 
 function intrigueCardEffects(card: HubCard): CardEffectSpec[] | undefined {
+  if (card.id === backedByChoamSourceId) {
+    return influenceLossFactions.map((faction) =>
+      plotLoseInfluenceForResource(faction, faction, 1, "solari", 4),
+    );
+  }
   if (card.id === councilorsAmbitionSourceId) {
     return [plotGainResource("water", 2, [hasHighCouncilSeat()])];
   }

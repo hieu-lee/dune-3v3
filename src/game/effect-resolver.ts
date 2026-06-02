@@ -268,6 +268,7 @@ type PlayerEffectResult = {
 
 export type GameEffectResult = PlayerEffectResult & {
   activatedAlly: PlayerEffectResult;
+  influenceLosses: Partial<Record<FactionId, number>>;
   persuasion: number;
   swords: number;
   vp: number;
@@ -286,6 +287,7 @@ const emptyPlayerEffectResult: PlayerEffectResult = {
 const emptyEffectResult: GameEffectResult = {
   cardsToDraw: 0,
   blocksDeploymentsThisTurn: false,
+  influenceLosses: {},
   intriguesToDraw: 0,
   recruitedTroops: 0,
   persuasion: 0,
@@ -329,6 +331,14 @@ function addResourceSpend(spent: Partial<Resources>, resource: ResourceId, amoun
   return {
     ...spent,
     [resource]: (spent[resource] ?? 0) + amount,
+  };
+}
+
+function addInfluenceLoss(losses: Partial<Record<FactionId, number>>, faction: FactionId, amount: number) {
+  if (amount === 0) return losses;
+  return {
+    ...losses,
+    [faction]: (losses[faction] ?? 0) + amount,
   };
 }
 
@@ -590,6 +600,16 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
     const amount = amountFor(effect.amount, context.source);
     return addSelectedResourceSpend(result, effect.selector, effect.resource, amount);
   }
+  if (effect.kind === "lose-influence") {
+    if (effect.selector !== "self") {
+      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
+    const amount = amountFor(effect.amount, context.source);
+    return {
+      ...result,
+      influenceLosses: addInfluenceLoss(result.influenceLosses, effect.faction, amount),
+    };
+  }
   if (effect.kind === "gain-persuasion") {
     if (effect.selector !== "self") {
       throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
@@ -734,6 +754,10 @@ function mergeEffectResult(result: GameEffectResult, next: GameEffectResult): Ga
     blocksDeploymentsThisTurn: result.blocksDeploymentsThisTurn || next.blocksDeploymentsThisTurn,
     deploymentBlockSource: result.deploymentBlockSource ?? next.deploymentBlockSource,
     intriguesToDraw: result.intriguesToDraw + next.intriguesToDraw,
+    influenceLosses: Object.entries(next.influenceLosses ?? {}).reduce(
+      (losses, [faction, amount]) => addInfluenceLoss(losses, faction as FactionId, amount ?? 0),
+      result.influenceLosses,
+    ),
     recruitedTroops: result.recruitedTroops + next.recruitedTroops,
     recruitedTroopsSource: mergeEffectSourceLabel(
       result.recruitedTroops > 0,
@@ -1274,6 +1298,7 @@ function legacyRevealResult(card: Card): GameEffectResult {
   return {
     cardsToDraw: 0,
     blocksDeploymentsThisTurn: false,
+    influenceLosses: {},
     intriguesToDraw: 0,
     recruitedTroops: 0,
     persuasion: card.persuasion,
@@ -1308,6 +1333,7 @@ function legacyAcquireResult(card: Card): GameEffectResult {
   return {
     cardsToDraw: 0,
     blocksDeploymentsThisTurn: false,
+    influenceLosses: {},
     intriguesToDraw: 0,
     recruitedTroops: 0,
     persuasion: 0,

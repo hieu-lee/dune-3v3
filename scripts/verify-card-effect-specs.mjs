@@ -159,6 +159,7 @@ try {
   const wheelsWithinWheels = data.imperiumDeck.find((card) => card.name === "Wheels Within Wheels");
   const prepareTheWay = data.reserveMarket.find((card) => card.sourceId === 537);
   const spiceMustFlow = data.reserveMarket.find((card) => card.sourceId === 538);
+  const backedByChoam = data.intrigueCards.find((card) => card.name === "Backed by CHOAM");
   const councilorsAmbition = data.intrigueCards.find((card) => card.name === "Councilor's Ambition");
   const contingencyPlan = data.intrigueCards.find((card) => card.name === "Contingency Plan");
   const departForArrakis = data.intrigueCards.find((card) => card.name === "Depart For Arrakis");
@@ -235,7 +236,7 @@ try {
     wheelsWithinWheels,
   );
   assert.ok(commandRespect && prepareTheWay && spiceMustFlow && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
-  assert.ok(councilorsAmbition && contingencyPlan && departForArrakis && intelligenceReport && leverage && marketOpportunity && mercenaries && shaddamsFavor && strategicStockpiling);
+  assert.ok(backedByChoam && councilorsAmbition && contingencyPlan && departForArrakis && intelligenceReport && leverage && marketOpportunity && mercenaries && shaddamsFavor && strategicStockpiling);
   assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && dutifulService && deliverSupplies && sietchTabr && spiceRefinery);
   assert.equal(revealSpecCards.length, 79, "Unexpected number of cards with declarative Reveal specs");
   assert.equal(
@@ -497,6 +498,79 @@ try {
     2,
     "Mercenaries Plot spec should route Commander troop recruitment to the activated Ally",
   );
+  assert.ok(
+    backedByChoam.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.choiceId === "bene" &&
+      spec.effects.some((effect) =>
+        effect.kind === "lose-influence" &&
+        effect.selector === "self" &&
+        effect.faction === "bene" &&
+        effect.amount === 1
+      ) &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-resource" &&
+        effect.selector === "self" &&
+        effect.resource === "solari" &&
+        effect.amount === 4
+      )
+    ),
+    "Backed by CHOAM should carry a typed Bene Gesserit Influence-loss Plot choice spec",
+  );
+  assert.ok(
+    ["emperor", "spacing", "bene", "fremen", "greatHouses", "fringeWorlds"].every((faction) =>
+      backedByChoam.effects?.some((spec) =>
+        spec.trigger === "plot-intrigue" &&
+        spec.choiceId === faction &&
+        spec.effects.some((effect) =>
+          effect.kind === "lose-influence" &&
+          effect.selector === "self" &&
+          effect.faction === faction &&
+          effect.amount === 1
+        ) &&
+        spec.effects.some((effect) =>
+          effect.kind === "gain-resource" &&
+          effect.selector === "self" &&
+          effect.resource === "solari" &&
+          effect.amount === 4
+        )
+      )
+    ),
+    "Backed by CHOAM should carry typed Plot choice specs for every influence track",
+  );
+  const backedNoChoiceResolved = effectResolver.resolveGameEffects(backedByChoam.effects, {
+    trigger: "plot-intrigue",
+    source: p2,
+    state: game,
+  });
+  assert.deepEqual(
+    backedNoChoiceResolved.influenceLosses,
+    {},
+    "Backed by CHOAM Plot choice specs should not lose Influence without a selected choice",
+  );
+  assert.deepEqual(
+    backedNoChoiceResolved.revealGain,
+    {},
+    "Backed by CHOAM Plot choice specs should not gain resources without a selected choice",
+  );
+  const backedBeneResolved = effectResolver.resolveGameEffects(backedByChoam.effects, {
+    trigger: "plot-intrigue",
+    choiceId: "bene",
+    source: p2,
+    state: game,
+  });
+  assert.equal(backedBeneResolved.influenceLosses.bene, 1, "Backed by CHOAM Bene choice should lose 1 Bene Gesserit Influence");
+  assert.equal(backedBeneResolved.influenceLosses.spacing, undefined, "Backed by CHOAM Bene choice should not lose other Influence");
+  assert.equal(backedBeneResolved.revealGain.solari, 4, "Backed by CHOAM Bene choice should gain 4 Solari");
+  const backedSpacingResolved = effectResolver.resolveGameEffects(backedByChoam.effects, {
+    trigger: "plot-intrigue",
+    choiceId: "spacing",
+    source: p2,
+    state: game,
+  });
+  assert.equal(backedSpacingResolved.influenceLosses.spacing, 1, "Backed by CHOAM Spacing Guild choice should lose 1 Spacing Influence");
+  assert.equal(backedSpacingResolved.influenceLosses.bene, undefined, "Backed by CHOAM Spacing Guild choice should not lose Bene Gesserit Influence");
+  assert.equal(backedSpacingResolved.revealGain.solari, 4, "Backed by CHOAM Spacing Guild choice should gain 4 Solari");
   assert.ok(
     departForArrakis.effects?.some((spec) =>
       spec.trigger === "plot-intrigue" &&
@@ -2396,6 +2470,17 @@ try {
     /Unsupported effect "gain-vp" for reveal/,
     "Acquire VP effects should not silently run during Reveal",
   );
+  const invalidRevealLoseInfluenceCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-reveal-lose-influence-card",
+    name: "Effect Spec Invalid Reveal Lose Influence",
+    effects: [revealSpec([{ kind: "lose-influence", selector: "self", faction: "bene", amount: 1 }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [invalidRevealLoseInfluenceCard], highCouncilSeat: false }),
+    /Unsupported effect "lose-influence" for reveal/,
+    "Influence-loss effects should stay on Plot specs until other triggers can apply them",
+  );
   const invalidAcquirePersuasionCard = {
     ...convincingArgument,
     id: "effect-spec-invalid-acquire-persuasion-card",
@@ -2730,6 +2815,22 @@ try {
     ),
     /Invalid spend-resource source ""/,
     "Spend-resource specs should reject empty source labels",
+  );
+  assert.throws(
+    () => effectResolver.resolveGameEffects(
+      [plotSpec([{ kind: "lose-influence", selector: "self", faction: "guild", amount: 1 }])],
+      { trigger: "plot-intrigue", source: p2, state: game },
+    ),
+    /Unsupported effect faction "guild"/,
+    "Lose-influence specs should reject unsupported faction ids",
+  );
+  assert.throws(
+    () => effectResolver.resolveGameEffects(
+      [plotSpec([{ kind: "lose-influence", selector: "self", faction: "bene", amount: -1 }])],
+      { trigger: "plot-intrigue", source: p2, state: game },
+    ),
+    /Invalid effect amount "-1"/,
+    "Lose-influence specs should validate effect amounts",
   );
   assert.throws(
     () => effectResolver.resolveGameEffects(

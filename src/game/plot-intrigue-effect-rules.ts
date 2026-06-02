@@ -1,8 +1,10 @@
 import { drawCards } from "./deck-utils";
 import { resolveGameEffects, resolveTakeContracts } from "./effect-resolver";
 import { drawIntrigueCards } from "./intrigue-deck";
+import { adjustInfluence } from "./leader-rewards";
 import { activatedAllyEffectOwner } from "./market-rules";
 import type {
+  FactionId,
   GameState,
   IntrigueCard,
   PendingAction,
@@ -30,8 +32,16 @@ function hasResourceSpends(spent: Partial<Resources>) {
   return resourceIds.some((resource) => (spent[resource] ?? 0) > 0);
 }
 
+function hasInfluenceLosses(losses: Partial<Record<FactionId, number>>) {
+  return Object.values(losses).some((amount) => (amount ?? 0) > 0);
+}
+
 function canSpendResources(resources: Resources, spent: Partial<Resources>) {
   return resourceIds.every((resource) => resources[resource] >= (spent[resource] ?? 0));
+}
+
+function canLoseInfluence(player: Player, losses: Partial<Record<FactionId, number>>) {
+  return Object.entries(losses).every(([faction, amount]) => player.influence[faction as FactionId] >= (amount ?? 0));
 }
 
 function applyResourceChanges(resources: Resources, gain: Partial<Resources>, spent: Partial<Resources>): Resources {
@@ -41,6 +51,13 @@ function applyResourceChanges(resources: Resources, gain: Partial<Resources>, sp
       [resource]: next[resource] + (gain[resource] ?? 0) - (spent[resource] ?? 0),
     }),
     { ...resources },
+  );
+}
+
+function applyInfluenceLosses(player: Player, losses: Partial<Record<FactionId, number>>) {
+  return Object.entries(losses).reduce(
+    (next, [faction, amount]) => adjustInfluence(next, faction as FactionId, -(amount ?? 0)),
+    player,
   );
 }
 
@@ -103,11 +120,14 @@ export function playTypedPlotIntrigue(
   const hasCardDraw = resolved.cardsToDraw > 0;
   const hasIntrigueDraw = resolved.intriguesToDraw > 0;
   const hasResourceSpend = hasResourceSpends(resolved.spentResources);
+  const hasInfluenceLoss = hasInfluenceLosses(resolved.influenceLosses);
   const hasVpGain = resolved.vp > 0;
   if (!canSpendResources(player.resources, resolved.spentResources)) return state;
+  if (!canLoseInfluence(player, resolved.influenceLosses)) return state;
   if (
     !hasResourceGains(resolved.revealGain) &&
     !hasResourceSpend &&
+    !hasInfluenceLoss &&
     !hasVpGain &&
     !hasTroopRecruits &&
     !hasCardDraw &&
@@ -122,11 +142,16 @@ export function playTypedPlotIntrigue(
     if (candidate.id === player.id) {
       let next = {
         ...candidate,
-        vp: candidate.vp + resolved.vp,
         resources: applyResourceChanges(candidate.resources, resolved.revealGain, resolved.spentResources),
         garrison: candidate.garrison + resolved.recruitedTroops,
         intrigues: candidate.intrigues.filter((card) => card.id !== intrigue.id),
       };
+      if (hasInfluenceLoss) {
+        next = applyInfluenceLosses(next, resolved.influenceLosses);
+      }
+      if (resolved.vp > 0) {
+        next = { ...next, vp: next.vp + resolved.vp };
+      }
       if (hasCardDraw) {
         const handSize = next.hand.length;
         next = drawCards(next, handSize + resolved.cardsToDraw);

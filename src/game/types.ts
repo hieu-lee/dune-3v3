@@ -74,6 +74,7 @@ export type GameEffectConditionSpec =
 export type GameEffectSpec =
   | { kind: "gain-resource"; selector: PlayerSelector; resource: ResourceId; amount: EffectAmountSpec; source?: string }
   | { kind: "spend-resource"; selector: PlayerSelector; resource: ResourceId; amount: EffectAmountSpec; source?: string }
+  | { kind: "lose-influence"; selector: PlayerSelector; faction: FactionId; amount: EffectAmountSpec }
   | { kind: "gain-persuasion"; selector: PlayerSelector; amount: EffectAmountSpec }
   | { kind: "gain-strength"; selector: PlayerSelector; amount: EffectAmountSpec }
   | { kind: "gain-vp"; selector: PlayerSelector; amount: EffectAmountSpec }

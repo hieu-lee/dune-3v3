@@ -198,6 +198,19 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     validateAmount(effect.amount);
     return;
   }
+  if (effect.kind === "lose-influence") {
+    if (trigger !== "plot-intrigue") {
+      throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
+    }
+    if (effect.selector !== "self") {
+      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
+    if (!supportedFactions.has(effect.faction)) {
+      throw new Error(`Unsupported effect faction "${effect.faction}"`);
+    }
+    validateAmount(effect.amount);
+    return;
+  }
   if (effect.kind === "gain-vp") {
     if (trigger !== "acquire" && trigger !== "plot-intrigue") {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);

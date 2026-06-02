@@ -13,7 +13,7 @@ These cards currently use typed reveal effect specs:
 - Reserve/Imperium fixed reveal rewards are generated declaratively from catalog fields for every card with positive printed persuasion, strength, or reveal resource gain.
 - Custom Reserve/Imperium reveal cards: Smuggler's Harvester, Interstellar Trade, Bene Gesserit Operative, Captured Mentat, Calculus of Power, Cargo Runner, Chani, Clever Tactician, Covert Operation, Desert Power, Double Agent, Ecological Testing Station, Fedaykin Stilltent, Guild Envoy, Hidden Missive, Maker Keeper, Maula Pistol, Northern Watermaster, Paracompass, Prepare The Way, Reliable Informant, Space-time Folding, Wheels Within Wheels.
 - Custom Reserve/Imperium acquire cards: Guild Spy, In High Places, Overthrow, Price is No Object, Spy Network, Strike Fleet, Subversive Advisor, The Spice Must Flow.
-- Plot Intrigue cards: Contingency Plan uses typed `plot-intrigue` specs for its immediate Solari gain; Councilor's Ambition uses typed `plot-intrigue` specs for its High Council-gated water gain; Leverage uses typed `plot-intrigue` specs for its turn-spice-gated Solari gain and optional public CHOAM contract pending action; Shaddam's Favor uses typed `plot-intrigue` specs for routed troop recruitment and Emperor-icon-gated Solari.
+- Plot Intrigue cards: Contingency Plan uses typed `plot-intrigue` specs for its immediate Solari gain; Councilor's Ambition uses typed `plot-intrigue` specs for its High Council-gated water gain; Leverage uses typed `plot-intrigue` specs for its turn-spice-gated Solari gain and optional public CHOAM contract pending action; Intelligence Report uses typed `plot-intrigue` specs for fixed and spy-count-gated card draw; Shaddam's Favor uses typed `plot-intrigue` specs for routed troop recruitment and Emperor-icon-gated Solari.
 
 These cards currently use typed Agent effect specs:
 
@@ -39,7 +39,7 @@ These cards are automated but still rely on explicit card or leader branches whi
 
 - Commander starter cards: Shaddam Signet Ring choices.
 - Ally leader Signet Ring pay/choice effects: Lady Jessica, Princess Irulan, Reverend Mother Jessica.
-- Plot and Combat Intrigues: mostly automated through pattern modules and card-specific branches; Contingency Plan, Councilor's Ambition, Leverage, and Shaddam's Favor have been migrated to typed Plot Intrigue specs.
+- Plot and Combat Intrigues: mostly automated through pattern modules and card-specific branches; Contingency Plan, Councilor's Ambition, Leverage, Intelligence Report, and Shaddam's Favor have been migrated to typed Plot Intrigue specs.
 
 ## Data-Driven Non-Card Islands
 

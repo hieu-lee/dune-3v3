@@ -160,6 +160,7 @@ try {
   const spiceMustFlow = data.reserveMarket.find((card) => card.sourceId === 538);
   const councilorsAmbition = data.intrigueCards.find((card) => card.name === "Councilor's Ambition");
   const contingencyPlan = data.intrigueCards.find((card) => card.name === "Contingency Plan");
+  const intelligenceReport = data.intrigueCards.find((card) => card.name === "Intelligence Report");
   const leverage = data.intrigueCards.find((card) => card.name === "Leverage");
   const shaddamsFavor = data.intrigueCards.find((card) => card.name === "Shaddam's Favor");
   const commandRespect = data.muadDibCommanderCards.find((card) => card.name === "Command Respect");
@@ -229,7 +230,7 @@ try {
     wheelsWithinWheels,
   );
   assert.ok(commandRespect && prepareTheWay && spiceMustFlow && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
-  assert.ok(councilorsAmbition && contingencyPlan && leverage && shaddamsFavor);
+  assert.ok(councilorsAmbition && contingencyPlan && intelligenceReport && leverage && shaddamsFavor);
   assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && dutifulService && deliverSupplies && sietchTabr && spiceRefinery);
   assert.equal(revealSpecCards.length, 79, "Unexpected number of cards with declarative Reveal specs");
   assert.equal(
@@ -372,6 +373,54 @@ try {
     }),
     [],
     "Leverage Plot contract spec should not resolve without a turn spice gain",
+  );
+  assert.ok(
+    intelligenceReport.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      !spec.conditions &&
+      spec.effects.some((effect) =>
+        effect.kind === "draw-cards" &&
+        effect.selector === "self" &&
+        effect.amount === 1
+      )
+    ),
+    "Intelligence Report should carry a typed Plot card draw spec",
+  );
+  assert.ok(
+    intelligenceReport.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.conditions?.some((condition) => condition.kind === "has-spy-posts" && condition.count === 2) &&
+      spec.effects.some((effect) =>
+        effect.kind === "draw-cards" &&
+        effect.selector === "self" &&
+        effect.amount === 1
+      )
+    ),
+    "Intelligence Report should carry a typed spy-count-gated Plot card draw spec",
+  );
+  assert.equal(
+    effectResolver.resolveGameEffects(intelligenceReport.effects, {
+      trigger: "plot-intrigue",
+      source: p2,
+      state: {
+        spyPosts: { arrakeen: "p2", "hagga-basin": "p3" },
+        sharedSpyPosts: {},
+      },
+    }).cardsToDraw,
+    1,
+    "Intelligence Report Plot spec should draw only 1 card below two own spy posts",
+  );
+  assert.equal(
+    effectResolver.resolveGameEffects(intelligenceReport.effects, {
+      trigger: "plot-intrigue",
+      source: p2,
+      state: {
+        spyPosts: { arrakeen: "p2", "hagga-basin": "p2" },
+        sharedSpyPosts: {},
+      },
+    }).cardsToDraw,
+    2,
+    "Intelligence Report Plot spec should draw 2 cards with two own spy posts",
   );
   assert.ok(
     shaddamsFavor.effects?.some((spec) =>

@@ -18,6 +18,7 @@ import {
   hiddenMissiveSourceId,
   inHighPlacesSourceId,
   imperialSpymasterSourceId,
+  intelligenceReportSourceId,
   leadershipSourceId,
   leverageSourceId,
   interstellarTradeSourceId,
@@ -70,6 +71,7 @@ import {
   hasSpyPosts,
   hasSwordmasterBonus,
   gainedSpiceThisTurn,
+  plotDrawCards,
   plotGainResource,
   plotRecruitTroops,
   plotTakeContracts,
@@ -835,6 +837,12 @@ function intrigueCardEffects(card: HubCard): CardEffectSpec[] | undefined {
     return [
       plotGainResource("solari", 1, [gainedSpiceThisTurn()]),
       plotTakeContracts(1, { optional: true, source: "Leverage" }, [gainedSpiceThisTurn()]),
+    ];
+  }
+  if (card.id === intelligenceReportSourceId) {
+    return [
+      plotDrawCards(1),
+      plotDrawCards(1, [hasSpyPosts(2)]),
     ];
   }
   if (card.id === shaddamsFavorSourceId) {

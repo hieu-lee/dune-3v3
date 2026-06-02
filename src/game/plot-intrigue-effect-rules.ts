@@ -1,3 +1,4 @@
+import { drawCards } from "./deck-utils";
 import { resolveGameEffects, resolveTakeContracts } from "./effect-resolver";
 import { activatedAllyEffectOwner } from "./market-rules";
 import type {
@@ -13,6 +14,10 @@ const resourceIds = ["solari", "spice", "water"] as const;
 type PlayTypedPlotIntrigueOptions = {
   activatedAllyOwnerId?: string;
   requireActivatedAlly?: boolean;
+};
+
+type TypedPlotIntrigueOutcome = {
+  cardsDrawn: number;
 };
 
 function hasResourceGains(gain: Partial<Resources>) {
@@ -57,6 +62,7 @@ export function playTypedPlotIntrigue(
     contractPending: PendingAction | undefined,
     activatedAlly: Player | undefined,
     resolved: ReturnType<typeof resolveGameEffects>,
+    outcome: TypedPlotIntrigueOutcome,
   ) => string,
   options: PlayTypedPlotIntrigueOptions = {},
 ): GameState {
@@ -83,28 +89,37 @@ export function playTypedPlotIntrigue(
   const [contractEffect] = contractEffects;
   const contractPending = publicContractPendingFor(state, player, intrigue, contractEffect);
   const hasTroopRecruits = resolved.recruitedTroops > 0 || resolved.activatedAlly.recruitedTroops > 0;
-  if (!hasResourceGains(resolved.revealGain) && !hasTroopRecruits && !contractPending) return state;
+  const hasCardDraw = resolved.cardsToDraw > 0;
+  if (!hasResourceGains(resolved.revealGain) && !hasTroopRecruits && !hasCardDraw && !contractPending) return state;
 
-  const players = state.players.map((candidate) =>
-    candidate.id === player.id
+  const outcome: TypedPlotIntrigueOutcome = { cardsDrawn: 0 };
+  const players = state.players.map((candidate) => {
+    if (candidate.id === player.id) {
+      let next = {
+        ...candidate,
+        resources: addResourceGains(candidate.resources, resolved.revealGain),
+        garrison: candidate.garrison + resolved.recruitedTroops,
+        intrigues: candidate.intrigues.filter((card) => card.id !== intrigue.id),
+      };
+      if (hasCardDraw) {
+        const handSize = next.hand.length;
+        next = drawCards(next, handSize + resolved.cardsToDraw);
+        outcome.cardsDrawn = next.hand.length - handSize;
+      }
+      return next;
+    }
+    return activatedAlly && candidate.id === activatedAlly.id
       ? {
           ...candidate,
-          resources: addResourceGains(candidate.resources, resolved.revealGain),
-          garrison: candidate.garrison + resolved.recruitedTroops,
-          intrigues: candidate.intrigues.filter((card) => card.id !== intrigue.id),
+          garrison: candidate.garrison + resolved.activatedAlly.recruitedTroops,
         }
-      : activatedAlly && candidate.id === activatedAlly.id
-        ? {
-            ...candidate,
-            garrison: candidate.garrison + resolved.activatedAlly.recruitedTroops,
-          }
-      : candidate,
-  );
+      : candidate;
+  });
   return {
     ...state,
     players,
     pendingAction: contractPending,
     intrigueDiscard: [...state.intrigueDiscard, intrigue],
-    log: [logFor(player, contractPending, activatedAlly, resolved), ...state.log],
+    log: [logFor(player, contractPending, activatedAlly, resolved, outcome), ...state.log],
   };
 }

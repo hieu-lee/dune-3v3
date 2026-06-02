@@ -18,7 +18,6 @@ import {
   canPlayDistractionPlotIntrigue,
   distractionSpyPending,
 } from "./spy-pending-rules";
-import { spyPostCount } from "./spy-posts";
 import { playTypedPlotIntrigue } from "./plot-intrigue-effect-rules";
 import { trashableCards } from "./trash-rules";
 import type {
@@ -187,31 +186,16 @@ export function playIntelligenceReportPlotIntrigue(
   playerId: string,
   intrigueId: string,
 ): GameState {
-  if (state.phase !== "playing" || state.pendingAction || state.pendingQueue.length > 0) return state;
-  const player = state.players[state.activeSeat];
-  if (!player || player.id !== playerId) return state;
-  const intrigue = player.intrigues.find((card) => card.id === intrigueId);
-  if (!intrigue || !isIntelligenceReportIntrigue(intrigue)) return state;
-
-  const cardsToDraw = spyPostCount(state, player.id) >= 2 ? 2 : 1;
-  let cardsDrawn = 0;
-  const players = state.players.map((candidate) => {
-    if (candidate.id !== player.id) return candidate;
-    const withoutIntrigue = {
-      ...candidate,
-      intrigues: candidate.intrigues.filter((card) => card.id !== intrigue.id),
-    };
-    const drawn = drawCards(withoutIntrigue, withoutIntrigue.hand.length + cardsToDraw);
-    cardsDrawn = drawn.hand.length - withoutIntrigue.hand.length;
-    return drawn;
-  });
-  const cardText = cardsDrawn === 1 ? "1 card" : `${cardsDrawn} cards`;
-  return {
-    ...state,
-    players,
-    intrigueDiscard: [...state.intrigueDiscard, intrigue],
-    log: [`${player.leader} plays Intelligence Report as a Plot Intrigue and draws ${cardText}.`, ...state.log],
-  };
+  return playTypedPlotIntrigue(
+    state,
+    playerId,
+    intrigueId,
+    isIntelligenceReportIntrigue,
+    (player, _contractPending, _activatedAlly, _resolved, outcome) => {
+      const cardText = outcome.cardsDrawn === 1 ? "1 card" : `${outcome.cardsDrawn} cards`;
+      return `${player.leader} plays Intelligence Report as a Plot Intrigue and draws ${cardText}.`;
+    },
+  );
 }
 
 export function playCunningPlotIntrigue(

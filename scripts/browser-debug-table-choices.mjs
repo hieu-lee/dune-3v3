@@ -154,6 +154,96 @@ export async function runTableChoicesSmoke({
     "Calculus should trash the selected Emperor card",
   );
 
+  await setDebugGameAndWait(page, states.imperiumPoliticsAlly);
+  await waitForActiveIntrigue(page, "Imperium Politics");
+  const allyPoliticsCard = page.locator(".intrigue-card").filter({ hasText: "Imperium Politics" });
+  const allyPoliticsButton = allyPoliticsCard.getByRole("button", { name: /1 Solari -> GH/ });
+  assert.equal(await allyPoliticsButton.count(), 1, "Expected one Ally Imperium Politics Great Houses button");
+  assert.equal(await allyPoliticsButton.isEnabled(), true, "Ally Imperium Politics should be playable with 1 Solari");
+  await screenshot(page, captures, "imperium-politics-ally-ready.png");
+
+  const allyPoliticsBefore = await currentGame(page);
+  const allyPoliticsOwnerBefore = allyPoliticsBefore.players.find((player) => player.id === "p2");
+  assert.ok(allyPoliticsOwnerBefore, "Expected Feyd before Ally Imperium Politics");
+  await allyPoliticsButton.click();
+  await page.waitForFunction(() => {
+    const game = window.__DUNE_DEBUG__?.getGame();
+    const player = game?.players.find((candidate) => candidate.id === "p2");
+    return Boolean(
+      player &&
+        !game.pendingAction &&
+        game.pendingQueue.length === 0 &&
+        player.resources.solari === 1 &&
+        player.influence.greatHouses === 2 &&
+        !player.intrigues.some((card) => card.name === "Imperium Politics") &&
+        game?.intrigueDiscard.at(-1)?.name === "Imperium Politics",
+    );
+  });
+  const allyPoliticsAfter = await currentGame(page);
+  const allyPoliticsOwnerAfter = allyPoliticsAfter.players.find((player) => player.id === "p2");
+  assert.ok(allyPoliticsOwnerAfter, "Expected Feyd after Ally Imperium Politics");
+  assert.equal(
+    allyPoliticsOwnerAfter.vp,
+    allyPoliticsOwnerBefore.vp + 1,
+    "Ally Imperium Politics should award the Great Houses threshold VP",
+  );
+  assert.match(allyPoliticsAfter.log[0], /Imperium Politics, spends 1 Solari, and gains 1 Great Houses Influence/);
+  await screenshot(page, captures, "imperium-politics-ally-after.png");
+
+  await setDebugGameAndWait(page, states.imperiumPoliticsCommander);
+  await waitForActiveIntrigue(page, "Imperium Politics");
+  const commanderPoliticsCard = page.locator(".intrigue-card").filter({ hasText: "Imperium Politics" });
+  const commanderPoliticsButton = commanderPoliticsCard.getByRole("button", {
+    name: new RegExp(`1 Solari -> GH: ${escapeRegExp(states.imperiumPoliticsCommanderTargetName)}`),
+  });
+  assert.equal(await commanderPoliticsButton.count(), 1, "Expected one Commander routed Imperium Politics button");
+  assert.equal(
+    await commanderPoliticsButton.isEnabled(),
+    true,
+    "Commander routed Imperium Politics should be playable with 1 Solari",
+  );
+  await screenshot(page, captures, "imperium-politics-commander-ready.png");
+
+  const commanderPoliticsBefore = await currentGame(page);
+  const commanderPoliticsSourceBefore = commanderPoliticsBefore.players.find((player) => player.id === "p4");
+  const commanderPoliticsOwnerBefore = commanderPoliticsBefore.players.find((player) => player.id === "p6");
+  assert.ok(commanderPoliticsSourceBefore, "Expected Shaddam before routed Imperium Politics");
+  assert.ok(commanderPoliticsOwnerBefore, "Expected Princess Irulan before routed Imperium Politics");
+  await commanderPoliticsButton.click();
+  await page.waitForFunction(() => {
+    const game = window.__DUNE_DEBUG__?.getGame();
+    const commander = game?.players.find((candidate) => candidate.id === "p4");
+    const ally = game?.players.find((candidate) => candidate.id === "p6");
+    return Boolean(
+      commander &&
+        ally &&
+        !game.pendingAction &&
+        game.pendingQueue.length === 0 &&
+        commander.resources.solari === 1 &&
+        commander.influence.greatHouses === 0 &&
+        ally.influence.greatHouses === 2 &&
+        !commander.intrigues.some((card) => card.name === "Imperium Politics") &&
+        game?.intrigueDiscard.at(-1)?.name === "Imperium Politics",
+    );
+  });
+  const commanderPoliticsAfter = await currentGame(page);
+  const commanderPoliticsSourceAfter = commanderPoliticsAfter.players.find((player) => player.id === "p4");
+  const commanderPoliticsOwnerAfter = commanderPoliticsAfter.players.find((player) => player.id === "p6");
+  assert.ok(commanderPoliticsSourceAfter, "Expected Shaddam after routed Imperium Politics");
+  assert.ok(commanderPoliticsOwnerAfter, "Expected Princess Irulan after routed Imperium Politics");
+  assert.equal(
+    commanderPoliticsSourceAfter.influence.greatHouses,
+    commanderPoliticsSourceBefore.influence.greatHouses,
+    "Commander routed Imperium Politics should not move the Commander's Great Houses Influence",
+  );
+  assert.equal(
+    commanderPoliticsOwnerAfter.vp,
+    commanderPoliticsOwnerBefore.vp + 1,
+    "Commander routed Imperium Politics should award the activated Ally threshold VP",
+  );
+  assert.match(commanderPoliticsAfter.log[0], /Princess Irulan gains 1 Great Houses Influence/);
+  await screenshot(page, captures, "imperium-politics-commander-after.png");
+
   await setDebugGameAndWait(page, states.manipulatePlot);
   const manipulateButton = page.getByRole("button", { name: states.manipulateButtonName });
   await screenshot(page, captures, "manipulate-ready.png");
@@ -312,6 +402,8 @@ async function createTableChoiceStates(server, initialPlayableGame) {
   assert.ok(imperialTent, "Expected Imperial Tent for declarative Throne Row browser debug state");
   const manipulate = data.intrigueCards.find((card) => card.name === "Manipulate");
   assert.ok(manipulate, "Expected Manipulate for Plot row-manipulation browser debug state");
+  const imperiumPolitics = data.intrigueCards.find((card) => card.name === "Imperium Politics");
+  assert.ok(imperiumPolitics, "Expected Imperium Politics for Plot Influence browser debug state");
   const manipulateRowCard = data.imperiumDeck.find((card) => (card.cost ?? 0) > 0);
   assert.ok(manipulateRowCard, "Expected a priced Imperium Row card for Manipulate browser debug state");
   const manipulateReplacement = data.imperiumDeck.find((card) => card.id !== manipulateRowCard.id);
@@ -479,6 +571,50 @@ async function createTableChoiceStates(server, initialPlayableGame) {
     },
     calculusTrashTargetId: calculusTrashTarget.id,
     calculusTrashTargetName: calculusTrashTarget.name,
+    imperiumPoliticsAlly: {
+      ...base,
+      activeSeat: feydSeat,
+      intrigueDiscard: [],
+      players: base.players.map((player) =>
+        player.id === "p2"
+          ? {
+              ...player,
+              hand: [],
+              influence: { ...player.influence, greatHouses: 1, spacing: 1, emperor: 1 },
+              intrigues: [cloneCard(imperiumPolitics)],
+              resources: { ...player.resources, solari: 2 },
+              revealed: false,
+            }
+          : { ...player, intrigues: [] }
+      ),
+    },
+    imperiumPoliticsCommander: {
+      ...base,
+      activeSeat: shaddamSeat,
+      intrigueDiscard: [],
+      players: base.players.map((player) => {
+        if (player.id === "p4") {
+          return {
+            ...player,
+            hand: [],
+            influence: { ...player.influence, emperor: 1, greatHouses: 0, spacing: 0 },
+            intrigues: [cloneCard(imperiumPolitics)],
+            resources: { ...player.resources, solari: 2 },
+            revealActivatedAllyId: "p6",
+            revealed: true,
+          };
+        }
+        if (player.id === "p6") {
+          return {
+            ...player,
+            influence: { ...player.influence, greatHouses: 1, spacing: 1 },
+            intrigues: [],
+          };
+        }
+        return { ...player, intrigues: [] };
+      }),
+    },
+    imperiumPoliticsCommanderTargetName: "Princess Irulan",
     manipulatePlot: {
       ...base,
       activeSeat: feydSeat,
@@ -546,6 +682,14 @@ async function createTableChoiceStates(server, initialPlayableGame) {
 
 function cloneCard(card) {
   return { ...card, traits: card.traits ? [...card.traits] : undefined };
+}
+
+async function waitForActiveIntrigue(page, cardName) {
+  await page.waitForFunction((name) => {
+    const game = window.__DUNE_DEBUG__?.getGame();
+    const activePlayer = game?.players[game.activeSeat];
+    return Boolean(activePlayer?.intrigues.some((card) => card.name === name));
+  }, cardName);
 }
 
 function escapeRegExp(value) {

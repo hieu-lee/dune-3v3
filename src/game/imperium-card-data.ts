@@ -1,0 +1,643 @@
+import {
+  beneGesseritOperativeSourceId,
+  calculusOfPowerSourceId,
+  capturedMentatSourceId,
+  chaniCleverTacticianSourceId,
+  cargoRunnerSourceId,
+  covertOperationSourceId,
+  dangerousRhetoricSourceId,
+  desertPowerSourceId,
+  doubleAgentSourceId,
+  ecologicalTestingStationSourceId,
+  fedaykinStilltentSourceId,
+  guildEnvoySourceId,
+  guildSpySourceId,
+  hiddenMissiveSourceId,
+  inHighPlacesSourceId,
+  interstellarTradeSourceId,
+  imperialSpymasterSourceId,
+  leadershipSourceId,
+  makerKeeperSourceId,
+  maulaPistolSourceId,
+  northernWatermasterSourceId,
+  overthrowSourceId,
+  paracompassSourceId,
+  prepareTheWaySourceId,
+  priceIsNoObjectSourceId,
+  publicSpectacleSourceId,
+  rebelSupplierSourceId,
+  reliableInformantSourceId,
+  sardaukarSoldierSourceId,
+  smugglersHarvesterSourceId,
+  southernEldersSourceId,
+  spaceTimeFoldingSourceId,
+  spiceMustFlowSourceId,
+  spyNetworkSourceId,
+  stilgarDevotedSourceId,
+  strikeFleetSourceId,
+  subversiveAdvisorSourceId,
+  theacherousManeuverSourceId,
+  undercoverAssetSourceId,
+  wheelsWithinWheelsSourceId,
+} from "./card-identifiers";
+import {
+  acquireDrawIntrigues,
+  acquireGainInfluenceChoice,
+  acquireGainResource,
+  acquireGainVp,
+  acquirePlaceSpies,
+  acquireTakeContracts,
+  agentAcquireCard,
+  agentDiscardCardForDraw,
+  agentDiscardCardForInfluenceAndDraw,
+  agentDrawCards,
+  agentDrawIntrigues,
+  agentGainInfluenceChoice,
+  agentGainResource,
+  agentOpponentsDiscardCards,
+  agentPayResourceForDrawCards,
+  agentPlaceSpies,
+  agentRecruitTroops,
+  hasCardTraitInPlay,
+  hasCompletedContracts,
+  hasConflictUnits,
+  hasHighCouncilSeat,
+  hasInfluence,
+  hasRole,
+  hasSpyPosts,
+  hasSwordmasterBonus,
+  revealGainPersuasion,
+  revealPlaceSpies,
+  revealGainResource,
+  revealGainStrength,
+  revealLoseInfluenceForIntrigues,
+  revealPayResourceForSandworms,
+  revealRetreatTroopsForStrength,
+  revealTrashCardForStrength,
+  visitedMakerSpace,
+  visitedSpaceIcon,
+  visitedSpaceWithSpyPost,
+} from "./effect-specs";
+import {
+  attributeNumber,
+  catalog,
+  hasConditionalAttribute,
+  iconAttributeMap,
+  summarizeAttributes,
+  type HubCard,
+} from "./catalog-data";
+import type {
+  Card,
+  CardEffectSpec,
+  GameEffectConditionSpec,
+  ResourceId,
+} from "./types";
+
+const acquireSpySourceIds = new Set([
+  guildSpySourceId,
+  inHighPlacesSourceId,
+  spyNetworkSourceId,
+  strikeFleetSourceId,
+  subversiveAdvisorSourceId,
+]);
+
+function revealText(persuasion: number, swords: number) {
+  const parts = [`+${persuasion} persuasion`];
+  if (swords > 0) parts.push(`+${swords} strength`);
+  return `${parts.join(" and ")}.`;
+}
+
+function imperiumRevealText(card: HubCard, persuasion: number, swords: number, printedReveal: boolean) {
+  if (card.id === prepareTheWaySourceId) {
+    return "+2 persuasion.";
+  }
+  if (card.id === smugglersHarvesterSourceId) {
+    return "If you sent an Agent to a Maker board space this turn, gain 1 spice. +1 persuasion.";
+  }
+  if (card.id === interstellarTradeSourceId) {
+    return "+1 persuasion for each completed contract.";
+  }
+  if (card.id === calculusOfPowerSourceId) {
+    return "+2 persuasion. You may trash another Emperor card you have in play to add 3 strength.";
+  }
+  if (card.id === capturedMentatSourceId) {
+    return "+1 persuasion. You may lose 1 Influence to draw 1 Intrigue.";
+  }
+  if (card.id === beneGesseritOperativeSourceId) {
+    return "+1 persuasion. If you have two or more spies on the board, +2 persuasion.";
+  }
+  if (card.id === chaniCleverTacticianSourceId) {
+    return "Fremen Bond: +2 persuasion. You may retreat two troops to add 4 strength.";
+  }
+  if (card.id === ecologicalTestingStationSourceId) {
+    return "+1 persuasion. Fremen Bond: gain 1 water.";
+  }
+  if (card.id === fedaykinStilltentSourceId) {
+    return "Gain 1 water.";
+  }
+  if (card.id === northernWatermasterSourceId) {
+    return "+1 persuasion. Fremen Bond: gain 2 spice.";
+  }
+  if (card.id === paracompassSourceId) {
+    return "If you have a seat on the High Council, +2 persuasion. If you also have a Swordmaster, +1 persuasion.";
+  }
+  if (card.id === doubleAgentSourceId) {
+    return "+1 persuasion and +1 strength.";
+  }
+  if (card.id === wheelsWithinWheelsSourceId) {
+    return "+1 persuasion. Place 1 spy.";
+  }
+  if (card.id === reliableInformantSourceId) {
+    return "+1 persuasion. Gain 1 Solari.";
+  }
+  if (card.id === covertOperationSourceId) {
+    return "Gain 2 Solari.";
+  }
+  if (card.id === desertPowerSourceId) {
+    return "+2 persuasion, or pay 1 water to summon 1 sandworm.";
+  }
+  return printedReveal ? "Resolve printed reveal text." : revealText(persuasion, swords);
+}
+
+function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
+  const simpleAgentEffects = imperiumSimpleAgentEffects(card);
+  if (simpleAgentEffects) return simpleAgentEffects;
+
+  if (card.id === smugglersHarvesterSourceId) {
+    return [
+      revealGainPersuasion(1),
+      revealGainResource("spice", 1, [visitedMakerSpace()]),
+    ];
+  }
+  if (card.id === interstellarTradeSourceId) {
+    return [
+      acquireGainInfluenceChoice(1, { source: "Interstellar Trade" }),
+      acquireTakeContracts(1, { source: "Interstellar Trade" }),
+      revealGainPersuasion({ kind: "completed-contracts" }),
+    ];
+  }
+  if (card.id === calculusOfPowerSourceId) {
+    return [
+      revealGainPersuasion(2),
+      revealTrashCardForStrength(3, {
+        zones: ["playArea"],
+        excludeSource: true,
+        requiredTrait: "Faction: Emperor",
+      }),
+    ];
+  }
+  if (card.id === capturedMentatSourceId) {
+    return [
+      agentDiscardCardForInfluenceAndDraw(1, 1),
+      revealGainPersuasion(1),
+      revealLoseInfluenceForIntrigues(1),
+    ];
+  }
+  if (card.id === covertOperationSourceId) {
+    return [
+      agentOpponentsDiscardCards(1),
+      revealGainResource("solari", 2),
+    ];
+  }
+  if (card.id === dangerousRhetoricSourceId) {
+    return [
+      agentGainInfluenceChoice(1, { trashSource: true }),
+      revealGainPersuasion(1),
+      revealGainStrength(1),
+    ];
+  }
+  if (card.id === beneGesseritOperativeSourceId) {
+    return [
+      agentPlaceSpies("self", 1, { recallForSupply: true, mustPlace: true }),
+      revealGainPersuasion(1),
+      revealGainPersuasion(2, [hasSpyPosts(2)]),
+    ];
+  }
+  if (card.id === fedaykinStilltentSourceId) {
+    return [
+      revealGainResource("water", 1),
+      agentRecruitTroops("self", 1, [visitedMakerSpace(), hasRole("Ally")]),
+      agentRecruitTroops("activated-ally", 1, [visitedMakerSpace(), hasRole("Commander")]),
+    ];
+  }
+  if (card.id === ecologicalTestingStationSourceId) {
+    return [
+      agentPayResourceForDrawCards("water", 2, 2),
+      revealGainPersuasion(1),
+      revealGainResource("water", 1, [hasCardTraitInPlay("Faction: Fremen", 2)]),
+    ];
+  }
+  if (card.id === doubleAgentSourceId) {
+    return [
+      agentPlaceSpies(
+        "self",
+        1,
+        { allowSharedPost: true },
+        [visitedSpaceWithSpyPost()],
+      ),
+      revealGainPersuasion(1),
+      revealGainStrength(1),
+    ];
+  }
+  if (card.id === hiddenMissiveSourceId) {
+    return [
+      agentDrawCards(1, [hasInfluence("bene", 2)]),
+      agentRecruitTroops("self", 1, [hasInfluence("bene", 2), hasRole("Ally")]),
+      agentRecruitTroops("activated-ally", 1, [hasInfluence("bene", 2), hasRole("Commander")]),
+      revealGainPersuasion(1),
+      revealGainStrength(1),
+    ];
+  }
+  if (card.id === makerKeeperSourceId) {
+    return [
+      agentGainResource("water", 1, [hasInfluence("bene", 2)]),
+      agentGainResource("spice", 1, [hasInfluence("fremen", 2)]),
+      revealGainPersuasion(2),
+    ];
+  }
+  if (card.id === cargoRunnerSourceId) {
+    return [
+      agentDrawCards(1, [hasCompletedContracts(2)]),
+      agentDrawCards(1, [hasCompletedContracts(4)]),
+      revealGainPersuasion(1),
+    ];
+  }
+  if (card.id === chaniCleverTacticianSourceId) {
+    return [
+      agentDrawIntrigues(1, [hasConflictUnits(3)]),
+      revealGainPersuasion(2, [hasCardTraitInPlay("Faction: Fremen", 2)]),
+      revealRetreatTroopsForStrength(2, 4),
+    ];
+  }
+  if (card.id === maulaPistolSourceId) {
+    return [
+      agentDrawCards(1),
+      revealGainPersuasion(1),
+      revealGainStrength(1),
+    ];
+  }
+  if (card.id === northernWatermasterSourceId) {
+    return [
+      revealGainPersuasion(1),
+      revealGainResource("spice", 2, [hasCardTraitInPlay("Faction: Fremen", 2)]),
+      agentGainResource("water", 1),
+    ];
+  }
+  if (card.id === paracompassSourceId) {
+    return [
+      agentGainResource("solari", 2),
+      revealGainPersuasion(2, [hasHighCouncilSeat()]),
+      revealGainPersuasion(1, [hasHighCouncilSeat(), hasSwordmasterBonus()]),
+    ];
+  }
+  if (card.id === reliableInformantSourceId) {
+    return [
+      agentGainResource("solari", 1, [visitedSpaceIcon("emperor")]),
+      agentGainResource("solari", 1, [visitedSpaceIcon("bene")]),
+      agentGainResource("solari", 1, [visitedSpaceIcon("spacing")]),
+      revealGainPersuasion(1),
+      revealGainResource("solari", 1),
+    ];
+  }
+  if (card.id === spaceTimeFoldingSourceId) {
+    return [
+      agentDiscardCardForDraw(1, {
+        bonusDraw: {
+          requiredDiscardTrait: "Faction: Spacing Guild",
+          drawCards: 1,
+        },
+      }),
+      revealGainPersuasion(1),
+    ];
+  }
+  if (card.id === guildEnvoySourceId) {
+    return [
+      agentDiscardCardForDraw(0, {
+        bonusDraw: {
+          requiredDiscardTrait: "Faction: Spacing Guild",
+          drawCards: 2,
+        },
+      }),
+      revealGainPersuasion(1),
+    ];
+  }
+  if (card.id === wheelsWithinWheelsSourceId) {
+    return [
+      agentGainResource("solari", 2, [hasInfluence("emperor", 2)]),
+      agentGainResource("spice", 1, [hasInfluence("spacing", 2)]),
+      revealGainPersuasion(1),
+      revealPlaceSpies(1, { mustPlace: true }),
+    ];
+  }
+  if (acquireSpySourceIds.has(card.id)) {
+    return [
+      ...(fixedRevealEffects(
+        attributeNumber(card, "Persuasion on reveal"),
+        attributeNumber(card, "Swords"),
+      ) ?? []),
+      acquirePlaceSpies(1, { recallForSupply: true, mustPlace: true }),
+    ];
+  }
+  if (card.id === overthrowSourceId) {
+    return [
+      ...(fixedRevealEffects(
+        attributeNumber(card, "Persuasion on reveal"),
+        attributeNumber(card, "Swords"),
+      ) ?? []),
+      acquireDrawIntrigues(1),
+    ];
+  }
+  if (card.id === priceIsNoObjectSourceId) {
+    return [
+      agentAcquireCard({ destination: "hand", paymentResource: "solari", optional: true }),
+      ...(fixedRevealEffects(
+        attributeNumber(card, "Persuasion on reveal"),
+        attributeNumber(card, "Swords"),
+      ) ?? []),
+      acquireGainResource("solari", 2),
+    ];
+  }
+  if (card.id === spiceMustFlowSourceId) {
+    return [
+      acquireGainVp(1),
+      acquireGainResource("spice", 1),
+    ];
+  }
+  return undefined;
+}
+
+type SimpleAgentEffectConfig = {
+  conditions?: GameEffectConditionSpec[];
+  drawCards?: number;
+  drawIntrigues?: number;
+  gainInfluence?: number;
+  gain?: Partial<Record<ResourceId, number>>;
+  placeSpies?: number;
+  recruitTroops?: number;
+  revealPaySandworms?: {
+    resource: ResourceId;
+    cost: number;
+    sandworms: number;
+    persuasionCost?: number;
+  };
+};
+
+const simpleAgentEffectConfigs: Record<number, SimpleAgentEffectConfig> = {
+  [desertPowerSourceId]: {
+    conditions: [visitedMakerSpace()],
+    gain: { spice: 2 },
+    revealPaySandworms: { resource: "water", cost: 1, sandworms: 1, persuasionCost: 2 },
+  },
+  [imperialSpymasterSourceId]: { drawIntrigues: 1 },
+  [leadershipSourceId]: { drawCards: 1 },
+  [publicSpectacleSourceId]: { gainInfluence: 1, placeSpies: 1 },
+  [rebelSupplierSourceId]: { gain: { spice: 1 }, recruitTroops: 2 },
+  [sardaukarSoldierSourceId]: { drawIntrigues: 1 },
+  [southernEldersSourceId]: { gain: { water: 1 }, recruitTroops: 2 },
+  [stilgarDevotedSourceId]: { recruitTroops: 2 },
+  [theacherousManeuverSourceId]: { drawIntrigues: 1, gainInfluence: 1 },
+  [undercoverAssetSourceId]: { placeSpies: 1 },
+};
+
+function agentRecruitTroopsForActivatedOwner(
+  amount: number,
+  conditions: GameEffectConditionSpec[] = [],
+): CardEffectSpec[] {
+  return [
+    agentRecruitTroops("self", amount, [...conditions, hasRole("Ally")]),
+    agentRecruitTroops("activated-ally", amount, [...conditions, hasRole("Commander")]),
+  ];
+}
+
+function imperiumSimpleAgentEffects(card: HubCard): CardEffectSpec[] | undefined {
+  const config = simpleAgentEffectConfigs[card.id];
+  if (!config) return undefined;
+  const effects = [
+    ...(fixedRevealEffects(
+      attributeNumber(card, "Persuasion on reveal"),
+      attributeNumber(card, "Swords"),
+    ) ?? []),
+  ];
+  const conditions = config.conditions ?? [];
+  if (config.revealPaySandworms) {
+    effects.push(revealPayResourceForSandworms(
+      config.revealPaySandworms.resource,
+      config.revealPaySandworms.cost,
+      config.revealPaySandworms.sandworms,
+      { persuasionCost: config.revealPaySandworms.persuasionCost },
+    ));
+  }
+  if (config.drawIntrigues) {
+    effects.push(agentDrawIntrigues(config.drawIntrigues, conditions));
+  }
+  if (config.drawCards) {
+    effects.push(agentDrawCards(config.drawCards, conditions));
+  }
+  if (config.gainInfluence) {
+    effects.push(agentGainInfluenceChoice(config.gainInfluence, {}, conditions));
+  }
+  if (config.placeSpies) {
+    effects.push(agentPlaceSpies("self", config.placeSpies, { recallForSupply: true, mustPlace: true }, conditions));
+  }
+  for (const resource of ["solari", "spice", "water"] as const) {
+    const amount = config.gain?.[resource] ?? 0;
+    if (amount > 0) effects.push(agentGainResource(resource, amount, conditions));
+  }
+  if (config.recruitTroops) {
+    effects.push(...agentRecruitTroopsForActivatedOwner(config.recruitTroops, conditions));
+  }
+  return effects;
+}
+
+function fixedRevealEffects(
+  persuasion: number,
+  swords: number,
+  revealGain?: Partial<Record<ResourceId, number>>,
+): CardEffectSpec[] | undefined {
+  const effects: CardEffectSpec[] = [];
+  if (persuasion > 0) effects.push(revealGainPersuasion(persuasion));
+  if (swords > 0) effects.push(revealGainStrength(swords));
+  for (const resource of ["solari", "spice", "water"] as const) {
+    const amount = revealGain?.[resource] ?? 0;
+    if (amount > 0) effects.push(revealGainResource(resource, amount));
+  }
+  return effects.length > 0 ? effects : undefined;
+}
+
+function imperiumPlayText(card: HubCard) {
+  if (card.id === doubleAgentSourceId) {
+    return "If you have a spy on the board space you sent an Agent to this turn, you may place a spy on the same observation post as another player's spy.";
+  }
+  if (card.id === ecologicalTestingStationSourceId) {
+    return "Pay 2 water to draw 2 cards.";
+  }
+  if (card.id === fedaykinStilltentSourceId) {
+    return "If you sent an Agent to a Maker board space this turn, recruit 1 troop.";
+  }
+  if (card.id === hiddenMissiveSourceId) {
+    return "If you have 2 or more Bene Gesserit Influence, recruit 1 troop and draw 1 card.";
+  }
+  if (card.id === wheelsWithinWheelsSourceId) {
+    return "If you have 2 or more Emperor/Great Houses Influence, gain 2 Solari. If you have 2 or more Spacing Guild Influence, gain 1 spice.";
+  }
+  if (card.id === reliableInformantSourceId) {
+    return "Gain 1 Solari on Emperor, Bene Gesserit, or Spacing Guild board spaces.";
+  }
+  if (card.id === spaceTimeFoldingSourceId) {
+    return "Discard 1 card to draw 1 card. If you discarded a Spacing Guild card, draw 1 more card.";
+  }
+  if (card.id === guildEnvoySourceId) {
+    return "Discard 1 card. If you discarded a Spacing Guild card, draw 2 cards.";
+  }
+  if (card.id === covertOperationSourceId) {
+    return "Each opponent discards a card.";
+  }
+  if (card.id === dangerousRhetoricSourceId) {
+    return "Gain 1 Influence and trash this card.";
+  }
+  if (card.id === desertPowerSourceId) {
+    return "If you sent an Agent to a Maker board space this turn, gain 2 spice.";
+  }
+  if (card.id === priceIsNoObjectSourceId) {
+    return "You may acquire a card to your hand using Solari instead of persuasion.";
+  }
+  return summarizeAttributes(card);
+}
+
+function toImperiumCard(card: HubCard): Card {
+  if (card.id === prepareTheWaySourceId) {
+    return {
+      id: `hub-${card.id}`,
+      name: card.name,
+      icons: ["landsraad", "city"],
+      persuasion: 2,
+      swords: 0,
+      conditionalPersuasion: false,
+      conditionalSwords: false,
+      effects: [
+        agentDrawCards(1, [hasInfluence("bene", 2)]),
+        revealGainPersuasion(2),
+      ],
+      play: "If you have 2 or more Bene Gesserit Influence, draw 1 card.",
+      reveal: "+2 persuasion.",
+      cost: 2,
+      imagePath: card.localImagePath ?? card.fullImageUrl ?? undefined,
+      thumbnailPath: card.localThumbnailPath ?? card.thumbnailImageUrl ?? undefined,
+      sourceId: card.id,
+      sourceSlug: card.slug,
+      sourceType: card.type,
+      traits: ["Faction: Bene Gesserit"],
+    };
+  }
+  if (card.id === capturedMentatSourceId) {
+    return {
+      id: `hub-${card.id}`,
+      name: card.name,
+      icons: card.attributes.flatMap(([name]) => iconAttributeMap[name] ?? []),
+      persuasion: 1,
+      swords: 0,
+      conditionalPersuasion: false,
+      conditionalSwords: false,
+      effects: imperiumCardEffects(card),
+      play: "You may discard 1 card to gain 1 Influence and draw 1 card.",
+      reveal: imperiumRevealText(card, 1, 0, false),
+      cost: 5,
+      imagePath: card.localImagePath ?? card.fullImageUrl ?? undefined,
+      thumbnailPath: card.localThumbnailPath ?? card.thumbnailImageUrl ?? undefined,
+      sourceId: card.id,
+      sourceSlug: card.slug,
+      sourceType: card.type,
+      traits: card.attributes.map(([name]) => name),
+    };
+  }
+  if (card.id === beneGesseritOperativeSourceId) {
+    return {
+      id: `hub-${card.id}`,
+      name: card.name,
+      icons: card.attributes.flatMap(([name]) => iconAttributeMap[name] ?? []),
+      persuasion: 1,
+      swords: 0,
+      conditionalPersuasion: false,
+      conditionalSwords: false,
+      effects: imperiumCardEffects(card),
+      play: "Place 1 spy.",
+      reveal: imperiumRevealText(card, 1, 0, false),
+      cost: 3,
+      imagePath: card.localImagePath ?? card.fullImageUrl ?? undefined,
+      thumbnailPath: card.localThumbnailPath ?? card.thumbnailImageUrl ?? undefined,
+      sourceId: card.id,
+      sourceSlug: card.slug,
+      sourceType: card.type,
+      traits: ["Faction: Bene Gesserit"],
+    };
+  }
+  if (card.id === chaniCleverTacticianSourceId) {
+    return {
+      id: `hub-${card.id}`,
+      name: card.name,
+      icons: card.attributes.flatMap(([name]) => iconAttributeMap[name] ?? []),
+      persuasion: 0,
+      swords: 0,
+      conditionalPersuasion: false,
+      conditionalSwords: false,
+      effects: imperiumCardEffects(card),
+      play: "If you have three or more units in the Conflict, draw 1 Intrigue.",
+      reveal: imperiumRevealText(card, 0, 0, true),
+      cost: 5,
+      imagePath: card.localImagePath ?? card.fullImageUrl ?? undefined,
+      thumbnailPath: card.localThumbnailPath ?? card.thumbnailImageUrl ?? undefined,
+      sourceId: card.id,
+      sourceSlug: card.slug,
+      sourceType: card.type,
+      traits: ["Faction: Fremen"],
+    };
+  }
+  const persuasion = card.id === paracompassSourceId ? 0 : attributeNumber(card, "Persuasion on reveal");
+  const swords = attributeNumber(card, "Swords");
+  const revealGain =
+    card.id === fedaykinStilltentSourceId
+      ? { water: 1 }
+      : card.id === reliableInformantSourceId
+        ? { solari: 1 }
+        : card.id === covertOperationSourceId
+          ? { solari: 2 }
+          : undefined;
+  const effects = imperiumCardEffects(card) ?? fixedRevealEffects(persuasion, swords, revealGain);
+  const automatedConditionalPersuasion = card.id === interstellarTradeSourceId || card.id === paracompassSourceId;
+  const automatedConditionalSwords = card.id === calculusOfPowerSourceId;
+  const conditionalPersuasion =
+    !automatedConditionalPersuasion && !card.attributes.some(([name]) => name === "Persuasion on reveal");
+  const conditionalSwords = !automatedConditionalSwords && hasConditionalAttribute(card, "Swords");
+  return {
+    id: `hub-${card.id}`,
+    name: card.name,
+    icons: card.attributes.flatMap(([name]) => iconAttributeMap[name] ?? []),
+    acquired: hasConditionalAttribute(card, "Victory Point") ? 1 : undefined,
+    persuasion,
+    swords,
+    conditionalPersuasion,
+    conditionalSwords,
+    revealGain,
+    effects,
+    play: imperiumPlayText(card),
+    reveal: imperiumRevealText(card, persuasion, swords, conditionalPersuasion || conditionalSwords),
+    cost: attributeNumber(card, "Persuasion cost"),
+    imagePath: card.localImagePath ?? card.fullImageUrl ?? undefined,
+    thumbnailPath: card.localThumbnailPath ?? card.thumbnailImageUrl ?? undefined,
+    sourceId: card.id,
+    sourceSlug: card.slug,
+    sourceType: card.type,
+    traits: card.attributes.map(([name]) => name),
+  };
+}
+
+export const imperiumDeck: Card[] = catalog.cards
+  .filter((card) => card.type === "imperium")
+  .map(toImperiumCard);
+
+const reserveMarketSourceIds = [prepareTheWaySourceId, spiceMustFlowSourceId];
+
+export const reserveMarket: Card[] = catalog.cards
+  .filter((card) => reserveMarketSourceIds.includes(card.id))
+  .sort((first, second) => reserveMarketSourceIds.indexOf(first.id) - reserveMarketSourceIds.indexOf(second.id))
+  .map(toImperiumCard);

@@ -104,9 +104,18 @@ function traitLabel(trait: string) {
   return trait.startsWith("Faction: ") ? trait.slice("Faction: ".length) : trait;
 }
 
-function bonusDrawText(bonusDraw: PendingDiscardDrawPanelProps["bonusDraw"]) {
+function baseDrawText(drawCards: number) {
+  return drawCards > 0 ? `Discard 1 card to draw ${cardCountText(drawCards)}` : "Discard 1 card";
+}
+
+function bonusDrawText(bonusDraw: PendingDiscardDrawPanelProps["bonusDraw"], baseDrawCards: number) {
   if (!bonusDraw) return undefined;
-  return `Discard a ${traitLabel(bonusDraw.requiredDiscardTrait)} card to draw ${bonusDraw.drawCards} more card${bonusDraw.drawCards === 1 ? "" : "s"}`;
+  const suffix = baseDrawCards > 0 ? " more" : "";
+  return `Discard a ${traitLabel(bonusDraw.requiredDiscardTrait)} card to draw ${bonusDraw.drawCards}${suffix} card${bonusDraw.drawCards === 1 ? "" : "s"}`;
+}
+
+function selectedDrawSuffix(totalDrawCards: number) {
+  return totalDrawCards > 0 ? ` (${cardCountText(totalDrawCards)})` : " (no cards)";
 }
 
 export function PendingDiscardDrawPanel({
@@ -125,13 +134,13 @@ export function PendingDiscardDrawPanel({
     ? bonusDraw.drawCards
     : 0;
   const totalDrawCards = drawCards + selectedBonusDraw;
-  const bonusText = bonusDrawText(bonusDraw);
+  const bonusText = bonusDrawText(bonusDraw, drawCards);
 
   return (
     <div className="pending-controls trade-intrigue-grid">
       <div className="trade-intrigue-column">
         <strong>{owner?.leader ?? "Player"}</strong>
-        <span>Discard 1 card to draw {cardCountText(drawCards)}</span>
+        <span>{baseDrawText(drawCards)}</span>
         {bonusText && <span>{bonusText}</span>}
         {discardChoices.length === 0 && <span>No discardable cards</span>}
         {discardChoices.map((card) => (
@@ -156,7 +165,7 @@ export function PendingDiscardDrawPanel({
           if (selectedCard) onResolve(selectedCard.id);
         }}
       >
-        Resolve {source}{selectedCard ? ` (${cardCountText(totalDrawCards)})` : ""}
+        Resolve {source}{selectedCard ? selectedDrawSuffix(totalDrawCards) : ""}
       </button>
       {optional && <button type="button" onClick={onSkip}>Skip</button>}
     </div>

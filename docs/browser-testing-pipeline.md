@@ -109,7 +109,7 @@ Current scenarios:
 | --- | --- |
 | `home` | Desktop/mobile first-load layout. |
 | `agent-placement` | Legal card/space selection and placed Agent state transition. |
-| `card-choices` | Contract, acquire, Captured Mentat, Space-time Folding, Bene Gesserit Operative spy, and empty acquire pending surfaces. |
+| `card-choices` | Contract, acquire, Captured Mentat, Space-time Folding, Guild Envoy, Bene Gesserit Operative spy, and empty acquire pending surfaces. |
 | `combat-intrigues` | Combat Intrigue targeting/play flow plus a mobile layout screenshot. |
 | `commander-reveal` | Commander reveal targeting, Call to Arms, and acquire follow-up. |
 | `control-defense` | Critical-location control defense on desktop/mobile. |

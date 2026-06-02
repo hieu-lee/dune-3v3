@@ -98,6 +98,7 @@ try {
   const paracompass = data.imperiumDeck.find((card) => card.name === "Paracompass");
   const reliableInformant = data.imperiumDeck.find((card) => card.name === "Reliable Informant");
   const spaceTimeFolding = data.imperiumDeck.find((card) => card.name === "Space-time Folding");
+  const guildEnvoy = data.imperiumDeck.find((card) => card.name === "Guild Envoy");
   const wheelsWithinWheels = data.imperiumDeck.find((card) => card.name === "Wheels Within Wheels");
   const prepareTheWay = data.reserveMarket.find((card) => card.sourceId === 537);
   const commandRespect = data.muadDibCommanderCards.find((card) => card.name === "Command Respect");
@@ -143,11 +144,12 @@ try {
     paracompass &&
     reliableInformant &&
     spaceTimeFolding &&
+    guildEnvoy &&
     wheelsWithinWheels,
   );
   assert.ok(commandRespect && prepareTheWay && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
   assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && dutifulService && deliverSupplies);
-  assert.equal(revealSpecCards.length, 38, "Unexpected number of cards with declarative Reveal specs");
+  assert.equal(revealSpecCards.length, 40, "Unexpected number of cards with declarative Reveal specs");
   assert.deepEqual(
     [
       ...data.reserveMarket,
@@ -160,6 +162,7 @@ try {
       "Chani, Clever Tactician",
       "Double Agent",
       "Fedaykin Stilltent",
+      "Guild Envoy",
       "Hidden Missive",
       "Maker Keeper",
       "Maula Pistol",
@@ -186,6 +189,8 @@ try {
       fedaykinStilltent,
       northernWatermaster,
       reliableInformant,
+      spaceTimeFolding,
+      guildEnvoy,
 	    beneGesseritOperative,
 	    chani,
 	  ]) {
@@ -641,6 +646,13 @@ try {
   assert.equal(spaceTimeFolding.reveal, "+1 persuasion.", "Space-time Folding should keep its fixed reveal persuasion");
   assert.ok(
     spaceTimeFolding.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.effects.some((effect) => effect.kind === "gain-persuasion" && effect.amount === 1)
+    ),
+    "Space-time Folding should carry its printed persuasion in Reveal specs",
+  );
+  assert.ok(
+    spaceTimeFolding.effects?.some((spec) =>
       spec.trigger === "agent-play" &&
       spec.effects.some((effect) =>
         effect.kind === "discard-card-for-draw" &&
@@ -652,6 +664,33 @@ try {
       )
     ),
     "Space-time Folding should carry a declarative Agent discard-for-draw spec with a Spacing Guild bonus",
+  );
+  assert.equal(
+    guildEnvoy.play,
+    "Discard 1 card. If you discarded a Spacing Guild card, draw 2 cards.",
+    "Guild Envoy play text should preserve its conditional discard-draw effect",
+  );
+  assert.equal(guildEnvoy.reveal, "+1 persuasion.", "Guild Envoy should keep its fixed reveal persuasion");
+  assert.ok(
+    guildEnvoy.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.effects.some((effect) => effect.kind === "gain-persuasion" && effect.amount === 1)
+    ),
+    "Guild Envoy should carry its printed persuasion in Reveal specs",
+  );
+  assert.ok(
+    guildEnvoy.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.effects.some((effect) =>
+        effect.kind === "discard-card-for-draw" &&
+        effect.selector === "self" &&
+        effect.drawCards === 0 &&
+        effect.optional === false &&
+        effect.bonusDraw?.requiredDiscardTrait === "Faction: Spacing Guild" &&
+        effect.bonusDraw?.drawCards === 2
+      )
+    ),
+    "Guild Envoy should carry a declarative Agent discard-for-draw spec with only a Spacing Guild bonus",
   );
   assert.ok(
     fedaykinStilltent.effects?.some((spec) =>
@@ -3231,6 +3270,101 @@ try {
     undefined,
     "Space-time Folding should not queue a discard choice when no card remains in hand after placement",
   );
+  const spaceTimeReveal = turnActions.revealTurnPlan(
+    { ...p2, hand: [spaceTimeFolding], highCouncilSeat: false },
+    game,
+  );
+  assert.equal(spaceTimeReveal.persuasion, 1, "Space-time Folding should reveal for 1 persuasion through specs");
+
+  const guildEnvoyNonGuildDiscard = { ...dagger, id: "guild-envoy-non-guild-discard-card" };
+  const guildEnvoyDrawOne = { ...convincingArgument, id: "guild-envoy-draw-one-card" };
+  const guildEnvoyDrawTwo = { ...convincingArgument, id: "guild-envoy-draw-two-card" };
+  const guildEnvoyNonGuildPlaced = turnActions.placeAgentAction(
+    withActivePlayer(game, p2.id, () => ({
+      agentsReady: 1,
+      deck: [guildEnvoyDrawOne, guildEnvoyDrawTwo],
+      discard: [],
+      hand: [guildEnvoy, guildEnvoyNonGuildDiscard],
+      playArea: [],
+      resources: { solari: 0, spice: 0, water: 0 },
+    })),
+    {
+      commanderTargets: {},
+      selectedCard: guildEnvoy,
+      selectedSpace: deliverSupplies,
+    },
+  );
+  assert.equal(guildEnvoyNonGuildPlaced.pendingAction?.kind, "discard-card-for-draw", "Guild Envoy should queue discard-for-draw after Agent placement");
+  assert.equal(guildEnvoyNonGuildPlaced.pendingAction?.drawCards, 0, "Guild Envoy should have no base draw");
+  assert.equal(guildEnvoyNonGuildPlaced.pendingAction?.bonusDraw?.drawCards, 2, "Guild Envoy should draw two cards only from its bonus");
+  const guildEnvoyNonGuildResolved = state.resolveDiscardCardForDrawChoice(
+    guildEnvoyNonGuildPlaced,
+    guildEnvoyNonGuildPlaced.pendingAction,
+    guildEnvoyNonGuildDiscard.id,
+  );
+  const guildEnvoyNonGuildOwner = playerById(guildEnvoyNonGuildResolved, p2.id);
+  assert.equal(guildEnvoyNonGuildOwner.discard.at(-1).id, guildEnvoyNonGuildDiscard.id, "Guild Envoy should discard the selected card");
+  assert.equal(
+    guildEnvoyNonGuildOwner.hand.some((card) => card.id === guildEnvoyDrawOne.id || card.id === guildEnvoyDrawTwo.id),
+    false,
+    "Guild Envoy should draw no cards when the discarded card is not Spacing Guild",
+  );
+  assert.match(guildEnvoyNonGuildResolved.log[0], /Guild Envoy: discards .* and draws no cards/);
+
+  const guildEnvoyGuildDiscard = { ...spaceTimeFolding, id: "guild-envoy-guild-discard-card" };
+  const guildEnvoyGuildPlaced = turnActions.placeAgentAction(
+    withActivePlayer(game, p2.id, () => ({
+      agentsReady: 1,
+      deck: [guildEnvoyDrawOne, guildEnvoyDrawTwo],
+      discard: [],
+      hand: [guildEnvoy, guildEnvoyGuildDiscard],
+      playArea: [],
+      resources: { solari: 0, spice: 0, water: 0 },
+    })),
+    {
+      commanderTargets: {},
+      selectedCard: guildEnvoy,
+      selectedSpace: deliverSupplies,
+    },
+  );
+  const guildEnvoyGuildResolved = state.resolveDiscardCardForDrawChoice(
+    guildEnvoyGuildPlaced,
+    guildEnvoyGuildPlaced.pendingAction,
+    guildEnvoyGuildDiscard.id,
+  );
+  const guildEnvoyGuildOwner = playerById(guildEnvoyGuildResolved, p2.id);
+  assert.ok(
+    guildEnvoyGuildOwner.hand.some((card) => card.id === guildEnvoyDrawOne.id) &&
+      guildEnvoyGuildOwner.hand.some((card) => card.id === guildEnvoyDrawTwo.id),
+    "Guild Envoy should draw two cards when discarding a Spacing Guild card",
+  );
+  assert.match(guildEnvoyGuildResolved.log[0], /Guild Envoy: discards .* and draws 2 cards/);
+
+  const guildEnvoyEmptyHandPlaced = turnActions.placeAgentAction(
+    withActivePlayer(game, p2.id, () => ({
+      agentsReady: 1,
+      deck: [guildEnvoyDrawOne],
+      discard: [],
+      hand: [guildEnvoy],
+      playArea: [],
+      resources: { solari: 0, spice: 0, water: 0 },
+    })),
+    {
+      commanderTargets: {},
+      selectedCard: guildEnvoy,
+      selectedSpace: deliverSupplies,
+    },
+  );
+  assert.equal(
+    guildEnvoyEmptyHandPlaced.pendingAction,
+    undefined,
+    "Guild Envoy should not queue a discard choice when no card remains in hand after placement",
+  );
+  const guildEnvoyReveal = turnActions.revealTurnPlan(
+    { ...p2, hand: [guildEnvoy], highCouncilSeat: false },
+    game,
+  );
+  assert.equal(guildEnvoyReveal.persuasion, 1, "Guild Envoy should reveal for 1 persuasion through specs");
   const fedaykinMakerEffect = state.applyCardAgentEffect(
     fedaykinStilltent,
     { ...p2, garrison: 0 },

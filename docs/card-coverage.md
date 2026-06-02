@@ -10,7 +10,7 @@ These cards currently use typed reveal effect specs:
 - Muad'Dib Commander reveal cards: Command Respect, Convincing Argument, Demand Attention, Desert Call, Limited Landsraad Access, Signet Ring, Threaten Spice Production, Usul.
 - Emperor Commander reveal cards: Convincing Argument, Corrino Might, Critical Shipments, Demand Results, Devastating Assault, Imperial Ornithopter, Imperial Tent, Signet Ring.
 - Reserve cards: Prepare The Way.
-- Imperium cards: Smuggler's Harvester, Interstellar Trade, Bene Gesserit Operative, Captured Mentat, Calculus of Power, Chani, Clever Tactician, Covert Operation, Fedaykin Stilltent, Northern Watermaster, Reliable Informant.
+- Imperium cards: Smuggler's Harvester, Interstellar Trade, Bene Gesserit Operative, Captured Mentat, Calculus of Power, Chani, Clever Tactician, Covert Operation, Fedaykin Stilltent, Guild Envoy, Northern Watermaster, Reliable Informant, Space-time Folding.
 
 These cards currently use typed Agent effect specs:
 
@@ -18,7 +18,7 @@ These cards currently use typed Agent effect specs:
 - Reserve cards: Prepare The Way.
 - Muad'Dib Commander cards: Command Respect, Demand Attention, Desert Call, Signet Ring, Threaten Spice Production, Usul.
 - Emperor Commander cards: Critical Shipments, Demand Results, Devastating Assault, Imperial Tent, Signet Ring.
-- Imperium cards: Bene Gesserit Operative, Captured Mentat, Cargo Runner, Chani, Clever Tactician, Double Agent, Fedaykin Stilltent, Hidden Missive, Maker Keeper, Maula Pistol, Northern Watermaster, Paracompass, Reliable Informant, Space-time Folding, Wheels Within Wheels.
+- Imperium cards: Bene Gesserit Operative, Captured Mentat, Cargo Runner, Chani, Clever Tactician, Double Agent, Fedaykin Stilltent, Guild Envoy, Hidden Missive, Maker Keeper, Maula Pistol, Northern Watermaster, Paracompass, Reliable Informant, Space-time Folding, Wheels Within Wheels.
 
 ## Bespoke Automated Cards
 

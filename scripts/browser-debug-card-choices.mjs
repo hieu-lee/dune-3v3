@@ -180,6 +180,29 @@ export async function runCardChoicesSmoke({
     "Space-time Folding should draw two cards after discarding a Spacing Guild card",
   );
 
+  await setDebugGameAndWait(page, states.guildEnvoy);
+  pendingText = await page.locator(".pending-panel").innerText();
+  const guildEnvoyDiscardName = states.guildEnvoy.guildEnvoyDiscardName;
+  const guildEnvoyDiscardId = states.guildEnvoy.guildEnvoyDiscardId;
+  const guildEnvoyDrawOneId = states.guildEnvoy.guildEnvoyDrawOneId;
+  const guildEnvoyDrawTwoId = states.guildEnvoy.guildEnvoyDrawTwoId;
+  assert.match(pendingText, /Guild Envoy/i);
+  assert.match(pendingText, new RegExp(escapeRegExp(guildEnvoyDiscardName)));
+  assert.match(pendingText, /draw 2 cards/i);
+  await screenshot(page, captures, "pending-guild-envoy-discard-draw.png");
+
+  await page.locator(".pending-panel").getByRole("button", { name: guildEnvoyDiscardName }).click();
+  await page.locator(".pending-panel").getByRole("button", { name: /Resolve Guild Envoy/ }).click();
+  await waitForNoPending(page);
+  after = await currentGame(page);
+  ownerAfter = after.players.find((player) => player.id === "p2");
+  assert.equal(ownerAfter.discard.at(-1).id, guildEnvoyDiscardId, "Guild Envoy should discard the selected card");
+  assert.ok(
+    ownerAfter.hand.some((card) => card.id === guildEnvoyDrawOneId) &&
+      ownerAfter.hand.some((card) => card.id === guildEnvoyDrawTwoId),
+    "Guild Envoy should draw two cards after discarding a Spacing Guild card",
+  );
+
   await setDebugGameAndWait(page, states.capturedMentatReveal);
   pendingText = await page.locator(".pending-panel").innerText();
   const capturedMentatIntrigueId = states.capturedMentatReveal.capturedMentatIntrigueId;
@@ -220,6 +243,8 @@ async function createCardChoiceStates(server, initialPlayableGame) {
   assert.ok(doubleAgent, "Expected Double Agent Imperium card");
   const spaceTimeFolding = data.imperiumDeck.find((card) => card.sourceId === 12);
   assert.ok(spaceTimeFolding, "Expected Space-time Folding Imperium card");
+  const guildEnvoy = data.imperiumDeck.find((card) => card.sourceId === 38);
+  assert.ok(guildEnvoy, "Expected Guild Envoy Imperium card");
   const spySpace = data.boardSpaces.find((space) => space.id === "high-council");
   assert.ok(spySpace, "Expected High Council spy placement space");
   const spyPlaceAfterRecallSpace = data.boardSpaces.find((space) => space.id === "secrets");
@@ -240,6 +265,13 @@ async function createCardChoiceStates(server, initialPlayableGame) {
   };
   const spaceTimeFoldingDrawOne = { ...data.allyStarterCards[1], id: "browser-space-time-folding-draw-one-card" };
   const spaceTimeFoldingDrawTwo = { ...data.allyStarterCards[2], id: "browser-space-time-folding-draw-two-card" };
+  const guildEnvoyDiscard = {
+    ...guildEnvoy,
+    id: "browser-guild-envoy-discard-card",
+    name: "Guild Envoy Spacing Guild Card",
+  };
+  const guildEnvoyDrawOne = { ...data.allyStarterCards[3], id: "browser-guild-envoy-draw-one-card" };
+  const guildEnvoyDrawTwo = { ...data.allyStarterCards[4], id: "browser-guild-envoy-draw-two-card" };
 
   const base = {
     ...game,
@@ -331,6 +363,30 @@ async function createCardChoiceStates(server, initialPlayableGame) {
     },
   );
   assert.equal(spaceTimeFoldingState.pendingAction?.kind, "discard-card-for-draw", "Expected Space-time Folding discard-draw pending action");
+  const guildEnvoyState = turnActions.placeAgentAction(
+    {
+      ...base,
+      players: base.players.map((player) =>
+        player.id === ownerId
+          ? {
+              ...player,
+              agentsReady: 1,
+              deck: [guildEnvoyDrawOne, guildEnvoyDrawTwo],
+              discard: [],
+              hand: [guildEnvoy, guildEnvoyDiscard],
+              playArea: [],
+              resources: { solari: 0, spice: 0, water: 0 },
+            }
+          : player,
+      ),
+    },
+    {
+      commanderTargets: {},
+      selectedCard: guildEnvoy,
+      selectedSpace: deliverSupplies,
+    },
+  );
+  assert.equal(guildEnvoyState.pendingAction?.kind, "discard-card-for-draw", "Expected Guild Envoy discard-draw pending action");
 
   return {
     contractPublic: {
@@ -425,6 +481,13 @@ async function createCardChoiceStates(server, initialPlayableGame) {
       spaceTimeFoldingDiscardName: spaceTimeFoldingDiscard.name,
       spaceTimeFoldingDrawOneId: spaceTimeFoldingDrawOne.id,
       spaceTimeFoldingDrawTwoId: spaceTimeFoldingDrawTwo.id,
+    },
+    guildEnvoy: {
+      ...guildEnvoyState,
+      guildEnvoyDiscardId: guildEnvoyDiscard.id,
+      guildEnvoyDiscardName: guildEnvoyDiscard.name,
+      guildEnvoyDrawOneId: guildEnvoyDrawOne.id,
+      guildEnvoyDrawTwoId: guildEnvoyDrawTwo.id,
     },
     capturedMentatReveal: {
       ...base,

@@ -62,6 +62,7 @@ export const hiddenMissiveSourceId = 21;
 export const wheelsWithinWheelsSourceId = 22;
 export const cargoRunnerSourceId = 181;
 export const chaniCleverTacticianSourceId = 67;
+export const guildEnvoySourceId = 38;
 export const makerKeeperSourceId = 19;
 export const maulaPistolSourceId = 32;
 export const northernWatermasterSourceId = 34;

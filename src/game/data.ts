@@ -8,6 +8,7 @@ import {
   covertOperationSourceId,
   doubleAgentSourceId,
   fedaykinStilltentSourceId,
+  guildEnvoySourceId,
   hiddenMissiveSourceId,
   interstellarTradeSourceId,
   makerKeeperSourceId,
@@ -351,6 +352,18 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
           drawCards: 1,
         },
       }),
+      revealGainPersuasion(1),
+    ];
+  }
+  if (card.id === guildEnvoySourceId) {
+    return [
+      agentDiscardCardForDraw(0, {
+        bonusDraw: {
+          requiredDiscardTrait: "Faction: Spacing Guild",
+          drawCards: 2,
+        },
+      }),
+      revealGainPersuasion(1),
     ];
   }
   if (card.id === wheelsWithinWheelsSourceId) {
@@ -380,6 +393,9 @@ function imperiumPlayText(card: HubCard) {
   }
   if (card.id === spaceTimeFoldingSourceId) {
     return "Discard 1 card to draw 1 card. If you discarded a Spacing Guild card, draw 1 more card.";
+  }
+  if (card.id === guildEnvoySourceId) {
+    return "Discard 1 card. If you discarded a Spacing Guild card, draw 2 cards.";
   }
   if (card.id === covertOperationSourceId) {
     return "Each opponent discards a card.";

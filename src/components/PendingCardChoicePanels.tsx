@@ -1,5 +1,13 @@
 import { CircleDollarSign } from "lucide-react";
-import type { Card, ContractCard, Player } from "../game/types";
+import type { Card, ContractCard, PendingAction, Player, ResourceId } from "../game/types";
+
+type AcquireCardPendingAction = Extract<PendingAction, { kind: "acquire-card" }>;
+
+const resourceLabels: Record<ResourceId, string> = {
+  solari: "Solari",
+  spice: "spice",
+  water: "water",
+};
 
 type PendingContractPanelProps = {
   contractOffer: ContractCard[];
@@ -45,17 +53,36 @@ export function PendingContractPanel({
 
 type PendingAcquireCardPanelProps = {
   cards: Card[];
-  maxCost: number;
   owner: Player;
+  pending: AcquireCardPendingAction;
   onAcquireCard: (cardId: string) => void;
+  onSkip: () => void;
 };
 
 export function PendingAcquireCardPanel({
   cards,
-  maxCost,
   owner,
+  pending,
   onAcquireCard,
+  onSkip,
 }: PendingAcquireCardPanelProps) {
+  const costBoundsText =
+    pending.minCost !== undefined && pending.maxCost !== undefined
+      ? pending.minCost === pending.maxCost
+        ? `cost exactly ${pending.minCost}`
+        : `cost from ${pending.minCost} to ${pending.maxCost}`
+      : pending.minCost !== undefined
+        ? `cost at least ${pending.minCost}`
+        : pending.maxCost !== undefined
+          ? `cost ${pending.maxCost} or less`
+          : undefined;
+  const noEligibleText = [
+    "No eligible cards",
+    costBoundsText ? `that ${costBoundsText}` : undefined,
+    pending.paymentResource
+      ? `can be acquired with ${owner.resources[pending.paymentResource]} ${resourceLabels[pending.paymentResource]}`
+      : undefined,
+  ].filter((part): part is string => Boolean(part)).join(" ") + ".";
   return (
     <div className="pending-controls contract-choice">
       {cards.map((card) => (
@@ -63,15 +90,23 @@ export function PendingAcquireCardPanel({
           type="button"
           key={card.id}
           onClick={() => onAcquireCard(card.id)}
-          title={`Acquire ${card.name} for ${owner.leader}`}
+          title={
+            pending.paymentResource
+              ? `Acquire ${card.name} for ${card.cost ?? 0} ${resourceLabels[pending.paymentResource]} for ${owner.leader}`
+              : `Acquire ${card.name} for ${owner.leader}`
+          }
         >
           {card.thumbnailPath && <img src={card.thumbnailPath} alt="" />}
           <span>{card.name}</span>
+          {pending.paymentResource && (
+            <span>{card.cost ?? 0} {resourceLabels[pending.paymentResource]}</span>
+          )}
         </button>
       ))}
       {cards.length === 0 && (
-        <span>No eligible cards cost {maxCost} or less.</span>
+        <span>{noEligibleText}</span>
       )}
+      {pending.optional === true && <button type="button" onClick={onSkip}>Skip</button>}
     </div>
   );
 }

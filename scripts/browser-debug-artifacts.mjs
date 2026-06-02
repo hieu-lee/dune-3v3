@@ -41,6 +41,7 @@ const generatedScreenshotNames = [
   "pending-contract-fallback.png",
   "pending-acquire-card.png",
   "pending-acquire-prepare-the-way.png",
+  "pending-price-is-no-object-acquire.png",
   "pending-acquire-spy-network-spy.png",
   "pending-bene-gesserit-operative-spy.png",
   "pending-double-agent-shared-spy.png",

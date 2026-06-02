@@ -107,6 +107,28 @@ export function irulanSignetTrashPending(ownerId: string): TrashCardPendingActio
   };
 }
 
+function acquireCardCostBoundIsValid(cost: unknown) {
+  return cost === undefined || (typeof cost === "number" && Number.isInteger(cost) && cost >= 0);
+}
+
+export function acquireCardPendingIsValid(pending: AcquireCardPendingAction) {
+  return (pending.maxCost !== undefined || pending.paymentResource !== undefined)
+    && typeof pending.ownerId === "string"
+    && typeof pending.source === "string"
+    && pending.source.trim().length > 0
+    && (pending.destination === "hand" || pending.destination === "discard")
+    && (
+      pending.paymentResource === undefined ||
+      pending.paymentResource === "solari" ||
+      pending.paymentResource === "spice" ||
+      pending.paymentResource === "water"
+    )
+    && acquireCardCostBoundIsValid(pending.minCost)
+    && acquireCardCostBoundIsValid(pending.maxCost)
+    && (pending.minCost === undefined || pending.maxCost === undefined || pending.minCost <= pending.maxCost)
+    && (pending.optional === undefined || typeof pending.optional === "boolean");
+}
+
 export function addAcquiredCard(
   player: Player,
   card: Card,
@@ -262,11 +284,13 @@ export function moveImperiumCardToThroneRow(
 
 export function acquirableCardsForPending(state: GameState, pending: AcquireCardPendingAction) {
   const owner = state.players.find((player) => player.id === pending.ownerId);
-  if (!owner) return [];
+  if (!owner || !acquireCardPendingIsValid(pending)) return [];
   const minCost = pending.minCost ?? 0;
   const affordable = (card: Card) => {
     const cost = card.cost ?? 0;
-    return cost >= minCost && cost <= pending.maxCost;
+    const withinPendingCost = cost >= minCost && (pending.maxCost === undefined || cost <= pending.maxCost);
+    const hasPaymentResource = pending.paymentResource === undefined || owner.resources[pending.paymentResource] >= cost;
+    return withinPendingCost && hasPaymentResource;
   };
   return [
     ...state.imperiumRow.filter(affordable),

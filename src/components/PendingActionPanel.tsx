@@ -491,7 +491,7 @@ export function PendingActionPanel({
           {pendingAction.kind === "reveal-adjust" && "Printed reveal adjustment"}
           {pendingAction.kind === "retreat-troops-for-strength" && `${pendingRetreatStrengthOwner?.leader ?? "Player"} ${pendingAction.source}`}
           {pendingAction.kind === "contract" && `${pendingContractOwner?.leader ?? "Player"} CHOAM contract`}
-          {pendingAction.kind === "acquire-card" && `${pendingAcquireOwner?.leader ?? "Player"} acquisition`}
+          {pendingAction.kind === "acquire-card" && `${pendingAcquireOwner?.leader ?? "Player"} acquisition from ${pendingAction.source}`}
           {pendingAction.kind === "discard-card-for-influence-and-draw" && `${pendingDiscardInfluenceDrawOwner?.leader ?? "Player"} ${pendingAction.source}`}
           {pendingAction.kind === "discard-card-for-draw" && `${pendingDiscardDrawOwner?.leader ?? "Player"} ${pendingAction.source}`}
           {pendingAction.kind === "discard-hand-card" && `${pendingDiscardHandCardOwner?.leader ?? "Player"} ${pendingAction.source}`}
@@ -875,9 +875,10 @@ export function PendingActionPanel({
       {pendingAction.kind === "acquire-card" && pendingAcquireOwner && (
         <PendingAcquireCardPanel
           cards={pendingAcquireCards}
-          maxCost={pendingAction.maxCost}
           owner={pendingAcquireOwner}
+          pending={pendingAction}
           onAcquireCard={acquirePendingCard}
+          onSkip={clearPendingAction}
         />
       )}
 

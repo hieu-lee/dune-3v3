@@ -79,6 +79,29 @@ export async function runCardChoicesSmoke({
   assert.equal(ownerAfter.discard.at(-1).sourceId, 537, "Reserve acquire should take Prepare The Way");
   assert.ok(after.reserveMarket.some((card) => card.sourceId === 537), "Prepare The Way reserve should remain available");
 
+  await setDebugGameAndWait(page, states.priceIsNoObjectAcquire);
+  pendingText = await page.locator(".pending-panel").innerText();
+  const priceAcquireName = states.priceIsNoObjectAcquire.priceIsNoObjectAcquireCardName;
+  const priceAcquireId = states.priceIsNoObjectAcquire.priceIsNoObjectAcquireCardId;
+  const priceAcquireCost = states.priceIsNoObjectAcquire.priceIsNoObjectAcquireCardCost;
+  assert.match(pendingText, /Price is No Object/i);
+  assert.match(pendingText, new RegExp(escapeRegExp(priceAcquireName)));
+  assert.match(pendingText, /Skip/i);
+  await screenshot(page, captures, "pending-price-is-no-object-acquire.png");
+
+  before = await currentGame(page);
+  ownerBefore = before.players.find((player) => player.id === "p2");
+  await page.locator(".pending-panel").getByRole("button", { name: priceAcquireName }).click();
+  await waitForNoPending(page);
+  after = await currentGame(page);
+  ownerAfter = after.players.find((player) => player.id === "p2");
+  assert.equal(
+    ownerAfter.resources.solari,
+    ownerBefore.resources.solari - priceAcquireCost,
+    "Price is No Object acquire should spend Solari equal to the card cost",
+  );
+  assert.equal(ownerAfter.hand.at(-1).id, priceAcquireId, "Price is No Object acquire should move the selected card to hand");
+
   await setDebugGameAndWait(page, states.acquireSpyNetwork);
   pendingText = await page.locator(".pending-panel").innerText();
   assert.match(pendingText, /Spy Network/i);
@@ -279,7 +302,7 @@ export async function runCardChoicesSmoke({
 
   await setDebugGameAndWait(page, states.acquireEmpty);
   pendingText = await page.locator(".pending-panel").innerText();
-  assert.match(pendingText, /No eligible cards cost 99 or less/i);
+  assert.match(pendingText, /No eligible cards that cost exactly 99/i);
   await screenshot(page, captures, "pending-acquire-card-empty.png");
 }
 
@@ -301,6 +324,8 @@ async function createCardChoiceStates(server, initialPlayableGame) {
   assert.ok(spyNetworkReplacement, "Expected Spy Network replacement card");
   const beneGesseritOperative = data.imperiumDeck.find((card) => card.sourceId === 30);
   assert.ok(beneGesseritOperative, "Expected Bene Gesserit Operative Imperium card");
+  const priceIsNoObject = data.imperiumDeck.find((card) => card.sourceId === 73);
+  assert.ok(priceIsNoObject, "Expected Price is No Object Imperium card");
   const doubleAgent = data.imperiumDeck.find((card) => card.sourceId === 37);
   assert.ok(doubleAgent, "Expected Double Agent Imperium card");
   const spaceTimeFolding = data.imperiumDeck.find((card) => card.sourceId === 12);
@@ -353,6 +378,22 @@ async function createCardChoiceStates(server, initialPlayableGame) {
     id: "browser-covert-operation-discard-card",
     name: "Covert Operation Debug Discard",
   };
+  const priceIsNoObjectAcquireCard = {
+    ...beneGesseritOperative,
+    id: "browser-price-is-no-object-acquire-card",
+  };
+  const priceIsNoObjectBlockedCard = data.imperiumDeck.find((card) =>
+    card.id !== priceIsNoObject.id &&
+    card.id !== beneGesseritOperative.id &&
+    (card.cost ?? 0) > priceIsNoObjectAcquireCard.cost
+  );
+  assert.ok(priceIsNoObjectBlockedCard, "Expected unaffordable Price is No Object browser card");
+  const priceIsNoObjectReplacement = data.imperiumDeck.find((card) =>
+    card.id !== priceIsNoObject.id &&
+    card.id !== beneGesseritOperative.id &&
+    card.id !== priceIsNoObjectBlockedCard.id
+  );
+  assert.ok(priceIsNoObjectReplacement, "Expected Price is No Object replacement card");
 
   const base = {
     ...game,
@@ -497,6 +538,35 @@ async function createCardChoiceStates(server, initialPlayableGame) {
     "pay-resource-for-draw-cards",
     "Expected Ecological Testing Station resource-for-draw pending action",
   );
+  const priceIsNoObjectAcquireState = turnActions.placeAgentAction(
+    {
+      ...base,
+      imperiumRow: [priceIsNoObjectAcquireCard, priceIsNoObjectBlockedCard],
+      marketDeck: [priceIsNoObjectReplacement],
+      players: base.players.map((player) =>
+        player.id === ownerId
+          ? {
+              ...player,
+              agentsReady: 1,
+              discard: [],
+              hand: [priceIsNoObject],
+              playArea: [],
+              resources: { solari: priceIsNoObjectAcquireCard.cost, spice: 0, water: 0 },
+            }
+          : player,
+      ),
+    },
+    {
+      commanderTargets: {},
+      selectedCard: priceIsNoObject,
+      selectedSpace: spyPlaceAfterRecallSpace,
+    },
+  );
+  assert.equal(
+    priceIsNoObjectAcquireState.pendingAction?.kind,
+    "acquire-card",
+    "Expected Price is No Object Solari acquisition pending action",
+  );
   const covertOperationOwner = base.players.find((player) => player.id === ownerId);
   assert.ok(covertOperationOwner, "Expected Covert Operation owner");
   const covertOperationSource = {
@@ -600,6 +670,12 @@ async function createCardChoiceStates(server, initialPlayableGame) {
         maxCost: prepareTheWay.cost,
         destination: "discard",
       },
+    },
+    priceIsNoObjectAcquire: {
+      ...priceIsNoObjectAcquireState,
+      priceIsNoObjectAcquireCardCost: priceIsNoObjectAcquireCard.cost,
+      priceIsNoObjectAcquireCardId: priceIsNoObjectAcquireCard.id,
+      priceIsNoObjectAcquireCardName: priceIsNoObjectAcquireCard.name,
     },
     acquireSpyNetwork: {
       ...acquireSpyNetworkState,

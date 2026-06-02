@@ -29,6 +29,7 @@ const supportedTriggers = new Set<GameEffectTrigger>([
 const supportedResources = new Set<ResourceId>(["solari", "spice", "water"]);
 const supportedTradeGoods = new Set<TradeGoodId>(["solari", "spice", "water", "intrigue"]);
 const supportedIcons = new Set<IconId>(["emperor", "spacing", "bene", "fremen", "landsraad", "city", "spice", "spy"]);
+const supportedAcquireDestinations = new Set(["discard", "hand"]);
 const supportedTrashZones = new Set<TrashCardZone>(["hand", "discard", "playArea"]);
 const supportedFactions = new Set<FactionId>([
   "emperor",
@@ -205,6 +206,35 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
     }
     validateAmount(effect.amount);
+    return;
+  }
+  if (effect.kind === "acquire-card") {
+    if (trigger !== "agent-play") {
+      throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
+    }
+    if (effect.selector !== "self") {
+      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
+    if (!supportedAcquireDestinations.has(effect.destination)) {
+      invalidSpecField("acquire-card destination", effect.destination);
+    }
+    if (effect.paymentResource !== undefined && !supportedResources.has(effect.paymentResource)) {
+      throw new Error(`Unsupported effect resource "${effect.paymentResource}"`);
+    }
+    if (effect.minCost !== undefined) validateAmount(effect.minCost);
+    if (effect.maxCost !== undefined) validateAmount(effect.maxCost);
+    if (
+      typeof effect.minCost === "number" &&
+      typeof effect.maxCost === "number" &&
+      effect.minCost > effect.maxCost
+    ) {
+      invalidSpecField("acquire-card cost bounds", `${effect.minCost}-${effect.maxCost}`);
+    }
+    if (effect.maxCost === undefined && effect.paymentResource === undefined) {
+      throw new Error("Invalid acquire-card constraint: expected maxCost or paymentResource");
+    }
+    validateOptionalBoolean("acquire-card optional", (effect as { optional?: unknown }).optional);
+    validateSourceLabel("acquire-card source", effect.source);
     return;
   }
   if (effect.kind === "recruit-troops") {

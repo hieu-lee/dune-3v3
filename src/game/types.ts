@@ -18,6 +18,10 @@ export type FactionId =
   | "greatHouses"
   | "fringeWorlds";
 export type ResourceId = "solari" | "spice" | "water";
+export type AcquireCardDestination = "discard" | "hand";
+export type AcquireCardPendingConstraint =
+  | { maxCost: number; paymentResource?: ResourceId }
+  | { maxCost?: number; paymentResource: ResourceId };
 export type CriticalLocationId = "arrakeen" | "spice-refinery" | "imperial-basin";
 export type BattleIconId = "crysknife" | "desertMouse" | "ornithopter";
 export type ConflictBattleIconId = BattleIconId | "wild";
@@ -73,6 +77,16 @@ export type GameEffectSpec =
   | { kind: "gain-vp"; selector: PlayerSelector; amount: EffectAmountSpec }
   | { kind: "draw-cards"; selector: PlayerSelector; amount: EffectAmountSpec; source?: string }
   | { kind: "draw-intrigues"; selector: PlayerSelector; amount: EffectAmountSpec }
+  | {
+      kind: "acquire-card";
+      selector: PlayerSelector;
+      minCost?: EffectAmountSpec;
+      maxCost?: EffectAmountSpec;
+      destination: AcquireCardDestination;
+      paymentResource?: ResourceId;
+      optional?: boolean;
+      source?: string;
+    }
   | { kind: "recruit-troops"; selector: PlayerSelector; amount: EffectAmountSpec; source?: string }
   | {
       kind: "retreat-troops-for-strength";
@@ -566,15 +580,14 @@ export type PendingAction =
       spaceId?: string;
       publicOnly?: boolean;
     }
-  | {
+  | ({
       kind: "acquire-card";
       ownerId: string;
       source: string;
       minCost?: number;
-      maxCost: number;
-      destination: "discard" | "hand";
+      destination: AcquireCardDestination;
       optional?: boolean;
-    }
+    } & AcquireCardPendingConstraint)
   | {
       kind: "discard-card-for-influence-and-draw";
       ownerId: string;

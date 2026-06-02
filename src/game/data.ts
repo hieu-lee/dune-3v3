@@ -35,6 +35,7 @@ import {
   acquireGainResource,
   acquireGainVp,
   acquirePlaceSpies,
+  agentAcquireCard,
   agentDiscardCardForDraw,
   agentDiscardCardForInfluenceAndDraw,
   agentDrawCards,
@@ -450,6 +451,7 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
   }
   if (card.id === priceIsNoObjectSourceId) {
     return [
+      agentAcquireCard({ destination: "hand", paymentResource: "solari", optional: true }),
       ...(fixedRevealEffects(
         attributeNumber(card, "Persuasion on reveal"),
         attributeNumber(card, "Swords"),
@@ -508,6 +510,9 @@ function imperiumPlayText(card: HubCard) {
   }
   if (card.id === covertOperationSourceId) {
     return "Each opponent discards a card.";
+  }
+  if (card.id === priceIsNoObjectSourceId) {
+    return "You may acquire a card to your hand using Solari instead of persuasion.";
   }
   return summarizeAttributes(card);
 }

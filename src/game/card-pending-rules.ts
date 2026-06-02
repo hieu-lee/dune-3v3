@@ -28,6 +28,7 @@ import {
   resolveRevealPayResourceForTroops,
   resolveRevealRetreatTroopsForStrength,
   resolveRevealTrashCardEffects,
+  resolveAgentAcquireCards,
 } from "./effect-resolver";
 import { discardCardForDrawChoices } from "./discard-draw-rules";
 import { discardCardForInfluenceAndDrawChoices } from "./discard-influence-draw-rules";
@@ -40,6 +41,7 @@ import {
   reverendMotherJessicaLeaderName,
 } from "./leader-constants";
 import {
+  acquirableCardsForPending,
   irulanSignetAcquireCards,
   irulanSignetTrashableCards,
 } from "./market-rules";
@@ -254,6 +256,51 @@ function pendingActionsForAgentOpponentsDiscardCards(
       remaining: Math.min(discardCount, player.hand.length),
     }];
   });
+}
+
+function pendingActionForAgentAcquireCard(
+  card: Card,
+  source: Player,
+  state?: GameState,
+  target?: Player,
+  space?: BoardSpace,
+): PendingAction | undefined {
+  if (!card.effects || !source.playArea.some((candidate) => candidate.id === card.id)) return undefined;
+  if (!state) return undefined;
+  const players = playersWithPendingCardEffect(state, source, target);
+  const effectState = { ...state, players };
+  const effects = resolveAgentAcquireCards(card.effects, {
+    trigger: "agent-play",
+    source,
+    target,
+    state: effectState,
+    space,
+  });
+  return effects
+    .map((effect): PendingAction | undefined => {
+      if (effect.selector !== "self" || (effect.destination !== "hand" && effect.destination !== "discard")) return undefined;
+      const pendingBase = {
+        kind: "acquire-card" as const,
+        ownerId: source.id,
+        source: effect.source ?? card.name,
+        ...(effect.minCost !== undefined ? { minCost: effect.minCost } : {}),
+        destination: effect.destination,
+        optional: effect.optional,
+      };
+      const pending: Extract<PendingAction, { kind: "acquire-card" }> | undefined =
+        effect.paymentResource !== undefined
+          ? {
+              ...pendingBase,
+              ...(effect.maxCost !== undefined ? { maxCost: effect.maxCost } : {}),
+              paymentResource: effect.paymentResource,
+            }
+          : effect.maxCost !== undefined
+            ? { ...pendingBase, maxCost: effect.maxCost }
+            : undefined;
+      if (!pending) return undefined;
+      return acquirableCardsForPending(effectState, pending).length > 0 ? pending : undefined;
+    })
+    .find((pending): pending is PendingAction => Boolean(pending));
 }
 
 function pendingActionForAgentPayResourceForInfluence(
@@ -593,6 +640,8 @@ export function pendingActionsForCard(
   if (agentDiscardDrawPending) typedPendings.push(agentDiscardDrawPending);
   const agentOpponentDiscardPendings = pendingActionsForAgentOpponentsDiscardCards(card, source, state, target);
   typedPendings.push(...agentOpponentDiscardPendings);
+  const agentAcquireCardPending = pendingActionForAgentAcquireCard(card, source, state, target, space);
+  if (agentAcquireCardPending) typedPendings.push(agentAcquireCardPending);
   const agentPayResourceInfluencePending = pendingActionForAgentPayResourceForInfluence(card, source, state, target, space);
   if (agentPayResourceInfluencePending) typedPendings.push(agentPayResourceInfluencePending);
   const agentPayResourceSandwormsPending = pendingActionForAgentPayResourceForSandworms(card, source, state, target, space);

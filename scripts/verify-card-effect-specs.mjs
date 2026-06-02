@@ -270,6 +270,21 @@ try {
     "Price is No Object should use a typed acquire Solari effect",
   );
   assert.ok(
+    priceIsNoObject.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.effects.some((effect) =>
+        effect.kind === "acquire-card" &&
+        effect.selector === "self" &&
+        effect.destination === "hand" &&
+        effect.paymentResource === "solari" &&
+        effect.optional === true &&
+        effect.minCost === undefined &&
+        effect.maxCost === undefined
+      )
+    ),
+    "Price is No Object should use a typed Agent acquire-card Solari payment effect",
+  );
+  assert.ok(
     spiceMustFlow.effects?.some((spec) =>
       spec.trigger === "acquire" &&
       spec.effects.some((effect) => effect.kind === "gain-vp" && effect.selector === "self" && effect.amount === 1)
@@ -306,6 +321,7 @@ try {
       "Northern Watermaster",
       "Paracompass",
       "Prepare The Way",
+      "Price is No Object",
       "Reliable Informant",
       "Space-time Folding",
       "Wheels Within Wheels",
@@ -2403,6 +2419,149 @@ try {
     () => state.applyCardAgentEffect(invalidPayResourceDrawCardsOptionalCard, p2, p2),
     /Invalid pay-resource-for-draw-cards optional "false"/,
     "Resource-for-draw specs should reject non-true optional values",
+  );
+  const revealAcquireCardCard = {
+    ...convincingArgument,
+    id: "effect-spec-reveal-acquire-card-card",
+    name: "Effect Spec Reveal Acquire Card",
+    effects: [revealSpec([{
+      kind: "acquire-card",
+      selector: "self",
+      destination: "hand",
+    }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [revealAcquireCardCard], highCouncilSeat: false }),
+    /Unsupported effect "acquire-card" for reveal/,
+    "Acquire-card specs should stay in Agent play",
+  );
+  const invalidAcquireCardSelectorCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-acquire-card-selector-card",
+    name: "Effect Spec Invalid Acquire Card Selector",
+    effects: [agentSpec([{
+      kind: "acquire-card",
+      selector: "activated-ally",
+      destination: "hand",
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidAcquireCardSelectorCard, p4, p2),
+    /Unsupported effect selector "activated-ally" for acquire-card/,
+    "Acquire-card specs should reject activated Ally selectors",
+  );
+  const invalidAcquireCardDestinationCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-acquire-card-destination-card",
+    name: "Effect Spec Invalid Acquire Card Destination",
+    effects: [agentSpec([{
+      kind: "acquire-card",
+      selector: "self",
+      destination: "deck",
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidAcquireCardDestinationCard, p2, p2),
+    /Invalid acquire-card destination "deck"/,
+    "Acquire-card specs should reject unsupported destinations",
+  );
+  const invalidAcquireCardUnconstrainedCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-acquire-card-unconstrained-card",
+    name: "Effect Spec Invalid Acquire Card Unconstrained",
+    effects: [agentSpec([{
+      kind: "acquire-card",
+      selector: "self",
+      destination: "hand",
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidAcquireCardUnconstrainedCard, p2, p2),
+    /Invalid acquire-card constraint: expected maxCost or paymentResource/,
+    "Acquire-card specs should reject unconstrained free acquisitions",
+  );
+  const invalidAcquireCardResourceCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-acquire-card-resource-card",
+    name: "Effect Spec Invalid Acquire Card Resource",
+    effects: [agentSpec([{
+      kind: "acquire-card",
+      selector: "self",
+      destination: "hand",
+      paymentResource: "melange",
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidAcquireCardResourceCard, p2, p2),
+    /Unsupported effect resource "melange"/,
+    "Acquire-card specs should reject unsupported payment resources",
+  );
+  const invalidAcquireCardMaxCostCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-acquire-card-max-cost-card",
+    name: "Effect Spec Invalid Acquire Card Max Cost",
+    effects: [agentSpec([{
+      kind: "acquire-card",
+      selector: "self",
+      destination: "hand",
+      maxCost: -1,
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidAcquireCardMaxCostCard, p2, p2),
+    /Invalid effect amount "-1"/,
+    "Acquire-card specs should require non-negative cost bounds",
+  );
+  const invalidAcquireCardCostBoundsCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-acquire-card-cost-bounds-card",
+    name: "Effect Spec Invalid Acquire Card Cost Bounds",
+    effects: [agentSpec([{
+      kind: "acquire-card",
+      selector: "self",
+      destination: "hand",
+      minCost: 3,
+      maxCost: 1,
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidAcquireCardCostBoundsCard, p2, p2),
+    /Invalid acquire-card cost bounds "3-1"/,
+    "Acquire-card specs should reject minCost greater than maxCost",
+  );
+  const invalidAcquireCardOptionalCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-acquire-card-optional-card",
+    name: "Effect Spec Invalid Acquire Card Optional",
+    effects: [agentSpec([{
+      kind: "acquire-card",
+      selector: "self",
+      destination: "hand",
+      maxCost: 1,
+      optional: "true",
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidAcquireCardOptionalCard, p2, p2),
+    /Invalid acquire-card optional "true"/,
+    "Acquire-card specs should reject non-boolean optional values",
+  );
+  const invalidAcquireCardSourceCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-acquire-card-source-card",
+    name: "Effect Spec Invalid Acquire Card Source",
+    effects: [agentSpec([{
+      kind: "acquire-card",
+      selector: "self",
+      destination: "hand",
+      maxCost: 1,
+      source: "",
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidAcquireCardSourceCard, p2, p2),
+    /Invalid acquire-card source ""/,
+    "Acquire-card specs should reject empty source labels",
   );
   const revealPayResourceInfluenceCard = {
     ...convincingArgument,

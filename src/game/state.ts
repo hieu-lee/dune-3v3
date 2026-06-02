@@ -520,7 +520,7 @@ function continueAfterResolvedConflictReward(state: GameState): GameState {
 
 export function finishPendingAction(state: GameState): GameState {
   if (state.pendingAction?.kind === "spy" && state.pendingAction.mustPlaceSpy) return state;
-  if (state.pendingAction?.kind === "acquire-card" && !state.pendingAction.optional) return state;
+  if (state.pendingAction?.kind === "acquire-card" && state.pendingAction.optional !== true) return state;
   if (state.pendingAction?.kind === "discard-hand-card") return state;
   const resolvedState = state.pendingAction?.kind === "deploy"
     ? resolvePostDeployIntrigueDraw(state, state.pendingAction.postDeployIntrigueDraw)

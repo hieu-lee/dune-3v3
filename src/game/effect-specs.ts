@@ -1,4 +1,5 @@
 import type {
+  AcquireCardDestination,
   CardEffectSpec,
   CommanderResourceSplitOption,
   ContractEffectRecipient,
@@ -24,6 +25,16 @@ import type {
   TroopEffectRecipient,
   TrashCardZone,
 } from "./types";
+
+type AgentAcquireCardOptions = (
+  | { maxCost: EffectAmountSpec; paymentResource?: ResourceId }
+  | { maxCost?: EffectAmountSpec; paymentResource: ResourceId }
+) & {
+  destination: AcquireCardDestination;
+  minCost?: EffectAmountSpec;
+  optional?: boolean;
+  source?: string;
+};
 
 export function agentPlayEffects(effects: GameEffectSpec[], conditions?: GameEffectConditionSpec[]): CardEffectSpec {
   return {
@@ -304,6 +315,13 @@ export function agentOpponentsDiscardCards(
       ...(options.source ? { source: options.source } : {}),
     },
   ], conditions);
+}
+
+export function agentAcquireCard(
+  options: AgentAcquireCardOptions,
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return agentPlayEffects([{ kind: "acquire-card", selector: "self", ...options }], conditions);
 }
 
 export function agentPayResourceForInfluence(

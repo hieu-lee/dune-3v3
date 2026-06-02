@@ -1,5 +1,6 @@
 import {
   addAcquiredCard,
+  acquireCardPendingIsValid,
   acquireRewardParts,
   callToArmsRecruitOwner,
   drawAcquireIntrigues,
@@ -47,6 +48,17 @@ function contractPaymentAmountIsValid(value: unknown) {
 
 function contractPaymentSourceIsValid(pending: { source?: unknown }) {
   return typeof pending.source === "string" && pending.source.trim().length > 0;
+}
+
+function spendAcquireCardPayment(player: Player, pending: AcquireCardPendingAction, cost: number): Player {
+  if (!pending.paymentResource || cost <= 0) return player;
+  return {
+    ...player,
+    resources: {
+      ...player.resources,
+      [pending.paymentResource]: player.resources[pending.paymentResource] - cost,
+    },
+  };
 }
 
 function pendingStringIds(value: unknown) {
@@ -275,6 +287,7 @@ export function resolveAcquireCardForPending(
   finishPendingResolution: FinishPendingResolution,
   callToArmsRecruitOwnerId?: string,
 ): GameState {
+  if (state.pendingAction !== pending) return state;
   const owner = state.players.find((player) => player.id === pending.ownerId);
   if (!owner) return state;
 
@@ -285,7 +298,15 @@ export function resolveAcquireCardForPending(
   const card = reserveCard ?? throneCard ?? rowCard;
   const minCost = pending.minCost ?? 0;
   const cardCost = card?.cost ?? 0;
-  if (!card || cardCost < minCost || cardCost > pending.maxCost) return state;
+  if (
+    !card ||
+    !acquireCardPendingIsValid(pending) ||
+    cardCost < minCost ||
+    (pending.maxCost !== undefined && cardCost > pending.maxCost)
+  ) {
+    return state;
+  }
+  if (pending.paymentResource && owner.resources[pending.paymentResource] < cardCost) return state;
 
   const [replacement, ...marketDeckAfterDraw] = state.marketDeck;
   const marketDeck = rowCard ? marketDeckAfterDraw : state.marketDeck;
@@ -305,7 +326,11 @@ export function resolveAcquireCardForPending(
   const players = state.players.map((player) => {
     let next = player;
     if (player.id === owner.id) {
-      next = addAcquiredCard(player, card, Boolean(reserveCard), pending.destination, 0, acquireReward);
+      next = spendAcquireCardPayment(
+        addAcquiredCard(player, card, Boolean(reserveCard), pending.destination, 0, acquireReward),
+        pending,
+        cardCost,
+      );
     }
     if (recruitOwner && player.id === recruitOwner.id) {
       next = { ...next, garrison: next.garrison + 1 };
@@ -313,6 +338,9 @@ export function resolveAcquireCardForPending(
     return next;
   });
   const destinationText = pending.destination === "hand" ? "hand" : "discard pile";
+  const paymentText = pending.paymentResource && cardCost > 0
+    ? ` for ${cardCost} ${resourceLabels[pending.paymentResource]}`
+    : "";
   const recruitPart = recruitOwner
     ? recruitOwner.id === owner.id
       ? "recruits 1 troop"
@@ -330,7 +358,7 @@ export function resolveAcquireCardForPending(
     throneRow,
     ...advancePendingAction(state),
     log: [
-      `${owner.leader} acquires ${card.name} to their ${destinationText} from ${pending.source}${outcomeText}.`,
+      `${owner.leader} acquires ${card.name} to their ${destinationText}${paymentText} from ${pending.source}${outcomeText}.`,
       ...state.log,
     ],
   }, owner.id, acquireReward);

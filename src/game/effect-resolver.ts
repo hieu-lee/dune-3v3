@@ -8,6 +8,7 @@ import { playerConflictUnitCount } from "./conflict-rules";
 import { validateSpec } from "./effect-spec-validation";
 import { playerHasSpyPost, spyPostCount } from "./spy-posts";
 import type {
+  AcquireCardDestination,
   BoardSpace,
   Card,
   CardEffectSpec,
@@ -131,6 +132,16 @@ export type AgentDiscardCardForDraw = {
 export type AgentOpponentsDiscardCards = {
   selector: PlayerSelector;
   amount: number;
+  source?: string;
+};
+
+export type AgentAcquireCard = {
+  selector: PlayerSelector;
+  minCost?: number;
+  maxCost?: number;
+  destination: AcquireCardDestination;
+  paymentResource?: ResourceId;
+  optional: boolean;
   source?: string;
 };
 
@@ -545,6 +556,9 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
     const amount = amountFor(effect.amount, context.source);
     return addSelectedIntriguesToDraw(result, effect.selector, amount);
   }
+  if (effect.kind === "acquire-card") {
+    return result;
+  }
   if (effect.kind === "recruit-troops") {
     const amount = amountFor(effect.amount, context.source);
     return addSelectedRecruitedTroops(result, effect.selector, amount, effect.source);
@@ -901,6 +915,28 @@ export function resolveAgentOpponentsDiscardCards(
       .map((effect) => ({
         selector: effect.selector,
         amount: amountFor(effect.amount, context.source),
+        source: effect.source,
+      }));
+  });
+}
+
+export function resolveAgentAcquireCards(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): AgentAcquireCard[] {
+  specs?.forEach(validateSpec);
+  return (specs ?? []).flatMap((spec) => {
+    if (spec.trigger !== "agent-play") return [];
+    if (!specApplies(spec, context)) return [];
+    return spec.effects
+      .filter((effect) => effect.kind === "acquire-card")
+      .map((effect) => ({
+        selector: effect.selector,
+        ...(effect.minCost !== undefined ? { minCost: amountFor(effect.minCost, context.source) } : {}),
+        ...(effect.maxCost !== undefined ? { maxCost: amountFor(effect.maxCost, context.source) } : {}),
+        destination: effect.destination,
+        paymentResource: effect.paymentResource,
+        optional: effect.optional ?? false,
         source: effect.source,
       }));
   });

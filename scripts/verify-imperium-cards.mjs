@@ -242,7 +242,24 @@ try {
     ),
     "Price is No Object should model its acquisition Solari as a typed acquire effect",
   );
-  for (const name of ["Bene Gesserit Operative", "Cargo Runner", "Chani, Clever Tactician", "Maker Keeper", "Maula Pistol", "Northern Watermaster", "Paracompass"]) {
+  assert.ok(
+    priceIsNoObject.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.effects.some((effect) =>
+        effect.kind === "acquire-card" &&
+        effect.destination === "hand" &&
+        effect.paymentResource === "solari" &&
+        effect.optional === true
+      )
+    ),
+    "Price is No Object should model its Solari-paid Agent acquisition as a typed effect",
+  );
+  assert.match(
+    priceIsNoObject.play,
+    /acquire a card to your hand using Solari instead of persuasion/i,
+    "Price is No Object should expose its automated Agent acquire text in hand",
+  );
+  for (const name of ["Bene Gesserit Operative", "Cargo Runner", "Chani, Clever Tactician", "Maker Keeper", "Maula Pistol", "Northern Watermaster", "Paracompass", "Price is No Object"]) {
     const card = data.imperiumDeck.find((candidate) => candidate.name === name);
     assert.ok(card?.effects?.some((spec) => spec.trigger === "agent-play"), `${name} should use a structured Agent effect`);
   }
@@ -535,6 +552,284 @@ try {
   assert.equal(priceBuyer.resources.solari, 2, "Price is No Object acquire bonus should award 2 Solari");
   assert.equal(priceBuyer.discard.at(-1).id, priceIsNoObject.id, "Price is No Object should go to discard when bought from the row");
   assert.match(priceBought.log[0], /acquires Price is No Object and gains 2 Solari/);
+
+  const priceAgentAcquireTarget = { ...beneGesseritOperative, id: "price-agent-bene-gesserit-operative" };
+  const priceAgentBlockedTarget = data.imperiumDeck.find((card) =>
+    card.id !== priceIsNoObject.id &&
+    card.id !== beneGesseritOperative.id &&
+    (card.cost ?? 0) > priceAgentAcquireTarget.cost
+  );
+  assert.ok(priceAgentBlockedTarget, "Expected an unaffordable Imperium card for Price is No Object Agent coverage");
+  const priceAgentReplacement = data.imperiumDeck.find((card) =>
+    card.id !== priceIsNoObject.id &&
+    card.id !== beneGesseritOperative.id &&
+    card.id !== priceAgentBlockedTarget.id
+  );
+  assert.ok(priceAgentReplacement, "Expected an Imperium row replacement card for Price is No Object Agent coverage");
+  const priceAgentFixture = {
+    ...withActivePlayer(game, p2.id, (player) => ({
+      agentsReady: 1,
+      discard: [],
+      hand: [priceIsNoObject],
+      playArea: [],
+      persuasion: 0,
+      resources: { ...player.resources, solari: priceAgentAcquireTarget.cost },
+    })),
+    imperiumRow: [priceAgentAcquireTarget, priceAgentBlockedTarget],
+    marketDeck: [priceAgentReplacement],
+  };
+  const priceAgentPlayed = turnActions.placeAgentAction(priceAgentFixture, {
+    commanderTargets: {},
+    selectedCard: priceIsNoObject,
+    selectedSpace: secrets,
+  });
+  const priceAgentPending = priceAgentPlayed.pendingAction;
+  assert.equal(priceAgentPending?.kind, "acquire-card", "Price is No Object Agent play should queue an acquire-card choice");
+  assert.equal(priceAgentPending.ownerId, p2.id);
+  assert.equal(priceAgentPending.source, "Price is No Object");
+  assert.equal(priceAgentPending.destination, "hand");
+  assert.equal(priceAgentPending.paymentResource, "solari");
+  assert.equal(priceAgentPending.optional, true);
+  assert.equal(priceAgentPending.maxCost, undefined);
+  const priceAgentChoices = state.acquirableCardsForPending(priceAgentPlayed, priceAgentPending);
+  assert.ok(
+    priceAgentChoices.some((card) => card.id === priceAgentAcquireTarget.id),
+    "Price is No Object should offer affordable Imperium Row cards",
+  );
+  assert.equal(
+    priceAgentChoices.some((card) => card.id === priceAgentBlockedTarget.id),
+    false,
+    "Price is No Object should exclude Imperium Row cards that cost more Solari than the owner has",
+  );
+  assert.ok(
+    priceAgentChoices.every((card) => (card.cost ?? 0) <= priceAgentAcquireTarget.cost),
+    "Price is No Object should only offer cards affordable with Solari",
+  );
+  assert.equal(
+    state.finishPendingAction(priceAgentPlayed).pendingAction,
+    undefined,
+    "Price is No Object's optional acquire-card pending should be skippable",
+  );
+  const priceAgentResolved = state.acquireCardForPending(
+    priceAgentPlayed,
+    priceAgentPending,
+    priceAgentAcquireTarget.id,
+  );
+  const priceAgentOwner = playerById(priceAgentResolved, p2.id);
+  assert.equal(
+    priceAgentOwner.resources.solari,
+    0,
+    "Price is No Object Agent acquire should spend the acquired card's printed cost in Solari",
+  );
+  assert.equal(priceAgentOwner.persuasion, 0, "Price is No Object Agent acquire should not spend persuasion");
+  assert.equal(
+    priceAgentOwner.hand.at(-1).id,
+    priceAgentAcquireTarget.id,
+    "Price is No Object Agent acquire should put the selected card into hand",
+  );
+  assert.match(
+    priceAgentResolved.log[0],
+    /acquires Bene Gesserit Operative to their hand for 3 Solari from Price is No Object/,
+  );
+  const priceAgentNoSolari = turnActions.placeAgentAction(
+    {
+      ...priceAgentFixture,
+      players: priceAgentFixture.players.map((player) =>
+        player.id === p2.id
+          ? { ...player, resources: { ...player.resources, solari: 0 } }
+          : player,
+      ),
+      pendingAction: undefined,
+      pendingQueue: [],
+    },
+    {
+      commanderTargets: {},
+      selectedCard: priceIsNoObject,
+      selectedSpace: secrets,
+    },
+  );
+  assert.notEqual(
+    priceAgentNoSolari.pendingAction?.kind,
+    "acquire-card",
+    "Price is No Object should not queue an acquire-card choice without enough Solari for any card",
+  );
+  const unconstrainedAcquirePending = {
+    kind: "acquire-card",
+    ownerId: p2.id,
+    source: "Verifier Unconstrained Acquire",
+    destination: "hand",
+    optional: true,
+  };
+  const unconstrainedAcquireFixture = {
+    ...withActivePlayer(game, p2.id, () => ({
+      hand: [],
+      resources: { solari: 99, spice: 0, water: 0 },
+    })),
+    imperiumRow: [priceAgentAcquireTarget],
+    marketDeck: [priceAgentReplacement],
+    pendingAction: unconstrainedAcquirePending,
+    pendingQueue: [],
+  };
+  assert.deepEqual(
+    state.acquirableCardsForPending(unconstrainedAcquireFixture, unconstrainedAcquirePending),
+    [],
+    "Unconstrained acquire-card pendings should expose no eligible cards",
+  );
+  const unconstrainedResolved = state.acquireCardForPending(
+    unconstrainedAcquireFixture,
+    unconstrainedAcquirePending,
+    priceAgentAcquireTarget.id,
+  );
+  assert.equal(
+    playerById(unconstrainedResolved, p2.id).hand.length,
+    0,
+    "Unconstrained acquire-card pendings should not resolve acquisitions",
+  );
+  assert.equal(
+    unconstrainedResolved.pendingAction,
+    unconstrainedAcquirePending,
+    "Unconstrained acquire-card pendings should remain unresolved",
+  );
+  const malformedAcquirePendingBase = {
+    kind: "acquire-card",
+    ownerId: p2.id,
+    source: "Verifier Malformed Acquire",
+    maxCost: priceAgentAcquireTarget.cost,
+    optional: true,
+  };
+  const invalidDestinationAcquirePending = {
+    ...malformedAcquirePendingBase,
+    destination: "deck",
+  };
+  const missingSourceAcquirePending = {
+    ...malformedAcquirePendingBase,
+    destination: "hand",
+    source: undefined,
+  };
+  const nonStringSourceAcquirePending = {
+    ...malformedAcquirePendingBase,
+    destination: "hand",
+    source: 17,
+  };
+  const emptySourceAcquirePending = {
+    ...malformedAcquirePendingBase,
+    destination: "hand",
+    source: "  ",
+  };
+  const nonStringOwnerAcquirePending = {
+    ...malformedAcquirePendingBase,
+    destination: "hand",
+    ownerId: 17,
+  };
+  const invalidResourceAcquirePending = {
+    ...malformedAcquirePendingBase,
+    destination: "hand",
+    paymentResource: "melange",
+  };
+  const stringCostAcquirePending = {
+    ...malformedAcquirePendingBase,
+    destination: "hand",
+    maxCost: String(priceAgentAcquireTarget.cost),
+  };
+  const negativeCostAcquirePending = {
+    ...malformedAcquirePendingBase,
+    destination: "hand",
+    maxCost: -1,
+  };
+  const nanCostAcquirePending = {
+    ...malformedAcquirePendingBase,
+    destination: "hand",
+    maxCost: Number.NaN,
+  };
+  const negativeMinCostAcquirePending = {
+    ...malformedAcquirePendingBase,
+    destination: "hand",
+    minCost: -1,
+  };
+  const invertedCostAcquirePending = {
+    ...malformedAcquirePendingBase,
+    destination: "hand",
+    minCost: priceAgentAcquireTarget.cost + 1,
+    maxCost: priceAgentAcquireTarget.cost,
+  };
+  const stringOptionalAcquirePending = {
+    ...malformedAcquirePendingBase,
+    destination: "hand",
+    optional: "true",
+  };
+  for (const malformedPending of [
+    invalidDestinationAcquirePending,
+    missingSourceAcquirePending,
+    nonStringSourceAcquirePending,
+    emptySourceAcquirePending,
+    nonStringOwnerAcquirePending,
+    invalidResourceAcquirePending,
+    stringCostAcquirePending,
+    negativeCostAcquirePending,
+    nanCostAcquirePending,
+    negativeMinCostAcquirePending,
+    invertedCostAcquirePending,
+    stringOptionalAcquirePending,
+  ]) {
+    const malformedFixture = {
+      ...unconstrainedAcquireFixture,
+      pendingAction: malformedPending,
+    };
+    assert.deepEqual(
+      state.acquirableCardsForPending(malformedFixture, malformedPending),
+      [],
+      "Malformed acquire-card pendings should expose no eligible cards",
+    );
+    const malformedResolved = state.acquireCardForPending(
+      malformedFixture,
+      malformedPending,
+      priceAgentAcquireTarget.id,
+    );
+    assert.equal(
+      playerById(malformedResolved, p2.id).hand.length,
+      0,
+      "Malformed acquire-card pendings should not resolve acquisitions",
+    );
+    assert.equal(
+      malformedResolved.pendingAction,
+      malformedPending,
+      "Malformed acquire-card pendings should remain unresolved",
+    );
+  }
+  assert.equal(
+    state.finishPendingAction({
+      ...unconstrainedAcquireFixture,
+      pendingAction: stringOptionalAcquirePending,
+    }).pendingAction,
+    stringOptionalAcquirePending,
+    "Acquire-card pending skip should require optional to be boolean true",
+  );
+  const forgedAcquirePending = {
+    kind: "acquire-card",
+    ownerId: p2.id,
+    source: "Verifier Forged Acquire",
+    maxCost: priceAgentAcquireTarget.cost,
+    destination: "hand",
+  };
+  const forgedAcquireFixture = {
+    ...unconstrainedAcquireFixture,
+    pendingAction: undefined,
+  };
+  const forgedResolved = state.acquireCardForPending(
+    forgedAcquireFixture,
+    forgedAcquirePending,
+    priceAgentAcquireTarget.id,
+  );
+  assert.equal(
+    playerById(forgedResolved, p2.id).hand.length,
+    0,
+    "Acquire-card resolution should require the active pending object",
+  );
+  assert.equal(
+    forgedResolved.pendingAction,
+    undefined,
+    "Forged acquire-card resolution should leave pending state untouched",
+  );
 
   const spyNetworkReplacement = data.imperiumDeck.find((card) => card.id !== spyNetwork.id);
   assert.ok(spyNetworkReplacement, "Expected an Imperium row replacement card for Spy Network purchase coverage");

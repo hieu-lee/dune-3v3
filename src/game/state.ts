@@ -230,15 +230,18 @@ export {
 
 export {
   pendingActionForCard,
-  pendingActionForReverendMotherJessicaRepeat,
   pendingActionsForCard,
+} from "./card-pending-rules";
+
+export {
   pendingActionsForRevealPayResourceForSandworms,
   pendingActionsForRevealPayResourceForStrength,
   pendingActionsForRevealPayResourceForTroops,
   pendingActionsForReveal,
-} from "./card-pending-rules";
+} from "./reveal-pending-rules";
 
 export {
+  pendingActionForReverendMotherJessicaRepeat,
   pendingActionsForLeaderPlacementEffects,
 } from "./leader-effect-pending-rules";
 

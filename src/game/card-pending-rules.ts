@@ -5,7 +5,6 @@ import {
 import {
   canSummonSandworms,
   conflictDeploymentBlockedFor,
-  playerHasConflictUnits,
 } from "./conflict-rules";
 import { playerTroopSupply } from "./deck-utils";
 import {
@@ -24,24 +23,12 @@ import {
   resolveAgentPayTeamResourceForVps,
   resolveAgentTrashSourceForTrades,
   resolveCardEffects,
-  resolveRevealLoseInfluenceForIntrigues,
-  resolveRevealPayResourceForSandworms,
-  resolveRevealPayResourceForStrengths,
-  resolveRevealPayResourceForTroops,
-  resolveRevealRetreatTroopsForStrength,
-  resolveRevealTrashCardEffects,
   resolveAgentAcquireCards,
 } from "./effect-resolver";
 import { discardCardForDrawChoices } from "./discard-draw-rules";
 import { discardCardForInfluenceAndDrawChoices } from "./discard-influence-draw-rules";
 import { changeAllegiancesGainChoices } from "./influence-choices";
 import { influenceEffectOwnerForChoice } from "./influence-loss-rules";
-import { loseInfluenceForIntriguesChoices } from "./influence-intrigue-rules";
-import {
-  feydRauthaLeaderName,
-  ladyAmberMetulliLeaderName,
-  reverendMotherJessicaLeaderName,
-} from "./leader-constants";
 import {
   acquirableCardsForPending,
 } from "./market-rules";
@@ -49,18 +36,12 @@ import {
   pendingActionChoiceOptionIsResolvable,
 } from "./pending-action-choice-rules";
 import {
-  recallableSpySpaces,
-} from "./spy-choices";
-import {
   mergedSpyPlacement,
   spyPendingForPlacement,
 } from "./spy-effect-pending-rules";
-import { trashableCardsForPending } from "./trash-rules";
-import { hasUsedReverendMotherJessicaRepeat } from "./turn-trackers";
 import type {
   BoardSpace,
   Card,
-  FactionId,
   GameState,
   IconId,
   PaidRewardChoicePendingOption,
@@ -127,25 +108,6 @@ function pendingActionForAgentSpyPlacement(
     return spyPendingForPlacement(card.name, target, allyPlacement, effectState);
   }
   return undefined;
-}
-
-function pendingActionForRevealSpyPlacement(
-  card: Card,
-  source: Player,
-  state: GameState,
-): PendingAction | undefined {
-  if (!card.effects) return undefined;
-  const result = resolveCardEffects([card], {
-    trigger: "reveal",
-    source,
-    state,
-  });
-  const sourcePlacement = mergedSpyPlacement(card.name, result.spyPlacements);
-  const allyPlacement = mergedSpyPlacement(card.name, result.activatedAlly.spyPlacements);
-  if (allyPlacement) {
-    throw new Error(`Unsupported activated Ally reveal spy placement for ${card.name}`);
-  }
-  return sourcePlacement ? spyPendingForPlacement(card.name, source, sourcePlacement, state) : undefined;
 }
 
 function pendingActionForAgentDiscardCardForInfluenceAndDraw(
@@ -952,331 +914,4 @@ export function pendingActionForCard(
   space?: BoardSpace,
 ): PendingAction | undefined {
   return pendingActionsForCard(card, source, state, target, space)[0];
-}
-
-export function pendingActionForReverendMotherJessicaRepeat(
-  state: Pick<GameState, "turnReverendMotherJessicaRepeats">,
-  owner: Player,
-  space: BoardSpace,
-  deferredWater = 0,
-): PendingAction | undefined {
-  if (
-    owner.leader !== reverendMotherJessicaLeaderName ||
-    owner.role !== "Ally" ||
-    (space.icon !== "bene" && space.icon !== "fremen") ||
-    Boolean(space.personal) ||
-    owner.resources.water + deferredWater < 1 ||
-    hasUsedReverendMotherJessicaRepeat(state, owner.id)
-  ) {
-    return undefined;
-  }
-  return {
-    kind: "repeat-board-space",
-    ownerId: owner.id,
-    source: "Reverend Mother",
-    spaceId: space.id,
-    resource: "water",
-    cost: 1,
-    optional: true,
-    ability: "reverend-mother-jessica",
-  };
-}
-
-export function pendingActionsForRevealPayResourceForTroops(
-  card: Card,
-  source: Player,
-  state: GameState,
-): PendingAction[] {
-  if (!card.effects || !source.playArea.some((candidate) => candidate.id === card.id)) return [];
-
-  const effectState = { ...state, players: playersWithPendingCardEffect(state, source) };
-  return resolveRevealPayResourceForTroops(card.effects, {
-    trigger: "reveal",
-    source,
-    state: effectState,
-  }).flatMap((effect) => {
-    if (effect.selector !== "self" || effect.cost <= 0 || effect.troops <= 0) return [];
-    if (source.resources[effect.resource] < effect.cost) return [];
-    if (effect.recipient !== "same-team-allies" || effect.destination !== "garrison") return [];
-    const allies = sameTeamAllies(effectState.players, source);
-    if (!allies) return [];
-    return [{
-      kind: "pay-resource-for-troops",
-      ownerId: source.id,
-      recipientIds: [allies[0].id, allies[1].id],
-      resource: effect.resource,
-      cost: effect.cost,
-      troops: effect.troops,
-      destination: effect.destination,
-      optional: effect.optional,
-      ...(effect.trashSource ? { trashSource: true } : {}),
-      source: effect.source ?? card.name,
-      cardId: card.id,
-    }];
-  });
-}
-
-export function pendingActionsForRevealPayResourceForSandworms(
-  card: Card,
-  source: Player,
-  state: GameState,
-  combatRecipientId: string,
-): PendingAction[] {
-  const recipient = state.players.find((player) => player.id === combatRecipientId);
-  if (!card.effects || !source.playArea.some((candidate) => candidate.id === card.id) || !recipient) return [];
-  if (source.role === "Commander" && (recipient.team !== source.team || recipient.role !== "Ally")) return [];
-  if (source.role !== "Commander" && recipient.id !== source.id) return [];
-
-  const players = playersWithPendingCardEffect(state, source, recipient);
-  const effectState = { ...state, players };
-  return resolveRevealPayResourceForSandworms(card.effects, {
-    trigger: "reveal",
-    source,
-    target: recipient,
-    state: effectState,
-  }).flatMap((effect) => {
-    if (effect.selector !== "self" || effect.cost <= 0 || effect.sandworms <= 0 || effect.persuasionCost < 0) return [];
-    if (source.resources[effect.resource] < effect.cost) return [];
-    if (source.persuasion < effect.persuasionCost) return [];
-    if (effect.recipient !== "combat-recipient" || effect.destination !== "conflict") return [];
-    if (!canSummonSandworms(state, recipient, effect.sandworms)) return [];
-    return [{
-      kind: "pay-resource-for-sandworms",
-      ownerId: source.id,
-      recipientId: recipient.id,
-      resource: effect.resource,
-      cost: effect.cost,
-      sandworms: effect.sandworms,
-      strength: effect.sandworms * 3,
-      destination: effect.destination,
-      optional: effect.optional,
-      ...(effect.trashSource ? { trashSource: true } : {}),
-      ...(effect.persuasionCost > 0 ? { persuasionCost: effect.persuasionCost } : {}),
-      source: effect.source ?? card.name,
-      cardId: card.id,
-    }];
-  });
-}
-
-export function pendingActionsForRevealPayResourceForStrength(
-  card: Card,
-  source: Player,
-  state: GameState,
-  combatRecipientId: string,
-): PendingAction[] {
-  const combatRecipient = state.players.find((player) => player.id === combatRecipientId);
-  if (!card.effects || !source.playArea.some((candidate) => candidate.id === card.id) || !combatRecipient) return [];
-  if (source.role === "Commander" && (combatRecipient.team !== source.team || combatRecipient.role !== "Ally")) return [];
-  if (source.role !== "Commander" && combatRecipient.id !== source.id) return [];
-  if (!playerHasConflictUnits(combatRecipient)) return [];
-
-  const players = playersWithPendingCardEffect(state, source, combatRecipient);
-  const effectState = { ...state, players };
-  return resolveRevealPayResourceForStrengths(card.effects, {
-    trigger: "reveal",
-    source,
-    target: combatRecipient,
-    state: effectState,
-  }).flatMap((effect) => {
-    if (effect.selector !== "self" || effect.cost <= 0 || effect.strength <= 0) return [];
-    if (source.resources[effect.resource] < effect.cost) return [];
-    return [{
-      kind: "pay-resource-for-strength",
-      ownerId: source.id,
-      combatRecipientId,
-      resource: effect.resource,
-      cost: effect.cost,
-      strength: effect.strength,
-      optional: effect.optional,
-      source: effect.source ?? card.name,
-      cardId: card.id,
-    }];
-  });
-}
-
-export function pendingActionsForReveal(
-  source: Player,
-  state: GameState,
-  revealedCards: Card[],
-  combatRecipientId: string,
-): PendingAction[] {
-  const printedRevealCards = revealedCards
-    .filter((card) => card.conditionalPersuasion || card.conditionalSwords)
-    .map((card) => card.name);
-  const allowPersuasionAdjustment = revealedCards.some((card) => card.conditionalPersuasion);
-  const allowStrengthAdjustment = revealedCards.some((card) => card.conditionalSwords);
-  const revealAdjustPending: PendingAction | undefined = printedRevealCards.length > 0
-    ? {
-        kind: "reveal-adjust",
-        ownerId: source.id,
-        combatRecipientId,
-        cards: printedRevealCards,
-        persuasionAdjustment: 0,
-        strengthAdjustment: 0,
-        allowPersuasionAdjustment,
-        allowStrengthAdjustment,
-        source: "Printed reveal",
-      }
-    : undefined;
-  const revealTrashCardPendings = revealedCards.flatMap((card) =>
-    pendingActionsForRevealTrashCards(card, source, state, combatRecipientId)
-  );
-  const revealSpyPlacementPendings = revealedCards
-    .map((card) => pendingActionForRevealSpyPlacement(card, source, state))
-    .filter((pending): pending is PendingAction => Boolean(pending));
-  const payResourceStrengthPendings = revealedCards.flatMap((card) =>
-    pendingActionsForRevealPayResourceForStrength(card, source, state, combatRecipientId)
-  );
-  const payResourceTroopPendings = revealedCards.flatMap((card) =>
-    pendingActionsForRevealPayResourceForTroops(card, source, state)
-  );
-  const payResourceSandwormPendings = revealedCards.flatMap((card) =>
-    pendingActionsForRevealPayResourceForSandworms(card, source, state, combatRecipientId)
-  );
-  const influenceIntriguePendings = revealedCards.flatMap((card) =>
-    pendingActionsForRevealInfluenceIntrigues(card, source, state, combatRecipientId)
-  );
-  const retreatTroopStrengthPendings = revealedCards.flatMap((card) =>
-    pendingActionsForRevealRetreatTroopsForStrength(card, source, state, combatRecipientId)
-  );
-  const feydDeviousStrengthPending = pendingActionForFeydDeviousStrength(source, state, combatRecipientId);
-  const amberDesertScoutsPending = pendingActionForLadyAmberDesertScouts(source);
-
-  return [
-    revealAdjustPending,
-    ...revealSpyPlacementPendings,
-    ...revealTrashCardPendings,
-    ...payResourceStrengthPendings,
-    ...payResourceTroopPendings,
-    ...payResourceSandwormPendings,
-    ...influenceIntriguePendings,
-    ...retreatTroopStrengthPendings,
-    feydDeviousStrengthPending,
-    amberDesertScoutsPending,
-  ].filter((action): action is PendingAction => Boolean(action));
-}
-
-function pendingActionsForRevealInfluenceIntrigues(
-  card: Card,
-  source: Player,
-  state: GameState,
-  combatRecipientId: string,
-): PendingAction[] {
-  const recipient = state.players.find((player) => player.id === combatRecipientId);
-  return resolveRevealLoseInfluenceForIntrigues(card.effects, {
-    trigger: "reveal",
-    source,
-    target: recipient,
-    state,
-  }).flatMap((effect) => {
-    if (effect.selector !== "self" || effect.amount <= 0) return [];
-    if (loseInfluenceForIntriguesChoices(source).length === 0) return [];
-    return [{
-      kind: "lose-influence-for-intrigues",
-      ownerId: source.id,
-      source: card.name,
-      amount: effect.amount,
-      optional: effect.optional,
-    }];
-  });
-}
-
-function pendingActionForFeydDeviousStrength(
-  source: Player,
-  state: GameState,
-  combatRecipientId: string,
-): PendingAction | undefined {
-  if (source.leader !== feydRauthaLeaderName || source.role !== "Ally") return undefined;
-  const recipient = state.players.find((player) => player.id === combatRecipientId);
-  if (!recipient || !playerHasConflictUnits(recipient)) return undefined;
-  const pending: Extract<PendingAction, { kind: "recall-spy" }> = {
-    kind: "recall-spy",
-    ownerId: source.id,
-    combatRecipientId,
-    remaining: 1,
-    strength: 2,
-    source: "Devious Strength",
-    optional: true,
-  };
-  return recallableSpySpaces(state, pending).length > 0 ? pending : undefined;
-}
-
-function pendingActionForLadyAmberDesertScouts(source: Player): PendingAction | undefined {
-  if (
-    source.leader !== ladyAmberMetulliLeaderName ||
-    source.role !== "Ally" ||
-    source.deployedTroops <= 0
-  ) {
-    return undefined;
-  }
-  return {
-    kind: "amber-desert-scouts",
-    ownerId: source.id,
-    source: "Desert Scouts",
-  };
-}
-
-function pendingActionsForRevealTrashCards(
-  card: Card,
-  source: Player,
-  state: GameState,
-  combatRecipientId: string,
-): PendingAction[] {
-  const recipient = state.players.find((player) => player.id === combatRecipientId);
-  return resolveRevealTrashCardEffects(card.effects, {
-    trigger: "reveal",
-    source,
-    target: recipient,
-    state,
-  }).flatMap((effect) => {
-    if (effect.selector !== "self") return [];
-    if (effect.strengthReward !== undefined && (!recipient || !playerHasConflictUnits(recipient))) return [];
-    const pending: Extract<PendingAction, { kind: "trash-card" }> = {
-      kind: "trash-card",
-      ownerId: source.id,
-      source: card.name,
-      optional: effect.optional,
-      ...(effect.zones ? { zones: effect.zones } : {}),
-      ...(effect.excludeSource ? { excludeCardId: card.id } : {}),
-      ...(effect.requiredTrait ? { requiredTrait: effect.requiredTrait } : {}),
-      ...(effect.strengthReward !== undefined && recipient ? {
-        combatRecipientId: recipient.id,
-        strengthReward: effect.strengthReward,
-      } : {}),
-      ...(effect.spiceRewardCostThreshold !== undefined ? {
-        spiceRewardCostThreshold: effect.spiceRewardCostThreshold,
-      } : {}),
-      ...(effect.spiceReward !== undefined ? { spiceReward: effect.spiceReward } : {}),
-    };
-    return trashableCardsForPending(source, pending).length > 0 ? [pending] : [];
-  });
-}
-
-function pendingActionsForRevealRetreatTroopsForStrength(
-  card: Card,
-  source: Player,
-  state: GameState,
-  combatRecipientId: string,
-): PendingAction[] {
-  const recipient = state.players.find((player) => player.id === combatRecipientId);
-  if (!recipient || !playerHasConflictUnits(recipient)) return [];
-
-  return resolveRevealRetreatTroopsForStrength(card.effects, {
-    trigger: "reveal",
-    source,
-    target: recipient,
-    state,
-  }).flatMap((effect) => {
-    if (effect.selector !== "self" || effect.troopCount <= 0 || effect.strength <= 0) return [];
-    if (recipient.deployedTroops < effect.troopCount) return [];
-    return [{
-      kind: "retreat-troops-for-strength",
-      ownerId: source.id,
-      combatRecipientId,
-      troopCount: effect.troopCount,
-      strength: effect.strength,
-      optional: effect.optional,
-      source: card.name,
-    }];
-  });
 }

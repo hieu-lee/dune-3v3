@@ -4,7 +4,7 @@ import {
 } from "./data";
 import {
   pendingActionForReverendMotherJessicaRepeat,
-} from "./card-pending-rules";
+} from "./leader-effect-pending-rules";
 import {
   drawCards,
 } from "./deck-utils";

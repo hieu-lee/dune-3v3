@@ -4,6 +4,12 @@ import {
 import {
   leaderPlacementEffectSpecs,
 } from "./leader-effect-data";
+import {
+  reverendMotherJessicaLeaderName,
+} from "./leader-constants";
+import {
+  hasUsedReverendMotherJessicaRepeat,
+} from "./turn-trackers";
 import type {
   BoardSpace,
   GameState,
@@ -54,4 +60,32 @@ export function pendingActionsForLeaderPlacementEffects(
       ...(followUp ? { followUp } : {}),
     }];
   });
+}
+
+export function pendingActionForReverendMotherJessicaRepeat(
+  state: Pick<GameState, "turnReverendMotherJessicaRepeats">,
+  owner: Player,
+  space: BoardSpace,
+  deferredWater = 0,
+): PendingAction | undefined {
+  if (
+    owner.leader !== reverendMotherJessicaLeaderName ||
+    owner.role !== "Ally" ||
+    (space.icon !== "bene" && space.icon !== "fremen") ||
+    Boolean(space.personal) ||
+    owner.resources.water + deferredWater < 1 ||
+    hasUsedReverendMotherJessicaRepeat(state, owner.id)
+  ) {
+    return undefined;
+  }
+  return {
+    kind: "repeat-board-space",
+    ownerId: owner.id,
+    source: "Reverend Mother",
+    spaceId: space.id,
+    resource: "water",
+    cost: 1,
+    optional: true,
+    ability: "reverend-mother-jessica",
+  };
 }

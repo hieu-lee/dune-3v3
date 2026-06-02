@@ -56,6 +56,7 @@ function validateTrigger(trigger: GameEffectTrigger): asserts trigger is GameEff
 function validateCondition(condition: GameEffectConditionSpec, trigger: GameEffectTrigger) {
   if (condition.kind === "visited-maker-space") return;
   if (condition.kind === "visited-space-has-spy-post") return;
+  if (condition.kind === "has-spy-post-on-maker-space") return;
   if (condition.kind === "has-combat-recipient") {
     if (trigger === "combat-intrigue") return;
     throw new Error(`Unsupported effect condition "${condition.kind}" for ${trigger}`);

@@ -166,6 +166,7 @@ export type GameEffectConditionSpec =
   | { kind: "visited-maker-space" }
   | { kind: "visited-space-icon"; icon: IconId }
   | { kind: "visited-space-has-spy-post" }
+  | { kind: "has-spy-post-on-maker-space" }
   | { kind: "has-combat-recipient" }
   | { kind: "has-combat-recipient-sandworms"; count: number }
   | { kind: "has-spy-posts"; count: number }

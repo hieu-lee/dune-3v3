@@ -17,6 +17,10 @@ export function visitedSpaceWithSpyPost() {
   return { kind: "visited-space-has-spy-post" } as const;
 }
 
+export function hasSpyPostOnMakerSpace() {
+  return { kind: "has-spy-post-on-maker-space" } as const;
+}
+
 export function hasSpyPosts(count: number) {
   return { kind: "has-spy-posts", count } as const;
 }

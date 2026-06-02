@@ -4,6 +4,7 @@ import {
   effectiveFremenIconInfluence,
   effectiveRequirementInfluence,
 } from "./board-rules";
+import { boardSpaces } from "./board-space-data";
 import { playerConflictUnitCount } from "./conflict-rules";
 import { playerHasSpyPost, spyPostCount } from "./spy-posts";
 import type { GameEffectContext } from "./effect-resolver-types";
@@ -101,6 +102,15 @@ export function conditionApplies(condition: GameEffectConditionSpec, context: Ga
         context.space.id,
         context.source.id,
       ),
+    );
+  }
+  if (condition.kind === "has-spy-post-on-maker-space") {
+    const spyPosts = context.state?.spyPosts;
+    const sharedSpyPosts = context.state?.sharedSpyPosts;
+    if (!spyPosts || !sharedSpyPosts) return false;
+    return boardSpaces.some((space) =>
+      space.maker &&
+      playerHasSpyPost({ spyPosts, sharedSpyPosts }, space.id, context.source.id)
     );
   }
   if (condition.kind === "has-combat-recipient") {

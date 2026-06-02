@@ -28,6 +28,7 @@ import {
   rebelSupplierSourceId,
   reliableInformantSourceId,
   sardaukarSoldierSourceId,
+  smugglersHavenSourceId,
   smugglersHarvesterSourceId,
   southernEldersSourceId,
   spaceTimeFoldingSourceId,
@@ -64,6 +65,7 @@ import {
   hasHighCouncilSeat,
   hasInfluence,
   hasRole,
+  hasSpyPostOnMakerSpace,
   hasSpyPosts,
   hasSwordmasterBonus,
   revealGainPersuasion,
@@ -237,6 +239,12 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
       ),
       revealGainPersuasion(1),
       revealGainStrength(1),
+    ];
+  }
+  if (card.id === smugglersHavenSourceId) {
+    return [
+      agentGainResource("spice", 2, [hasSpyPostOnMakerSpace()]),
+      revealGainPersuasion(1),
     ];
   }
   if (card.id === hiddenMissiveSourceId) {
@@ -482,6 +490,9 @@ function imperiumPlayText(card: HubCard) {
   }
   if (card.id === reliableInformantSourceId) {
     return "Gain 1 Solari on Emperor, Bene Gesserit, or Spacing Guild board spaces.";
+  }
+  if (card.id === smugglersHavenSourceId) {
+    return "If you are spying on a Maker board space, gain 2 spice.";
   }
   if (card.id === spaceTimeFoldingSourceId) {
     return "Discard 1 card to draw 1 card. If you discarded a Spacing Guild card, draw 1 more card.";

@@ -170,6 +170,7 @@ try {
   const rebelSupplier = data.imperiumDeck.find((card) => card.name === "Rebel Supplier");
   const reliableInformant = data.imperiumDeck.find((card) => card.name === "Reliable Informant");
   const sardaukarSoldier = data.imperiumDeck.find((card) => card.name === "Sardaukar Soldier");
+  const smugglersHaven = data.imperiumDeck.find((card) => card.name === "Smuggler's Haven");
   const southernElders = data.imperiumDeck.find((card) => card.name === "Southern Elders");
   const spaceTimeFolding = data.imperiumDeck.find((card) => card.name === "Space-time Folding");
   const stilgar = data.imperiumDeck.find((card) => card.name === "Stilgar, The Devoted");
@@ -270,6 +271,7 @@ try {
     rebelSupplier &&
     reliableInformant &&
     sardaukarSoldier &&
+    smugglersHaven &&
     southernElders &&
     spaceTimeFolding &&
     stilgar &&
@@ -3324,6 +3326,7 @@ try {
       "Rebel Supplier",
       "Reliable Informant",
       "Sardaukar Soldier",
+      "Smuggler's Haven",
       "Southern Elders",
       "Space-time Folding",
       "Stilgar, The Devoted",
@@ -3353,6 +3356,7 @@ try {
     northernWatermaster,
     paracompass,
     reliableInformant,
+    smugglersHaven,
     spaceTimeFolding,
     guildEnvoy,
     wheelsWithinWheels,
@@ -4445,6 +4449,28 @@ try {
     hasRevealEffect(doubleAgent, (effect) => effect.kind === "gain-persuasion" && effect.amount === 1) &&
       hasRevealEffect(doubleAgent, (effect) => effect.kind === "gain-strength" && effect.amount === 1),
     "Double Agent should carry fixed Reveal persuasion and strength specs",
+  );
+  assert.equal(
+    smugglersHaven.play,
+    "If you are spying on a Maker board space, gain 2 spice.",
+    "Smuggler's Haven play text should include its Maker-space spy condition",
+  );
+  assert.ok(
+    smugglersHaven.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.conditions?.some((condition) => condition.kind === "has-spy-post-on-maker-space") &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-resource" &&
+        effect.selector === "self" &&
+        effect.resource === "spice" &&
+        effect.amount === 2
+      )
+    ),
+    "Smuggler's Haven should carry an owned Maker-space spy-post gated Agent spice spec",
+  );
+  assert.ok(
+    hasRevealEffect(smugglersHaven, (effect) => effect.kind === "gain-persuasion" && effect.amount === 1),
+    "Smuggler's Haven should carry its fixed Reveal persuasion spec",
   );
   assert.ok(
     hiddenMissive.effects?.some((spec) =>
@@ -10048,6 +10074,76 @@ try {
   );
   assert.equal(reliableInformantReveal.persuasion, 1, "Reliable Informant should reveal for 1 persuasion");
   assert.deepEqual(reliableInformantReveal.revealGain, { solari: 1 }, "Reliable Informant should reveal for 1 Solari");
+  const smugglersHavenSpiedMakerEffect = state.applyCardAgentEffect(
+    smugglersHaven,
+    { ...p2, resources: { solari: 0, spice: 0, water: 0 } },
+    p2,
+    {
+      ...game,
+      spyPosts: { [imperialBasin.id]: p2.id },
+    },
+    deliverSupplies,
+  );
+  assert.deepEqual(
+    smugglersHavenSpiedMakerEffect.source.resources,
+    { solari: 0, spice: 2, water: 0 },
+    "Smuggler's Haven should gain 2 Agent spice when the player has a spy on any Maker space",
+  );
+  assert.equal(
+    smugglersHavenSpiedMakerEffect.sourceSpiceGained,
+    2,
+    "Smuggler's Haven Agent spice should be tracked as turn spice gain",
+  );
+  assert.match(smugglersHavenSpiedMakerEffect.log ?? "", /Smuggler's Haven: gains 2 spice/);
+  const smugglersHavenUnspiedMakerEffect = state.applyCardAgentEffect(
+    smugglersHaven,
+    { ...p2, resources: { solari: 0, spice: 0, water: 0 } },
+    p2,
+    game,
+    deliverSupplies,
+  );
+  assert.deepEqual(
+    smugglersHavenUnspiedMakerEffect.source.resources,
+    { solari: 0, spice: 0, water: 0 },
+    "Smuggler's Haven should not gain Agent spice without the player's Maker-space spy",
+  );
+  assert.equal(smugglersHavenUnspiedMakerEffect.log, undefined, "Smuggler's Haven should not log without its spy condition");
+  const smugglersHavenOpponentSpiedMakerEffect = state.applyCardAgentEffect(
+    smugglersHaven,
+    { ...p2, resources: { solari: 0, spice: 0, water: 0 } },
+    p2,
+    {
+      ...game,
+      spyPosts: { [imperialBasin.id]: p1.id },
+    },
+    deliverSupplies,
+  );
+  assert.deepEqual(
+    smugglersHavenOpponentSpiedMakerEffect.source.resources,
+    { solari: 0, spice: 0, water: 0 },
+    "Smuggler's Haven should not gain Agent spice from another player's Maker-space spy",
+  );
+  assert.equal(
+    smugglersHavenOpponentSpiedMakerEffect.log,
+    undefined,
+    "Smuggler's Haven should not log for another player's Maker-space spy",
+  );
+  const smugglersHavenSpiedNonMakerEffect = state.applyCardAgentEffect(
+    smugglersHaven,
+    { ...p2, resources: { solari: 0, spice: 0, water: 0 } },
+    p2,
+    {
+      ...game,
+      spyPosts: { [deliverSupplies.id]: p2.id },
+    },
+    deliverSupplies,
+  );
+  assert.deepEqual(
+    smugglersHavenSpiedNonMakerEffect.source.resources,
+    { solari: 0, spice: 0, water: 0 },
+    "Smuggler's Haven should not gain Agent spice from a spy on a non-Maker space",
+  );
+  assert.equal(smugglersHavenSpiedNonMakerEffect.log, undefined, "Smuggler's Haven should not log on non-Maker spaces");
   const spaceTimeNonGuildDiscard = { ...dagger, id: "space-time-non-guild-discard-card" };
   const spaceTimeDrawOne = { ...convincingArgument, id: "space-time-draw-one-card" };
   const spaceTimeDrawTwo = { ...convincingArgument, id: "space-time-draw-two-card" };

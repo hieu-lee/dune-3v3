@@ -29,6 +29,16 @@ export function verifyCombatIntrigueGoToGround({
     "Go To Ground should require an explicit retreat count",
   );
   assert.equal(
+    state.playCombatIntrigue(goToGroundCombat, "p2", goToGround.id, undefined, "retreat-troops"),
+    goToGroundCombat,
+    "Go To Ground should reject the legacy retreat branch string without an explicit troop count",
+  );
+  assert.equal(
+    state.playCombatIntrigue(goToGroundCombat, "p2", goToGround.id, undefined, { kind: "retreat-troops" }),
+    goToGroundCombat,
+    "Go To Ground should reject malformed retreat choices without an explicit troop count",
+  );
+  assert.equal(
     state.playCombatIntrigue(goToGroundCombat, "p2", goToGround.id, undefined, { kind: "retreat-troops", count: 0 }),
     goToGroundCombat,
     "Go To Ground should reject zero troops",

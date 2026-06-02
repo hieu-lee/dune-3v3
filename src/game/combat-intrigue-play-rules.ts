@@ -3,7 +3,6 @@ import {
   combatIntrigueTargets,
 } from "./combat-intrigue-rules";
 import {
-  isGoToGroundIntrigue,
   isSpiceIsPowerIntrigue,
   isTacticalOptionIntrigue,
 } from "./card-identifiers";
@@ -12,6 +11,7 @@ import {
   resolveCombatInfluenceLossForStrengths,
   resolveCombatRetreatTroops,
   resolveCombatSpyRecallForStrengths,
+  resolveGameEffects,
   resolveTakeContracts,
   resolveTrashCardEffects,
   type AgentAcquireCard,
@@ -28,11 +28,9 @@ import {
   acquirableCardsForPending,
 } from "./market-rules";
 import {
-  placeableSpySpaces,
-} from "./spy-choices";
-import {
   trashableCardsForPending,
 } from "./trash-rules";
+import { pendingActionForSpyPlacements } from "./spy-effect-pending-rules";
 import type {
   GameState,
   IntrigueCard,
@@ -348,6 +346,30 @@ function resolveCombatContractPendingActions(
   }, { pendingActions: [], logTexts: [] });
 }
 
+function combatSpyPlacementDescription(pending: SpyPendingAction) {
+  return pending.mustPlaceSpy ? "must place a spy" : "may place a spy";
+}
+
+function resolveCombatSpyPlacementPendingActions(
+  state: GameState,
+  intrigue: IntrigueCard,
+  actor: Player,
+  target: Player,
+  combatChoice: CombatIntrigueChoice | undefined,
+) {
+  const resolved = resolveGameEffects(intrigue.effects, combatEffectContext(state, actor, target, combatChoice));
+  if (resolved.activatedAlly.spyPlacements.length > 0) {
+    throw new Error(`Unsupported activated Ally Combat Intrigue spy placement for ${intrigue.name}`);
+  }
+  const pending = pendingActionForSpyPlacements(intrigue.name, target, resolved.spyPlacements, state);
+  if (!pending) return { pendingActions: [], logTexts: [] };
+  if (pending.kind !== "spy") throw new Error(`Unsupported Combat Intrigue spy placement pending action for ${intrigue.name}`);
+  return {
+    pendingActions: [pending],
+    logTexts: [combatSpyPlacementDescription(pending)],
+  };
+}
+
 export function resolvePlayCombatIntrigue(
   state: GameState,
   actorId: string,
@@ -367,46 +389,6 @@ export function resolvePlayCombatIntrigue(
   if (!resolvedTargetId || !targets.includes(resolvedTargetId)) return state;
   const target = state.players.find((player) => player.id === resolvedTargetId);
   if (!target) return state;
-  if (isGoToGroundIntrigue(intrigue)) {
-    const retreatCount =
-      typeof combatChoice === "object" && combatChoice.kind === "retreat-troops" ? combatChoice.count : undefined;
-    if (
-      !Number.isInteger(retreatCount) ||
-      (retreatCount ?? 0) < 1 ||
-      (retreatCount ?? 0) > 2 ||
-      (retreatCount ?? 0) > target.deployedTroops
-    ) return state;
-    const count = retreatCount ?? 0;
-    const spyPending: SpyPendingAction = { kind: "spy", ownerId: target.id, remaining: 1, source: "Go To Ground" };
-    const canPlaceSpy = placeableSpySpaces(state, spyPending).length > 0;
-
-    const players = state.players.map((player) => {
-      let next = player;
-      if (player.id === actor.id) {
-        next = { ...next, intrigues: next.intrigues.filter((card) => card.id !== intrigue.id) };
-      }
-      if (player.id === target.id) {
-        next = {
-          ...next,
-          conflict: Math.max(0, next.conflict - count * 2),
-          deployedTroops: next.deployedTroops - count,
-          garrison: next.garrison + count,
-        };
-      }
-      return next;
-    });
-    return advanceAfterCombatIntriguePlay({
-      ...state,
-      players,
-      combatPasses: [],
-      intrigueDiscard: [...state.intrigueDiscard, intrigue],
-      pendingAction: canPlaceSpy ? spyPending : undefined,
-      log: [
-        `${actor.leader} plays Go To Ground for ${target.leader}; ${target.leader} retreats ${count} ${count === 1 ? "troop" : "troops"}${canPlaceSpy ? " and may place a spy" : ""}.`,
-        ...state.log,
-      ],
-    });
-  }
   if (isSpiceIsPowerIntrigue(intrigue)) {
     if (combatChoice !== "spend-spice" && combatChoice !== "retreat-troops") return state;
     if (combatChoice === "spend-spice" && target.resources.spice < 3) return state;
@@ -490,6 +472,7 @@ export function resolvePlayCombatIntrigue(
   const combatAcquire = resolveCombatAcquirePendingActions(state, intrigue, actor, target, combatChoice);
   const combatInfluenceLoss = resolveCombatInfluenceLossPendingActions(state, intrigue, actor, target, combatChoice);
   const combatContract = resolveCombatContractPendingActions(state, intrigue, actor, target, combatChoice);
+  const combatSpyPlacement = resolveCombatSpyPlacementPendingActions(state, intrigue, actor, target, combatChoice);
   const combatSpyRecall = resolveCombatSpyRecallPendingActions(state, intrigue, actor, target, combatChoice);
   const combatTrash = resolveCombatTrashPendingActions(state, intrigue, actor, target, combatChoice);
   if (selectedRetreatChoiceRequested(combatChoice) && combatRetreat.retreats.length === 0) return state;
@@ -500,6 +483,7 @@ export function resolvePlayCombatIntrigue(
     combatAcquire.logTexts.length === 0 &&
     combatInfluenceLoss.logTexts.length === 0 &&
     combatContract.logTexts.length === 0 &&
+    combatSpyPlacement.logTexts.length === 0 &&
     combatSpyRecall.logTexts.length === 0 &&
     combatTrash.logTexts.length === 0
   ) return state;
@@ -533,6 +517,7 @@ export function resolvePlayCombatIntrigue(
   pendingActions.push(...combatInfluenceLoss.pendingActions);
   pendingActions.push(...combatContract.pendingActions);
   pendingActions.push(...combatTrash.pendingActions);
+  pendingActions.push(...combatSpyPlacement.pendingActions);
   pendingActions.push(...combatSpyRecall.pendingActions);
   pendingActions.push(...combatAcquire.pendingActions);
   const nextState = {
@@ -553,6 +538,7 @@ export function resolvePlayCombatIntrigue(
     ...combatInfluenceLoss.logTexts,
     ...combatContract.logTexts,
     ...combatTrash.logTexts,
+    ...combatSpyPlacement.logTexts,
     ...combatSpyRecall.logTexts,
     ...combatAcquire.logTexts,
   ];

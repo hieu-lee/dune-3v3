@@ -24,6 +24,7 @@ import {
   guildEnvoySourceId,
   guildSpySourceId,
   findWeaknessSourceId,
+  goToGroundSourceId,
   hiddenMissiveSourceId,
   inHighPlacesSourceId,
   impressSourceId,
@@ -88,6 +89,7 @@ import {
   combatAcquireCard,
   combatGainStrength,
   combatLoseInfluenceForStrength,
+  combatPlaceSpies,
   combatRecallSpiesForStrength,
   combatRetreatTroops,
   combatTakeContracts,
@@ -1024,6 +1026,12 @@ function intrigueCardEffects(card: HubCard): CardEffectSpec[] | undefined {
     return [
       combatGainStrength(2),
       combatRecallSpiesForStrength(1, 3, { optional: true, source: "Find Weakness" }, [hasSpyPosts(1)]),
+    ];
+  }
+  if (card.id === goToGroundSourceId) {
+    return [
+      combatRetreatTroops(1, 2, { source: "Go To Ground" }, undefined, { choiceId: "retreat-troops" }),
+      combatPlaceSpies(1, { source: "Go To Ground" }, undefined, { choiceId: "retreat-troops" }),
     ];
   }
   if (card.id === questionableMethodsSourceId) {

@@ -160,6 +160,26 @@ export function combatRecallSpiesForStrength(
   ], conditions);
 }
 
+export function combatPlaceSpies(
+  amount: EffectAmountSpec,
+  options: {
+    source?: string;
+    mustPlace?: boolean;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+  specOptions?: CardEffectSpecOptions,
+): CardEffectSpec {
+  return combatIntrigueEffects([
+    {
+      kind: "place-spies",
+      selector: "self",
+      amount,
+      ...(options.source ? { source: options.source } : {}),
+      ...(options.mustPlace !== undefined ? { mustPlace: options.mustPlace } : {}),
+    },
+  ], conditions, specOptions);
+}
+
 export function combatLoseInfluenceForStrength(
   strengthReward: EffectAmountSpec,
   options: {

@@ -184,6 +184,7 @@ try {
   const devour = data.intrigueCards.find((card) => card.name === "Devour");
   const distraction = data.intrigueCards.find((card) => card.name === "Distraction");
   const findWeakness = data.intrigueCards.find((card) => card.name === "Find Weakness");
+  const goToGround = data.intrigueCards.find((card) => card.name === "Go To Ground");
   const impress = data.intrigueCards.find((card) => card.name === "Impress");
   const imperiumPolitics = data.intrigueCards.find((card) => card.name === "Imperium Politics");
   const inspireAwe = data.intrigueCards.find((card) => card.name === "Inspire Awe");
@@ -268,7 +269,7 @@ try {
     wheelsWithinWheels,
   );
   assert.ok(commandRespect && prepareTheWay && spiceMustFlow && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
-  assert.ok(backedByChoam && buyAccess && callToArms && changeAllegiances && councilorsAmbition && contingencyPlan && cunning && departForArrakis && devour && distraction && findWeakness && impress && imperiumPolitics && inspireAwe && intelligenceReport && leverage && manipulate && marketOpportunity && mercenaries && opportunism && questionableMethods && reachAgreement && shaddamsFavor && specialMission && springTheTrap && sietchRitual && strategicStockpiling && weirdingCombat);
+  assert.ok(backedByChoam && buyAccess && callToArms && changeAllegiances && councilorsAmbition && contingencyPlan && cunning && departForArrakis && devour && distraction && findWeakness && goToGround && impress && imperiumPolitics && inspireAwe && intelligenceReport && leverage && manipulate && marketOpportunity && mercenaries && opportunism && questionableMethods && reachAgreement && shaddamsFavor && specialMission && springTheTrap && sietchRitual && strategicStockpiling && weirdingCombat);
   assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && dutifulService && deliverSupplies && sietchTabr && spiceRefinery);
   assert.equal(revealSpecCards.length, 79, "Unexpected number of cards with declarative Reveal specs");
   assert.equal(
@@ -463,6 +464,67 @@ try {
     findWeaknessSpyRecallEffects,
     [{ selector: "self", amount: 1, strength: 3, optional: true, source: "Find Weakness" }],
     "Find Weakness spy-recall spec should resolve with one owned spy post",
+  );
+  assert.ok(
+    goToGround.effects?.some((spec) =>
+      spec.trigger === "combat-intrigue" &&
+      spec.choiceId === "retreat-troops" &&
+      spec.effects.some((effect) =>
+        effect.kind === "retreat-troops" &&
+        effect.selector === "self" &&
+        effect.min === 1 &&
+        effect.max === 2 &&
+        effect.source === "Go To Ground"
+      )
+    ),
+    "Go To Ground should carry a typed selected Combat troop-retreat spec",
+  );
+  assert.ok(
+    goToGround.effects?.some((spec) =>
+      spec.trigger === "combat-intrigue" &&
+      spec.choiceId === "retreat-troops" &&
+      spec.effects.some((effect) =>
+        effect.kind === "place-spies" &&
+        effect.selector === "self" &&
+        effect.amount === 1 &&
+        effect.source === "Go To Ground"
+      )
+    ),
+    "Go To Ground should carry a typed Combat spy-placement spec",
+  );
+  const goToGroundCombatContext = {
+    trigger: "combat-intrigue",
+    choiceId: "retreat-troops",
+    selectedTroopCount: 2,
+    source: p2,
+    target: p2,
+    state: game,
+  };
+  assert.deepEqual(
+    effectResolver.resolveCombatRetreatTroops(goToGround.effects, goToGroundCombatContext),
+    [{ selector: "self", count: 2, min: 1, max: 2, source: "Go To Ground" }],
+    "Go To Ground selected retreat spec should resolve the chosen troop count",
+  );
+  assert.deepEqual(
+    effectResolver.resolveGameEffects(goToGround.effects, goToGroundCombatContext).spyPlacements,
+    [{
+      count: 1,
+      recallForSupply: undefined,
+      mustPlace: undefined,
+      placementIcon: undefined,
+      allowSharedPost: undefined,
+      source: "Go To Ground",
+      postPlacementAction: undefined,
+    }],
+    "Go To Ground spy-placement spec should resolve through the generic effect resolver",
+  );
+  assert.deepEqual(
+    effectResolver.resolveGameEffects(goToGround.effects, {
+      ...goToGroundCombatContext,
+      choiceId: undefined,
+    }).spyPlacements,
+    [],
+    "Go To Ground spy-placement spec should remain gated by the selected-retreat choice",
   );
   assert.ok(
     hasCombatEffect(questionableMethods, (effect) =>

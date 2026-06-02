@@ -33,6 +33,49 @@ export async function runCombatIntriguesSmoke({
   await page.setViewportSize({ width: 1440, height: 1100 });
   await page.evaluate(() => window.scrollTo(0, 0));
 
+  const beforeGoToGround = await currentGame(page);
+  const gurneyBeforeGoToGround = playerById(beforeGoToGround, "p3");
+  await combatCard(page, "Go To Ground").getByRole("button", { name: "Gurney Halleck: retreat 2 + spy" }).click();
+  await page.waitForFunction(() => {
+    const game = window.__DUNE_DEBUG__?.getGame();
+    const gurney = game?.players.find((player) => player.id === "p3");
+    const muadDib = game?.players.find((player) => player.id === "p1");
+    return Boolean(
+      game &&
+        game.pendingAction?.kind === "spy" &&
+        game.pendingAction.ownerId === "p3" &&
+        game.pendingAction.remaining === 1 &&
+        game.pendingAction.source === "Go To Ground" &&
+        gurney?.conflict === 2 &&
+        gurney?.deployedTroops === 1 &&
+        !muadDib?.intrigues.some((card) => card.name === "Go To Ground"),
+    );
+  });
+  const afterGoToGround = await currentGame(page);
+  const gurneyAfterGoToGround = playerById(afterGoToGround, "p3");
+  assert.equal(
+    gurneyAfterGoToGround.conflict,
+    gurneyBeforeGoToGround.conflict - 4,
+    "Go To Ground should remove the chosen troops' strength",
+  );
+  assert.equal(
+    gurneyAfterGoToGround.deployedTroops,
+    gurneyBeforeGoToGround.deployedTroops - 2,
+    "Go To Ground should retreat the selected troop count",
+  );
+  assert.equal(
+    gurneyAfterGoToGround.garrison,
+    gurneyBeforeGoToGround.garrison + 2,
+    "Go To Ground should return retreated troops to the recipient's garrison",
+  );
+  assert.deepEqual(
+    afterGoToGround.pendingAction,
+    { kind: "spy", ownerId: "p3", remaining: 1, source: "Go To Ground" },
+    "Go To Ground should queue an optional spy-placement pending action for the chosen Ally",
+  );
+  await screenshot(page, captures, "combat-intrigues-go-to-ground-pending.png");
+
+  await setDebugGameAndWait(page, states.commander);
   const beforeImpress = await currentGame(page);
   const gurneyBeforeImpress = playerById(beforeImpress, "p3");
   await combatCard(page, "Impress").getByRole("button", { name: "Gurney Halleck: +2 + acquire" }).click();

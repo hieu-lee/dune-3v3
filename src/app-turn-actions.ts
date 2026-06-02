@@ -4,7 +4,9 @@ import {
   boardSpaceSpiceGainFor,
   revealGainLabel,
 } from "./app-helpers";
+import { factionLabels } from "./game/data";
 import {
+  adjustInfluence,
   applyBoardEffect,
   applyCardAgentEffect,
   collectMakerSpice,
@@ -40,6 +42,7 @@ import {
 import type {
   BoardSpace,
   Card,
+  FactionId,
   GameState,
   PendingAction,
   Player,
@@ -376,6 +379,7 @@ export function placeAgentAction(
 }
 
 type RevealTurnPlan = {
+  influenceGains: Partial<Record<FactionId, number>>;
   persuasion: number;
   printedRevealCards: string[];
   recruitedTroops: number;
@@ -392,11 +396,12 @@ export function revealTurnPlan(
   const persuasion = effectResult.persuasion + highCouncilPersuasion;
   const swords = effectResult.swords + (activePlayer.swordmasterBonus ? 2 : 0);
   const revealGain = effectResult.revealGain;
+  const influenceGains = effectResult.influenceGains;
   const recruitedTroops = effectResult.recruitedTroops;
   const printedRevealCards = activePlayer.hand
     .filter((card) => card.conditionalPersuasion || card.conditionalSwords)
     .map((card) => card.name);
-  return { persuasion, printedRevealCards, recruitedTroops, revealGain, swords };
+  return { influenceGains, persuasion, printedRevealCards, recruitedTroops, revealGain, swords };
 }
 
 type RevealTurnInput = {
@@ -410,11 +415,39 @@ function revealRecruitLabel(troops: number, owner?: Player) {
   return ` and ${ownerLabel}recruits ${troops} troop${troops === 1 ? "" : "s"}`;
 }
 
+function revealInfluenceLabel(gains: Partial<Record<FactionId, number>>) {
+  const entries = Object.entries(gains).filter((entry): entry is [FactionId, number] => (entry[1] ?? 0) > 0);
+  if (entries.length === 0) return "";
+  const text = entries
+    .map(([faction, amount]) => `${amount} ${factionLabels[faction]} Influence`)
+    .join(", ");
+  return ` and gains ${text}`;
+}
+
+function applyRevealInfluenceGains(
+  state: GameState,
+  playerId: string,
+  gains: Partial<Record<FactionId, number>>,
+) {
+  const entries = Object.entries(gains).filter((entry): entry is [FactionId, number] => (entry[1] ?? 0) > 0);
+  if (entries.length === 0) return state;
+  const previousPlayers = state.players;
+  const influencedState = {
+    ...state,
+    players: state.players.map((player) =>
+      player.id === playerId
+        ? entries.reduce((next, [faction, amount]) => adjustInfluence(next, faction, amount), player)
+        : player
+    ),
+  };
+  return resolveLeaderInfluenceThresholdRewards(influencedState, previousPlayers);
+}
+
 export function revealTurnAction(
   current: GameState,
   { commanderTargets, revealPlan }: RevealTurnInput,
 ): GameState {
-  const { persuasion, printedRevealCards, recruitedTroops, revealGain, swords } = revealPlan;
+  const { influenceGains = {}, persuasion, printedRevealCards, recruitedTroops, revealGain, swords } = revealPlan;
   const player = current.players[current.activeSeat];
   const targetId =
     player.role === "Commander"
@@ -449,22 +482,10 @@ export function revealTurnAction(
     }
     return candidate;
   });
-  const postRevealState = { ...current, players };
-  const revealedPlayer = players[current.activeSeat];
-  const pending = queuePendingActions(
-    current,
-    pendingActionsForReveal(
-      revealedPlayer,
-      postRevealState,
-      player.hand,
-      player.role === "Commander" ? targetId : player.id,
-    ),
-  );
   const revealedState: GameState = {
     ...current,
     conflictDeploymentBlock: undefined,
     players,
-    ...pending,
     log: [
       ...(
         printedRevealCards.length > 0
@@ -472,13 +493,25 @@ export function revealTurnAction(
           : []
       ),
       player.role === "Commander"
-        ? `${player.leader} reveals for ${persuasion} persuasion${revealGainLabel(revealGain)}${revealRecruitLabel(actualRecruitedTroops, target)} and gives ${combatSwords} strength to ${target?.leader ?? "an Ally"}.`
-        : `${player.leader} reveals for ${persuasion} persuasion, ${combatSwords} strength${revealGainLabel(revealGain)}${revealRecruitLabel(actualRecruitedTroops)}.`,
+        ? `${player.leader} reveals for ${persuasion} persuasion${revealGainLabel(revealGain)}${revealInfluenceLabel(influenceGains)}${revealRecruitLabel(actualRecruitedTroops, target)} and gives ${combatSwords} strength to ${target?.leader ?? "an Ally"}.`
+        : `${player.leader} reveals for ${persuasion} persuasion, ${combatSwords} strength${revealGainLabel(revealGain)}${revealInfluenceLabel(influenceGains)}${revealRecruitLabel(actualRecruitedTroops)}.`,
       ...current.log,
     ],
   };
+  const influenceState = applyRevealInfluenceGains(revealedState, player.id, influenceGains);
+  const revealedPlayer = influenceState.players[current.activeSeat];
+  const pending = queuePendingActions(
+    influenceState,
+    pendingActionsForReveal(
+      revealedPlayer,
+      influenceState,
+      player.hand,
+      player.role === "Commander" ? targetId : player.id,
+    ),
+  );
+  const pendingRevealState: GameState = { ...influenceState, ...pending };
   const spiceTrackedState = (revealGain.spice ?? 0) > 0
-    ? recordTurnSpiceGain(revealedState, player.id, revealGain.spice ?? 0)
-    : revealedState;
+    ? recordTurnSpiceGain(pendingRevealState, player.id, revealGain.spice ?? 0)
+    : pendingRevealState;
   return scoreGurneyAlwaysSmiling(spiceTrackedState, player.id);
 }

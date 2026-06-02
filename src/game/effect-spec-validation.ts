@@ -234,7 +234,7 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     return;
   }
   if (effect.kind === "gain-influence") {
-    if (trigger !== "plot-intrigue") {
+    if (trigger !== "plot-intrigue" && trigger !== "reveal") {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
     }
     if (!supportedFactions.has(effect.faction)) {

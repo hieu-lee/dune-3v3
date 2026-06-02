@@ -2,6 +2,7 @@ import { revealEffects } from "./effect-spec-base";
 import type {
   CardEffectSpec,
   EffectAmountSpec,
+  FactionId,
   GameEffectConditionSpec,
   IconId,
   ResourceId,
@@ -29,6 +30,14 @@ export function revealGainPersuasion(
 
 export function revealGainStrength(amount: EffectAmountSpec, conditions?: GameEffectConditionSpec[]): CardEffectSpec {
   return revealEffects([{ kind: "gain-strength", selector: "self", amount }], conditions);
+}
+
+export function revealGainInfluence(
+  faction: FactionId,
+  amount: EffectAmountSpec,
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return revealEffects([{ kind: "gain-influence", selector: "self", faction, amount }], conditions);
 }
 
 export function revealRecruitTroops(

@@ -81,6 +81,7 @@ import {
   hasSpyPostOnMakerSpace,
   hasSpyPosts,
   hasSwordmasterBonus,
+  revealGainInfluence,
   revealGainPersuasion,
   revealPlaceSpies,
   revealGainResource,
@@ -152,6 +153,9 @@ function imperiumRevealText(card: HubCard, persuasion: number, swords: number, p
   }
   if (card.id === beneGesseritOperativeSourceId) {
     return "+1 persuasion. If you have two or more spies on the board, +2 persuasion.";
+  }
+  if (card.id === shishakliSourceId) {
+    return "+2 strength. Fremen Bond: gain 1 Fremen Influence.";
   }
   if (card.id === chaniCleverTacticianSourceId) {
     return "Fremen Bond: +2 persuasion. You may retreat two troops to add 4 strength.";
@@ -276,6 +280,7 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
     return [
       agentTrashSourceForDrawCards(1),
       revealGainStrength(2),
+      revealGainInfluence("fremen", 1, [hasCardTraitInPlay("Faction: Fremen", 2)]),
     ];
   }
   if (card.id === beneGesseritOperativeSourceId) {

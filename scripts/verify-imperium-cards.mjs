@@ -466,6 +466,22 @@ try {
     ),
     "Shishakli should keep its fixed Reveal strength spec",
   );
+  assert.ok(
+    shishakli.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.conditions?.some((condition) =>
+        condition.kind === "has-card-trait-in-play" &&
+        condition.trait === "Faction: Fremen" &&
+        condition.count === 2
+      ) &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-influence" &&
+        effect.faction === "fremen" &&
+        effect.amount === 1
+      )
+    ),
+    "Shishakli should model its Fremen Bond Reveal Influence as a typed effect",
+  );
   for (const name of ["Bene Gesserit Operative", "Branching Path", "Cargo Runner", "Chani, Clever Tactician", "Guild Spy", "In High Places", "Junction Headquarters", "Maker Keeper", "Maula Pistol", "Northern Watermaster", "Overthrow", "Paracompass", "Price is No Object", "Shishakli"]) {
     const card = data.imperiumDeck.find((candidate) => candidate.name === name);
     assert.ok(card?.effects?.some((spec) => spec.trigger === "agent-play"), `${name} should use a structured Agent effect`);

@@ -4509,8 +4509,29 @@ try {
     hasRevealEffect(shishakli, (effect) => effect.kind === "gain-strength" && effect.amount === 2),
     "Shishakli should carry its fixed Reveal strength spec",
   );
+  assert.ok(
+    shishakli.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.conditions?.some((condition) =>
+        condition.kind === "has-card-trait-in-play" &&
+        condition.trait === "Faction: Fremen" &&
+        condition.count === 2
+      ) &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-influence" &&
+        effect.selector === "self" &&
+        effect.faction === "fremen" &&
+        effect.amount === 1
+      )
+    ),
+    "Shishakli should carry a typed Fremen Bond Reveal Fremen Influence spec",
+  );
   assert.equal(shishakli.play, "You may trash this card to draw 1 card.", "Shishakli play text should expose source trash for draw");
-  assert.equal(shishakli.reveal, "+0 persuasion and +2 strength.", "Shishakli reveal text should keep the fixed strength text");
+  assert.equal(
+    shishakli.reveal,
+    "+2 strength. Fremen Bond: gain 1 Fremen Influence.",
+    "Shishakli reveal text should describe its Fremen Bond Influence reward",
+  );
   assert.deepEqual(
     hiddenMissive.traits?.filter((trait) => trait.startsWith("Faction:")),
     ["Faction: Bene Gesserit"],
@@ -6580,7 +6601,7 @@ try {
   };
   assert.deepEqual(
     turnActions.revealTurnPlan({ ...p2, hand: [revealSpyPlacementCard], highCouncilSeat: false }),
-    { persuasion: 0, printedRevealCards: [], recruitedTroops: 0, revealGain: {}, swords: 0 },
+    { influenceGains: {}, persuasion: 0, printedRevealCards: [], recruitedTroops: 0, revealGain: {}, swords: 0 },
     "Reveal spy placement specs should not alter fixed reveal totals",
   );
   const agentTrashCard = {
@@ -8411,7 +8432,7 @@ try {
   };
   assert.deepEqual(
     turnActions.revealTurnPlan({ ...p3, hand: [revealPayResourceSandwormsCard], highCouncilSeat: false }, game),
-    { persuasion: 0, printedRevealCards: [], recruitedTroops: 0, revealGain: {}, swords: 0 },
+    { influenceGains: {}, persuasion: 0, printedRevealCards: [], recruitedTroops: 0, revealGain: {}, swords: 0 },
     "Reveal sandworm payment specs should not add immediate reveal rewards by themselves",
   );
   const unprotectedConflict = data.conflictCards.find((card) => card.name === "Skirmish (Desert Mouse)");
@@ -10904,6 +10925,85 @@ try {
     { spice: 2 },
     "Northern Watermaster Fremen Bond should count a Fremen card already in play",
   );
+  const shishakliSoloReveal = turnActions.revealTurnPlan(
+    { ...p2, hand: [shishakli], highCouncilSeat: false },
+    game,
+  );
+  assert.equal(shishakliSoloReveal.swords, 2, "Shishakli should always reveal for 2 strength");
+  assert.deepEqual(shishakliSoloReveal.influenceGains, {}, "Shishakli Fremen Bond should not trigger by itself");
+  const shishakliHandBondReveal = turnActions.revealTurnPlan(
+    { ...p2, hand: [shishakli, fremenSupportCard], highCouncilSeat: false },
+    game,
+  );
+  assert.deepEqual(
+    shishakliHandBondReveal.influenceGains,
+    { fremen: 1 },
+    "Shishakli Fremen Bond should gain 1 Fremen Influence with another revealed Fremen card",
+  );
+  const shishakliPlayAreaBondReveal = turnActions.revealTurnPlan(
+    { ...p2, hand: [shishakli], playArea: [fremenSupportCard], highCouncilSeat: false },
+    game,
+  );
+  assert.deepEqual(
+    shishakliPlayAreaBondReveal.influenceGains,
+    { fremen: 1 },
+    "Shishakli Fremen Bond should count a Fremen card already in play",
+  );
+  const shishakliRevealFixture = withActivePlayer(game, p2.id, (player) => ({
+    ...player,
+    agentsReady: 1,
+    garrison: 0,
+    hand: [shishakli, fremenSupportCard],
+    highCouncilSeat: false,
+    influence: { ...player.influence, fremen: 1 },
+    playArea: [],
+    vp: 0,
+  }));
+  const shishakliRevealPlan = turnActions.revealTurnPlan(
+    playerById(shishakliRevealFixture, p2.id),
+    shishakliRevealFixture,
+  );
+  const shishakliRevealed = turnActions.revealTurnAction(
+    shishakliRevealFixture,
+    { commanderTargets: {}, revealPlan: shishakliRevealPlan },
+  );
+  assert.equal(playerById(shishakliRevealed, p2.id).influence.fremen, 2, "Shishakli Reveal should apply Fremen Influence");
+  assert.equal(playerById(shishakliRevealed, p2.id).vp, 1, "Shishakli Reveal Influence should resolve threshold VP");
+  assert.match(shishakliRevealed.log[0], /gains 1 Fremen Influence/, "Shishakli Reveal log should mention Influence gain");
+  const shishakliCapturedMentatFixture = withActivePlayer(game, p2.id, (player) => ({
+    ...player,
+    agentsReady: 1,
+    hand: [shishakli, capturedMentat, fremenSupportCard],
+    highCouncilSeat: false,
+    influence: {
+      emperor: 0,
+      spacing: 0,
+      bene: 0,
+      fremen: 0,
+      greatHouses: 0,
+      fringeWorlds: 0,
+    },
+    playArea: [],
+  }));
+  const shishakliCapturedMentatPlan = turnActions.revealTurnPlan(
+    playerById(shishakliCapturedMentatFixture, p2.id),
+    shishakliCapturedMentatFixture,
+  );
+  const shishakliCapturedMentatRevealed = turnActions.revealTurnAction(
+    shishakliCapturedMentatFixture,
+    { commanderTargets: {}, revealPlan: shishakliCapturedMentatPlan },
+  );
+  assert.equal(
+    playerById(shishakliCapturedMentatRevealed, p2.id).influence.fremen,
+    1,
+    "Shishakli should apply Reveal Influence before same-reveal pending choices are generated",
+  );
+  assert.equal(
+    shishakliCapturedMentatRevealed.pendingAction?.kind,
+    "lose-influence-for-intrigues",
+    "Captured Mentat should see Shishakli's same-reveal Influence gain when queuing its pending choice",
+  );
+  assert.equal(shishakliCapturedMentatRevealed.pendingAction?.source, "Captured Mentat");
   const paracompassEffect = state.applyCardAgentEffect(
     paracompass,
     { ...p2, resources: { solari: 0, spice: 0, water: 0 } },

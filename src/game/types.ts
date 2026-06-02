@@ -78,6 +78,13 @@ export type GameEffectSpec =
   | { kind: "draw-cards"; selector: PlayerSelector; amount: EffectAmountSpec; source?: string }
   | { kind: "draw-intrigues"; selector: PlayerSelector; amount: EffectAmountSpec }
   | {
+      kind: "gain-influence-choice";
+      selector: PlayerSelector;
+      amount: EffectAmountSpec;
+      trashSource?: boolean;
+      source?: string;
+    }
+  | {
       kind: "acquire-card";
       selector: PlayerSelector;
       minCost?: EffectAmountSpec;
@@ -284,6 +291,8 @@ export type Card = {
   sourceSlug?: string;
   sourceType?: string;
   traits?: string[];
+  agentPlacementSpaceId?: string;
+  agentPlacementTargetOwnerId?: string;
 };
 
 export type ConflictCard = {
@@ -494,6 +503,12 @@ export type PendingAction =
   | {
       kind: "board-influence-choice";
       source: string;
+      amount?: number;
+      trashSource?: boolean;
+      cardId?: string;
+      cardOwnerId?: string;
+      targetOwnerId?: string;
+      spaceId?: string;
       choices: Array<{
         ownerId: string;
         faction: FactionId;

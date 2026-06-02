@@ -517,6 +517,17 @@ export function agentDrawIntrigues(
   return agentPlayEffects([{ kind: "draw-intrigues", selector: "self", amount }], conditions);
 }
 
+export function agentGainInfluenceChoice(
+  amount: EffectAmountSpec,
+  options: {
+    trashSource?: boolean;
+    source?: string;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return agentPlayEffects([{ kind: "gain-influence-choice", selector: "self", amount, ...options }], conditions);
+}
+
 export function agentGainResource(
   resource: ResourceId,
   amount: EffectAmountSpec,

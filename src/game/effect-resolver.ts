@@ -145,6 +145,13 @@ export type AgentAcquireCard = {
   source?: string;
 };
 
+export type AgentGainInfluenceChoice = {
+  selector: PlayerSelector;
+  amount: number;
+  trashSource: boolean;
+  source?: string;
+};
+
 export type AgentPayResourceForInfluence = {
   selector: PlayerSelector;
   resource: ResourceId;
@@ -556,6 +563,9 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
     const amount = amountFor(effect.amount, context.source);
     return addSelectedIntriguesToDraw(result, effect.selector, amount);
   }
+  if (effect.kind === "gain-influence-choice") {
+    return result;
+  }
   if (effect.kind === "acquire-card") {
     return result;
   }
@@ -898,6 +908,25 @@ export function resolveAgentDiscardCardForDraws(
               },
             }
           : {}),
+      }));
+  });
+}
+
+export function resolveAgentGainInfluenceChoices(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): AgentGainInfluenceChoice[] {
+  specs?.forEach(validateSpec);
+  return (specs ?? []).flatMap((spec) => {
+    if (spec.trigger !== "agent-play") return [];
+    if (!specApplies(spec, context)) return [];
+    return spec.effects
+      .filter((effect) => effect.kind === "gain-influence-choice")
+      .map((effect) => ({
+        selector: effect.selector,
+        amount: amountFor(effect.amount, context.source),
+        trashSource: effect.trashSource ?? false,
+        source: effect.source,
       }));
   });
 }

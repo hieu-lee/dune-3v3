@@ -6,6 +6,7 @@ import {
   capturedMentatSourceId,
   chaniCleverTacticianSourceId,
   covertOperationSourceId,
+  dangerousRhetoricSourceId,
   doubleAgentSourceId,
   ecologicalTestingStationSourceId,
   fedaykinStilltentSourceId,
@@ -40,6 +41,7 @@ import {
   agentDiscardCardForInfluenceAndDraw,
   agentDrawCards,
   agentDrawIntrigues,
+  agentGainInfluenceChoice,
   agentGainResource,
   agentOpponentsDiscardCards,
   agentPayResourceForDrawCards,
@@ -308,6 +310,13 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
       revealGainResource("solari", 2),
     ];
   }
+  if (card.id === dangerousRhetoricSourceId) {
+    return [
+      agentGainInfluenceChoice(1, { trashSource: true }),
+      revealGainPersuasion(1),
+      revealGainStrength(1),
+    ];
+  }
   if (card.id === beneGesseritOperativeSourceId) {
     return [
       agentPlaceSpies("self", 1, { recallForSupply: true, mustPlace: true }),
@@ -510,6 +519,9 @@ function imperiumPlayText(card: HubCard) {
   }
   if (card.id === covertOperationSourceId) {
     return "Each opponent discards a card.";
+  }
+  if (card.id === dangerousRhetoricSourceId) {
+    return "Gain 1 Influence and trash this card.";
   }
   if (card.id === priceIsNoObjectSourceId) {
     return "You may acquire a card to your hand using Solari instead of persuasion.";

@@ -107,7 +107,12 @@ export function placeAgentAction(
       : player.id;
   const target = current.players.find((candidate) => candidate.id === targetId) ?? player;
   const hand = player.hand.filter((card) => card.id !== selectedCard.id);
-  const playArea = selectedCard.trashOnPlay ? player.playArea : [...player.playArea, selectedCard];
+  const playedCard = {
+    ...selectedCard,
+    agentPlacementSpaceId: selectedSpace.id,
+    agentPlacementTargetOwnerId: target.id,
+  };
+  const playArea = selectedCard.trashOnPlay ? player.playArea : [...player.playArea, playedCard];
   const cost = effectiveCost(selectedSpace, current.players);
   const makerBonus = selectedSpace.maker ? current.makerSpice[selectedSpace.id] ?? 0 : 0;
   const makerChoiceOwner = player.role === "Commander" ? target : player;

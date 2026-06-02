@@ -14,6 +14,7 @@ import {
   resolveAgentCommanderResourceSplits,
   resolveAgentDiscardCardForDraws,
   resolveAgentDiscardCardForInfluenceAndDraws,
+  resolveAgentGainInfluenceChoices,
   resolveAgentMoveCardToThroneRows,
   resolveAgentOpponentsDiscardCards,
   resolveAgentPayResourceForContracts,
@@ -32,6 +33,8 @@ import {
 } from "./effect-resolver";
 import { discardCardForDrawChoices } from "./discard-draw-rules";
 import { discardCardForInfluenceAndDrawChoices } from "./discard-influence-draw-rules";
+import { changeAllegiancesGainChoices } from "./influence-choices";
+import { influenceEffectOwnerForChoice } from "./influence-loss-rules";
 import { loseInfluenceForIntriguesChoices } from "./influence-intrigue-rules";
 import {
   feydRauthaLeaderName,
@@ -212,6 +215,49 @@ function pendingActionForAgentDiscardCardForDraw(
       };
       if (discardCardForDrawChoices(source, pending).length === 0) return undefined;
       return pending;
+    })
+    .find((pending): pending is PendingAction => Boolean(pending));
+}
+
+function pendingActionForAgentGainInfluenceChoice(
+  card: Card,
+  source: Player,
+  state?: GameState,
+  target?: Player,
+): PendingAction | undefined {
+  const sourceCardInPlay = source.playArea.find((candidate) => candidate.id === card.id);
+  if (!card.effects || !sourceCardInPlay) return undefined;
+  if (!state) return undefined;
+  const players = playersWithPendingCardEffect(state, source, target);
+  const effectState = { ...state, players };
+  const effects = resolveAgentGainInfluenceChoices(card.effects, {
+    trigger: "agent-play",
+    source,
+    target,
+    state: effectState,
+  });
+  return effects
+    .map((effect): PendingAction | undefined => {
+      if (effect.selector !== "self" || effect.amount <= 0) return undefined;
+      if (effect.trashSource && !source.playArea.some((candidate) => candidate.id === card.id)) return undefined;
+      const choices = changeAllegiancesGainChoices(source).flatMap((faction) => {
+        const ownerResult = influenceEffectOwnerForChoice(effectState, source, faction, target?.id);
+        return ownerResult.valid && ownerResult.owner ? [{ ownerId: ownerResult.owner.id, faction }] : [];
+      });
+      if (choices.length === 0) return undefined;
+      return {
+        kind: "board-influence-choice",
+        source: effect.source ?? card.name,
+        amount: effect.amount,
+        cardId: card.id,
+        cardOwnerId: source.id,
+        ...(sourceCardInPlay.agentPlacementSpaceId ? { spaceId: sourceCardInPlay.agentPlacementSpaceId } : {}),
+        ...(source.role === "Commander" && (sourceCardInPlay.agentPlacementTargetOwnerId ?? target?.id)
+          ? { targetOwnerId: sourceCardInPlay.agentPlacementTargetOwnerId ?? target?.id }
+          : {}),
+        ...(effect.trashSource ? { trashSource: true } : {}),
+        choices,
+      };
     })
     .find((pending): pending is PendingAction => Boolean(pending));
 }
@@ -638,6 +684,8 @@ export function pendingActionsForCard(
   if (agentDiscardInfluenceDrawPending) typedPendings.push(agentDiscardInfluenceDrawPending);
   const agentDiscardDrawPending = pendingActionForAgentDiscardCardForDraw(card, source, state, target);
   if (agentDiscardDrawPending) typedPendings.push(agentDiscardDrawPending);
+  const agentGainInfluencePending = pendingActionForAgentGainInfluenceChoice(card, source, state, target);
+  if (agentGainInfluencePending) typedPendings.push(agentGainInfluencePending);
   const agentOpponentDiscardPendings = pendingActionsForAgentOpponentsDiscardCards(card, source, state, target);
   typedPendings.push(...agentOpponentDiscardPendings);
   const agentAcquireCardPending = pendingActionForAgentAcquireCard(card, source, state, target, space);

@@ -213,9 +213,12 @@ async function createSpaceChoiceStates(server, initialPlayableGame) {
     },
     boardInfluenceChoice: {
       ...base,
+      activeSeat: game.players.findIndex((player) => player.id === "p4"),
+      spaces: { ...base.spaces, shipping: "p2" },
       pendingAction: {
         kind: "board-influence-choice",
         source: "Shipping",
+        spaceId: "shipping",
         choices: [
           { ownerId: "p4", faction: "emperor" },
           { ownerId: "p2", faction: "greatHouses" },

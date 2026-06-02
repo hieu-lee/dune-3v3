@@ -102,6 +102,27 @@ export async function runCardChoicesSmoke({
   );
   assert.equal(ownerAfter.hand.at(-1).id, priceAcquireId, "Price is No Object acquire should move the selected card to hand");
 
+  await setDebugGameAndWait(page, states.dangerousRhetoric);
+  pendingText = await page.locator(".pending-panel").innerText();
+  assert.match(pendingText, /Dangerous Rhetoric/i);
+  assert.match(pendingText, /Choose Influence/i);
+  assert.match(pendingText, /BG/i);
+  await screenshot(page, captures, "pending-dangerous-rhetoric-influence.png");
+
+  before = await currentGame(page);
+  ownerBefore = before.players.find((player) => player.id === "p2");
+  await page.locator(".pending-panel").getByRole("button", { name: /BG/ }).click();
+  await waitForNoPending(page);
+  after = await currentGame(page);
+  ownerAfter = after.players.find((player) => player.id === "p2");
+  assert.equal(ownerAfter.influence.bene, ownerBefore.influence.bene + 1, "Dangerous Rhetoric should gain chosen Influence");
+  assert.equal(ownerAfter.vp, ownerBefore.vp + 1, "Dangerous Rhetoric should award Influence threshold VP");
+  assert.equal(
+    ownerAfter.playArea.some((card) => card.id === states.dangerousRhetoric.pendingAction.cardId),
+    false,
+    "Dangerous Rhetoric should trash itself after the Influence choice",
+  );
+
   await setDebugGameAndWait(page, states.acquireSpyNetwork);
   pendingText = await page.locator(".pending-panel").innerText();
   assert.match(pendingText, /Spy Network/i);
@@ -324,6 +345,8 @@ async function createCardChoiceStates(server, initialPlayableGame) {
   assert.ok(spyNetworkReplacement, "Expected Spy Network replacement card");
   const beneGesseritOperative = data.imperiumDeck.find((card) => card.sourceId === 30);
   assert.ok(beneGesseritOperative, "Expected Bene Gesserit Operative Imperium card");
+  const dangerousRhetoric = data.imperiumDeck.find((card) => card.sourceId === 44);
+  assert.ok(dangerousRhetoric, "Expected Dangerous Rhetoric Imperium card");
   const priceIsNoObject = data.imperiumDeck.find((card) => card.sourceId === 73);
   assert.ok(priceIsNoObject, "Expected Price is No Object Imperium card");
   const doubleAgent = data.imperiumDeck.find((card) => card.sourceId === 37);
@@ -567,6 +590,34 @@ async function createCardChoiceStates(server, initialPlayableGame) {
     "acquire-card",
     "Expected Price is No Object Solari acquisition pending action",
   );
+  const dangerousRhetoricState = turnActions.placeAgentAction(
+    {
+      ...base,
+      players: base.players.map((player) =>
+        player.id === ownerId
+          ? {
+              ...player,
+              agentsReady: 1,
+              hand: [dangerousRhetoric],
+              influence: { ...player.influence, bene: 1 },
+              playArea: [],
+              resources: { solari: 5, spice: 0, water: 0 },
+              vp: 0,
+            }
+          : player,
+      ),
+    },
+    {
+      commanderTargets: {},
+      selectedCard: dangerousRhetoric,
+      selectedSpace: spySpace,
+    },
+  );
+  assert.equal(
+    dangerousRhetoricState.pendingAction?.kind,
+    "board-influence-choice",
+    "Expected Dangerous Rhetoric Influence choice pending action",
+  );
   const covertOperationOwner = base.players.find((player) => player.id === ownerId);
   assert.ok(covertOperationOwner, "Expected Covert Operation owner");
   const covertOperationSource = {
@@ -677,6 +728,7 @@ async function createCardChoiceStates(server, initialPlayableGame) {
       priceIsNoObjectAcquireCardId: priceIsNoObjectAcquireCard.id,
       priceIsNoObjectAcquireCardName: priceIsNoObjectAcquireCard.name,
     },
+    dangerousRhetoric: dangerousRhetoricState,
     acquireSpyNetwork: {
       ...acquireSpyNetworkState,
       spySpaceId: spySpace.id,

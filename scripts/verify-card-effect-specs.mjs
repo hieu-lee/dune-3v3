@@ -109,6 +109,7 @@ try {
   const capturedMentat = data.imperiumDeck.find((card) => card.name === "Captured Mentat");
   const beneGesseritOperative = data.imperiumDeck.find((card) => card.name === "Bene Gesserit Operative");
   const covertOperation = data.imperiumDeck.find((card) => card.name === "Covert Operation");
+  const dangerousRhetoric = data.imperiumDeck.find((card) => card.name === "Dangerous Rhetoric");
   const doubleAgent = data.imperiumDeck.find((card) => card.name === "Double Agent");
   const fedaykinStilltent = data.imperiumDeck.find((card) => card.name === "Fedaykin Stilltent");
   const hiddenMissive = data.imperiumDeck.find((card) => card.name === "Hidden Missive");
@@ -311,6 +312,7 @@ try {
       "Cargo Runner",
       "Chani, Clever Tactician",
       "Covert Operation",
+      "Dangerous Rhetoric",
       "Double Agent",
       "Ecological Testing Station",
       "Fedaykin Stilltent",
@@ -698,6 +700,23 @@ try {
       )
     ),
     "Captured Mentat should carry a declarative Agent discard-for-Influence-and-draw spec",
+  );
+  assert.ok(
+    dangerousRhetoric.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-influence-choice" &&
+        effect.selector === "self" &&
+        effect.amount === 1 &&
+        effect.trashSource === true
+      )
+    ),
+    "Dangerous Rhetoric should carry a declarative Agent gain-Influence choice spec",
+  );
+  assert.equal(
+    dangerousRhetoric.play,
+    "Gain 1 Influence and trash this card.",
+    "Dangerous Rhetoric play text should expose its automated Influence choice",
   );
   assert.equal(
     covertOperation.play,
@@ -2563,6 +2582,83 @@ try {
     /Invalid acquire-card source ""/,
     "Acquire-card specs should reject empty source labels",
   );
+  const revealGainInfluenceChoiceCard = {
+    ...convincingArgument,
+    id: "effect-spec-reveal-gain-influence-choice-card",
+    name: "Effect Spec Reveal Gain Influence Choice",
+    effects: [revealSpec([{
+      kind: "gain-influence-choice",
+      selector: "self",
+      amount: 1,
+    }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [revealGainInfluenceChoiceCard], highCouncilSeat: false }),
+    /Unsupported effect "gain-influence-choice" for reveal/,
+    "Gain-Influence choice specs should stay in Agent play",
+  );
+  const invalidGainInfluenceChoiceSelectorCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-gain-influence-choice-selector-card",
+    name: "Effect Spec Invalid Gain Influence Choice Selector",
+    effects: [agentSpec([{
+      kind: "gain-influence-choice",
+      selector: "activated-ally",
+      amount: 1,
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidGainInfluenceChoiceSelectorCard, p4, p2),
+    /Unsupported effect selector "activated-ally" for gain-influence-choice/,
+    "Gain-Influence choice specs should reject activated Ally selectors",
+  );
+  const invalidGainInfluenceChoiceAmountCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-gain-influence-choice-amount-card",
+    name: "Effect Spec Invalid Gain Influence Choice Amount",
+    effects: [agentSpec([{
+      kind: "gain-influence-choice",
+      selector: "self",
+      amount: -1,
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidGainInfluenceChoiceAmountCard, p2, p2),
+    /Invalid effect amount "-1"/,
+    "Gain-Influence choice specs should require non-negative amounts",
+  );
+  const invalidGainInfluenceChoiceSourceCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-gain-influence-choice-source-card",
+    name: "Effect Spec Invalid Gain Influence Choice Source",
+    effects: [agentSpec([{
+      kind: "gain-influence-choice",
+      selector: "self",
+      amount: 1,
+      source: "",
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidGainInfluenceChoiceSourceCard, p2, p2),
+    /Invalid gain-influence-choice source ""/,
+    "Gain-Influence choice specs should reject empty source labels",
+  );
+  const invalidGainInfluenceChoiceTrashSourceCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-gain-influence-choice-trash-source-card",
+    name: "Effect Spec Invalid Gain Influence Choice Trash Source",
+    effects: [agentSpec([{
+      kind: "gain-influence-choice",
+      selector: "self",
+      amount: 1,
+      trashSource: "true",
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidGainInfluenceChoiceTrashSourceCard, p2, p2),
+    /Invalid gain-influence-choice trashSource "true"/,
+    "Gain-Influence choice specs should reject non-boolean trashSource values",
+  );
   const revealPayResourceInfluenceCard = {
     ...convincingArgument,
     id: "effect-spec-reveal-pay-resource-influence-card",
@@ -4398,6 +4494,187 @@ try {
     game,
   );
   assert.equal(guildEnvoyReveal.persuasion, 1, "Guild Envoy should reveal for 1 persuasion through specs");
+  const dangerousRhetoricFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 1,
+    hand: [dangerousRhetoric],
+    influence: { ...p2.influence, bene: 1 },
+    playArea: [],
+    resources: { solari: 5, spice: 0, water: 0 },
+    vp: 0,
+  }));
+  assert.equal(
+    state.pendingActionForCard(dangerousRhetoric, playerById(dangerousRhetoricFixture, p2.id), dangerousRhetoricFixture),
+    undefined,
+    "Dangerous Rhetoric should only queue its Influence choice from play",
+  );
+  const dangerousRhetoricPlaced = turnActions.placeAgentAction(dangerousRhetoricFixture, {
+    commanderTargets: {},
+    selectedCard: dangerousRhetoric,
+    selectedSpace: highCouncil,
+  });
+  assert.equal(
+    dangerousRhetoricPlaced.pendingAction?.kind,
+    "board-influence-choice",
+    "Dangerous Rhetoric should queue a typed Influence choice",
+  );
+  assert.equal(dangerousRhetoricPlaced.pendingAction.source, "Dangerous Rhetoric");
+  assert.equal(dangerousRhetoricPlaced.pendingAction.amount, 1);
+  assert.equal(dangerousRhetoricPlaced.pendingAction.trashSource, true);
+  assert.equal(dangerousRhetoricPlaced.pendingAction.cardOwnerId, p2.id);
+  assert.equal(dangerousRhetoricPlaced.pendingAction.cardId, dangerousRhetoric.id);
+  assert.equal(dangerousRhetoricPlaced.pendingAction.spaceId, highCouncil.id);
+  assert.equal(
+    playerById(dangerousRhetoricPlaced, p2.id).playArea.find((card) => card.id === dangerousRhetoric.id)?.agentPlacementSpaceId,
+    highCouncil.id,
+    "Dangerous Rhetoric should record the Agent placement space on the source card in play",
+  );
+  assert.deepEqual(
+    dangerousRhetoricPlaced.pendingAction.choices,
+    [
+      { ownerId: p2.id, faction: "greatHouses" },
+      { ownerId: p2.id, faction: "spacing" },
+      { ownerId: p2.id, faction: "bene" },
+      { ownerId: p2.id, faction: "fringeWorlds" },
+    ],
+    "Ally Dangerous Rhetoric should offer main-board Influence choices",
+  );
+  const dangerousRhetoricResolved = state.resolveBoardInfluenceChoice(
+    dangerousRhetoricPlaced,
+    dangerousRhetoricPlaced.pendingAction,
+    p2.id,
+    "bene",
+  );
+  assert.equal(dangerousRhetoricResolved.pendingAction, undefined);
+  assert.equal(playerById(dangerousRhetoricResolved, p2.id).influence.bene, 2);
+  assert.equal(playerById(dangerousRhetoricResolved, p2.id).vp, 1, "Dangerous Rhetoric should award Influence threshold VP");
+  assert.equal(
+    playerById(dangerousRhetoricResolved, p2.id).playArea.some((card) => card.id === dangerousRhetoric.id),
+    false,
+    "Dangerous Rhetoric should trash itself after the Influence choice",
+  );
+  assert.match(dangerousRhetoricResolved.log[0], /gains 1 Bene Gesserit Influence from Dangerous Rhetoric/);
+  const dangerousRhetoricStrippedTrashSourcePending = {
+    ...dangerousRhetoricPlaced.pendingAction,
+    trashSource: true,
+    cardId: undefined,
+    cardOwnerId: undefined,
+  };
+  const dangerousRhetoricStrippedTrashSourceState = {
+    ...dangerousRhetoricPlaced,
+    pendingAction: dangerousRhetoricStrippedTrashSourcePending,
+  };
+  assert.equal(
+    state.resolveBoardInfluenceChoice(
+      dangerousRhetoricStrippedTrashSourceState,
+      dangerousRhetoricStrippedTrashSourcePending,
+      p2.id,
+      "bene",
+    ),
+    dangerousRhetoricStrippedTrashSourceState,
+    "Dangerous Rhetoric should reject trash-source pendings without source-card metadata",
+  );
+  const dangerousRhetoricStrippedSourceCardPending = {
+    ...dangerousRhetoricPlaced.pendingAction,
+    trashSource: undefined,
+    cardId: undefined,
+    cardOwnerId: undefined,
+  };
+  const dangerousRhetoricStrippedSourceCardState = {
+    ...dangerousRhetoricPlaced,
+    pendingAction: dangerousRhetoricStrippedSourceCardPending,
+  };
+  assert.equal(
+    state.resolveBoardInfluenceChoice(
+      dangerousRhetoricStrippedSourceCardState,
+      dangerousRhetoricStrippedSourceCardPending,
+      p2.id,
+      "bene",
+    ),
+    dangerousRhetoricStrippedSourceCardState,
+    "Dangerous Rhetoric should reject metadata-stripped card Influence pendings",
+  );
+  const dangerousRhetoricCommanderPlaced = turnActions.placeAgentAction(
+    withActivePlayer(game, p4.id, () => ({
+      agentsReady: 1,
+      hand: [dangerousRhetoric],
+      playArea: [],
+      resources: { solari: 5, spice: 0, water: 0 },
+    })),
+    {
+      commanderTargets: { [p4.id]: p2.id },
+      selectedCard: dangerousRhetoric,
+      selectedSpace: highCouncil,
+    },
+  );
+  assert.equal(
+    dangerousRhetoricCommanderPlaced.pendingAction?.targetOwnerId,
+    p2.id,
+    "Commander Dangerous Rhetoric should lock the activated Ally target on the pending action",
+  );
+  assert.equal(dangerousRhetoricCommanderPlaced.pendingAction?.spaceId, highCouncil.id);
+  const dangerousRhetoricCommanderSourceCard = playerById(dangerousRhetoricCommanderPlaced, p4.id).playArea.find(
+    (card) => card.id === dangerousRhetoric.id,
+  );
+  assert.equal(
+    dangerousRhetoricCommanderSourceCard?.agentPlacementTargetOwnerId,
+    p2.id,
+    "Commander Dangerous Rhetoric should record the activated Ally on the source card in play",
+  );
+  assert.deepEqual(
+    dangerousRhetoricCommanderPlaced.pendingAction?.choices,
+    [
+      { ownerId: p4.id, faction: "emperor" },
+      { ownerId: p2.id, faction: "greatHouses" },
+      { ownerId: p2.id, faction: "spacing" },
+      { ownerId: p2.id, faction: "bene" },
+      { ownerId: p2.id, faction: "fringeWorlds" },
+    ],
+    "Commander Dangerous Rhetoric should route personal Influence to the Commander and main-board Influence to the activated Ally",
+  );
+  const alternateShaddamAlly = dangerousRhetoricCommanderPlaced.players.find((player) =>
+    player.team === p4.team &&
+    player.role === "Ally" &&
+    player.id !== p2.id
+  );
+  assert.ok(alternateShaddamAlly, "Expected another Shaddam Ally for Dangerous Rhetoric routing hardening");
+  const dangerousRhetoricForgedTargetPending = {
+    ...dangerousRhetoricCommanderPlaced.pendingAction,
+    choices: dangerousRhetoricCommanderPlaced.pendingAction.choices.map((choice) =>
+      choice.ownerId === p2.id ? { ...choice, ownerId: alternateShaddamAlly.id } : choice,
+    ),
+  };
+  const dangerousRhetoricForgedTargetState = {
+    ...dangerousRhetoricCommanderPlaced,
+    pendingAction: dangerousRhetoricForgedTargetPending,
+  };
+  assert.equal(
+    state.resolveBoardInfluenceChoice(
+      dangerousRhetoricForgedTargetState,
+      dangerousRhetoricForgedTargetPending,
+      alternateShaddamAlly.id,
+      "bene",
+    ),
+    dangerousRhetoricForgedTargetState,
+    "Commander Dangerous Rhetoric should reject forged choices for a different same-team Ally",
+  );
+  const dangerousRhetoricForgedLockedTargetPending = {
+    ...dangerousRhetoricForgedTargetPending,
+    targetOwnerId: alternateShaddamAlly.id,
+  };
+  const dangerousRhetoricForgedLockedTargetState = {
+    ...dangerousRhetoricCommanderPlaced,
+    pendingAction: dangerousRhetoricForgedLockedTargetPending,
+  };
+  assert.equal(
+    state.resolveBoardInfluenceChoice(
+      dangerousRhetoricForgedLockedTargetState,
+      dangerousRhetoricForgedLockedTargetPending,
+      alternateShaddamAlly.id,
+      "bene",
+    ),
+    dangerousRhetoricForgedLockedTargetState,
+    "Commander Dangerous Rhetoric should reject forged targetOwnerId values that disagree with the source card",
+  );
   const fedaykinMakerEffect = state.applyCardAgentEffect(
     fedaykinStilltent,
     { ...p2, garrison: 0 },

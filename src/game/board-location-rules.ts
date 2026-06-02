@@ -1,12 +1,121 @@
 import { advancePendingAction } from "./pending-actions";
 import { canPay } from "./board-rules";
-import { factionLabels } from "./data";
+import { boardSpaces, factionIds, factionLabels } from "./data";
+import { resolveAgentGainInfluenceChoices } from "./effect-resolver";
 import { adjustInfluenceAndResolveThresholdRewards } from "./leader-rewards";
+import { pendingActionForBoardInfluenceChoice } from "./placement-rules";
 import { recordTurnSpiceGain } from "./turn-trackers";
-import type { GameState, PendingAction, ResourceId } from "./types";
+import { changeAllegiancesGainChoices } from "./influence-choices";
+import { influenceEffectOwnerForChoice } from "./influence-loss-rules";
+import type { Card, FactionId, GameState, PendingAction, Player, ResourceId } from "./types";
 
 type BoardInfluenceChoicePendingAction = Extract<PendingAction, { kind: "board-influence-choice" }>;
 type OptionalSpacePaymentPendingAction = Extract<PendingAction, { kind: "optional-space-payment" }>;
+
+function boardInfluenceChoiceIsValid(choice: unknown): choice is { ownerId: string; faction: FactionId } {
+  if (typeof choice !== "object" || choice === null) return false;
+  const candidate = choice as { ownerId?: unknown; faction?: unknown };
+  return typeof candidate.ownerId === "string" &&
+    typeof candidate.faction === "string" &&
+    (factionIds as readonly string[]).includes(candidate.faction);
+}
+
+function boardInfluenceChoicePendingIsValid(pending: BoardInfluenceChoicePendingAction) {
+  const hasSourceCard = pending.cardId !== undefined || pending.cardOwnerId !== undefined;
+  return typeof pending.source === "string" &&
+    pending.source.trim().length > 0 &&
+    (pending.amount === undefined || (Number.isInteger(pending.amount) && pending.amount > 0)) &&
+    (pending.trashSource === undefined || typeof pending.trashSource === "boolean") &&
+    (pending.trashSource !== true || hasSourceCard) &&
+    (!hasSourceCard || (typeof pending.cardId === "string" && typeof pending.cardOwnerId === "string")) &&
+    (!hasSourceCard || pending.targetOwnerId === undefined || typeof pending.targetOwnerId === "string") &&
+    (hasSourceCard || (pending.amount === undefined && pending.trashSource === undefined && typeof pending.spaceId === "string")) &&
+    Array.isArray(pending.choices) &&
+    pending.choices.every(boardInfluenceChoiceIsValid);
+}
+
+function boardInfluenceChoiceArraysMatch(
+  first: BoardInfluenceChoicePendingAction["choices"],
+  second: BoardInfluenceChoicePendingAction["choices"],
+) {
+  return first.length === second.length &&
+    first.every((choice, index) =>
+      choice.ownerId === second[index]?.ownerId &&
+      choice.faction === second[index]?.faction
+    );
+}
+
+function boardInfluenceChoiceMatchesCurrentBoardSpace(
+  state: GameState,
+  pending: BoardInfluenceChoicePendingAction,
+) {
+  const source = state.players[state.activeSeat];
+  const space = boardSpaces.find((candidate) => candidate.id === pending.spaceId);
+  const target = space ? state.players.find((player) => player.id === state.spaces[space.id]) : undefined;
+  if (!source || !space || !target) return false;
+  const expected = pendingActionForBoardInfluenceChoice(space, source, target);
+  return expected?.kind === "board-influence-choice" &&
+    expected.source === pending.source &&
+    expected.spaceId === pending.spaceId &&
+    boardInfluenceChoiceArraysMatch(expected.choices, pending.choices);
+}
+
+function boardInfluenceChoiceMatchesCurrentRouting(
+  state: GameState,
+  sourceOwner: Player,
+  targetOwnerId: string | undefined,
+  choice: { ownerId: string; faction: FactionId },
+) {
+  if (!changeAllegiancesGainChoices(sourceOwner).includes(choice.faction)) return false;
+  const ownerResult = influenceEffectOwnerForChoice(state, sourceOwner, choice.faction, targetOwnerId);
+  return ownerResult.valid && ownerResult.owner?.id === choice.ownerId;
+}
+
+function sourceCardInfluenceChoicesMatchCurrentRouting(
+  state: GameState,
+  sourceOwner: Player,
+  pending: BoardInfluenceChoicePendingAction,
+) {
+  const expectedChoices = changeAllegiancesGainChoices(sourceOwner).flatMap((faction) => {
+    const ownerResult = influenceEffectOwnerForChoice(state, sourceOwner, faction, pending.targetOwnerId);
+    return ownerResult.valid && ownerResult.owner ? [{ ownerId: ownerResult.owner.id, faction }] : [];
+  });
+  return boardInfluenceChoiceArraysMatch(expectedChoices, pending.choices);
+}
+
+function sourceCardPlacementMetadataMatches(
+  sourceOwner: Player,
+  sourceCard: Card,
+  pending: BoardInfluenceChoicePendingAction,
+) {
+  if (!sourceCard.agentPlacementSpaceId || pending.spaceId !== sourceCard.agentPlacementSpaceId) return false;
+  if (sourceOwner.role === "Commander") {
+    return typeof pending.targetOwnerId === "string" &&
+      pending.targetOwnerId === sourceCard.agentPlacementTargetOwnerId;
+  }
+  return pending.targetOwnerId === undefined &&
+    (sourceCard.agentPlacementTargetOwnerId === undefined || sourceCard.agentPlacementTargetOwnerId === sourceOwner.id);
+}
+
+function sourceCardSupportsInfluenceChoice(
+  state: GameState,
+  pending: BoardInfluenceChoicePendingAction,
+  sourceOwner: Player,
+  sourceCard: Card,
+  amount: number,
+) {
+  const effects = resolveAgentGainInfluenceChoices(sourceCard.effects, {
+    trigger: "agent-play",
+    source: sourceOwner,
+    state,
+  });
+  return effects.some((effect) =>
+    effect.selector === "self" &&
+    effect.trashSource === (pending.trashSource === true) &&
+    effect.amount === amount &&
+    (effect.source ?? sourceCard.name) === pending.source
+  );
+}
 
 function resourceLabel(resource: ResourceId) {
   return resource === "solari" ? "Solari" : resource;
@@ -25,21 +134,44 @@ export function resolveBoardInfluenceChoice(
   ownerId: string,
   faction: BoardInfluenceChoicePendingAction["choices"][number]["faction"],
 ): GameState {
-  if (state.pendingAction?.kind !== "board-influence-choice") return state;
+  if (state.pendingAction !== pending || !boardInfluenceChoicePendingIsValid(pending)) return state;
+  const amount = pending.amount ?? 1;
+  const sourceOwner = pending.cardOwnerId
+    ? state.players.find((player) => player.id === pending.cardOwnerId)
+    : undefined;
+  const sourceCard = sourceOwner && pending.cardId
+    ? sourceOwner.playArea.find((card) => card.id === pending.cardId)
+    : undefined;
+  const hasSourceCard = pending.cardId !== undefined || pending.cardOwnerId !== undefined;
+  if (hasSourceCard && (
+    !sourceOwner ||
+    !sourceCard ||
+    !sourceCardPlacementMetadataMatches(sourceOwner, sourceCard, pending) ||
+    !sourceCardSupportsInfluenceChoice(state, pending, sourceOwner, sourceCard, amount) ||
+    !sourceCardInfluenceChoicesMatchCurrentRouting(state, sourceOwner, pending) ||
+    !pending.choices.every((choice) => boardInfluenceChoiceMatchesCurrentRouting(state, sourceOwner, pending.targetOwnerId, choice))
+  )) {
+    return state;
+  }
+  if (!hasSourceCard && !boardInfluenceChoiceMatchesCurrentBoardSpace(state, pending)) return state;
   const choice = pending.choices.find((candidate) => candidate.ownerId === ownerId && candidate.faction === faction);
   if (!choice) return state;
   const owner = state.players.find((player) => player.id === choice.ownerId);
-  if (!owner) return { ...state, ...advancePendingAction(state) };
+  if (!owner) return state;
 
   const advancedState = {
     ...state,
+    players: state.players.map((player) => {
+      if (!pending.trashSource || !pending.cardId || player.id !== pending.cardOwnerId) return player;
+      return { ...player, playArea: player.playArea.filter((card) => card.id !== pending.cardId) };
+    }),
     ...advancePendingAction(state),
     log: [
-      `${owner.leader} gains 1 ${factionLabels[choice.faction]} Influence from ${pending.source}.`,
+      `${owner.leader} gains ${amount} ${factionLabels[choice.faction]} Influence from ${pending.source}.`,
       ...state.log,
     ],
   };
-  return adjustInfluenceAndResolveThresholdRewards(advancedState, owner.id, choice.faction, 1);
+  return adjustInfluenceAndResolveThresholdRewards(advancedState, owner.id, choice.faction, amount);
 }
 
 export function resolveOptionalSpacePayment(

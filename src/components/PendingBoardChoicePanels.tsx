@@ -17,6 +17,7 @@ export function PendingBoardInfluenceChoicePanel({
   pending,
   onChoose,
 }: PendingBoardInfluenceChoicePanelProps) {
+  const amount = pending.amount ?? 1;
   return (
     <div className="pending-controls support-grid">
       <span>Choose Influence from {pending.source}</span>
@@ -27,7 +28,7 @@ export function PendingBoardInfluenceChoicePanel({
             type="button"
             key={`${choice.ownerId}-${choice.faction}`}
             onClick={() => onChoose(choice.ownerId, choice.faction)}
-            title={`${owner?.leader ?? "Player"} gains 1 ${factionLabels[choice.faction]} Influence`}
+            title={`${owner?.leader ?? "Player"} gains ${amount} ${factionLabels[choice.faction]} Influence`}
           >
             <Handshake size={14} />
             <span>{factionShortLabels[choice.faction]}</span>

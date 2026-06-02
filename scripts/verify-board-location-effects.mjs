@@ -280,6 +280,7 @@ try {
   );
   assert.equal(playerById(shipping, "p4").resources.solari, 5, "Shipping should pay 5 Solari");
   assert.equal(shipping.pendingAction?.kind, "board-influence-choice", "Shipping should queue any-Faction influence");
+  assert.equal(shipping.pendingAction.spaceId, "shipping", "Shipping Influence choice should carry its board space id");
   assert.deepEqual(
     shipping.pendingAction.choices,
     [
@@ -301,6 +302,7 @@ try {
     { p4: "p2" },
   );
   assert.equal(dutifulChoice.pendingAction?.kind, "board-influence-choice", "Shaddam should choose Great Houses or Emperor on Dutiful Service");
+  assert.equal(dutifulChoice.pendingAction.spaceId, "dutiful-service", "Mapped board Influence choices should carry their board space id");
   assert.deepEqual(dutifulChoice.pendingAction.choices, [
     { faction: "greatHouses", ownerId: "p2" },
     { faction: "emperor", ownerId: "p4" },

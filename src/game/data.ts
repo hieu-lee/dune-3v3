@@ -14,6 +14,7 @@ import {
   guildSpySourceId,
   hiddenMissiveSourceId,
   inHighPlacesSourceId,
+  imperialSpymasterSourceId,
   interstellarTradeSourceId,
   makerKeeperSourceId,
   maulaPistolSourceId,
@@ -22,9 +23,13 @@ import {
   paracompassSourceId,
   prepareTheWaySourceId,
   priceIsNoObjectSourceId,
+  rebelSupplierSourceId,
   reliableInformantSourceId,
+  sardaukarSoldierSourceId,
+  southernEldersSourceId,
   spaceTimeFoldingSourceId,
   spyNetworkSourceId,
+  stilgarDevotedSourceId,
   smugglersHarvesterSourceId,
   spiceMustFlowSourceId,
   strikeFleetSourceId,
@@ -278,6 +283,9 @@ function imperiumRevealText(card: HubCard, persuasion: number, swords: number, p
 }
 
 function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
+  const simpleAgentEffects = imperiumSimpleAgentEffects(card);
+  if (simpleAgentEffects) return simpleAgentEffects;
+
   if (card.id === smugglersHarvesterSourceId) {
     return [
       revealGainPersuasion(1),
@@ -475,6 +483,49 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
     ];
   }
   return undefined;
+}
+
+type SimpleAgentEffectConfig = {
+  drawIntrigues?: number;
+  gain?: Partial<Record<ResourceId, number>>;
+  recruitTroops?: number;
+};
+
+const simpleAgentEffectConfigs: Record<number, SimpleAgentEffectConfig> = {
+  [imperialSpymasterSourceId]: { drawIntrigues: 1 },
+  [rebelSupplierSourceId]: { gain: { spice: 1 }, recruitTroops: 2 },
+  [sardaukarSoldierSourceId]: { drawIntrigues: 1 },
+  [southernEldersSourceId]: { gain: { water: 1 }, recruitTroops: 2 },
+  [stilgarDevotedSourceId]: { recruitTroops: 2 },
+};
+
+function agentRecruitTroopsForActivatedOwner(amount: number): CardEffectSpec[] {
+  return [
+    agentRecruitTroops("self", amount, [hasRole("Ally")]),
+    agentRecruitTroops("activated-ally", amount, [hasRole("Commander")]),
+  ];
+}
+
+function imperiumSimpleAgentEffects(card: HubCard): CardEffectSpec[] | undefined {
+  const config = simpleAgentEffectConfigs[card.id];
+  if (!config) return undefined;
+  const effects = [
+    ...(fixedRevealEffects(
+      attributeNumber(card, "Persuasion on reveal"),
+      attributeNumber(card, "Swords"),
+    ) ?? []),
+  ];
+  if (config.drawIntrigues) {
+    effects.push(agentDrawIntrigues(config.drawIntrigues));
+  }
+  for (const resource of ["solari", "spice", "water"] as const) {
+    const amount = config.gain?.[resource] ?? 0;
+    if (amount > 0) effects.push(agentGainResource(resource, amount));
+  }
+  if (config.recruitTroops) {
+    effects.push(...agentRecruitTroopsForActivatedOwner(config.recruitTroops));
+  }
+  return effects;
 }
 
 function fixedRevealEffects(

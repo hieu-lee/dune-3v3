@@ -111,6 +111,7 @@ try {
   const covertOperation = data.imperiumDeck.find((card) => card.name === "Covert Operation");
   const dangerousRhetoric = data.imperiumDeck.find((card) => card.name === "Dangerous Rhetoric");
   const doubleAgent = data.imperiumDeck.find((card) => card.name === "Double Agent");
+  const imperialSpymaster = data.imperiumDeck.find((card) => card.name === "Imperial Spymaster");
   const fedaykinStilltent = data.imperiumDeck.find((card) => card.name === "Fedaykin Stilltent");
   const hiddenMissive = data.imperiumDeck.find((card) => card.name === "Hidden Missive");
   const ecologicalTestingStation = data.imperiumDeck.find((card) => card.name === "Ecological Testing Station");
@@ -120,8 +121,12 @@ try {
   const maulaPistol = data.imperiumDeck.find((card) => card.name === "Maula Pistol");
   const northernWatermaster = data.imperiumDeck.find((card) => card.name === "Northern Watermaster");
   const paracompass = data.imperiumDeck.find((card) => card.name === "Paracompass");
+  const rebelSupplier = data.imperiumDeck.find((card) => card.name === "Rebel Supplier");
   const reliableInformant = data.imperiumDeck.find((card) => card.name === "Reliable Informant");
+  const sardaukarSoldier = data.imperiumDeck.find((card) => card.name === "Sardaukar Soldier");
+  const southernElders = data.imperiumDeck.find((card) => card.name === "Southern Elders");
   const spaceTimeFolding = data.imperiumDeck.find((card) => card.name === "Space-time Folding");
+  const stilgar = data.imperiumDeck.find((card) => card.name === "Stilgar, The Devoted");
   const guildEnvoy = data.imperiumDeck.find((card) => card.name === "Guild Envoy");
   const guildSpy = data.imperiumDeck.find((card) => card.name === "Guild Spy");
   const inHighPlaces = data.imperiumDeck.find((card) => card.name === "In High Places");
@@ -168,6 +173,7 @@ try {
     beneGesseritOperative &&
     covertOperation &&
     doubleAgent &&
+    imperialSpymaster &&
     fedaykinStilltent &&
     hiddenMissive &&
     ecologicalTestingStation &&
@@ -177,8 +183,12 @@ try {
     maulaPistol &&
     northernWatermaster &&
     paracompass &&
+    rebelSupplier &&
     reliableInformant &&
+    sardaukarSoldier &&
+    southernElders &&
     spaceTimeFolding &&
+    stilgar &&
     guildEnvoy &&
     guildSpy &&
     inHighPlaces &&
@@ -318,14 +328,19 @@ try {
       "Fedaykin Stilltent",
       "Guild Envoy",
       "Hidden Missive",
+      "Imperial Spymaster",
       "Maker Keeper",
       "Maula Pistol",
       "Northern Watermaster",
       "Paracompass",
       "Prepare The Way",
       "Price is No Object",
+      "Rebel Supplier",
       "Reliable Informant",
+      "Sardaukar Soldier",
+      "Southern Elders",
       "Space-time Folding",
+      "Stilgar, The Devoted",
       "Wheels Within Wheels",
     ],
     "Unexpected cards with declarative Agent-play specs",
@@ -335,30 +350,88 @@ try {
     dagger,
     prepareTheWay,
     limitedLandsraadAccess,
-	    imperialOrnithopter,
-      smuggler,
-	    interstellarTrade,
-      calculus,
-      capturedMentat,
-      covertOperation,
-      doubleAgent,
-      fedaykinStilltent,
-      hiddenMissive,
-      cargoRunner,
-      makerKeeper,
-      maulaPistol,
-      northernWatermaster,
-      paracompass,
-      reliableInformant,
-      spaceTimeFolding,
-      guildEnvoy,
-      wheelsWithinWheels,
-	    beneGesseritOperative,
-	    chani,
-	  ]) {
+    imperialOrnithopter,
+    smuggler,
+    interstellarTrade,
+    calculus,
+    capturedMentat,
+    covertOperation,
+    doubleAgent,
+    fedaykinStilltent,
+    hiddenMissive,
+    cargoRunner,
+    makerKeeper,
+    maulaPistol,
+    northernWatermaster,
+    paracompass,
+    reliableInformant,
+    spaceTimeFolding,
+    guildEnvoy,
+    wheelsWithinWheels,
+    beneGesseritOperative,
+    chani,
+    imperialSpymaster,
+    rebelSupplier,
+    sardaukarSoldier,
+    southernElders,
+    stilgar,
+  ]) {
     assert.ok(
       card.effects?.some((spec) => spec.trigger === "reveal"),
       `${card.name} should carry a declarative Reveal effect spec`,
+    );
+  }
+  for (const card of [imperialSpymaster, sardaukarSoldier]) {
+    assert.ok(
+      hasAgentEffect(
+        card,
+        (effect) => effect.kind === "draw-intrigues" && effect.selector === "self" && effect.amount === 1,
+      ),
+      `${card.name} should carry a declarative Agent Intrigue draw spec`,
+    );
+  }
+  assert.ok(
+    hasAgentEffect(
+      rebelSupplier,
+      (effect) => effect.kind === "gain-resource" && effect.selector === "self" && effect.resource === "spice" && effect.amount === 1,
+    ),
+    "Rebel Supplier should carry a declarative Agent spice spec",
+  );
+  assert.ok(
+    hasAgentEffect(
+      southernElders,
+      (effect) => effect.kind === "gain-resource" && effect.selector === "self" && effect.resource === "water" && effect.amount === 1,
+    ),
+    "Southern Elders should carry a declarative Agent water spec",
+  );
+  for (const [card, expectedTroops] of [
+    [rebelSupplier, 2],
+    [southernElders, 2],
+    [stilgar, 2],
+  ]) {
+    assert.ok(
+      card.effects?.some((spec) =>
+        spec.trigger === "agent-play" &&
+        spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Ally") &&
+        spec.effects.some((effect) =>
+          effect.kind === "recruit-troops" &&
+          effect.selector === "self" &&
+          effect.amount === expectedTroops
+        )
+      ),
+      `${card.name} should recruit troops to an Ally player through a declarative Agent spec`,
+    );
+    assert.ok(
+      card.effects?.some((spec) =>
+        spec.trigger === "agent-play" &&
+        spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Commander") &&
+        spec.effects.some((effect) =>
+          effect.kind === "recruit-troops" &&
+          effect.selector === "activated-ally" &&
+          effect.amount === expectedTroops
+        )
+      ),
+      `${card.name} should route Commander troop rewards to the activated Ally through a declarative Agent spec`,
     );
   }
   assert.ok(
@@ -3697,6 +3770,63 @@ try {
   );
   assert.equal(maulaPistolEffect.source.hand[0]?.id, maulaDraw.id, "Maula Pistol Agent spec should draw 1 card");
   assert.match(maulaPistolEffect.log ?? "", /Maula Pistol: draws 1 card/);
+
+  for (const card of [imperialSpymaster, sardaukarSoldier]) {
+    const intrigueEffect = state.applyCardAgentEffect(card, p2, p2, game);
+    assert.equal(intrigueEffect.sourceIntriguesToDraw, 1, `${card.name} Agent spec should draw 1 Intrigue`);
+  }
+
+  const rebelSupplierEffect = state.applyCardAgentEffect(
+    rebelSupplier,
+    { ...p2, garrison: 0, resources: { ...p2.resources, spice: 0 } },
+    p2,
+    game,
+  );
+  assert.equal(rebelSupplierEffect.source.resources.spice, 1, "Rebel Supplier Agent spec should gain 1 spice");
+  assert.equal(rebelSupplierEffect.source.garrison, 2, "Rebel Supplier Agent spec should recruit 2 troops for an Ally");
+  assert.equal(rebelSupplierEffect.recruitedTroops, 2, "Rebel Supplier recruited troops should count for deployment limits");
+  assert.equal(rebelSupplierEffect.sourceSpiceGained, 1, "Rebel Supplier spice should be trackable for turn spice gains");
+
+  const rebelSupplierCommanderEffect = state.applyCardAgentEffect(
+    rebelSupplier,
+    { ...p4, garrison: 0, resources: { ...p4.resources, spice: 0 } },
+    { ...p2, garrison: 0 },
+    game,
+  );
+  assert.equal(rebelSupplierCommanderEffect.source.resources.spice, 1, "Commander Rebel Supplier should give spice to the Commander");
+  assert.equal(rebelSupplierCommanderEffect.source.garrison, 0, "Commander Rebel Supplier should not recruit troops to the Commander");
+  assert.equal(rebelSupplierCommanderEffect.target.garrison, 2, "Commander Rebel Supplier should recruit troops to the activated Ally");
+  assert.equal(rebelSupplierCommanderEffect.recruitedTroops, 2, "Commander Rebel Supplier recruited troops should count for deployment limits");
+
+  const southernEldersEffect = state.applyCardAgentEffect(
+    southernElders,
+    { ...p2, garrison: 0, resources: { ...p2.resources, water: 0 } },
+    p2,
+    game,
+  );
+  assert.equal(southernEldersEffect.source.resources.water, 1, "Southern Elders Agent spec should gain 1 water");
+  assert.equal(southernEldersEffect.source.garrison, 2, "Southern Elders Agent spec should recruit 2 troops for an Ally");
+  assert.equal(southernEldersEffect.recruitedTroops, 2, "Southern Elders recruited troops should count for deployment limits");
+
+  const southernEldersCommanderEffect = state.applyCardAgentEffect(
+    southernElders,
+    { ...p4, garrison: 0, resources: { ...p4.resources, water: 0 } },
+    { ...p2, garrison: 0 },
+    game,
+  );
+  assert.equal(southernEldersCommanderEffect.source.resources.water, 1, "Commander Southern Elders should give water to the Commander");
+  assert.equal(southernEldersCommanderEffect.source.garrison, 0, "Commander Southern Elders should not recruit troops to the Commander");
+  assert.equal(southernEldersCommanderEffect.target.garrison, 2, "Commander Southern Elders should recruit troops to the activated Ally");
+  assert.equal(southernEldersCommanderEffect.recruitedTroops, 2, "Commander Southern Elders recruited troops should count for deployment limits");
+
+  const stilgarEffect = state.applyCardAgentEffect(stilgar, { ...p2, garrison: 0 }, p2, game);
+  assert.equal(stilgarEffect.source.garrison, 2, "Stilgar Agent spec should recruit 2 troops for an Ally");
+  assert.equal(stilgarEffect.recruitedTroops, 2, "Stilgar recruited troops should count for deployment limits");
+
+  const stilgarCommanderEffect = state.applyCardAgentEffect(stilgar, { ...p4, garrison: 0 }, { ...p2, garrison: 0 }, game);
+  assert.equal(stilgarCommanderEffect.source.garrison, 0, "Commander Stilgar should not recruit troops to the Commander");
+  assert.equal(stilgarCommanderEffect.target.garrison, 2, "Commander Stilgar should recruit troops to the activated Ally");
+  assert.equal(stilgarCommanderEffect.recruitedTroops, 2, "Commander Stilgar recruited troops should count for deployment limits");
 
   const ecologicalSoloReveal = turnActions.revealTurnPlan(
     { ...p2, hand: [ecologicalTestingStation], playArea: [], highCouncilSeat: false },

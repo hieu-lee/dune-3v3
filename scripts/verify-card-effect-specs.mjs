@@ -52,6 +52,10 @@ function hasPlotEffect(card, predicate) {
   return card.effects?.some((spec) => spec.trigger === "plot-intrigue" && spec.effects.some(predicate)) ?? false;
 }
 
+function hasCombatEffect(card, predicate) {
+  return card.effects?.some((spec) => spec.trigger === "combat-intrigue" && spec.effects.some(predicate)) ?? false;
+}
+
 function hasRevealEffect(card, predicate) {
   return card.effects?.some((spec) => spec.trigger === "reveal" && spec.effects.some(predicate)) ?? false;
 }
@@ -182,6 +186,7 @@ try {
   const specialMission = data.intrigueCards.find((card) => card.name === "Special Mission");
   const sietchRitual = data.intrigueCards.find((card) => card.name === "Sietch Ritual");
   const strategicStockpiling = data.intrigueCards.find((card) => card.name === "Strategic Stockpiling");
+  const weirdingCombat = data.intrigueCards.find((card) => card.name === "Weirding Combat");
   const commandRespect = data.muadDibCommanderCards.find((card) => card.name === "Command Respect");
   const limitedLandsraadAccess = data.muadDibCommanderCards.find((card) => card.name === "Limited Landsraad Access");
   const demandAttention = data.muadDibCommanderCards.find((card) => card.name === "Demand Attention");
@@ -249,7 +254,7 @@ try {
     wheelsWithinWheels,
   );
   assert.ok(commandRespect && prepareTheWay && spiceMustFlow && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
-  assert.ok(backedByChoam && buyAccess && callToArms && changeAllegiances && councilorsAmbition && contingencyPlan && cunning && departForArrakis && distraction && imperiumPolitics && inspireAwe && intelligenceReport && leverage && manipulate && marketOpportunity && mercenaries && opportunism && shaddamsFavor && specialMission && sietchRitual && strategicStockpiling);
+  assert.ok(backedByChoam && buyAccess && callToArms && changeAllegiances && councilorsAmbition && contingencyPlan && cunning && departForArrakis && distraction && imperiumPolitics && inspireAwe && intelligenceReport && leverage && manipulate && marketOpportunity && mercenaries && opportunism && shaddamsFavor && specialMission && sietchRitual && strategicStockpiling && weirdingCombat);
   assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && dutifulService && deliverSupplies && sietchTabr && spiceRefinery);
   assert.equal(revealSpecCards.length, 79, "Unexpected number of cards with declarative Reveal specs");
   assert.equal(
@@ -343,6 +348,24 @@ try {
     contingencyPlanPlotResolved.revealGain.solari,
     2,
     "Contingency Plan Plot spec should resolve its Solari gain",
+  );
+  assert.ok(
+    hasCombatEffect(contingencyPlan, (effect) =>
+      effect.kind === "gain-strength" &&
+      effect.selector === "self" &&
+      effect.amount === 3
+    ),
+    "Contingency Plan should carry a typed Combat Intrigue strength spec",
+  );
+  const contingencyPlanCombatResolved = effectResolver.resolveGameEffects(contingencyPlan.effects, {
+    trigger: "combat-intrigue",
+    source: p2,
+    state: game,
+  });
+  assert.equal(
+    contingencyPlanCombatResolved.swords,
+    3,
+    "Contingency Plan Combat spec should resolve its strength",
   );
   assert.ok(
     inspireAwe.effects?.some((spec) =>
@@ -1768,6 +1791,81 @@ try {
   assert.equal(backedSpacingResolved.influenceLosses.spacing, 1, "Backed by CHOAM Spacing Guild choice should lose 1 Spacing Influence");
   assert.equal(backedSpacingResolved.influenceLosses.bene, undefined, "Backed by CHOAM Spacing Guild choice should not lose Bene Gesserit Influence");
   assert.equal(backedSpacingResolved.revealGain.solari, 4, "Backed by CHOAM Spacing Guild choice should gain 4 Solari");
+  assert.ok(
+    backedByChoam.effects?.some((spec) =>
+      spec.trigger === "combat-intrigue" &&
+      spec.conditions?.some((condition) => condition.kind === "has-completed-contracts" && condition.count === 2) &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-strength" &&
+        effect.selector === "self" &&
+        effect.amount === 4
+      )
+    ),
+    "Backed by CHOAM should carry a typed Combat strength spec gated by completed contracts",
+  );
+  const backedCombatContracts = data.standardContracts.slice(0, 2).map((card, index) => ({
+    card,
+    completed: true,
+    takenRound: index + 1,
+  }));
+  const backedUncontractedCombat = effectResolver.resolveGameEffects(backedByChoam.effects, {
+    trigger: "combat-intrigue",
+    source: { ...p2, contracts: [backedCombatContracts[0]] },
+    state: game,
+  });
+  assert.equal(
+    backedUncontractedCombat.swords,
+    0,
+    "Backed by CHOAM Combat spec should not resolve below two completed contracts",
+  );
+  const backedContractedCombat = effectResolver.resolveGameEffects(backedByChoam.effects, {
+    trigger: "combat-intrigue",
+    source: { ...p2, contracts: backedCombatContracts },
+    state: game,
+  });
+  assert.equal(
+    backedContractedCombat.swords,
+    4,
+    "Backed by CHOAM Combat spec should resolve with two completed contracts",
+  );
+  assert.ok(
+    hasCombatEffect(weirdingCombat, (effect) =>
+      effect.kind === "gain-strength" &&
+      effect.selector === "self" &&
+      effect.amount === 3
+    ) &&
+    weirdingCombat.effects?.some((spec) =>
+      spec.trigger === "combat-intrigue" &&
+      spec.conditions?.some((condition) =>
+        condition.kind === "has-influence" &&
+        condition.faction === "bene" &&
+        condition.amount === 3
+      ) &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-strength" &&
+        effect.selector === "self" &&
+        effect.amount === 2
+      )
+    ),
+    "Weirding Combat should carry typed base and Bene Gesserit threshold Combat strength specs",
+  );
+  const weirdingBaseCombat = effectResolver.resolveGameEffects(weirdingCombat.effects, {
+    trigger: "combat-intrigue",
+    source: p2,
+    state: game,
+  });
+  assert.equal(weirdingBaseCombat.swords, 3, "Weirding Combat should resolve its base Combat strength");
+  const weirdingThresholdSource = { ...p2, influence: { ...p2.influence, bene: 3 } };
+  const weirdingThresholdCombat = effectResolver.resolveGameEffects(weirdingCombat.effects, {
+    trigger: "combat-intrigue",
+    source: weirdingThresholdSource,
+    state: { ...game, players: game.players.map((player) => player.id === p2.id ? weirdingThresholdSource : player) },
+  });
+  assert.equal(
+    weirdingThresholdCombat.swords,
+    5,
+    "Weirding Combat should add its Bene Gesserit threshold strength",
+  );
   assert.ok(
     callToArms.effects?.some((spec) =>
       spec.trigger === "plot-intrigue" &&

@@ -72,7 +72,9 @@ try {
     ...impress,
     id: "intrigue-verifier-auto-combat",
     name: "Verifier Combat",
-    automatedCombatSwords: 2,
+    sourceId: undefined,
+    combatSwords: undefined,
+    effects: [{ trigger: "combat-intrigue", effects: [{ kind: "gain-strength", selector: "self", amount: 2 }] }],
   };
   verifyCombatIntriguePhaseFlow({ data, state });
   verifyCombatIntrigueBasicPlays({

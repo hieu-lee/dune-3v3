@@ -83,6 +83,20 @@ export function plotIntrigueEffects(
   return effectSpec("plot-intrigue", effects, conditions, options);
 }
 
+export function combatIntrigueEffects(
+  effects: GameEffectSpec[],
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return effectSpec("combat-intrigue", effects, conditions);
+}
+
+export function combatGainStrength(
+  amount: EffectAmountSpec,
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return combatIntrigueEffects([{ kind: "gain-strength", selector: "self", amount }], conditions);
+}
+
 export function plotGainResource(
   resource: ResourceId,
   amount: EffectAmountSpec,

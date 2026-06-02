@@ -10,6 +10,7 @@ import {
   isWeirdingCombatIntrigue,
 } from "./card-identifiers";
 import { playerHasConflictUnits } from "./conflict-rules";
+import { resolveGameEffects } from "./effect-resolver";
 import { spyPostCount } from "./spy-posts";
 import type { GameState, IntrigueCard, Player } from "./types";
 
@@ -40,6 +41,13 @@ export function combatIntrigueStrength(
   intrigue: IntrigueCard,
   target?: Player,
 ) {
+  const resolved = resolveGameEffects(intrigue.effects, {
+    trigger: "combat-intrigue",
+    source: actor,
+    target,
+    state,
+  });
+  if (resolved.swords > 0) return resolved.swords;
   if (intrigue.automatedCombatSwords) return intrigue.automatedCombatSwords;
   if (isFindWeaknessIntrigue(intrigue)) return 2;
   if (isQuestionableMethodsIntrigue(intrigue)) return 1;

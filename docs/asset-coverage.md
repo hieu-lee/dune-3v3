@@ -22,7 +22,7 @@ This report tracks the private-play visual assets currently wired into the game.
 | Conflict cards | 16 | 16 / 16 | Dune Cards Hub `conflict` images. |
 | Leader cards | 10 | 10 / 10 | Dune Cards Hub `leader` images. |
 | Board spaces | 27 | 27 / 27 | Catalog art plus six-player official overrides. |
-| CHOAM contracts | 20 | 19 / 20 | `Spice Refinery I` has no catalog image URL yet. |
+| CHOAM contracts | 20 | 20 / 20 | `Spice Refinery I` uses the Dune Cards Hub card-page image override. |
 
 ## Board-Space Overrides
 
@@ -42,12 +42,12 @@ The following six-player board-space tiles intentionally use local override file
 
 These are also covered by `pnpm run verify:board-spaces`.
 
-## Missing Assets
+## Manual Asset Overrides
 
-- `Spice Refinery I` CHOAM contract (`sourceId` 513, `sourceSlug` `uprising-spice-refinery-i`): Dune Cards Hub has no fullImageUrl or thumbnailImageUrl for this contract entry. The runtime data intentionally leaves the image fields empty until a trustworthy private-play source is added.
+- `Spice Refinery I` CHOAM contract (`sourceId` 513, `sourceSlug` `uprising-spice-refinery-i`): the Dune Cards Hub API entry still needs the local override path, but the public card page exposes the image used at `/assets/dune-cards-hub/contract/uprising-contract-spice-refinery-i.png`.
 
 ## Verification
 
-- `pnpm run verify:assets` loads `src/game/data.ts` through Vite, checks the expected runtime counts for every asset class, verifies every non-missing `imagePath` and `thumbnailPath` is a normalized local browser path that resolves to a file under `public/assets`, and confirms this report documents the exact known missing contract image.
+- `pnpm run verify:assets` loads `src/game/data.ts` through Vite, checks the expected runtime counts for every asset class, verifies every `imagePath` and `thumbnailPath` is a normalized local browser path that resolves to a file under `public/assets`, and confirms this report documents the manual `Spice Refinery I` contract image override.
 - `pnpm run verify:board-spaces` separately checks exact six-player board-space override filenames.
 - `pnpm run verify` includes `verify:assets` through `scripts/verify-all.mjs`.

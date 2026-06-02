@@ -38,6 +38,7 @@ try {
     false,
     "Sardaukar contracts must not appear in the public CHOAM bank",
   );
+  assertLocalArt(data.standardContracts, "Public CHOAM");
   assertLocalArt(data.shaddamReservedContracts, "Shaddam reserve");
 
   const game = state.initialGame();

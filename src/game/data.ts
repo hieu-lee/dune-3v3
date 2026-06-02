@@ -60,6 +60,7 @@ import {
   strategicStockpilingSourceId,
   strikeFleetSourceId,
   subversiveAdvisorSourceId,
+  weirdingCombatSourceId,
   wheelsWithinWheelsSourceId,
 } from "./card-identifiers";
 import {
@@ -78,6 +79,7 @@ import {
   agentPayResourceForDrawCards,
   agentPlaceSpies,
   agentRecruitTroops,
+  combatGainStrength,
   deployedUnitsThisTurn,
   hasCompletedContracts,
   hasCardTraitInPlay,
@@ -309,9 +311,6 @@ const riseOfIxContractNames = new Set([
   "Tech Negotiation",
 ]);
 const shaddamReservedContractNames = new Set(["Sardaukar I", "Sardaukar II"]);
-const automatedCombatSwordValues: Partial<Record<number, number>> = {
-  147: 3,
-};
 const acquireSpySourceIds = new Set([
   guildSpySourceId,
   inHighPlacesSourceId,
@@ -982,9 +981,12 @@ export const conflictCards: ConflictCard[] = catalog.cards
 
 function intrigueCardEffects(card: HubCard): CardEffectSpec[] | undefined {
   if (card.id === backedByChoamSourceId) {
-    return influenceLossFactions.map((faction) =>
-      plotLoseInfluenceForResource(faction, faction, 1, "solari", 4),
-    );
+    return [
+      ...influenceLossFactions.map((faction) =>
+        plotLoseInfluenceForResource(faction, faction, 1, "solari", 4),
+      ),
+      combatGainStrength(4, [hasCompletedContracts(2)]),
+    ];
   }
   if (card.id === callToArmsSourceId) {
     return [plotActivateAcquireRecruitBonus(1)];
@@ -993,7 +995,10 @@ function intrigueCardEffects(card: HubCard): CardEffectSpec[] | undefined {
     return [plotGainResource("water", 2, [hasHighCouncilSeat()])];
   }
   if (card.id === contingencyPlanSourceId) {
-    return [plotGainResource("solari", 2)];
+    return [
+      plotGainResource("solari", 2),
+      combatGainStrength(3),
+    ];
   }
   if (card.id === inspireAweSourceId) {
     return [
@@ -1158,13 +1163,18 @@ function intrigueCardEffects(card: HubCard): CardEffectSpec[] | undefined {
       plotGainResource("solari", 3, [hasInfluence("emperor", 3)]),
     ];
   }
+  if (card.id === weirdingCombatSourceId) {
+    return [
+      combatGainStrength(3),
+      combatGainStrength(2, [hasInfluence("bene", 3)]),
+    ];
+  }
   return undefined;
 }
 
 function toIntrigueCard(card: HubCard): IntrigueCard {
   const battleIcon = intrigueBattleIconsByCatalogId[card.id];
   const combatSwords = attributeNumber(card, "Swords");
-  const automatedCombatSwords = automatedCombatSwordValues[card.id];
   return {
     id: `intrigue-${card.id}`,
     name: card.name,
@@ -1172,7 +1182,6 @@ function toIntrigueCard(card: HubCard): IntrigueCard {
     effects: intrigueCardEffects(card),
     battleIcon,
     combatSwords: combatSwords > 0 ? combatSwords : undefined,
-    automatedCombatSwords,
     imagePath: card.localImagePath ?? card.fullImageUrl ?? undefined,
     thumbnailPath: card.localThumbnailPath ?? card.thumbnailImageUrl ?? undefined,
     sourceId: card.id,

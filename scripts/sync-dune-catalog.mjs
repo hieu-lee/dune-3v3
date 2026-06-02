@@ -4,6 +4,17 @@ import { basename, join } from "node:path";
 const HUB_ORIGIN = "https://dunecardshub.com";
 const CATALOG_PATH = "src/game/uprising-catalog.generated.json";
 const LOCAL_ASSET_ROOT = "public/assets/dune-cards-hub";
+const localImageOverrides = new Map([
+  [
+    513,
+    {
+      fullImageUrl: `${HUB_ORIGIN}/images/contract_uprising_15.png`,
+      thumbnailImageUrl: `${HUB_ORIGIN}/images/contract_uprising_15.png`,
+      localImagePath: "/assets/dune-cards-hub/contract/uprising-contract-spice-refinery-i.png",
+      localThumbnailPath: "/assets/dune-cards-hub/contract/uprising-contract-spice-refinery-i.png",
+    },
+  ],
+]);
 
 const downloadImages = process.argv.includes("--download-images");
 
@@ -61,16 +72,17 @@ for (const card of cards
   .sort((left, right) => left.type.localeCompare(right.type) || left.name.localeCompare(right.name))) {
   const fullImageAvailable = card.fullImagePath ? await imageExists(card.fullImagePath) : false;
   const thumbnailAvailable = card.thumbnailImagePath ? await imageExists(card.thumbnailImagePath) : false;
+  const localImageOverride = localImageOverrides.get(card.id);
   uprisingCards.push({
     id: card.id,
     name: card.name,
     type: card.type,
     displayType: card.displayType,
     slug: card.slug,
-    fullImageUrl: fullImageAvailable ? `${HUB_ORIGIN}${card.fullImagePath}` : null,
-    thumbnailImageUrl: thumbnailAvailable ? `${HUB_ORIGIN}${card.thumbnailImagePath}` : null,
-    localImagePath: null,
-    localThumbnailPath: null,
+    fullImageUrl: localImageOverride?.fullImageUrl ?? (fullImageAvailable ? `${HUB_ORIGIN}${card.fullImagePath}` : null),
+    thumbnailImageUrl: localImageOverride?.thumbnailImageUrl ?? (thumbnailAvailable ? `${HUB_ORIGIN}${card.thumbnailImagePath}` : null),
+    localImagePath: localImageOverride?.localImagePath ?? null,
+    localThumbnailPath: localImageOverride?.localThumbnailPath ?? null,
     attributes: attributesByCard.get(card.id) ?? [],
   });
 }
@@ -91,6 +103,7 @@ await writeFile(CATALOG_PATH, `${JSON.stringify(catalog)}\n`);
 
 if (downloadImages) {
   for (const card of uprisingCards) {
+    if (localImageOverrides.has(card.id)) continue;
     if (!card.fullImageUrl) continue;
     const downloaded = await downloadImage(card, new URL(card.fullImageUrl).pathname);
     if (downloaded) {

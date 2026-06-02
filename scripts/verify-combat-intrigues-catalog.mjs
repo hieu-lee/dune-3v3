@@ -73,7 +73,17 @@ export function verifyCombatIntrigueCatalog({ cards, data, state }) {
     "Weirding Combat should expose its conditional Influence threshold",
   );
   assert.equal(contingencyPlan.combatSwords, 3, "Contingency Plan should expose its printed Combat strength");
-  assert.equal(contingencyPlan.automatedCombatSwords, 3, "Contingency Plan's full Combat branch should auto-resolve");
+  assert.ok(
+    contingencyPlan.effects?.some((spec) =>
+      spec.trigger === "combat-intrigue" &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-strength" &&
+        effect.selector === "self" &&
+        effect.amount === 3
+      )
+    ),
+    "Contingency Plan should carry a typed Combat Intrigue strength spec",
+  );
   assert.equal(devour.combatSwords, 4, "Devour should expose its maximum structured Combat strength");
   assert.equal(
     devour.summary,
@@ -81,6 +91,43 @@ export function verifyCombatIntrigueCatalog({ cards, data, state }) {
     "Devour should expose its sandworm bonus and optional trash text",
   );
   assert.equal(backedByChoam.combatSwords, 4, "Backed by CHOAM should expose its structured Combat strength");
+  assert.ok(
+    backedByChoam.effects?.some((spec) =>
+      spec.trigger === "combat-intrigue" &&
+      spec.conditions?.some((condition) => condition.kind === "has-completed-contracts" && condition.count === 2) &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-strength" &&
+        effect.selector === "self" &&
+        effect.amount === 4
+      )
+    ),
+    "Backed by CHOAM should carry a typed completed-contract Combat strength spec",
+  );
+  assert.ok(
+    weirdingCombat.effects?.some((spec) =>
+      spec.trigger === "combat-intrigue" &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-strength" &&
+        effect.selector === "self" &&
+        effect.amount === 3
+      )
+    ) &&
+    weirdingCombat.effects?.some((spec) =>
+      spec.trigger === "combat-intrigue" &&
+      spec.conditions?.some((condition) =>
+        condition.kind === "has-influence" &&
+        condition.faction === "bene" &&
+        condition.amount === 3
+      ) &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-strength" &&
+        effect.selector === "self" &&
+        effect.amount === 2
+      )
+    ),
+    "Weirding Combat should carry typed base and Bene Gesserit threshold Combat strength specs",
+  );
+  assert.equal(contingencyPlan.automatedCombatSwords, undefined, "Contingency Plan should not rely on automatedCombatSwords");
   assert.equal(impress.automatedCombatSwords, undefined, "Impress has extra printed text and should not auto-resolve");
   assert.equal(findWeakness.automatedCombatSwords, undefined, "Find Weakness should resolve through spy-recall state");
   assert.equal(goToGround.automatedCombatSwords, undefined, "Go To Ground should resolve through retreat and spy choices");
@@ -97,7 +144,7 @@ export function verifyCombatIntrigueCatalog({ cards, data, state }) {
     data.intrigueCards
       .filter((card) => card.automatedCombatSwords)
       .map((card) => card.name),
-    ["Contingency Plan"],
-    "Only fully modeled catalog Combat Intrigues should auto-resolve",
+    [],
+    "Combat Intrigue strength should resolve through typed specs instead of automatedCombatSwords",
   );
 }

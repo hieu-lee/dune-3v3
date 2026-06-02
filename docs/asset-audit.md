@@ -29,6 +29,14 @@ Six-player-only overrides:
 
 The `-6p` suffix is used where the catalog image exists but is not the six-player board-side value.
 
+## Contract Asset Coverage
+
+All 20 runtime CHOAM contract entries now resolve to local images under `public/assets/dune-cards-hub/contract`.
+
+Manual override:
+
+- `Spice Refinery I` (`sourceId` 513, `sourceSlug` `uprising-spice-refinery-i`) uses the Dune Cards Hub public card-page image at `/images/contract_uprising_15.png`, stored locally as `uprising-contract-spice-refinery-i.png`. The generated catalog and `scripts/sync-dune-catalog.mjs` keep this override because the API image fields can lag the card page.
+
 ## Verification
 
 `pnpm run verify:board-spaces` loads `src/game/data.ts` through Vite and verifies:

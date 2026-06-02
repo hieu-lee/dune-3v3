@@ -8,15 +8,7 @@ const projectRoot = fileURLToPath(new URL("..", import.meta.url));
 const reportPath = join(projectRoot, "docs", "asset-coverage.md");
 const publicAssetsRoot = resolve(projectRoot, "public", "assets");
 
-const knownMissingAssets = [
-  {
-    group: "Contracts",
-    name: "Spice Refinery I",
-    sourceId: 513,
-    sourceSlug: "uprising-spice-refinery-i",
-    reason: "Dune Cards Hub has no fullImageUrl or thumbnailImageUrl for this contract entry.",
-  },
-];
+const knownMissingAssets = [];
 
 const seenKnownMissingAssets = new Map();
 

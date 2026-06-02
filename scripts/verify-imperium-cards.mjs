@@ -177,6 +177,10 @@ try {
   assert.ok(prepareTheWay, "Reserve market should include Prepare The Way");
   const spiceMustFlow = data.reserveMarket.find((card) => card.sourceId === 538);
   assert.ok(spiceMustFlow, "Reserve market should include The Spice Must Flow");
+  const overthrow = data.imperiumDeck.find((card) => card.name === "Overthrow");
+  assert.ok(overthrow, "Imperium deck should include Overthrow");
+  const priceIsNoObject = data.imperiumDeck.find((card) => card.name === "Price is No Object");
+  assert.ok(priceIsNoObject, "Imperium deck should include Price is No Object");
   const spyNetwork = data.imperiumDeck.find((card) => card.name === "Spy Network");
   assert.ok(spyNetwork, "Imperium deck should include Spy Network");
   assert.equal(state.isPrepareTheWayCard(prepareTheWay), true, "Prepare The Way should be recognized");
@@ -223,6 +227,20 @@ try {
       )
     ),
     "Spy Network should model its acquisition spy bonus as a typed acquire effect",
+  );
+  assert.ok(
+    overthrow.effects?.some((spec) =>
+      spec.trigger === "acquire" &&
+      spec.effects.some((effect) => effect.kind === "draw-intrigues" && effect.amount === 1)
+    ),
+    "Overthrow should model its acquisition Intrigue draw as a typed acquire effect",
+  );
+  assert.ok(
+    priceIsNoObject.effects?.some((spec) =>
+      spec.trigger === "acquire" &&
+      spec.effects.some((effect) => effect.kind === "gain-resource" && effect.resource === "solari" && effect.amount === 2)
+    ),
+    "Price is No Object should model its acquisition Solari as a typed acquire effect",
   );
   for (const name of ["Bene Gesserit Operative", "Cargo Runner", "Chani, Clever Tactician", "Maker Keeper", "Maula Pistol", "Northern Watermaster", "Paracompass"]) {
     const card = data.imperiumDeck.find((candidate) => candidate.name === name);
@@ -474,6 +492,50 @@ try {
   );
   assert.match(spiceBought.log[0], /acquires The Spice Must Flow for 1 VP and gains 1 spice/);
 
+  const overthrowReplacement = data.imperiumDeck.find((card) => card.id !== overthrow.id);
+  const overthrowIntrigue = { ...data.intrigueCards[0], id: "overthrow-acquire-intrigue" };
+  assert.ok(overthrowReplacement, "Expected an Imperium row replacement card for Overthrow purchase coverage");
+  assert.ok(overthrowIntrigue.name, "Expected an Intrigue card for Overthrow acquire coverage");
+  const overthrowBuyFixture = {
+    ...withActivePlayer(game, p2.id, () => ({
+      revealed: true,
+      persuasion: overthrow.cost,
+      discard: [],
+      intrigues: [],
+    })),
+    imperiumRow: [overthrow],
+    intrigueDeck: [overthrowIntrigue],
+    intrigueDiscard: [],
+    marketDeck: [overthrowReplacement],
+  };
+  const overthrowBought = state.acquireMarketCard(overthrowBuyFixture, p2.id, overthrow.id);
+  const overthrowBuyer = playerById(overthrowBought, p2.id);
+  assert.equal(overthrowBuyer.persuasion, 0, "Overthrow should spend its persuasion cost");
+  assert.equal(overthrowBuyer.discard.at(-1).id, overthrow.id, "Overthrow should go to discard when bought from the row");
+  assert.equal(overthrowBuyer.intrigues.at(-1).id, overthrowIntrigue.id, "Overthrow acquire bonus should draw one Intrigue");
+  assert.equal(overthrowBought.intrigueDeck.length, 0, "Overthrow acquire bonus should consume the Intrigue deck");
+  assert.match(overthrowBought.log[0], /draws an Intrigue card from Overthrow/);
+  assert.match(overthrowBought.log[1], /acquires Overthrow/);
+
+  const priceReplacement = data.imperiumDeck.find((card) => card.id !== priceIsNoObject.id);
+  assert.ok(priceReplacement, "Expected an Imperium row replacement card for Price is No Object purchase coverage");
+  const priceBuyFixture = {
+    ...withActivePlayer(game, p2.id, (player) => ({
+      revealed: true,
+      persuasion: priceIsNoObject.cost,
+      discard: [],
+      resources: { ...player.resources, solari: 0 },
+    })),
+    imperiumRow: [priceIsNoObject],
+    marketDeck: [priceReplacement],
+  };
+  const priceBought = state.acquireMarketCard(priceBuyFixture, p2.id, priceIsNoObject.id);
+  const priceBuyer = playerById(priceBought, p2.id);
+  assert.equal(priceBuyer.persuasion, 0, "Price is No Object should spend its persuasion cost");
+  assert.equal(priceBuyer.resources.solari, 2, "Price is No Object acquire bonus should award 2 Solari");
+  assert.equal(priceBuyer.discard.at(-1).id, priceIsNoObject.id, "Price is No Object should go to discard when bought from the row");
+  assert.match(priceBought.log[0], /acquires Price is No Object and gains 2 Solari/);
+
   const spyNetworkReplacement = data.imperiumDeck.find((card) => card.id !== spyNetwork.id);
   assert.ok(spyNetworkReplacement, "Expected an Imperium row replacement card for Spy Network purchase coverage");
   const spyNetworkBuyFixture = {
@@ -540,6 +602,43 @@ try {
     spicePendingAcquired.log[0],
     /acquires The Spice Must Flow to their hand from Verifier Acquire for 1 VP and gains 1 spice/,
   );
+
+  const overthrowAcquirePending = {
+    kind: "acquire-card",
+    ownerId: p2.id,
+    source: "Verifier Acquire",
+    maxCost: overthrow.cost,
+    destination: "hand",
+  };
+  const overthrowPendingIntrigue = { ...data.intrigueCards[1], id: "overthrow-pending-acquire-intrigue" };
+  assert.ok(overthrowPendingIntrigue.name, "Expected an Intrigue card for pending Overthrow acquire coverage");
+  const overthrowPendingFixture = {
+    ...withActivePlayer(game, p2.id, () => ({
+      hand: [],
+      intrigues: [],
+    })),
+    imperiumRow: [overthrow],
+    intrigueDeck: [overthrowPendingIntrigue],
+    intrigueDiscard: [],
+    marketDeck: [overthrowReplacement],
+    pendingAction: overthrowAcquirePending,
+    pendingQueue: [],
+  };
+  const overthrowPendingAcquired = state.acquireCardForPending(
+    overthrowPendingFixture,
+    overthrowAcquirePending,
+    overthrow.id,
+  );
+  const overthrowPendingOwner = playerById(overthrowPendingAcquired, p2.id);
+  assert.equal(overthrowPendingOwner.hand.at(-1).id, overthrow.id, "Acquire-card pending should honor Overthrow hand destination");
+  assert.equal(
+    overthrowPendingOwner.intrigues.at(-1).id,
+    overthrowPendingIntrigue.id,
+    "Acquire-card pending should apply Overthrow acquire Intrigue reward",
+  );
+  assert.match(overthrowPendingAcquired.log[0], /draws an Intrigue card from Overthrow/);
+  assert.match(overthrowPendingAcquired.log[1], /acquires Overthrow to their hand from Verifier Acquire/);
+  assert.equal(overthrowPendingAcquired.pendingAction, undefined, "Overthrow acquire-card pending should advance after acquisition");
 
   const queuedAfterAcquire = {
     kind: "trash-card",

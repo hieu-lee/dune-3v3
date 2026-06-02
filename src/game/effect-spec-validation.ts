@@ -162,7 +162,8 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     trigger === "acquire" &&
     effect.kind !== "gain-resource" &&
     effect.kind !== "gain-vp" &&
-    effect.kind !== "place-spies"
+    effect.kind !== "place-spies" &&
+    effect.kind !== "draw-intrigues"
   ) {
     throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
   }
@@ -200,7 +201,7 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     return;
   }
   if (effect.kind === "draw-intrigues") {
-    if (trigger !== "agent-play") {
+    if (trigger !== "agent-play" && trigger !== "acquire") {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
     }
     validateAmount(effect.amount);

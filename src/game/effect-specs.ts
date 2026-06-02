@@ -61,6 +61,13 @@ export function acquireGainVp(amount: EffectAmountSpec, conditions?: GameEffectC
   return acquireEffects([{ kind: "gain-vp", selector: "self", amount }], conditions);
 }
 
+export function acquireDrawIntrigues(
+  amount: EffectAmountSpec,
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return acquireEffects([{ kind: "draw-intrigues", selector: "self", amount }], conditions);
+}
+
 export function acquirePlaceSpies(
   amount: EffectAmountSpec,
   options: {

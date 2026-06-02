@@ -2,6 +2,7 @@ import {
   addAcquiredCard,
   acquireRewardParts,
   callToArmsRecruitOwner,
+  drawAcquireIntrigues,
   formatAcquireOutcome,
   pendingActionForAcquireSpyReward,
   recordAcquireSpiceGain,
@@ -321,7 +322,7 @@ export function resolveAcquireCardForPending(
     ...acquireRewardParts(acquireReward),
     ...(recruitPart ? [recruitPart] : []),
   ]);
-  const acquiredState = recordAcquireSpiceGain({
+  const acquiredStateBase = recordAcquireSpiceGain({
     ...state,
     players,
     imperiumRow,
@@ -333,6 +334,7 @@ export function resolveAcquireCardForPending(
       ...state.log,
     ],
   }, owner.id, acquireReward);
+  const acquiredState = drawAcquireIntrigues(acquiredStateBase, owner.id, card, acquireReward);
   const acquireSpyPending = pendingActionForAcquireSpyReward(acquiredState, owner.id, card, acquireReward);
   return finishPendingResolution(prependPendingAction(acquiredState, acquireSpyPending));
 }

@@ -1,5 +1,6 @@
 import { canMoveCardToThroneRow } from "./card-identifiers";
 import { resolveCardAcquireEffects, type GameEffectResult } from "./effect-resolver";
+import { drawIntrigueCards } from "./intrigue-deck";
 import { advancePendingAction, queuePendingActions } from "./pending-actions";
 import { defaultActivatedAllyId } from "./placement-rules";
 import { pendingActionForSpyPlacements } from "./spy-effect-pending-rules";
@@ -56,6 +57,17 @@ export function formatAcquireOutcome(parts: string[]) {
 export function recordAcquireSpiceGain(state: GameState, playerId: string, reward: GameEffectResult) {
   const spiceGain = reward.revealGain.spice ?? 0;
   return spiceGain > 0 ? recordTurnSpiceGain(state, playerId, spiceGain) : state;
+}
+
+export function drawAcquireIntrigues(
+  state: GameState,
+  playerId: string,
+  card: Card,
+  acquireReward: GameEffectResult,
+) {
+  return acquireReward.intriguesToDraw > 0
+    ? drawIntrigueCards(state, playerId, acquireReward.intriguesToDraw, card.name)
+    : state;
 }
 
 export function pendingActionForAcquireSpyReward(
@@ -201,7 +213,7 @@ export function acquireMarketCard(
     ...(recruitPart ? [recruitPart] : []),
   ]);
 
-  const acquiredState = recordAcquireSpiceGain({
+  const acquiredStateBase = recordAcquireSpiceGain({
     ...state,
     players,
     imperiumRow,
@@ -212,6 +224,7 @@ export function acquireMarketCard(
       ...state.log,
     ],
   }, buyer.id, acquireReward);
+  const acquiredState = drawAcquireIntrigues(acquiredStateBase, buyer.id, card, acquireReward);
   const acquireSpyPending = pendingActionForAcquireSpyReward(acquiredState, buyer.id, card, acquireReward);
   return {
     ...acquiredState,

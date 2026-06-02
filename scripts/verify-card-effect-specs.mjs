@@ -124,6 +124,8 @@ try {
   const guildEnvoy = data.imperiumDeck.find((card) => card.name === "Guild Envoy");
   const guildSpy = data.imperiumDeck.find((card) => card.name === "Guild Spy");
   const inHighPlaces = data.imperiumDeck.find((card) => card.name === "In High Places");
+  const overthrow = data.imperiumDeck.find((card) => card.name === "Overthrow");
+  const priceIsNoObject = data.imperiumDeck.find((card) => card.name === "Price is No Object");
   const spyNetwork = data.imperiumDeck.find((card) => card.name === "Spy Network");
   const strikeFleet = data.imperiumDeck.find((card) => card.name === "Strike Fleet");
   const subversiveAdvisor = data.imperiumDeck.find((card) => card.name === "Subversive Advisor");
@@ -179,6 +181,8 @@ try {
     guildEnvoy &&
     guildSpy &&
     inHighPlaces &&
+    overthrow &&
+    priceIsNoObject &&
     spyNetwork &&
     strikeFleet &&
     subversiveAdvisor &&
@@ -218,6 +222,8 @@ try {
     [
       "Guild Spy",
       "In High Places",
+      "Overthrow",
+      "Price is No Object",
       "Spy Network",
       "Strike Fleet",
       "Subversive Advisor",
@@ -240,6 +246,29 @@ try {
       `${card.name} should use a typed acquire spy-placement effect`,
     );
   }
+  assert.ok(
+    overthrow.effects?.some((spec) =>
+      spec.trigger === "acquire" &&
+      spec.effects.some((effect) =>
+        effect.kind === "draw-intrigues" &&
+        effect.selector === "self" &&
+        effect.amount === 1
+      )
+    ),
+    "Overthrow should use a typed acquire Intrigue draw effect",
+  );
+  assert.ok(
+    priceIsNoObject.effects?.some((spec) =>
+      spec.trigger === "acquire" &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-resource" &&
+        effect.selector === "self" &&
+        effect.resource === "solari" &&
+        effect.amount === 2
+      )
+    ),
+    "Price is No Object should use a typed acquire Solari effect",
+  );
   assert.ok(
     spiceMustFlow.effects?.some((spec) =>
       spec.trigger === "acquire" &&
@@ -1519,6 +1548,22 @@ try {
     ),
     /Invalid place-spies recallForSupply "yes"/,
     "Acquire spy-placement specs should reject non-boolean recallForSupply flags",
+  );
+  const invalidAcquireDrawIntriguesCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-acquire-draw-intrigues-card",
+    name: "Effect Spec Invalid Acquire Draw Intrigues",
+    cost: 0,
+    effects: [{ trigger: "acquire", effects: [{ kind: "draw-intrigues", selector: "self", amount: -1 }] }],
+  };
+  assert.throws(
+    () => state.acquireMarketCard(
+      { ...invalidAcquireFixtureBase, imperiumRow: [invalidAcquireDrawIntriguesCard], marketDeck: [] },
+      p2.id,
+      invalidAcquireDrawIntriguesCard.id,
+    ),
+    /Invalid effect amount "-1"/,
+    "Acquire draw-Intrigue specs should validate effect amounts",
   );
   const fractionalAmountCard = {
     ...convincingArgument,

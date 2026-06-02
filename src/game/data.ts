@@ -17,8 +17,10 @@ import {
   makerKeeperSourceId,
   maulaPistolSourceId,
   northernWatermasterSourceId,
+  overthrowSourceId,
   paracompassSourceId,
   prepareTheWaySourceId,
+  priceIsNoObjectSourceId,
   reliableInformantSourceId,
   spaceTimeFoldingSourceId,
   spyNetworkSourceId,
@@ -29,6 +31,7 @@ import {
   wheelsWithinWheelsSourceId,
 } from "./card-identifiers";
 import {
+  acquireDrawIntrigues,
   acquireGainResource,
   acquireGainVp,
   acquirePlaceSpies,
@@ -434,6 +437,24 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
         attributeNumber(card, "Swords"),
       ) ?? []),
       acquirePlaceSpies(1, { recallForSupply: true, mustPlace: true }),
+    ];
+  }
+  if (card.id === overthrowSourceId) {
+    return [
+      ...(fixedRevealEffects(
+        attributeNumber(card, "Persuasion on reveal"),
+        attributeNumber(card, "Swords"),
+      ) ?? []),
+      acquireDrawIntrigues(1),
+    ];
+  }
+  if (card.id === priceIsNoObjectSourceId) {
+    return [
+      ...(fixedRevealEffects(
+        attributeNumber(card, "Persuasion on reveal"),
+        attributeNumber(card, "Swords"),
+      ) ?? []),
+      acquireGainResource("solari", 2),
     ];
   }
   if (card.id === spiceMustFlowSourceId) {

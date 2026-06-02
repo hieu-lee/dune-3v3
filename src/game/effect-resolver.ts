@@ -118,6 +118,16 @@ export type AgentDiscardCardForInfluenceAndDraw = {
   optional: boolean;
 };
 
+export type AgentDiscardCardForDraw = {
+  selector: PlayerSelector;
+  drawCards: number;
+  optional: boolean;
+  bonusDraw?: {
+    requiredDiscardTrait: string;
+    drawCards: number;
+  };
+};
+
 export type AgentPayResourceForInfluence = {
   selector: PlayerSelector;
   resource: ResourceId;
@@ -530,6 +540,9 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
   if (effect.kind === "discard-card-for-influence-and-draw") {
     return result;
   }
+  if (effect.kind === "discard-card-for-draw") {
+    return result;
+  }
   if (effect.kind === "pay-resource-for-influence") {
     return result;
   }
@@ -811,6 +824,32 @@ export function resolveAgentDiscardCardForInfluenceAndDraws(
         drawCards: amountFor(effect.drawCards, context.source),
         influenceAmount: amountFor(effect.influenceAmount, context.source),
         optional: effect.optional ?? true,
+      }));
+  });
+}
+
+export function resolveAgentDiscardCardForDraws(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): AgentDiscardCardForDraw[] {
+  specs?.forEach(validateSpec);
+  return (specs ?? []).flatMap((spec) => {
+    if (spec.trigger !== "agent-play") return [];
+    if (!specApplies(spec, context)) return [];
+    return spec.effects
+      .filter((effect) => effect.kind === "discard-card-for-draw")
+      .map((effect) => ({
+        selector: effect.selector,
+        drawCards: amountFor(effect.drawCards, context.source),
+        optional: effect.optional ?? false,
+        ...(effect.bonusDraw
+          ? {
+              bonusDraw: {
+                requiredDiscardTrait: effect.bonusDraw.requiredDiscardTrait,
+                drawCards: amountFor(effect.bonusDraw.drawCards, context.source),
+              },
+            }
+          : {}),
       }));
   });
 }

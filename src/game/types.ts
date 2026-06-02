@@ -137,6 +137,16 @@ export type GameEffectSpec =
       optional?: boolean;
     }
   | {
+      kind: "discard-card-for-draw";
+      selector: PlayerSelector;
+      drawCards: EffectAmountSpec;
+      optional?: boolean;
+      bonusDraw?: {
+        requiredDiscardTrait: string;
+        drawCards: EffectAmountSpec;
+      };
+    }
+  | {
       kind: "pay-resource-for-influence";
       selector: PlayerSelector;
       resource: ResourceId;
@@ -546,6 +556,17 @@ export type PendingAction =
       drawCards: number;
       influenceAmount: number;
       optional: boolean;
+    }
+  | {
+      kind: "discard-card-for-draw";
+      ownerId: string;
+      source: string;
+      drawCards: number;
+      optional: boolean;
+      bonusDraw?: {
+        requiredDiscardTrait: string;
+        drawCards: number;
+      };
     }
   | {
       kind: "lose-influence-for-intrigues";

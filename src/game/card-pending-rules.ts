@@ -12,6 +12,7 @@ import {
 import { playerTroopSupply } from "./deck-utils";
 import {
   resolveAgentCommanderResourceSplits,
+  resolveAgentDiscardCardForDraws,
   resolveAgentDiscardCardForInfluenceAndDraws,
   resolveAgentMoveCardToThroneRows,
   resolveAgentPayResourceForContracts,
@@ -27,6 +28,7 @@ import {
   resolveRevealTrashCardEffects,
   type SpyPlacementEffectResult,
 } from "./effect-resolver";
+import { discardCardForDrawChoices } from "./discard-draw-rules";
 import { discardCardForInfluenceAndDrawChoices } from "./discard-influence-draw-rules";
 import { loseInfluenceForIntriguesChoices } from "./influence-intrigue-rules";
 import {
@@ -198,6 +200,39 @@ function pendingActionForAgentDiscardCardForInfluenceAndDraw(
         influenceAmount: effect.influenceAmount,
         optional: effect.optional,
       };
+    })
+    .find((pending): pending is PendingAction => Boolean(pending));
+}
+
+function pendingActionForAgentDiscardCardForDraw(
+  card: Card,
+  source: Player,
+  state?: GameState,
+  target?: Player,
+): PendingAction | undefined {
+  if (!card.effects || !source.playArea.some((candidate) => candidate.id === card.id)) return undefined;
+  const players = state ? playersWithPendingCardEffect(state, source, target) : undefined;
+  const effectState = state && players ? { ...state, players } : undefined;
+  const effects = resolveAgentDiscardCardForDraws(card.effects, {
+    trigger: "agent-play",
+    source,
+    target,
+    state: effectState,
+  });
+  return effects
+    .map((effect): PendingAction | undefined => {
+      const maxDrawCards = effect.drawCards + (effect.bonusDraw?.drawCards ?? 0);
+      if (effect.selector !== "self" || maxDrawCards <= 0) return undefined;
+      const pending: Extract<PendingAction, { kind: "discard-card-for-draw" }> = {
+        kind: "discard-card-for-draw",
+        ownerId: source.id,
+        source: card.name,
+        drawCards: effect.drawCards,
+        optional: effect.optional,
+        ...(effect.bonusDraw ? { bonusDraw: { ...effect.bonusDraw } } : {}),
+      };
+      if (discardCardForDrawChoices(source, pending).length === 0) return undefined;
+      return pending;
     })
     .find((pending): pending is PendingAction => Boolean(pending));
 }
@@ -498,6 +533,8 @@ export function pendingActionForCard(
   if (agentSpyPlacementPending) return agentSpyPlacementPending;
   const agentDiscardInfluenceDrawPending = pendingActionForAgentDiscardCardForInfluenceAndDraw(card, source, state, target);
   if (agentDiscardInfluenceDrawPending) return agentDiscardInfluenceDrawPending;
+  const agentDiscardDrawPending = pendingActionForAgentDiscardCardForDraw(card, source, state, target);
+  if (agentDiscardDrawPending) return agentDiscardDrawPending;
   const agentPayResourceInfluencePending = pendingActionForAgentPayResourceForInfluence(card, source, state, target, space);
   if (agentPayResourceInfluencePending) return agentPayResourceInfluencePending;
   const agentPayResourceSandwormsPending = pendingActionForAgentPayResourceForSandworms(card, source, state, target, space);

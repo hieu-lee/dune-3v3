@@ -97,6 +97,7 @@ try {
   const northernWatermaster = data.imperiumDeck.find((card) => card.name === "Northern Watermaster");
   const paracompass = data.imperiumDeck.find((card) => card.name === "Paracompass");
   const reliableInformant = data.imperiumDeck.find((card) => card.name === "Reliable Informant");
+  const spaceTimeFolding = data.imperiumDeck.find((card) => card.name === "Space-time Folding");
   const wheelsWithinWheels = data.imperiumDeck.find((card) => card.name === "Wheels Within Wheels");
   const prepareTheWay = data.reserveMarket.find((card) => card.sourceId === 537);
   const commandRespect = data.muadDibCommanderCards.find((card) => card.name === "Command Respect");
@@ -141,6 +142,7 @@ try {
     northernWatermaster &&
     paracompass &&
     reliableInformant &&
+    spaceTimeFolding &&
     wheelsWithinWheels,
   );
   assert.ok(commandRespect && prepareTheWay && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
@@ -165,6 +167,7 @@ try {
       "Paracompass",
       "Prepare The Way",
       "Reliable Informant",
+      "Space-time Folding",
       "Wheels Within Wheels",
     ],
     "Unexpected cards with declarative Agent-play specs",
@@ -629,6 +632,26 @@ try {
       spec.effects.some((effect) => effect.kind === "gain-resource" && effect.resource === "solari" && effect.amount === 1)
     ),
     "Reliable Informant should carry a reveal Solari spec",
+  );
+  assert.equal(
+    spaceTimeFolding.play,
+    "Discard 1 card to draw 1 card. If you discarded a Spacing Guild card, draw 1 more card.",
+    "Space-time Folding play text should preserve its conditional discard-draw effect",
+  );
+  assert.equal(spaceTimeFolding.reveal, "+1 persuasion.", "Space-time Folding should keep its fixed reveal persuasion");
+  assert.ok(
+    spaceTimeFolding.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.effects.some((effect) =>
+        effect.kind === "discard-card-for-draw" &&
+        effect.selector === "self" &&
+        effect.drawCards === 1 &&
+        effect.optional === false &&
+        effect.bonusDraw?.requiredDiscardTrait === "Faction: Spacing Guild" &&
+        effect.bonusDraw?.drawCards === 1
+      )
+    ),
+    "Space-time Folding should carry a declarative Agent discard-for-draw spec with a Spacing Guild bonus",
   );
   assert.ok(
     fedaykinStilltent.effects?.some((spec) =>
@@ -2214,6 +2237,105 @@ try {
     /Invalid effect amount "-1"/,
     "Discard-for-Influence-and-draw specs should require non-negative Influence amounts",
   );
+  const revealDiscardDrawCard = {
+    ...convincingArgument,
+    id: "effect-spec-reveal-discard-draw-card",
+    name: "Effect Spec Reveal Discard Draw",
+    effects: [revealSpec([{
+      kind: "discard-card-for-draw",
+      selector: "self",
+      drawCards: 1,
+    }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [revealDiscardDrawCard], highCouncilSeat: false }),
+    /Unsupported effect "discard-card-for-draw" for reveal/,
+    "Discard-for-draw specs should stay in Agent play until other trigger resolvers support them",
+  );
+  const invalidDiscardDrawSelectorCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-discard-draw-selector-card",
+    name: "Effect Spec Invalid Discard Draw Selector",
+    effects: [agentSpec([{
+      kind: "discard-card-for-draw",
+      selector: "activated-ally",
+      drawCards: 1,
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidDiscardDrawSelectorCard, p4, p2),
+    /Unsupported effect selector "activated-ally" for discard-card-for-draw/,
+    "Discard-for-draw specs should reject activated Ally selectors",
+  );
+  const invalidDiscardDrawAmountCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-discard-draw-amount-card",
+    name: "Effect Spec Invalid Discard Draw Amount",
+    effects: [agentSpec([{
+      kind: "discard-card-for-draw",
+      selector: "self",
+      drawCards: -1,
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidDiscardDrawAmountCard, p2, p2),
+    /Invalid effect amount "-1"/,
+    "Discard-for-draw specs should require non-negative draw amounts",
+  );
+  const invalidDiscardDrawOptionalCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-discard-draw-optional-card",
+    name: "Effect Spec Invalid Discard Draw Optional",
+    effects: [agentSpec([{
+      kind: "discard-card-for-draw",
+      selector: "self",
+      drawCards: 1,
+      optional: "false",
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidDiscardDrawOptionalCard, p2, p2),
+    /Invalid discard-card-for-draw optional "false"/,
+    "Discard-for-draw specs should reject non-boolean optional values",
+  );
+  const invalidDiscardDrawBonusTraitCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-discard-draw-bonus-trait-card",
+    name: "Effect Spec Invalid Discard Draw Bonus Trait",
+    effects: [agentSpec([{
+      kind: "discard-card-for-draw",
+      selector: "self",
+      drawCards: 1,
+      bonusDraw: {
+        requiredDiscardTrait: "",
+        drawCards: 1,
+      },
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidDiscardDrawBonusTraitCard, p2, p2),
+    /Invalid discard-card-for-draw bonusDraw requiredDiscardTrait ""/,
+    "Discard-for-draw specs should reject empty bonus trait labels",
+  );
+  const invalidDiscardDrawBonusAmountCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-discard-draw-bonus-amount-card",
+    name: "Effect Spec Invalid Discard Draw Bonus Amount",
+    effects: [agentSpec([{
+      kind: "discard-card-for-draw",
+      selector: "self",
+      drawCards: 1,
+      bonusDraw: {
+        requiredDiscardTrait: "Faction: Spacing Guild",
+        drawCards: -1,
+      },
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidDiscardDrawBonusAmountCard, p2, p2),
+    /Invalid effect amount "-1"/,
+    "Discard-for-draw specs should reject negative bonus draw amounts",
+  );
   const revealDeploymentBlockCard = {
     ...convincingArgument,
     id: "effect-spec-reveal-deployment-block-card",
@@ -3010,6 +3132,105 @@ try {
   );
   assert.equal(reliableInformantReveal.persuasion, 1, "Reliable Informant should reveal for 1 persuasion");
   assert.deepEqual(reliableInformantReveal.revealGain, { solari: 1 }, "Reliable Informant should reveal for 1 Solari");
+  const spaceTimeNonGuildDiscard = { ...dagger, id: "space-time-non-guild-discard-card" };
+  const spaceTimeDrawOne = { ...convincingArgument, id: "space-time-draw-one-card" };
+  const spaceTimeDrawTwo = { ...convincingArgument, id: "space-time-draw-two-card" };
+  const spaceTimeNonGuildFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 1,
+    deck: [spaceTimeDrawOne, spaceTimeDrawTwo],
+    discard: [],
+    hand: [spaceTimeFolding, spaceTimeNonGuildDiscard],
+    playArea: [],
+    resources: { solari: 0, spice: 0, water: 0 },
+  }));
+  const spaceTimeNonGuildPlaced = turnActions.placeAgentAction(spaceTimeNonGuildFixture, {
+    commanderTargets: {},
+    selectedCard: spaceTimeFolding,
+    selectedSpace: deliverSupplies,
+  });
+  assert.equal(spaceTimeNonGuildPlaced.pendingAction?.kind, "discard-card-for-draw", "Space-time Folding should queue discard-for-draw after Agent placement");
+  assert.equal(spaceTimeNonGuildPlaced.pendingAction?.ownerId, p2.id, "Space-time Folding discard choice should belong to the card player");
+  assert.equal(spaceTimeNonGuildPlaced.pendingAction?.drawCards, 1, "Space-time Folding should draw one card before its trait bonus");
+  assert.equal(spaceTimeNonGuildPlaced.pendingAction?.optional, false, "Space-time Folding discard should be mandatory when a hand card remains");
+  assert.equal(
+    spaceTimeNonGuildPlaced.pendingAction?.bonusDraw?.requiredDiscardTrait,
+    "Faction: Spacing Guild",
+    "Space-time Folding should preserve its Spacing Guild bonus trait",
+  );
+  assert.equal(spaceTimeNonGuildPlaced.pendingAction?.bonusDraw?.drawCards, 1, "Space-time Folding should draw one bonus card");
+  const spaceTimeMandatorySkipped = state.skipDiscardCardForDraw(spaceTimeNonGuildPlaced, spaceTimeNonGuildPlaced.pendingAction);
+  assert.equal(
+    spaceTimeMandatorySkipped.pendingAction,
+    spaceTimeNonGuildPlaced.pendingAction,
+    "Mandatory Space-time Folding discard should not be skippable",
+  );
+  const spaceTimeNonGuildResolved = state.resolveDiscardCardForDrawChoice(
+    spaceTimeNonGuildPlaced,
+    spaceTimeNonGuildPlaced.pendingAction,
+    spaceTimeNonGuildDiscard.id,
+  );
+  assert.equal(spaceTimeNonGuildResolved.pendingAction, undefined, "Resolving Space-time Folding should clear its pending action");
+  const spaceTimeNonGuildOwner = playerById(spaceTimeNonGuildResolved, p2.id);
+  assert.equal(spaceTimeNonGuildOwner.discard.at(-1).id, spaceTimeNonGuildDiscard.id, "Space-time Folding should discard the selected card");
+  assert.ok(
+    spaceTimeNonGuildOwner.hand.some((card) => card.id === spaceTimeDrawOne.id),
+    "Space-time Folding should draw one card when the discarded card is not Spacing Guild",
+  );
+  assert.equal(
+    spaceTimeNonGuildOwner.hand.some((card) => card.id === spaceTimeDrawTwo.id),
+    false,
+    "Space-time Folding should not draw the bonus card for non-Spacing Guild discards",
+  );
+  assert.match(spaceTimeNonGuildResolved.log[0], /Space-time Folding: discards .* and draws 1 card/);
+
+  const spaceTimeGuildDiscard = { ...spaceTimeFolding, id: "space-time-guild-discard-card" };
+  const spaceTimeGuildFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 1,
+    deck: [spaceTimeDrawOne, spaceTimeDrawTwo],
+    discard: [],
+    hand: [spaceTimeFolding, spaceTimeGuildDiscard],
+    playArea: [],
+    resources: { solari: 0, spice: 0, water: 0 },
+  }));
+  const spaceTimeGuildPlaced = turnActions.placeAgentAction(spaceTimeGuildFixture, {
+    commanderTargets: {},
+    selectedCard: spaceTimeFolding,
+    selectedSpace: deliverSupplies,
+  });
+  assert.equal(spaceTimeGuildPlaced.pendingAction?.kind, "discard-card-for-draw", "Space-time Folding should queue the same pending action for Spacing Guild discards");
+  const spaceTimeGuildResolved = state.resolveDiscardCardForDrawChoice(
+    spaceTimeGuildPlaced,
+    spaceTimeGuildPlaced.pendingAction,
+    spaceTimeGuildDiscard.id,
+  );
+  const spaceTimeGuildOwner = playerById(spaceTimeGuildResolved, p2.id);
+  assert.ok(
+    spaceTimeGuildOwner.hand.some((card) => card.id === spaceTimeDrawOne.id) &&
+      spaceTimeGuildOwner.hand.some((card) => card.id === spaceTimeDrawTwo.id),
+    "Space-time Folding should draw two cards when discarding a Spacing Guild card",
+  );
+  assert.match(spaceTimeGuildResolved.log[0], /Space-time Folding: discards .* and draws 2 cards/);
+
+  const spaceTimeEmptyHandPlaced = turnActions.placeAgentAction(
+    withActivePlayer(game, p2.id, () => ({
+      agentsReady: 1,
+      deck: [spaceTimeDrawOne],
+      discard: [],
+      hand: [spaceTimeFolding],
+      playArea: [],
+      resources: { solari: 0, spice: 0, water: 0 },
+    })),
+    {
+      commanderTargets: {},
+      selectedCard: spaceTimeFolding,
+      selectedSpace: deliverSupplies,
+    },
+  );
+  assert.equal(
+    spaceTimeEmptyHandPlaced.pendingAction,
+    undefined,
+    "Space-time Folding should not queue a discard choice when no card remains in hand after placement",
+  );
   const fedaykinMakerEffect = state.applyCardAgentEffect(
     fedaykinStilltent,
     { ...p2, garrison: 0 },

@@ -157,6 +157,29 @@ export async function runCardChoicesSmoke({
   assert.equal(ownerAfter.hand.at(-1).id, capturedMentatDrawId, "Captured Mentat should draw one deck card");
   assert.equal(ownerAfter.influence.bene, ownerBefore.influence.bene + 1, "Captured Mentat should gain chosen Influence");
 
+  await setDebugGameAndWait(page, states.spaceTimeFolding);
+  pendingText = await page.locator(".pending-panel").innerText();
+  const spaceTimeFoldingDiscardName = states.spaceTimeFolding.spaceTimeFoldingDiscardName;
+  const spaceTimeFoldingDiscardId = states.spaceTimeFolding.spaceTimeFoldingDiscardId;
+  const spaceTimeFoldingDrawOneId = states.spaceTimeFolding.spaceTimeFoldingDrawOneId;
+  const spaceTimeFoldingDrawTwoId = states.spaceTimeFolding.spaceTimeFoldingDrawTwoId;
+  assert.match(pendingText, /Space-time Folding/i);
+  assert.match(pendingText, new RegExp(escapeRegExp(spaceTimeFoldingDiscardName)));
+  assert.match(pendingText, /Spacing Guild/i);
+  await screenshot(page, captures, "pending-space-time-folding-discard-draw.png");
+
+  await page.locator(".pending-panel").getByRole("button", { name: spaceTimeFoldingDiscardName }).click();
+  await page.locator(".pending-panel").getByRole("button", { name: /Resolve Space-time Folding/ }).click();
+  await waitForNoPending(page);
+  after = await currentGame(page);
+  ownerAfter = after.players.find((player) => player.id === "p2");
+  assert.equal(ownerAfter.discard.at(-1).id, spaceTimeFoldingDiscardId, "Space-time Folding should discard the selected card");
+  assert.ok(
+    ownerAfter.hand.some((card) => card.id === spaceTimeFoldingDrawOneId) &&
+      ownerAfter.hand.some((card) => card.id === spaceTimeFoldingDrawTwoId),
+    "Space-time Folding should draw two cards after discarding a Spacing Guild card",
+  );
+
   await setDebugGameAndWait(page, states.capturedMentatReveal);
   pendingText = await page.locator(".pending-panel").innerText();
   const capturedMentatIntrigueId = states.capturedMentatReveal.capturedMentatIntrigueId;
@@ -195,10 +218,14 @@ async function createCardChoiceStates(server, initialPlayableGame) {
   assert.ok(beneGesseritOperative, "Expected Bene Gesserit Operative Imperium card");
   const doubleAgent = data.imperiumDeck.find((card) => card.sourceId === 37);
   assert.ok(doubleAgent, "Expected Double Agent Imperium card");
+  const spaceTimeFolding = data.imperiumDeck.find((card) => card.sourceId === 12);
+  assert.ok(spaceTimeFolding, "Expected Space-time Folding Imperium card");
   const spySpace = data.boardSpaces.find((space) => space.id === "high-council");
   assert.ok(spySpace, "Expected High Council spy placement space");
   const spyPlaceAfterRecallSpace = data.boardSpaces.find((space) => space.id === "secrets");
   assert.ok(spyPlaceAfterRecallSpace, "Expected Secrets spy placement space");
+  const deliverSupplies = data.boardSpaces.find((space) => space.id === "deliver-supplies");
+  assert.ok(deliverSupplies, "Expected Deliver Supplies board space");
   const capturedMentat = data.imperiumDeck.find((card) => card.sourceId === 61);
   assert.ok(capturedMentat, "Expected Captured Mentat Imperium card");
   const capturedMentatDiscard = { ...data.allyStarterCards[0], id: "browser-captured-mentat-discard-card" };
@@ -206,6 +233,13 @@ async function createCardChoiceStates(server, initialPlayableGame) {
   assert.ok(capturedMentatDraw.name, "Expected Captured Mentat draw card");
   const capturedMentatIntrigue = { ...data.intrigueCards[0], id: "browser-captured-mentat-intrigue-card" };
   assert.ok(capturedMentatIntrigue.name, "Expected Captured Mentat reveal Intrigue card");
+  const spaceTimeFoldingDiscard = {
+    ...spaceTimeFolding,
+    id: "browser-space-time-folding-discard-card",
+    name: "Spacing Guild Debug Card",
+  };
+  const spaceTimeFoldingDrawOne = { ...data.allyStarterCards[1], id: "browser-space-time-folding-draw-one-card" };
+  const spaceTimeFoldingDrawTwo = { ...data.allyStarterCards[2], id: "browser-space-time-folding-draw-two-card" };
 
   const base = {
     ...game,
@@ -273,6 +307,30 @@ async function createCardChoiceStates(server, initialPlayableGame) {
       selectedSpace: spySpace,
     },
   );
+  const spaceTimeFoldingState = turnActions.placeAgentAction(
+    {
+      ...base,
+      players: base.players.map((player) =>
+        player.id === ownerId
+          ? {
+              ...player,
+              agentsReady: 1,
+              deck: [spaceTimeFoldingDrawOne, spaceTimeFoldingDrawTwo],
+              discard: [],
+              hand: [spaceTimeFolding, spaceTimeFoldingDiscard],
+              playArea: [],
+              resources: { solari: 0, spice: 0, water: 0 },
+            }
+          : player,
+      ),
+    },
+    {
+      commanderTargets: {},
+      selectedCard: spaceTimeFolding,
+      selectedSpace: deliverSupplies,
+    },
+  );
+  assert.equal(spaceTimeFoldingState.pendingAction?.kind, "discard-card-for-draw", "Expected Space-time Folding discard-draw pending action");
 
   return {
     contractPublic: {
@@ -360,6 +418,13 @@ async function createCardChoiceStates(server, initialPlayableGame) {
         influenceAmount: 1,
         optional: true,
       },
+    },
+    spaceTimeFolding: {
+      ...spaceTimeFoldingState,
+      spaceTimeFoldingDiscardId: spaceTimeFoldingDiscard.id,
+      spaceTimeFoldingDiscardName: spaceTimeFoldingDiscard.name,
+      spaceTimeFoldingDrawOneId: spaceTimeFoldingDrawOne.id,
+      spaceTimeFoldingDrawTwoId: spaceTimeFoldingDrawTwo.id,
     },
     capturedMentatReveal: {
       ...base,

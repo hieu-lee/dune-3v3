@@ -16,11 +16,13 @@ import {
   paracompassSourceId,
   prepareTheWaySourceId,
   reliableInformantSourceId,
+  spaceTimeFoldingSourceId,
   smugglersHarvesterSourceId,
   spiceMustFlowSourceId,
   wheelsWithinWheelsSourceId,
 } from "./card-identifiers";
 import {
+  agentDiscardCardForDraw,
   agentDiscardCardForInfluenceAndDraw,
   agentDrawCards,
   agentDrawIntrigues,
@@ -341,6 +343,16 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
       revealGainResource("solari", 1),
     ];
   }
+  if (card.id === spaceTimeFoldingSourceId) {
+    return [
+      agentDiscardCardForDraw(1, {
+        bonusDraw: {
+          requiredDiscardTrait: "Faction: Spacing Guild",
+          drawCards: 1,
+        },
+      }),
+    ];
+  }
   if (card.id === wheelsWithinWheelsSourceId) {
     return [
       agentGainResource("solari", 2, [hasInfluence("emperor", 2)]),
@@ -365,6 +377,9 @@ function imperiumPlayText(card: HubCard) {
   }
   if (card.id === reliableInformantSourceId) {
     return "Gain 1 Solari on Emperor, Bene Gesserit, or Spacing Guild board spaces.";
+  }
+  if (card.id === spaceTimeFoldingSourceId) {
+    return "Discard 1 card to draw 1 card. If you discarded a Spacing Guild card, draw 1 more card.";
   }
   if (card.id === covertOperationSourceId) {
     return "Each opponent discards a card.";

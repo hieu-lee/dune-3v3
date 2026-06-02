@@ -21,6 +21,7 @@ import {
   reinforceTroop,
   resolveCommanderResourceSplitChoice,
   resolveConflictTie,
+  resolveDiscardCardForDrawChoice,
   resolveDiscardCardForInfluenceAndDrawChoice,
   resolveIrulanSignetRingChoice,
   resolveBoardInfluenceChoice,
@@ -46,6 +47,7 @@ import {
   scoreGurneyAlwaysSmiling,
   skipConflictVpConversion,
   skipControlDefenseTroop,
+  skipDiscardCardForDraw,
   skipDiscardCardForInfluenceAndDraw,
   skipLoseInfluence,
   skipLoseInfluenceForIntrigues,
@@ -253,6 +255,14 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     runPending("discard-card-for-influence-and-draw", (current, pending) =>
       maybeStartCombatPhase(skipDiscardCardForInfluenceAndDraw(current, pending))
     );
+  const chooseDiscardCardForDraw = (discardCardId: string) =>
+    runPending("discard-card-for-draw", (current, pending) =>
+      maybeStartCombatPhase(resolveDiscardCardForDrawChoice(current, pending, discardCardId))
+    );
+  const skipDiscardCardForDrawChoice = () =>
+    runPending("discard-card-for-draw", (current, pending) =>
+      maybeStartCombatPhase(skipDiscardCardForDraw(current, pending))
+    );
   const chooseLoseInfluenceForIntrigues = (faction: FactionId) =>
     runPending("lose-influence-for-intrigues", (current, pending) =>
       maybeStartCombatPhase(resolveLoseInfluenceForIntriguesChoice(current, pending, faction))
@@ -286,6 +296,7 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     chooseConflictInfluence,
     chooseBoardInfluence,
     chooseConflictTieWinner,
+    chooseDiscardCardForDraw,
     chooseDiscardCardForInfluenceAndDraw,
     chooseIrulanSignet,
     chooseJessicaOtherMemories,
@@ -322,6 +333,7 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     reinforceOne,
     skipControlDefense,
     skipConflictVpReward,
+    skipDiscardCardForDrawChoice,
     skipDiscardCardForInfluenceAndDrawChoice,
     skipInfluenceLoss,
     skipLoseInfluenceForIntriguesChoice,

@@ -67,6 +67,7 @@ export const maulaPistolSourceId = 32;
 export const northernWatermasterSourceId = 34;
 export const paracompassSourceId = 49;
 export const reliableInformantSourceId = 20;
+export const spaceTimeFoldingSourceId = 12;
 
 export const shadowAllianceFactions: FactionId[] = [
   "emperor",

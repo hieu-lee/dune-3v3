@@ -13,6 +13,10 @@ import {
   playerConflictUnitCount,
 } from "./conflict-rules";
 import {
+  resolveDiscardCardForDraw as resolveDiscardCardForDrawForPending,
+  skipDiscardCardForDraw as resolveSkipDiscardCardForDraw,
+} from "./discard-draw-rules";
+import {
   resolveDiscardCardForInfluenceAndDraw as resolveDiscardCardForInfluenceAndDrawForPending,
   skipDiscardCardForInfluenceAndDraw as resolveSkipDiscardCardForInfluenceAndDraw,
 } from "./discard-influence-draw-rules";
@@ -169,6 +173,10 @@ export {
   playerDoublesConflictRewards,
   playerHasConflictUnits,
 } from "./conflict-rules";
+
+export {
+  discardCardForDrawChoices,
+} from "./discard-draw-rules";
 
 export {
   discardCardForInfluenceAndDrawChoices,
@@ -523,6 +531,7 @@ type RetreatTroopsForStrengthPendingAction = Extract<PendingAction, { kind: "ret
 type CommanderResourceSplitPendingAction = Extract<PendingAction, { kind: "commander-resource-split" }>;
 type TrashCardPendingAction = Extract<PendingAction, { kind: "trash-card" }>;
 type DiscardCardForInfluenceAndDrawPendingAction = Extract<PendingAction, { kind: "discard-card-for-influence-and-draw" }>;
+type DiscardCardForDrawPendingAction = Extract<PendingAction, { kind: "discard-card-for-draw" }>;
 type LoseInfluenceForIntriguesPendingAction = Extract<PendingAction, { kind: "lose-influence-for-intrigues" }>;
 type BoardInfluenceChoicePendingAction = Extract<PendingAction, { kind: "board-influence-choice" }>;
 type OptionalSpacePaymentPendingAction = Extract<PendingAction, { kind: "optional-space-payment" }>;
@@ -661,6 +670,23 @@ export function skipDiscardCardForInfluenceAndDraw(
   pending: DiscardCardForInfluenceAndDrawPendingAction,
 ): GameState {
   return continueAfterResolvedConflictReward(resolveSkipDiscardCardForInfluenceAndDraw(state, pending));
+}
+
+export function resolveDiscardCardForDrawChoice(
+  state: GameState,
+  pending: DiscardCardForDrawPendingAction,
+  discardCardId: string,
+): GameState {
+  return continueAfterResolvedConflictReward(
+    resolveDiscardCardForDrawForPending(state, pending, discardCardId),
+  );
+}
+
+export function skipDiscardCardForDraw(
+  state: GameState,
+  pending: DiscardCardForDrawPendingAction,
+): GameState {
+  return continueAfterResolvedConflictReward(resolveSkipDiscardCardForDraw(state, pending));
 }
 
 export function resolveLoseInfluenceForIntriguesChoice(

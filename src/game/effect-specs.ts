@@ -187,6 +187,28 @@ export function agentDiscardCardForInfluenceAndDraw(
   ], conditions);
 }
 
+export function agentDiscardCardForDraw(
+  drawCards: EffectAmountSpec,
+  options: {
+    optional?: boolean;
+    bonusDraw?: {
+      requiredDiscardTrait: string;
+      drawCards: EffectAmountSpec;
+    };
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return agentPlayEffects([
+    {
+      kind: "discard-card-for-draw",
+      selector: "self",
+      drawCards,
+      optional: options.optional ?? false,
+      ...(options.bonusDraw ? { bonusDraw: { ...options.bonusDraw } } : {}),
+    },
+  ], conditions);
+}
+
 export function agentPayResourceForInfluence(
   resource: ResourceId,
   cost: EffectAmountSpec,
@@ -516,6 +538,9 @@ export function cloneCardEffects(effects: CardEffectSpec[] | undefined): CardEff
         : {}),
       ...("drawCards" in effect
         ? { drawCards: cloneAmount(effect.drawCards) }
+        : {}),
+      ...("bonusDraw" in effect && effect.bonusDraw
+        ? { bonusDraw: { ...effect.bonusDraw, drawCards: cloneAmount(effect.bonusDraw.drawCards) } }
         : {}),
       ...("influenceAmount" in effect
         ? { influenceAmount: cloneAmount(effect.influenceAmount) }

@@ -286,6 +286,26 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     validateAmount(effect.influenceAmount);
     return;
   }
+  if (effect.kind === "discard-card-for-draw") {
+    if (trigger !== "agent-play") {
+      throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
+    }
+    if (effect.selector !== "self") {
+      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
+    validateAmount(effect.drawCards);
+    validateOptionalBoolean("discard-card-for-draw optional", (effect as { optional?: unknown }).optional);
+    if (effect.bonusDraw !== undefined) {
+      if (
+        typeof effect.bonusDraw.requiredDiscardTrait !== "string" ||
+        effect.bonusDraw.requiredDiscardTrait.trim().length === 0
+      ) {
+        invalidSpecField("discard-card-for-draw bonusDraw requiredDiscardTrait", effect.bonusDraw.requiredDiscardTrait);
+      }
+      validateAmount(effect.bonusDraw.drawCards);
+    }
+    return;
+  }
   if (effect.kind === "pay-resource-for-influence") {
     if (trigger !== "agent-play") {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);

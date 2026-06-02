@@ -3910,6 +3910,82 @@ try {
     }],
     "Other Memories leader placement spec should resolve its leader transition branch",
   );
+  const validLeaderTransitionChoiceEffect = {
+    kind: "leader-transition-choice",
+    selector: "self",
+    source: "Other Memories",
+    fromLeader: "Lady Jessica",
+    toLeader: "Reverend Mother Jessica",
+    counter: "jessicaMemories",
+    counterAmount: "all",
+    drawCardsPerCounter: 1,
+    followUp: {
+      kind: "repeat-board-space",
+      sameSpace: true,
+      ability: "reverend-mother-jessica",
+      source: "Reverend Mother",
+      resource: "water",
+      cost: 1,
+    },
+  };
+  const leaderTransitionChoiceContext = {
+    trigger: "agent-placement",
+    source: { ...p5, leader: "Lady Jessica", role: "Ally", jessicaMemories: 2 },
+    state: game,
+    space: secrets,
+  };
+  [
+    ["fromLeader", { fromLeader: "" }, /Invalid leader-transition-choice fromLeader ""/],
+    ["toLeader", { toLeader: "" }, /Invalid leader-transition-choice toLeader ""/],
+    ["same toLeader", { toLeader: "Lady Jessica" }, /Invalid leader-transition-choice toLeader "Lady Jessica"/],
+    ["counter", { counter: "otherMemories" }, /Invalid leader-transition-choice counter "otherMemories"/],
+    ["counterAmount", { counterAmount: 1 }, /Invalid leader-transition-choice counterAmount "1"/],
+    ["drawCardsPerCounter", { drawCardsPerCounter: 0 }, /Invalid leader-transition-choice drawCardsPerCounter "0"/],
+    ["source", { source: "" }, /Invalid leader-transition-choice source ""/],
+    [
+      "followUp kind",
+      { followUp: { ...validLeaderTransitionChoiceEffect.followUp, kind: "gain-resource" } },
+      /Unsupported leader-transition-choice followUp "gain-resource"/,
+    ],
+    [
+      "followUp sameSpace",
+      { followUp: { ...validLeaderTransitionChoiceEffect.followUp, sameSpace: false } },
+      /Invalid leader-transition-choice followUp sameSpace "false"/,
+    ],
+    [
+      "followUp ability",
+      { followUp: { ...validLeaderTransitionChoiceEffect.followUp, ability: "other-memory" } },
+      /Invalid leader-transition-choice followUp ability "other-memory"/,
+    ],
+    [
+      "followUp source",
+      { followUp: { ...validLeaderTransitionChoiceEffect.followUp, source: "" } },
+      /Invalid leader-transition-choice followUp source ""/,
+    ],
+    [
+      "followUp resource",
+      { followUp: { ...validLeaderTransitionChoiceEffect.followUp, resource: "intrigue" } },
+      /Unsupported effect resource "intrigue"/,
+    ],
+    [
+      "followUp cost",
+      { followUp: { ...validLeaderTransitionChoiceEffect.followUp, cost: 0 } },
+      /Invalid leader-transition-choice followUp cost "0"/,
+    ],
+  ].forEach(([label, effectPatch, expectedError]) => {
+    assert.throws(
+      () =>
+        effectResolver.resolveLeaderTransitionChoices(
+          [{
+            trigger: "agent-placement",
+            effects: [{ ...validLeaderTransitionChoiceEffect, ...effectPatch }],
+          }],
+          leaderTransitionChoiceContext,
+        ),
+      expectedError,
+      `Leader transition choice specs should reject invalid ${label}`,
+    );
+  });
   assert.deepEqual(
     effectResolver.resolveLeaderTransitionChoices(leaderEffectData.leaderPlacementEffectSpecs, {
       trigger: "agent-placement",

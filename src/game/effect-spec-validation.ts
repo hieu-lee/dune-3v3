@@ -1,19 +1,37 @@
 import type {
   CardEffectSpec,
   CommanderResourceSplitOption,
-  EffectAmountSpec,
-  FactionId,
   GameEffectConditionSpec,
   GameEffectSpec,
   GameEffectTrigger,
-  IconId,
-  ResourceId,
-  Role,
-  TeamId,
-  TradeGoodId,
-  TroopRetreatBoundSpec,
-  TrashCardZone,
 } from "./types";
+import {
+  validateLeaderTransitionChoiceEffect,
+  validatePaidRewardChoiceEffect,
+  validatePendingActionChoiceEffect,
+} from "./effect-spec-choice-validation";
+import {
+  invalidSpecField,
+  isNonNegativeInteger,
+  isPositiveInteger,
+  supportedAcquireDestinations,
+  supportedFactions,
+  supportedIcons,
+  supportedResources,
+  supportedRoles,
+  supportedTeams,
+  supportedTradeGoods,
+  supportedTrashZones,
+  unsupportedKind,
+  validateAmount,
+  validateFixedAmount,
+  validateOptionalBoolean,
+  validateOptionalTrue,
+  validatePositiveAmount,
+  validatePositiveFixedAmount,
+  validateRetreatBound,
+  validateSourceLabel,
+} from "./effect-spec-validation-utils";
 
 const supportedTriggers = new Set<GameEffectTrigger>([
   "agent-play",
@@ -28,110 +46,12 @@ const supportedTriggers = new Set<GameEffectTrigger>([
   "round-end",
 ]);
 
-const supportedResources = new Set<ResourceId>(["solari", "spice", "water"]);
-const supportedTradeGoods = new Set<TradeGoodId>(["solari", "spice", "water", "intrigue"]);
-const supportedIcons = new Set<IconId>(["emperor", "spacing", "bene", "fremen", "landsraad", "city", "spice", "spy"]);
-const supportedAcquireDestinations = new Set(["discard", "hand"]);
-const supportedTrashZones = new Set<TrashCardZone>(["hand", "discard", "playArea"]);
-const supportedFactions = new Set<FactionId>([
-  "emperor",
-  "spacing",
-  "bene",
-  "fremen",
-  "greatHouses",
-  "fringeWorlds",
-]);
-const supportedTeams = new Set<TeamId>(["muaddib", "shaddam"]);
-const supportedRoles = new Set<Role>(["Commander", "Ally"]);
-
-function unsupportedKind(label: string, value: unknown): never {
-  const kind = typeof value === "object" && value !== null && "kind" in value
-    ? String((value as { kind?: unknown }).kind)
-    : String(value);
-  throw new Error(`Unsupported ${label} "${kind}"`);
-}
-
-function invalidSpecField(label: string, value: unknown): never {
-  throw new Error(`Invalid ${label} "${String(value)}"`);
-}
-
-function isNonNegativeInteger(value: number) {
-  return Number.isInteger(value) && value >= 0;
-}
-
-function isPositiveInteger(value: number) {
-  return Number.isInteger(value) && value > 0;
-}
-
 function validateTrigger(trigger: GameEffectTrigger): asserts trigger is GameEffectTrigger {
   if (!supportedTriggers.has(trigger)) {
     throw new Error(`Unsupported effect trigger "${trigger}"`);
   }
 }
 
-function validateAmount(amount: EffectAmountSpec) {
-  if (typeof amount === "number") {
-    if (isNonNegativeInteger(amount)) return;
-    invalidSpecField("effect amount", amount);
-  }
-  if (amount.kind === "completed-contracts") {
-    if (amount.multiplier === undefined || isNonNegativeInteger(amount.multiplier)) return;
-    invalidSpecField("completed-contracts multiplier", amount.multiplier);
-  }
-  unsupportedKind("effect amount", amount);
-}
-
-function validateFixedAmount(label: string, amount: number) {
-  if (isNonNegativeInteger(amount)) return;
-  invalidSpecField(label, amount);
-}
-
-function validatePositiveFixedAmount(label: string, amount: unknown): asserts amount is number {
-  if (typeof amount === "number" && isPositiveInteger(amount)) return;
-  invalidSpecField(label, amount);
-}
-
-function validateRetreatBound(label: string, amount: unknown): asserts amount is TroopRetreatBoundSpec {
-  if (typeof amount === "number") {
-    if (isPositiveInteger(amount)) return;
-    invalidSpecField(label, amount);
-  }
-  if (typeof amount === "object" && amount !== null && "kind" in amount) {
-    if ((amount as { kind?: unknown }).kind === "deployed-troops") return;
-    unsupportedKind(label, amount);
-  }
-  invalidSpecField(label, amount);
-}
-
-function validatePositiveAmount(label: string, amount: EffectAmountSpec) {
-  if (typeof amount === "number") {
-    if (isPositiveInteger(amount)) return;
-    invalidSpecField(label, amount);
-  }
-  if (amount.kind === "completed-contracts") {
-    if (amount.multiplier === undefined || isPositiveInteger(amount.multiplier)) return;
-    invalidSpecField(`${label} completed-contracts multiplier`, amount.multiplier);
-  }
-  unsupportedKind(label, amount);
-}
-
-function validateSourceLabel(label: string, value: unknown) {
-  if (value !== undefined && (typeof value !== "string" || value.trim().length === 0)) {
-    invalidSpecField(label, value);
-  }
-}
-
-function validateOptionalBoolean(label: string, value: unknown) {
-  if (value !== undefined && typeof value !== "boolean") {
-    invalidSpecField(label, value);
-  }
-}
-
-function validateOptionalTrue(label: string, value: unknown) {
-  if (value !== undefined && value !== true) {
-    invalidSpecField(label, value);
-  }
-}
 
 function validateCondition(condition: GameEffectConditionSpec, trigger: GameEffectTrigger) {
   if (condition.kind === "visited-maker-space") return;
@@ -374,202 +294,15 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     return;
   }
   if (effect.kind === "paid-reward-choice") {
-    if (trigger !== "agent-play") {
-      throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
-    }
-    const selector = (effect as { selector?: unknown }).selector;
-    if (selector !== "self") {
-      throw new Error(`Unsupported effect selector "${String(selector)}" for ${effect.kind}`);
-    }
-    validateSourceLabel("paid-reward-choice source", effect.source);
-    const requiredRecipient = (effect as { requiredRecipient?: unknown }).requiredRecipient;
-    if (requiredRecipient !== undefined && requiredRecipient !== "activated-ally") {
-      invalidSpecField("paid-reward-choice requiredRecipient", requiredRecipient);
-    }
-    validateOptionalTrue("paid-reward-choice requirePayableOption", (effect as { requirePayableOption?: unknown }).requirePayableOption);
-    if (!Array.isArray(effect.options) || effect.options.length === 0) {
-      invalidSpecField("paid-reward-choice options", effect.options);
-    }
-    const optionIds = new Set<string>();
-    effect.options.forEach((option) => {
-      if (typeof option.id !== "string" || option.id.trim().length === 0) {
-        invalidSpecField("paid-reward-choice option id", option.id);
-      }
-      if (optionIds.has(option.id)) {
-        invalidSpecField("paid-reward-choice duplicate option id", option.id);
-      }
-      optionIds.add(option.id);
-      if (!supportedResources.has(option.resource)) {
-        throw new Error(`Unsupported effect resource "${option.resource}"`);
-      }
-      validatePositiveAmount("paid-reward-choice cost", option.cost);
-      const validateAtomicReward = (reward: typeof option.reward) => {
-        if (reward.kind === "bundle") {
-          invalidSpecField("paid-reward-choice nested bundle", reward.kind);
-        }
-        if (reward.selector !== "self" && reward.selector !== "activated-ally") {
-          throw new Error(`Unsupported paid-reward-choice selector "${reward.selector}"`);
-        }
-        if (reward.kind === "recruit-troops") {
-          validatePositiveAmount("paid-reward-choice troops", reward.amount);
-          if (reward.destination !== "garrison") {
-            invalidSpecField("paid-reward-choice troop destination", reward.destination);
-          }
-          return;
-        }
-        if (reward.kind === "gain-influence") {
-          if (!supportedFactions.has(reward.faction)) {
-            throw new Error(`Unsupported effect faction "${reward.faction}"`);
-          }
-          validatePositiveAmount("paid-reward-choice influence", reward.amount);
-          return;
-        }
-        if (reward.kind === "gain-resource") {
-          if (!supportedResources.has(reward.resource)) {
-            throw new Error(`Unsupported effect resource "${reward.resource}"`);
-          }
-          validatePositiveAmount("paid-reward-choice resource", reward.amount);
-          return;
-        }
-        if (reward.kind === "draw-intrigues") {
-          validatePositiveAmount("paid-reward-choice intrigues", reward.amount);
-          return;
-        }
-        if (reward.kind === "gain-leader-counter") {
-          if (reward.counter !== "jessicaMemories") {
-            invalidSpecField("paid-reward-choice leader counter", reward.counter);
-          }
-          validatePositiveAmount("paid-reward-choice leader counter", reward.amount);
-          validatePositiveAmount("paid-reward-choice leader counter troopSupplyCost", reward.troopSupplyCost);
-          if (reward.troopSupplyCost !== reward.amount) {
-            invalidSpecField("paid-reward-choice leader counter troopSupplyCost", reward.troopSupplyCost);
-          }
-          return;
-        }
-        unsupportedKind("paid-reward-choice reward", reward);
-      };
-      const validateReward = (reward: typeof option.reward) => {
-        if (reward.kind === "bundle") {
-          if (!Array.isArray(reward.rewards) || reward.rewards.length === 0) {
-            invalidSpecField("paid-reward-choice bundle rewards", reward.rewards);
-          }
-          reward.rewards.forEach((nestedReward) => validateAtomicReward(nestedReward));
-          return;
-        }
-        validateAtomicReward(reward);
-      };
-      validateReward(option.reward);
-    });
+    validatePaidRewardChoiceEffect(effect, trigger);
     return;
   }
   if (effect.kind === "pending-action-choice") {
-    if (trigger !== "agent-play") {
-      throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
-    }
-    const selector = (effect as { selector?: unknown }).selector;
-    if (selector !== "self") {
-      throw new Error(`Unsupported effect selector "${String(selector)}" for ${effect.kind}`);
-    }
-    validateSourceLabel("pending-action-choice source", effect.source);
-    if (!Array.isArray(effect.options) || effect.options.length === 0) {
-      invalidSpecField("pending-action-choice options", effect.options);
-    }
-    const optionIds = new Set<string>();
-    effect.options.forEach((option) => {
-      if (typeof option.id !== "string" || option.id.trim().length === 0) {
-        invalidSpecField("pending-action-choice option id", option.id);
-      }
-      if (optionIds.has(option.id)) {
-        invalidSpecField("pending-action-choice duplicate option id", option.id);
-      }
-      optionIds.add(option.id);
-      if (typeof option.label !== "string" || option.label.trim().length === 0) {
-        invalidSpecField("pending-action-choice option label", option.label);
-      }
-      const nestedSelector = (option.effect as { selector?: unknown }).selector;
-      if (nestedSelector !== "self") {
-        throw new Error(`Unsupported pending-action-choice selector "${String(nestedSelector)}"`);
-      }
-      if (option.effect.kind === "acquire-card") {
-        if (!supportedAcquireDestinations.has(option.effect.destination)) {
-          invalidSpecField("pending-action-choice acquire destination", option.effect.destination);
-        }
-        if (option.effect.paymentResource !== undefined && !supportedResources.has(option.effect.paymentResource)) {
-          throw new Error(`Unsupported effect resource "${option.effect.paymentResource}"`);
-        }
-        if (option.effect.minCost !== undefined) validateAmount(option.effect.minCost);
-        if (option.effect.maxCost !== undefined) validateAmount(option.effect.maxCost);
-        if (
-          typeof option.effect.minCost === "number" &&
-          typeof option.effect.maxCost === "number" &&
-          option.effect.minCost > option.effect.maxCost
-        ) {
-          invalidSpecField("pending-action-choice acquire cost bounds", `${option.effect.minCost}-${option.effect.maxCost}`);
-        }
-        if (option.effect.maxCost === undefined && option.effect.paymentResource === undefined) {
-          throw new Error("Invalid pending-action-choice acquire constraint: expected maxCost or paymentResource");
-        }
-        validateOptionalBoolean("pending-action-choice acquire optional", (option.effect as { optional?: unknown }).optional);
-        validateSourceLabel("pending-action-choice acquire source", option.effect.source);
-        return;
-      }
-      if (option.effect.kind === "trash-card") {
-        validateOptionalBoolean("pending-action-choice trash optional", (option.effect as { optional?: unknown }).optional);
-        if (option.effect.zones?.some((zone) => !supportedTrashZones.has(zone))) {
-          throw new Error(`Unsupported trash-card zone "${option.effect.zones.find((zone) => !supportedTrashZones.has(zone))}"`);
-        }
-        if (
-          option.effect.requiredTrait !== undefined &&
-          (typeof option.effect.requiredTrait !== "string" || option.effect.requiredTrait.trim().length === 0)
-        ) {
-          invalidSpecField("pending-action-choice trash requiredTrait", option.effect.requiredTrait);
-        }
-        if (option.effect.spiceRewardCostThreshold !== undefined) validateAmount(option.effect.spiceRewardCostThreshold);
-        if (option.effect.spiceReward !== undefined) validateAmount(option.effect.spiceReward);
-        validateSourceLabel("pending-action-choice trash source", option.effect.source);
-        return;
-      }
-      unsupportedKind("pending-action-choice effect", option.effect);
-    });
+    validatePendingActionChoiceEffect(effect, trigger);
     return;
   }
   if (effect.kind === "leader-transition-choice") {
-    if (trigger !== "agent-placement") {
-      throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
-    }
-    if (typeof effect.fromLeader !== "string" || effect.fromLeader.trim().length === 0) {
-      invalidSpecField("leader-transition-choice fromLeader", effect.fromLeader);
-    }
-    if (typeof effect.toLeader !== "string" || effect.toLeader.trim().length === 0) {
-      invalidSpecField("leader-transition-choice toLeader", effect.toLeader);
-    }
-    if (effect.fromLeader === effect.toLeader) {
-      invalidSpecField("leader-transition-choice toLeader", effect.toLeader);
-    }
-    if (effect.counter !== "jessicaMemories") {
-      invalidSpecField("leader-transition-choice counter", effect.counter);
-    }
-    if (effect.counterAmount !== "all") {
-      invalidSpecField("leader-transition-choice counterAmount", effect.counterAmount);
-    }
-    validatePositiveAmount("leader-transition-choice drawCardsPerCounter", effect.drawCardsPerCounter);
-    validateSourceLabel("leader-transition-choice source", effect.source);
-    if (effect.followUp !== undefined) {
-      if (effect.followUp.kind !== "repeat-board-space") {
-        unsupportedKind("leader-transition-choice followUp", effect.followUp);
-      }
-      if (effect.followUp.sameSpace !== true) {
-        invalidSpecField("leader-transition-choice followUp sameSpace", effect.followUp.sameSpace);
-      }
-      if (effect.followUp.ability !== "reverend-mother-jessica") {
-        invalidSpecField("leader-transition-choice followUp ability", effect.followUp.ability);
-      }
-      validateSourceLabel("leader-transition-choice followUp source", effect.followUp.source);
-      if (!supportedResources.has(effect.followUp.resource)) {
-        throw new Error(`Unsupported effect resource "${effect.followUp.resource}"`);
-      }
-      validatePositiveAmount("leader-transition-choice followUp cost", effect.followUp.cost);
-    }
+    validateLeaderTransitionChoiceEffect(effect, trigger);
     return;
   }
   if (effect.kind === "acquire-card") {

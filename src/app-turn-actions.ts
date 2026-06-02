@@ -11,9 +11,9 @@ import {
   defaultActivatedAllyId,
   drawIntrigueCards,
   effectiveCost,
-  pendingActionForJessicaOtherMemories,
   pendingActionForBoardInfluenceChoice,
   pendingActionForBoardTrash,
+  pendingActionsForLeaderPlacementEffects,
   pendingActionForMakerChoice,
   pendingActionForOptionalSpacePayment,
   pendingActionForReverendMotherJessicaRepeat,
@@ -209,7 +209,7 @@ export function placeAgentAction(
     optionalSpacePaymentPending,
     boardInfluencePending,
   ].filter((action): action is PendingAction => Boolean(action));
-  const jessicaOtherMemoriesPending = pendingActionForJessicaOtherMemories(source, selectedSpace);
+  const [leaderPlacementPending, ...remainingLeaderPlacementPendings] = pendingActionsForLeaderPlacementEffects(postEffectState, source, selectedSpace);
   const paidRewardWater = paidRewardResourceGain(firstCardPending, source.id, "water");
   const jessicaRepeatDeferredWater = paidRewardWater;
   const jessicaReverendMotherPending = pendingActionForReverendMotherJessicaRepeat(
@@ -222,18 +222,20 @@ export function placeAgentAction(
     (firstCardPending?.kind === "paid-reward-choice" && firstCardPending.source === "Spice Agony") || paidRewardWater > 0
       ? firstCardPending
       : undefined;
-  const pendingActions = prioritizedCardPending || jessicaOtherMemoriesPending || jessicaReverendMotherPending
+  const pendingActions = prioritizedCardPending || leaderPlacementPending || jessicaReverendMotherPending
     ? [
-        ...[prioritizedCardPending, jessicaOtherMemoriesPending, jessicaReverendMotherPending].filter((action): action is PendingAction => Boolean(action)),
+        ...[prioritizedCardPending, leaderPlacementPending, jessicaReverendMotherPending].filter((action): action is PendingAction => Boolean(action)),
         ...boardChoicePendings,
         ...pendingActionsFor(spacePending, prioritizedCardPending ? undefined : firstCardPending, source.spies),
         ...remainingCardPendings,
+        ...remainingLeaderPlacementPendings,
         ...[boardTrashPending].filter((action): action is PendingAction => Boolean(action)),
       ]
     : [
         ...boardChoicePendings,
         ...pendingActionsFor(spacePending, firstCardPending, source.spies),
         ...remainingCardPendings,
+        ...remainingLeaderPlacementPendings,
         ...[boardTrashPending].filter((action): action is PendingAction => Boolean(action)),
       ];
   if (sietchTabrPending) {

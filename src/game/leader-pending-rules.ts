@@ -10,8 +10,6 @@ import {
 } from "./deck-utils";
 import {
   ladyAmberMetulliLeaderName,
-  ladyJessicaLeaderName,
-  reverendMotherJessicaLeaderName,
 } from "./leader-constants";
 import {
   adjustInfluence,
@@ -27,10 +25,10 @@ import type {
 } from "./types";
 
 export type LadyAmberDesertScoutsChoice = "retreat" | "skip";
-export type JessicaOtherMemoriesChoice = "flip" | "skip";
+export type LeaderTransitionChoice = "transition" | "skip";
 
 type LadyAmberDesertScoutsPendingAction = Extract<PendingAction, { kind: "amber-desert-scouts" }>;
-type JessicaOtherMemoriesPendingAction = Extract<PendingAction, { kind: "jessica-other-memories" }>;
+type LeaderTransitionPendingAction = Extract<PendingAction, { kind: "leader-transition" }>;
 
 export function resolveLadyAmberDesertScoutsChoice(
   state: GameState,
@@ -66,44 +64,76 @@ export function resolveLadyAmberDesertScoutsChoice(
   };
 }
 
-export function resolveJessicaOtherMemoriesChoice(
+function leaderCounterAmount(owner: GameState["players"][number], counter: LeaderTransitionPendingAction["counter"]) {
+  if (counter === "jessicaMemories") return owner.jessicaMemories;
+  return 0;
+}
+
+function resetLeaderCounter(owner: GameState["players"][number], counter: LeaderTransitionPendingAction["counter"]) {
+  if (counter === "jessicaMemories") return { ...owner, jessicaMemories: 0 };
+  return owner;
+}
+
+function counterText(counter: LeaderTransitionPendingAction["counter"], amount: number) {
+  if (counter === "jessicaMemories") return `${amount} ${amount === 1 ? "memory" : "memories"}`;
+  return `${amount} counter${amount === 1 ? "" : "s"}`;
+}
+
+export function resolveLeaderTransitionChoice(
   state: GameState,
-  pending: JessicaOtherMemoriesPendingAction,
-  choice: JessicaOtherMemoriesChoice,
+  pending: LeaderTransitionPendingAction,
+  choice: LeaderTransitionChoice,
 ): GameState {
   const owner = state.players.find((player) => player.id === pending.ownerId);
-  const space = boardSpaces.find((candidate) => candidate.id === pending.spaceId);
-  if (!owner || owner.leader !== ladyJessicaLeaderName || owner.role !== "Ally" || owner.jessicaMemories <= 0 || space?.icon !== "bene") return state;
+  const counterAmount = owner ? leaderCounterAmount(owner, pending.counter) : 0;
+  if (
+    !owner ||
+    owner.leader !== pending.fromLeader ||
+    owner.role !== "Ally" ||
+    pending.counterAmount !== "all" ||
+    counterAmount <= 0 ||
+    pending.drawCardsPerCounter <= 0
+  ) {
+    return state;
+  }
 
   if (choice === "skip") {
     return {
       ...state,
       ...advancePendingAction(state),
-      log: [`${owner.leader} keeps her memories and remains Lady Jessica.`, ...state.log],
+      log: [`${owner.leader} declines ${pending.source}.`, ...state.log],
     };
   }
 
-  const memories = owner.jessicaMemories;
+  const cardsToDraw = counterAmount * pending.drawCardsPerCounter;
   const drawnOwner = drawCards(
     {
-      ...owner,
-      leader: reverendMotherJessicaLeaderName,
-      leaderCard: leaderCardByName(reverendMotherJessicaLeaderName),
-      jessicaMemories: 0,
+      ...resetLeaderCounter(owner, pending.counter),
+      leader: pending.toLeader,
+      leaderCard: leaderCardByName(pending.toLeader),
     },
-    owner.hand.length + memories,
+    owner.hand.length + cardsToDraw,
   );
   const drawn = drawnOwner.hand.length - owner.hand.length;
-  const memoryText = `${memories} ${memories === 1 ? "memory" : "memories"}`;
+  const returnedText = counterText(pending.counter, counterAmount);
   const cardText = `${drawn} ${drawn === 1 ? "card" : "cards"}`;
   const baseState = {
     ...state,
     players: state.players.map((player) => (player.id === owner.id ? drawnOwner : player)),
     ...advancePendingAction(state),
-    log: [`${owner.leader} returns ${memoryText} for ${cardText} and becomes Reverend Mother Jessica.`, ...state.log],
+    log: [`${owner.leader} returns ${returnedText} for ${cardText} and becomes ${pending.toLeader}.`, ...state.log],
   };
+  if (
+    pending.followUp?.kind !== "repeat-board-space" ||
+    pending.followUp.ability !== "reverend-mother-jessica" ||
+    pending.followUp.resource !== "water" ||
+    pending.followUp.cost !== 1
+  ) {
+    return baseState;
+  }
+  const space = boardSpaces.find((candidate) => candidate.id === pending.followUp?.spaceId);
   return prependPendingAction(
     baseState,
-    pendingActionForReverendMotherJessicaRepeat(baseState, drawnOwner, space),
+    space ? pendingActionForReverendMotherJessicaRepeat(baseState, drawnOwner, space) : undefined,
   );
 }

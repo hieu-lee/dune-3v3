@@ -121,6 +121,7 @@ try {
   const deckUtils = await server.ssrLoadModule("/src/game/deck-utils.ts");
   const state = await server.ssrLoadModule("/src/game/state.ts");
   const effectResolver = await server.ssrLoadModule("/src/game/effect-resolver.ts");
+  const leaderEffectData = await server.ssrLoadModule("/src/game/leader-effect-data.ts");
   const plotIntrigueEffectRules = await server.ssrLoadModule("/src/game/plot-intrigue-effect-rules.ts");
   const turnActions = await server.ssrLoadModule("/src/app-turn-actions.ts");
 
@@ -3882,6 +3883,69 @@ try {
       }],
     }],
     "Spice Agony paid reward spec should resolve its spice-for-Intrigue-and-memory branch",
+  );
+  assert.deepEqual(
+    effectResolver.resolveLeaderTransitionChoices(leaderEffectData.leaderPlacementEffectSpecs, {
+      trigger: "agent-placement",
+      source: { ...p5, leader: "Lady Jessica", role: "Ally", jessicaMemories: 2 },
+      state: game,
+      space: secrets,
+    }),
+    [{
+      selector: "self",
+      source: "Other Memories",
+      fromLeader: "Lady Jessica",
+      toLeader: "Reverend Mother Jessica",
+      counter: "jessicaMemories",
+      counterAmount: "all",
+      drawCardsPerCounter: 1,
+      followUp: {
+        kind: "repeat-board-space",
+        sameSpace: true,
+        ability: "reverend-mother-jessica",
+        source: "Reverend Mother",
+        resource: "water",
+        cost: 1,
+      },
+    }],
+    "Other Memories leader placement spec should resolve its leader transition branch",
+  );
+  assert.deepEqual(
+    effectResolver.resolveLeaderTransitionChoices(leaderEffectData.leaderPlacementEffectSpecs, {
+      trigger: "agent-placement",
+      source: { ...p5, leader: "Lady Jessica", role: "Ally", jessicaMemories: 0 },
+      state: game,
+      space: secrets,
+    }),
+    [],
+    "Other Memories leader placement spec should require memories",
+  );
+  assert.deepEqual(
+    effectResolver.resolveLeaderTransitionChoices(leaderEffectData.leaderPlacementEffectSpecs, {
+      trigger: "agent-placement",
+      source: { ...p5, leader: "Lady Jessica", role: "Ally", jessicaMemories: 2 },
+      state: game,
+      space: arrakeen,
+    }),
+    [],
+    "Other Memories leader placement spec should require a Bene Gesserit space",
+  );
+  assert.throws(
+    () =>
+      effectResolver.resolveLeaderTransitionChoices(
+        [{
+          trigger: "agent-placement",
+          effects: [{ kind: "gain-resource", selector: "self", resource: "water", amount: 1 }],
+        }],
+        {
+          trigger: "agent-placement",
+          source: { ...p5, leader: "Lady Jessica", role: "Ally", jessicaMemories: 2 },
+          state: game,
+          space: secrets,
+        },
+      ),
+    /Unsupported effect "gain-resource" for agent-placement/,
+    "Agent placement specs should stay scoped to leader-transition choices until runtime semantics exist",
   );
   assert.ok(
     makerKeeper.effects?.some((spec) =>

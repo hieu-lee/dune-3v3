@@ -25,7 +25,7 @@ import {
   resolveDiscardHandCardChoice,
   resolveDiscardCardForInfluenceAndDrawChoice,
   resolveBoardInfluenceChoice,
-  resolveJessicaOtherMemoriesChoice,
+  resolveLeaderTransitionChoice,
   resolveLadyAmberDesertScoutsChoice,
   resolveLoseInfluenceForIntriguesChoice,
   resolveMakerChoice,
@@ -79,8 +79,8 @@ import type {
   TrashCardZone,
 } from "./game/types";
 import type {
-  JessicaOtherMemoriesChoice,
   LadyAmberDesertScoutsChoice,
+  LeaderTransitionChoice,
   RepeatBoardSpaceChoice,
   StabanUnseenNetworkChoice,
 } from "./game/state";
@@ -189,8 +189,8 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     runPending("amber-desert-scouts", (current, pending) => maybeStartCombatPhase(resolveLadyAmberDesertScoutsChoice(current, pending, choice)));
   const chooseRepeatBoardSpace = (choice: RepeatBoardSpaceChoice) =>
     runPending("repeat-board-space", (current, pending) => maybeStartCombatPhase(resolveRepeatBoardSpaceChoice(current, pending, choice)));
-  const chooseJessicaOtherMemories = (choice: JessicaOtherMemoriesChoice) =>
-    runPending("jessica-other-memories", (current, pending) => maybeStartCombatPhase(resolveJessicaOtherMemoriesChoice(current, pending, choice)));
+  const chooseLeaderTransition = (choice: LeaderTransitionChoice) =>
+    runPending("leader-transition", (current, pending) => maybeStartCombatPhase(resolveLeaderTransitionChoice(current, pending, choice)));
   const chooseTrashSourceForTrade = (partnerId: string) =>
     runPending("trash-source-for-trade", (current, pending) => resolveTrashSourceForTradeChoice(current, pending, partnerId));
   const skipTrashSourceForTradeChoice = () =>
@@ -310,8 +310,8 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     chooseDiscardCardForDraw,
     chooseDiscardHandCard,
     chooseDiscardCardForInfluenceAndDraw,
-    chooseJessicaOtherMemories,
     chooseLadyAmberDesertScouts,
+    chooseLeaderTransition,
     chooseLoseInfluenceForIntrigues,
     chooseMakerReward,
     choosePayResourceForContracts,

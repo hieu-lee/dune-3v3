@@ -27,6 +27,7 @@ export type BattleIconId = "crysknife" | "desertMouse" | "ornithopter";
 export type ConflictBattleIconId = BattleIconId | "wild";
 export type GameEffectTrigger =
   | "agent-play"
+  | "agent-placement"
   | "reveal"
   | "acquire"
   | "plot-intrigue"
@@ -210,9 +211,19 @@ export type GameEffectConditionSpec =
   | { kind: "has-high-council-seat" }
   | { kind: "has-swordmaster-bonus" }
   | { kind: "has-leader"; leader: string }
+  | { kind: "has-leader-counter"; counter: LeaderCounterId; amount: number }
   | { kind: "has-alliance"; faction?: FactionId }
   | { kind: "deployed-units-this-turn"; count: number }
   | { kind: "gained-spice-this-turn" };
+export type LeaderTransitionFollowUpEffect =
+  | {
+      kind: "repeat-board-space";
+      sameSpace: true;
+      ability: "reverend-mother-jessica";
+      source: string;
+      resource: ResourceId;
+      cost: EffectAmountSpec;
+    };
 export type GameEffectSpec =
   | { kind: "gain-resource"; selector: PlayerSelector; resource: ResourceId; amount: EffectAmountSpec; source?: string }
   | { kind: "spend-resource"; selector: PlayerSelector; resource: ResourceId; amount: EffectAmountSpec; source?: string }
@@ -251,6 +262,17 @@ export type GameEffectSpec =
       kind: "pending-action-choice";
       selector: "self";
       options: PendingActionChoiceEffectOption[];
+      source?: string;
+    }
+  | {
+      kind: "leader-transition-choice";
+      selector: "self";
+      fromLeader: string;
+      toLeader: string;
+      counter: LeaderCounterId;
+      counterAmount: "all";
+      drawCardsPerCounter: EffectAmountSpec;
+      followUp?: LeaderTransitionFollowUpEffect;
       source?: string;
     }
   | {
@@ -990,10 +1012,22 @@ export type PendingAction =
       source: string;
     }
   | {
-      kind: "jessica-other-memories";
+      kind: "leader-transition";
       ownerId: string;
       source: string;
-      spaceId: string;
+      fromLeader: string;
+      toLeader: string;
+      counter: LeaderCounterId;
+      counterAmount: "all";
+      drawCardsPerCounter: number;
+      followUp?: {
+        kind: "repeat-board-space";
+        spaceId: string;
+        ability: "reverend-mother-jessica";
+        source: string;
+        resource: ResourceId;
+        cost: number;
+      };
     }
   | {
       kind: "conflict-vp-conversion";

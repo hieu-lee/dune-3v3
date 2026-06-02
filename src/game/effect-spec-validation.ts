@@ -17,6 +17,7 @@ import type {
 
 const supportedTriggers = new Set<GameEffectTrigger>([
   "agent-play",
+  "agent-placement",
   "reveal",
   "acquire",
   "plot-intrigue",
@@ -190,6 +191,13 @@ function validateCondition(condition: GameEffectConditionSpec, trigger: GameEffe
     if (typeof condition.leader === "string" && condition.leader.trim().length > 0) return;
     invalidSpecField("has-leader leader", condition.leader);
   }
+  if (condition.kind === "has-leader-counter") {
+    if (condition.counter !== "jessicaMemories") {
+      invalidSpecField("has-leader-counter counter", condition.counter);
+    }
+    if (isPositiveInteger(condition.amount)) return;
+    invalidSpecField("has-leader-counter amount", condition.amount);
+  }
   if (condition.kind === "has-alliance") {
     if (condition.faction === undefined || supportedFactions.has(condition.faction)) return;
     throw new Error(`Unsupported effect faction "${condition.faction}"`);
@@ -231,6 +239,9 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     effect.kind !== "gain-influence-choice" &&
     effect.kind !== "take-contracts"
   ) {
+    throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
+  }
+  if (trigger === "agent-placement" && effect.kind !== "leader-transition-choice") {
     throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
   }
   if (effect.kind === "gain-resource") {
@@ -520,6 +531,45 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
       }
       unsupportedKind("pending-action-choice effect", option.effect);
     });
+    return;
+  }
+  if (effect.kind === "leader-transition-choice") {
+    if (trigger !== "agent-placement") {
+      throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
+    }
+    if (typeof effect.fromLeader !== "string" || effect.fromLeader.trim().length === 0) {
+      invalidSpecField("leader-transition-choice fromLeader", effect.fromLeader);
+    }
+    if (typeof effect.toLeader !== "string" || effect.toLeader.trim().length === 0) {
+      invalidSpecField("leader-transition-choice toLeader", effect.toLeader);
+    }
+    if (effect.fromLeader === effect.toLeader) {
+      invalidSpecField("leader-transition-choice toLeader", effect.toLeader);
+    }
+    if (effect.counter !== "jessicaMemories") {
+      invalidSpecField("leader-transition-choice counter", effect.counter);
+    }
+    if (effect.counterAmount !== "all") {
+      invalidSpecField("leader-transition-choice counterAmount", effect.counterAmount);
+    }
+    validatePositiveAmount("leader-transition-choice drawCardsPerCounter", effect.drawCardsPerCounter);
+    validateSourceLabel("leader-transition-choice source", effect.source);
+    if (effect.followUp !== undefined) {
+      if (effect.followUp.kind !== "repeat-board-space") {
+        unsupportedKind("leader-transition-choice followUp", effect.followUp);
+      }
+      if (effect.followUp.sameSpace !== true) {
+        invalidSpecField("leader-transition-choice followUp sameSpace", effect.followUp.sameSpace);
+      }
+      if (effect.followUp.ability !== "reverend-mother-jessica") {
+        invalidSpecField("leader-transition-choice followUp ability", effect.followUp.ability);
+      }
+      validateSourceLabel("leader-transition-choice followUp source", effect.followUp.source);
+      if (!supportedResources.has(effect.followUp.resource)) {
+        throw new Error(`Unsupported effect resource "${effect.followUp.resource}"`);
+      }
+      validatePositiveAmount("leader-transition-choice followUp cost", effect.followUp.cost);
+    }
     return;
   }
   if (effect.kind === "acquire-card") {

@@ -230,7 +230,6 @@ export {
 
 export {
   pendingActionForCard,
-  pendingActionForJessicaOtherMemories,
   pendingActionForReverendMotherJessicaRepeat,
   pendingActionsForCard,
   pendingActionsForRevealPayResourceForSandworms,
@@ -238,6 +237,10 @@ export {
   pendingActionsForRevealPayResourceForTroops,
   pendingActionsForReveal,
 } from "./card-pending-rules";
+
+export {
+  pendingActionsForLeaderPlacementEffects,
+} from "./leader-effect-pending-rules";
 
 export {
   resolvePaidRewardChoice,
@@ -255,12 +258,12 @@ export {
 } from "./commander-pending-rules";
 
 export {
-  resolveJessicaOtherMemoriesChoice,
+  resolveLeaderTransitionChoice,
   resolveLadyAmberDesertScoutsChoice,
 } from "./leader-pending-rules";
 
 export type {
-  JessicaOtherMemoriesChoice,
+  LeaderTransitionChoice,
   LadyAmberDesertScoutsChoice,
 } from "./leader-pending-rules";
 

@@ -20,8 +20,8 @@ import {
   trashableCardsForPending,
 } from "../game/state";
 import type {
-  JessicaOtherMemoriesChoice,
   LadyAmberDesertScoutsChoice,
+  LeaderTransitionChoice,
   RepeatBoardSpaceChoice,
   StabanUnseenNetworkChoice,
 } from "../game/state";
@@ -39,8 +39,8 @@ import { PendingConflictVpPanel } from "./PendingConflictVpPanel";
 import { PendingInfluenceLossPanel } from "./PendingInfluenceLossPanel";
 import { PendingActionChoicePanel } from "./PendingActionChoicePanel";
 import {
-  PendingJessicaOtherMemoriesPanel,
   PendingLadyAmberDesertScoutsPanel,
+  PendingLeaderTransitionPanel,
   PendingPayResourceForContractsPanel,
   PendingPayResourceForDrawCardsPanel,
   PendingPayResourceForInfluencePanel,
@@ -83,7 +83,7 @@ type PendingActionPanelProps = {
   chooseDiscardCardForInfluenceAndDraw: (discardCardId: string, faction: FactionId) => void;
   chooseLoseInfluenceForIntrigues: (faction: FactionId) => void;
   choosePendingActionChoice: (optionId: string) => void;
-  chooseJessicaOtherMemories: (choice: JessicaOtherMemoriesChoice) => void;
+  chooseLeaderTransition: (choice: LeaderTransitionChoice) => void;
   chooseLadyAmberDesertScouts: (choice: LadyAmberDesertScoutsChoice) => void;
   chooseMakerReward: (choice: "spice" | "sandworms") => void;
   choosePayResourceForContracts: (optionIndex: number) => void;
@@ -154,7 +154,7 @@ export function PendingActionPanel({
   chooseDiscardCardForInfluenceAndDraw,
   chooseLoseInfluenceForIntrigues,
   choosePendingActionChoice,
-  chooseJessicaOtherMemories,
+  chooseLeaderTransition,
   chooseLadyAmberDesertScouts,
   chooseMakerReward,
   choosePayResourceForContracts,
@@ -372,8 +372,8 @@ export function PendingActionPanel({
     pendingAction.kind === "repeat-board-space" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingRepeatBoardSpaceSpace =
     pendingAction.kind === "repeat-board-space" ? boardSpaces.find((space) => space.id === pendingAction.spaceId) : undefined;
-  const pendingJessicaOtherMemoriesOwner =
-    pendingAction.kind === "jessica-other-memories" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
+  const pendingLeaderTransitionOwner =
+    pendingAction.kind === "leader-transition" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingConflictVpOwner =
     pendingAction.kind === "conflict-vp-conversion" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingConflictInfluenceOwner =
@@ -476,7 +476,7 @@ export function PendingActionPanel({
           {pendingAction.kind === "staban-unseen-network" && `${pendingStabanUnseenNetworkOwner?.leader ?? "Staban Tuek"} Unseen Network`}
           {pendingAction.kind === "amber-desert-scouts" && `${pendingLadyAmberDesertScoutsOwner?.leader ?? "Lady Amber"} Desert Scouts`}
           {pendingAction.kind === "repeat-board-space" && `${pendingRepeatBoardSpaceOwner?.leader ?? "Player"} ${pendingAction.source}`}
-          {pendingAction.kind === "jessica-other-memories" && `${pendingJessicaOtherMemoriesOwner?.leader ?? "Lady Jessica"} Other Memories`}
+          {pendingAction.kind === "leader-transition" && `${pendingLeaderTransitionOwner?.leader ?? "Player"} ${pendingAction.source}`}
           {pendingAction.kind === "conflict-influence" && `${pendingConflictInfluenceOwner?.leader ?? "Player"} Conflict Influence`}
           {pendingAction.kind === "board-influence-choice" && `${pendingAction.source} Influence`}
           {pendingAction.kind === "optional-space-payment" && `${pendingOptionalSpacePaymentOwner?.leader ?? "Player"} ${pendingAction.source}`}
@@ -654,11 +654,12 @@ export function PendingActionPanel({
         />
       )}
 
-      {pendingAction.kind === "jessica-other-memories" && (
-        <PendingJessicaOtherMemoriesPanel
-          memoryLabel={memoryCountLabel(pendingJessicaOtherMemoriesOwner?.jessicaMemories ?? 0)}
-          owner={pendingJessicaOtherMemoriesOwner}
-          onChoose={chooseJessicaOtherMemories}
+      {pendingAction.kind === "leader-transition" && (
+        <PendingLeaderTransitionPanel
+          counterLabel={memoryCountLabel(pendingLeaderTransitionOwner?.jessicaMemories ?? 0)}
+          owner={pendingLeaderTransitionOwner}
+          pending={pendingAction}
+          onChoose={chooseLeaderTransition}
         />
       )}
 

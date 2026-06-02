@@ -70,6 +70,13 @@ export function agentPlayEffects(
   return effectSpec("agent-play", effects, conditions);
 }
 
+export function agentPlacementEffects(
+  effects: GameEffectSpec[],
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return effectSpec("agent-placement", effects, conditions);
+}
+
 export function revealEffects(
   effects: GameEffectSpec[],
   conditions?: GameEffectConditionSpec[],
@@ -1323,6 +1330,10 @@ export function hasLeader(leader: string) {
   return { kind: "has-leader", leader } as const;
 }
 
+export function hasLeaderCounter(counter: "jessicaMemories", amount: number) {
+  return { kind: "has-leader-counter", counter, amount } as const;
+}
+
 export function hasAlliance(faction?: FactionId) {
   return faction ? ({ kind: "has-alliance", faction } as const) : ({ kind: "has-alliance" } as const);
 }
@@ -1341,6 +1352,20 @@ export function cloneCardEffects(effects: CardEffectSpec[] | undefined): CardEff
     conditions: spec.conditions?.map((condition) => ({ ...condition })),
     effects: spec.effects.map((effect): GameEffectSpec => {
       if (effect.kind === "summon-sandworms") return { ...effect };
+      if (effect.kind === "leader-transition-choice") {
+        return {
+          ...effect,
+          drawCardsPerCounter: cloneAmount(effect.drawCardsPerCounter),
+          ...(effect.followUp
+            ? {
+                followUp: {
+                  ...effect.followUp,
+                  cost: cloneAmount(effect.followUp.cost),
+                },
+              }
+            : {}),
+        };
+      }
       if (effect.kind === "paid-reward-choice") {
         return {
           ...effect,

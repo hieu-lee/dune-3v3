@@ -26,6 +26,7 @@ import type {
   InfluenceLossForStrengthOwner,
   InfluenceEffectFaction,
   InfluenceEffectRecipient,
+  LeaderCounterId,
   PaidRewardChoiceEffectOption,
   PaidRewardChoiceEffectAtomicReward,
   PendingActionChoiceEffectOption,
@@ -276,6 +277,24 @@ export type AgentPendingActionChoice = {
   source?: string;
 };
 
+export type LeaderTransitionChoice = {
+  selector: "self";
+  source?: string;
+  fromLeader: string;
+  toLeader: string;
+  counter: LeaderCounterId;
+  counterAmount: "all";
+  drawCardsPerCounter: number;
+  followUp?: {
+    kind: "repeat-board-space";
+    sameSpace: true;
+    ability: "reverend-mother-jessica";
+    source: string;
+    resource: ResourceId;
+    cost: number;
+  };
+};
+
 export type AgentAcquireCard = {
   selector: PlayerSelector;
   minCost?: number;
@@ -523,6 +542,11 @@ function amountFor(amount: EffectAmountSpec, source: Player) {
   return unsupportedKind("effect amount", amount);
 }
 
+function leaderCounterAmount(source: Player, counter: LeaderCounterId) {
+  if (counter === "jessicaMemories") return source.jessicaMemories;
+  return unsupportedKind("leader counter", counter);
+}
+
 function conditionApplies(condition: GameEffectConditionSpec, context: GameEffectContext) {
   if (condition.kind === "visited-maker-space") {
     if (context.trigger === "agent-play") return Boolean(context.space?.maker);
@@ -586,6 +610,9 @@ function conditionApplies(condition: GameEffectConditionSpec, context: GameEffec
   }
   if (condition.kind === "has-leader") {
     return context.source.leader === condition.leader;
+  }
+  if (condition.kind === "has-leader-counter") {
+    return leaderCounterAmount(context.source, condition.counter) >= condition.amount;
   }
   if (condition.kind === "has-alliance") {
     if (!context.state?.alliances) return false;
@@ -1541,6 +1568,36 @@ export function resolveAgentPendingActionChoices(
         selector: effect.selector,
         options: effect.options.map((option) => resolvePendingActionChoiceOption(option, context)),
         source: effect.source,
+      }));
+  });
+}
+
+export function resolveLeaderTransitionChoices(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): LeaderTransitionChoice[] {
+  specs?.forEach(validateSpec);
+  return (specs ?? []).flatMap((spec) => {
+    if (spec.trigger !== "agent-placement") return [];
+    if (!specApplies(spec, context)) return [];
+    return spec.effects
+      .filter((effect) => effect.kind === "leader-transition-choice")
+      .map((effect) => ({
+        selector: effect.selector,
+        fromLeader: effect.fromLeader,
+        toLeader: effect.toLeader,
+        counter: effect.counter,
+        counterAmount: effect.counterAmount,
+        drawCardsPerCounter: amountFor(effect.drawCardsPerCounter, context.source),
+        ...(effect.followUp
+          ? {
+              followUp: {
+                ...effect.followUp,
+                cost: amountFor(effect.followUp.cost, context.source),
+              },
+            }
+          : {}),
+        ...(effect.source ? { source: effect.source } : {}),
       }));
   });
 }

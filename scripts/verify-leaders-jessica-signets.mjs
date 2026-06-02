@@ -234,30 +234,43 @@ export function verifyLeaderJessicaSignets({ appTurnActions, cards, data, game, 
     discard: [],
     jessicaMemories: 2,
   };
-  const jessicaOtherMemoriesPending = state.pendingActionForJessicaOtherMemories(jessicaOtherMemoriesOwner, secrets);
+  const jessicaOtherMemoriesPending = state.pendingActionsForLeaderPlacementEffects(game, jessicaOtherMemoriesOwner, secrets)[0];
+  const expectedOtherMemoriesPending = {
+    kind: "leader-transition",
+    ownerId: ladyJessica.id,
+    source: "Other Memories",
+    fromLeader: "Lady Jessica",
+    toLeader: "Reverend Mother Jessica",
+    counter: "jessicaMemories",
+    counterAmount: "all",
+    drawCardsPerCounter: 1,
+    followUp: {
+      kind: "repeat-board-space",
+      spaceId: secrets.id,
+      ability: "reverend-mother-jessica",
+      source: "Reverend Mother",
+      resource: "water",
+      cost: 1,
+    },
+  };
   assert.deepEqual(
     jessicaOtherMemoriesPending,
-    {
-      kind: "jessica-other-memories",
-      ownerId: ladyJessica.id,
-      source: "Other Memories",
-      spaceId: secrets.id,
-    },
+    expectedOtherMemoriesPending,
     "Lady Jessica should be able to trigger Other Memories on Bene Gesserit spaces",
   );
-  assert.equal(
-    state.pendingActionForJessicaOtherMemories({ ...jessicaOtherMemoriesOwner, jessicaMemories: 0 }, secrets),
-    undefined,
+  assert.deepEqual(
+    state.pendingActionsForLeaderPlacementEffects(game, { ...jessicaOtherMemoriesOwner, jessicaMemories: 0 }, secrets),
+    [],
     "Other Memories should require at least one memory to return",
   );
-  assert.equal(
-    state.pendingActionForJessicaOtherMemories(jessicaOtherMemoriesOwner, arrakeen),
-    undefined,
+  assert.deepEqual(
+    state.pendingActionsForLeaderPlacementEffects(game, jessicaOtherMemoriesOwner, arrakeen),
+    [],
     "Other Memories should require a Bene Gesserit space",
   );
-  assert.equal(
-    state.pendingActionForJessicaOtherMemories({ ...jessicaOtherMemoriesOwner, leader: "Princess Irulan" }, secrets),
-    undefined,
+  assert.deepEqual(
+    state.pendingActionsForLeaderPlacementEffects(game, { ...jessicaOtherMemoriesOwner, leader: "Princess Irulan" }, secrets),
+    [],
     "Other Memories should not trigger for another Ally leader",
   );
   const jessicaOtherMemoriesGame = {
@@ -266,10 +279,10 @@ export function verifyLeaderJessicaSignets({ appTurnActions, cards, data, game, 
     pendingAction: jessicaOtherMemoriesPending,
     pendingQueue: [],
   };
-  const jessicaOtherMemoriesResolved = state.resolveJessicaOtherMemoriesChoice(
+  const jessicaOtherMemoriesResolved = state.resolveLeaderTransitionChoice(
     jessicaOtherMemoriesGame,
     jessicaOtherMemoriesPending,
-    "flip",
+    "transition",
   );
   assert.equal(
     playerById(jessicaOtherMemoriesResolved, ladyJessica.id).leader,
@@ -283,9 +296,9 @@ export function verifyLeaderJessicaSignets({ appTurnActions, cards, data, game, 
   );
   assert.equal(playerById(jessicaOtherMemoriesResolved, ladyJessica.id).jessicaMemories, 0, "Other Memories should return all memories");
   assert.equal(state.playerTroopSupply(playerById(jessicaOtherMemoriesResolved, ladyJessica.id)), 9, "Other Memories should return memory troops to Jessica's supply");
-  assert.equal(
-    state.pendingActionForJessicaOtherMemories(playerById(jessicaOtherMemoriesResolved, ladyJessica.id), secrets),
-    undefined,
+  assert.deepEqual(
+    state.pendingActionsForLeaderPlacementEffects(game, playerById(jessicaOtherMemoriesResolved, ladyJessica.id), secrets),
+    [],
     "Other Memories should not queue after Jessica has flipped to Reverend Mother",
   );
   assert.deepEqual(
@@ -293,7 +306,7 @@ export function verifyLeaderJessicaSignets({ appTurnActions, cards, data, game, 
     [leadTheWayDraw.id, leadTheWayDiscardDraw.id],
     "Other Memories should draw one deck card per returned memory",
   );
-  const skippedOtherMemories = state.resolveJessicaOtherMemoriesChoice(
+  const skippedOtherMemories = state.resolveLeaderTransitionChoice(
     jessicaOtherMemoriesGame,
     jessicaOtherMemoriesPending,
     "skip",

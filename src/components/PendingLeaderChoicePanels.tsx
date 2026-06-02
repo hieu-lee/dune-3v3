@@ -112,29 +112,35 @@ export function PendingRepeatBoardSpacePanel({
   );
 }
 
-type PendingJessicaOtherMemoriesPanelProps = {
-  memoryLabel: string;
+type PendingLeaderTransitionPanelProps = {
+  counterLabel: string;
   owner?: Player;
-  onChoose: (choice: "flip" | "skip") => void;
+  pending: Extract<PendingAction, { kind: "leader-transition" }>;
+  onChoose: (choice: "transition" | "skip") => void;
 };
 
-export function PendingJessicaOtherMemoriesPanel({
-  memoryLabel,
+export function PendingLeaderTransitionPanel({
+  counterLabel,
   owner,
+  pending,
   onChoose,
-}: PendingJessicaOtherMemoriesPanelProps) {
+}: PendingLeaderTransitionPanelProps) {
   return (
     <div className="pending-controls">
       {owner ? (
         <>
-          <button type="button" onClick={() => onChoose("flip")}>
+          <button
+            type="button"
+            onClick={() => onChoose("transition")}
+            disabled={owner.leader !== pending.fromLeader || owner.jessicaMemories <= 0}
+          >
             <BookOpen size={15} />
-            Return {memoryLabel}: draw and flip
+            Return {counterLabel}: draw and flip
           </button>
           <span>Reverend Mother side becomes active.</span>
         </>
       ) : (
-        <span>Other Memories can no longer resolve with the current table state.</span>
+        <span>{pending.source} can no longer resolve with the current table state.</span>
       )}
       <button type="button" onClick={() => onChoose("skip")}>Skip</button>
     </div>

@@ -40,7 +40,6 @@ import { loseInfluenceForIntriguesChoices } from "./influence-intrigue-rules";
 import {
   feydRauthaLeaderName,
   ladyAmberMetulliLeaderName,
-  ladyJessicaLeaderName,
   reverendMotherJessicaLeaderName,
 } from "./leader-constants";
 import {
@@ -953,19 +952,6 @@ export function pendingActionForCard(
   space?: BoardSpace,
 ): PendingAction | undefined {
   return pendingActionsForCard(card, source, state, target, space)[0];
-}
-
-export function pendingActionForJessicaOtherMemories(
-  source: Player,
-  space: BoardSpace,
-): PendingAction | undefined {
-  if (source.leader !== ladyJessicaLeaderName || source.role !== "Ally" || source.jessicaMemories <= 0 || space.icon !== "bene") return undefined;
-  return {
-    kind: "jessica-other-memories",
-    ownerId: source.id,
-    source: "Other Memories",
-    spaceId: space.id,
-  };
 }
 
 export function pendingActionForReverendMotherJessicaRepeat(

@@ -14,6 +14,7 @@ import {
   northernWatermasterSourceId,
   paracompassSourceId,
   prepareTheWaySourceId,
+  reliableInformantSourceId,
   smugglersHarvesterSourceId,
   spiceMustFlowSourceId,
   wheelsWithinWheelsSourceId,
@@ -37,6 +38,7 @@ import {
   revealRetreatTroopsForStrength,
   revealTrashCardForStrength,
   visitedMakerSpace,
+  visitedSpaceIcon,
   visitedSpaceWithSpyPost,
 } from "./effect-specs";
 import type {
@@ -224,6 +226,9 @@ function imperiumRevealText(card: HubCard, persuasion: number, swords: number, p
   if (card.id === wheelsWithinWheelsSourceId) {
     return "+1 persuasion. Place 1 spy.";
   }
+  if (card.id === reliableInformantSourceId) {
+    return "+1 persuasion. Gain 1 Solari.";
+  }
   return printedReveal ? "Resolve printed reveal text." : revealText(persuasion, swords);
 }
 
@@ -313,6 +318,15 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
   if (card.id === paracompassSourceId) {
     return [agentGainResource("solari", 2)];
   }
+  if (card.id === reliableInformantSourceId) {
+    return [
+      agentGainResource("solari", 1, [visitedSpaceIcon("emperor")]),
+      agentGainResource("solari", 1, [visitedSpaceIcon("bene")]),
+      agentGainResource("solari", 1, [visitedSpaceIcon("spacing")]),
+      revealGainPersuasion(1),
+      revealGainResource("solari", 1),
+    ];
+  }
   if (card.id === wheelsWithinWheelsSourceId) {
     return [
       agentGainResource("solari", 2, [hasInfluence("emperor", 2)]),
@@ -334,6 +348,9 @@ function imperiumPlayText(card: HubCard) {
   }
   if (card.id === wheelsWithinWheelsSourceId) {
     return "If you have 2 or more Emperor/Great Houses Influence, gain 2 Solari. If you have 2 or more Spacing Guild Influence, gain 1 spice.";
+  }
+  if (card.id === reliableInformantSourceId) {
+    return "Gain 1 Solari on Emperor, Bene Gesserit, or Spacing Guild board spaces.";
   }
   return summarizeAttributes(card);
 }
@@ -429,7 +446,12 @@ function toImperiumCard(card: HubCard): Card {
   const persuasion = attributeNumber(card, "Persuasion on reveal");
   const swords = attributeNumber(card, "Swords");
   const effects = imperiumCardEffects(card);
-  const revealGain = card.id === fedaykinStilltentSourceId ? { water: 1 } : undefined;
+  const revealGain =
+    card.id === fedaykinStilltentSourceId
+      ? { water: 1 }
+      : card.id === reliableInformantSourceId
+        ? { solari: 1 }
+        : undefined;
   const automatedContractPersuasion = card.id === interstellarTradeSourceId;
   const automatedConditionalSwords = card.id === calculusOfPowerSourceId;
   const conditionalPersuasion =

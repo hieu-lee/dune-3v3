@@ -95,6 +95,7 @@ try {
   const maulaPistol = data.imperiumDeck.find((card) => card.name === "Maula Pistol");
   const northernWatermaster = data.imperiumDeck.find((card) => card.name === "Northern Watermaster");
   const paracompass = data.imperiumDeck.find((card) => card.name === "Paracompass");
+  const reliableInformant = data.imperiumDeck.find((card) => card.name === "Reliable Informant");
   const wheelsWithinWheels = data.imperiumDeck.find((card) => card.name === "Wheels Within Wheels");
   const prepareTheWay = data.reserveMarket.find((card) => card.sourceId === 537);
   const commandRespect = data.muadDibCommanderCards.find((card) => card.name === "Command Respect");
@@ -117,6 +118,8 @@ try {
   const imperialBasin = data.boardSpaces.find((space) => space.id === "imperial-basin");
   const secrets = data.boardSpaces.find((space) => space.id === "secrets");
   const highCouncil = data.boardSpaces.find((space) => space.id === "high-council");
+  const dutifulService = data.boardSpaces.find((space) => space.id === "dutiful-service");
+  const deliverSupplies = data.boardSpaces.find((space) => space.id === "deliver-supplies");
   assert.ok(
     convincingArgument &&
     dagger &&
@@ -135,11 +138,12 @@ try {
     maulaPistol &&
     northernWatermaster &&
     paracompass &&
+    reliableInformant &&
     wheelsWithinWheels,
   );
   assert.ok(commandRespect && prepareTheWay && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
-  assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil);
-  assert.equal(revealSpecCards.length, 35, "Unexpected number of cards with declarative Reveal specs");
+  assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && dutifulService && deliverSupplies);
+  assert.equal(revealSpecCards.length, 36, "Unexpected number of cards with declarative Reveal specs");
   assert.deepEqual(
     [
       ...data.reserveMarket,
@@ -158,6 +162,7 @@ try {
       "Northern Watermaster",
       "Paracompass",
       "Prepare The Way",
+      "Reliable Informant",
       "Wheels Within Wheels",
     ],
     "Unexpected cards with declarative Agent-play specs",
@@ -173,6 +178,7 @@ try {
       calculus,
       capturedMentat,
       fedaykinStilltent,
+      reliableInformant,
 	    beneGesseritOperative,
 	    chani,
 	  ]) {
@@ -534,6 +540,45 @@ try {
       spec.effects.some((effect) => effect.kind === "gain-resource" && effect.resource === "solari" && effect.amount === 2)
     ),
     "Paracompass should carry a Solari Agent spec",
+  );
+  assert.equal(
+    reliableInformant.play,
+    "Gain 1 Solari on Emperor, Bene Gesserit, or Spacing Guild board spaces.",
+    "Reliable Informant play text should name its board-space icon condition",
+  );
+  for (const icon of ["emperor", "bene", "spacing"]) {
+    assert.ok(
+      reliableInformant.effects?.some((spec) =>
+        spec.trigger === "agent-play" &&
+        spec.conditions?.some((condition) => condition.kind === "visited-space-icon" && condition.icon === icon) &&
+        spec.effects.some((effect) =>
+          effect.kind === "gain-resource" &&
+          effect.selector === "self" &&
+          effect.resource === "solari" &&
+          effect.amount === 1
+        )
+      ),
+      `Reliable Informant should carry a ${icon} board-space gated Agent Solari spec`,
+    );
+  }
+  assert.equal(
+    reliableInformant.reveal,
+    "+1 persuasion. Gain 1 Solari.",
+    "Reliable Informant reveal text should preserve its printed reveal Solari",
+  );
+  assert.ok(
+    reliableInformant.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.effects.some((effect) => effect.kind === "gain-persuasion" && effect.amount === 1)
+    ),
+    "Reliable Informant should carry its printed persuasion in Reveal specs",
+  );
+  assert.ok(
+    reliableInformant.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.effects.some((effect) => effect.kind === "gain-resource" && effect.resource === "solari" && effect.amount === 1)
+    ),
+    "Reliable Informant should carry a reveal Solari spec",
   );
   assert.ok(
     fedaykinStilltent.effects?.some((spec) =>
@@ -2843,6 +2888,44 @@ try {
   );
   assert.deepEqual(paracompassEffect.source.resources, { solari: 2, spice: 0, water: 0 }, "Paracompass should gain 2 Agent Solari");
   assert.match(paracompassEffect.log ?? "", /Paracompass: gains 2 Solari/);
+  for (const [space, label] of [
+    [dutifulService, "Emperor"],
+    [secrets, "Bene Gesserit"],
+    [deliverSupplies, "Spacing Guild"],
+  ]) {
+    const reliableInformantEffect = state.applyCardAgentEffect(
+      reliableInformant,
+      { ...p2, resources: { solari: 0, spice: 0, water: 0 } },
+      p2,
+      game,
+      space,
+    );
+    assert.deepEqual(
+      reliableInformantEffect.source.resources,
+      { solari: 1, spice: 0, water: 0 },
+      `Reliable Informant should gain 1 Agent Solari on ${label} spaces`,
+    );
+    assert.match(reliableInformantEffect.log ?? "", /Reliable Informant: gains 1 Solari/);
+  }
+  const reliableInformantLandsraadEffect = state.applyCardAgentEffect(
+    reliableInformant,
+    { ...p2, resources: { solari: 0, spice: 0, water: 0 } },
+    p2,
+    game,
+    highCouncil,
+  );
+  assert.deepEqual(
+    reliableInformantLandsraadEffect.source.resources,
+    { solari: 0, spice: 0, water: 0 },
+    "Reliable Informant should not gain Agent Solari on unrelated board-space icons",
+  );
+  assert.equal(reliableInformantLandsraadEffect.log, undefined, "Reliable Informant should not log when no Agent spec applies");
+  const reliableInformantReveal = turnActions.revealTurnPlan(
+    { ...p2, hand: [reliableInformant], highCouncilSeat: false },
+    game,
+  );
+  assert.equal(reliableInformantReveal.persuasion, 1, "Reliable Informant should reveal for 1 persuasion");
+  assert.deepEqual(reliableInformantReveal.revealGain, { solari: 1 }, "Reliable Informant should reveal for 1 Solari");
   const fedaykinMakerEffect = state.applyCardAgentEffect(
     fedaykinStilltent,
     { ...p2, garrison: 0 },

@@ -105,7 +105,7 @@ export async function runLeaderCharacterChoicesSmoke({
   assert.match(pendingText, /draw and flip/i);
   await screenshot(page, captures, "pending-jessica-other-memories.png");
   await page.locator(".pending-panel").getByRole("button", { name: /draw and flip/ }).click();
-  await page.waitForFunction(() => window.__DUNE_DEBUG__?.getGame().pendingAction?.kind === "jessica-reverend-mother");
+  await page.waitForFunction(() => window.__DUNE_DEBUG__?.getGame().pendingAction?.kind === "repeat-board-space");
   after = await currentGame(page);
   ownerAfter = after.players.find((player) => player.id === "p5");
   assert.equal(ownerAfter.leader, leaderNames.reverendJessica, "Other Memories should flip Jessica");
@@ -625,10 +625,14 @@ async function createLeaderCharacterChoiceStates(server, initialPlayableGame) {
           : player,
       ),
       pendingAction: {
-        kind: "jessica-reverend-mother",
+        kind: "repeat-board-space",
         ownerId: "p5",
         spaceId: "expedition",
         source: "Reverend Mother",
+        resource: "water",
+        cost: 1,
+        optional: true,
+        ability: "reverend-mother-jessica",
       },
     },
     jessicaOtherMemories: {

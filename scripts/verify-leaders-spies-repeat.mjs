@@ -287,24 +287,24 @@ export function verifyLeaderSpiesAndReverendRepeat({ cards, data, game, players,
     reverendRepeatOwner,
     secrets,
   );
+  const expectedReverendRepeatPending = (spaceId) => ({
+    kind: "repeat-board-space",
+    ownerId: ladyJessica.id,
+    source: "Reverend Mother",
+    spaceId,
+    resource: "water",
+    cost: 1,
+    optional: true,
+    ability: "reverend-mother-jessica",
+  });
   assert.deepEqual(
     reverendRepeatPending,
-    {
-      kind: "jessica-reverend-mother",
-      ownerId: ladyJessica.id,
-      source: "Reverend Mother",
-      spaceId: secrets.id,
-    },
+    expectedReverendRepeatPending(secrets.id),
     "Reverend Mother Jessica should be able to repeat a Bene Gesserit space for 1 water",
   );
   assert.deepEqual(
     state.pendingActionForReverendMotherJessicaRepeat(reverendRepeatGame, reverendRepeatOwner, expedition),
-    {
-      kind: "jessica-reverend-mother",
-      ownerId: ladyJessica.id,
-      source: "Reverend Mother",
-      spaceId: expedition.id,
-    },
+    expectedReverendRepeatPending(expedition.id),
     "Reverend Mother Jessica should be able to repeat a Fremen board space for 1 water",
   );
   assert.equal(
@@ -355,7 +355,7 @@ export function verifyLeaderSpiesAndReverendRepeat({ cards, data, game, players,
     undefined,
     "Reverend Mother should be once per turn",
   );
-  const skippedReverendRepeat = state.resolveJessicaReverendMotherChoice(
+  const skippedReverendRepeat = state.resolveRepeatBoardSpaceChoice(
     { ...reverendRepeatGame, pendingAction: reverendRepeatPending, pendingQueue: [] },
     reverendRepeatPending,
     "skip",
@@ -375,7 +375,7 @@ export function verifyLeaderSpiesAndReverendRepeat({ cards, data, game, players,
     ),
   };
   const repeatedSecrets = withStubbedRandom(0.49, () =>
-    state.resolveJessicaReverendMotherChoice(
+    state.resolveRepeatBoardSpaceChoice(
       { ...reverendSecretsGame, pendingAction: reverendRepeatPending, pendingQueue: [] },
       reverendRepeatPending,
       "repeat",
@@ -397,7 +397,7 @@ export function verifyLeaderSpiesAndReverendRepeat({ cards, data, game, players,
   assert.equal(repeatedSecrets.pendingAction, undefined, "Reverend Mother without deferred space effects should advance pending actions");
   const duplicateRepeatState = { ...repeatedSecrets, pendingAction: reverendRepeatPending, pendingQueue: [] };
   assert.equal(
-    state.resolveJessicaReverendMotherChoice(duplicateRepeatState, reverendRepeatPending, "repeat"),
+    state.resolveRepeatBoardSpaceChoice(duplicateRepeatState, reverendRepeatPending, "repeat"),
     duplicateRepeatState,
     "A duplicate Reverend Mother pending should not resolve after the once-per-turn use",
   );
@@ -407,7 +407,7 @@ export function verifyLeaderSpiesAndReverendRepeat({ cards, data, game, players,
     controversialTech,
   );
   assert.ok(controversialRepeatPending, "Controversial Technology should queue Reverend Mother repeat");
-  const repeatedControversialTech = state.resolveJessicaReverendMotherChoice(
+  const repeatedControversialTech = state.resolveRepeatBoardSpaceChoice(
     {
       ...reverendRepeatGame,
       intrigueDeck: [intrigueCard],
@@ -438,7 +438,7 @@ export function verifyLeaderSpiesAndReverendRepeat({ cards, data, game, players,
       player.id === ladyJessica.id ? { ...reverendRepeatOwner, playArea: [] } : player,
     ),
   };
-  const repeatedControversialWithOriginalTrash = state.resolveJessicaReverendMotherChoice(
+  const repeatedControversialWithOriginalTrash = state.resolveRepeatBoardSpaceChoice(
     {
       ...oneTrashReverendRepeatGame,
       intrigueDeck: [intrigueCard],
@@ -499,7 +499,7 @@ export function verifyLeaderSpiesAndReverendRepeat({ cards, data, game, players,
     espionageRepeatGame.players,
   );
   assert.ok(espionageSpyPending, "Espionage should create an initial spy pending action");
-  const repeatedEspionage = state.resolveJessicaReverendMotherChoice(
+  const repeatedEspionage = state.resolveRepeatBoardSpaceChoice(
     {
       ...espionageRepeatGame,
       pendingAction: espionageRepeatPending,
@@ -535,12 +535,7 @@ export function verifyLeaderSpiesAndReverendRepeat({ cards, data, game, players,
   );
   assert.deepEqual(
     jessicaOtherMemoriesResolved.pendingAction,
-    {
-      kind: "jessica-reverend-mother",
-      ownerId: ladyJessica.id,
-      source: "Reverend Mother",
-      spaceId: secrets.id,
-    },
+    expectedReverendRepeatPending(secrets.id),
     "Other Memories should let Reverend Mother Jessica repeat the same Bene Gesserit space after flipping",
   );
 

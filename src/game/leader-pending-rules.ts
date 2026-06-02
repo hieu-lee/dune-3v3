@@ -3,12 +3,6 @@ import {
   leaderCardByName,
 } from "./data";
 import {
-  applyBoardEffect,
-} from "./agent-effects";
-import {
-  boardSpaceRewardApplies,
-} from "./board-rules";
-import {
   pendingActionForReverendMotherJessicaRepeat,
 } from "./card-pending-rules";
 import {
@@ -19,7 +13,6 @@ import {
   playerTroopSupply,
 } from "./deck-utils";
 import { drawIntrigueCards } from "./intrigue-deck";
-import { resolveSecretsIntriguePressure } from "./board-location-rules";
 import {
   ladyAmberMetulliLeaderName,
   ladyJessicaLeaderName,
@@ -33,15 +26,6 @@ import {
   advancePendingAction,
   prependPendingAction,
 } from "./pending-actions";
-import {
-  pendingActionForBoardTrash,
-  pendingActionForSpace,
-} from "./placement-rules";
-import {
-  hasUsedReverendMotherJessicaRepeat,
-  recordReverendMotherJessicaRepeat,
-  recordTurnSpiceGain,
-} from "./turn-trackers";
 import type {
   GameState,
   PendingAction,
@@ -49,12 +33,10 @@ import type {
 
 export type LadyAmberDesertScoutsChoice = "retreat" | "skip";
 export type JessicaSpiceAgonyChoice = "pay" | "skip";
-export type JessicaReverendMotherChoice = "repeat" | "skip";
 export type JessicaOtherMemoriesChoice = "flip" | "skip";
 
 type LadyAmberDesertScoutsPendingAction = Extract<PendingAction, { kind: "amber-desert-scouts" }>;
 type JessicaSpiceAgonyPendingAction = Extract<PendingAction, { kind: "jessica-spice-agony" }>;
-type JessicaReverendMotherPendingAction = Extract<PendingAction, { kind: "jessica-reverend-mother" }>;
 type JessicaOtherMemoriesPendingAction = Extract<PendingAction, { kind: "jessica-other-memories" }>;
 
 export function resolveLadyAmberDesertScoutsChoice(
@@ -130,61 +112,6 @@ export function resolveJessicaSpiceAgonyChoice(
     log: [`${owner.leader} spends 1 spice for ${pending.source} and moves a supply troop as 1 memory.`, ...state.log],
   };
   return drawIntrigueCards(paidState, owner.id, 1, pending.source);
-}
-
-export function resolveJessicaReverendMotherChoice(
-  state: GameState,
-  pending: JessicaReverendMotherPendingAction,
-  choice: JessicaReverendMotherChoice,
-): GameState {
-  const owner = state.players.find((player) => player.id === pending.ownerId);
-  const space = boardSpaces.find((candidate) => candidate.id === pending.spaceId);
-  if (!owner || !space) return state;
-
-  if (choice === "skip") {
-    return {
-      ...state,
-      ...advancePendingAction(state),
-      log: [`${owner.leader} declines ${pending.source}.`, ...state.log],
-    };
-  }
-
-  if (
-    owner.leader !== reverendMotherJessicaLeaderName ||
-    owner.role !== "Ally" ||
-    owner.resources.water < 1 ||
-    (space.icon !== "bene" && space.icon !== "fremen") ||
-    Boolean(space.personal) ||
-    hasUsedReverendMotherJessicaRepeat(state, owner.id)
-  ) {
-    return state;
-  }
-
-  const paidOwner = {
-    ...owner,
-    resources: { ...owner.resources, water: owner.resources.water - 1 },
-  };
-  const { source: repeatedOwner } = applyBoardEffect(paidOwner, paidOwner, space);
-  const players = state.players.map((player) => (player.id === owner.id ? repeatedOwner : player));
-  const baseState = recordReverendMotherJessicaRepeat({
-    ...state,
-    players,
-    ...advancePendingAction(state),
-    log: [`${owner.leader} spends 1 water for ${pending.source} to repeat ${space.name}.`, ...state.log],
-  }, owner.id);
-  const repeatedPending = pendingActionForSpace(space, repeatedOwner, repeatedOwner, players);
-  const repeatedTrashPending = pendingActionForBoardTrash(space, repeatedOwner);
-  const withPending = prependPendingAction(
-    prependPendingAction(baseState, repeatedPending),
-    repeatedTrashPending,
-  );
-  const intrigueGain = boardSpaceRewardApplies(space, paidOwner) ? space.gain?.intrigue ?? 0 : 0;
-  const withIntrigue = intrigueGain > 0
-    ? drawIntrigueCards(withPending, owner.id, intrigueGain, `${pending.source} / ${space.name}`)
-    : withPending;
-  const spiceGain = boardSpaceRewardApplies(space, paidOwner) ? space.gain?.spice ?? 0 : 0;
-  const secretsState = space.id === "secrets" ? resolveSecretsIntriguePressure(withIntrigue, owner.id) : withIntrigue;
-  return spiceGain > 0 ? recordTurnSpiceGain(secretsState, owner.id, spiceGain) : secretsState;
 }
 
 export function resolveJessicaOtherMemoriesChoice(

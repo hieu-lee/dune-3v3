@@ -111,30 +111,38 @@ export function PendingJessicaSpiceAgonyPanel({
   );
 }
 
-type PendingJessicaReverendMotherPanelProps = {
+type PendingRepeatBoardSpacePanelProps = {
   owner?: Player;
+  pending: Extract<PendingAction, { kind: "repeat-board-space" }>;
   space?: BoardSpace;
   onChoose: (choice: "repeat" | "skip") => void;
 };
 
-export function PendingJessicaReverendMotherPanel({
+export function PendingRepeatBoardSpacePanel({
   owner,
+  pending,
   space,
   onChoose,
-}: PendingJessicaReverendMotherPanelProps) {
+}: PendingRepeatBoardSpacePanelProps) {
+  const resourceIcon = pending.resource === "water"
+    ? <Droplets size={15} />
+    : pending.resource === "spice"
+      ? <Sparkles size={15} />
+      : <CircleDollarSign size={15} />;
+
   return (
     <div className="pending-controls">
       {owner && space ? (
         <button
           type="button"
           onClick={() => onChoose("repeat")}
-          disabled={owner.resources.water < 1}
+          disabled={owner.resources[pending.resource] < pending.cost}
         >
-          <Droplets size={15} />
-          Spend 1 water: repeat {space.name}
+          {resourceIcon}
+          Spend {pending.cost} {resourceLabels[pending.resource]}: repeat {space.name}
         </button>
       ) : (
-        <span>Reverend Mother can no longer resolve with the current table state.</span>
+        <span>{pending.source} can no longer resolve with the current table state.</span>
       )}
       <button type="button" onClick={() => onChoose("skip")}>Skip</button>
     </div>

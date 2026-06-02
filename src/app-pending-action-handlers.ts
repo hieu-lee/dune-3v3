@@ -26,7 +26,6 @@ import {
   resolveDiscardCardForInfluenceAndDrawChoice,
   resolveBoardInfluenceChoice,
   resolveJessicaOtherMemoriesChoice,
-  resolveJessicaReverendMotherChoice,
   resolveJessicaSpiceAgonyChoice,
   resolveLadyAmberDesertScoutsChoice,
   resolveLoseInfluenceForIntriguesChoice,
@@ -40,6 +39,7 @@ import {
   resolvePayResourceForSandwormsChoice,
   resolvePayResourceForStrengthChoice,
   resolvePayResourceForTroopsChoice,
+  resolveRepeatBoardSpaceChoice,
   resolveRetreatTroopsForStrength,
   resolveSietchTabrChoice,
   resolveStabanUnseenNetworkChoice,
@@ -81,9 +81,9 @@ import type {
 } from "./game/types";
 import type {
   JessicaOtherMemoriesChoice,
-  JessicaReverendMotherChoice,
   JessicaSpiceAgonyChoice,
   LadyAmberDesertScoutsChoice,
+  RepeatBoardSpaceChoice,
   StabanUnseenNetworkChoice,
 } from "./game/state";
 
@@ -191,8 +191,8 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     runPending("amber-desert-scouts", (current, pending) => maybeStartCombatPhase(resolveLadyAmberDesertScoutsChoice(current, pending, choice)));
   const chooseJessicaSpiceAgony = (choice: JessicaSpiceAgonyChoice) =>
     runPending("jessica-spice-agony", (current, pending) => maybeStartCombatPhase(resolveJessicaSpiceAgonyChoice(current, pending, choice)));
-  const chooseJessicaReverendMother = (choice: JessicaReverendMotherChoice) =>
-    runPending("jessica-reverend-mother", (current, pending) => maybeStartCombatPhase(resolveJessicaReverendMotherChoice(current, pending, choice)));
+  const chooseRepeatBoardSpace = (choice: RepeatBoardSpaceChoice) =>
+    runPending("repeat-board-space", (current, pending) => maybeStartCombatPhase(resolveRepeatBoardSpaceChoice(current, pending, choice)));
   const chooseJessicaOtherMemories = (choice: JessicaOtherMemoriesChoice) =>
     runPending("jessica-other-memories", (current, pending) => maybeStartCombatPhase(resolveJessicaOtherMemoriesChoice(current, pending, choice)));
   const chooseTrashSourceForTrade = (partnerId: string) =>
@@ -315,7 +315,6 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     chooseDiscardHandCard,
     chooseDiscardCardForInfluenceAndDraw,
     chooseJessicaOtherMemories,
-    chooseJessicaReverendMother,
     chooseJessicaSpiceAgony,
     chooseLadyAmberDesertScouts,
     chooseLoseInfluenceForIntrigues,
@@ -329,6 +328,7 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     choosePaidReward,
     choosePendingActionChoice,
     chooseRetreatTroopsForStrength,
+    chooseRepeatBoardSpace,
     chooseSietchTabr,
     chooseStabanUnseenNetwork,
     chooseTeamResourcePayment,

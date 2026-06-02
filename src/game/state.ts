@@ -256,17 +256,23 @@ export {
 
 export {
   resolveJessicaOtherMemoriesChoice,
-  resolveJessicaReverendMotherChoice,
   resolveJessicaSpiceAgonyChoice,
   resolveLadyAmberDesertScoutsChoice,
 } from "./leader-pending-rules";
 
 export type {
   JessicaOtherMemoriesChoice,
-  JessicaReverendMotherChoice,
   JessicaSpiceAgonyChoice,
   LadyAmberDesertScoutsChoice,
 } from "./leader-pending-rules";
+
+export {
+  resolveRepeatBoardSpaceChoice,
+} from "./repeat-board-space-rules";
+
+export type {
+  RepeatBoardSpaceChoice,
+} from "./repeat-board-space-rules";
 
 export {
   pendingActionChoiceOptionIsResolvable,

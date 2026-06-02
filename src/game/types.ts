@@ -973,9 +973,13 @@ export type PendingAction =
       source: string;
     }
   | {
-      kind: "jessica-reverend-mother";
+      kind: "repeat-board-space";
       ownerId: string;
       spaceId: string;
+      resource: ResourceId;
+      cost: number;
+      optional: true;
+      ability: "reverend-mother-jessica";
       source: string;
     }
   | {

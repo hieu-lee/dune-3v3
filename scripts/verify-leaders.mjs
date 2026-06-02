@@ -16,6 +16,7 @@ const server = await createServer({
 try {
   const data = await server.ssrLoadModule("/src/game/data.ts");
   const state = await server.ssrLoadModule("/src/game/state.ts");
+  const appTurnActions = await server.ssrLoadModule("/src/app-turn-actions.ts");
 
   const {
     cards: {
@@ -43,6 +44,7 @@ try {
     spaces: { haggaBasin, secrets },
     states: { jessicaOtherMemoriesResolved },
   } = verifyLeaderJessicaSignets({
+    appTurnActions,
     cards: {
       allySignet,
       emperorSignet,

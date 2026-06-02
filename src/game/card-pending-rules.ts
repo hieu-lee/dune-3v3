@@ -961,10 +961,14 @@ export function pendingActionForReverendMotherJessicaRepeat(
     return undefined;
   }
   return {
-    kind: "jessica-reverend-mother",
+    kind: "repeat-board-space",
     ownerId: owner.id,
     source: "Reverend Mother",
     spaceId: space.id,
+    resource: "water",
+    cost: 1,
+    optional: true,
+    ability: "reverend-mother-jessica",
   };
 }
 

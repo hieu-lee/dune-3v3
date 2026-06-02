@@ -21,9 +21,9 @@ import {
 } from "../game/state";
 import type {
   JessicaOtherMemoriesChoice,
-  JessicaReverendMotherChoice,
   JessicaSpiceAgonyChoice,
   LadyAmberDesertScoutsChoice,
+  RepeatBoardSpaceChoice,
   StabanUnseenNetworkChoice,
 } from "../game/state";
 import type { FactionId, GameState, PendingAction, Player, TradeGoodId, TrashCardZone } from "../game/types";
@@ -41,7 +41,6 @@ import { PendingInfluenceLossPanel } from "./PendingInfluenceLossPanel";
 import { PendingActionChoicePanel } from "./PendingActionChoicePanel";
 import {
   PendingJessicaOtherMemoriesPanel,
-  PendingJessicaReverendMotherPanel,
   PendingJessicaSpiceAgonyPanel,
   PendingLadyAmberDesertScoutsPanel,
   PendingPayResourceForContractsPanel,
@@ -50,6 +49,7 @@ import {
   PendingPayResourceForSandwormsPanel,
   PendingPayResourceForStrengthPanel,
   PendingPayResourceForTroopsPanel,
+  PendingRepeatBoardSpacePanel,
   PendingStabanUnseenNetworkPanel,
   PendingTrashSourceForTradePanel,
 } from "./PendingLeaderChoicePanels";
@@ -86,7 +86,6 @@ type PendingActionPanelProps = {
   chooseLoseInfluenceForIntrigues: (faction: FactionId) => void;
   choosePendingActionChoice: (optionId: string) => void;
   chooseJessicaOtherMemories: (choice: JessicaOtherMemoriesChoice) => void;
-  chooseJessicaReverendMother: (choice: JessicaReverendMotherChoice) => void;
   chooseJessicaSpiceAgony: (choice: JessicaSpiceAgonyChoice) => void;
   chooseLadyAmberDesertScouts: (choice: LadyAmberDesertScoutsChoice) => void;
   chooseMakerReward: (choice: "spice" | "sandworms") => void;
@@ -98,6 +97,7 @@ type PendingActionPanelProps = {
   choosePayResourceForTroops: () => void;
   choosePaidReward: (optionId: string) => void;
   chooseRetreatTroopsForStrength: () => void;
+  chooseRepeatBoardSpace: (choice: RepeatBoardSpaceChoice) => void;
   chooseSietchTabr: (choice: "hooks" | "shield-wall") => void;
   chooseStabanUnseenNetwork: (choice: StabanUnseenNetworkChoice) => void;
   chooseTeamResourcePayment: () => void;
@@ -158,7 +158,6 @@ export function PendingActionPanel({
   chooseLoseInfluenceForIntrigues,
   choosePendingActionChoice,
   chooseJessicaOtherMemories,
-  chooseJessicaReverendMother,
   chooseJessicaSpiceAgony,
   chooseLadyAmberDesertScouts,
   chooseMakerReward,
@@ -170,6 +169,7 @@ export function PendingActionPanel({
   choosePayResourceForTroops,
   choosePaidReward,
   chooseRetreatTroopsForStrength,
+  chooseRepeatBoardSpace,
   chooseSietchTabr,
   chooseStabanUnseenNetwork,
   chooseTeamResourcePayment,
@@ -382,10 +382,10 @@ export function PendingActionPanel({
       pendingJessicaSpiceAgonyOwner.resources.spice >= 1 &&
       pendingJessicaSpiceAgonyTroopSupply > 0,
   );
-  const pendingJessicaReverendMotherOwner =
-    pendingAction.kind === "jessica-reverend-mother" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
-  const pendingJessicaReverendMotherSpace =
-    pendingAction.kind === "jessica-reverend-mother" ? boardSpaces.find((space) => space.id === pendingAction.spaceId) : undefined;
+  const pendingRepeatBoardSpaceOwner =
+    pendingAction.kind === "repeat-board-space" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
+  const pendingRepeatBoardSpaceSpace =
+    pendingAction.kind === "repeat-board-space" ? boardSpaces.find((space) => space.id === pendingAction.spaceId) : undefined;
   const pendingJessicaOtherMemoriesOwner =
     pendingAction.kind === "jessica-other-memories" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingConflictVpOwner =
@@ -490,7 +490,7 @@ export function PendingActionPanel({
           {pendingAction.kind === "staban-unseen-network" && `${pendingStabanUnseenNetworkOwner?.leader ?? "Staban Tuek"} Unseen Network`}
           {pendingAction.kind === "amber-desert-scouts" && `${pendingLadyAmberDesertScoutsOwner?.leader ?? "Lady Amber"} Desert Scouts`}
           {pendingAction.kind === "jessica-spice-agony" && `${pendingJessicaSpiceAgonyOwner?.leader ?? "Lady Jessica"} Spice Agony`}
-          {pendingAction.kind === "jessica-reverend-mother" && `${pendingJessicaReverendMotherOwner?.leader ?? "Reverend Mother Jessica"} Reverend Mother`}
+          {pendingAction.kind === "repeat-board-space" && `${pendingRepeatBoardSpaceOwner?.leader ?? "Player"} ${pendingAction.source}`}
           {pendingAction.kind === "jessica-other-memories" && `${pendingJessicaOtherMemoriesOwner?.leader ?? "Lady Jessica"} Other Memories`}
           {pendingAction.kind === "conflict-influence" && `${pendingConflictInfluenceOwner?.leader ?? "Player"} Conflict Influence`}
           {pendingAction.kind === "board-influence-choice" && `${pendingAction.source} Influence`}
@@ -670,11 +670,12 @@ export function PendingActionPanel({
         />
       )}
 
-      {pendingAction.kind === "jessica-reverend-mother" && (
-        <PendingJessicaReverendMotherPanel
-          owner={pendingJessicaReverendMotherOwner}
-          space={pendingJessicaReverendMotherSpace}
-          onChoose={chooseJessicaReverendMother}
+      {pendingAction.kind === "repeat-board-space" && (
+        <PendingRepeatBoardSpacePanel
+          owner={pendingRepeatBoardSpaceOwner}
+          pending={pendingAction}
+          space={pendingRepeatBoardSpaceSpace}
+          onChoose={chooseRepeatBoardSpace}
         />
       )}
 

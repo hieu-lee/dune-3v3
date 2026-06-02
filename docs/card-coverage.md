@@ -29,6 +29,7 @@ These cards currently use typed Agent effect specs:
 - Ecological Testing Station uses the typed Agent `pay-resource-for-draw-cards` pending primitive for its "pay 2 water to draw 2 cards" choice.
 - Emperor Commander Signet Ring uses the typed Agent `paid-reward-choice` primitive for Shaddam's Solari-paid troop and Influence choices.
 - Ally Signet Ring uses the typed Agent `paid-reward-choice` primitive for Reverend Mother Jessica's spice-paid Water of Life reward.
+- Reverend Mother Jessica's Bene/Fremen repeat uses the generic `repeat-board-space` pending primitive.
 - Ally Signet Ring uses the typed Agent `pending-action-choice` primitive for Princess Irulan's acquire-or-trash Chronicler's Insight choice.
 - Imperial Spymaster and Sardaukar Soldier use the typed Agent `draw-intrigues` primitive for fixed Intrigue rewards.
 - Leadership uses the typed Agent `draw-cards` primitive for its fixed card draw.
@@ -41,7 +42,7 @@ These cards currently use typed Agent effect specs:
 
 These cards are automated but still rely on explicit card or leader branches while the shared primitive library grows:
 
-- Ally leader Signet Ring choices still using bespoke branches: Lady Jessica's Spice Agony and Other Memories, and Reverend Mother Jessica's repeat-space choice.
+- Ally leader Signet Ring choices still using bespoke branches: Lady Jessica's Spice Agony and Other Memories.
 - Plot and Combat Intrigues: mostly automated through pattern modules and card-specific branches; Backed by CHOAM, Buy Access, Call to Arms, Change Allegiances, Contingency Plan, Councilor's Ambition, Cunning, Depart For Arrakis, Detonation, Distraction, Imperium Politics, Inspire Awe, Leverage, Intelligence Report, Manipulate, Mercenaries, Opportunism, Market Opportunity, Shaddam's Favor, Sietch Ritual, Special Mission, Strategic Stockpiling, and Unexpected Allies have been migrated to typed Plot Intrigue specs. Contingency Plan, Devour, Find Weakness, Go To Ground, Impress, Questionable Methods, Reach Agreement, Spice is Power, Spring The Trap, Tactical Option, Backed by CHOAM, and Weirding Combat now use typed Combat Intrigue specs for their strength, resource spend/gain, Influence-loss, selected fixed/dynamic retreat, contract, spy-placement, spy-recall, acquisition, and/or trash effects.
 
 ## Data-Driven Non-Card Islands

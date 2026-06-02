@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 
 import { playerById } from "./verify-leaders-fixtures.mjs";
 
-export function verifyLeaderJessicaSignets({ cards, data, game, spaces, state }) {
+export function verifyLeaderJessicaSignets({ appTurnActions, cards, data, game, spaces, state }) {
+  const { placeAgentAction } = appTurnActions;
   const { allySignet, emperorSignet, intrigueCard, leadTheWayDiscardDraw, leadTheWayDraw, muadDibSignet } = cards;
   const { arrakeen } = spaces;
 
@@ -319,6 +320,16 @@ export function verifyLeaderJessicaSignets({ cards, data, game, spaces, state })
       },
     }],
   };
+  const expectedReverendRepeatPending = (spaceId) => ({
+    kind: "repeat-board-space",
+    ownerId: ladyJessica.id,
+    source: "Reverend Mother",
+    spaceId,
+    resource: "water",
+    cost: 1,
+    optional: true,
+    ability: "reverend-mother-jessica",
+  });
   assert.deepEqual(
     waterOfLifePending,
     expectedWaterOfLifePending,
@@ -359,6 +370,50 @@ export function verifyLeaderJessicaSignets({ cards, data, game, spaces, state })
   );
   assert.equal(playerById(skippedWaterOfLife, ladyJessica.id).resources.spice, 1, "Skipping Water of Life should not spend spice");
   assert.equal(playerById(skippedWaterOfLife, ladyJessica.id).resources.water, 0, "Skipping Water of Life should not gain water");
+  const expedition = data.boardSpaces.find((space) => space.id === "expedition");
+  assert.ok(expedition, "Expedition should exist for Water of Life into Reverend Mother repeat ordering");
+  const reverendSeat = game.players.findIndex((player) => player.id === ladyJessica.id);
+  assert.notEqual(reverendSeat, -1, "Expected Reverend Mother Jessica's active seat");
+  const waterRepeatOwner = {
+    ...reverendJessicaOwner,
+    resources: { ...reverendJessicaOwner.resources, spice: 1, water: 0 },
+    influence: { ...reverendJessicaOwner.influence, fringeWorlds: 0 },
+    hand: [allySignet],
+    playArea: [],
+  };
+  const waterRepeatGame = {
+    ...game,
+    activeSeat: reverendSeat,
+    players: game.players.map((player) => (player.id === ladyJessica.id ? waterRepeatOwner : player)),
+    pendingAction: undefined,
+    pendingQueue: [],
+  };
+  const waterRepeatPlaced = placeAgentAction(waterRepeatGame, {
+    commanderTargets: {},
+    selectedCard: allySignet,
+    selectedSpace: expedition,
+  });
+  assert.deepEqual(
+    waterRepeatPlaced.pendingAction,
+    expectedWaterOfLifePending,
+    "Agent placement should put deferred Water of Life before Reverend Mother repeat",
+  );
+  assert.deepEqual(
+    waterRepeatPlaced.pendingQueue[0],
+    expectedReverendRepeatPending(expedition.id),
+    "Agent placement should queue Reverend Mother repeat immediately behind Water of Life when its water can be supplied",
+  );
+  const waterRepeatAfterWater = state.resolvePaidRewardChoice(
+    waterRepeatPlaced,
+    waterRepeatPlaced.pendingAction,
+    "water",
+  );
+  assert.deepEqual(
+    waterRepeatAfterWater.pendingAction,
+    expectedReverendRepeatPending(expedition.id),
+    "Resolving Water of Life should advance to the queued repeat-board-space pending action",
+  );
+  assert.equal(playerById(waterRepeatAfterWater, ladyJessica.id).resources.water, 1, "Resolved Water of Life should make the queued repeat payable");
   const deferredWaterOwner = {
     ...reverendJessicaOwner,
     resources: { ...reverendJessicaOwner.resources, spice: 0, water: 1 },

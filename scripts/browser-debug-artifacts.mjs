@@ -54,6 +54,7 @@ const generatedScreenshotNames = [
   "pending-price-is-no-object-acquire.png",
   "pending-dangerous-rhetoric-influence.png",
   "pending-subversive-advisor-board-influence.png",
+  "pending-overthrow-board-influence.png",
   "pending-desert-survival-trash.png",
   "pending-tread-in-darkness-trash-draw.png",
   "pending-acquire-spy-network-spy.png",

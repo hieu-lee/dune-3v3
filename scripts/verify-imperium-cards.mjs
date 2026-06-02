@@ -307,6 +307,23 @@ try {
     ),
     "Overthrow should model its acquisition Intrigue draw as a typed acquire effect",
   );
+  assert.deepEqual(
+    overthrow.effects?.filter((spec) => spec.trigger === "agent-play"),
+    [
+      {
+        trigger: "agent-play",
+        effects: [
+          {
+            kind: "gain-board-space-influence",
+            selector: "self",
+            amount: 1,
+          },
+        ],
+      },
+    ],
+    "Overthrow should only model its Agent Faction-space Influence bonus as a typed effect",
+  );
+  assert.match(overthrow.play, /Gain two Influence instead of one/i);
   assert.ok(
     priceIsNoObject.effects?.some((spec) =>
       spec.trigger === "acquire" &&
@@ -331,7 +348,7 @@ try {
     /acquire a card to your hand using Solari instead of persuasion/i,
     "Price is No Object should expose its automated Agent acquire text in hand",
   );
-  for (const name of ["Bene Gesserit Operative", "Cargo Runner", "Chani, Clever Tactician", "In High Places", "Maker Keeper", "Maula Pistol", "Northern Watermaster", "Paracompass", "Price is No Object"]) {
+  for (const name of ["Bene Gesserit Operative", "Cargo Runner", "Chani, Clever Tactician", "In High Places", "Maker Keeper", "Maula Pistol", "Northern Watermaster", "Overthrow", "Paracompass", "Price is No Object"]) {
     const card = data.imperiumDeck.find((candidate) => candidate.name === name);
     assert.ok(card?.effects?.some((spec) => spec.trigger === "agent-play"), `${name} should use a structured Agent effect`);
   }

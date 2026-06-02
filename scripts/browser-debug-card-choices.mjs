@@ -166,6 +166,27 @@ export async function runCardChoicesSmoke({
     "Subversive Advisor should trash itself after the board-space Influence choice",
   );
 
+  await setDebugGameAndWait(page, states.overthrow);
+  pendingText = await page.locator(".pending-panel").innerText();
+  assert.match(pendingText, /Overthrow/i);
+  assert.match(pendingText, /Choose Influence/i);
+  assert.match(pendingText, /BG/i);
+  assert.doesNotMatch(pendingText, /SG/i);
+  await screenshot(page, captures, "pending-overthrow-board-influence.png");
+
+  before = await currentGame(page);
+  ownerBefore = before.players.find((player) => player.id === "p2");
+  await page.locator(".pending-panel").getByRole("button", { name: /BG/ }).click();
+  await waitForNoPending(page);
+  after = await currentGame(page);
+  ownerAfter = after.players.find((player) => player.id === "p2");
+  assert.equal(ownerAfter.influence.bene, ownerBefore.influence.bene + 1, "Overthrow should add one more board-space Influence");
+  assert.equal(
+    ownerAfter.playArea.some((card) => card.id === states.overthrow.pendingAction.cardId),
+    true,
+    "Overthrow should remain in play after the board-space Influence choice",
+  );
+
   await setDebugGameAndWait(page, states.desertSurvival);
   pendingText = await page.locator(".pending-panel").innerText();
   assert.match(pendingText, /Desert Survival/i);
@@ -512,6 +533,8 @@ async function createCardChoiceStates(server, initialPlayableGame) {
   assert.ok(dangerousRhetoric, "Expected Dangerous Rhetoric Imperium card");
   const subversiveAdvisor = data.imperiumDeck.find((card) => card.sourceId === 62);
   assert.ok(subversiveAdvisor, "Expected Subversive Advisor Imperium card");
+  const overthrow = data.imperiumDeck.find((card) => card.sourceId === 75);
+  assert.ok(overthrow, "Expected Overthrow Imperium card");
   const desertSurvival = data.imperiumDeck.find((card) => card.sourceId === 27);
   assert.ok(desertSurvival, "Expected Desert Survival Imperium card");
   const treadInDarkness = data.imperiumDeck.find((card) => card.sourceId === 58);
@@ -892,6 +915,36 @@ async function createCardChoiceStates(server, initialPlayableGame) {
     "board-influence-choice",
     "Expected Subversive Advisor board-space Influence pending action",
   );
+  const overthrowState = turnActions.placeAgentAction(
+    {
+      ...base,
+      sharedSpyPosts: {},
+      spyPosts: { [spyPlaceAfterRecallSpace.id]: ownerId },
+      players: base.players.map((player) =>
+        player.id === ownerId
+          ? {
+              ...player,
+              agentsReady: 1,
+              hand: [overthrow],
+              influence: { ...player.influence, bene: 0 },
+              playArea: [],
+              resources: { solari: 0, spice: 0, water: 0 },
+              vp: 0,
+            }
+          : player,
+      ),
+    },
+    {
+      commanderTargets: {},
+      selectedCard: overthrow,
+      selectedSpace: spyPlaceAfterRecallSpace,
+    },
+  );
+  assert.equal(
+    overthrowState.pendingAction?.kind,
+    "board-influence-choice",
+    "Expected Overthrow board-space Influence pending action",
+  );
   const desertSurvivalState = turnActions.placeAgentAction(
     {
       ...base,
@@ -1146,6 +1199,7 @@ async function createCardChoiceStates(server, initialPlayableGame) {
     },
     dangerousRhetoric: dangerousRhetoricState,
     subversiveAdvisor: subversiveAdvisorState,
+    overthrow: overthrowState,
     desertSurvival: {
       ...desertSurvivalState,
       desertSurvivalOtherPlayCardId: desertSurvivalOtherPlayCard.id,

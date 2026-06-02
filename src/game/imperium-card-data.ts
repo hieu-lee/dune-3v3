@@ -392,6 +392,7 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
   }
   if (card.id === overthrowSourceId) {
     return [
+      agentGainBoardSpaceInfluence(1),
       ...(fixedRevealEffects(
         attributeNumber(card, "Persuasion on reveal"),
         attributeNumber(card, "Swords"),
@@ -579,6 +580,9 @@ function imperiumPlayText(card: HubCard) {
   }
   if (card.id === subversiveAdvisorSourceId) {
     return "If you sent an Agent to a Faction board space this turn, gain two Influence instead of one and trash this card.";
+  }
+  if (card.id === overthrowSourceId) {
+    return "Gain two Influence instead of one.";
   }
   return summarizeAttributes(card);
 }

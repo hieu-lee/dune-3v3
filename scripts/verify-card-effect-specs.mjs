@@ -3245,6 +3245,24 @@ try {
     ),
     "Overthrow should use a typed acquire Intrigue draw effect",
   );
+  assert.deepEqual(
+    overthrow.effects?.filter((spec) => spec.trigger === "agent-play"),
+    [
+      agentSpec([
+        {
+          kind: "gain-board-space-influence",
+          selector: "self",
+          amount: 1,
+        },
+      ]),
+    ],
+    "Overthrow should only use its typed Agent current-board-space Influence bonus without source trash",
+  );
+  assert.equal(
+    overthrow.play,
+    "Gain two Influence instead of one.",
+    "Overthrow play text should expose its automated Faction-space Influence bonus",
+  );
   assert.ok(
     priceIsNoObject.effects?.some((spec) =>
       spec.trigger === "acquire" &&
@@ -3392,6 +3410,7 @@ try {
       "Maker Keeper",
       "Maula Pistol",
       "Northern Watermaster",
+      "Overthrow",
       "Paracompass",
       "Prepare The Way",
       "Price is No Object",
@@ -11756,6 +11775,142 @@ try {
     ),
     dangerousRhetoricForgedLockedTargetState,
     "Commander Dangerous Rhetoric should reject forged targetOwnerId values that disagree with the source card",
+  );
+  const overthrowFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 1,
+    hand: [overthrow],
+    influence: { ...p2.influence, bene: 0 },
+    playArea: [],
+    resources: { solari: 0, spice: 0, water: 0 },
+    vp: 0,
+  }));
+  assert.equal(
+    state.pendingActionForCard(overthrow, playerById(overthrowFixture, p2.id), overthrowFixture),
+    undefined,
+    "Overthrow should only queue its board-space Influence bonus after its Agent placement is known",
+  );
+  const overthrowFactionPlaced = turnActions.placeAgentAction(
+    {
+      ...overthrowFixture,
+      sharedSpyPosts: {},
+      spyPosts: { [secrets.id]: p2.id },
+    },
+    {
+      commanderTargets: {},
+      selectedCard: overthrow,
+      selectedSpace: secrets,
+    },
+  );
+  assert.equal(
+    playerById(overthrowFactionPlaced, p2.id).influence.bene,
+    1,
+    "Overthrow should keep the normal board-space Influence before its pending bonus resolves",
+  );
+  assert.equal(overthrowFactionPlaced.pendingAction?.kind, "board-influence-choice");
+  assert.equal(overthrowFactionPlaced.pendingAction.source, "Overthrow");
+  assert.equal(overthrowFactionPlaced.pendingAction.sourceEffect, "gain-board-space-influence");
+  assert.equal(overthrowFactionPlaced.pendingAction.amount, 1);
+  assert.equal(overthrowFactionPlaced.pendingAction.trashSource, undefined);
+  assert.equal(overthrowFactionPlaced.pendingAction.cardId, overthrow.id);
+  assert.equal(overthrowFactionPlaced.pendingAction.cardOwnerId, p2.id);
+  assert.equal(overthrowFactionPlaced.pendingAction.spaceId, secrets.id);
+  assert.deepEqual(
+    overthrowFactionPlaced.pendingAction.choices,
+    [{ ownerId: p2.id, faction: "bene" }],
+    "Ally Overthrow should only offer the current board-space Influence",
+  );
+  const overthrowForgedChoicePending = {
+    ...overthrowFactionPlaced.pendingAction,
+    choices: [
+      ...overthrowFactionPlaced.pendingAction.choices,
+      { ownerId: p2.id, faction: "spacing" },
+    ],
+  };
+  const overthrowForgedChoiceState = {
+    ...overthrowFactionPlaced,
+    pendingAction: overthrowForgedChoicePending,
+  };
+  assert.equal(
+    state.resolveBoardInfluenceChoice(
+      overthrowForgedChoiceState,
+      overthrowForgedChoicePending,
+      p2.id,
+      "spacing",
+    ),
+    overthrowForgedChoiceState,
+    "Overthrow should reject forged off-space Influence choices",
+  );
+  const overthrowFactionResolved = state.resolveBoardInfluenceChoice(
+    overthrowFactionPlaced,
+    overthrowFactionPlaced.pendingAction,
+    p2.id,
+    "bene",
+  );
+  assert.equal(playerById(overthrowFactionResolved, p2.id).influence.bene, 2);
+  assert.ok(
+    playerById(overthrowFactionResolved, p2.id).vp > playerById(overthrowFactionPlaced, p2.id).vp,
+    "Overthrow should resolve Influence threshold rewards after its bonus",
+  );
+  assert.equal(
+    playerById(overthrowFactionResolved, p2.id).playArea.some((card) => card.id === overthrow.id),
+    true,
+    "Overthrow should remain in play after its board-space Influence bonus",
+  );
+  assert.match(overthrowFactionResolved.log[0], /gains 1 Bene Gesserit Influence from Overthrow/);
+  const overthrowCommanderPlaced = turnActions.placeAgentAction(
+    {
+      ...withActivePlayer(game, p4.id, () => ({
+        agentsReady: 1,
+        hand: [overthrow],
+        playArea: [],
+        resources: { solari: 0, spice: 0, water: 0 },
+      })),
+      sharedSpyPosts: {},
+      spyPosts: { [dutifulService.id]: p4.id },
+    },
+    {
+      commanderTargets: { [p4.id]: p2.id },
+      selectedCard: overthrow,
+      selectedSpace: dutifulService,
+    },
+  );
+  assert.equal(
+    overthrowCommanderPlaced.pendingAction?.kind,
+    "board-influence-choice",
+    "Commander Overthrow should combine with the mapped board Influence choice",
+  );
+  assert.equal(overthrowCommanderPlaced.pendingAction.source, "Overthrow");
+  assert.equal(overthrowCommanderPlaced.pendingAction.sourceEffect, "gain-board-space-influence");
+  assert.equal(overthrowCommanderPlaced.pendingAction.amount, 2);
+  assert.equal(overthrowCommanderPlaced.pendingAction.trashSource, undefined);
+  assert.equal(overthrowCommanderPlaced.pendingAction.targetOwnerId, p2.id);
+  assert.deepEqual(
+    overthrowCommanderPlaced.pendingAction.choices,
+    [
+      { ownerId: p2.id, faction: "greatHouses" },
+      { ownerId: p4.id, faction: "emperor" },
+    ],
+    "Commander Overthrow should keep the normal mapped board-space choices but make the chosen one worth 2",
+  );
+  assert.equal(
+    overthrowCommanderPlaced.pendingQueue.find((pending) =>
+      pending.kind === "board-influence-choice" && pending.source === "Dutiful Service"
+    ),
+    undefined,
+    "Overthrow should not leave the original 1-Influence board choice queued separately",
+  );
+  const overthrowCommanderResolved = state.resolveBoardInfluenceChoice(
+    overthrowCommanderPlaced,
+    overthrowCommanderPlaced.pendingAction,
+    p4.id,
+    "emperor",
+  );
+  assert.equal(playerById(overthrowCommanderResolved, p4.id).influence.emperor, 2);
+  assert.equal(playerById(overthrowCommanderResolved, p2.id).influence.greatHouses, 0);
+  assert.equal(
+    playerById(overthrowCommanderResolved, p4.id).playArea.some((card) => card.id === overthrow.id),
+    true,
+    "Commander Overthrow should remain in play after resolving the combined Influence choice",
   );
   const subversiveNonFactionPlaced = turnActions.placeAgentAction(
     {

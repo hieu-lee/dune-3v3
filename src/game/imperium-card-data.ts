@@ -372,11 +372,18 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
     ];
   }
   if (acquireSpySourceIds.has(card.id)) {
+    const inHighPlacesAgentCondition = [hasCardTraitInPlay("Faction: Bene Gesserit", 2)];
     return [
       ...(fixedRevealEffects(
         attributeNumber(card, "Persuasion on reveal"),
         attributeNumber(card, "Swords"),
       ) ?? []),
+      ...(card.id === inHighPlacesSourceId
+        ? [
+            agentDrawCards(1, inHighPlacesAgentCondition),
+            agentPlaceSpies("self", 1, { recallForSupply: true, mustPlace: true }, inHighPlacesAgentCondition),
+          ]
+        : []),
       ...(card.id === subversiveAdvisorSourceId
         ? [agentGainBoardSpaceInfluence(1, { trashSource: true })]
         : []),
@@ -560,6 +567,9 @@ function imperiumPlayText(card: HubCard) {
   }
   if (card.id === treadInDarknessSourceId) {
     return "If you have another Bene Gesserit card in play, you may trash this card to draw 1 card.";
+  }
+  if (card.id === inHighPlacesSourceId) {
+    return "If you have another Bene Gesserit card in play, draw 1 card and place 1 spy.";
   }
   if (card.id === desertPowerSourceId) {
     return "If you sent an Agent to a Maker board space this turn, gain 2 spice.";

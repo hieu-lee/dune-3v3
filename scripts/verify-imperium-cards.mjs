@@ -175,6 +175,38 @@ try {
   );
   assert.match(beneGesseritOperative.play, /place 1 spy/i);
   assert.match(beneGesseritOperative.reveal, /two or more spies.*\+2 persuasion/i);
+  const inHighPlaces = data.imperiumDeck.find((card) => card.name === "In High Places");
+  assert.ok(inHighPlaces, "Imperium deck should include In High Places");
+  assert.ok(
+    inHighPlaces.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.conditions?.some((condition) =>
+        condition.kind === "has-card-trait-in-play" &&
+        condition.trait === "Faction: Bene Gesserit" &&
+        condition.count === 2
+      ) &&
+      spec.effects.some((effect) => effect.kind === "draw-cards" && effect.amount === 1)
+    ),
+    "In High Places should use a structured another-Bene-Gesserit Agent draw effect",
+  );
+  assert.ok(
+    inHighPlaces.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.conditions?.some((condition) =>
+        condition.kind === "has-card-trait-in-play" &&
+        condition.trait === "Faction: Bene Gesserit" &&
+        condition.count === 2
+      ) &&
+      spec.effects.some((effect) =>
+        effect.kind === "place-spies" &&
+        effect.amount === 1 &&
+        effect.recallForSupply === true &&
+        effect.mustPlace === true
+      )
+    ),
+    "In High Places should use a structured another-Bene-Gesserit Agent spy-placement effect",
+  );
+  assert.match(inHighPlaces.play, /another Bene Gesserit card.*draw 1 card.*place 1 spy/i);
   const chani = data.imperiumDeck.find((card) => card.name === "Chani, Clever Tactician");
   assert.ok(chani, "Imperium deck should include Chani, Clever Tactician");
   assert.equal(chani.cost, 5, "Chani should cost 5 persuasion");
@@ -299,7 +331,7 @@ try {
     /acquire a card to your hand using Solari instead of persuasion/i,
     "Price is No Object should expose its automated Agent acquire text in hand",
   );
-  for (const name of ["Bene Gesserit Operative", "Cargo Runner", "Chani, Clever Tactician", "Maker Keeper", "Maula Pistol", "Northern Watermaster", "Paracompass", "Price is No Object"]) {
+  for (const name of ["Bene Gesserit Operative", "Cargo Runner", "Chani, Clever Tactician", "In High Places", "Maker Keeper", "Maula Pistol", "Northern Watermaster", "Paracompass", "Price is No Object"]) {
     const card = data.imperiumDeck.find((candidate) => candidate.name === name);
     assert.ok(card?.effects?.some((spec) => spec.trigger === "agent-play"), `${name} should use a structured Agent effect`);
   }

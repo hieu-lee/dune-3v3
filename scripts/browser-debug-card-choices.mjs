@@ -276,6 +276,27 @@ export async function runCardChoicesSmoke({
   );
   assert.equal(ownerAfter.discard.at(-1).name, "Interstellar Trade", "Interstellar Trade should remain acquired after its bonuses");
 
+  await setDebugGameAndWait(page, states.inHighPlaces);
+  pendingText = await page.locator(".pending-panel").innerText();
+  assert.match(pendingText, /In High Places/i);
+  assert.match(pendingText, /spies ready/i);
+  assert.equal(await page.locator(".pending-panel").getByRole("button", { name: "Done" }).isDisabled(), true);
+  before = await currentGame(page);
+  ownerBefore = before.players.find((player) => player.id === "p2");
+  assert.equal(
+    ownerBefore.hand.some((card) => card.id === states.inHighPlaces.inHighPlacesDrawCardId),
+    true,
+    "In High Places should draw its card before the queued spy placement",
+  );
+  await screenshot(page, captures, "pending-in-high-places-spy.png");
+
+  await page.locator(".pending-panel").getByRole("button", { name: states.inHighPlaces.spySpaceName }).click();
+  await waitForNoPending(page);
+  after = await currentGame(page);
+  ownerAfter = after.players.find((player) => player.id === "p2");
+  assert.equal(ownerAfter.spies, ownerBefore.spies - 1, "In High Places should spend one spy");
+  assert.equal(after.spyPosts[states.inHighPlaces.spySpaceId], "p2", "In High Places should place the chosen spy");
+
   await setDebugGameAndWait(page, states.beneGesseritOperativeSpy);
   pendingText = await page.locator(".pending-panel").innerText();
   assert.match(pendingText, /Bene Gesserit Operative/i);
@@ -485,6 +506,8 @@ async function createCardChoiceStates(server, initialPlayableGame) {
   assert.ok(interstellarTradeReplacement, "Expected Interstellar Trade replacement card");
   const beneGesseritOperative = data.imperiumDeck.find((card) => card.sourceId === 30);
   assert.ok(beneGesseritOperative, "Expected Bene Gesserit Operative Imperium card");
+  const inHighPlaces = data.imperiumDeck.find((card) => card.sourceId === 64);
+  assert.ok(inHighPlaces, "Expected In High Places Imperium card");
   const dangerousRhetoric = data.imperiumDeck.find((card) => card.sourceId === 44);
   assert.ok(dangerousRhetoric, "Expected Dangerous Rhetoric Imperium card");
   const subversiveAdvisor = data.imperiumDeck.find((card) => card.sourceId === 62);
@@ -573,6 +596,16 @@ async function createCardChoiceStates(server, initialPlayableGame) {
     id: "browser-tread-in-darkness-extra-deck-card",
     name: "Tread in Darkness Debug Extra Deck",
   };
+  const inHighPlacesOtherBeneCard = {
+    ...hiddenMissive,
+    id: "browser-in-high-places-other-bene-card",
+    name: "In High Places Debug Other Bene",
+  };
+  const inHighPlacesDrawCard = {
+    ...data.allyStarterCards[3],
+    id: "browser-in-high-places-draw-card",
+    name: "In High Places Debug Draw",
+  };
   const priceIsNoObjectAcquireCard = {
     ...beneGesseritOperative,
     id: "browser-price-is-no-object-acquire-card",
@@ -630,6 +663,45 @@ async function createCardChoiceStates(server, initialPlayableGame) {
       selectedCard: beneGesseritOperative,
       selectedSpace: spyPlaceAfterRecallSpace,
     },
+  );
+  const inHighPlacesState = turnActions.placeAgentAction(
+    {
+      ...base,
+      sharedSpyPosts: {},
+      spyPosts: {},
+      players: base.players.map((player) =>
+        player.id === ownerId
+          ? {
+              ...player,
+              agentsReady: 1,
+              deck: [inHighPlacesDrawCard],
+              discard: [],
+              hand: [inHighPlaces],
+              playArea: [inHighPlacesOtherBeneCard],
+              resources: { solari: 0, spice: 0, water: 0 },
+              spies: 2,
+            }
+          : player,
+      ),
+    },
+    {
+      commanderTargets: {},
+      selectedCard: inHighPlaces,
+      selectedSpace: spyPlaceAfterRecallSpace,
+    },
+  );
+  assert.equal(
+    inHighPlacesState.pendingAction?.kind,
+    "spy",
+    "Expected In High Places to queue spy placement",
+  );
+  assert.equal(inHighPlacesState.pendingAction.source, "In High Places");
+  assert.equal(
+    inHighPlacesState.players
+      .find((player) => player.id === ownerId)
+      ?.hand.some((card) => card.id === inHighPlacesDrawCard.id),
+    true,
+    "Expected In High Places to draw a card in the browser state",
   );
   const doubleAgentSharedSpyState = turnActions.placeAgentAction(
     {
@@ -1090,6 +1162,12 @@ async function createCardChoiceStates(server, initialPlayableGame) {
       spySpaceName: spySpace.name,
     },
     acquireInterstellarTrade: acquireInterstellarTradeState,
+    inHighPlaces: {
+      ...inHighPlacesState,
+      inHighPlacesDrawCardId: inHighPlacesDrawCard.id,
+      spySpaceId: spySpace.id,
+      spySpaceName: spySpace.name,
+    },
     beneGesseritOperativeSpy: {
       ...beneGesseritOperativeSpyState,
       spySpaceId: spySpace.id,

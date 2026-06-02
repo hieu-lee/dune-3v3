@@ -3290,6 +3290,45 @@ try {
     "Subversive Advisor play text should expose its automated Faction-space Influence bonus",
   );
   assert.ok(
+    inHighPlaces.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.conditions?.some((condition) =>
+        condition.kind === "has-card-trait-in-play" &&
+        condition.trait === "Faction: Bene Gesserit" &&
+        condition.count === 2
+      ) &&
+      spec.effects.some((effect) =>
+        effect.kind === "draw-cards" &&
+        effect.selector === "self" &&
+        effect.amount === 1
+      )
+    ),
+    "In High Places should use a typed another-Bene-Gesserit Agent draw spec",
+  );
+  assert.ok(
+    inHighPlaces.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.conditions?.some((condition) =>
+        condition.kind === "has-card-trait-in-play" &&
+        condition.trait === "Faction: Bene Gesserit" &&
+        condition.count === 2
+      ) &&
+      spec.effects.some((effect) =>
+        effect.kind === "place-spies" &&
+        effect.selector === "self" &&
+        effect.amount === 1 &&
+        effect.recallForSupply === true &&
+        effect.mustPlace === true
+      )
+    ),
+    "In High Places should use a typed another-Bene-Gesserit Agent spy-placement spec",
+  );
+  assert.equal(
+    inHighPlaces.play,
+    "If you have another Bene Gesserit card in play, draw 1 card and place 1 spy.",
+    "In High Places play text should expose its conditional Agent draw and spy placement",
+  );
+  assert.ok(
     spiceMustFlow.effects?.some((spec) =>
       spec.trigger === "acquire" &&
       spec.effects.some((effect) => effect.kind === "gain-vp" && effect.selector === "self" && effect.amount === 1)
@@ -3348,6 +3387,7 @@ try {
       "Guild Envoy",
       "Hidden Missive",
       "Imperial Spymaster",
+      "In High Places",
       "Leadership",
       "Maker Keeper",
       "Maula Pistol",
@@ -11303,6 +11343,98 @@ try {
   );
   assert.equal(treadEmptyDeckOwner.hand.length, 0, "Unsatisfied Tread in Darkness draw should not add cards");
   assert.match(treadEmptyDeckTrashed.log[0], /trashes Tread in Darkness from Tread in Darkness and has no card to draw/);
+  const inHighPlacesDrawCard = {
+    ...dagger,
+    id: "in-high-places-draw-card",
+    name: "In High Places Draw Probe",
+  };
+  const inHighPlacesExtraDeckCard = {
+    ...convincingArgument,
+    id: "in-high-places-extra-deck-card",
+    name: "In High Places Extra Deck Probe",
+  };
+  const inHighPlacesOtherBeneCard = {
+    ...hiddenMissive,
+    id: "in-high-places-other-bene-card",
+    name: "In High Places Other Bene",
+  };
+  const inHighPlacesFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 1,
+    deck: [inHighPlacesDrawCard, inHighPlacesExtraDeckCard],
+    discard: [],
+    garrison: 0,
+    hand: [inHighPlaces],
+    playArea: [inHighPlacesOtherBeneCard],
+    resources: { solari: 0, spice: 0, water: 0 },
+    spies: 2,
+  }));
+  const inHighPlacesPlaced = turnActions.placeAgentAction(inHighPlacesFixture, {
+    commanderTargets: {},
+    selectedCard: inHighPlaces,
+    selectedSpace: imperialBasin,
+  });
+  const inHighPlacesOwner = playerById(inHighPlacesPlaced, p2.id);
+  assert.deepEqual(
+    inHighPlacesOwner.hand.map((card) => card.id),
+    [inHighPlacesDrawCard.id],
+    "In High Places should draw exactly one card when another Bene Gesserit card is in play",
+  );
+  assert.deepEqual(
+    inHighPlacesOwner.deck.map((card) => card.id),
+    [inHighPlacesExtraDeckCard.id],
+    "In High Places should leave the second deck card undrawn",
+  );
+  assert.equal(
+    inHighPlacesPlaced.pendingAction?.kind,
+    "spy",
+    "In High Places should queue spy placement when another Bene Gesserit card is in play",
+  );
+  assert.equal(inHighPlacesPlaced.pendingAction.ownerId, p2.id);
+  assert.equal(inHighPlacesPlaced.pendingAction.source, "In High Places");
+  assert.equal(inHighPlacesPlaced.pendingAction.remaining, 1);
+  assert.equal(inHighPlacesPlaced.pendingAction.recallForSupply, true);
+  assert.equal(inHighPlacesPlaced.pendingAction.mustPlaceSpy, true);
+  assert.equal(
+    state.finishPendingAction(inHighPlacesPlaced),
+    inHighPlacesPlaced,
+    "In High Places spy placement should be mandatory",
+  );
+  const inHighPlacesSpyPlaced = state.placeSpyForPending(
+    inHighPlacesPlaced,
+    inHighPlacesPlaced.pendingAction,
+    highCouncil.id,
+  );
+  assert.equal(inHighPlacesSpyPlaced.pendingAction, undefined);
+  assert.equal(playerById(inHighPlacesSpyPlaced, p2.id).spies, 1, "In High Places should spend one spy from supply");
+  assert.equal(inHighPlacesSpyPlaced.spyPosts[highCouncil.id], p2.id, "In High Places should place the selected spy");
+  assert.match(inHighPlacesSpyPlaced.log[0], /places a spy near High Council from In High Places/);
+  const inHighPlacesUnqualified = turnActions.placeAgentAction(
+    withActivePlayer(game, p2.id, () => ({
+      agentsReady: 1,
+      deck: [inHighPlacesDrawCard, inHighPlacesExtraDeckCard],
+      discard: [],
+      garrison: 0,
+      hand: [inHighPlaces],
+      playArea: [],
+      resources: { solari: 0, spice: 0, water: 0 },
+      spies: 2,
+    })),
+    {
+      commanderTargets: {},
+      selectedCard: inHighPlaces,
+      selectedSpace: imperialBasin,
+    },
+  );
+  assert.deepEqual(
+    playerById(inHighPlacesUnqualified, p2.id).hand.map((card) => card.id),
+    [],
+    "In High Places should not draw when it is the only Bene Gesserit card in play",
+  );
+  assert.equal(
+    inHighPlacesUnqualified.pendingAction,
+    undefined,
+    "In High Places should not queue spy placement when it is the only Bene Gesserit card in play",
+  );
   const genericDrawRewardTrashCard = {
     ...dagger,
     id: "generic-draw-reward-trash-card",

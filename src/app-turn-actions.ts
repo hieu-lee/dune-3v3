@@ -150,6 +150,22 @@ function combinedBoardInfluenceChoicePending(
   };
 }
 
+function futureSourceIntriguesBeforePendingChoice(
+  state: Pick<GameState, "intrigueDeck" | "intrigueDiscard" | "players">,
+  space: BoardSpace,
+  boardActor: Player,
+  source: Player,
+  sourceIntriguesToDraw = 0,
+) {
+  const availableDeckIntrigues = state.intrigueDeck.length + state.intrigueDiscard.length;
+  const boardIntrigues = Math.min(boardSpaceIntrigueGainFor(space, boardActor), availableDeckIntrigues);
+  const sourceIntrigues = Math.min(sourceIntriguesToDraw, availableDeckIntrigues - boardIntrigues);
+  const secretsTransfers = space.id === "secrets"
+    ? state.players.filter((player) => player.team !== source.team && player.intrigues.length >= 4).length
+    : 0;
+  return boardIntrigues + sourceIntrigues + secretsTransfers;
+}
+
 export function placeAgentAction(
   current: GameState,
   { commanderTargets, selectedCard, selectedSpace }: PlaceAgentInput,
@@ -218,6 +234,13 @@ export function placeAgentAction(
   effectedTarget = players.find((candidate) => candidate.id === effectedTarget.id) ?? effectedTarget;
   deploymentOwner = player.role === "Commander" ? effectedTarget : source;
   const postEffectState = { ...controlledPostEffectState, players, conflictDeploymentBlock };
+  const futureSourceIntrigues = futureSourceIntriguesBeforePendingChoice(
+    postEffectState,
+    selectedSpace,
+    player,
+    source,
+    cardAgentEffect.sourceIntriguesToDraw,
+  );
   const postDeployIntrigueDraw = postDeployIntrigueDrawFor(selectedCard, source, deploymentOwner);
   const baseSpacePending = sietchTabrPending
     ? undefined
@@ -239,6 +262,7 @@ export function placeAgentAction(
     postEffectState,
     deploymentOwner,
     selectedSpace,
+    futureSourceIntrigues,
   );
   const [firstCardPending, ...remainingCardPendings] = cardPendings;
   const optionalSpacePaymentPending = pendingActionForOptionalSpacePayment(selectedSpace, source);

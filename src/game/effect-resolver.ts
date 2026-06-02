@@ -55,6 +55,7 @@ export type {
   AgentPayResourceForInfluence,
   AgentPayResourceForSandworms,
   AgentPayTeamResourceForVp,
+  AgentTrashIntrigueForReward,
   AgentTrashSourceForTrade,
   CombatInfluenceLossForStrength,
   CombatRetreatTroops,
@@ -373,6 +374,9 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
     return result;
   }
   if (effect.kind === "discard-card-for-draw") {
+    return result;
+  }
+  if (effect.kind === "trash-intrigue-for-reward") {
     return result;
   }
   if (effect.kind === "opponents-discard-cards") {

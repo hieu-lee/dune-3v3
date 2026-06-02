@@ -38,6 +38,10 @@ import {
   skipLoseInfluenceForIntrigues as resolveSkipLoseInfluenceForIntrigues,
 } from "./influence-intrigue-rules";
 import {
+  resolveTrashIntrigueForReward as resolveTrashIntrigueForRewardForPending,
+  skipTrashIntrigueForReward as resolveSkipTrashIntrigueForReward,
+} from "./intrigue-trash-rules";
+import {
   drawIntrigueCards,
 } from "./intrigue-deck";
 import {
@@ -117,6 +121,7 @@ type CommanderResourceSplitPendingAction = Extract<PendingAction, { kind: "comma
 type TrashCardPendingAction = Extract<PendingAction, { kind: "trash-card" }>;
 type DiscardCardForInfluenceAndDrawPendingAction = Extract<PendingAction, { kind: "discard-card-for-influence-and-draw" }>;
 type DiscardCardForDrawPendingAction = Extract<PendingAction, { kind: "discard-card-for-draw" }>;
+type TrashIntrigueForRewardPendingAction = Extract<PendingAction, { kind: "trash-intrigue-for-reward" }>;
 type DiscardHandCardPendingAction = Extract<PendingAction, { kind: "discard-hand-card" }>;
 type LoseInfluenceForIntriguesPendingAction = Extract<PendingAction, { kind: "lose-influence-for-intrigues" }>;
 type BoardInfluenceChoicePendingAction = Extract<PendingAction, { kind: "board-influence-choice" }>;
@@ -274,6 +279,23 @@ export function skipDiscardCardForDraw(
   pending: DiscardCardForDrawPendingAction,
 ): GameState {
   return continueAfterResolvedConflictReward(resolveSkipDiscardCardForDraw(state, pending));
+}
+
+export function resolveTrashIntrigueForRewardChoice(
+  state: GameState,
+  pending: TrashIntrigueForRewardPendingAction,
+  intrigueId: string,
+): GameState {
+  return continueAfterResolvedConflictReward(
+    resolveTrashIntrigueForRewardForPending(state, pending, intrigueId),
+  );
+}
+
+export function skipTrashIntrigueForReward(
+  state: GameState,
+  pending: TrashIntrigueForRewardPendingAction,
+): GameState {
+  return continueAfterResolvedConflictReward(resolveSkipTrashIntrigueForReward(state, pending));
 }
 
 export function resolveDiscardHandCardChoice(

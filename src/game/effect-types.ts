@@ -371,6 +371,14 @@ export type GameEffectSpec =
       };
     }
   | {
+      kind: "trash-intrigue-for-reward";
+      selector: PlayerSelector;
+      drawIntrigues?: EffectAmountSpec;
+      gain?: Partial<Record<ResourceId, EffectAmountSpec>>;
+      optional?: boolean;
+      source?: string;
+    }
+  | {
       kind: "opponents-discard-cards";
       selector: PlayerSelector;
       amount: EffectAmountSpec;

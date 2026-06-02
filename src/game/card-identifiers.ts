@@ -52,6 +52,7 @@ export const demandResultsSourceId = 558;
 export const devastatingAssaultSourceId = 559;
 export const smugglersHarvesterSourceId = 17;
 export const smugglersHavenSourceId = 47;
+export const branchingPathSourceId = 45;
 export const interstellarTradeSourceId = 184;
 export const calculusOfPowerSourceId = 42;
 export const capturedMentatSourceId = 61;

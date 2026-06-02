@@ -144,6 +144,27 @@ export function agentDiscardCardForDraw(
   ], conditions);
 }
 
+export function agentTrashIntrigueForReward(
+  options: {
+    drawIntrigues?: EffectAmountSpec;
+    gain?: Partial<Record<ResourceId, EffectAmountSpec>>;
+    optional?: boolean;
+    source?: string;
+  },
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return agentPlayEffects([
+    {
+      kind: "trash-intrigue-for-reward",
+      selector: "self",
+      ...(options.drawIntrigues !== undefined ? { drawIntrigues: options.drawIntrigues } : {}),
+      ...(options.gain ? { gain: { ...options.gain } } : {}),
+      ...(options.optional !== undefined ? { optional: options.optional } : {}),
+      ...(options.source ? { source: options.source } : {}),
+    },
+  ], conditions);
+}
+
 export function agentOpponentsDiscardCards(
   amount: EffectAmountSpec,
   options: {

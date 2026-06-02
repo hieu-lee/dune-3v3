@@ -77,6 +77,10 @@ export {
 } from "./discard-draw-rules";
 
 export {
+  trashIntrigueForRewardChoices,
+} from "./intrigue-trash-rules";
+
+export {
   discardHandCardChoices,
 } from "./discard-hand-rules";
 
@@ -421,6 +425,7 @@ export {
   resolveLoseInfluenceForIntriguesChoice,
   resolveMakerChoice,
   resolveOptionalSpacePayment,
+  resolveTrashIntrigueForRewardChoice,
   resolveRetreatTroopsForStrength,
   resolveSietchTabrChoice,
   resolveStabanUnseenNetworkChoice,
@@ -430,6 +435,7 @@ export {
   skipLoseInfluenceForIntrigues,
   skipOptionalSpacePayment,
   skipRetreatTroopsForStrength,
+  skipTrashIntrigueForReward,
   skipTrashCard,
   takeChoamContract,
   trashPlayerCard,

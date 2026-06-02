@@ -43,6 +43,7 @@ import {
   resolveSietchTabrChoice,
   resolveStabanUnseenNetworkChoice,
   resolveTeamResourcePaymentChoice,
+  resolveTrashIntrigueForRewardChoice,
   resolveTrashSourceForTradeChoice,
   scoreGurneyAlwaysSmiling,
   skipConflictVpConversion,
@@ -64,6 +65,7 @@ import {
   skipRetreatTroopsForStrength,
   skipTeamResourcePayment,
   skipTrashCard,
+  skipTrashIntrigueForReward,
   skipTrashSourceForTrade,
   startNextRound,
   takeChoamContract,
@@ -272,6 +274,14 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     runPending("discard-card-for-draw", (current, pending) =>
       maybeStartCombatPhase(skipDiscardCardForDraw(current, pending))
     );
+  const chooseTrashIntrigueForReward = (intrigueId: string) =>
+    runPending("trash-intrigue-for-reward", (current, pending) =>
+      maybeStartCombatPhase(resolveTrashIntrigueForRewardChoice(current, pending, intrigueId))
+    );
+  const skipTrashIntrigueForRewardChoice = () =>
+    runPending("trash-intrigue-for-reward", (current, pending) =>
+      maybeStartCombatPhase(skipTrashIntrigueForReward(current, pending))
+    );
   const chooseDiscardHandCard = (discardCardId: string) =>
     runPending("discard-hand-card", (current, pending) =>
       maybeStartCombatPhase(resolveDiscardHandCardChoice(current, pending, discardCardId))
@@ -329,6 +339,7 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     chooseSietchTabr,
     chooseStabanUnseenNetwork,
     chooseTeamResourcePayment,
+    chooseTrashIntrigueForReward,
     chooseTrashSourceForTrade,
     chooseThroneRowCard,
     clearPendingAction,
@@ -363,6 +374,7 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     skipRetreatTroopsForStrengthChoice,
     skipTeamResourcePaymentChoice,
     skipTrash,
+    skipTrashIntrigueForRewardChoice,
     skipTrashSourceForTradeChoice,
     takeContract,
     transferTrade,

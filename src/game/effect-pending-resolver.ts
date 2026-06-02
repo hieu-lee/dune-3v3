@@ -9,7 +9,6 @@ import {
   specApplies,
 } from "./effect-resolver-helpers";
 import { spyPostCount } from "./spy-posts";
-import type { CardEffectSpec } from "./types";
 import type {
   AgentAcquireCard,
   AgentBoardSpaceInfluence,
@@ -24,6 +23,7 @@ import type {
   AgentPayResourceForInfluence,
   AgentPayResourceForSandworms,
   AgentPayTeamResourceForVp,
+  AgentTrashIntrigueForReward,
   AgentTrashSourceForTrade,
   CombatInfluenceLossForStrength,
   CombatRetreatTroops,
@@ -43,6 +43,23 @@ import type {
   TakeContractsEffect,
   TrashCardEffect,
 } from "./effect-resolver-types";
+import type {
+  CardEffectSpec,
+  EffectAmountSpec,
+  ResourceId,
+  Resources,
+} from "./types";
+
+function resolvedResourceGain(
+  gain: Partial<Record<ResourceId, EffectAmountSpec>> | undefined,
+  context: GameEffectContext,
+): Partial<Resources> {
+  const resolved: Partial<Resources> = {};
+  for (const [resource, amount] of Object.entries(gain ?? {}) as [ResourceId, EffectAmountSpec][]) {
+    resolved[resource] = amountFor(amount, context.source);
+  }
+  return resolved;
+}
 
 export function resolveDeferredAgentConflictUnitIntrigueDraws(
   specs: CardEffectSpec[] | undefined,
@@ -272,6 +289,26 @@ export function resolveAgentDiscardCardForDraws(
               },
             }
           : {}),
+      }));
+  });
+}
+
+export function resolveAgentTrashIntrigueForRewards(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): AgentTrashIntrigueForReward[] {
+  specs?.forEach(validateSpec);
+  return (specs ?? []).flatMap((spec) => {
+    if (spec.trigger !== "agent-play") return [];
+    if (!specApplies(spec, context)) return [];
+    return spec.effects
+      .filter((effect) => effect.kind === "trash-intrigue-for-reward")
+      .map((effect) => ({
+        selector: effect.selector,
+        drawIntrigues: effect.drawIntrigues === undefined ? 0 : amountFor(effect.drawIntrigues, context.source),
+        gain: resolvedResourceGain(effect.gain, context),
+        optional: effect.optional ?? false,
+        source: effect.source,
       }));
   });
 }

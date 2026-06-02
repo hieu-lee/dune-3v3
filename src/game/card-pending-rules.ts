@@ -23,6 +23,7 @@ import {
   resolveAgentPayResourceForInfluences,
   resolveAgentPayResourceForSandworms,
   resolveAgentPayTeamResourceForVps,
+  resolveAgentTrashIntrigueForRewards,
   resolveAgentTrashSourceForTrades,
   resolveTrashCardEffects,
   resolveCardEffects,
@@ -180,6 +181,42 @@ function pendingActionForAgentDiscardCardForDraw(
       };
       if (discardCardForDrawChoices(source, pending).length === 0) return undefined;
       return pending;
+    })
+    .find((pending): pending is PendingAction => Boolean(pending));
+}
+
+function hasResourceGain(gain: Partial<Record<keyof Player["resources"], number>>) {
+  return Object.values(gain).some((amount) => (amount ?? 0) > 0);
+}
+
+function pendingActionForAgentTrashIntrigueForReward(
+  card: Card,
+  source: Player,
+  state?: GameState,
+  target?: Player,
+  futureIntrigues = 0,
+): PendingAction | undefined {
+  if (!card.effects || !source.playArea.some((candidate) => candidate.id === card.id)) return undefined;
+  const players = state ? playersWithPendingCardEffect(state, source, target) : undefined;
+  const effectState = state && players ? { ...state, players } : undefined;
+  const effects = resolveAgentTrashIntrigueForRewards(card.effects, {
+    trigger: "agent-play",
+    source,
+    target,
+    state: effectState,
+  });
+  return effects
+    .map((effect): PendingAction | undefined => {
+      if (effect.selector !== "self" || (effect.drawIntrigues <= 0 && !hasResourceGain(effect.gain))) return undefined;
+      if (source.intrigues.length + futureIntrigues <= 0) return undefined;
+      return {
+        kind: "trash-intrigue-for-reward",
+        ownerId: source.id,
+        source: effect.source ?? card.name,
+        drawIntrigues: effect.drawIntrigues,
+        gain: { ...effect.gain },
+        optional: effect.optional,
+      };
     })
     .find((pending): pending is PendingAction => Boolean(pending));
 }
@@ -978,6 +1015,7 @@ export function pendingActionsForCard(
   state?: GameState,
   target?: Player,
   space?: BoardSpace,
+  futureIntrigues = 0,
 ): PendingAction[] {
   const typedPendings: PendingAction[] = [];
   const agentSpyPlacementPending = pendingActionForAgentSpyPlacement(card, source, state, target, space);
@@ -986,6 +1024,8 @@ export function pendingActionsForCard(
   if (agentDiscardInfluenceDrawPending) typedPendings.push(agentDiscardInfluenceDrawPending);
   const agentDiscardDrawPending = pendingActionForAgentDiscardCardForDraw(card, source, state, target);
   if (agentDiscardDrawPending) typedPendings.push(agentDiscardDrawPending);
+  const agentTrashIntriguePending = pendingActionForAgentTrashIntrigueForReward(card, source, state, target, futureIntrigues);
+  if (agentTrashIntriguePending) typedPendings.push(agentTrashIntriguePending);
   const agentGainInfluencePending = pendingActionForAgentGainInfluenceChoice(card, source, state, target);
   if (agentGainInfluencePending) typedPendings.push(agentGainInfluencePending);
   const agentBoardSpaceInfluencePending = pendingActionForAgentBoardSpaceInfluence(card, source, state, target, space);

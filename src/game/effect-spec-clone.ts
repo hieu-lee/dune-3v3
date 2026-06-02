@@ -6,6 +6,7 @@ import type {
   PaidRewardChoiceEffectOption,
   PaidRewardChoiceEffectReward,
   PendingActionChoiceEffectOption,
+  ResourceId,
 } from "./types";
 
 export function cloneCardEffects(effects: CardEffectSpec[] | undefined): CardEffectSpec[] | undefined {
@@ -38,6 +39,13 @@ export function cloneCardEffects(effects: CardEffectSpec[] | undefined): CardEff
         return {
           ...effect,
           options: clonePendingActionChoiceOptions(effect.options),
+        };
+      }
+      if (effect.kind === "trash-intrigue-for-reward") {
+        return {
+          ...effect,
+          ...(effect.drawIntrigues !== undefined ? { drawIntrigues: cloneAmount(effect.drawIntrigues) } : {}),
+          ...(effect.gain ? { gain: cloneResourceAmountMap(effect.gain) } : {}),
         };
       }
       return {
@@ -81,6 +89,14 @@ export function cloneCardEffects(effects: CardEffectSpec[] | undefined): CardEff
       };
     }),
   }));
+}
+
+function cloneResourceAmountMap(
+  gain: Partial<Record<ResourceId, EffectAmountSpec>>,
+): Partial<Record<ResourceId, EffectAmountSpec>> {
+  return Object.fromEntries(
+    Object.entries(gain).map(([resource, amount]) => [resource, cloneAmount(amount as EffectAmountSpec)]),
+  ) as Partial<Record<ResourceId, EffectAmountSpec>>;
 }
 
 export function clonePendingActionChoiceOptions(options: PendingActionChoiceEffectOption[]): PendingActionChoiceEffectOption[] {

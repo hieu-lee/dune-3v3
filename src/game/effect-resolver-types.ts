@@ -172,6 +172,14 @@ export type AgentDiscardCardForDraw = {
   };
 };
 
+export type AgentTrashIntrigueForReward = {
+  selector: PlayerSelector;
+  drawIntrigues: number;
+  gain: Partial<Resources>;
+  optional: boolean;
+  source?: string;
+};
+
 export type AgentOpponentsDiscardCards = {
   selector: PlayerSelector;
   amount: number;

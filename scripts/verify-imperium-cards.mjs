@@ -255,6 +255,8 @@ try {
   assert.ok(priceIsNoObject, "Imperium deck should include Price is No Object");
   const guildSpy = data.imperiumDeck.find((card) => card.name === "Guild Spy");
   assert.ok(guildSpy, "Imperium deck should include Guild Spy");
+  const branchingPath = data.imperiumDeck.find((card) => card.name === "Branching Path");
+  assert.ok(branchingPath, "Imperium deck should include Branching Path");
   const spyNetwork = data.imperiumDeck.find((card) => card.name === "Spy Network");
   assert.ok(spyNetwork, "Imperium deck should include Spy Network");
   const shishakli = data.imperiumDeck.find((card) => card.name === "Shishakli");
@@ -375,6 +377,27 @@ try {
   );
   assert.match(guildSpy.play, /discard 1 card.*draw 1 card.*Spacing Guild.*draw 1 Intrigue card/i);
   assert.deepEqual(
+    branchingPath.effects?.filter((spec) => spec.trigger === "agent-play"),
+    [
+      {
+        trigger: "agent-play",
+        conditions: [{ kind: "has-alliance", faction: "bene" }],
+        effects: [
+          {
+            kind: "trash-intrigue-for-reward",
+            selector: "self",
+            drawIntrigues: 1,
+            gain: { spice: 2 },
+            optional: true,
+          },
+        ],
+      },
+    ],
+    "Branching Path should model its Bene Gesserit Alliance Intrigue trash reward as a typed effect",
+  );
+  assert.match(branchingPath.play, /Bene Gesserit Alliance.*may trash 1 Intrigue.*draw 1 Intrigue.*gain 2 spice/i);
+  assert.equal(branchingPath.reveal, "+2 persuasion.", "Branching Path should keep its fixed Reveal persuasion");
+  assert.deepEqual(
     shishakli.effects?.filter((spec) => spec.trigger === "agent-play"),
     [
       {
@@ -401,7 +424,7 @@ try {
     ),
     "Shishakli should keep its fixed Reveal strength spec",
   );
-  for (const name of ["Bene Gesserit Operative", "Cargo Runner", "Chani, Clever Tactician", "Guild Spy", "In High Places", "Maker Keeper", "Maula Pistol", "Northern Watermaster", "Overthrow", "Paracompass", "Price is No Object", "Shishakli"]) {
+  for (const name of ["Bene Gesserit Operative", "Branching Path", "Cargo Runner", "Chani, Clever Tactician", "Guild Spy", "In High Places", "Maker Keeper", "Maula Pistol", "Northern Watermaster", "Overthrow", "Paracompass", "Price is No Object", "Shishakli"]) {
     const card = data.imperiumDeck.find((candidate) => candidate.name === name);
     assert.ok(card?.effects?.some((spec) => spec.trigger === "agent-play"), `${name} should use a structured Agent effect`);
   }

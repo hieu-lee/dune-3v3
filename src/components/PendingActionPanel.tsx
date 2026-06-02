@@ -17,6 +17,7 @@ import {
   playerTroopSupply,
   recallableSpySpaces,
   recallableSpySupplySpaces,
+  trashIntrigueForRewardChoices,
   trashableCardsForPending,
 } from "../game/state";
 import type {
@@ -66,6 +67,7 @@ import { PendingSpyPanel } from "./PendingSpyPanel";
 import { PendingConflictTiePanel, PendingRevealAdjustPanel, PendingThroneRowPanel } from "./PendingTableChoicePanels";
 import { PendingTeamResourcePaymentSection } from "./PendingTeamResourcePaymentSection";
 import { PendingTradePanel } from "./PendingTradePanel";
+import { PendingTrashIntriguePanel } from "./PendingTrashIntriguePanel";
 import { PendingTrashPanel } from "./PendingTrashPanel";
 
 type PendingActionPanelProps = {
@@ -99,6 +101,7 @@ type PendingActionPanelProps = {
   chooseStabanUnseenNetwork: (choice: StabanUnseenNetworkChoice) => void;
   chooseTeamResourcePayment: () => void;
   chooseThroneRowCard: (cardId: string) => void;
+  chooseTrashIntrigueForReward: (intrigueId: string) => void;
   chooseTrashSourceForTrade: (partnerId: string) => void;
   clearPendingAction: () => void;
   collectContractFallback: () => void;
@@ -132,6 +135,7 @@ type PendingActionPanelProps = {
   skipRetreatTroopsForStrengthChoice: () => void;
   skipTeamResourcePaymentChoice: () => void;
   skipTrash: () => void;
+  skipTrashIntrigueForRewardChoice: () => void;
   skipTrashSourceForTradeChoice: () => void;
   takeContract: (contractId: string) => void;
   transferTrade: (fromId: string, toId: string, intrigueId?: string) => void;
@@ -170,6 +174,7 @@ export function PendingActionPanel({
   chooseStabanUnseenNetwork,
   chooseTeamResourcePayment,
   chooseThroneRowCard,
+  chooseTrashIntrigueForReward,
   chooseTrashSourceForTrade,
   clearPendingAction,
   collectContractFallback,
@@ -203,6 +208,7 @@ export function PendingActionPanel({
   skipRetreatTroopsForStrengthChoice,
   skipTeamResourcePaymentChoice,
   skipTrash,
+  skipTrashIntrigueForRewardChoice,
   skipTrashSourceForTradeChoice,
   takeContract,
   transferTrade,
@@ -236,6 +242,12 @@ export function PendingActionPanel({
   const pendingDiscardDrawChoices =
     pendingAction.kind === "discard-card-for-draw" && pendingDiscardDrawOwner
       ? discardCardForDrawChoices(pendingDiscardDrawOwner, pendingAction)
+      : [];
+  const pendingTrashIntrigueOwner =
+    pendingAction.kind === "trash-intrigue-for-reward" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
+  const pendingTrashIntrigueChoices =
+    pendingAction.kind === "trash-intrigue-for-reward" && pendingTrashIntrigueOwner
+      ? trashIntrigueForRewardChoices(pendingTrashIntrigueOwner, pendingAction)
       : [];
   const pendingDiscardHandCardOwner =
     pendingAction.kind === "discard-hand-card" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
@@ -466,6 +478,7 @@ export function PendingActionPanel({
           {pendingAction.kind === "acquire-card" && `${pendingAcquireOwner?.leader ?? "Player"} acquisition from ${pendingAction.source}`}
           {pendingAction.kind === "discard-card-for-influence-and-draw" && `${pendingDiscardInfluenceDrawOwner?.leader ?? "Player"} ${pendingAction.source}`}
           {pendingAction.kind === "discard-card-for-draw" && `${pendingDiscardDrawOwner?.leader ?? "Player"} ${pendingAction.source}`}
+          {pendingAction.kind === "trash-intrigue-for-reward" && `${pendingTrashIntrigueOwner?.leader ?? "Player"} ${pendingAction.source}`}
           {pendingAction.kind === "discard-hand-card" && `${pendingDiscardHandCardOwner?.leader ?? "Player"} ${pendingAction.source}`}
           {pendingAction.kind === "lose-influence-for-intrigues" && `${pendingInfluenceIntrigueOwner?.leader ?? "Player"} ${pendingAction.source} reveal`}
           {pendingAction.kind === "maker-choice" && `${pendingMakerLabel ?? "Player"} Maker space`}
@@ -869,6 +882,16 @@ export function PendingActionPanel({
           source={pendingAction.source}
           onResolve={chooseDiscardCardForDraw}
           onSkip={skipDiscardCardForDrawChoice}
+        />
+      )}
+
+      {pendingAction.kind === "trash-intrigue-for-reward" && (
+        <PendingTrashIntriguePanel
+          choices={pendingTrashIntrigueChoices}
+          owner={pendingTrashIntrigueOwner}
+          pending={pendingAction}
+          onResolve={chooseTrashIntrigueForReward}
+          onSkip={skipTrashIntrigueForRewardChoice}
         />
       )}
 

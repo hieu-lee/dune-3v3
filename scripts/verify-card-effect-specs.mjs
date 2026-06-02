@@ -189,6 +189,7 @@ try {
   const undercoverAsset = data.imperiumDeck.find((card) => card.name === "Undercover Asset");
   const guildEnvoy = data.imperiumDeck.find((card) => card.name === "Guild Envoy");
   const guildSpy = data.imperiumDeck.find((card) => card.name === "Guild Spy");
+  const branchingPath = data.imperiumDeck.find((card) => card.name === "Branching Path");
   const inHighPlaces = data.imperiumDeck.find((card) => card.name === "In High Places");
   const overthrow = data.imperiumDeck.find((card) => card.name === "Overthrow");
   const priceIsNoObject = data.imperiumDeck.find((card) => card.name === "Price is No Object");
@@ -295,6 +296,7 @@ try {
     undercoverAsset &&
     guildEnvoy &&
     guildSpy &&
+    branchingPath &&
     inHighPlaces &&
     overthrow &&
     priceIsNoObject &&
@@ -3394,6 +3396,7 @@ try {
     marketAndImperiumCards.filter(hasAgentPlaySpec).map((card) => card.name).sort(),
     [
       "Bene Gesserit Operative",
+      "Branching Path",
       "Captured Mentat",
       "Cargo Runner",
       "Chani, Clever Tactician",
@@ -3461,6 +3464,7 @@ try {
     spaceTimeFolding,
     guildEnvoy,
     wheelsWithinWheels,
+    branchingPath,
     beneGesseritOperative,
     chani,
     desertPower,
@@ -4609,6 +4613,30 @@ try {
     ),
     "Guild Spy should carry a declarative Agent discard-for-draw spec with a Spacing Guild Intrigue bonus",
   );
+  assert.deepEqual(
+    branchingPath.effects?.filter((spec) => spec.trigger === "agent-play"),
+    [
+      agentSpec(
+        [
+          {
+            kind: "trash-intrigue-for-reward",
+            selector: "self",
+            drawIntrigues: 1,
+            gain: { spice: 2 },
+            optional: true,
+          },
+        ],
+        [{ kind: "has-alliance", faction: "bene" }],
+      ),
+    ],
+    "Branching Path should model its Bene Gesserit Alliance Intrigue trash reward as a typed Agent effect",
+  );
+  assert.equal(
+    branchingPath.play,
+    "Bene Gesserit Alliance: may trash 1 Intrigue to draw 1 Intrigue card and gain 2 spice.",
+    "Branching Path play text should expose its Alliance-gated Intrigue trash reward",
+  );
+  assert.equal(branchingPath.reveal, "+2 persuasion.", "Branching Path should keep its fixed reveal persuasion");
   assert.equal(
     spacingGuildFavor.play,
     "Draw 1 card. When discarded from hand, gain 2 spice.",
@@ -8702,6 +8730,157 @@ try {
     /Invalid effect amount "-1"/,
     "Discard-for-draw specs should reject negative bonus Intrigue amounts",
   );
+  const revealTrashIntrigueRewardCard = {
+    ...convincingArgument,
+    id: "effect-spec-reveal-trash-intrigue-reward-card",
+    name: "Effect Spec Reveal Trash Intrigue Reward",
+    effects: [revealSpec([{
+      kind: "trash-intrigue-for-reward",
+      selector: "self",
+      drawIntrigues: 1,
+    }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [revealTrashIntrigueRewardCard], highCouncilSeat: false }),
+    /Unsupported effect "trash-intrigue-for-reward" for reveal/,
+    "Trash-Intrigue reward specs should stay in Agent play until other trigger resolvers support them",
+  );
+  const invalidTrashIntrigueSelectorCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-trash-intrigue-selector-card",
+    name: "Effect Spec Invalid Trash Intrigue Selector",
+    effects: [agentSpec([{
+      kind: "trash-intrigue-for-reward",
+      selector: "activated-ally",
+      drawIntrigues: 1,
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidTrashIntrigueSelectorCard, p4, p2),
+    /Unsupported effect selector "activated-ally" for trash-intrigue-for-reward/,
+    "Trash-Intrigue reward specs should reject activated Ally selectors",
+  );
+  const invalidTrashIntrigueAmountCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-trash-intrigue-amount-card",
+    name: "Effect Spec Invalid Trash Intrigue Amount",
+    effects: [agentSpec([{
+      kind: "trash-intrigue-for-reward",
+      selector: "self",
+      drawIntrigues: -1,
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidTrashIntrigueAmountCard, p2, p2),
+    /Invalid trash-intrigue-for-reward drawIntrigues "-1"/,
+    "Trash-Intrigue reward specs should reject negative Intrigue draw amounts",
+  );
+  const invalidTrashIntrigueZeroAmountCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-trash-intrigue-zero-amount-card",
+    name: "Effect Spec Invalid Trash Intrigue Zero Amount",
+    effects: [agentSpec([{
+      kind: "trash-intrigue-for-reward",
+      selector: "self",
+      drawIntrigues: 0,
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidTrashIntrigueZeroAmountCard, p2, p2),
+    /Invalid trash-intrigue-for-reward drawIntrigues "0"/,
+    "Trash-Intrigue reward specs should reject zero Intrigue draw rewards",
+  );
+  const invalidTrashIntrigueResourceCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-trash-intrigue-resource-card",
+    name: "Effect Spec Invalid Trash Intrigue Resource",
+    effects: [agentSpec([{
+      kind: "trash-intrigue-for-reward",
+      selector: "self",
+      gain: { melange: 1 },
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidTrashIntrigueResourceCard, p2, p2),
+    /Unsupported effect resource "melange"/,
+    "Trash-Intrigue reward specs should reject unsupported resource gains",
+  );
+  const invalidTrashIntrigueGainAmountCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-trash-intrigue-gain-amount-card",
+    name: "Effect Spec Invalid Trash Intrigue Gain Amount",
+    effects: [agentSpec([{
+      kind: "trash-intrigue-for-reward",
+      selector: "self",
+      gain: { spice: -1 },
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidTrashIntrigueGainAmountCard, p2, p2),
+    /Invalid trash-intrigue-for-reward gain spice "-1"/,
+    "Trash-Intrigue reward specs should reject negative resource gains",
+  );
+  const invalidTrashIntrigueZeroGainAmountCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-trash-intrigue-zero-gain-amount-card",
+    name: "Effect Spec Invalid Trash Intrigue Zero Gain Amount",
+    effects: [agentSpec([{
+      kind: "trash-intrigue-for-reward",
+      selector: "self",
+      gain: { spice: 0 },
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidTrashIntrigueZeroGainAmountCard, p2, p2),
+    /Invalid trash-intrigue-for-reward gain spice "0"/,
+    "Trash-Intrigue reward specs should reject zero resource gains",
+  );
+  const invalidTrashIntrigueEmptyRewardCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-trash-intrigue-empty-reward-card",
+    name: "Effect Spec Invalid Trash Intrigue Empty Reward",
+    effects: [agentSpec([{
+      kind: "trash-intrigue-for-reward",
+      selector: "self",
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidTrashIntrigueEmptyRewardCard, p2, p2),
+    /Invalid trash-intrigue-for-reward reward "undefined"/,
+    "Trash-Intrigue reward specs should require at least one reward",
+  );
+  const invalidTrashIntrigueSourceCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-trash-intrigue-source-card",
+    name: "Effect Spec Invalid Trash Intrigue Source",
+    effects: [agentSpec([{
+      kind: "trash-intrigue-for-reward",
+      selector: "self",
+      drawIntrigues: 1,
+      source: "",
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidTrashIntrigueSourceCard, p2, p2),
+    /Invalid trash-intrigue-for-reward source ""/,
+    "Trash-Intrigue reward specs should reject empty source labels",
+  );
+  const invalidTrashIntrigueOptionalCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-trash-intrigue-optional-card",
+    name: "Effect Spec Invalid Trash Intrigue Optional",
+    effects: [agentSpec([{
+      kind: "trash-intrigue-for-reward",
+      selector: "self",
+      drawIntrigues: 1,
+      optional: "yes",
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidTrashIntrigueOptionalCard, p2, p2),
+    /Invalid trash-intrigue-for-reward optional "yes"/,
+    "Trash-Intrigue reward specs should reject non-boolean optional values",
+  );
   const revealOpponentDiscardCard = {
     ...convincingArgument,
     id: "effect-spec-reveal-opponent-discard-card",
@@ -10995,6 +11174,227 @@ try {
   assert.match(guildSpyGuildResolved.log[0], /Guild Spy: discards .* and draws 1 card/);
   assert.match(guildSpyGuildResolved.log[1], /draws an Intrigue card from Guild Spy/);
   assert.equal(guildSpyGuildResolved.intrigueDeck.some((card) => card.id === guildSpyBonusIntrigue.id), false);
+
+  const branchingPathTrashIntrigue = { ...backedByChoam, id: "branching-path-trash-intrigue-card" };
+  const branchingPathBoardIntrigue = { ...intelligenceReport, id: "branching-path-board-intrigue-card" };
+  const branchingPathRewardIntrigue = { ...buyAccess, id: "branching-path-reward-intrigue-card" };
+  const branchingPathFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 1,
+    hand: [branchingPath],
+    intrigueDeck: [],
+    intrigues: [branchingPathTrashIntrigue],
+    playArea: [],
+    resources: { solari: 0, spice: 0, water: 0 },
+  }));
+  const branchingPathPlaced = turnActions.placeAgentAction(
+    {
+      ...branchingPathFixture,
+      alliances: { bene: p2.id },
+      intrigueDeck: [branchingPathBoardIntrigue, branchingPathRewardIntrigue],
+      intrigueDiscard: [],
+      turnSpiceGains: {},
+    },
+    {
+      commanderTargets: {},
+      selectedCard: branchingPath,
+      selectedSpace: secrets,
+    },
+  );
+  assert.equal(branchingPathPlaced.pendingAction?.kind, "trash-intrigue-for-reward", "Branching Path should queue Intrigue trash with the Bene Gesserit Alliance");
+  assert.equal(branchingPathPlaced.pendingAction?.drawIntrigues, 1, "Branching Path should draw one replacement Intrigue");
+  assert.deepEqual(branchingPathPlaced.pendingAction?.gain, { spice: 2 }, "Branching Path should carry its 2-spice reward");
+  assert.equal(branchingPathPlaced.pendingAction?.optional, true, "Branching Path Intrigue trash should be optional");
+  const branchingPathResolved = state.resolveTrashIntrigueForRewardChoice(
+    branchingPathPlaced,
+    branchingPathPlaced.pendingAction,
+    branchingPathTrashIntrigue.id,
+  );
+  const branchingPathOwner = playerById(branchingPathResolved, p2.id);
+  assert.equal(
+    branchingPathOwner.intrigues.some((card) => card.id === branchingPathTrashIntrigue.id),
+    false,
+    "Branching Path should remove the trashed Intrigue from hand",
+  );
+  assert.ok(
+    branchingPathOwner.intrigues.some((card) => card.id === branchingPathRewardIntrigue.id),
+    "Branching Path should draw one Intrigue after trashing",
+  );
+  assert.equal(
+    branchingPathResolved.intrigueDiscard.some((card) => card.id === branchingPathTrashIntrigue.id),
+    false,
+    "Branching Path should remove the trashed Intrigue from the Intrigue draw cycle",
+  );
+  assert.equal(branchingPathOwner.resources.spice, 2, "Branching Path should gain 2 spice");
+  assert.equal(
+    branchingPathResolved.turnSpiceGains[p2.id],
+    2,
+    "Branching Path spice should count as turn spice gain",
+  );
+  assert.equal(branchingPathResolved.pendingAction, undefined, "Resolving Branching Path should clear its pending action");
+  assert.match(branchingPathResolved.log[0], /Branching Path: trashes .* to draw 1 Intrigue card and gains 2 spice/);
+  assert.match(branchingPathResolved.log[1], /draws an Intrigue card from Branching Path/);
+  const branchingPathSkipped = state.skipTrashIntrigueForReward(branchingPathPlaced, branchingPathPlaced.pendingAction);
+  const branchingPathSkippedOwner = playerById(branchingPathSkipped, p2.id);
+  assert.ok(
+    branchingPathSkippedOwner.intrigues.some((card) => card.id === branchingPathTrashIntrigue.id),
+    "Skipping Branching Path should keep the selected Intrigue",
+  );
+  assert.ok(
+    branchingPathSkippedOwner.intrigues.some((card) => card.id === branchingPathBoardIntrigue.id),
+    "Skipping Branching Path should keep the Intrigue drawn from the board space",
+  );
+  assert.equal(branchingPathSkippedOwner.resources.spice, 0, "Skipping Branching Path should not gain spice");
+  assert.equal(branchingPathSkipped.pendingAction, undefined, "Skipping Branching Path should clear its pending action");
+  assert.match(branchingPathSkipped.log[0], /declines to trash an Intrigue for Branching Path/);
+  const branchingPathDiscardDrawResolved = state.resolveTrashIntrigueForRewardChoice(
+    {
+      ...branchingPathPlaced,
+      intrigueDeck: [],
+      intrigueDiscard: [branchingPathRewardIntrigue],
+    },
+    branchingPathPlaced.pendingAction,
+    branchingPathTrashIntrigue.id,
+  );
+  const branchingPathDiscardDrawOwner = playerById(branchingPathDiscardDrawResolved, p2.id);
+  assert.ok(
+    branchingPathDiscardDrawOwner.intrigues.some((card) => card.id === branchingPathRewardIntrigue.id),
+    "Branching Path should draw its replacement Intrigue from the discard pile if the deck is empty",
+  );
+  assert.equal(
+    [
+      ...branchingPathDiscardDrawResolved.intrigueDeck,
+      ...branchingPathDiscardDrawResolved.intrigueDiscard,
+      ...branchingPathDiscardDrawOwner.intrigues,
+    ].some((card) => card.id === branchingPathTrashIntrigue.id),
+    false,
+    "Branching Path should not recycle the trashed Intrigue through the deck, discard, or owner hand",
+  );
+  const branchingPathNoReplacementResolved = state.resolveTrashIntrigueForRewardChoice(
+    {
+      ...branchingPathPlaced,
+      intrigueDeck: [],
+      intrigueDiscard: [],
+    },
+    branchingPathPlaced.pendingAction,
+    branchingPathTrashIntrigue.id,
+  );
+  const branchingPathNoReplacementOwner = playerById(branchingPathNoReplacementResolved, p2.id);
+  assert.equal(branchingPathNoReplacementOwner.resources.spice, 2, "Branching Path should still gain spice without a replacement Intrigue");
+  assert.equal(
+    branchingPathNoReplacementOwner.intrigues.some((card) => card.id === branchingPathRewardIntrigue.id),
+    false,
+    "Branching Path should not draw a missing replacement Intrigue",
+  );
+  assert.match(
+    branchingPathNoReplacementResolved.log[0],
+    /Branching Path: trashes .* but draws no Intrigue cards and gains 2 spice/,
+    "Branching Path should log actual replacement Intrigue draws",
+  );
+
+  const branchingPathNoAlliance = turnActions.placeAgentAction(
+    {
+      ...branchingPathFixture,
+      alliances: {},
+      intrigueDeck: [branchingPathBoardIntrigue, branchingPathRewardIntrigue],
+      intrigueDiscard: [],
+    },
+    {
+      commanderTargets: {},
+      selectedCard: branchingPath,
+      selectedSpace: secrets,
+    },
+  );
+  assert.equal(
+    branchingPathNoAlliance.pendingAction,
+    undefined,
+    "Branching Path should not queue its Intrigue-trash reward without the Bene Gesserit Alliance",
+  );
+  const branchingPathBoardIntrigueOnly = turnActions.placeAgentAction(
+    {
+      ...branchingPathFixture,
+      alliances: { bene: p2.id },
+      intrigueDeck: [branchingPathBoardIntrigue, branchingPathRewardIntrigue],
+      intrigueDiscard: [],
+      players: branchingPathFixture.players.map((player) =>
+        player.id === p2.id ? { ...player, intrigues: [] } : player
+      ),
+    },
+    {
+      commanderTargets: {},
+      selectedCard: branchingPath,
+      selectedSpace: secrets,
+    },
+  );
+  assert.equal(
+    branchingPathBoardIntrigueOnly.pendingAction?.kind,
+    "trash-intrigue-for-reward",
+    "Branching Path should queue when the selected board space draws an Intrigue to trash",
+  );
+  const branchingPathBoardIntrigueOwner = playerById(branchingPathBoardIntrigueOnly, p2.id);
+  assert.ok(
+    branchingPathBoardIntrigueOwner.intrigues.some((card) => card.id === branchingPathBoardIntrigue.id),
+    "Branching Path should let the player choose the Intrigue drawn from Secrets",
+  );
+  const branchingPathBoardIntrigueResolved = state.resolveTrashIntrigueForRewardChoice(
+    branchingPathBoardIntrigueOnly,
+    branchingPathBoardIntrigueOnly.pendingAction,
+    branchingPathBoardIntrigue.id,
+  );
+  const branchingPathBoardIntrigueResolvedOwner = playerById(branchingPathBoardIntrigueResolved, p2.id);
+  assert.ok(
+    branchingPathBoardIntrigueResolvedOwner.intrigues.some((card) => card.id === branchingPathRewardIntrigue.id),
+    "Branching Path should draw a replacement after trashing the same-space Intrigue",
+  );
+  assert.equal(
+    [
+      ...branchingPathBoardIntrigueResolved.intrigueDeck,
+      ...branchingPathBoardIntrigueResolved.intrigueDiscard,
+      ...branchingPathBoardIntrigueResolvedOwner.intrigues,
+    ].some((card) => card.id === branchingPathBoardIntrigue.id),
+    false,
+    "Branching Path should remove the same-space Intrigue from the draw cycle when it is trashed",
+  );
+  const branchingPathEmptyIntrigueSupply = turnActions.placeAgentAction(
+    {
+      ...branchingPathFixture,
+      alliances: { bene: p2.id },
+      intrigueDeck: [],
+      intrigueDiscard: [],
+      players: branchingPathFixture.players.map((player) => ({ ...player, intrigues: [] })),
+    },
+    {
+      commanderTargets: {},
+      selectedCard: branchingPath,
+      selectedSpace: secrets,
+    },
+  );
+  assert.equal(
+    branchingPathEmptyIntrigueSupply.pendingAction,
+    undefined,
+    "Branching Path should not queue when no starting or drawable same-space Intrigue exists",
+  );
+  const branchingPathNoIntrigueSource = {
+    ...p2,
+    hand: [],
+    playArea: [branchingPath],
+    intrigues: [],
+  };
+  const branchingPathNoIntriguePendings = state.pendingActionsForCard(
+    branchingPath,
+    branchingPathNoIntrigueSource,
+    {
+      ...game,
+      alliances: { bene: p2.id },
+      players: game.players.map((player) => player.id === p2.id ? branchingPathNoIntrigueSource : player),
+    },
+    p2,
+    arrakeen,
+  );
+  assert.equal(
+    branchingPathNoIntriguePendings.some((pending) => pending.kind === "trash-intrigue-for-reward"),
+    false,
+    "Branching Path should not queue without a starting or same-space Intrigue to trash",
+  );
 
   const spacingGuildFavorDraw = { ...convincingArgument, id: "spacing-guild-favor-agent-draw-card" };
   const spacingGuildFavorAgentEffect = state.applyCardAgentEffect(

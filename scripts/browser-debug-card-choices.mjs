@@ -506,6 +506,57 @@ export async function runCardChoicesSmoke({
     "Guild Spy should draw an Intrigue after discarding a Spacing Guild card",
   );
 
+  await setDebugGameAndWait(page, states.branchingPath);
+  pendingText = await page.locator(".pending-panel").innerText();
+  const branchingPathTrashName = states.branchingPath.branchingPathTrashName;
+  const branchingPathTrashId = states.branchingPath.branchingPathTrashId;
+  const branchingPathRewardIntrigueId = states.branchingPath.branchingPathRewardIntrigueId;
+  assert.match(pendingText, /Branching Path/i);
+  assert.match(pendingText, new RegExp(escapeRegExp(branchingPathTrashName)));
+  assert.match(pendingText, /draw 1 Intrigue card/i);
+  assert.match(pendingText, /2 spice/i);
+  assert.equal(
+    await page.locator(".pending-panel").getByRole("button", { name: "Skip" }).isVisible(),
+    true,
+    "Branching Path should expose a Skip button",
+  );
+  await screenshot(page, captures, "pending-branching-path-trash-intrigue.png");
+
+  before = await currentGame(page);
+  ownerBefore = before.players.find((player) => player.id === "p2");
+  await page.locator(".pending-panel").getByRole("button", { name: "Skip" }).click();
+  await waitForNoPending(page);
+  after = await currentGame(page);
+  ownerAfter = after.players.find((player) => player.id === "p2");
+  assert.ok(
+    ownerAfter.intrigues.some((card) => card.id === branchingPathTrashId),
+    "Skipping Branching Path should keep the selected Intrigue",
+  );
+  assert.equal(ownerAfter.resources.spice, ownerBefore.resources.spice, "Skipping Branching Path should not gain spice");
+
+  await setDebugGameAndWait(page, states.branchingPath);
+  before = await currentGame(page);
+  ownerBefore = before.players.find((player) => player.id === "p2");
+  await page.locator(".pending-panel").getByRole("button", { name: branchingPathTrashName }).click();
+  await page.locator(".pending-panel").getByRole("button", { name: "Resolve Branching Path" }).click();
+  await waitForNoPending(page);
+  after = await currentGame(page);
+  ownerAfter = after.players.find((player) => player.id === "p2");
+  assert.equal(
+    [
+      ...after.intrigueDeck,
+      ...after.intrigueDiscard,
+      ...ownerAfter.intrigues,
+    ].some((card) => card.id === branchingPathTrashId),
+    false,
+    "Branching Path should remove the selected Intrigue from the Intrigue draw cycle",
+  );
+  assert.equal(ownerAfter.resources.spice, ownerBefore.resources.spice + 2, "Branching Path should gain 2 spice");
+  assert.ok(
+    ownerAfter.intrigues.some((card) => card.id === branchingPathRewardIntrigueId),
+    "Branching Path should draw one replacement Intrigue",
+  );
+
   await setDebugGameAndWait(page, states.covertOperation);
   pendingText = await page.locator(".pending-panel").innerText();
   const covertOperationDiscardName = states.covertOperation.covertOperationDiscardName;
@@ -617,6 +668,8 @@ async function createCardChoiceStates(server, initialPlayableGame) {
   assert.ok(guildEnvoy, "Expected Guild Envoy Imperium card");
   const guildSpy = data.imperiumDeck.find((card) => card.sourceId === 43);
   assert.ok(guildSpy, "Expected Guild Spy Imperium card");
+  const branchingPath = data.imperiumDeck.find((card) => card.sourceId === 45);
+  assert.ok(branchingPath, "Expected Branching Path Imperium card");
   const ecologicalTestingStation = data.imperiumDeck.find((card) => card.sourceId === 46);
   assert.ok(ecologicalTestingStation, "Expected Ecological Testing Station Imperium card");
   const covertOperation = data.imperiumDeck.find((card) => card.sourceId === 35);
@@ -662,6 +715,19 @@ async function createCardChoiceStates(server, initialPlayableGame) {
   const guildSpyDraw = { ...data.allyStarterCards[0], id: "browser-guild-spy-draw-card" };
   const guildSpyBoardIntrigue = { ...data.intrigueCards[0], id: "browser-guild-spy-board-intrigue-card" };
   const guildSpyBonusIntrigue = { ...data.intrigueCards[1], id: "browser-guild-spy-bonus-intrigue-card" };
+  const branchingPathTrashIntrigue = {
+    ...data.intrigueCards[2],
+    id: "browser-branching-path-trash-intrigue",
+    name: "Branching Path Debug Intrigue",
+  };
+  const branchingPathRewardIntrigue = {
+    ...data.intrigueCards[3],
+    id: "browser-branching-path-reward-intrigue",
+  };
+  const branchingPathBoardIntrigue = {
+    ...data.intrigueCards[4],
+    id: "browser-branching-path-board-intrigue",
+  };
   const ecologicalTestingStationDrawOne = {
     ...data.allyStarterCards[0],
     id: "browser-ecological-testing-station-draw-one-card",
@@ -918,6 +984,41 @@ async function createCardChoiceStates(server, initialPlayableGame) {
   );
   assert.equal(guildSpyState.pendingAction?.kind, "discard-card-for-draw", "Expected Guild Spy discard-draw pending action");
   assert.equal(guildSpyState.pendingAction.bonusIntrigues?.amount, 1, "Expected Guild Spy Intrigue bonus in browser state");
+  const branchingPathState = turnActions.placeAgentAction(
+    {
+      ...base,
+      alliances: { ...base.alliances, bene: ownerId },
+      intrigueDeck: [branchingPathBoardIntrigue, branchingPathRewardIntrigue],
+      intrigueDiscard: [],
+      turnSpiceGains: {},
+      players: base.players.map((player) =>
+        player.id === ownerId
+          ? {
+              ...player,
+              agentsReady: 1,
+              discard: [],
+              hand: [branchingPath],
+              intrigues: [branchingPathTrashIntrigue],
+              playArea: [],
+              resources: { solari: 0, spice: 0, water: 0 },
+            }
+          : player,
+      ),
+    },
+    {
+      commanderTargets: {},
+      selectedCard: branchingPath,
+      selectedSpace: spyPlaceAfterRecallSpace,
+    },
+  );
+  assert.equal(
+    branchingPathState.pendingAction?.kind,
+    "trash-intrigue-for-reward",
+    "Expected Branching Path Intrigue-trash pending action",
+  );
+  assert.equal(branchingPathState.pendingAction.drawIntrigues, 1, "Expected Branching Path replacement Intrigue reward");
+  assert.equal(branchingPathState.pendingAction.gain.spice, 2, "Expected Branching Path spice reward");
+  assert.equal(branchingPathState.pendingAction.optional, true, "Expected Branching Path Intrigue trash to be optional");
   const ecologicalTestingStationState = turnActions.placeAgentAction(
     {
       ...base,
@@ -1454,6 +1555,12 @@ async function createCardChoiceStates(server, initialPlayableGame) {
       guildSpyDiscardName: guildSpyDiscard.name,
       guildSpyDrawId: guildSpyDraw.id,
       guildSpyIntrigueId: guildSpyBonusIntrigue.id,
+    },
+    branchingPath: {
+      ...branchingPathState,
+      branchingPathRewardIntrigueId: branchingPathRewardIntrigue.id,
+      branchingPathTrashId: branchingPathTrashIntrigue.id,
+      branchingPathTrashName: branchingPathTrashIntrigue.name,
     },
     ecologicalTestingStation: {
       ...ecologicalTestingStationState,

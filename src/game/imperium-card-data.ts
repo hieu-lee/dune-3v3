@@ -1,5 +1,6 @@
 import {
   beneGesseritOperativeSourceId,
+  branchingPathSourceId,
   calculusOfPowerSourceId,
   capturedMentatSourceId,
   chaniCleverTacticianSourceId,
@@ -65,9 +66,11 @@ import {
   agentPayResourceForSandworms,
   agentPlaceSpies,
   agentRecruitTroops,
+  agentTrashIntrigueForReward,
   agentTrashSource,
   agentTrashSourceForDrawCards,
   discardGainResource,
+  hasAlliance,
   hasCardTraitInPlay,
   hasCompletedContracts,
   hasConflictUnits,
@@ -196,6 +199,16 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
       acquireGainInfluenceChoice(1, { source: "Interstellar Trade" }),
       acquireTakeContracts(1, { source: "Interstellar Trade" }),
       revealGainPersuasion({ kind: "completed-contracts" }),
+    ];
+  }
+  if (card.id === branchingPathSourceId) {
+    return [
+      agentTrashIntrigueForReward({
+        drawIntrigues: 1,
+        gain: { spice: 2 },
+        optional: true,
+      }, [hasAlliance("bene")]),
+      revealGainPersuasion(2),
     ];
   }
   if (card.id === calculusOfPowerSourceId) {
@@ -573,6 +586,9 @@ function imperiumPlayText(card: HubCard) {
   }
   if (card.id === guildSpySourceId) {
     return "Discard 1 card to draw 1 card. If you discarded a Spacing Guild card, draw 1 Intrigue card.";
+  }
+  if (card.id === branchingPathSourceId) {
+    return "Bene Gesserit Alliance: may trash 1 Intrigue to draw 1 Intrigue card and gain 2 spice.";
   }
   if (card.id === spacingGuildFavorSourceId) {
     return "Draw 1 card. When discarded from hand, gain 2 spice.";

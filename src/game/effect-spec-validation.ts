@@ -1,9 +1,11 @@
 import type {
   CardEffectSpec,
   CommanderResourceSplitOption,
+  EffectAmountSpec,
   GameEffectConditionSpec,
   GameEffectSpec,
   GameEffectTrigger,
+  ResourceId,
 } from "./types";
 import {
   validateLeaderTransitionChoiceEffect,
@@ -130,6 +132,25 @@ function validateCondition(condition: GameEffectConditionSpec, trigger: GameEffe
   }
   if (condition.kind === "gained-spice-this-turn") return;
   unsupportedKind("effect condition", condition);
+}
+
+function validateResourceAmountMap(
+  label: string,
+  gain: Partial<Record<ResourceId, EffectAmountSpec>> | undefined,
+) {
+  if (gain === undefined) return false;
+  if (typeof gain !== "object" || gain === null || Array.isArray(gain)) {
+    invalidSpecField(label, gain);
+  }
+  let hasReward = false;
+  for (const [resource, amount] of Object.entries(gain) as [ResourceId, EffectAmountSpec][]) {
+    if (!supportedResources.has(resource)) {
+      throw new Error(`Unsupported effect resource "${resource}"`);
+    }
+    validatePositiveAmount(`${label} ${resource}`, amount);
+    hasReward = true;
+  }
+  return hasReward;
 }
 
 function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
@@ -612,6 +633,24 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
       }
       validateAmount(effect.bonusIntrigues.amount);
     }
+    return;
+  }
+  if (effect.kind === "trash-intrigue-for-reward") {
+    if (trigger !== "agent-play") {
+      throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
+    }
+    if (effect.selector !== "self") {
+      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
+    if (effect.drawIntrigues !== undefined) {
+      validatePositiveAmount("trash-intrigue-for-reward drawIntrigues", effect.drawIntrigues);
+    }
+    const hasResourceReward = validateResourceAmountMap("trash-intrigue-for-reward gain", effect.gain);
+    if (effect.drawIntrigues === undefined && !hasResourceReward) {
+      invalidSpecField("trash-intrigue-for-reward reward", undefined);
+    }
+    validateOptionalBoolean("trash-intrigue-for-reward optional", (effect as { optional?: unknown }).optional);
+    validateSourceLabel("trash-intrigue-for-reward source", effect.source);
     return;
   }
   if (effect.kind === "opponents-discard-cards") {

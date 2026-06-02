@@ -241,6 +241,14 @@ export type PendingAction =
       };
     }
   | {
+      kind: "trash-intrigue-for-reward";
+      ownerId: string;
+      source: string;
+      drawIntrigues: number;
+      gain: Partial<Resources>;
+      optional: boolean;
+    }
+  | {
       kind: "lose-influence-for-intrigues";
       ownerId: string;
       source: string;

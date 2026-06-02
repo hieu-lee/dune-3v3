@@ -33,9 +33,11 @@ import {
   hasCompletedContracts,
   hasCardTraitInPlay,
   hasConflictUnits,
+  hasHighCouncilSeat,
   hasInfluence,
   hasRole,
   hasSpyPosts,
+  hasSwordmasterBonus,
   revealGainPersuasion,
   revealGainResource,
   revealLoseInfluenceForIntrigues,
@@ -227,6 +229,9 @@ function imperiumRevealText(card: HubCard, persuasion: number, swords: number, p
   if (card.id === northernWatermasterSourceId) {
     return "+1 persuasion. Fremen Bond: gain 2 spice.";
   }
+  if (card.id === paracompassSourceId) {
+    return "If you have a seat on the High Council, +2 persuasion. If you also have a Swordmaster, +1 persuasion.";
+  }
   if (card.id === doubleAgentSourceId) {
     return "+1 persuasion and +1 strength.";
   }
@@ -333,7 +338,11 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
     ];
   }
   if (card.id === paracompassSourceId) {
-    return [agentGainResource("solari", 2)];
+    return [
+      agentGainResource("solari", 2),
+      revealGainPersuasion(2, [hasHighCouncilSeat()]),
+      revealGainPersuasion(1, [hasHighCouncilSeat(), hasSwordmasterBonus()]),
+    ];
   }
   if (card.id === reliableInformantSourceId) {
     return [
@@ -491,7 +500,7 @@ function toImperiumCard(card: HubCard): Card {
       traits: ["Faction: Fremen"],
     };
   }
-  const persuasion = attributeNumber(card, "Persuasion on reveal");
+  const persuasion = card.id === paracompassSourceId ? 0 : attributeNumber(card, "Persuasion on reveal");
   const swords = attributeNumber(card, "Swords");
   const effects = imperiumCardEffects(card);
   const revealGain =
@@ -502,10 +511,10 @@ function toImperiumCard(card: HubCard): Card {
         : card.id === covertOperationSourceId
           ? { solari: 2 }
         : undefined;
-  const automatedContractPersuasion = card.id === interstellarTradeSourceId;
+  const automatedConditionalPersuasion = card.id === interstellarTradeSourceId || card.id === paracompassSourceId;
   const automatedConditionalSwords = card.id === calculusOfPowerSourceId;
   const conditionalPersuasion =
-    !automatedContractPersuasion && !card.attributes.some(([name]) => name === "Persuasion on reveal");
+    !automatedConditionalPersuasion && !card.attributes.some(([name]) => name === "Persuasion on reveal");
   const conditionalSwords = !automatedConditionalSwords && hasConditionalAttribute(card, "Swords");
   return {
     id: `hub-${card.id}`,

@@ -149,7 +149,7 @@ try {
   );
   assert.ok(commandRespect && prepareTheWay && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
   assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && dutifulService && deliverSupplies);
-  assert.equal(revealSpecCards.length, 40, "Unexpected number of cards with declarative Reveal specs");
+  assert.equal(revealSpecCards.length, 41, "Unexpected number of cards with declarative Reveal specs");
   assert.deepEqual(
     [
       ...data.reserveMarket,
@@ -188,6 +188,7 @@ try {
       covertOperation,
       fedaykinStilltent,
       northernWatermaster,
+      paracompass,
       reliableInformant,
       spaceTimeFolding,
       guildEnvoy,
@@ -598,6 +599,29 @@ try {
       spec.effects.some((effect) => effect.kind === "gain-resource" && effect.resource === "solari" && effect.amount === 2)
     ),
     "Paracompass should carry a Solari Agent spec",
+  );
+  assert.equal(
+    paracompass.reveal,
+    "If you have a seat on the High Council, +2 persuasion. If you also have a Swordmaster, +1 persuasion.",
+    "Paracompass reveal text should preserve its High Council and Swordmaster conditions",
+  );
+  assert.equal(paracompass.persuasion, 0, "Paracompass should not expose its conditional reveal as fixed persuasion");
+  assert.ok(
+    paracompass.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.conditions?.some((condition) => condition.kind === "has-high-council-seat") &&
+      spec.effects.some((effect) => effect.kind === "gain-persuasion" && effect.amount === 2)
+    ),
+    "Paracompass should carry a High Council-gated Reveal persuasion spec",
+  );
+  assert.ok(
+    paracompass.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.conditions?.some((condition) => condition.kind === "has-high-council-seat") &&
+      spec.conditions?.some((condition) => condition.kind === "has-swordmaster-bonus") &&
+      spec.effects.some((effect) => effect.kind === "gain-persuasion" && effect.amount === 1)
+    ),
+    "Paracompass should carry a High Council plus Swordmaster Reveal persuasion spec",
   );
   assert.equal(
     reliableInformant.play,
@@ -3133,6 +3157,42 @@ try {
   );
   assert.deepEqual(paracompassEffect.source.resources, { solari: 2, spice: 0, water: 0 }, "Paracompass should gain 2 Agent Solari");
   assert.match(paracompassEffect.log ?? "", /Paracompass: gains 2 Solari/);
+  const paracompassNoCouncilReveal = turnActions.revealTurnPlan(
+    { ...p2, hand: [paracompass], highCouncilSeat: false, swordmasterBonus: false },
+    game,
+  );
+  assert.equal(paracompassNoCouncilReveal.persuasion, 0, "Paracompass should not reveal for persuasion without High Council");
+  const paracompassSwordmasterOnlyReveal = turnActions.revealTurnPlan(
+    { ...p2, hand: [paracompass], highCouncilSeat: false, swordmasterBonus: true },
+    game,
+  );
+  assert.equal(paracompassSwordmasterOnlyReveal.persuasion, 0, "Paracompass Swordmaster bonus should require High Council");
+  const paracompassCouncilReveal = turnActions.revealTurnPlan(
+    { ...p2, hand: [paracompass], highCouncilSeat: true, swordmasterBonus: false },
+    game,
+  );
+  const highCouncilOnlyReveal = turnActions.revealTurnPlan(
+    { ...p2, hand: [], highCouncilSeat: true, swordmasterBonus: false },
+    game,
+  );
+  assert.equal(
+    paracompassCouncilReveal.persuasion - highCouncilOnlyReveal.persuasion,
+    2,
+    "Paracompass should add 2 card persuasion with High Council",
+  );
+  const paracompassCouncilSwordmasterReveal = turnActions.revealTurnPlan(
+    { ...p2, hand: [paracompass], highCouncilSeat: true, swordmasterBonus: true },
+    game,
+  );
+  const highCouncilSwordmasterOnlyReveal = turnActions.revealTurnPlan(
+    { ...p2, hand: [], highCouncilSeat: true, swordmasterBonus: true },
+    game,
+  );
+  assert.equal(
+    paracompassCouncilSwordmasterReveal.persuasion - highCouncilSwordmasterOnlyReveal.persuasion,
+    3,
+    "Paracompass should add 3 card persuasion with High Council and Swordmaster",
+  );
   for (const [space, label] of [
     [dutifulService, "Emperor"],
     [secrets, "Bene Gesserit"],

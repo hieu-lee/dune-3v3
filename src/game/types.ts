@@ -62,6 +62,7 @@ export type GameEffectConditionSpec =
   | { kind: "has-card-trait-in-play"; trait: string; count?: number }
   | { kind: "has-team"; team: TeamId }
   | { kind: "has-role"; role: Role }
+  | { kind: "has-high-council-seat" }
   | { kind: "has-swordmaster-bonus" }
   | { kind: "has-leader"; leader: string }
   | { kind: "has-alliance"; faction?: FactionId };

@@ -138,6 +138,7 @@ function validateCondition(condition: GameEffectConditionSpec) {
     if (supportedRoles.has(condition.role)) return;
     throw new Error(`Unsupported effect role "${condition.role}"`);
   }
+  if (condition.kind === "has-high-council-seat") return;
   if (condition.kind === "has-swordmaster-bonus") return;
   if (condition.kind === "has-leader") {
     if (typeof condition.leader === "string" && condition.leader.trim().length > 0) return;

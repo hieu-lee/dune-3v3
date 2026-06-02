@@ -86,6 +86,30 @@ export async function runTableChoicesSmoke({
   assert.equal(chaniBondAfter.pendingAction, undefined, "Chani Fremen Bond should not create a reveal-adjust pending action");
   await screenshot(page, captures, "chani-fremen-bond-after-reveal.png");
 
+  await setDebugGameAndWait(page, states.paracompassReveal);
+  await screenshot(page, captures, "paracompass-reveal-ready.png");
+  await page.getByTestId("reveal-turn").click();
+  await page.waitForFunction(() => {
+    const game = window.__DUNE_DEBUG__?.getGame();
+    const player = game?.players.find((candidate) => candidate.id === "p2");
+    return Boolean(
+      player?.revealed &&
+        player.persuasion === 5 &&
+        !game.pendingAction &&
+        game.pendingQueue.length === 0,
+    );
+  });
+  const paracompassRevealAfter = await currentGame(page);
+  const paracompassRevealPlayer = paracompassRevealAfter.players.find((player) => player.id === "p2");
+  assert.ok(paracompassRevealPlayer, "Expected Feyd after Paracompass reveal");
+  assert.equal(
+    paracompassRevealPlayer.persuasion,
+    5,
+    "Paracompass should add 3 persuasion on top of the High Council reveal bonus in the browser flow",
+  );
+  assert.equal(paracompassRevealAfter.pendingAction, undefined, "Paracompass should not create a reveal-adjust pending action");
+  await screenshot(page, captures, "paracompass-reveal-after.png");
+
   await setDebugGameAndWait(page, states.calculusTrashReveal);
   await screenshot(page, captures, "calculus-trash-ready.png");
   await page.getByTestId("reveal-turn").click();
@@ -196,6 +220,8 @@ async function createTableChoiceStates(server, initialPlayableGame) {
   assert.ok(conflict, "Expected a conflict card for same-team tie debug state");
   const chani = data.imperiumDeck.find((card) => card.name === "Chani, Clever Tactician");
   assert.ok(chani, "Expected Chani for Fremen Bond browser debug state");
+  const paracompass = data.imperiumDeck.find((card) => card.name === "Paracompass");
+  assert.ok(paracompass, "Expected Paracompass for conditional reveal browser debug state");
   const fremenSupport = data.imperiumDeck.find((card) =>
     card.id !== chani.id && card.traits?.includes("Faction: Fremen")
   );
@@ -299,6 +325,27 @@ async function createTableChoiceStates(server, initialPlayableGame) {
               persuasion: 0,
               playArea: [],
               revealed: false,
+            }
+          : { ...player, conflict: 0, deployedTroops: 0 }
+      ),
+    },
+    paracompassReveal: {
+      ...base,
+      activeSeat: feydSeat,
+      players: base.players.map((player) =>
+        player.id === "p2"
+          ? {
+              ...player,
+              agentsReady: 0,
+              conflict: 0,
+              deployedTroops: 0,
+              discard: [],
+              hand: [cloneCard(paracompass)],
+              highCouncilSeat: true,
+              persuasion: 0,
+              playArea: [],
+              revealed: false,
+              swordmasterBonus: true,
             }
           : { ...player, conflict: 0, deployedTroops: 0 }
       ),

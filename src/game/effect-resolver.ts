@@ -324,6 +324,9 @@ function conditionApplies(condition: GameEffectConditionSpec, context: GameEffec
   if (condition.kind === "has-role") {
     return context.source.role === condition.role;
   }
+  if (condition.kind === "has-high-council-seat") {
+    return context.source.highCouncilSeat;
+  }
   if (condition.kind === "has-swordmaster-bonus") {
     return context.source.swordmasterBonus;
   }

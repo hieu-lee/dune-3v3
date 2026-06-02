@@ -502,6 +502,10 @@ export function hasRole(role: Role) {
   return { kind: "has-role", role } as const;
 }
 
+export function hasHighCouncilSeat() {
+  return { kind: "has-high-council-seat" } as const;
+}
+
 export function hasSwordmasterBonus() {
   return { kind: "has-swordmaster-bonus" } as const;
 }

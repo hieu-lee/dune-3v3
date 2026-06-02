@@ -79,6 +79,23 @@ export async function runCardChoicesSmoke({
   assert.equal(ownerAfter.discard.at(-1).sourceId, 537, "Reserve acquire should take Prepare The Way");
   assert.ok(after.reserveMarket.some((card) => card.sourceId === 537), "Prepare The Way reserve should remain available");
 
+  await setDebugGameAndWait(page, states.acquireSpyNetwork);
+  pendingText = await page.locator(".pending-panel").innerText();
+  assert.match(pendingText, /Spy Network/i);
+  assert.match(pendingText, /spies ready/i);
+  assert.equal(await page.locator(".pending-panel").getByRole("button", { name: "Done" }).isDisabled(), true);
+  await screenshot(page, captures, "pending-acquire-spy-network-spy.png");
+
+  before = await currentGame(page);
+  ownerBefore = before.players.find((player) => player.id === "p2");
+  await page.locator(".pending-panel").getByRole("button", { name: states.acquireSpyNetwork.spySpaceName }).click();
+  await waitForNoPending(page);
+  after = await currentGame(page);
+  ownerAfter = after.players.find((player) => player.id === "p2");
+  assert.equal(ownerAfter.spies, ownerBefore.spies - 1, "Spy Network acquire bonus should spend one spy");
+  assert.equal(after.spyPosts[states.acquireSpyNetwork.spySpaceId], "p2", "Spy Network acquire bonus should place the chosen spy");
+  assert.equal(ownerAfter.discard.at(-1).name, "Spy Network", "Spy Network should remain acquired after resolving its spy bonus");
+
   await setDebugGameAndWait(page, states.beneGesseritOperativeSpy);
   pendingText = await page.locator(".pending-panel").innerText();
   assert.match(pendingText, /Bene Gesserit Operative/i);
@@ -278,6 +295,10 @@ async function createCardChoiceStates(server, initialPlayableGame) {
   assert.ok(game.imperiumRow[0], "Expected at least one Imperium Row card");
   const prepareTheWay = game.reserveMarket.find((card) => card.sourceId === 537);
   assert.ok(prepareTheWay, "Expected Prepare The Way reserve card");
+  const spyNetwork = data.imperiumDeck.find((card) => card.sourceId === 25);
+  assert.ok(spyNetwork, "Expected Spy Network Imperium card");
+  const spyNetworkReplacement = data.imperiumDeck.find((card) => card.id !== spyNetwork.id);
+  assert.ok(spyNetworkReplacement, "Expected Spy Network replacement card");
   const beneGesseritOperative = data.imperiumDeck.find((card) => card.sourceId === 30);
   assert.ok(beneGesseritOperative, "Expected Bene Gesserit Operative Imperium card");
   const doubleAgent = data.imperiumDeck.find((card) => card.sourceId === 37);
@@ -508,6 +529,33 @@ async function createCardChoiceStates(server, initialPlayableGame) {
     pendingAction: covertOperationPendings[0],
     pendingQueue: covertOperationPendings.slice(1),
   };
+  const acquireSpyNetworkState = state.acquireMarketCard(
+    {
+      ...base,
+      imperiumRow: [spyNetwork],
+      marketDeck: [spyNetworkReplacement],
+      spyPosts: {},
+      sharedSpyPosts: {},
+      players: base.players.map((player) =>
+        player.id === ownerId
+          ? {
+              ...player,
+              discard: [],
+              persuasion: spyNetwork.cost,
+              revealed: true,
+              spies: 1,
+            }
+          : player,
+      ),
+    },
+    ownerId,
+    spyNetwork.id,
+  );
+  assert.equal(
+    acquireSpyNetworkState.pendingAction?.kind,
+    "spy",
+    "Expected Spy Network purchase to queue a spy placement pending action",
+  );
 
   return {
     contractPublic: {
@@ -552,6 +600,11 @@ async function createCardChoiceStates(server, initialPlayableGame) {
         maxCost: prepareTheWay.cost,
         destination: "discard",
       },
+    },
+    acquireSpyNetwork: {
+      ...acquireSpyNetworkState,
+      spySpaceId: spySpace.id,
+      spySpaceName: spySpace.name,
     },
     beneGesseritOperativeSpy: {
       ...beneGesseritOperativeSpyState,

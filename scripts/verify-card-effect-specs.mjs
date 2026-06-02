@@ -122,6 +122,11 @@ try {
   const reliableInformant = data.imperiumDeck.find((card) => card.name === "Reliable Informant");
   const spaceTimeFolding = data.imperiumDeck.find((card) => card.name === "Space-time Folding");
   const guildEnvoy = data.imperiumDeck.find((card) => card.name === "Guild Envoy");
+  const guildSpy = data.imperiumDeck.find((card) => card.name === "Guild Spy");
+  const inHighPlaces = data.imperiumDeck.find((card) => card.name === "In High Places");
+  const spyNetwork = data.imperiumDeck.find((card) => card.name === "Spy Network");
+  const strikeFleet = data.imperiumDeck.find((card) => card.name === "Strike Fleet");
+  const subversiveAdvisor = data.imperiumDeck.find((card) => card.name === "Subversive Advisor");
   const wheelsWithinWheels = data.imperiumDeck.find((card) => card.name === "Wheels Within Wheels");
   const prepareTheWay = data.reserveMarket.find((card) => card.sourceId === 537);
   const spiceMustFlow = data.reserveMarket.find((card) => card.sourceId === 538);
@@ -172,6 +177,11 @@ try {
     reliableInformant &&
     spaceTimeFolding &&
     guildEnvoy &&
+    guildSpy &&
+    inHighPlaces &&
+    spyNetwork &&
+    strikeFleet &&
+    subversiveAdvisor &&
     wheelsWithinWheels,
   );
   assert.ok(commandRespect && prepareTheWay && spiceMustFlow && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
@@ -205,9 +215,31 @@ try {
   );
   assert.deepEqual(
     marketAndImperiumCards.filter(hasAcquireSpec).map((card) => card.name).sort(),
-    ["The Spice Must Flow"],
-    "Only The Spice Must Flow should currently carry a declarative Acquire spec",
+    [
+      "Guild Spy",
+      "In High Places",
+      "Spy Network",
+      "Strike Fleet",
+      "Subversive Advisor",
+      "The Spice Must Flow",
+    ],
+    "Only implemented acquisition reward cards should currently carry declarative Acquire specs",
   );
+  for (const card of [guildSpy, inHighPlaces, spyNetwork, strikeFleet, subversiveAdvisor]) {
+    assert.ok(
+      card.effects?.some((spec) =>
+        spec.trigger === "acquire" &&
+        spec.effects.some((effect) =>
+          effect.kind === "place-spies" &&
+          effect.selector === "self" &&
+          effect.amount === 1 &&
+          effect.recallForSupply === true &&
+          effect.mustPlace === true
+        )
+      ),
+      `${card.name} should use a typed acquire spy-placement effect`,
+    );
+  }
   assert.ok(
     spiceMustFlow.effects?.some((spec) =>
       spec.trigger === "acquire" &&
@@ -1438,6 +1470,55 @@ try {
     () => state.acquireMarketCard(invalidAcquireFixture, p2.id, invalidAcquirePersuasionCard.id),
     /Unsupported effect "gain-persuasion" for acquire/,
     "Acquire specs should reject non-acquire reward effect kinds",
+  );
+  const invalidAcquireSpyPlacementCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-acquire-spy-placement-card",
+    name: "Effect Spec Invalid Acquire Spy Placement",
+    cost: 0,
+    effects: [{ trigger: "acquire", effects: [{ kind: "place-spies", selector: "self", amount: -1 }] }],
+  };
+  const invalidAcquireSpyPlacementFixture = {
+    ...invalidAcquireFixtureBase,
+    imperiumRow: [invalidAcquireSpyPlacementCard],
+    marketDeck: [],
+  };
+  assert.throws(
+    () => state.acquireMarketCard(invalidAcquireSpyPlacementFixture, p2.id, invalidAcquireSpyPlacementCard.id),
+    /Invalid effect amount "-1"/,
+    "Acquire spy-placement specs should validate effect amounts",
+  );
+  const invalidAcquireSpyPlacementIconCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-acquire-spy-placement-icon-card",
+    name: "Effect Spec Invalid Acquire Spy Placement Icon",
+    cost: 0,
+    effects: [{ trigger: "acquire", effects: [{ kind: "place-spies", selector: "self", amount: 1, placementIcon: "worm" }] }],
+  };
+  assert.throws(
+    () => state.acquireMarketCard(
+      { ...invalidAcquireFixtureBase, imperiumRow: [invalidAcquireSpyPlacementIconCard], marketDeck: [] },
+      p2.id,
+      invalidAcquireSpyPlacementIconCard.id,
+    ),
+    /Unsupported effect icon "worm"/,
+    "Acquire spy-placement specs should reject unsupported placement icons",
+  );
+  const invalidAcquireSpyPlacementFlagCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-acquire-spy-placement-flag-card",
+    name: "Effect Spec Invalid Acquire Spy Placement Flag",
+    cost: 0,
+    effects: [{ trigger: "acquire", effects: [{ kind: "place-spies", selector: "self", amount: 1, recallForSupply: "yes" }] }],
+  };
+  assert.throws(
+    () => state.acquireMarketCard(
+      { ...invalidAcquireFixtureBase, imperiumRow: [invalidAcquireSpyPlacementFlagCard], marketDeck: [] },
+      p2.id,
+      invalidAcquireSpyPlacementFlagCard.id,
+    ),
+    /Invalid place-spies recallForSupply "yes"/,
+    "Acquire spy-placement specs should reject non-boolean recallForSupply flags",
   );
   const fractionalAmountCard = {
     ...convincingArgument,

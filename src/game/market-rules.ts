@@ -1,7 +1,8 @@
 import { canMoveCardToThroneRow } from "./card-identifiers";
 import { resolveCardAcquireEffects, type GameEffectResult } from "./effect-resolver";
-import { advancePendingAction } from "./pending-actions";
+import { advancePendingAction, queuePendingActions } from "./pending-actions";
 import { defaultActivatedAllyId } from "./placement-rules";
+import { pendingActionForSpyPlacements } from "./spy-effect-pending-rules";
 import { recordTurnSpiceGain } from "./turn-trackers";
 import { trashableCardsForPending } from "./trash-rules";
 import type { Card, GameState, PendingAction, Player, ResourceId, Resources } from "./types";
@@ -55,6 +56,16 @@ export function formatAcquireOutcome(parts: string[]) {
 export function recordAcquireSpiceGain(state: GameState, playerId: string, reward: GameEffectResult) {
   const spiceGain = reward.revealGain.spice ?? 0;
   return spiceGain > 0 ? recordTurnSpiceGain(state, playerId, spiceGain) : state;
+}
+
+export function pendingActionForAcquireSpyReward(
+  state: GameState,
+  playerId: string,
+  card: Card,
+  acquireReward: GameEffectResult,
+): PendingAction | undefined {
+  const owner = state.players.find((player) => player.id === playerId);
+  return owner ? pendingActionForSpyPlacements(card.name, owner, acquireReward.spyPlacements, state) : undefined;
 }
 
 export function manipulateAcquisitionCost(card: Card) {
@@ -190,7 +201,7 @@ export function acquireMarketCard(
     ...(recruitPart ? [recruitPart] : []),
   ]);
 
-  return recordAcquireSpiceGain({
+  const acquiredState = recordAcquireSpiceGain({
     ...state,
     players,
     imperiumRow,
@@ -201,6 +212,11 @@ export function acquireMarketCard(
       ...state.log,
     ],
   }, buyer.id, acquireReward);
+  const acquireSpyPending = pendingActionForAcquireSpyReward(acquiredState, buyer.id, card, acquireReward);
+  return {
+    ...acquiredState,
+    ...queuePendingActions(acquiredState, acquireSpyPending ? [acquireSpyPending] : []),
+  };
 }
 
 export function moveImperiumCardToThroneRow(

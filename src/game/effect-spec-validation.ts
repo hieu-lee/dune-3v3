@@ -158,7 +158,12 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
   if (effect.selector === "activated-ally" && trigger !== "agent-play") {
     throw new Error(`Unsupported effect selector "${effect.selector}" for ${trigger}`);
   }
-  if (trigger === "acquire" && effect.kind !== "gain-resource" && effect.kind !== "gain-vp") {
+  if (
+    trigger === "acquire" &&
+    effect.kind !== "gain-resource" &&
+    effect.kind !== "gain-vp" &&
+    effect.kind !== "place-spies"
+  ) {
     throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
   }
   if (effect.kind === "gain-resource") {
@@ -500,10 +505,16 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     return;
   }
   if (effect.kind === "place-spies") {
-    if (trigger !== "agent-play" && trigger !== "reveal") {
+    if (trigger !== "agent-play" && trigger !== "reveal" && trigger !== "acquire") {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
     }
     validateSourceLabel("place-spies source", effect.source);
+    if (effect.placementIcon !== undefined && !supportedIcons.has(effect.placementIcon)) {
+      throw new Error(`Unsupported effect icon "${effect.placementIcon}"`);
+    }
+    validateOptionalBoolean("place-spies recallForSupply", effect.recallForSupply);
+    validateOptionalBoolean("place-spies mustPlace", effect.mustPlace);
+    validateOptionalBoolean("place-spies allowSharedPost", effect.allowSharedPost);
     if (
       effect.postPlacementAction !== undefined &&
       effect.postPlacementAction !== "staban-unseen-network"

@@ -17,6 +17,11 @@ function matchingSpyPendingDetails(first: SpyPendingAction, second: SpyPendingAc
   );
 }
 
+function mergedSpyRemaining(first: SpyPendingAction, second: SpyPendingAction, spySupply: number) {
+  const combined = first.remaining + second.remaining;
+  return first.recallForSupply ? combined : Math.min(spySupply, combined);
+}
+
 export function pendingActionsFor(
   spacePending: PendingAction | undefined,
   cardPending: PendingAction | undefined,
@@ -25,7 +30,7 @@ export function pendingActionsFor(
   if (isSpyPending(spacePending) && isSpyPending(cardPending) && matchingSpyPendingDetails(spacePending, cardPending)) {
     return [{
       ...spacePending,
-      remaining: Math.min(spySupply, spacePending.remaining + cardPending.remaining),
+      remaining: mergedSpyRemaining(spacePending, cardPending, spySupply),
       source: `${spacePending.source} / ${cardPending.source}`,
     }];
   }
@@ -59,7 +64,7 @@ export function prependPendingAction(state: GameState, action: PendingAction | u
       ...state,
       pendingAction: {
         ...state.pendingAction,
-        remaining: Math.min(owner?.spies ?? 0, state.pendingAction.remaining + action.remaining),
+        remaining: mergedSpyRemaining(state.pendingAction, action, owner?.spies ?? 0),
         source: `${state.pendingAction.source} / ${action.source}`,
       },
     };

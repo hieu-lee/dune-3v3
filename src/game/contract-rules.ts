@@ -3,13 +3,14 @@ import {
   acquireRewardParts,
   callToArmsRecruitOwner,
   formatAcquireOutcome,
+  pendingActionForAcquireSpyReward,
   recordAcquireSpiceGain,
 } from "./market-rules";
 import {
   resolveAgentPayResourceForContracts,
   resolveCardAcquireEffects,
 } from "./effect-resolver";
-import { advancePendingAction } from "./pending-actions";
+import { advancePendingAction, prependPendingAction } from "./pending-actions";
 import type {
   ContractCard,
   GameState,
@@ -320,20 +321,20 @@ export function resolveAcquireCardForPending(
     ...acquireRewardParts(acquireReward),
     ...(recruitPart ? [recruitPart] : []),
   ]);
-  return finishPendingResolution(
-    recordAcquireSpiceGain({
-      ...state,
-      players,
-      imperiumRow,
-      marketDeck,
-      throneRow,
-      ...advancePendingAction(state),
-      log: [
-        `${owner.leader} acquires ${card.name} to their ${destinationText} from ${pending.source}${outcomeText}.`,
-        ...state.log,
-      ],
-    }, owner.id, acquireReward),
-  );
+  const acquiredState = recordAcquireSpiceGain({
+    ...state,
+    players,
+    imperiumRow,
+    marketDeck,
+    throneRow,
+    ...advancePendingAction(state),
+    log: [
+      `${owner.leader} acquires ${card.name} to their ${destinationText} from ${pending.source}${outcomeText}.`,
+      ...state.log,
+    ],
+  }, owner.id, acquireReward);
+  const acquireSpyPending = pendingActionForAcquireSpyReward(acquiredState, owner.id, card, acquireReward);
+  return finishPendingResolution(prependPendingAction(acquiredState, acquireSpyPending));
 }
 
 export function resolveChoamContractFallback(

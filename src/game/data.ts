@@ -10,7 +10,9 @@ import {
   ecologicalTestingStationSourceId,
   fedaykinStilltentSourceId,
   guildEnvoySourceId,
+  guildSpySourceId,
   hiddenMissiveSourceId,
+  inHighPlacesSourceId,
   interstellarTradeSourceId,
   makerKeeperSourceId,
   maulaPistolSourceId,
@@ -19,13 +21,17 @@ import {
   prepareTheWaySourceId,
   reliableInformantSourceId,
   spaceTimeFoldingSourceId,
+  spyNetworkSourceId,
   smugglersHarvesterSourceId,
   spiceMustFlowSourceId,
+  strikeFleetSourceId,
+  subversiveAdvisorSourceId,
   wheelsWithinWheelsSourceId,
 } from "./card-identifiers";
 import {
   acquireGainResource,
   acquireGainVp,
+  acquirePlaceSpies,
   agentDiscardCardForDraw,
   agentDiscardCardForInfluenceAndDraw,
   agentDrawCards,
@@ -124,6 +130,13 @@ const shaddamReservedContractNames = new Set(["Sardaukar I", "Sardaukar II"]);
 const automatedCombatSwordValues: Partial<Record<number, number>> = {
   147: 3,
 };
+const acquireSpySourceIds = new Set([
+  guildSpySourceId,
+  inHighPlacesSourceId,
+  spyNetworkSourceId,
+  strikeFleetSourceId,
+  subversiveAdvisorSourceId,
+]);
 const intrigueSummariesByCatalogId: Partial<Record<number, string>> = {
   127: "Discard a card to gain 1 Bene Gesserit or Fremen/Fringe Influence.",
   128: "Spend 3 Solari to draw 1 Intrigue and recruit 2 troops.",
@@ -412,6 +425,15 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
       agentGainResource("spice", 1, [hasInfluence("spacing", 2)]),
       revealGainPersuasion(1),
       revealPlaceSpies(1, { mustPlace: true }),
+    ];
+  }
+  if (acquireSpySourceIds.has(card.id)) {
+    return [
+      ...(fixedRevealEffects(
+        attributeNumber(card, "Persuasion on reveal"),
+        attributeNumber(card, "Swords"),
+      ) ?? []),
+      acquirePlaceSpies(1, { recallForSupply: true, mustPlace: true }),
     ];
   }
   if (card.id === spiceMustFlowSourceId) {

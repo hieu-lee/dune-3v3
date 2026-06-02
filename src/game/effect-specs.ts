@@ -61,6 +61,21 @@ export function acquireGainVp(amount: EffectAmountSpec, conditions?: GameEffectC
   return acquireEffects([{ kind: "gain-vp", selector: "self", amount }], conditions);
 }
 
+export function acquirePlaceSpies(
+  amount: EffectAmountSpec,
+  options: {
+    recallForSupply?: boolean;
+    mustPlace?: boolean;
+    placementIcon?: IconId;
+    allowSharedPost?: boolean;
+    source?: string;
+    postPlacementAction?: "staban-unseen-network";
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return acquireEffects([{ kind: "place-spies", selector: "self", amount, ...options }], conditions);
+}
+
 export function revealGainResource(
   resource: ResourceId,
   amount: number,

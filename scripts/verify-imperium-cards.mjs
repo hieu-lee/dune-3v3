@@ -177,6 +177,8 @@ try {
   assert.ok(prepareTheWay, "Reserve market should include Prepare The Way");
   const spiceMustFlow = data.reserveMarket.find((card) => card.sourceId === 538);
   assert.ok(spiceMustFlow, "Reserve market should include The Spice Must Flow");
+  const spyNetwork = data.imperiumDeck.find((card) => card.name === "Spy Network");
+  assert.ok(spyNetwork, "Imperium deck should include Spy Network");
   assert.equal(state.isPrepareTheWayCard(prepareTheWay), true, "Prepare The Way should be recognized");
   assert.deepEqual(
     data.reserveMarket.map((card) => card.sourceId),
@@ -208,6 +210,19 @@ try {
       spec.effects.some((effect) => effect.kind === "gain-resource" && effect.resource === "spice" && effect.amount === 1)
     ),
     "The Spice Must Flow should model its acquire spice as a typed acquire effect",
+  );
+  assert.ok(
+    spyNetwork.effects?.some((spec) =>
+      spec.trigger === "acquire" &&
+      spec.effects.some((effect) =>
+        effect.kind === "place-spies" &&
+        effect.selector === "self" &&
+        effect.amount === 1 &&
+        effect.recallForSupply === true &&
+        effect.mustPlace === true
+      )
+    ),
+    "Spy Network should model its acquisition spy bonus as a typed acquire effect",
   );
   for (const name of ["Bene Gesserit Operative", "Cargo Runner", "Chani, Clever Tactician", "Maker Keeper", "Maula Pistol", "Northern Watermaster", "Paracompass"]) {
     const card = data.imperiumDeck.find((candidate) => candidate.name === name);
@@ -459,6 +474,45 @@ try {
   );
   assert.match(spiceBought.log[0], /acquires The Spice Must Flow for 1 VP and gains 1 spice/);
 
+  const spyNetworkReplacement = data.imperiumDeck.find((card) => card.id !== spyNetwork.id);
+  assert.ok(spyNetworkReplacement, "Expected an Imperium row replacement card for Spy Network purchase coverage");
+  const spyNetworkBuyFixture = {
+    ...withActivePlayer(game, p2.id, () => ({
+      revealed: true,
+      persuasion: spyNetwork.cost,
+      discard: [],
+      spies: 1,
+    })),
+    imperiumRow: [spyNetwork],
+    marketDeck: [spyNetworkReplacement],
+    spyPosts: {},
+    sharedSpyPosts: {},
+  };
+  const spyNetworkBought = state.acquireMarketCard(spyNetworkBuyFixture, p2.id, spyNetwork.id);
+  const spyNetworkBuyer = playerById(spyNetworkBought, p2.id);
+  assert.equal(spyNetworkBuyer.persuasion, 0, "Spy Network should spend its persuasion cost");
+  assert.equal(spyNetworkBuyer.discard.at(-1).id, spyNetwork.id, "Spy Network should go to discard when bought from the row");
+  assert.deepEqual(
+    spyNetworkBought.imperiumRow.map((card) => card.id),
+    [spyNetworkReplacement.id],
+    "Buying Spy Network from the row should draw a replacement",
+  );
+  assert.equal(spyNetworkBought.pendingAction?.kind, "spy", "Buying Spy Network should queue a spy placement");
+  assert.equal(spyNetworkBought.pendingAction.ownerId, p2.id);
+  assert.equal(spyNetworkBought.pendingAction.source, "Spy Network");
+  assert.equal(spyNetworkBought.pendingAction.remaining, 1);
+  assert.equal(spyNetworkBought.pendingAction.recallForSupply, true);
+  assert.equal(spyNetworkBought.pendingAction.mustPlaceSpy, true);
+  const spyNetworkSpyPlaced = state.placeSpyForPending(
+    spyNetworkBought,
+    spyNetworkBought.pendingAction,
+    highCouncil.id,
+  );
+  assert.equal(spyNetworkSpyPlaced.pendingAction, undefined);
+  assert.equal(playerById(spyNetworkSpyPlaced, p2.id).spies, 0, "Spy Network acquire bonus should spend one spy");
+  assert.equal(spyNetworkSpyPlaced.spyPosts[highCouncil.id], p2.id, "Spy Network acquire bonus should place the selected spy");
+  assert.match(spyNetworkSpyPlaced.log[0], /places a spy near High Council from Spy Network/);
+
   const spiceAcquirePending = {
     kind: "acquire-card",
     ownerId: p2.id,
@@ -485,6 +539,97 @@ try {
   assert.match(
     spicePendingAcquired.log[0],
     /acquires The Spice Must Flow to their hand from Verifier Acquire for 1 VP and gains 1 spice/,
+  );
+
+  const queuedAfterAcquire = {
+    kind: "trash-card",
+    ownerId: p2.id,
+    source: "Queued Verifier",
+    optional: false,
+    zones: ["hand"],
+  };
+  const spyAcquirePending = {
+    kind: "acquire-card",
+    ownerId: p2.id,
+    source: "Verifier Acquire",
+    maxCost: spyNetwork.cost,
+    destination: "hand",
+  };
+  const spyPendingAcquireFixture = {
+    ...withActivePlayer(game, p2.id, () => ({
+      hand: [],
+      spies: 1,
+    })),
+    imperiumRow: [spyNetwork],
+    marketDeck: [spyNetworkReplacement],
+    pendingAction: spyAcquirePending,
+    pendingQueue: [queuedAfterAcquire],
+    spyPosts: {},
+    sharedSpyPosts: {},
+  };
+  const spyPendingAcquired = state.acquireCardForPending(spyPendingAcquireFixture, spyAcquirePending, spyNetwork.id);
+  const spyPendingOwner = playerById(spyPendingAcquired, p2.id);
+  assert.equal(spyPendingOwner.hand.at(-1).id, spyNetwork.id, "Acquire-card pending should honor Spy Network hand destination");
+  assert.equal(spyPendingAcquired.pendingAction?.kind, "spy", "Acquire-card pending should immediately queue Spy Network spy bonus");
+  assert.equal(spyPendingAcquired.pendingAction.source, "Spy Network");
+  assert.equal(spyPendingAcquired.pendingQueue[0], queuedAfterAcquire, "Spy Network acquire bonus should resolve before existing queued prompts");
+
+  const queuedSpyAfterAcquire = {
+    kind: "spy",
+    ownerId: p2.id,
+    remaining: 1,
+    recallForSupply: true,
+    mustPlaceSpy: true,
+    source: "Queued Spy",
+  };
+  const spyPendingAcquireRecallFixture = {
+    ...withActivePlayer(game, p2.id, () => ({
+      hand: [],
+      spies: 0,
+    })),
+    imperiumRow: [spyNetwork],
+    marketDeck: [spyNetworkReplacement],
+    pendingAction: spyAcquirePending,
+    pendingQueue: [queuedSpyAfterAcquire],
+    spyPosts: { [highCouncil.id]: p2.id },
+    sharedSpyPosts: {},
+  };
+  const spyPendingAcquiredWithRecall = state.acquireCardForPending(
+    spyPendingAcquireRecallFixture,
+    spyAcquirePending,
+    spyNetwork.id,
+  );
+  assert.equal(
+    spyPendingAcquiredWithRecall.pendingAction?.remaining,
+    2,
+    "Merged recall-for-supply spy rewards should not cap remaining to zero when supply is empty",
+  );
+  assert.equal(spyPendingAcquiredWithRecall.pendingAction.mustPlaceSpy, true);
+  assert.deepEqual(
+    state.recallableSpySupplySpaces(spyPendingAcquiredWithRecall, spyPendingAcquiredWithRecall.pendingAction).map((space) => space.id),
+    [highCouncil.id],
+    "Merged acquire spy rewards should expose recall-for-supply choices instead of deadlocking",
+  );
+  const spyPendingRecallResolved = state.recallSpyForSupplyForPending(
+    spyPendingAcquiredWithRecall,
+    spyPendingAcquiredWithRecall.pendingAction,
+    highCouncil.id,
+  );
+  const spyPendingRecallPlaced = state.placeSpyForPending(
+    spyPendingRecallResolved,
+    spyPendingRecallResolved.pendingAction,
+    secrets.id,
+  );
+  assert.equal(
+    spyPendingRecallPlaced.pendingAction?.remaining,
+    1,
+    "Merged recall-for-supply spy rewards should remain resolvable after placing the recalled spy",
+  );
+  assert.equal(spyPendingRecallPlaced.pendingAction.mustPlaceSpy, false);
+  assert.equal(
+    state.finishPendingAction(spyPendingRecallPlaced).pendingAction,
+    undefined,
+    "Remaining merged recall-for-supply spy rewards should be skippable after the mandatory placement resolves",
   );
 
   const prepareDrawCard = { ...calculusTrashTarget, id: "prepare-way-draw-target" };

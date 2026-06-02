@@ -28,7 +28,6 @@ import {
   resolveRevealPayResourceForTroops,
   resolveRevealRetreatTroopsForStrength,
   resolveRevealTrashCardEffects,
-  type SpyPlacementEffectResult,
 } from "./effect-resolver";
 import { discardCardForDrawChoices } from "./discard-draw-rules";
 import { discardCardForInfluenceAndDrawChoices } from "./discard-influence-draw-rules";
@@ -45,10 +44,12 @@ import {
   irulanSignetTrashableCards,
 } from "./market-rules";
 import {
-  placeableSpySpaces,
   recallableSpySpaces,
-  recallableSpySupplySpaces,
 } from "./spy-choices";
+import {
+  mergedSpyPlacement,
+  spyPendingForPlacement,
+} from "./spy-effect-pending-rules";
 import { trashableCardsForPending } from "./trash-rules";
 import { hasUsedReverendMotherJessicaRepeat } from "./turn-trackers";
 import type {
@@ -98,51 +99,6 @@ function potentialDeferredMakerChoiceSpice(state: GameState, source: Player, tar
   return spice;
 }
 
-function sameSpyPlacementDetails(first: SpyPlacementEffectResult, second: SpyPlacementEffectResult) {
-  return first.recallForSupply === second.recallForSupply &&
-    first.mustPlace === second.mustPlace &&
-    first.placementIcon === second.placementIcon &&
-    first.allowSharedPost === second.allowSharedPost &&
-    first.source === second.source &&
-    first.postPlacementAction === second.postPlacementAction;
-}
-
-function mergedSpyPlacement(card: Card, placements: SpyPlacementEffectResult[]) {
-  if (placements.length === 0) return undefined;
-  const [first, ...rest] = placements;
-  if (rest.some((placement) => !sameSpyPlacementDetails(first, placement))) {
-    throw new Error(`Unsupported mixed spy placement specs for ${card.name}`);
-  }
-  return {
-    ...first,
-    count: placements.reduce((sum, placement) => sum + placement.count, 0),
-  };
-}
-
-function spyPendingForPlacement(
-  card: Card,
-  owner: Player,
-  placement: SpyPlacementEffectResult,
-  state?: GameState,
-): PendingAction | undefined {
-  if (placement.count <= 0) return undefined;
-  const pending: Extract<PendingAction, { kind: "spy" }> = {
-    kind: "spy",
-    ownerId: owner.id,
-    remaining: placement.count,
-    ...(placement.recallForSupply ? { recallForSupply: true } : {}),
-    ...(placement.mustPlace ? { mustPlaceSpy: true } : {}),
-    ...(placement.placementIcon ? { placementIcon: placement.placementIcon } : {}),
-    ...(placement.allowSharedPost ? { allowSharedPost: true } : {}),
-    ...(placement.postPlacementAction ? { postPlacementAction: placement.postPlacementAction } : {}),
-    source: placement.source ?? card.name,
-  };
-  const canPlace = state
-    ? placeableSpySpaces(state, pending).length > 0 || recallableSpySupplySpaces(state, pending).length > 0
-    : owner.spies > 0;
-  return canPlace ? pending : undefined;
-}
-
 function pendingActionForAgentSpyPlacement(
   card: Card,
   source: Player,
@@ -160,16 +116,16 @@ function pendingActionForAgentSpyPlacement(
     space,
     state: effectState,
   });
-  const sourcePlacement = mergedSpyPlacement(card, result.spyPlacements);
-  const allyPlacement = mergedSpyPlacement(card, result.activatedAlly.spyPlacements);
+  const sourcePlacement = mergedSpyPlacement(card.name, result.spyPlacements);
+  const allyPlacement = mergedSpyPlacement(card.name, result.activatedAlly.spyPlacements);
   if (sourcePlacement && allyPlacement) {
     throw new Error(`Unsupported mixed spy placement owners for ${card.name}`);
   }
   if (sourcePlacement) {
-    return spyPendingForPlacement(card, source, sourcePlacement, effectState);
+    return spyPendingForPlacement(card.name, source, sourcePlacement, effectState);
   }
   if (allyPlacement && target) {
-    return spyPendingForPlacement(card, target, allyPlacement, effectState);
+    return spyPendingForPlacement(card.name, target, allyPlacement, effectState);
   }
   return undefined;
 }
@@ -185,12 +141,12 @@ function pendingActionForRevealSpyPlacement(
     source,
     state,
   });
-  const sourcePlacement = mergedSpyPlacement(card, result.spyPlacements);
-  const allyPlacement = mergedSpyPlacement(card, result.activatedAlly.spyPlacements);
+  const sourcePlacement = mergedSpyPlacement(card.name, result.spyPlacements);
+  const allyPlacement = mergedSpyPlacement(card.name, result.activatedAlly.spyPlacements);
   if (allyPlacement) {
     throw new Error(`Unsupported activated Ally reveal spy placement for ${card.name}`);
   }
-  return sourcePlacement ? spyPendingForPlacement(card, source, sourcePlacement, state) : undefined;
+  return sourcePlacement ? spyPendingForPlacement(card.name, source, sourcePlacement, state) : undefined;
 }
 
 function pendingActionForAgentDiscardCardForInfluenceAndDraw(

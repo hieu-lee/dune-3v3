@@ -1,0 +1,218 @@
+import { validateSpec } from "./effect-spec-validation";
+import { amountFor, specApplies } from "./effect-resolver-helpers";
+import type {
+  AgentPaidRewardChoice,
+  AgentPaidRewardChoiceAtomicReward,
+  AgentPendingActionChoice,
+  GameEffectContext,
+  LeaderTransitionChoice,
+} from "./effect-resolver-types";
+import type {
+  CardEffectSpec,
+  PaidRewardChoiceEffectAtomicReward,
+  PaidRewardChoiceEffectOption,
+  PendingActionChoiceEffectOption,
+} from "./types";
+
+function resolvePaidRewardChoiceOption(
+  option: PaidRewardChoiceEffectOption,
+  context: GameEffectContext,
+): AgentPaidRewardChoice["options"][number] {
+  const resolveReward = (reward: PaidRewardChoiceEffectAtomicReward): AgentPaidRewardChoiceAtomicReward => {
+    switch (reward.kind) {
+      case "recruit-troops":
+        return {
+          kind: "recruit-troops",
+          selector: reward.selector,
+          amount: amountFor(reward.amount, context.source),
+          destination: reward.destination,
+        };
+      case "gain-influence":
+        return {
+          kind: "gain-influence",
+          selector: reward.selector,
+          faction: reward.faction,
+          amount: amountFor(reward.amount, context.source),
+        };
+      case "gain-resource":
+        return {
+          kind: "gain-resource",
+          selector: reward.selector,
+          resource: reward.resource,
+          amount: amountFor(reward.amount, context.source),
+        };
+      case "draw-intrigues":
+        return {
+          kind: "draw-intrigues",
+          selector: reward.selector,
+          amount: amountFor(reward.amount, context.source),
+        };
+      case "gain-leader-counter":
+        return {
+          kind: "gain-leader-counter",
+          selector: reward.selector,
+          counter: reward.counter,
+          amount: amountFor(reward.amount, context.source),
+          troopSupplyCost: amountFor(reward.troopSupplyCost, context.source),
+        };
+      default: {
+        const unsupported = reward as { kind?: unknown };
+        throw new Error(`Unsupported paid-reward-choice reward "${String(unsupported.kind)}"`);
+      }
+    }
+  };
+  const resolvedBase = {
+    id: option.id,
+    resource: option.resource,
+    cost: amountFor(option.cost, context.source),
+  };
+  if (option.reward.kind === "bundle") {
+    return {
+      ...resolvedBase,
+      reward: {
+        kind: "bundle",
+        rewards: option.reward.rewards.map(resolveReward),
+      },
+    };
+  }
+  switch (option.reward.kind) {
+    case "recruit-troops":
+      return {
+        ...resolvedBase,
+        reward: resolveReward(option.reward),
+      };
+    case "gain-influence":
+      return {
+        ...resolvedBase,
+        reward: resolveReward(option.reward),
+      };
+    case "gain-resource":
+      return {
+        ...resolvedBase,
+        reward: resolveReward(option.reward),
+      };
+    case "draw-intrigues":
+    case "gain-leader-counter":
+      return {
+        ...resolvedBase,
+        reward: resolveReward(option.reward),
+      };
+    default: {
+      const reward = option.reward as { kind?: unknown };
+      throw new Error(`Unsupported paid-reward-choice reward "${String(reward.kind)}"`);
+    }
+  }
+}
+
+export function resolveAgentPaidRewardChoices(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): AgentPaidRewardChoice[] {
+  specs?.forEach(validateSpec);
+  return (specs ?? []).flatMap((spec) => {
+    if (spec.trigger !== "agent-play") return [];
+    if (!specApplies(spec, context)) return [];
+    return spec.effects
+      .filter((effect) => effect.kind === "paid-reward-choice")
+      .map((effect) => ({
+        selector: effect.selector,
+        options: effect.options.map((option) => resolvePaidRewardChoiceOption(option, context)),
+        ...(effect.requiredRecipient ? { requiredRecipient: effect.requiredRecipient } : {}),
+        ...(effect.requirePayableOption ? { requirePayableOption: true } : {}),
+        source: effect.source,
+      }));
+  });
+}
+
+function resolvePendingActionChoiceOption(
+  option: PendingActionChoiceEffectOption,
+  context: GameEffectContext,
+): AgentPendingActionChoice["options"][number] {
+  if (option.effect.kind === "acquire-card") {
+    return {
+      id: option.id,
+      label: option.label,
+      effect: {
+        kind: "acquire-card",
+        selector: option.effect.selector,
+        ...(option.effect.minCost !== undefined ? { minCost: amountFor(option.effect.minCost, context.source) } : {}),
+        ...(option.effect.maxCost !== undefined ? { maxCost: amountFor(option.effect.maxCost, context.source) } : {}),
+        destination: option.effect.destination,
+        ...(option.effect.paymentResource ? { paymentResource: option.effect.paymentResource } : {}),
+        optional: option.effect.optional ?? false,
+        ...(option.effect.source ? { source: option.effect.source } : {}),
+      },
+    };
+  }
+  if (option.effect.kind === "trash-card") {
+    return {
+      id: option.id,
+      label: option.label,
+      effect: {
+        kind: "trash-card",
+        selector: option.effect.selector,
+        optional: option.effect.optional ?? false,
+        ...(option.effect.zones ? { zones: [...option.effect.zones] } : {}),
+        excludeSource: option.effect.excludeSource ?? false,
+        ...(option.effect.requiredTrait ? { requiredTrait: option.effect.requiredTrait } : {}),
+        ...(option.effect.spiceRewardCostThreshold !== undefined
+          ? { spiceRewardCostThreshold: amountFor(option.effect.spiceRewardCostThreshold, context.source) }
+          : {}),
+        ...(option.effect.spiceReward !== undefined
+          ? { spiceReward: amountFor(option.effect.spiceReward, context.source) }
+          : {}),
+        ...(option.effect.source ? { source: option.effect.source } : {}),
+      },
+    };
+  }
+  const effect = option.effect as { kind?: unknown };
+  throw new Error(`Unsupported pending-action-choice effect "${String(effect.kind)}"`);
+}
+
+export function resolveAgentPendingActionChoices(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): AgentPendingActionChoice[] {
+  specs?.forEach(validateSpec);
+  return (specs ?? []).flatMap((spec) => {
+    if (spec.trigger !== "agent-play") return [];
+    if (!specApplies(spec, context)) return [];
+    return spec.effects
+      .filter((effect) => effect.kind === "pending-action-choice")
+      .map((effect) => ({
+        selector: effect.selector,
+        options: effect.options.map((option) => resolvePendingActionChoiceOption(option, context)),
+        source: effect.source,
+      }));
+  });
+}
+
+export function resolveLeaderTransitionChoices(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): LeaderTransitionChoice[] {
+  specs?.forEach(validateSpec);
+  return (specs ?? []).flatMap((spec) => {
+    if (spec.trigger !== "agent-placement") return [];
+    if (!specApplies(spec, context)) return [];
+    return spec.effects
+      .filter((effect) => effect.kind === "leader-transition-choice")
+      .map((effect) => ({
+        selector: effect.selector,
+        fromLeader: effect.fromLeader,
+        toLeader: effect.toLeader,
+        counter: effect.counter,
+        counterAmount: effect.counterAmount,
+        drawCardsPerCounter: amountFor(effect.drawCardsPerCounter, context.source),
+        ...(effect.followUp
+          ? {
+              followUp: {
+                ...effect.followUp,
+                cost: amountFor(effect.followUp.cost, context.source),
+              },
+            }
+          : {}),
+        ...(effect.source ? { source: effect.source } : {}),
+      }));
+  });
+}

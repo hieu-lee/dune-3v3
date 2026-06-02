@@ -120,6 +120,9 @@ export function resolveTrashCardEffects(
           ? undefined
           : amountFor(effect.spiceRewardCostThreshold, context.source),
         spiceReward: effect.spiceReward === undefined ? undefined : amountFor(effect.spiceReward, context.source),
+        drawCardsReward: effect.drawCardsReward === undefined
+          ? undefined
+          : amountFor(effect.drawCardsReward, context.source),
       }));
   });
 }

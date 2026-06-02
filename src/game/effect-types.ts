@@ -281,6 +281,7 @@ export type GameEffectSpec =
       strengthReward?: EffectAmountSpec;
       spiceRewardCostThreshold?: EffectAmountSpec;
       spiceReward?: EffectAmountSpec;
+      drawCardsReward?: EffectAmountSpec;
     }
   | {
       kind: "lose-influence-for-intrigues";

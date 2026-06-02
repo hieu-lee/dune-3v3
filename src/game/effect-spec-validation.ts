@@ -429,10 +429,14 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
       if (effect.spiceReward !== undefined) {
         throw new Error(`Unsupported trash-card spiceReward for ${trigger}`);
       }
+      if (effect.drawCardsReward !== undefined) validateAmount(effect.drawCardsReward);
       return;
     }
     if (effect.sourceOnly !== undefined) {
       throw new Error(`Unsupported trash-card sourceOnly for ${trigger}`);
+    }
+    if (effect.drawCardsReward !== undefined) {
+      throw new Error(`Unsupported trash-card drawCardsReward for ${trigger}`);
     }
     if (trigger === "combat-intrigue" && effect.optional !== true) {
       invalidSpecField("combat trash-card optional", effect.optional);

@@ -40,6 +40,7 @@ import {
   strikeFleetSourceId,
   subversiveAdvisorSourceId,
   theacherousManeuverSourceId,
+  treadInDarknessSourceId,
   undercoverAssetSourceId,
   wheelsWithinWheelsSourceId,
 } from "./card-identifiers";
@@ -63,6 +64,7 @@ import {
   agentPlaceSpies,
   agentRecruitTroops,
   agentTrashSource,
+  agentTrashSourceForDrawCards,
   discardGainResource,
   hasCardTraitInPlay,
   hasCompletedContracts,
@@ -107,6 +109,14 @@ const acquireSpySourceIds = new Set([
   strikeFleetSourceId,
   subversiveAdvisorSourceId,
 ]);
+
+function imperiumTrait(name: string) {
+  return name === "Faction: Bene Geserit" ? "Faction: Bene Gesserit" : name;
+}
+
+function imperiumTraits(card: HubCard) {
+  return card.attributes.map(([name]) => imperiumTrait(name));
+}
 
 function revealText(persuasion: number, swords: number) {
   const parts = [`+${persuasion} persuasion`];
@@ -220,6 +230,13 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
     return [
       agentTrashSource(),
       revealGainPersuasion(1),
+      revealGainStrength(1),
+    ];
+  }
+  if (card.id === treadInDarknessSourceId) {
+    return [
+      agentTrashSourceForDrawCards(1, {}, [hasCardTraitInPlay("Faction: Bene Gesserit", 2)]),
+      revealGainPersuasion(2),
       revealGainStrength(1),
     ];
   }
@@ -537,6 +554,9 @@ function imperiumPlayText(card: HubCard) {
   if (card.id === desertSurvivalSourceId) {
     return "You may trash this card.";
   }
+  if (card.id === treadInDarknessSourceId) {
+    return "If you have another Bene Gesserit card in play, you may trash this card to draw 1 card.";
+  }
   if (card.id === desertPowerSourceId) {
     return "If you sent an Agent to a Maker board space this turn, gain 2 spice.";
   }
@@ -589,7 +609,7 @@ function toImperiumCard(card: HubCard): Card {
       sourceId: card.id,
       sourceSlug: card.slug,
       sourceType: card.type,
-      traits: card.attributes.map(([name]) => name),
+      traits: imperiumTraits(card),
     };
   }
   if (card.id === beneGesseritOperativeSourceId) {
@@ -669,7 +689,7 @@ function toImperiumCard(card: HubCard): Card {
     sourceId: card.id,
     sourceSlug: card.slug,
     sourceType: card.type,
-    traits: card.attributes.map(([name]) => name),
+    traits: imperiumTraits(card),
   };
 }
 

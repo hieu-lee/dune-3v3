@@ -168,6 +168,40 @@ export async function runCardChoicesSmoke({
     "Desert Survival should leave other in-play cards alone",
   );
 
+  await setDebugGameAndWait(page, states.treadInDarkness);
+  pendingText = await page.locator(".pending-panel").innerText();
+  assert.match(pendingText, /Tread in Darkness/i);
+  assert.match(pendingText, /Trash reward: draw 1 card/i);
+  assert.match(pendingText, /Skip/i);
+  assert.doesNotMatch(pendingText, /Tread in Darkness Debug Other Bene/i);
+  await screenshot(page, captures, "pending-tread-in-darkness-trash-draw.png");
+
+  before = await currentGame(page);
+  await page.locator(".pending-panel").getByRole("button", { name: /Tread in Darkness \(in play\)/ }).click();
+  await waitForNoPending(page);
+  after = await currentGame(page);
+  ownerAfter = after.players.find((player) => player.id === "p2");
+  assert.equal(
+    ownerAfter.playArea.some((card) => card.id === before.pendingAction.requiredCardId),
+    false,
+    "Tread in Darkness should trash the source card from play",
+  );
+  assert.equal(
+    ownerAfter.playArea.some((card) => card.id === states.treadInDarkness.treadInDarknessOtherBeneCardId),
+    true,
+    "Tread in Darkness should leave the other Bene Gesserit card in play",
+  );
+  assert.equal(
+    ownerAfter.hand.some((card) => card.id === states.treadInDarkness.treadInDarknessDrawCardId),
+    true,
+    "Tread in Darkness should draw the reward card after trashing itself",
+  );
+  assert.equal(
+    ownerAfter.deck.some((card) => card.id === states.treadInDarkness.treadInDarknessExtraDeckCardId),
+    true,
+    "Tread in Darkness should leave the second deck card undrawn",
+  );
+
   await setDebugGameAndWait(page, states.acquireSpyNetwork);
   pendingText = await page.locator(".pending-panel").innerText();
   assert.match(pendingText, /Spy Network/i);
@@ -434,6 +468,10 @@ async function createCardChoiceStates(server, initialPlayableGame) {
   assert.ok(dangerousRhetoric, "Expected Dangerous Rhetoric Imperium card");
   const desertSurvival = data.imperiumDeck.find((card) => card.sourceId === 27);
   assert.ok(desertSurvival, "Expected Desert Survival Imperium card");
+  const treadInDarkness = data.imperiumDeck.find((card) => card.sourceId === 58);
+  assert.ok(treadInDarkness, "Expected Tread in Darkness Imperium card");
+  const hiddenMissive = data.imperiumDeck.find((card) => card.sourceId === 21);
+  assert.ok(hiddenMissive, "Expected Hidden Missive Imperium card");
   const priceIsNoObject = data.imperiumDeck.find((card) => card.sourceId === 73);
   assert.ok(priceIsNoObject, "Expected Price is No Object Imperium card");
   const doubleAgent = data.imperiumDeck.find((card) => card.sourceId === 37);
@@ -496,6 +534,21 @@ async function createCardChoiceStates(server, initialPlayableGame) {
     ...data.allyStarterCards[0],
     id: "browser-desert-survival-other-play-card",
     name: "Desert Survival Debug Other",
+  };
+  const treadInDarknessOtherBeneCard = {
+    ...hiddenMissive,
+    id: "browser-tread-in-darkness-other-bene-card",
+    name: "Tread in Darkness Debug Other Bene",
+  };
+  const treadInDarknessDrawCard = {
+    ...data.allyStarterCards[1],
+    id: "browser-tread-in-darkness-draw-card",
+    name: "Tread in Darkness Debug Draw",
+  };
+  const treadInDarknessExtraDeckCard = {
+    ...data.allyStarterCards[2],
+    id: "browser-tread-in-darkness-extra-deck-card",
+    name: "Tread in Darkness Debug Extra Deck",
   };
   const priceIsNoObjectAcquireCard = {
     ...beneGesseritOperative,
@@ -755,6 +808,50 @@ async function createCardChoiceStates(server, initialPlayableGame) {
     [desertSurvival.id],
     "Desert Survival browser state should only offer its source card",
   );
+  const treadInDarknessState = turnActions.placeAgentAction(
+    {
+      ...base,
+      spaces: {},
+      players: base.players.map((player) =>
+        player.id === ownerId
+          ? {
+              ...player,
+              agentsReady: 1,
+              deck: [treadInDarknessDrawCard, treadInDarknessExtraDeckCard],
+              discard: [],
+              garrison: 0,
+              hand: [treadInDarkness],
+              playArea: [treadInDarknessOtherBeneCard],
+              resources: { solari: 0, spice: 0, water: 0 },
+            }
+          : player,
+      ),
+    },
+    {
+      commanderTargets: {},
+      selectedCard: treadInDarkness,
+      selectedSpace: imperialBasin,
+    },
+  );
+  assert.equal(
+    treadInDarknessState.pendingAction?.kind,
+    "trash-card",
+    "Expected Tread in Darkness source-trash draw pending action",
+  );
+  assert.equal(treadInDarknessState.pendingAction.requiredCardId, treadInDarkness.id);
+  assert.equal(treadInDarknessState.pendingAction.requiredAgentPlacementSpaceId, imperialBasin.id);
+  assert.equal(treadInDarknessState.pendingAction.requiredAgentPlacementTargetOwnerId, ownerId);
+  assert.equal(treadInDarknessState.pendingAction.drawCardsReward, 1);
+  const treadInDarknessOwner = treadInDarknessState.players.find((player) => player.id === ownerId);
+  assert.ok(treadInDarknessOwner, "Expected Tread in Darkness owner in browser debug state");
+  assert.deepEqual(
+    state.trashableCardsForPending(
+      treadInDarknessOwner,
+      treadInDarknessState.pendingAction,
+    ).map(({ card }) => card.id),
+    [treadInDarkness.id],
+    "Tread in Darkness browser state should only offer its source card",
+  );
   const covertOperationOwner = base.players.find((player) => player.id === ownerId);
   assert.ok(covertOperationOwner, "Expected Covert Operation owner");
   const covertOperationSource = {
@@ -926,6 +1023,12 @@ async function createCardChoiceStates(server, initialPlayableGame) {
     desertSurvival: {
       ...desertSurvivalState,
       desertSurvivalOtherPlayCardId: desertSurvivalOtherPlayCard.id,
+    },
+    treadInDarkness: {
+      ...treadInDarknessState,
+      treadInDarknessDrawCardId: treadInDarknessDrawCard.id,
+      treadInDarknessExtraDeckCardId: treadInDarknessExtraDeckCard.id,
+      treadInDarknessOtherBeneCardId: treadInDarknessOtherBeneCard.id,
     },
     acquireSpyNetwork: {
       ...acquireSpyNetworkState,

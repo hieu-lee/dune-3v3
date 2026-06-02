@@ -324,6 +324,7 @@ export function agentTrashSourceForTrade(
 export function agentTrashSource(
   options: {
     optional?: boolean;
+    drawCardsReward?: EffectAmountSpec;
   } = {},
   conditions?: GameEffectConditionSpec[],
 ): CardEffectSpec {
@@ -334,8 +335,19 @@ export function agentTrashSource(
       optional: options.optional ?? true,
       zones: ["playArea"],
       sourceOnly: true,
+      ...(options.drawCardsReward !== undefined ? { drawCardsReward: options.drawCardsReward } : {}),
     },
   ], conditions);
+}
+
+export function agentTrashSourceForDrawCards(
+  drawCards: EffectAmountSpec,
+  options: {
+    optional?: boolean;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return agentTrashSource({ ...options, drawCardsReward: drawCards }, conditions);
 }
 
 export function agentMoveCardToThroneRow(

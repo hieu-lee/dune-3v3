@@ -106,6 +106,7 @@ export type TrashCardEffect = {
   strengthReward?: number;
   spiceRewardCostThreshold?: number;
   spiceReward?: number;
+  drawCardsReward?: number;
 };
 
 export type RevealTrashCardEffect = TrashCardEffect;

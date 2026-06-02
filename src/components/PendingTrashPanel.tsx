@@ -21,10 +21,15 @@ export function PendingTrashPanel({
   onSkip,
   onTrash,
 }: PendingTrashPanelProps) {
+  const drawCardsReward = pending.drawCardsReward ?? 0;
+
   return (
     <div className="pending-controls trade-intrigue-grid">
       <div className="trade-intrigue-column">
         <strong>{owner.leader}</strong>
+        {drawCardsReward > 0 && (
+          <span>Trash reward: draw {drawCardsReward} card{drawCardsReward === 1 ? "" : "s"}</span>
+        )}
         {choices.length === 0 && <span>No trashable cards</span>}
         {choices.map(({ zone, card }, index) => (
           <button

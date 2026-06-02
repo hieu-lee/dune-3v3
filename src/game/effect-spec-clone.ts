@@ -60,6 +60,9 @@ export function cloneCardEffects(effects: CardEffectSpec[] | undefined): CardEff
         ...("spiceReward" in effect && effect.spiceReward !== undefined
           ? { spiceReward: cloneAmount(effect.spiceReward) }
           : {}),
+        ...("drawCardsReward" in effect && effect.drawCardsReward !== undefined
+          ? { drawCardsReward: cloneAmount(effect.drawCardsReward) }
+          : {}),
         ...("drawCards" in effect
           ? { drawCards: cloneAmount(effect.drawCards) }
           : {}),

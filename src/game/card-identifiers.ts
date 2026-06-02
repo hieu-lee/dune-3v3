@@ -91,6 +91,7 @@ export const priceIsNoObjectSourceId = 73;
 export const spyNetworkSourceId = 25;
 export const strikeFleetSourceId = 65;
 export const subversiveAdvisorSourceId = 62;
+export const treadInDarknessSourceId = 58;
 
 export const shadowAllianceFactions: FactionId[] = [
   "emperor",

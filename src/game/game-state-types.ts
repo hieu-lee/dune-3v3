@@ -142,6 +142,7 @@ export type PendingAction =
       spiceReward?: number;
       combatRecipientId?: string;
       strengthReward?: number;
+      drawCardsReward?: number;
     }
   | {
       kind: "reveal-adjust";

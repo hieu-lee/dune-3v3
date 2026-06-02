@@ -918,6 +918,7 @@ function pendingActionForAgentTrashSourceCard(
         ...(sourceCardInPlay.agentPlacementTargetOwnerId
           ? { requiredAgentPlacementTargetOwnerId: sourceCardInPlay.agentPlacementTargetOwnerId }
           : {}),
+        ...(effect.drawCardsReward !== undefined ? { drawCardsReward: effect.drawCardsReward } : {}),
       };
       return trashableCardsForPending(source, pending).length > 0 ? pending : undefined;
     })

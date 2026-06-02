@@ -194,6 +194,7 @@ try {
   const spyNetwork = data.imperiumDeck.find((card) => card.name === "Spy Network");
   const strikeFleet = data.imperiumDeck.find((card) => card.name === "Strike Fleet");
   const subversiveAdvisor = data.imperiumDeck.find((card) => card.name === "Subversive Advisor");
+  const treadInDarkness = data.imperiumDeck.find((card) => card.name === "Tread in Darkness");
   const wheelsWithinWheels = data.imperiumDeck.find((card) => card.name === "Wheels Within Wheels");
   const prepareTheWay = data.reserveMarket.find((card) => card.sourceId === 537);
   const spiceMustFlow = data.reserveMarket.find((card) => card.sourceId === 538);
@@ -297,6 +298,7 @@ try {
     spyNetwork &&
     strikeFleet &&
     subversiveAdvisor &&
+    treadInDarkness &&
     wheelsWithinWheels,
   );
   assert.ok(commandRespect && prepareTheWay && spiceMustFlow && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
@@ -3346,6 +3348,7 @@ try {
       "Spacing Guild's Favor",
       "Stilgar, The Devoted",
       "Theacherous Maneuver",
+      "Tread in Darkness",
       "Undercover Asset",
       "Wheels Within Wheels",
     ],
@@ -4229,6 +4232,47 @@ try {
   );
   assert.equal(desertSurvival.play, "You may trash this card.", "Desert Survival play text should expose source trash");
   assert.equal(desertSurvival.reveal, "+1 persuasion and +1 strength.", "Desert Survival reveal text should stay fixed");
+  assert.deepEqual(
+    treadInDarkness.traits?.filter((trait) => trait.startsWith("Faction:")),
+    ["Faction: Bene Gesserit"],
+    "Tread in Darkness should normalize its Bene Gesserit trait",
+  );
+  assert.ok(
+    treadInDarkness.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.conditions?.some((condition) =>
+        condition.kind === "has-card-trait-in-play" &&
+        condition.trait === "Faction: Bene Gesserit" &&
+        condition.count === 2
+      ) &&
+      spec.effects.some((effect) =>
+        effect.kind === "trash-card" &&
+        effect.selector === "self" &&
+        effect.optional === true &&
+        effect.sourceOnly === true &&
+        effect.drawCardsReward === 1 &&
+        effect.zones?.length === 1 &&
+        effect.zones[0] === "playArea"
+      )
+    ),
+    "Tread in Darkness should carry a typed Agent source-trash draw spec gated by another Bene Gesserit card",
+  );
+  assert.ok(
+    hasRevealEffect(treadInDarkness, (effect) => effect.kind === "gain-persuasion" && effect.amount === 2) &&
+      hasRevealEffect(treadInDarkness, (effect) => effect.kind === "gain-strength" && effect.amount === 1),
+    "Tread in Darkness should carry fixed Reveal persuasion and strength specs",
+  );
+  assert.equal(
+    treadInDarkness.play,
+    "If you have another Bene Gesserit card in play, you may trash this card to draw 1 card.",
+    "Tread in Darkness play text should expose source trash for draw",
+  );
+  assert.equal(treadInDarkness.reveal, "+2 persuasion and +1 strength.", "Tread in Darkness reveal text should stay fixed");
+  assert.deepEqual(
+    hiddenMissive.traits?.filter((trait) => trait.startsWith("Faction:")),
+    ["Faction: Bene Gesserit"],
+    "Imported Bene Gesserit traits should normalize for Tread in Darkness card-in-play checks",
+  );
   assert.equal(
     covertOperation.play,
     "Each opponent discards a card.",
@@ -6181,6 +6225,28 @@ try {
     /Unsupported effect "trash-card" for agent-play without sourceOnly/,
     "Agent trash-card specs should require sourceOnly until broader Agent trash pending actions are supported",
   );
+  const invalidAgentTrashDrawRewardCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-agent-trash-draw-reward-card",
+    name: "Effect Spec Invalid Agent Trash Draw Reward",
+    effects: [agentSpec([{
+      kind: "trash-card",
+      selector: "self",
+      optional: true,
+      zones: ["playArea"],
+      sourceOnly: true,
+      drawCardsReward: -1,
+    }])],
+  };
+  assert.throws(
+    () => effectResolver.resolveTrashCardEffects(invalidAgentTrashDrawRewardCard.effects, {
+      trigger: "agent-play",
+      source: p2,
+      state: game,
+    }),
+    /Invalid effect amount "-1"/,
+    "Agent source trash-card draw rewards should require non-negative integer amounts",
+  );
   const invalidTrashOptionalCard = {
     ...convincingArgument,
     id: "effect-spec-invalid-trash-optional-card",
@@ -6288,6 +6354,17 @@ try {
     () => turnActions.revealTurnPlan({ ...p2, hand: [invalidTrashStrengthCard], highCouncilSeat: false }),
     /Invalid effect amount "-1"/,
     "Trash-card strength rewards should require non-negative integer amounts",
+  );
+  const invalidRevealTrashDrawRewardCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-reveal-trash-draw-reward-card",
+    name: "Effect Spec Invalid Reveal Trash Draw Reward",
+    effects: [revealSpec([{ kind: "trash-card", selector: "self", optional: true, drawCardsReward: 1 }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [invalidRevealTrashDrawRewardCard], highCouncilSeat: false }),
+    /Unsupported trash-card drawCardsReward for reveal/,
+    "Trash-card draw rewards should stay scoped to Agent source trash until other pending paths support them",
   );
   const agentInfluenceIntrigueCard = {
     ...convincingArgument,
@@ -11008,6 +11085,216 @@ try {
     remainingDuplicateDesertSurvivals[0]?.agentPlacementSpaceId,
     "shipping",
     "Source trash should leave a same-id non-source card in play",
+  );
+  const treadDrawCard = { ...dagger, id: "tread-in-darkness-draw-card", name: "Tread in Darkness Draw Probe" };
+  const treadExtraDeckCard = {
+    ...convincingArgument,
+    id: "tread-in-darkness-extra-deck-card",
+    name: "Tread in Darkness Extra Deck Probe",
+  };
+  const treadOtherBeneCard = {
+    ...hiddenMissive,
+    id: "tread-in-darkness-other-bene-card",
+    name: "Tread in Darkness Other Bene",
+  };
+  const treadFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 1,
+    deck: [treadDrawCard, treadExtraDeckCard],
+    discard: [],
+    garrison: 0,
+    hand: [treadInDarkness],
+    playArea: [treadOtherBeneCard],
+    resources: { solari: 0, spice: 0, water: 0 },
+  }));
+  const treadPlaced = turnActions.placeAgentAction(treadFixture, {
+    commanderTargets: {},
+    selectedCard: treadInDarkness,
+    selectedSpace: imperialBasin,
+  });
+  assert.equal(
+    treadPlaced.pendingAction?.kind,
+    "trash-card",
+    "Tread in Darkness should queue a source-trash pending action when another Bene Gesserit card is in play",
+  );
+  assert.equal(treadPlaced.pendingAction.source, "Tread in Darkness");
+  assert.equal(treadPlaced.pendingAction.optional, true);
+  assert.equal(treadPlaced.pendingAction.drawCardsReward, 1);
+  assert.deepEqual(treadPlaced.pendingAction.zones, ["playArea"]);
+  assert.equal(treadPlaced.pendingAction.requiredCardId, treadInDarkness.id);
+  assert.equal(treadPlaced.pendingAction.requiredAgentPlacementSpaceId, imperialBasin.id);
+  assert.equal(treadPlaced.pendingAction.requiredAgentPlacementTargetOwnerId, p2.id);
+  assert.deepEqual(
+    state.trashableCardsForPending(playerById(treadPlaced, p2.id), treadPlaced.pendingAction)
+      .map(({ zone, card }) => ({ zone, id: card.id })),
+    [{ zone: "playArea", id: treadInDarkness.id }],
+    "Tread in Darkness source-trash draw should only offer its source card",
+  );
+  const treadOtherTrashAttempt = state.trashPlayerCard(
+    treadPlaced,
+    treadPlaced.pendingAction,
+    "playArea",
+    treadOtherBeneCard.id,
+  );
+  assert.equal(
+    treadOtherTrashAttempt.pendingAction?.kind,
+    "trash-card",
+    "Rejected Tread in Darkness trash attempts should leave the pending action unresolved",
+  );
+  assert.equal(
+    playerById(treadOtherTrashAttempt, p2.id).playArea.some((card) => card.id === treadOtherBeneCard.id),
+    true,
+    "Tread in Darkness should reject trashing the other Bene Gesserit card",
+  );
+  const treadTrashed = state.trashPlayerCard(
+    treadPlaced,
+    treadPlaced.pendingAction,
+    "playArea",
+    treadInDarkness.id,
+  );
+  const treadOwner = playerById(treadTrashed, p2.id);
+  assert.equal(
+    treadOwner.playArea.some((card) => card.id === treadInDarkness.id),
+    false,
+    "Resolving Tread in Darkness trash should remove the source card from play",
+  );
+  assert.equal(
+    treadOwner.playArea.some((card) => card.id === treadOtherBeneCard.id),
+    true,
+    "Resolving Tread in Darkness trash should leave the other Bene Gesserit card in play",
+  );
+  assert.equal(
+    treadOwner.hand.some((card) => card.id === treadDrawCard.id),
+    true,
+    "Resolving Tread in Darkness trash should draw 1 card",
+  );
+  assert.deepEqual(
+    treadOwner.hand.map((card) => card.id),
+    [treadDrawCard.id],
+    "Resolving Tread in Darkness trash should draw exactly 1 card",
+  );
+  assert.deepEqual(
+    treadOwner.deck.map((card) => card.id),
+    [treadExtraDeckCard.id],
+    "Resolving Tread in Darkness trash should leave the second deck card undrawn",
+  );
+  assert.equal(treadTrashed.pendingAction, undefined);
+  assert.match(treadTrashed.log[0], /trashes Tread in Darkness from Tread in Darkness and draws 1 card/);
+  const treadSkipped = state.skipTrashCard(treadPlaced, treadPlaced.pendingAction);
+  const treadSkippedOwner = playerById(treadSkipped, p2.id);
+  assert.equal(
+    treadSkippedOwner.playArea.some((card) => card.id === treadInDarkness.id),
+    true,
+    "Skipping Tread in Darkness trash should leave the source card in play",
+  );
+  assert.equal(
+    treadSkippedOwner.hand.some((card) => card.id === treadDrawCard.id),
+    false,
+    "Skipping Tread in Darkness trash should not draw the reward card",
+  );
+  assert.deepEqual(
+    treadSkippedOwner.deck.map((card) => card.id),
+    [treadDrawCard.id, treadExtraDeckCard.id],
+    "Skipping Tread in Darkness trash should leave the deck untouched",
+  );
+  assert.equal(treadSkipped.pendingAction, undefined);
+  assert.match(treadSkipped.log[0], /declines to trash a card from Tread in Darkness/);
+  const treadUnqualifiedFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 1,
+    deck: [treadDrawCard, treadExtraDeckCard],
+    discard: [],
+    garrison: 0,
+    hand: [treadInDarkness],
+    playArea: [],
+    resources: { solari: 0, spice: 0, water: 0 },
+  }));
+  const treadUnqualifiedPlaced = turnActions.placeAgentAction(treadUnqualifiedFixture, {
+    commanderTargets: {},
+    selectedCard: treadInDarkness,
+    selectedSpace: imperialBasin,
+  });
+  assert.equal(
+    treadUnqualifiedPlaced.pendingAction,
+    undefined,
+    "Tread in Darkness should not queue its source-trash draw without another Bene Gesserit card in play",
+  );
+  const treadEmptyDeckFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 1,
+    deck: [],
+    discard: [],
+    garrison: 0,
+    hand: [treadInDarkness],
+    playArea: [treadOtherBeneCard],
+    resources: { solari: 0, spice: 0, water: 0 },
+  }));
+  const treadEmptyDeckPlaced = turnActions.placeAgentAction(treadEmptyDeckFixture, {
+    commanderTargets: {},
+    selectedCard: treadInDarkness,
+    selectedSpace: imperialBasin,
+  });
+  assert.equal(
+    treadEmptyDeckPlaced.pendingAction?.kind,
+    "trash-card",
+    "Tread in Darkness should still queue its source-trash draw with an empty deck",
+  );
+  const treadEmptyDeckTrashed = state.trashPlayerCard(
+    treadEmptyDeckPlaced,
+    treadEmptyDeckPlaced.pendingAction,
+    "playArea",
+    treadInDarkness.id,
+  );
+  const treadEmptyDeckOwner = playerById(treadEmptyDeckTrashed, p2.id);
+  assert.equal(
+    treadEmptyDeckOwner.playArea.some((card) => card.id === treadInDarkness.id),
+    false,
+    "Tread in Darkness should trash itself even when the draw reward cannot be satisfied",
+  );
+  assert.equal(treadEmptyDeckOwner.hand.length, 0, "Unsatisfied Tread in Darkness draw should not add cards");
+  assert.match(treadEmptyDeckTrashed.log[0], /trashes Tread in Darkness from Tread in Darkness and has no card to draw/);
+  const genericDrawRewardTrashCard = {
+    ...dagger,
+    id: "generic-draw-reward-trash-card",
+    name: "Generic Draw Reward Trash",
+  };
+  const genericDrawRewardDeckCard = {
+    ...convincingArgument,
+    id: "generic-draw-reward-deck-card",
+    name: "Generic Draw Reward Deck",
+  };
+  const genericDrawRewardPending = {
+    kind: "trash-card",
+    ownerId: p2.id,
+    source: "Generic Draw Reward",
+    optional: true,
+    zones: ["playArea"],
+    drawCardsReward: 2,
+  };
+  const genericDrawRewardState = withActivePlayer(game, p2.id, () => ({
+    deck: [genericDrawRewardDeckCard],
+    discard: [],
+    hand: [],
+    playArea: [genericDrawRewardTrashCard],
+  }));
+  const genericDrawRewardPartial = state.trashPlayerCard(
+    { ...genericDrawRewardState, pendingAction: genericDrawRewardPending },
+    genericDrawRewardPending,
+    "playArea",
+    genericDrawRewardTrashCard.id,
+  );
+  const genericDrawRewardOwner = playerById(genericDrawRewardPartial, p2.id);
+  assert.deepEqual(
+    genericDrawRewardOwner.hand.map((card) => card.id),
+    [genericDrawRewardDeckCard.id],
+    "Generic trash-card draw reward should draw the one available card",
+  );
+  assert.equal(
+    genericDrawRewardOwner.playArea.some((card) => card.id === genericDrawRewardTrashCard.id),
+    false,
+    "Generic trash-card draw reward should still trash the selected card",
+  );
+  assert.match(
+    genericDrawRewardPartial.log[0],
+    /trashes Generic Draw Reward Trash from Generic Draw Reward and draws 1 of 2 cards/,
+    "Generic trash-card draw reward should log partial draws",
   );
   const genericDuplicateTrashCardA = {
     ...dagger,

@@ -1,5 +1,6 @@
 import { advancePendingAction } from "./pending-actions";
 import { playerHasConflictUnits } from "./conflict-rules";
+import { drawCards } from "./deck-utils";
 import { recordTurnSpiceGain } from "./turn-trackers";
 import type { Card, GameState, PendingAction, Player, TrashCardZone } from "./types";
 
@@ -47,6 +48,13 @@ function removeCardInstance(cards: Card[], card: Card) {
     }
     return true;
   });
+}
+
+function drawnCardsText(requested: number, actual: number) {
+  if (requested === 0) return "";
+  if (actual === 0) return requested === 1 ? "has no card to draw" : "has no cards to draw";
+  if (actual === requested) return `draws ${actual} card${actual === 1 ? "" : "s"}`;
+  return `draws ${actual} of ${requested} cards`;
 }
 
 export function advancePastUnresolvableMandatoryTrash(state: GameState): GameState {
@@ -100,16 +108,25 @@ export function trashPlayerCard(
     (card.cost ?? 0) >= (pending.spiceRewardCostThreshold ?? 0)
       ? pending.spiceReward
       : 0;
+  const drawCardsReward = pending.drawCardsReward ?? 0;
+  let cardsDrawn = 0;
   const players = state.players.map((player) => {
     let nextPlayer = player;
     if (player.id === owner.id) {
-      nextPlayer = {
+      const ownerAfterTrash = {
         ...updateTrashZone(player, zone, removeCardInstance(cards, card)),
         resources: {
           ...player.resources,
           spice: player.resources.spice + spiceReward,
         },
       };
+      if (drawCardsReward > 0) {
+        const handBeforeDraw = ownerAfterTrash.hand.length;
+        nextPlayer = drawCards(ownerAfterTrash, ownerAfterTrash.hand.length + drawCardsReward);
+        cardsDrawn = nextPlayer.hand.length - handBeforeDraw;
+      } else {
+        nextPlayer = ownerAfterTrash;
+      }
     }
     if (player.id === combatRecipient?.id && strengthReward > 0) {
       nextPlayer = { ...nextPlayer, conflict: nextPlayer.conflict + strengthReward };
@@ -121,7 +138,7 @@ export function trashPlayerCard(
     players,
     ...advancePendingAction(state),
     log: [
-      `${owner.leader} trashes ${card.name} from ${pending.source}${spiceReward > 0 ? ` and gains ${spiceReward} spice` : ""}${strengthReward > 0 ? ` and adds ${strengthReward} strength` : ""}.`,
+      `${owner.leader} trashes ${card.name} from ${pending.source}${spiceReward > 0 ? ` and gains ${spiceReward} spice` : ""}${strengthReward > 0 ? ` and adds ${strengthReward} strength` : ""}${drawCardsReward > 0 ? ` and ${drawnCardsText(drawCardsReward, cardsDrawn)}` : ""}.`,
       ...state.log,
     ],
   };

@@ -119,9 +119,20 @@ function validateOptionalTrue(label: string, value: unknown) {
   }
 }
 
-function validateCondition(condition: GameEffectConditionSpec) {
+function validateCondition(condition: GameEffectConditionSpec, trigger: GameEffectTrigger) {
   if (condition.kind === "visited-maker-space") return;
   if (condition.kind === "visited-space-has-spy-post") return;
+  if (condition.kind === "has-combat-recipient") {
+    if (trigger === "combat-intrigue") return;
+    throw new Error(`Unsupported effect condition "${condition.kind}" for ${trigger}`);
+  }
+  if (condition.kind === "has-combat-recipient-sandworms") {
+    if (trigger !== "combat-intrigue") {
+      throw new Error(`Unsupported effect condition "${condition.kind}" for ${trigger}`);
+    }
+    if (isPositiveInteger(condition.count)) return;
+    invalidSpecField("has-combat-recipient-sandworms count", condition.count);
+  }
   if (condition.kind === "visited-space-icon") {
     if (supportedIcons.has(condition.icon)) return;
     throw new Error(`Unsupported effect icon "${condition.icon}"`);
@@ -360,7 +371,7 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     return;
   }
   if (effect.kind === "trash-card") {
-    if (trigger !== "reveal" && trigger !== "plot-intrigue") {
+    if (trigger !== "reveal" && trigger !== "plot-intrigue" && trigger !== "combat-intrigue") {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
     }
     if (effect.selector !== "self") {
@@ -370,13 +381,16 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     if (effect.zones?.some((zone) => !supportedTrashZones.has(zone))) {
       throw new Error(`Unsupported trash-card zone "${effect.zones.find((zone) => !supportedTrashZones.has(zone))}"`);
     }
+    if (trigger === "combat-intrigue" && effect.optional !== true) {
+      invalidSpecField("combat trash-card optional", effect.optional);
+    }
     if (
       effect.requiredTrait !== undefined &&
       (typeof effect.requiredTrait !== "string" || effect.requiredTrait.trim().length === 0)
     ) {
       invalidSpecField("trash-card requiredTrait", effect.requiredTrait);
     }
-    if (trigger === "plot-intrigue") {
+    if (trigger === "plot-intrigue" || trigger === "combat-intrigue") {
       if (effect.strengthReward !== undefined) {
         throw new Error(`Unsupported trash-card strengthReward for ${trigger}`);
       }
@@ -772,6 +786,6 @@ export function validateSpec(spec: CardEffectSpec) {
   if (spec.choiceId !== undefined && spec.trigger !== "plot-intrigue") {
     throw new Error(`Unsupported choiceId for ${spec.trigger}`);
   }
-  spec.conditions?.forEach(validateCondition);
+  spec.conditions?.forEach((condition) => validateCondition(condition, spec.trigger));
   spec.effects.forEach((effect) => validateEffect(effect, spec.trigger));
 }

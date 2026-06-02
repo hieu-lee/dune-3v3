@@ -32,6 +32,14 @@ function plotSpec(effects, conditions) {
   };
 }
 
+function combatSpec(effects, conditions) {
+  return {
+    trigger: "combat-intrigue",
+    ...(conditions ? { conditions } : {}),
+    effects,
+  };
+}
+
 function hasRevealSpec(card) {
   return card.effects?.some((spec) => spec.trigger === "reveal") ?? false;
 }
@@ -173,6 +181,7 @@ try {
   const contingencyPlan = data.intrigueCards.find((card) => card.name === "Contingency Plan");
   const cunning = data.intrigueCards.find((card) => card.name === "Cunning");
   const departForArrakis = data.intrigueCards.find((card) => card.name === "Depart For Arrakis");
+  const devour = data.intrigueCards.find((card) => card.name === "Devour");
   const distraction = data.intrigueCards.find((card) => card.name === "Distraction");
   const findWeakness = data.intrigueCards.find((card) => card.name === "Find Weakness");
   const impress = data.intrigueCards.find((card) => card.name === "Impress");
@@ -257,7 +266,7 @@ try {
     wheelsWithinWheels,
   );
   assert.ok(commandRespect && prepareTheWay && spiceMustFlow && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
-  assert.ok(backedByChoam && buyAccess && callToArms && changeAllegiances && councilorsAmbition && contingencyPlan && cunning && departForArrakis && distraction && findWeakness && impress && imperiumPolitics && inspireAwe && intelligenceReport && leverage && manipulate && marketOpportunity && mercenaries && opportunism && shaddamsFavor && specialMission && springTheTrap && sietchRitual && strategicStockpiling && weirdingCombat);
+  assert.ok(backedByChoam && buyAccess && callToArms && changeAllegiances && councilorsAmbition && contingencyPlan && cunning && departForArrakis && devour && distraction && findWeakness && impress && imperiumPolitics && inspireAwe && intelligenceReport && leverage && manipulate && marketOpportunity && mercenaries && opportunism && shaddamsFavor && specialMission && springTheTrap && sietchRitual && strategicStockpiling && weirdingCombat);
   assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && dutifulService && deliverSupplies && sietchTabr && spiceRefinery);
   assert.equal(revealSpecCards.length, 79, "Unexpected number of cards with declarative Reveal specs");
   assert.equal(
@@ -487,6 +496,91 @@ try {
     [{ selector: "self", amount: 2, strength: 7, optional: false, source: "Spring The Trap" }],
     "Spring The Trap spy-recall spec should resolve as a required two-spy recall",
   );
+  assert.ok(
+    devour.effects?.some((spec) =>
+      spec.trigger === "combat-intrigue" &&
+      spec.conditions?.some((condition) => condition.kind === "has-combat-recipient") &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-strength" &&
+        effect.selector === "self" &&
+        effect.amount === 2
+      )
+    ),
+    "Devour should carry a typed Combat recipient-gated base strength spec",
+  );
+  assert.ok(
+    devour.effects?.some((spec) =>
+      spec.trigger === "combat-intrigue" &&
+      spec.conditions?.some((condition) => condition.kind === "has-combat-recipient-sandworms" && condition.count === 1) &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-strength" &&
+        effect.selector === "self" &&
+        effect.amount === 2
+      )
+    ),
+    "Devour should carry a typed Combat recipient sandworm strength bonus spec",
+  );
+  assert.ok(
+    devour.effects?.some((spec) =>
+      spec.trigger === "combat-intrigue" &&
+      spec.conditions?.some((condition) => condition.kind === "has-combat-recipient-sandworms" && condition.count === 1) &&
+      spec.effects.some((effect) =>
+        effect.kind === "trash-card" &&
+        effect.selector === "self" &&
+        effect.optional === true
+      )
+    ),
+    "Devour should carry a typed Combat recipient sandworm trash-card spec",
+  );
+  const devourAllyNoWorm = effectResolver.resolveGameEffects(devour.effects, {
+    trigger: "combat-intrigue",
+    source: { ...p2, deployedSandworms: 0 },
+    state: game,
+  });
+  assert.equal(devourAllyNoWorm.swords, 2, "Devour should resolve two strength for an Ally without sandworms");
+  assert.deepEqual(
+    effectResolver.resolveTrashCardEffects(devour.effects, {
+      trigger: "combat-intrigue",
+      source: { ...p2, deployedSandworms: 0 },
+      state: game,
+    }),
+    [],
+    "Devour trash-card spec should not resolve for an Ally without sandworms",
+  );
+  const devourAllyWorm = effectResolver.resolveGameEffects(devour.effects, {
+    trigger: "combat-intrigue",
+    source: { ...p2, deployedSandworms: 1 },
+    state: game,
+  });
+  assert.equal(devourAllyWorm.swords, 4, "Devour should resolve four strength for an Ally with a sandworm");
+  const devourTrashEffects = effectResolver.resolveTrashCardEffects(devour.effects, {
+    trigger: "combat-intrigue",
+    source: { ...p2, deployedSandworms: 1 },
+    state: game,
+  });
+  assert.equal(devourTrashEffects.length, 1, "Devour should resolve one Combat trash-card effect with a sandworm");
+  assert.equal(devourTrashEffects[0]?.selector, "self", "Devour trash-card effect should target self in the card spec");
+  assert.equal(devourTrashEffects[0]?.optional, true, "Devour trash-card effect should be optional");
+  const devourCommanderNoTarget = effectResolver.resolveGameEffects(devour.effects, {
+    trigger: "combat-intrigue",
+    source: p4,
+    state: game,
+  });
+  assert.equal(devourCommanderNoTarget.swords, 0, "Commander Devour should not resolve strength without a target");
+  const devourCommanderTargetNoWorm = effectResolver.resolveGameEffects(devour.effects, {
+    trigger: "combat-intrigue",
+    source: p4,
+    target: { ...p6, deployedSandworms: 0 },
+    state: game,
+  });
+  assert.equal(devourCommanderTargetNoWorm.swords, 2, "Commander Devour should resolve two strength against a no-worm target Ally");
+  const devourCommanderTargetWorm = effectResolver.resolveGameEffects(devour.effects, {
+    trigger: "combat-intrigue",
+    source: p4,
+    target: { ...p6, deployedSandworms: 1 },
+    state: game,
+  });
+  assert.equal(devourCommanderTargetWorm.swords, 4, "Commander Devour should resolve four strength against a target Ally with a sandworm");
   assert.ok(
     inspireAwe.effects?.some((spec) =>
       spec.trigger === "plot-intrigue" &&
@@ -4107,6 +4201,50 @@ try {
     /Invalid has-spy-posts count "undefined"/,
     "Spy-count conditions should fail loudly when count is missing",
   );
+  assert.throws(
+    () => effectResolver.resolveGameEffects(
+      [combatSpec(
+        [{ kind: "gain-strength", selector: "self", amount: 1 }],
+        [{ kind: "has-combat-recipient-sandworms" }],
+      )],
+      { trigger: "combat-intrigue", source: p2, state: game },
+    ),
+    /Invalid has-combat-recipient-sandworms count "undefined"/,
+    "Combat recipient sandworm conditions should fail loudly when count is missing",
+  );
+  assert.throws(
+    () => effectResolver.resolveGameEffects(
+      [revealSpec(
+        [{ kind: "gain-strength", selector: "self", amount: 1 }],
+        [{ kind: "has-combat-recipient" }],
+      )],
+      { trigger: "reveal", source: p2, state: game },
+    ),
+    /Unsupported effect condition "has-combat-recipient" for reveal/,
+    "Combat recipient conditions should be rejected outside Combat Intrigue specs",
+  );
+  assert.throws(
+    () => effectResolver.resolveGameEffects(
+      [revealSpec(
+        [{ kind: "gain-strength", selector: "self", amount: 1 }],
+        [{ kind: "has-combat-recipient-sandworms", count: 1 }],
+      )],
+      { trigger: "reveal", source: p2, state: game },
+    ),
+    /Unsupported effect condition "has-combat-recipient-sandworms" for reveal/,
+    "Combat recipient sandworm conditions should be rejected outside Combat Intrigue specs",
+  );
+  assert.throws(
+    () => effectResolver.resolveGameEffects(
+      [combatSpec(
+        [{ kind: "gain-strength", selector: "self", amount: 1 }],
+        [{ kind: "has-combat-recipient-sandworms", count: 0 }],
+      )],
+      { trigger: "combat-intrigue", source: p2, state: game },
+    ),
+    /Invalid has-combat-recipient-sandworms count "0"/,
+    "Combat recipient sandworm conditions should require a positive threshold",
+  );
   const invalidDeployedUnitsCountCard = {
     ...convincingArgument,
     id: "effect-spec-invalid-deployed-units-count-card",
@@ -4598,6 +4736,51 @@ try {
     }),
     /Unsupported trash-card strengthReward for plot-intrigue/,
     "Plot trash-card specs should reject reveal/combat reward metadata until that pending path supports it",
+  );
+  const invalidCombatTrashStrengthCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-combat-trash-strength-card",
+    name: "Effect Spec Invalid Combat Trash Strength",
+    effects: [combatSpec([{ kind: "trash-card", selector: "self", strengthReward: 1, optional: true }])],
+  };
+  assert.throws(
+    () => effectResolver.resolveTrashCardEffects(invalidCombatTrashStrengthCard.effects, {
+      trigger: "combat-intrigue",
+      source: p2,
+      state: game,
+    }),
+    /Unsupported trash-card strengthReward for combat-intrigue/,
+    "Combat trash-card specs should reject reward metadata until that pending path supports it",
+  );
+  const invalidCombatTrashRequiredCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-combat-trash-required-card",
+    name: "Effect Spec Invalid Combat Trash Required",
+    effects: [combatSpec([{ kind: "trash-card", selector: "self", optional: false }])],
+  };
+  assert.throws(
+    () => effectResolver.resolveTrashCardEffects(invalidCombatTrashRequiredCard.effects, {
+      trigger: "combat-intrigue",
+      source: p2,
+      state: game,
+    }),
+    /Invalid combat trash-card optional "false"/,
+    "Combat trash-card specs should stay optional until mandatory Combat trash behavior is supported",
+  );
+  const invalidCombatTrashMissingOptionalCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-combat-trash-missing-optional-card",
+    name: "Effect Spec Invalid Combat Trash Missing Optional",
+    effects: [combatSpec([{ kind: "trash-card", selector: "self" }])],
+  };
+  assert.throws(
+    () => effectResolver.resolveTrashCardEffects(invalidCombatTrashMissingOptionalCard.effects, {
+      trigger: "combat-intrigue",
+      source: p2,
+      state: game,
+    }),
+    /Invalid combat trash-card optional "undefined"/,
+    "Combat trash-card specs should require explicit optional true",
   );
   const invalidTrashZoneCard = {
     ...convincingArgument,

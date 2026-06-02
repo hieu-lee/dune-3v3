@@ -1,7 +1,6 @@
 import { effectiveRequirementInfluence } from "./board-rules";
 import {
   isBackedByChoamIntrigue,
-  isDevourIntrigue,
   isQuestionableMethodsIntrigue,
   isSpiceIsPowerIntrigue,
   isTacticalOptionIntrigue,
@@ -61,11 +60,6 @@ export function combatIntrigueStrength(
     return effectOwner && effectOwner.resources.spice >= 3 ? 6 : undefined;
   }
   if (isTacticalOptionIntrigue(intrigue)) return 2;
-  if (isDevourIntrigue(intrigue)) {
-    // In six-player Combat, Commanders play Intrigues on behalf of one Ally and apply the effects to that Ally.
-    const effectOwner = actor.role === "Commander" ? target : actor;
-    return effectOwner ? (effectOwner.deployedSandworms > 0 ? 4 : 2) : undefined;
-  }
   if (isWeirdingCombatIntrigue(intrigue)) {
     return effectiveRequirementInfluence(actor, "bene", state.players) >= 3 ? 5 : 3;
   }

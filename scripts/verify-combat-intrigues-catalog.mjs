@@ -155,6 +155,42 @@ export function verifyCombatIntrigueCatalog({ cards, data, state }) {
     "Add 2 strength; if the recipient has one or more sandworms in the Conflict, add 4 strength instead and they may trash a card.",
     "Devour should expose its sandworm bonus and optional trash text",
   );
+  assert.ok(
+    devour.effects?.some((spec) =>
+      spec.trigger === "combat-intrigue" &&
+      spec.conditions?.some((condition) => condition.kind === "has-combat-recipient") &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-strength" &&
+        effect.selector === "self" &&
+        effect.amount === 2
+      )
+    ),
+    "Devour should carry a typed Combat recipient-gated base strength spec",
+  );
+  assert.ok(
+    devour.effects?.some((spec) =>
+      spec.trigger === "combat-intrigue" &&
+      spec.conditions?.some((condition) => condition.kind === "has-combat-recipient-sandworms" && condition.count === 1) &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-strength" &&
+        effect.selector === "self" &&
+        effect.amount === 2
+      )
+    ),
+    "Devour should carry a typed Combat recipient sandworm strength bonus spec",
+  );
+  assert.ok(
+    devour.effects?.some((spec) =>
+      spec.trigger === "combat-intrigue" &&
+      spec.conditions?.some((condition) => condition.kind === "has-combat-recipient-sandworms" && condition.count === 1) &&
+      spec.effects.some((effect) =>
+        effect.kind === "trash-card" &&
+        effect.selector === "self" &&
+        effect.optional === true
+      )
+    ),
+    "Devour should carry a typed Combat recipient sandworm trash-card spec",
+  );
   assert.equal(backedByChoam.combatSwords, 4, "Backed by CHOAM should expose its structured Combat strength");
   assert.ok(
     backedByChoam.effects?.some((spec) =>

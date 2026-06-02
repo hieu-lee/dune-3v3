@@ -421,6 +421,12 @@ function conditionApplies(condition: GameEffectConditionSpec, context: GameEffec
       ),
     );
   }
+  if (condition.kind === "has-combat-recipient") {
+    return Boolean(combatEffectRecipient(context));
+  }
+  if (condition.kind === "has-combat-recipient-sandworms") {
+    return (combatEffectRecipient(context)?.deployedSandworms ?? 0) >= condition.count;
+  }
   if (condition.kind === "has-spy-posts") {
     return context.state?.spyPosts && context.state.sharedSpyPosts
       ? spyPostCount(
@@ -491,6 +497,15 @@ function conflictUnitConditionPlayer(context: GameEffectContext) {
     context.target.team === context.source.team
     ? context.target
     : context.source;
+}
+
+function combatEffectRecipient(context: GameEffectContext) {
+  if (context.source.role === "Commander") {
+    return context.target?.role === "Ally" && context.target.team === context.source.team
+      ? context.target
+      : undefined;
+  }
+  return context.source;
 }
 
 function specApplies(spec: CardEffectSpec, context: GameEffectContext) {

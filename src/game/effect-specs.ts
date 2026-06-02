@@ -118,6 +118,24 @@ export function combatAcquireCard(
   ], conditions);
 }
 
+export function combatTrashCard(
+  options: {
+    optional: true;
+    zones?: TrashCardZone[];
+    excludeSource?: boolean;
+    requiredTrait?: string;
+  },
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return combatIntrigueEffects([
+    {
+      kind: "trash-card",
+      selector: "self",
+      ...options,
+    },
+  ], conditions);
+}
+
 export function combatRecallSpiesForStrength(
   amount: number,
   strength: EffectAmountSpec,
@@ -1001,6 +1019,14 @@ export function visitedSpaceWithSpyPost() {
 
 export function hasSpyPosts(count: number) {
   return { kind: "has-spy-posts", count } as const;
+}
+
+export function hasCombatRecipient() {
+  return { kind: "has-combat-recipient" } as const;
+}
+
+export function hasCombatRecipientSandworms(count: number) {
+  return { kind: "has-combat-recipient-sandworms", count } as const;
 }
 
 export function hasConflictUnits(count: number) {

@@ -15,6 +15,7 @@ import {
   cunningSourceId,
   dangerousRhetoricSourceId,
   desertPowerSourceId,
+  devourSourceId,
   distractionSourceId,
   doubleAgentSourceId,
   departForArrakisSourceId,
@@ -85,7 +86,10 @@ import {
   combatAcquireCard,
   combatGainStrength,
   combatRecallSpiesForStrength,
+  combatTrashCard,
   deployedUnitsThisTurn,
+  hasCombatRecipient,
+  hasCombatRecipientSandworms,
   hasCompletedContracts,
   hasCardTraitInPlay,
   hasConflictUnits,
@@ -1020,6 +1024,13 @@ function intrigueCardEffects(card: HubCard): CardEffectSpec[] | undefined {
   if (card.id === springTheTrapSourceId) {
     return [
       combatRecallSpiesForStrength(2, 7, { source: "Spring The Trap" }, [hasSpyPosts(2)]),
+    ];
+  }
+  if (card.id === devourSourceId) {
+    return [
+      combatGainStrength(2, [hasCombatRecipient()]),
+      combatGainStrength(2, [hasCombatRecipientSandworms(1)]),
+      combatTrashCard({ optional: true }, [hasCombatRecipientSandworms(1)]),
     ];
   }
   if (card.id === inspireAweSourceId) {

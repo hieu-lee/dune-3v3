@@ -3,7 +3,6 @@ import {
   combatIntrigueTargets,
 } from "./combat-intrigue-rules";
 import {
-  isDevourIntrigue,
   isGoToGroundIntrigue,
   isQuestionableMethodsIntrigue,
   isReachAgreementIntrigue,
@@ -13,8 +12,10 @@ import {
 import {
   resolveAcquireCards,
   resolveCombatSpyRecallForStrengths,
+  resolveTrashCardEffects,
   type AgentAcquireCard,
   type CombatSpyRecallForStrength,
+  type TrashCardEffect,
 } from "./effect-resolver";
 import {
   allowedInfluenceLossChoices,
@@ -26,7 +27,7 @@ import {
   placeableSpySpaces,
 } from "./spy-choices";
 import {
-  trashableCards,
+  trashableCardsForPending,
 } from "./trash-rules";
 import type {
   GameState,
@@ -42,6 +43,7 @@ export type CombatIntrigueChoice = SpiceIsPowerChoice | TacticalOptionChoice;
 type AcquireCardPendingAction = Extract<PendingAction, { kind: "acquire-card" }>;
 type RecallSpyPendingAction = Extract<PendingAction, { kind: "recall-spy" }>;
 type SpyPendingAction = Extract<PendingAction, { kind: "spy" }>;
+type TrashCardPendingAction = Extract<PendingAction, { kind: "trash-card" }>;
 type AdvanceAfterCombatIntriguePlay = (state: GameState) => GameState;
 
 function acquirePendingForCombatEffect(
@@ -158,6 +160,51 @@ function resolveCombatSpyRecallPendingActions(
     return {
       pendingActions: [...result.pendingActions, pending],
       logTexts: [...result.logTexts, combatSpyRecallDescription(pending)],
+    };
+  }, { pendingActions: [], logTexts: [] });
+}
+
+function trashCardPendingForCombatEffect(
+  intrigue: IntrigueCard,
+  target: Player,
+  effect: TrashCardEffect,
+): TrashCardPendingAction | undefined {
+  if (effect.selector !== "self") return undefined;
+  return {
+    kind: "trash-card",
+    ownerId: target.id,
+    source: intrigue.name,
+    optional: effect.optional,
+    ...(effect.zones ? { zones: effect.zones } : {}),
+    ...(effect.excludeSource ? { excludeCardId: intrigue.id } : {}),
+    ...(effect.requiredTrait ? { requiredTrait: effect.requiredTrait } : {}),
+  };
+}
+
+function combatTrashDescription(pending: TrashCardPendingAction) {
+  return `${pending.optional ? "may" : "must"} trash a card`;
+}
+
+function resolveCombatTrashPendingActions(
+  state: GameState,
+  intrigue: IntrigueCard,
+  actor: Player,
+  target: Player,
+) {
+  const effects = resolveTrashCardEffects(intrigue.effects, {
+    trigger: "combat-intrigue",
+    source: actor,
+    target,
+    state,
+  });
+  if (effects.length > 1) throw new Error("Unsupported multiple Combat Intrigue trash-card effects");
+  return effects.reduce<{ pendingActions: TrashCardPendingAction[]; logTexts: string[] }>((result, effect) => {
+    const pending = trashCardPendingForCombatEffect(intrigue, target, effect);
+    if (!pending) return result;
+    const canTrash = trashableCardsForPending(target, pending).length > 0;
+    return {
+      pendingActions: canTrash ? [...result.pendingActions, pending] : result.pendingActions,
+      logTexts: canTrash ? [...result.logTexts, combatTrashDescription(pending)] : result.logTexts,
     };
   }, { pendingActions: [], logTexts: [] });
 }
@@ -340,11 +387,13 @@ export function resolvePlayCombatIntrigue(
   const combatSwords = combatIntrigueStrength(state, actor, intrigue, target);
   const combatAcquire = resolveCombatAcquirePendingActions(state, intrigue, actor, target);
   const combatSpyRecall = resolveCombatSpyRecallPendingActions(state, intrigue, actor, target);
-  if (!combatSwords && combatAcquire.logTexts.length === 0 && combatSpyRecall.logTexts.length === 0) return state;
-  const canTrashFromDevour = isDevourIntrigue(intrigue) && target.deployedSandworms > 0 && trashableCards(target).length > 0;
-  const trashPending: PendingAction | undefined = canTrashFromDevour
-    ? { kind: "trash-card", ownerId: target.id, source: "Devour", optional: true }
-    : undefined;
+  const combatTrash = resolveCombatTrashPendingActions(state, intrigue, actor, target);
+  if (
+    !combatSwords &&
+    combatAcquire.logTexts.length === 0 &&
+    combatSpyRecall.logTexts.length === 0 &&
+    combatTrash.logTexts.length === 0
+  ) return state;
   const alternateInfluenceLossOwnerIds =
     actor.role === "Commander" && allowedInfluenceLossChoices(actor).length > 0 ? [actor.id] : undefined;
   const canLoseInfluenceForQuestionableMethods =
@@ -379,8 +428,9 @@ export function resolvePlayCombatIntrigue(
     return next;
   });
   const pendingActions: PendingAction[] = [];
-  const cardSpecificPending = trashPending ?? influenceLossPending;
+  const cardSpecificPending = influenceLossPending;
   if (cardSpecificPending) pendingActions.push(cardSpecificPending);
+  pendingActions.push(...combatTrash.pendingActions);
   pendingActions.push(...combatSpyRecall.pendingActions);
   pendingActions.push(...combatAcquire.pendingActions);
   const nextState = {
@@ -391,11 +441,10 @@ export function resolvePlayCombatIntrigue(
     pendingAction: pendingActions[0],
     pendingQueue: pendingActions.slice(1),
   };
-  const pendingText = canTrashFromDevour
-    ? " and may trash a card"
-    : influenceLossPending
+  const pendingText = influenceLossPending
       ? " and may lose 1 Influence"
       : "";
+  const trashText = combatTrash.logTexts.length > 0 ? ` and ${combatTrash.logTexts.join(" and ")}` : "";
   const spyRecallText = combatSpyRecall.logTexts.length > 0 ? ` and ${combatSpyRecall.logTexts.join(" and ")}` : "";
   const acquireText = combatAcquire.logTexts.length > 0 ? ` and ${combatAcquire.logTexts.join(" and ")}` : "";
   const strengthText = immediateCombatSwords === 0 && requiredSpyRecallStrength > 0
@@ -406,7 +455,7 @@ export function resolvePlayCombatIntrigue(
   return advanceAfterCombatIntriguePlay({
     ...nextState,
     log: [
-      `${actor.leader} plays ${intrigue.name} for ${target.leader}, ${strengthText}${pendingText}${spyRecallText}${acquireText}.`,
+      `${actor.leader} plays ${intrigue.name} for ${target.leader}, ${strengthText}${pendingText}${trashText}${spyRecallText}${acquireText}.`,
       ...state.log,
     ],
   });

@@ -148,6 +148,43 @@ export async function runCombatIntriguesSmoke({
   await screenshot(page, captures, "combat-intrigues-spring-recall-pending.png");
 
   await setDebugGameAndWait(page, states.commander);
+  const beforeDevour = await currentGame(page);
+  const gurneyBeforeDevour = playerById(beforeDevour, "p3");
+  await combatCard(page, "Devour").getByRole("button", { name: "Gurney Halleck (+4)" }).click();
+  await page.waitForFunction(() => {
+    const game = window.__DUNE_DEBUG__?.getGame();
+    const gurney = game?.players.find((player) => player.id === "p3");
+    const muadDib = game?.players.find((player) => player.id === "p1");
+    return Boolean(
+      game &&
+        game.pendingAction?.kind === "trash-card" &&
+        game.pendingAction.ownerId === "p3" &&
+        game.pendingAction.source === "Devour" &&
+        game.pendingAction.optional === true &&
+        gurney?.conflict === 10 &&
+        !muadDib?.intrigues.some((card) => card.name === "Devour"),
+    );
+  });
+  const afterDevour = await currentGame(page);
+  const gurneyAfterDevour = playerById(afterDevour, "p3");
+  assert.equal(
+    gurneyAfterDevour.conflict,
+    gurneyBeforeDevour.conflict + 4,
+    "Devour should add sandworm-enhanced strength before optional trash",
+  );
+  assert.deepEqual(
+    afterDevour.pendingAction,
+    {
+      kind: "trash-card",
+      ownerId: "p3",
+      source: "Devour",
+      optional: true,
+    },
+    "Devour should queue an optional trash-card pending action for the chosen Ally",
+  );
+  await screenshot(page, captures, "combat-intrigues-devour-trash-pending.png");
+
+  await setDebugGameAndWait(page, states.commander);
   const before = await currentGame(page);
   const gurneyBefore = playerById(before, "p3");
   await combatCard(page, "Tactical Option").getByRole("button", { name: "Gurney Halleck: +2" }).click();
@@ -244,6 +281,7 @@ async function createCombatIntrigueStates(server, initialPlayableGame) {
           resources: { ...player.resources, spice: 4 },
           influence: { ...player.influence, emperor: 1, bene: 1 },
           spies: Math.max(1, player.spies),
+          playArea: [data.allyStarterCards[0]],
         };
       }
 

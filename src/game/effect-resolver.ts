@@ -413,6 +413,24 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
   if (effect.kind === "move-card-to-throne-row") {
     return result;
   }
+  if (effect.kind === "recall-agent") {
+    if (effect.selector !== "self") {
+      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
+    if (result.recalledAgents > 0) {
+      throw new Error("Unsupported multiple recall-agent effects");
+    }
+    return {
+      ...result,
+      recalledAgents: result.recalledAgents + 1,
+      recalledAgentSource: mergeEffectSourceLabel(
+        result.recalledAgents > 0,
+        result.recalledAgentSource,
+        true,
+        effect.source,
+      ),
+    };
+  }
   if (effect.kind === "manipulate-row-card") {
     return result;
   }
@@ -461,6 +479,9 @@ export function resolveGameEffects(specs: CardEffectSpec[] | undefined, context:
 }
 
 function mergeEffectResult(result: GameEffectResult, next: GameEffectResult): GameEffectResult {
+  if (result.recalledAgents + next.recalledAgents > 1) {
+    throw new Error("Unsupported multiple recall-agent effects");
+  }
   return {
     acquireRecruitBonus: result.acquireRecruitBonus + next.acquireRecruitBonus,
     cardsToDraw: result.cardsToDraw + next.cardsToDraw,
@@ -490,6 +511,13 @@ function mergeEffectResult(result: GameEffectResult, next: GameEffectResult): Ga
       next.recruitedTroopsSource,
     ),
     persuasion: result.persuasion + next.persuasion,
+    recalledAgents: result.recalledAgents + next.recalledAgents,
+    recalledAgentSource: mergeEffectSourceLabel(
+      result.recalledAgents > 0,
+      result.recalledAgentSource,
+      next.recalledAgents > 0,
+      next.recalledAgentSource,
+    ),
     removeShieldWall: result.removeShieldWall || next.removeShieldWall,
     revealGain: Object.entries(next.revealGain).reduce(
       (gain, [resource, amount]) => addRevealGain(gain, resource as ResourceId, amount ?? 0),
@@ -569,6 +597,7 @@ function legacyRevealResult(card: Card): GameEffectResult {
     intriguesToDraw: 0,
     recruitedTroops: 0,
     persuasion: card.persuasion,
+    recalledAgents: 0,
     removeShieldWall: false,
     revealGain: card.revealGain ? { ...card.revealGain } : {},
     spentResources: {},
@@ -609,6 +638,7 @@ function legacyAcquireResult(card: Card): GameEffectResult {
     intriguesToDraw: 0,
     recruitedTroops: 0,
     persuasion: 0,
+    recalledAgents: 0,
     removeShieldWall: false,
     revealGain: {},
     spentResources: {},

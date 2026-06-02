@@ -86,6 +86,7 @@ export function applyCardAgentEffect(
   sourceSpiceGained?: number;
   sourceIntriguesToDraw?: number;
   targetIntriguesToDraw?: number;
+  recalledAgents?: number;
 } {
   const genericEffect = applyGenericCardAgentEffect(card, sourcePlayer, targetPlayer, state, space);
   if (genericEffect) return genericEffect;
@@ -109,6 +110,7 @@ function applyGenericCardAgentEffect(
   sourceSpiceGained?: number;
   sourceIntriguesToDraw?: number;
   targetIntriguesToDraw?: number;
+  recalledAgents?: number;
 } | undefined {
   if (!card.effects) return undefined;
   const players = state?.players.map((player) => {
@@ -138,6 +140,7 @@ function applyGenericCardAgentEffect(
   const hasTargetResourceGain = hasResourceGain(result.activatedAlly.revealGain);
   if (
     result.cardsToDraw === 0 &&
+    result.recalledAgents === 0 &&
     recruitedTroops === 0 &&
     intriguesToDraw === 0 &&
     !blocksDeploymentsThisTurn &&
@@ -149,6 +152,7 @@ function applyGenericCardAgentEffect(
 
   let source = {
     ...sourcePlayer,
+    agentsReady: Math.min(sourcePlayer.agentsTotal, sourcePlayer.agentsReady + result.recalledAgents),
     garrison: sourcePlayer.garrison + sourceRecruitedTroops,
     resources: addResources(sourcePlayer.resources, result.revealGain),
   };
@@ -172,6 +176,7 @@ function applyGenericCardAgentEffect(
     sourceSpiceGained: result.revealGain.spice ?? 0,
     sourceIntriguesToDraw: result.intriguesToDraw,
     targetIntriguesToDraw: result.activatedAlly.intriguesToDraw,
+    recalledAgents: result.recalledAgents,
   };
 }
 
@@ -201,6 +206,7 @@ function agentEffectLog(
     resourceGainText(result.revealGain),
     recruitText(undefined, sourceRecruitedTroops),
     drawText(result.cardsToDraw, cardsDrawn),
+    recallAgentText(result.recalledAgents),
     deploymentBlockText(result.blocksDeploymentsThisTurn),
     playerResourceGainText(targetPlayer, result.activatedAlly.revealGain),
     recruitText(targetPlayer.leader, targetRecruitedTroops),
@@ -228,6 +234,11 @@ function drawText(cardsToDraw: number, cardsDrawn: number) {
     return "no card to draw";
   }
   return `draws ${cardsDrawn} card${cardsDrawn === 1 ? "" : "s"}`;
+}
+
+function recallAgentText(recalledAgents: number) {
+  if (recalledAgents === 0) return undefined;
+  return `recalls ${recalledAgents === 1 ? "the Agent" : `${recalledAgents} Agents`}`;
 }
 
 function deploymentBlockText(blocksDeploymentsThisTurn: boolean) {

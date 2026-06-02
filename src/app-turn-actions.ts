@@ -154,6 +154,17 @@ function combinedBoardInfluenceChoicePending(
   };
 }
 
+function agentPlacementSpaces(
+  currentSpaces: GameState["spaces"],
+  selectedSpace: BoardSpace,
+  target: Player,
+  recalledAgents: number | undefined,
+) {
+  if (!recalledAgents) return { ...currentSpaces, [selectedSpace.id]: target.id };
+  const { [selectedSpace.id]: _recalledSpace, ...spaces } = currentSpaces;
+  return spaces;
+}
+
 function futureSourceIntriguesBeforePendingChoice(
   state: Pick<GameState, "intrigueDeck" | "intrigueDiscard" | "players">,
   space: BoardSpace,
@@ -336,7 +347,7 @@ export function placeAgentAction(
     ...controlledPostEffectState,
     agentTurnComplete: true,
     players,
-    spaces: { ...current.spaces, [selectedSpace.id]: target.id },
+    spaces: agentPlacementSpaces(current.spaces, selectedSpace, target, cardAgentEffect.recalledAgents),
     makerSpice: collectMakerSpice(current, selectedSpace),
     swordmasterClaimed: current.swordmasterClaimed || selectedSpace.id === "swordmaster",
     conflictDeploymentBlock,

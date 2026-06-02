@@ -57,6 +57,7 @@ export function pendingActionForBoardInfluenceChoice(
       kind: "board-influence-choice",
       source: space.name,
       spaceId: space.id,
+      targetOwnerId: target.id,
       choices: factions.map((faction) => ({
         faction,
         ownerId: influenceChoiceOwnerId(source, target, faction),
@@ -70,6 +71,7 @@ export function pendingActionForBoardInfluenceChoice(
     kind: "board-influence-choice",
     source: space.name,
     spaceId: space.id,
+    targetOwnerId: target.id,
     choices: [
       { faction: mappedFaction, ownerId: target.id },
       { faction: space.influence, ownerId: source.id },

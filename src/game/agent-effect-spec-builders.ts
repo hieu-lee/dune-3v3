@@ -389,6 +389,15 @@ export function agentMoveCardToThroneRow(
   return agentPlayEffects([{ kind: "move-card-to-throne-row", selector: "self", ...options }], conditions);
 }
 
+export function agentRecallAgent(
+  options: {
+    source?: string;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return agentPlayEffects([{ kind: "recall-agent", selector: "self", ...options }], conditions);
+}
+
 export function agentDrawCards(
   amount: EffectAmountSpec,
   conditions?: GameEffectConditionSpec[],

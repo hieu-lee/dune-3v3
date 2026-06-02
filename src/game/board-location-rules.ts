@@ -37,7 +37,7 @@ function boardInfluenceChoicePendingIsValid(pending: BoardInfluenceChoicePending
     (pending.trashSource === undefined || typeof pending.trashSource === "boolean") &&
     (pending.trashSource !== true || (hasSourceCard && !isAcquireSource)) &&
     (!hasSourceCard || (typeof pending.cardId === "string" && typeof pending.cardOwnerId === "string")) &&
-    (!hasSourceCard || pending.targetOwnerId === undefined || typeof pending.targetOwnerId === "string") &&
+    (pending.targetOwnerId === undefined || typeof pending.targetOwnerId === "string") &&
     (isAcquireSource || hasSourceCard || (
       pending.amount === undefined &&
       pending.trashSource === undefined &&
@@ -65,12 +65,16 @@ function boardInfluenceChoiceMatchesCurrentBoardSpace(
 ) {
   const source = state.players[state.activeSeat];
   const space = boardSpaces.find((candidate) => candidate.id === pending.spaceId);
-  const target = space ? state.players.find((player) => player.id === state.spaces[space.id]) : undefined;
+  const placedTargetOwnerId = space ? state.spaces[space.id] : undefined;
+  const targetOwnerId = placedTargetOwnerId ?? pending.targetOwnerId;
+  const target = targetOwnerId ? state.players.find((player) => player.id === targetOwnerId) : undefined;
   if (!source || !space || !target) return false;
+  if (pending.targetOwnerId !== undefined && pending.targetOwnerId !== target.id) return false;
   const expected = pendingActionForBoardInfluenceChoice(space, source, target);
   return expected?.kind === "board-influence-choice" &&
     expected.source === pending.source &&
     expected.spaceId === pending.spaceId &&
+    expected.targetOwnerId === target.id &&
     boardInfluenceChoiceArraysMatch(expected.choices, pending.choices);
 }
 

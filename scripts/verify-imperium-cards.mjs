@@ -161,6 +161,30 @@ try {
     "Dangerous Rhetoric should carry a declarative Agent Influence choice spec",
   );
   assert.match(dangerousRhetoric.play, /Gain 1 Influence.*trash this card/i);
+  const steersman = data.imperiumDeck.find((card) => card.name === "Steersman");
+  assert.ok(steersman, "Imperium deck should include Steersman");
+  assert.ok(
+    steersman.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.effects.some((effect) => effect.kind === "draw-cards" && effect.amount === 1)
+    ),
+    "Steersman should carry a typed Agent draw spec",
+  );
+  assert.ok(
+    steersman.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.effects.some((effect) => effect.kind === "recall-agent")
+    ),
+    "Steersman should carry a typed Recall Agent spec",
+  );
+  assert.ok(
+    steersman.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.effects.some((effect) => effect.kind === "gain-persuasion" && effect.amount === 2)
+    ),
+    "Steersman should preserve its typed Reveal persuasion",
+  );
+  assert.match(steersman.play, /Draw 1 card.*Recall Agent/i);
   const beneGesseritOperative = data.imperiumDeck.find((card) => card.name === "Bene Gesserit Operative");
   assert.ok(beneGesseritOperative, "Imperium deck should include Bene Gesserit Operative");
   assert.equal(state.isBeneGesseritOperativeCard(beneGesseritOperative), true, "Bene Gesserit Operative should be recognized");
@@ -482,7 +506,7 @@ try {
     ),
     "Shishakli should model its Fremen Bond Reveal Influence as a typed effect",
   );
-  for (const name of ["Bene Gesserit Operative", "Branching Path", "Cargo Runner", "Chani, Clever Tactician", "Guild Spy", "In High Places", "Junction Headquarters", "Maker Keeper", "Maula Pistol", "Northern Watermaster", "Overthrow", "Paracompass", "Price is No Object", "Shishakli"]) {
+  for (const name of ["Bene Gesserit Operative", "Branching Path", "Cargo Runner", "Chani, Clever Tactician", "Guild Spy", "In High Places", "Junction Headquarters", "Maker Keeper", "Maula Pistol", "Northern Watermaster", "Overthrow", "Paracompass", "Price is No Object", "Shishakli", "Steersman"]) {
     const card = data.imperiumDeck.find((candidate) => candidate.name === name);
     assert.ok(card?.effects?.some((spec) => spec.trigger === "agent-play"), `${name} should use a structured Agent effect`);
   }
@@ -502,6 +526,8 @@ try {
   assert.ok(imperialBasin?.maker, "Imperial Basin should be a Maker board space");
   const carthag = data.boardSpaces.find((space) => space.id === "carthag");
   assert.ok(carthag, "Carthag should exist for Prepare The Way Agent coverage");
+  const shipping = data.boardSpaces.find((space) => space.id === "shipping");
+  assert.ok(shipping, "Shipping should exist for Steersman Recall Agent pending coverage");
   const highCouncil = data.boardSpaces.find((space) => space.id === "high-council");
   assert.ok(highCouncil, "High Council should exist for Captured Mentat Agent coverage");
   const secrets = data.boardSpaces.find((space) => space.id === "secrets");
@@ -1289,6 +1315,61 @@ try {
     false,
     "Prepare The Way should not log a draw when the threshold is unmet",
   );
+
+  const steersmanDrawTarget = { ...calculusTrashTarget, id: "steersman-draw-target" };
+  const steersmanFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 1,
+    deck: [steersmanDrawTarget],
+    discard: [],
+    garrison: 0,
+    hand: [steersman],
+    playArea: [],
+    resources: { solari: 0, spice: 0, water: 0 },
+  }));
+  const steersmanPlayed = turnActions.placeAgentAction(steersmanFixture, {
+    commanderTargets: {},
+    selectedCard: steersman,
+    selectedSpace: carthag,
+  });
+  assert.equal(playerById(steersmanPlayed, p2.id).agentsReady, 1, "Steersman should recall the just-sent Agent to ready supply");
+  assert.equal(steersmanPlayed.spaces[carthag.id], undefined, "Steersman should leave the recalled board space unoccupied");
+  assert.equal(playerById(steersmanPlayed, p2.id).hand[0]?.id, steersmanDrawTarget.id, "Steersman should draw one card on Agent play");
+  assert.ok(playerById(steersmanPlayed, p2.id).playArea.some((card) => card.id === steersman.id));
+  assert.ok(steersmanPlayed.log.some((entry) => /Steersman: draws 1 card; recalls the Agent/.test(entry)));
+
+  const steersmanShippingDrawTarget = { ...calculusTrashTarget, id: "steersman-shipping-draw-target" };
+  const steersmanShippingFixture = withActivePlayer(game, p2.id, (player) => ({
+    agentsReady: 1,
+    deck: [steersmanShippingDrawTarget],
+    discard: [],
+    garrison: 0,
+    hand: [steersman],
+    influence: { ...player.influence, spacing: 2 },
+    playArea: [],
+    resources: { solari: 0, spice: 3, water: 0 },
+  }));
+  const steersmanShippingPlayed = turnActions.placeAgentAction(steersmanShippingFixture, {
+    commanderTargets: {},
+    selectedCard: steersman,
+    selectedSpace: shipping,
+  });
+  assert.equal(
+    steersmanShippingPlayed.pendingAction?.kind,
+    "board-influence-choice",
+    "Steersman on Shipping should leave the board Influence choice resolvable after Recall Agent",
+  );
+  assert.equal(steersmanShippingPlayed.pendingAction.targetOwnerId, p2.id);
+  assert.equal(steersmanShippingPlayed.spaces[shipping.id], undefined, "Steersman should leave Shipping unoccupied before resolving its pending reward");
+  const steersmanShippingResolved = state.resolveBoardInfluenceChoice(
+    steersmanShippingPlayed,
+    steersmanShippingPlayed.pendingAction,
+    p2.id,
+    "spacing",
+  );
+  assert.equal(playerById(steersmanShippingResolved, p2.id).influence.spacing, 3, "Steersman should resolve Shipping Influence after recalling the Agent");
+  assert.equal(playerById(steersmanShippingResolved, p2.id).agentsReady, 1, "Resolving Shipping should preserve the recalled Agent");
+  assert.equal(steersmanShippingResolved.pendingAction, undefined);
+  assert.equal(steersmanShippingResolved.spaces[shipping.id], undefined, "Shipping should remain unoccupied after its pending reward resolves");
 
   const operativeFixture = withActivePlayer(game, p2.id, () => ({
     agentsReady: 1,

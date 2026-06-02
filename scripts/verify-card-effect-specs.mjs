@@ -189,6 +189,7 @@ try {
   const southernElders = data.imperiumDeck.find((card) => card.name === "Southern Elders");
   const spacingGuildFavor = data.imperiumDeck.find((card) => card.name === "Spacing Guild's Favor");
   const spaceTimeFolding = data.imperiumDeck.find((card) => card.name === "Space-time Folding");
+  const steersman = data.imperiumDeck.find((card) => card.name === "Steersman");
   const stilgar = data.imperiumDeck.find((card) => card.name === "Stilgar, The Devoted");
   const theacherousManeuver = data.imperiumDeck.find((card) => card.name === "Theacherous Maneuver");
   const undercoverAsset = data.imperiumDeck.find((card) => card.name === "Undercover Asset");
@@ -3565,6 +3566,7 @@ try {
       "Southern Elders",
       "Space-time Folding",
       "Spacing Guild's Favor",
+      "Steersman",
       "Stilgar, The Devoted",
       "Subversive Advisor",
       "Theacherous Maneuver",
@@ -4588,6 +4590,16 @@ try {
     ),
     "Bene Gesserit Operative should carry a mandatory Agent spy-placement spec",
   );
+  assert.ok(steersman, "Imperium deck should include Steersman");
+  assert.ok(
+    hasAgentEffect(steersman, (effect) => effect.kind === "draw-cards" && effect.amount === 1),
+    "Steersman should use a typed Agent draw-card effect",
+  );
+  assert.ok(
+    hasAgentEffect(steersman, (effect) => effect.kind === "recall-agent"),
+    "Steersman should use a typed Recall Agent effect",
+  );
+  assert.match(steersman.play, /Draw 1 card.*Recall Agent/i);
   assert.ok(
     northernWatermaster.effects?.some((spec) =>
       spec.trigger === "agent-play" &&
@@ -9356,6 +9368,66 @@ try {
     () => state.applyCardAgentEffect(invalidThroneRowMoveSourceCard, p2, p2),
     /Invalid move-card-to-throne-row source ""/,
     "Throne Row movement specs should reject empty source labels",
+  );
+  const revealRecallAgentCard = {
+    ...convincingArgument,
+    id: "effect-spec-reveal-recall-agent-card",
+    name: "Effect Spec Reveal Recall Agent",
+    effects: [revealSpec([{ kind: "recall-agent", selector: "self" }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [revealRecallAgentCard], highCouncilSeat: false }),
+    /Unsupported effect "recall-agent" for reveal/,
+    "Recall Agent specs should stay in Agent play",
+  );
+  const invalidRecallAgentSelectorCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-recall-agent-selector-card",
+    name: "Effect Spec Invalid Recall Agent Selector",
+    effects: [agentSpec([{ kind: "recall-agent", selector: "activated-ally" }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidRecallAgentSelectorCard, p4, p2),
+    /Unsupported effect selector "activated-ally" for recall-agent/,
+    "Recall Agent specs should reject activated Ally selectors",
+  );
+  const invalidRecallAgentSourceCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-recall-agent-source-card",
+    name: "Effect Spec Invalid Recall Agent Source",
+    effects: [agentSpec([{ kind: "recall-agent", selector: "self", source: "" }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidRecallAgentSourceCard, p2, p2),
+    /Invalid recall-agent source ""/,
+    "Recall Agent specs should reject empty source labels",
+  );
+  const recallAgentEffectCard = {
+    ...convincingArgument,
+    id: "effect-spec-recall-agent-effect-card",
+    name: "Effect Spec Recall Agent",
+    effects: [agentSpec([{ kind: "recall-agent", selector: "self", source: "Recall Test" }])],
+  };
+  const recallAgentApplied = state.applyCardAgentEffect(
+    recallAgentEffectCard,
+    { ...p2, agentsReady: 0, agentsTotal: 2 },
+    { ...p2, agentsReady: 0, agentsTotal: 2 },
+  );
+  assert.equal(recallAgentApplied.source.agentsReady, 1, "Recall Agent should ready one spent Agent");
+  assert.equal(recallAgentApplied.recalledAgents, 1, "Recall Agent should expose its immediate recall count");
+  const duplicateRecallAgentEffectCard = {
+    ...convincingArgument,
+    id: "effect-spec-duplicate-recall-agent-effect-card",
+    name: "Effect Spec Duplicate Recall Agent",
+    effects: [agentSpec([
+      { kind: "recall-agent", selector: "self", source: "Recall Test" },
+      { kind: "recall-agent", selector: "self", source: "Recall Test" },
+    ])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(duplicateRecallAgentEffectCard, p2, p2),
+    /Unsupported multiple recall-agent effects/,
+    "Recall Agent specs should reject multiple simultaneous Agent recalls",
   );
 	  const conditionalRevealRetreatCard = {
 	    ...convincingArgument,

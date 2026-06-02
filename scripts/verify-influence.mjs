@@ -100,6 +100,7 @@ try {
       kind: "board-influence-choice",
       source: "Dutiful Service",
       spaceId: "dutiful-service",
+      targetOwnerId: oneGreatHouseFeyd.id,
       choices: [
         { faction: "greatHouses", ownerId: oneGreatHouseFeyd.id },
         { faction: "emperor", ownerId: shaddam.id },

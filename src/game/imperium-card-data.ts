@@ -37,6 +37,7 @@ import {
   southernEldersSourceId,
   spacingGuildFavorSourceId,
   spaceTimeFoldingSourceId,
+  steersmanSourceId,
   spiceMustFlowSourceId,
   spyNetworkSourceId,
   stilgarDevotedSourceId,
@@ -66,6 +67,7 @@ import {
   agentPayResourceForDrawCards,
   agentPayResourceForSandworms,
   agentPlaceSpies,
+  agentRecallAgent,
   agentRecruitTroops,
   agentTrashIntrigueForReward,
   agentTrashSource,
@@ -208,6 +210,13 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
       acquireGainInfluenceChoice(1, { source: "Interstellar Trade" }),
       acquireTakeContracts(1, { source: "Interstellar Trade" }),
       revealGainPersuasion({ kind: "completed-contracts" }),
+    ];
+  }
+  if (card.id === steersmanSourceId) {
+    return [
+      agentDrawCards(1),
+      agentRecallAgent(),
+      revealGainPersuasion(2),
     ];
   }
   if (card.id === branchingPathSourceId) {
@@ -647,6 +656,9 @@ function imperiumPlayText(card: HubCard) {
   }
   if (card.id === overthrowSourceId) {
     return "Gain two Influence instead of one.";
+  }
+  if (card.id === steersmanSourceId) {
+    return "Draw 1 card. Recall Agent.";
   }
   return summarizeAttributes(card);
 }

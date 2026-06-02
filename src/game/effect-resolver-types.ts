@@ -454,6 +454,8 @@ export type GameEffectResult = PlayerEffectResult & {
   influenceAdjustments: InfluenceAdjustmentEffect[];
   influenceLosses: Partial<Record<FactionId, number>>;
   persuasion: number;
+  recalledAgents: number;
+  recalledAgentSource?: string;
   removeShieldWall: boolean;
   spyRecalls: SpyRecallEffectResult[];
   swords: number;
@@ -481,6 +483,7 @@ export const emptyEffectResult: GameEffectResult = {
   intriguesToDraw: 0,
   recruitedTroops: 0,
   persuasion: 0,
+  recalledAgents: 0,
   removeShieldWall: false,
   revealGain: {},
   spentResources: {},

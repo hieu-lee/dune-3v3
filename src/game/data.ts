@@ -40,6 +40,7 @@ import {
   hasSwordmasterBonus,
   revealGainPersuasion,
   revealGainResource,
+  revealGainStrength,
   revealLoseInfluenceForIntrigues,
   revealRetreatTroopsForStrength,
   revealTrashCardForStrength,
@@ -299,6 +300,8 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
         { allowSharedPost: true },
         [visitedSpaceWithSpyPost()],
       ),
+      revealGainPersuasion(1),
+      revealGainStrength(1),
     ];
   }
   if (card.id === hiddenMissiveSourceId) {
@@ -306,18 +309,22 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
       agentDrawCards(1, [hasInfluence("bene", 2)]),
       agentRecruitTroops("self", 1, [hasInfluence("bene", 2), hasRole("Ally")]),
       agentRecruitTroops("activated-ally", 1, [hasInfluence("bene", 2), hasRole("Commander")]),
+      revealGainPersuasion(1),
+      revealGainStrength(1),
     ];
   }
   if (card.id === makerKeeperSourceId) {
     return [
       agentGainResource("water", 1, [hasInfluence("bene", 2)]),
       agentGainResource("spice", 1, [hasInfluence("fremen", 2)]),
+      revealGainPersuasion(2),
     ];
   }
   if (card.id === cargoRunnerSourceId) {
     return [
       agentDrawCards(1, [hasCompletedContracts(2)]),
       agentDrawCards(1, [hasCompletedContracts(4)]),
+      revealGainPersuasion(1),
     ];
   }
   if (card.id === chaniCleverTacticianSourceId) {
@@ -328,7 +335,11 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
     ];
   }
   if (card.id === maulaPistolSourceId) {
-    return [agentDrawCards(1)];
+    return [
+      agentDrawCards(1),
+      revealGainPersuasion(1),
+      revealGainStrength(1),
+    ];
   }
   if (card.id === northernWatermasterSourceId) {
     return [

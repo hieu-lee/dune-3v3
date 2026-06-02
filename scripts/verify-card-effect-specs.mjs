@@ -32,6 +32,10 @@ function hasAgentPlaySpec(card) {
   return card.effects?.some((spec) => spec.trigger === "agent-play") ?? false;
 }
 
+function hasRevealEffect(card, predicate) {
+  return card.effects?.some((spec) => spec.trigger === "reveal" && spec.effects.some(predicate)) ?? false;
+}
+
 function expectedFixedReveal(card) {
   return {
     persuasion: card.persuasion,
@@ -149,7 +153,7 @@ try {
   );
   assert.ok(commandRespect && prepareTheWay && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
   assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && dutifulService && deliverSupplies);
-  assert.equal(revealSpecCards.length, 41, "Unexpected number of cards with declarative Reveal specs");
+  assert.equal(revealSpecCards.length, 46, "Unexpected number of cards with declarative Reveal specs");
   assert.deepEqual(
     [
       ...data.reserveMarket,
@@ -186,7 +190,12 @@ try {
       calculus,
       capturedMentat,
       covertOperation,
+      doubleAgent,
       fedaykinStilltent,
+      hiddenMissive,
+      cargoRunner,
+      makerKeeper,
+      maulaPistol,
       northernWatermaster,
       paracompass,
       reliableInformant,
@@ -423,6 +432,10 @@ try {
     "Maker Keeper should carry a Fremen Influence-gated spice Agent spec",
   );
   assert.ok(
+    hasRevealEffect(makerKeeper, (effect) => effect.kind === "gain-persuasion" && effect.amount === 2),
+    "Maker Keeper should carry a fixed Reveal persuasion spec",
+  );
+  assert.ok(
     cargoRunner.effects?.some((spec) =>
       spec.trigger === "agent-play" &&
       spec.conditions?.some((condition) => condition.kind === "has-completed-contracts" && condition.count === 2) &&
@@ -436,11 +449,20 @@ try {
     "Cargo Runner should carry stacked completed-contract Agent draw specs",
   );
   assert.ok(
+    hasRevealEffect(cargoRunner, (effect) => effect.kind === "gain-persuasion" && effect.amount === 1),
+    "Cargo Runner should carry a fixed Reveal persuasion spec",
+  );
+  assert.ok(
     maulaPistol.effects?.some((spec) =>
       spec.trigger === "agent-play" &&
       spec.effects.some((effect) => effect.kind === "draw-cards" && effect.amount === 1)
     ),
     "Maula Pistol should carry an unconditional Agent draw spec",
+  );
+  assert.ok(
+    hasRevealEffect(maulaPistol, (effect) => effect.kind === "gain-persuasion" && effect.amount === 1) &&
+      hasRevealEffect(maulaPistol, (effect) => effect.kind === "gain-strength" && effect.amount === 1),
+    "Maula Pistol should carry fixed Reveal persuasion and strength specs",
   );
   assert.ok(
     chani.effects?.some((spec) =>
@@ -775,6 +797,11 @@ try {
     "Double Agent should carry a current-space spy-post gated shared spy placement spec",
   );
   assert.ok(
+    hasRevealEffect(doubleAgent, (effect) => effect.kind === "gain-persuasion" && effect.amount === 1) &&
+      hasRevealEffect(doubleAgent, (effect) => effect.kind === "gain-strength" && effect.amount === 1),
+    "Double Agent should carry fixed Reveal persuasion and strength specs",
+  );
+  assert.ok(
     hiddenMissive.effects?.some((spec) =>
       spec.trigger === "agent-play" &&
       spec.conditions?.some((condition) => condition.kind === "has-influence" && condition.faction === "bene" && condition.amount === 2) &&
@@ -808,6 +835,11 @@ try {
       )
     ),
     "Hidden Missive should carry a Bene Influence-gated Commander-to-activated-Ally troop spec",
+  );
+  assert.ok(
+    hasRevealEffect(hiddenMissive, (effect) => effect.kind === "gain-persuasion" && effect.amount === 1) &&
+      hasRevealEffect(hiddenMissive, (effect) => effect.kind === "gain-strength" && effect.amount === 1),
+    "Hidden Missive should carry fixed Reveal persuasion and strength specs",
   );
   assert.ok(
     wheelsWithinWheels.effects?.some((spec) =>

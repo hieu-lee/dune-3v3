@@ -5,6 +5,7 @@ import {
   cargoRunnerSourceId,
   capturedMentatSourceId,
   chaniCleverTacticianSourceId,
+  covertOperationSourceId,
   doubleAgentSourceId,
   fedaykinStilltentSourceId,
   hiddenMissiveSourceId,
@@ -232,6 +233,9 @@ function imperiumRevealText(card: HubCard, persuasion: number, swords: number, p
   if (card.id === reliableInformantSourceId) {
     return "+1 persuasion. Gain 1 Solari.";
   }
+  if (card.id === covertOperationSourceId) {
+    return "Gain 2 Solari.";
+  }
   return printedReveal ? "Resolve printed reveal text." : revealText(persuasion, swords);
 }
 
@@ -261,6 +265,9 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
       revealGainPersuasion(1),
       revealLoseInfluenceForIntrigues(1),
     ];
+  }
+  if (card.id === covertOperationSourceId) {
+    return [revealGainResource("solari", 2)];
   }
   if (card.id === beneGesseritOperativeSourceId) {
     return [
@@ -358,6 +365,9 @@ function imperiumPlayText(card: HubCard) {
   }
   if (card.id === reliableInformantSourceId) {
     return "Gain 1 Solari on Emperor, Bene Gesserit, or Spacing Guild board spaces.";
+  }
+  if (card.id === covertOperationSourceId) {
+    return "Each opponent discards a card.";
   }
   return summarizeAttributes(card);
 }
@@ -458,6 +468,8 @@ function toImperiumCard(card: HubCard): Card {
       ? { water: 1 }
       : card.id === reliableInformantSourceId
         ? { solari: 1 }
+        : card.id === covertOperationSourceId
+          ? { solari: 2 }
         : undefined;
   const automatedContractPersuasion = card.id === interstellarTradeSourceId;
   const automatedConditionalSwords = card.id === calculusOfPowerSourceId;

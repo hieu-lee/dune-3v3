@@ -10,7 +10,7 @@ These cards currently use typed reveal effect specs:
 - Muad'Dib Commander reveal cards: Command Respect, Convincing Argument, Demand Attention, Desert Call, Limited Landsraad Access, Signet Ring, Threaten Spice Production, Usul.
 - Emperor Commander reveal cards: Convincing Argument, Corrino Might, Critical Shipments, Demand Results, Devastating Assault, Imperial Ornithopter, Imperial Tent, Signet Ring.
 - Reserve cards: Prepare The Way.
-- Imperium cards: Smuggler's Harvester, Interstellar Trade, Bene Gesserit Operative, Captured Mentat, Calculus of Power, Chani, Clever Tactician, Fedaykin Stilltent, Northern Watermaster, Reliable Informant.
+- Imperium cards: Smuggler's Harvester, Interstellar Trade, Bene Gesserit Operative, Captured Mentat, Calculus of Power, Chani, Clever Tactician, Covert Operation, Fedaykin Stilltent, Northern Watermaster, Reliable Informant.
 
 These cards currently use typed Agent effect specs:
 
@@ -45,7 +45,7 @@ The largest current gaps are Agent and choice primitives:
 - Costs: Agent pay resources beyond typed Influence/sandworm/contract/team-VP payments and Reveal strength/Reveal troop payments, discard card, non-trade trash card, lose Influence, recall spy.
 - Conditions: combat participation beyond current conflict-unit count checks.
 - Selectors: activated Ally outside routed troop recruitment, teammate, faction, board space, market card, reserve card, contract, hand/discard/play-area card.
-- Effects: deploy troops to conflict, variable retreat troops, gain/lose Influence, recall spy, acquire card, take/complete contract, trash/discard card, gain VP, remove Shield Wall, remaining non-payment sandworm effects.
+- Effects: deploy troops to conflict, variable retreat troops, gain/lose Influence, recall spy, acquire card, take/complete contract, trash/discard card, make opponents discard cards, gain VP, remove Shield Wall, remaining non-payment sandworm effects.
 - Choices: optional effect, pay-or-skip, choose one, choose N, non-resource split Commander/Ally rewards.
 
 ## Verification

@@ -29,7 +29,7 @@ Unsupported spec shapes, including triggers, intentionally throw instead of fall
 
 1. Agent immediate gains: gain resources, draw cards, or draw Intrigues with non-self routing.
 2. Agent spy primitives: restricted post icon, recall spy costs, post-placement rewards.
-3. Costs and choices: remaining Agent pay-resource shapes, optional pay, discard/trash selected card, lose Influence.
+3. Costs and choices: remaining Agent pay-resource shapes, optional pay, discard/trash selected card, opponent discard, lose Influence.
 4. Routing: self versus activated Ally, Commander personal board influence, team-shared Influence checks.
 5. Market/contract effects: acquire card up to cost, take face-up CHOAM contract, complete contract.
 

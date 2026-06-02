@@ -86,6 +86,7 @@ try {
   const calculus = data.imperiumDeck.find((card) => card.name === "Calculus of Power");
   const capturedMentat = data.imperiumDeck.find((card) => card.name === "Captured Mentat");
   const beneGesseritOperative = data.imperiumDeck.find((card) => card.name === "Bene Gesserit Operative");
+  const covertOperation = data.imperiumDeck.find((card) => card.name === "Covert Operation");
   const doubleAgent = data.imperiumDeck.find((card) => card.name === "Double Agent");
   const fedaykinStilltent = data.imperiumDeck.find((card) => card.name === "Fedaykin Stilltent");
   const hiddenMissive = data.imperiumDeck.find((card) => card.name === "Hidden Missive");
@@ -129,6 +130,7 @@ try {
     calculus &&
     capturedMentat &&
     beneGesseritOperative &&
+    covertOperation &&
     doubleAgent &&
     fedaykinStilltent &&
     hiddenMissive &&
@@ -143,7 +145,7 @@ try {
   );
   assert.ok(commandRespect && prepareTheWay && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
   assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && dutifulService && deliverSupplies);
-  assert.equal(revealSpecCards.length, 37, "Unexpected number of cards with declarative Reveal specs");
+  assert.equal(revealSpecCards.length, 38, "Unexpected number of cards with declarative Reveal specs");
   assert.deepEqual(
     [
       ...data.reserveMarket,
@@ -177,6 +179,7 @@ try {
 	    interstellarTrade,
       calculus,
       capturedMentat,
+      covertOperation,
       fedaykinStilltent,
       northernWatermaster,
       reliableInformant,
@@ -514,6 +517,28 @@ try {
       )
     ),
     "Captured Mentat should carry a declarative Agent discard-for-Influence-and-draw spec",
+  );
+  assert.equal(
+    covertOperation.play,
+    "Each opponent discards a card.",
+    "Covert Operation play text should preserve its printed opponent discard effect",
+  );
+  assert.equal(
+    covertOperation.reveal,
+    "Gain 2 Solari.",
+    "Covert Operation reveal text should preserve its printed Solari reveal",
+  );
+  assert.ok(
+    covertOperation.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-resource" &&
+        effect.selector === "self" &&
+        effect.resource === "solari" &&
+        effect.amount === 2
+      )
+    ),
+    "Covert Operation should carry a reveal Solari spec",
   );
   assert.ok(
     beneGesseritOperative.effects?.some((spec) =>
@@ -873,6 +898,15 @@ try {
   });
   assert.equal(specReveal.persuasion, 2, "Spec starter cards should reveal for their printed persuasion");
   assert.equal(specReveal.swords, 1, "Spec starter cards should reveal for their printed strength");
+  const covertOperationReveal = turnActions.revealTurnPlan({
+    ...p2,
+    hand: [covertOperation],
+    highCouncilSeat: false,
+  });
+  assert.equal(covertOperationReveal.persuasion, 0, "Covert Operation should not reveal for persuasion");
+  assert.equal(covertOperationReveal.swords, 0, "Covert Operation should not reveal for strength");
+  assert.deepEqual(covertOperationReveal.revealGain, { solari: 2 }, "Covert Operation should reveal for 2 Solari");
+  assert.deepEqual(covertOperationReveal.printedRevealCards, [], "Covert Operation typed Reveal should not need manual fallback");
   const fremenSupportCard = {
     ...convincingArgument,
     id: "effect-spec-fremen-bond-support",

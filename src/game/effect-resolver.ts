@@ -261,6 +261,7 @@ type PlayerEffectResult = {
   recruitedTroopsSource?: string;
   revealGain: Partial<Resources>;
   revealGainSource?: string;
+  spentResources: Partial<Resources>;
   spyPlacements: SpyPlacementEffectResult[];
 };
 
@@ -277,6 +278,7 @@ const emptyPlayerEffectResult: PlayerEffectResult = {
   intriguesToDraw: 0,
   recruitedTroops: 0,
   revealGain: {},
+  spentResources: {},
   spyPlacements: [],
 };
 
@@ -287,6 +289,7 @@ const emptyEffectResult: GameEffectResult = {
   recruitedTroops: 0,
   persuasion: 0,
   revealGain: {},
+  spentResources: {},
   spyPlacements: [],
   swords: 0,
   vp: 0,
@@ -317,6 +320,14 @@ function addRevealGain(gain: Partial<Resources>, resource: ResourceId, amount: n
   return {
     ...gain,
     [resource]: (gain[resource] ?? 0) + amount,
+  };
+}
+
+function addResourceSpend(spent: Partial<Resources>, resource: ResourceId, amount: number) {
+  if (amount === 0) return spent;
+  return {
+    ...spent,
+    [resource]: (spent[resource] ?? 0) + amount,
   };
 }
 
@@ -470,6 +481,30 @@ function addSelectedRevealGain(
   return unsupportedKind("effect selector", selector);
 }
 
+function addSelectedResourceSpend(
+  result: GameEffectResult,
+  selector: PlayerSelector,
+  resource: ResourceId,
+  amount: number,
+) {
+  if (selector === "self") {
+    return {
+      ...result,
+      spentResources: addResourceSpend(result.spentResources, resource, amount),
+    };
+  }
+  if (selector === "activated-ally") {
+    return {
+      ...result,
+      activatedAlly: {
+        ...result.activatedAlly,
+        spentResources: addResourceSpend(result.activatedAlly.spentResources, resource, amount),
+      },
+    };
+  }
+  return unsupportedKind("effect selector", selector);
+}
+
 function addSelectedRecruitedTroops(
   result: GameEffectResult,
   selector: PlayerSelector,
@@ -548,6 +583,10 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
   if (effect.kind === "gain-resource") {
     const amount = amountFor(effect.amount, context.source);
     return addSelectedRevealGain(result, effect.selector, effect.resource, amount, effect.source);
+  }
+  if (effect.kind === "spend-resource") {
+    const amount = amountFor(effect.amount, context.source);
+    return addSelectedResourceSpend(result, effect.selector, effect.resource, amount);
   }
   if (effect.kind === "gain-persuasion") {
     if (effect.selector !== "self") {
@@ -711,6 +750,10 @@ function mergeEffectResult(result: GameEffectResult, next: GameEffectResult): Ga
       hasResourceGain(next.revealGain),
       next.revealGainSource,
     ),
+    spentResources: Object.entries(next.spentResources ?? {}).reduce(
+      (spent, [resource, amount]) => addResourceSpend(spent, resource as ResourceId, amount ?? 0),
+      result.spentResources,
+    ),
     spyPlacements: [...result.spyPlacements, ...next.spyPlacements],
     swords: result.swords + next.swords,
     vp: result.vp + next.vp,
@@ -746,6 +789,10 @@ function mergePlayerEffectResult(result: PlayerEffectResult, next: PlayerEffectR
       result.revealGainSource,
       hasResourceGain(next.revealGain),
       next.revealGainSource,
+    ),
+    spentResources: Object.entries(next.spentResources ?? {}).reduce(
+      (spent, [resource, amount]) => addResourceSpend(spent, resource as ResourceId, amount ?? 0),
+      result.spentResources,
     ),
     spyPlacements: [...result.spyPlacements, ...next.spyPlacements],
   };
@@ -1228,6 +1275,7 @@ function legacyRevealResult(card: Card): GameEffectResult {
     recruitedTroops: 0,
     persuasion: card.persuasion,
     revealGain: card.revealGain ? { ...card.revealGain } : {},
+    spentResources: {},
     spyPlacements: [],
     swords: card.swords,
     vp: 0,
@@ -1261,6 +1309,7 @@ function legacyAcquireResult(card: Card): GameEffectResult {
     recruitedTroops: 0,
     persuasion: 0,
     revealGain: {},
+    spentResources: {},
     spyPlacements: [],
     swords: 0,
     vp: card.acquired ?? 0,

@@ -162,6 +162,7 @@ try {
   const contingencyPlan = data.intrigueCards.find((card) => card.name === "Contingency Plan");
   const intelligenceReport = data.intrigueCards.find((card) => card.name === "Intelligence Report");
   const leverage = data.intrigueCards.find((card) => card.name === "Leverage");
+  const mercenaries = data.intrigueCards.find((card) => card.name === "Mercenaries");
   const shaddamsFavor = data.intrigueCards.find((card) => card.name === "Shaddam's Favor");
   const commandRespect = data.muadDibCommanderCards.find((card) => card.name === "Command Respect");
   const limitedLandsraadAccess = data.muadDibCommanderCards.find((card) => card.name === "Limited Landsraad Access");
@@ -230,7 +231,7 @@ try {
     wheelsWithinWheels,
   );
   assert.ok(commandRespect && prepareTheWay && spiceMustFlow && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
-  assert.ok(councilorsAmbition && contingencyPlan && intelligenceReport && leverage && shaddamsFavor);
+  assert.ok(councilorsAmbition && contingencyPlan && intelligenceReport && leverage && mercenaries && shaddamsFavor);
   assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && dutifulService && deliverSupplies && sietchTabr && spiceRefinery);
   assert.equal(revealSpecCards.length, 79, "Unexpected number of cards with declarative Reveal specs");
   assert.equal(
@@ -421,6 +422,76 @@ try {
     }).cardsToDraw,
     2,
     "Intelligence Report Plot spec should draw 2 cards with two own spy posts",
+  );
+  assert.ok(
+    hasPlotEffect(mercenaries, (effect) =>
+      effect.kind === "spend-resource" &&
+      effect.selector === "self" &&
+      effect.resource === "solari" &&
+      effect.amount === 3
+    ),
+    "Mercenaries should carry a typed Plot Solari spend spec",
+  );
+  assert.ok(
+    hasPlotEffect(mercenaries, (effect) =>
+      effect.kind === "draw-intrigues" &&
+      effect.selector === "self" &&
+      effect.amount === 1
+    ),
+    "Mercenaries should carry a typed Plot Intrigue draw spec",
+  );
+  assert.ok(
+    mercenaries.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Ally") &&
+      spec.effects.some((effect) =>
+        effect.kind === "recruit-troops" &&
+        effect.selector === "self" &&
+        effect.amount === 2
+      )
+    ),
+    "Mercenaries should carry a typed Plot self troop recruit spec for Allies",
+  );
+  assert.ok(
+    mercenaries.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Commander") &&
+      spec.effects.some((effect) =>
+        effect.kind === "recruit-troops" &&
+        effect.selector === "activated-ally" &&
+        effect.amount === 2
+      )
+    ),
+    "Mercenaries should carry a typed Plot activated-Ally troop recruit spec for Commanders",
+  );
+  const mercenariesAllyResolved = effectResolver.resolveGameEffects(mercenaries.effects, {
+    trigger: "plot-intrigue",
+    source: p2,
+    state: game,
+  });
+  assert.equal(mercenariesAllyResolved.spentResources.solari, 3, "Mercenaries Plot spec should spend 3 Solari");
+  assert.equal(mercenariesAllyResolved.intriguesToDraw, 1, "Mercenaries Plot spec should draw 1 Intrigue");
+  assert.equal(mercenariesAllyResolved.recruitedTroops, 2, "Mercenaries Plot spec should recruit for Ally actors");
+  const mercenariesCommanderResolved = effectResolver.resolveGameEffects(mercenaries.effects, {
+    trigger: "plot-intrigue",
+    source: p4,
+    target: p6,
+    state: game,
+  });
+  assert.equal(
+    mercenariesCommanderResolved.spentResources.solari,
+    3,
+    "Commander Mercenaries Plot spec should spend Commander Solari",
+  );
+  assert.equal(
+    mercenariesCommanderResolved.intriguesToDraw,
+    1,
+    "Commander Mercenaries Plot spec should draw an Intrigue for the Commander",
+  );
+  assert.equal(
+    mercenariesCommanderResolved.activatedAlly.recruitedTroops,
+    2,
+    "Mercenaries Plot spec should route Commander troop recruitment to the activated Ally",
   );
   assert.ok(
     shaddamsFavor.effects?.some((spec) =>
@@ -2220,6 +2291,38 @@ try {
     () => state.applyCardAgentEffect(invalidGainResourceSourceCard, p2, p2),
     /Invalid gain-resource source ""/,
     "Resource gain specs should reject empty source labels",
+  );
+  assert.throws(
+    () => effectResolver.resolveGameEffects(
+      [agentSpec([{ kind: "spend-resource", selector: "self", resource: "spice", amount: 1 }])],
+      { trigger: "agent-play", source: p2, state: game },
+    ),
+    /Unsupported effect "spend-resource" for agent-play/,
+    "Spend-resource specs should stay on Plot Intrigue until other trigger resolvers support them",
+  );
+  assert.throws(
+    () => effectResolver.resolveGameEffects(
+      [plotSpec([{ kind: "spend-resource", selector: "self", resource: "melange", amount: 1 }])],
+      { trigger: "plot-intrigue", source: p2, state: game },
+    ),
+    /Unsupported effect resource "melange"/,
+    "Spend-resource specs should reject unsupported resources",
+  );
+  assert.throws(
+    () => effectResolver.resolveGameEffects(
+      [plotSpec([{ kind: "spend-resource", selector: "self", resource: "spice", amount: -1 }])],
+      { trigger: "plot-intrigue", source: p2, state: game },
+    ),
+    /Invalid effect amount "-1"/,
+    "Spend-resource specs should validate effect amounts",
+  );
+  assert.throws(
+    () => effectResolver.resolveGameEffects(
+      [plotSpec([{ kind: "spend-resource", selector: "self", resource: "spice", amount: 1, source: "" }])],
+      { trigger: "plot-intrigue", source: p2, state: game },
+    ),
+    /Invalid spend-resource source ""/,
+    "Spend-resource specs should reject empty source labels",
   );
   assert.throws(
     () => effectResolver.resolveGameEffects(

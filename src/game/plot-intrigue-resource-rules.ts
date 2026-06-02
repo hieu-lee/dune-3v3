@@ -20,7 +20,6 @@ import {
 import {
   drawCards,
 } from "./deck-utils";
-import { drawIntrigueCards } from "./intrigue-deck";
 import {
   adjustInfluence,
 } from "./leader-rewards";
@@ -125,48 +124,17 @@ export function playMercenariesPlotIntrigue(
   intrigueId: string,
   troopOwnerId?: string,
 ): GameState {
-  if (state.phase !== "playing" || state.pendingAction || state.pendingQueue.length > 0) return state;
-  const player = state.players[state.activeSeat];
-  if (!player || player.id !== playerId) return state;
-  const intrigue = player.intrigues.find((card) => card.id === intrigueId);
-  if (!intrigue || !isMercenariesIntrigue(intrigue) || player.resources.solari < 3) return state;
-
-  const troopOwnerResult = activatedAllyEffectOwner(state, player, troopOwnerId);
-  if (!troopOwnerResult.valid || !troopOwnerResult.owner) return state;
-  const troopOwner = troopOwnerResult.owner;
-
-  const players = state.players.map((candidate) => {
-    let next = candidate;
-    if (candidate.id === player.id) {
-      next = {
-        ...next,
-        resources: { ...next.resources, solari: next.resources.solari - 3 },
-        intrigues: next.intrigues.filter((card) => card.id !== intrigue.id),
-      };
-    }
-    if (candidate.id === troopOwner.id) {
-      next = { ...next, garrison: next.garrison + 2 };
-    }
-    return next;
-  });
-  const troopLabel = troopOwner.id !== player.id ? ` for ${troopOwner.leader}` : "";
-  const drawnState = drawIntrigueCards(
-    {
-      ...state,
-      players,
+  return playTypedPlotIntrigue(
+    state,
+    playerId,
+    intrigueId,
+    isMercenariesIntrigue,
+    (player, _contractPending, activatedAlly) => {
+      const troopLabel = activatedAlly && activatedAlly.id !== player.id ? ` for ${activatedAlly.leader}` : "";
+      return `${player.leader} plays Mercenaries${troopLabel}, spends 3 Solari, and recruits 2 troops.`;
     },
-    player.id,
-    1,
-    "Mercenaries",
+    { activatedAllyOwnerId: troopOwnerId, requireActivatedAlly: true },
   );
-  return {
-    ...drawnState,
-    intrigueDiscard: [...drawnState.intrigueDiscard, intrigue],
-    log: [
-      `${player.leader} plays Mercenaries${troopLabel}, spends 3 Solari, and recruits 2 troops.`,
-      ...drawnState.log,
-    ],
-  };
 }
 
 export function playStrategicStockpilingPlotIntrigue(

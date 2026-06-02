@@ -24,6 +24,7 @@ import {
   interstellarTradeSourceId,
   makerKeeperSourceId,
   maulaPistolSourceId,
+  mercenariesSourceId,
   northernWatermasterSourceId,
   overthrowSourceId,
   paracompassSourceId,
@@ -72,8 +73,10 @@ import {
   hasSwordmasterBonus,
   gainedSpiceThisTurn,
   plotDrawCards,
+  plotDrawIntrigues,
   plotGainResource,
   plotRecruitTroops,
+  plotSpendResource,
   plotTakeContracts,
   revealGainPersuasion,
   revealPlaceSpies,
@@ -843,6 +846,14 @@ function intrigueCardEffects(card: HubCard): CardEffectSpec[] | undefined {
     return [
       plotDrawCards(1),
       plotDrawCards(1, [hasSpyPosts(2)]),
+    ];
+  }
+  if (card.id === mercenariesSourceId) {
+    return [
+      plotSpendResource("solari", 3),
+      plotDrawIntrigues(1),
+      plotRecruitTroops("self", 2, [hasRole("Ally")]),
+      plotRecruitTroops("activated-ally", 2, [hasRole("Commander")]),
     ];
   }
   if (card.id === shaddamsFavorSourceId) {

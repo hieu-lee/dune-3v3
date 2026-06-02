@@ -1,5 +1,6 @@
 import { drawCards } from "./deck-utils";
 import { resolveGameEffects, resolveTakeContracts } from "./effect-resolver";
+import { drawIntrigueCards } from "./intrigue-deck";
 import { activatedAllyEffectOwner } from "./market-rules";
 import type {
   GameState,
@@ -24,11 +25,19 @@ function hasResourceGains(gain: Partial<Resources>) {
   return resourceIds.some((resource) => (gain[resource] ?? 0) > 0);
 }
 
-function addResourceGains(resources: Resources, gain: Partial<Resources>): Resources {
+function hasResourceSpends(spent: Partial<Resources>) {
+  return resourceIds.some((resource) => (spent[resource] ?? 0) > 0);
+}
+
+function canSpendResources(resources: Resources, spent: Partial<Resources>) {
+  return resourceIds.every((resource) => resources[resource] >= (spent[resource] ?? 0));
+}
+
+function applyResourceChanges(resources: Resources, gain: Partial<Resources>, spent: Partial<Resources>): Resources {
   return resourceIds.reduce(
     (next, resource) => ({
       ...next,
-      [resource]: next[resource] + (gain[resource] ?? 0),
+      [resource]: next[resource] + (gain[resource] ?? 0) - (spent[resource] ?? 0),
     }),
     { ...resources },
   );
@@ -90,14 +99,26 @@ export function playTypedPlotIntrigue(
   const contractPending = publicContractPendingFor(state, player, intrigue, contractEffect);
   const hasTroopRecruits = resolved.recruitedTroops > 0 || resolved.activatedAlly.recruitedTroops > 0;
   const hasCardDraw = resolved.cardsToDraw > 0;
-  if (!hasResourceGains(resolved.revealGain) && !hasTroopRecruits && !hasCardDraw && !contractPending) return state;
+  const hasIntrigueDraw = resolved.intriguesToDraw > 0;
+  const hasResourceSpend = hasResourceSpends(resolved.spentResources);
+  if (!canSpendResources(player.resources, resolved.spentResources)) return state;
+  if (
+    !hasResourceGains(resolved.revealGain) &&
+    !hasResourceSpend &&
+    !hasTroopRecruits &&
+    !hasCardDraw &&
+    !hasIntrigueDraw &&
+    !contractPending
+  ) {
+    return state;
+  }
 
   const outcome: TypedPlotIntrigueOutcome = { cardsDrawn: 0 };
   const players = state.players.map((candidate) => {
     if (candidate.id === player.id) {
       let next = {
         ...candidate,
-        resources: addResourceGains(candidate.resources, resolved.revealGain),
+        resources: applyResourceChanges(candidate.resources, resolved.revealGain, resolved.spentResources),
         garrison: candidate.garrison + resolved.recruitedTroops,
         intrigues: candidate.intrigues.filter((card) => card.id !== intrigue.id),
       };
@@ -115,11 +136,17 @@ export function playTypedPlotIntrigue(
         }
       : candidate;
   });
-  return {
+  const immediateState = {
     ...state,
     players,
     pendingAction: contractPending,
-    intrigueDiscard: [...state.intrigueDiscard, intrigue],
-    log: [logFor(player, contractPending, activatedAlly, resolved, outcome), ...state.log],
+  };
+  const drawnState = hasIntrigueDraw
+    ? drawIntrigueCards(immediateState, player.id, resolved.intriguesToDraw, intrigue.name)
+    : immediateState;
+  return {
+    ...drawnState,
+    intrigueDiscard: [...drawnState.intrigueDiscard, intrigue],
+    log: [logFor(player, contractPending, activatedAlly, resolved, outcome), ...drawnState.log],
   };
 }

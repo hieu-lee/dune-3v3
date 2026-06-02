@@ -118,6 +118,26 @@ export function verifyEconomyPlotIntrigues({ cards, data, game, state }) {
   assert.equal(mercenariesPlayed.intrigueDiscard.at(-1).id, mercenaries.id);
   assert.match(mercenariesPlayed.log[0], /plays Mercenaries, spends 3 Solari, and recruits 2 troops/);
   assert.match(mercenariesPlayed.log[1], /draws an Intrigue card from Mercenaries/);
+  const emptyDeckMercenaries = state.playMercenariesPlotIntrigue(
+    {
+      ...mercenariesFixture,
+      intrigueDeck: [],
+      intrigueDiscard: [],
+      players: mercenariesFixture.players.map((candidate) =>
+        candidate.id === "p2" ? { ...candidate, resources: { ...candidate.resources, solari: 3 }, intrigues: [mercenaries] } : candidate,
+      ),
+    },
+    "p2",
+    mercenaries.id,
+  );
+  assert.deepEqual(
+    playerById(emptyDeckMercenaries, "p2").intrigues,
+    [],
+    "Mercenaries should not redraw itself when the Intrigue deck and discard are empty",
+  );
+  assert.equal(emptyDeckMercenaries.intrigueDiscard.at(-1).id, mercenaries.id);
+  assert.equal(playerById(emptyDeckMercenaries, "p2").resources.solari, 0);
+  assert.equal(playerById(emptyDeckMercenaries, "p2").garrison, 3);
 
   const poorMercenaries = {
     ...mercenariesFixture,

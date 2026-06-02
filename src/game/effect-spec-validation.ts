@@ -184,6 +184,20 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     validateAmount(effect.amount);
     return;
   }
+  if (effect.kind === "spend-resource") {
+    if (trigger !== "plot-intrigue") {
+      throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
+    }
+    if (effect.selector !== "self") {
+      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
+    if (!supportedResources.has(effect.resource)) {
+      throw new Error(`Unsupported effect resource "${effect.resource}"`);
+    }
+    validateSourceLabel("spend-resource source", effect.source);
+    validateAmount(effect.amount);
+    return;
+  }
   if (effect.kind === "gain-vp") {
     if (trigger !== "acquire") {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
@@ -210,7 +224,7 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     return;
   }
   if (effect.kind === "draw-intrigues") {
-    if (trigger !== "agent-play" && trigger !== "acquire") {
+    if (trigger !== "agent-play" && trigger !== "acquire" && trigger !== "plot-intrigue") {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
     }
     validateAmount(effect.amount);

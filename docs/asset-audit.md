@@ -1,5 +1,7 @@
 # Dune Uprising 3v3 Asset Audit
 
+Current asset status is tracked in `docs/asset-coverage.md`; this audit records source research and board-space-specific decisions.
+
 ## Sources Checked
 
 - Official Dire Wolf six-player rules supplement: source of the exact six-player board-space guide thumbnails.

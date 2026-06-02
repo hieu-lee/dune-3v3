@@ -138,6 +138,16 @@ export function plotTrashCard(
   return plotIntrigueEffects([{ kind: "trash-card", selector: "self", ...options }], conditions, specOptions);
 }
 
+export function plotManipulateRowCard(
+  options: {
+    source?: string;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+  specOptions?: CardEffectSpecOptions,
+): CardEffectSpec {
+  return plotIntrigueEffects([{ kind: "manipulate-row-card", selector: "self", ...options }], conditions, specOptions);
+}
+
 export function plotResourceExchange(
   choiceId: string,
   spendResource: ResourceId,

@@ -168,6 +168,7 @@ try {
   const distraction = data.intrigueCards.find((card) => card.name === "Distraction");
   const intelligenceReport = data.intrigueCards.find((card) => card.name === "Intelligence Report");
   const leverage = data.intrigueCards.find((card) => card.name === "Leverage");
+  const manipulate = data.intrigueCards.find((card) => card.name === "Manipulate");
   const marketOpportunity = data.intrigueCards.find((card) => card.name === "Market Opportunity");
   const mercenaries = data.intrigueCards.find((card) => card.name === "Mercenaries");
   const shaddamsFavor = data.intrigueCards.find((card) => card.name === "Shaddam's Favor");
@@ -239,7 +240,7 @@ try {
     wheelsWithinWheels,
   );
   assert.ok(commandRespect && prepareTheWay && spiceMustFlow && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
-  assert.ok(backedByChoam && callToArms && councilorsAmbition && contingencyPlan && cunning && departForArrakis && distraction && intelligenceReport && leverage && marketOpportunity && mercenaries && shaddamsFavor && strategicStockpiling);
+  assert.ok(backedByChoam && callToArms && councilorsAmbition && contingencyPlan && cunning && departForArrakis && distraction && intelligenceReport && leverage && manipulate && marketOpportunity && mercenaries && shaddamsFavor && strategicStockpiling);
   assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && dutifulService && deliverSupplies && sietchTabr && spiceRefinery);
   assert.equal(revealSpecCards.length, 79, "Unexpected number of cards with declarative Reveal specs");
   assert.equal(
@@ -535,6 +536,35 @@ try {
     }),
     [],
     "Leverage Plot contract spec should not resolve without a turn spice gain",
+  );
+  assert.ok(
+    manipulate.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.effects.some((effect) =>
+        effect.kind === "manipulate-row-card" &&
+        effect.selector === "self" &&
+        effect.source === "Manipulate"
+      )
+    ),
+    "Manipulate should carry a typed Plot row-manipulation spec",
+  );
+  assert.deepEqual(
+    effectResolver.resolveManipulateRowCards(manipulate.effects, {
+      trigger: "plot-intrigue",
+      source: p2,
+      state: game,
+    }),
+    [{ selector: "self", source: "Manipulate" }],
+    "Manipulate Plot spec should resolve a reusable row-manipulation effect",
+  );
+  assert.deepEqual(
+    effectResolver.resolveManipulateRowCards(manipulate.effects, {
+      trigger: "agent-play",
+      source: p2,
+      state: game,
+    }),
+    [],
+    "Manipulate row-manipulation specs should not resolve for other triggers",
   );
   assert.ok(
     intelligenceReport.effects?.some((spec) =>
@@ -3114,6 +3144,37 @@ try {
     () => turnActions.revealTurnPlan({ ...p2, hand: [invalidSpyPlacementAmountCard], highCouncilSeat: false }),
     /Invalid effect amount "-1"/,
     "Spy placement effect amounts should require a non-negative integer amount",
+  );
+  const agentManipulateRowCard = {
+    ...convincingArgument,
+    id: "effect-spec-agent-manipulate-row-card",
+    name: "Effect Spec Agent Manipulate Row",
+    effects: [agentSpec([{ kind: "manipulate-row-card", selector: "self", source: "Test" }])],
+  };
+  assert.throws(
+    () => effectResolver.resolveManipulateRowCards(agentManipulateRowCard.effects, {
+      trigger: "agent-play",
+      source: p2,
+      state: game,
+    }),
+    /Unsupported effect "manipulate-row-card" for agent-play/,
+    "Manipulate-row-card specs should fail outside Plot Intrigues",
+  );
+  const invalidManipulateRowSelectorCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-manipulate-row-selector-card",
+    name: "Effect Spec Invalid Manipulate Row Selector",
+    effects: [plotSpec([{ kind: "manipulate-row-card", selector: "activated-ally", source: "Test" }])],
+  };
+  assert.throws(
+    () => effectResolver.resolveManipulateRowCards(invalidManipulateRowSelectorCard.effects, {
+      trigger: "plot-intrigue",
+      source: p2,
+      target: p4,
+      state: game,
+    }),
+    /Unsupported effect selector "activated-ally" for plot-intrigue/,
+    "Manipulate-row-card specs should currently target only the source player",
   );
   const invalidSpyPlacementSourceCard = {
     ...convincingArgument,

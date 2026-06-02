@@ -251,6 +251,7 @@ export type GameEffectSpec =
     }
   | { kind: "block-conflict-deployment"; selector: PlayerSelector; source?: string }
   | { kind: "move-card-to-throne-row"; selector: PlayerSelector; source?: string }
+  | { kind: "manipulate-row-card"; selector: PlayerSelector; source?: string }
   | {
       kind: "place-spies";
       selector: PlayerSelector;

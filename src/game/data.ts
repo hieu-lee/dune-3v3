@@ -29,6 +29,7 @@ import {
   interstellarTradeSourceId,
   makerKeeperSourceId,
   marketOpportunitySourceId,
+  manipulateSourceId,
   maulaPistolSourceId,
   mercenariesSourceId,
   northernWatermasterSourceId,
@@ -85,6 +86,7 @@ import {
   plotDrawIntrigues,
   plotGainResource,
   plotLoseInfluenceForResource,
+  plotManipulateRowCard,
   plotPayResourcesForVp,
   plotPlaceSpies,
   plotRecruitTroops,
@@ -889,6 +891,9 @@ function intrigueCardEffects(card: HubCard): CardEffectSpec[] | undefined {
       plotGainResource("solari", 1, [gainedSpiceThisTurn()]),
       plotTakeContracts(1, { optional: true, source: "Leverage" }, [gainedSpiceThisTurn()]),
     ];
+  }
+  if (card.id === manipulateSourceId) {
+    return [plotManipulateRowCard({ source: "Manipulate" })];
   }
   if (card.id === departForArrakisSourceId) {
     return [

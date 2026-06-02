@@ -40,41 +40,15 @@ export function playManipulatePlotIntrigue(
   intrigueId: string,
   cardId: string,
 ): GameState {
-  if (state.phase !== "playing" || state.pendingAction || state.pendingQueue.length > 0) return state;
-  const player = state.players[state.activeSeat];
-  if (!player || player.id !== playerId) return state;
-  const intrigue = player.intrigues.find((card) => card.id === intrigueId);
-  if (!intrigue || !isManipulateIntrigue(intrigue)) return state;
-
-  const rowIndex = state.imperiumRow.findIndex((card) => card.id === cardId);
-  const manipulatedCard = state.imperiumRow[rowIndex];
-  if (!manipulatedCard) return state;
-  const [replacement, ...marketDeck] = state.marketDeck;
-  const imperiumRow = state.imperiumRow.flatMap((candidate, index) => {
-    if (index !== rowIndex) return [candidate];
-    return replacement ? [replacement] : [];
-  });
-  const players = state.players.map((candidate) =>
-    candidate.id === player.id
-      ? {
-          ...candidate,
-          manipulatedCards: [...candidate.manipulatedCards, manipulatedCard],
-          intrigues: candidate.intrigues.filter((card) => card.id !== intrigue.id),
-        }
-      : candidate,
+  return playTypedPlotIntrigue(
+    state,
+    playerId,
+    intrigueId,
+    isManipulateIntrigue,
+    (player, _contractPending, _activatedAlly, _resolved, outcome) =>
+      `${player.leader} plays Manipulate, removes ${outcome.manipulatedCard?.name ?? "a card"} from the Imperium Row, and may acquire it for 1 Persuasion less this round.`,
+    { targetCardId: cardId },
   );
-
-  return {
-    ...state,
-    players,
-    imperiumRow,
-    marketDeck,
-    intrigueDiscard: [...state.intrigueDiscard, intrigue],
-    log: [
-      `${player.leader} plays Manipulate, removes ${manipulatedCard.name} from the Imperium Row, and may acquire it for 1 Persuasion less this round.`,
-      ...state.log,
-    ],
-  };
 }
 
 export function playLeveragePlotIntrigue(

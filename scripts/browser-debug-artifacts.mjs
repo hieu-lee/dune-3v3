@@ -104,6 +104,8 @@ const generatedScreenshotNames = [
   "pending-wheels-within-wheels-reveal-spy.png",
   "calculus-trash-ready.png",
   "pending-calculus-trash.png",
+  "manipulate-ready.png",
+  "manipulate-after.png",
   "pending-throne-row.png",
   "pending-imperial-tent-throne-row.png",
   "pending-conflict-tie.png",

@@ -213,6 +213,11 @@ export type TakeContractsEffect = {
   source?: string;
 };
 
+export type ManipulateRowCardEffect = {
+  selector: PlayerSelector;
+  source?: string;
+};
+
 export type AgentPayResourceForDrawCards = {
   selector: PlayerSelector;
   resource: ResourceId;
@@ -739,6 +744,9 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
   if (effect.kind === "move-card-to-throne-row") {
     return result;
   }
+  if (effect.kind === "manipulate-row-card") {
+    return result;
+  }
   if (effect.kind === "place-spies") {
     const amount = amountFor(effect.amount, context.source);
     return addSelectedSpyPlacement(result, effect.selector, {
@@ -1216,6 +1224,23 @@ export function resolveTakeContracts(
         amount: amountFor(effect.amount, context.source),
         sourcePool: effect.sourcePool,
         optional: effect.optional === true,
+        source: effect.source,
+      }));
+  });
+}
+
+export function resolveManipulateRowCards(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): ManipulateRowCardEffect[] {
+  specs?.forEach(validateSpec);
+  return (specs ?? []).flatMap((spec) => {
+    if (spec.trigger !== context.trigger) return [];
+    if (!specApplies(spec, context)) return [];
+    return spec.effects
+      .filter((effect) => effect.kind === "manipulate-row-card")
+      .map((effect) => ({
+        selector: effect.selector,
         source: effect.source,
       }));
   });

@@ -154,6 +154,48 @@ export async function runTableChoicesSmoke({
     "Calculus should trash the selected Emperor card",
   );
 
+  await setDebugGameAndWait(page, states.manipulatePlot);
+  const manipulateButton = page.getByRole("button", { name: states.manipulateButtonName });
+  await screenshot(page, captures, "manipulate-ready.png");
+  const manipulateBefore = await currentGame(page);
+  const manipulateOwnerBefore = manipulateBefore.players.find((player) => player.id === "p2");
+  assert.ok(manipulateOwnerBefore, "Expected Feyd before Manipulate");
+  await manipulateButton.click();
+  await page.waitForFunction(({ cardId, replacementId }) => {
+    const game = window.__DUNE_DEBUG__?.getGame();
+    const player = game?.players.find((candidate) => candidate.id === "p2");
+    return Boolean(
+      player?.manipulatedCards.some((card) => card.id === cardId) &&
+        game?.imperiumRow.some((card) => card.id === replacementId) &&
+        !game?.imperiumRow.some((card) => card.id === cardId),
+    );
+  }, {
+    cardId: states.manipulateRowCardId,
+    replacementId: states.manipulateReplacementCardId,
+  });
+  const manipulateAfter = await currentGame(page);
+  const manipulateOwnerAfter = manipulateAfter.players.find((player) => player.id === "p2");
+  assert.ok(manipulateOwnerAfter, "Expected Feyd after Manipulate");
+  assert.equal(
+    manipulateOwnerAfter.manipulatedCards.some((card) => card.id === states.manipulateRowCardId),
+    true,
+    "Manipulate browser flow should hold the removed row card as a discounted acquisition",
+  );
+  assert.equal(
+    manipulateAfter.imperiumRow.some((card) => card.id === states.manipulateReplacementCardId),
+    true,
+    "Manipulate browser flow should refill the Imperium Row",
+  );
+  assert.equal(
+    manipulateOwnerAfter.intrigues.some((card) => card.id === states.manipulateIntrigueId),
+    false,
+    "Manipulate browser flow should discard the played Intrigue",
+  );
+  const manipulateMarketText = await page.locator(".market-panel").innerText();
+  assert.match(manipulateMarketText, new RegExp(escapeRegExp(states.manipulateRowCardName)));
+  assert.match(manipulateMarketText, /Manipulate/i);
+  await screenshot(page, captures, "manipulate-after.png");
+
   await setDebugGameAndWait(page, states.throneRow);
   pendingText = await page.locator(".pending-panel").innerText();
   assert.match(pendingText, /Throne Row/i);
@@ -268,6 +310,12 @@ async function createTableChoiceStates(server, initialPlayableGame) {
   assert.ok(calculusTrashTarget, "Expected an Emperor card for Calculus browser debug state");
   const imperialTent = data.emperorCommanderCards.find((card) => card.name === "Imperial Tent");
   assert.ok(imperialTent, "Expected Imperial Tent for declarative Throne Row browser debug state");
+  const manipulate = data.intrigueCards.find((card) => card.name === "Manipulate");
+  assert.ok(manipulate, "Expected Manipulate for Plot row-manipulation browser debug state");
+  const manipulateRowCard = data.imperiumDeck.find((card) => (card.cost ?? 0) > 0);
+  assert.ok(manipulateRowCard, "Expected a priced Imperium Row card for Manipulate browser debug state");
+  const manipulateReplacement = data.imperiumDeck.find((card) => card.id !== manipulateRowCard.id);
+  assert.ok(manipulateReplacement, "Expected a Manipulate replacement row card for browser debug state");
 
   const base = {
     ...game,
@@ -431,6 +479,29 @@ async function createTableChoiceStates(server, initialPlayableGame) {
     },
     calculusTrashTargetId: calculusTrashTarget.id,
     calculusTrashTargetName: calculusTrashTarget.name,
+    manipulatePlot: {
+      ...base,
+      activeSeat: feydSeat,
+      imperiumRow: [cloneCard(manipulateRowCard)],
+      marketDeck: [cloneCard(manipulateReplacement)],
+      players: base.players.map((player) =>
+        player.id === "p2"
+          ? {
+              ...player,
+              hand: [],
+              intrigues: [cloneCard(manipulate)],
+              manipulatedCards: [],
+              persuasion: 0,
+              revealed: false,
+            }
+          : { ...player, intrigues: [], manipulatedCards: [] }
+      ),
+    },
+    manipulateButtonName: `Remove ${manipulateRowCard.name}`,
+    manipulateIntrigueId: manipulate.id,
+    manipulateReplacementCardId: manipulateReplacement.id,
+    manipulateRowCardId: manipulateRowCard.id,
+    manipulateRowCardName: manipulateRowCard.name,
     throneRow: {
       ...base,
       activeSeat: shaddamSeat,

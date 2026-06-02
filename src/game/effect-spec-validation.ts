@@ -633,6 +633,16 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     validateSourceLabel("move-card-to-throne-row source", effect.source);
     return;
   }
+  if (effect.kind === "manipulate-row-card") {
+    if (trigger !== "plot-intrigue") {
+      throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
+    }
+    if (effect.selector !== "self") {
+      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
+    validateSourceLabel("manipulate-row-card source", effect.source);
+    return;
+  }
   if (effect.kind === "place-spies") {
     if (trigger !== "agent-play" && trigger !== "reveal" && trigger !== "acquire" && trigger !== "plot-intrigue") {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);

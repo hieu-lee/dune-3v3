@@ -1,11 +1,17 @@
 import { drawCards } from "./deck-utils";
-import { resolveGameEffects, resolveTakeContracts, resolveTrashCardEffects } from "./effect-resolver";
+import {
+  resolveGameEffects,
+  resolveManipulateRowCards,
+  resolveTakeContracts,
+  resolveTrashCardEffects,
+} from "./effect-resolver";
 import { drawIntrigueCards } from "./intrigue-deck";
 import { adjustInfluence } from "./leader-rewards";
 import { activatedAllyEffectOwner } from "./market-rules";
 import { pendingActionForSpyPlacements } from "./spy-effect-pending-rules";
 import { trashableCardsForPending } from "./trash-rules";
 import type {
+  Card,
   FactionId,
   GameState,
   IntrigueCard,
@@ -20,10 +26,12 @@ type PlayTypedPlotIntrigueOptions = {
   activatedAllyOwnerId?: string;
   choiceId?: string;
   requireActivatedAlly?: boolean;
+  targetCardId?: string;
 };
 
 type TypedPlotIntrigueOutcome = {
   cardsDrawn: number;
+  manipulatedCard?: Card;
 };
 
 type TrashCardPendingAction = Extract<PendingAction, { kind: "trash-card" }>;
@@ -100,6 +108,23 @@ function trashCardPendingFor(
   };
 }
 
+function rowManipulationFor(
+  state: GameState,
+  targetCardId: string | undefined,
+  effect: ReturnType<typeof resolveManipulateRowCards>[number] | undefined,
+): { card: Card; imperiumRow: Card[]; marketDeck: Card[] } | undefined {
+  if (!effect || effect.selector !== "self" || !targetCardId) return undefined;
+  const rowIndex = state.imperiumRow.findIndex((card) => card.id === targetCardId);
+  const manipulatedCard = state.imperiumRow[rowIndex];
+  if (!manipulatedCard) return undefined;
+  const [replacement, ...marketDeck] = state.marketDeck;
+  const imperiumRow = state.imperiumRow.flatMap((card, index) => {
+    if (index !== rowIndex) return [card];
+    return replacement ? [replacement] : [];
+  });
+  return { card: manipulatedCard, imperiumRow, marketDeck };
+}
+
 export function playTypedPlotIntrigue(
   state: GameState,
   playerId: string,
@@ -135,12 +160,17 @@ export function playTypedPlotIntrigue(
   const resolved = resolveGameEffects(intrigue.effects, context);
   const contractEffects = resolveTakeContracts(intrigue.effects, context);
   const trashEffects = resolveTrashCardEffects(intrigue.effects, context);
+  const rowManipulationEffects = resolveManipulateRowCards(intrigue.effects, context);
   if (contractEffects.length > 1) throw new Error("Unsupported multiple Plot Intrigue take-contracts effects");
   if (trashEffects.length > 1) throw new Error("Unsupported multiple Plot Intrigue trash-card effects");
+  if (rowManipulationEffects.length > 1) throw new Error("Unsupported multiple Plot Intrigue row manipulation effects");
   const [contractEffect] = contractEffects;
   const [trashEffect] = trashEffects;
+  const [rowManipulationEffect] = rowManipulationEffects;
   const contractPending = publicContractPendingFor(state, player, intrigue, contractEffect);
   const spyPending = pendingActionForSpyPlacements(intrigue.name, player, resolved.spyPlacements, state);
+  const rowManipulation = rowManipulationFor(state, options.targetCardId, rowManipulationEffect);
+  if (rowManipulationEffect && !rowManipulation) return state;
   if (resolved.activatedAlly.spyPlacements.length > 0) {
     throw new Error(`Unsupported activated Ally Plot Intrigue spy placement for ${intrigue.name}`);
   }
@@ -167,12 +197,13 @@ export function playTypedPlotIntrigue(
     !hasAcquireRecruitBonus &&
     !contractPending &&
     !spyPending &&
-    !trashEffect
+    !trashEffect &&
+    !rowManipulation
   ) {
     return state;
   }
 
-  const outcome: TypedPlotIntrigueOutcome = { cardsDrawn: 0 };
+  const outcome: TypedPlotIntrigueOutcome = { cardsDrawn: 0, manipulatedCard: rowManipulation?.card };
   let sourceAfterEffects: Player | undefined;
   const players = state.players.map((candidate) => {
     if (candidate.id === player.id) {
@@ -181,6 +212,9 @@ export function playTypedPlotIntrigue(
         resources: applyResourceChanges(candidate.resources, resolved.revealGain, resolved.spentResources),
         callToArmsActive: hasAcquireRecruitBonus ? true : candidate.callToArmsActive,
         garrison: candidate.garrison + resolved.recruitedTroops,
+        manipulatedCards: rowManipulation
+          ? [...candidate.manipulatedCards, rowManipulation.card]
+          : candidate.manipulatedCards,
         intrigues: candidate.intrigues.filter((card) => card.id !== intrigue.id),
       };
       if (hasInfluenceLoss) {
@@ -215,6 +249,8 @@ export function playTypedPlotIntrigue(
   const immediateState = {
     ...state,
     players,
+    imperiumRow: rowManipulation?.imperiumRow ?? state.imperiumRow,
+    marketDeck: rowManipulation?.marketDeck ?? state.marketDeck,
     pendingAction: pendingActions[0],
     pendingQueue: pendingActions.slice(1),
   };

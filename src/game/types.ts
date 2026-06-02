@@ -45,7 +45,7 @@ export type InfluenceEffectFaction = FactionId | "board-space";
 export type InfluenceEffectRecipient = "board-effect-recipient";
 export type TroopEffectRecipient = "same-team-allies";
 export type TroopEffectDestination = "garrison";
-export type SandwormEffectRecipient = "activated-ally";
+export type SandwormEffectRecipient = "activated-ally" | "combat-recipient";
 export type SandwormEffectDestination = "conflict";
 export type TradeEffectPartner = "same-team-allies";
 export type ContractEffectRecipient = "same-team-allies";
@@ -159,6 +159,7 @@ export type GameEffectSpec =
       destination: SandwormEffectDestination;
       optional?: true;
       trashSource?: boolean;
+      persuasionCost?: EffectAmountSpec;
       source?: string;
     }
   | {
@@ -660,6 +661,7 @@ export type PendingAction =
       destination: SandwormEffectDestination;
       optional: true;
       trashSource?: boolean;
+      persuasionCost?: number;
       cardId?: string;
       source: string;
     }

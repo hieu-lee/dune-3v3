@@ -349,23 +349,32 @@ export function resolvePayResourceForSandwormsChoice(
   const availableResource = ownerResources?.[pending.resource];
   const resourceLabel = (resourceLabels as Partial<Record<string, string>>)[pending.resource];
   const recipient = state.players.find((player) => player.id === pending.recipientId);
+  const persuasionCost = pending.persuasionCost ?? 0;
+  const validRecipient = Boolean(
+    owner &&
+      recipient &&
+      (
+        (owner.role === "Commander" && recipient.team === owner.team && recipient.role === "Ally") ||
+        (owner.role !== "Commander" && recipient.id === owner.id)
+      ),
+  );
   if (
     !owner ||
     !resourceLabel ||
     typeof availableResource !== "number" ||
     availableResource < pending.cost ||
+    owner.persuasion < persuasionCost ||
     !paymentPendingAmountIsValid(pending.cost) ||
     !paymentPendingAmountIsValid(pending.sandworms) ||
     !paymentPendingAmountIsValid(pending.strength) ||
+    (pending.persuasionCost !== undefined && !paymentPendingAmountIsValid(pending.persuasionCost)) ||
     pending.strength !== pending.sandworms * 3 ||
     pending.destination !== "conflict" ||
     !paymentPendingOptionalIsValid(pending) ||
     !paymentPendingTrashSourceIsValid(pending) ||
     (pending.cardId !== undefined && !owner.playArea.some((card) => card.id === pending.cardId)) ||
     !recipient ||
-    owner.role !== "Commander" ||
-    recipient.team !== owner.team ||
-    recipient.role !== "Ally" ||
+    !validRecipient ||
     conflictDeploymentBlockedFor(state, owner.id, recipient.id) ||
     !canSummonSandworms(state, recipient, pending.sandworms)
   ) {
@@ -378,6 +387,7 @@ export function resolvePayResourceForSandwormsChoice(
       next = {
         ...next,
         resources: { ...next.resources, [pending.resource]: availableResource - pending.cost },
+        persuasion: next.persuasion - persuasionCost,
         ...(pending.trashSource && pending.cardId
           ? { playArea: next.playArea.filter((card) => card.id !== pending.cardId) }
           : {}),
@@ -398,7 +408,7 @@ export function resolvePayResourceForSandwormsChoice(
     players,
     ...advancePendingAction(state),
     log: [
-      `${owner.leader} spends ${pending.cost} ${resourceLabel} for ${pending.source}; ${recipient.leader} summons ${pending.sandworms} sandworm${pending.sandworms === 1 ? "" : "s"}.`,
+      `${owner.leader} spends ${pending.cost} ${resourceLabel}${persuasionCost > 0 ? ` and forgoes ${persuasionCost} persuasion` : ""} for ${pending.source}; ${recipient.leader} summons ${pending.sandworms} sandworm${pending.sandworms === 1 ? "" : "s"}.`,
       ...state.log,
     ],
   };
@@ -414,6 +424,7 @@ export function skipPayResourceForSandworms(state: GameState, pending: PayResour
     !paymentPendingAmountIsValid(pending.cost) ||
     !paymentPendingAmountIsValid(pending.sandworms) ||
     !paymentPendingAmountIsValid(pending.strength) ||
+    (pending.persuasionCost !== undefined && !paymentPendingAmountIsValid(pending.persuasionCost)) ||
     pending.strength !== pending.sandworms * 3 ||
     !paymentPendingOptionalIsValid(pending) ||
     !paymentPendingTrashSourceIsValid(pending)

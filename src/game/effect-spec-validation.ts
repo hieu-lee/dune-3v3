@@ -420,7 +420,7 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     return;
   }
   if (effect.kind === "pay-resource-for-sandworms") {
-    if (trigger !== "agent-play") {
+    if (trigger !== "agent-play" && trigger !== "reveal") {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
     }
     if (effect.selector !== "self") {
@@ -430,7 +430,10 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
       throw new Error(`Unsupported effect resource "${effect.resource}"`);
     }
     const recipient = (effect as { recipient?: unknown }).recipient;
-    if (recipient !== "activated-ally") {
+    if (trigger === "agent-play" && recipient !== "activated-ally") {
+      invalidSpecField("pay-resource-for-sandworms recipient", recipient);
+    }
+    if (trigger === "reveal" && recipient !== "combat-recipient") {
       invalidSpecField("pay-resource-for-sandworms recipient", recipient);
     }
     const destination = (effect as { destination?: unknown }).destination;
@@ -440,6 +443,10 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     validateSourceLabel("pay-resource-for-sandworms source", effect.source);
     validateAmount(effect.cost);
     validateAmount(effect.sandworms);
+    if (trigger === "agent-play" && effect.persuasionCost !== undefined) {
+      invalidSpecField("pay-resource-for-sandworms persuasionCost", effect.persuasionCost);
+    }
+    if (effect.persuasionCost !== undefined) validateAmount(effect.persuasionCost);
     validateOptionalTrue("pay-resource-for-sandworms optional", (effect as { optional?: unknown }).optional);
     validateOptionalBoolean("pay-resource-for-sandworms trashSource", (effect as { trashSource?: unknown }).trashSource);
     return;

@@ -235,6 +235,37 @@ export function revealPayResourceForTroops(
   ], conditions);
 }
 
+export function revealPayResourceForSandworms(
+  resource: ResourceId,
+  cost: EffectAmountSpec,
+  sandworms: EffectAmountSpec,
+  options: {
+    recipient?: SandwormEffectRecipient;
+    destination?: SandwormEffectDestination;
+    optional?: true;
+    trashSource?: boolean;
+    persuasionCost?: EffectAmountSpec;
+    source?: string;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return revealEffects([
+    {
+      kind: "pay-resource-for-sandworms",
+      selector: "self",
+      resource,
+      cost,
+      sandworms,
+      recipient: options.recipient ?? "combat-recipient",
+      destination: options.destination ?? "conflict",
+      optional: true,
+      ...(options.trashSource ? { trashSource: true } : {}),
+      ...(options.persuasionCost !== undefined ? { persuasionCost: options.persuasionCost } : {}),
+      ...(options.source ? { source: options.source } : {}),
+    },
+  ], conditions);
+}
+
 export function agentPayResourceForDrawCards(
   resource: ResourceId,
   cost: EffectAmountSpec,

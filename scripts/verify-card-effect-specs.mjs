@@ -86,6 +86,7 @@ try {
   const turnActions = await server.ssrLoadModule("/src/app-turn-actions.ts");
 
   const game = state.initialGame();
+  const p1 = playerById(game, "p1");
   const p2 = playerById(game, "p2");
   const p3 = playerById(game, "p3");
   const p4 = playerById(game, "p4");
@@ -463,6 +464,27 @@ try {
       )
     ),
     "Desert Power should carry a Maker-space-gated Agent spice spec",
+  );
+  assert.ok(
+    desertPower.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.effects.some((effect) =>
+        effect.kind === "pay-resource-for-sandworms" &&
+        effect.selector === "self" &&
+        effect.resource === "water" &&
+        effect.cost === 1 &&
+        effect.sandworms === 1 &&
+        effect.recipient === "combat-recipient" &&
+        effect.destination === "conflict" &&
+        effect.persuasionCost === 2
+      )
+    ),
+    "Desert Power should carry a typed Reveal payment replacing persuasion with a sandworm",
+  );
+  assert.equal(
+    desertPower.reveal,
+    "+2 persuasion, or pay 1 water to summon 1 sandworm.",
+    "Desert Power reveal text should expose its typed sandworm choice",
   );
   assert.ok(
     hasAgentEffect(
@@ -3022,15 +3044,129 @@ try {
       resource: "water",
       cost: 1,
       sandworms: 1,
-      recipient: "activated-ally",
+      recipient: "combat-recipient",
       destination: "conflict",
+      persuasionCost: 2,
+      source: "Reveal Worms",
     }])],
   };
-  assert.throws(
-    () => turnActions.revealTurnPlan({ ...p2, hand: [revealPayResourceSandwormsCard], highCouncilSeat: false }),
-    /Unsupported effect "pay-resource-for-sandworms" for reveal/,
-    "Resource-for-sandworms specs should stay in Agent play",
+  assert.deepEqual(
+    turnActions.revealTurnPlan({ ...p3, hand: [revealPayResourceSandwormsCard], highCouncilSeat: false }, game),
+    { persuasion: 0, printedRevealCards: [], revealGain: {}, swords: 0 },
+    "Reveal sandworm payment specs should not add immediate reveal rewards by themselves",
   );
+  const unprotectedConflict = data.conflictCards.find((card) => card.name === "Skirmish (Desert Mouse)");
+  assert.ok(unprotectedConflict, "Verifier needs an unprotected Conflict fixture");
+  const revealSandwormOwner = {
+    ...p3,
+    makerHooks: true,
+    playArea: [revealPayResourceSandwormsCard],
+    persuasion: 2,
+    resources: { ...p3.resources, water: 1 },
+  };
+  const revealSandwormState = {
+    ...game,
+    conflict: unprotectedConflict,
+    pendingAction: undefined,
+    pendingQueue: [],
+    players: game.players.map((player) => player.id === p3.id ? revealSandwormOwner : player),
+    shieldWall: false,
+  };
+  const [revealSandwormPending] = state.pendingActionsForRevealPayResourceForSandworms(
+    revealPayResourceSandwormsCard,
+    revealSandwormOwner,
+    revealSandwormState,
+    p3.id,
+  );
+  assert.deepEqual(
+    revealSandwormPending,
+    {
+      kind: "pay-resource-for-sandworms",
+      ownerId: p3.id,
+      recipientId: p3.id,
+      resource: "water",
+      cost: 1,
+      sandworms: 1,
+      strength: 3,
+      destination: "conflict",
+      optional: true,
+      persuasionCost: 2,
+      source: "Reveal Worms",
+      cardId: revealPayResourceSandwormsCard.id,
+    },
+    "Reveal sandworm payments should queue against the combat recipient and carry the replaced persuasion",
+  );
+  const revealSandwormResolved = state.resolvePayResourceForSandwormsChoice(
+    { ...revealSandwormState, pendingAction: revealSandwormPending },
+    revealSandwormPending,
+  );
+  assert.equal(playerById(revealSandwormResolved, p3.id).resources.water, 0, "Reveal sandworm payment should spend water");
+  assert.equal(playerById(revealSandwormResolved, p3.id).persuasion, 0, "Reveal sandworm payment should forgo the configured persuasion");
+  assert.equal(playerById(revealSandwormResolved, p3.id).deployedSandworms, 1, "Reveal sandworm payment should deploy a sandworm");
+  assert.equal(playerById(revealSandwormResolved, p3.id).conflict, p3.conflict + 3, "Reveal sandworm payment should add sandworm strength");
+  assert.match(revealSandwormResolved.log[0], /spends 1 water and forgoes 2 persuasion for Reveal Worms/);
+  const revealSandwormSkipped = state.skipPayResourceForSandworms(
+    { ...revealSandwormState, pendingAction: revealSandwormPending },
+    revealSandwormPending,
+  );
+  assert.equal(playerById(revealSandwormSkipped, p3.id).resources.water, 1, "Skipping Reveal sandworm payment should preserve water");
+  assert.equal(playerById(revealSandwormSkipped, p3.id).persuasion, 2, "Skipping Reveal sandworm payment should keep persuasion");
+  assert.deepEqual(
+    state.pendingActionsForRevealPayResourceForSandworms(
+      revealPayResourceSandwormsCard,
+      { ...revealSandwormOwner, makerHooks: false },
+      {
+        ...revealSandwormState,
+        players: revealSandwormState.players.map((player) =>
+          player.id === p3.id ? { ...revealSandwormOwner, makerHooks: false } : player,
+        ),
+      },
+      p3.id,
+    ),
+    [],
+    "Reveal sandworm payments should not queue without Maker Hooks",
+  );
+  const commanderRevealSandwormOwner = {
+    ...p1,
+    playArea: [revealPayResourceSandwormsCard],
+    persuasion: 2,
+    resources: { ...p1.resources, water: 1 },
+  };
+  const commanderRevealSandwormRecipient = {
+    ...p3,
+    conflict: 0,
+    deployedSandworms: 0,
+    makerHooks: true,
+  };
+  const commanderRevealSandwormState = {
+    ...game,
+    conflict: unprotectedConflict,
+    pendingAction: undefined,
+    pendingQueue: [],
+    players: game.players.map((player) => {
+      if (player.id === p1.id) return commanderRevealSandwormOwner;
+      if (player.id === p3.id) return commanderRevealSandwormRecipient;
+      return player;
+    }),
+    shieldWall: false,
+  };
+  const [commanderRevealSandwormPending] = state.pendingActionsForRevealPayResourceForSandworms(
+    revealPayResourceSandwormsCard,
+    commanderRevealSandwormOwner,
+    commanderRevealSandwormState,
+    p3.id,
+  );
+  assert.equal(commanderRevealSandwormPending.ownerId, p1.id, "Commander Reveal sandworm payment should be paid by the Commander");
+  assert.equal(commanderRevealSandwormPending.recipientId, p3.id, "Commander Reveal sandworm payment should summon for the selected Ally");
+  const commanderRevealSandwormResolved = state.resolvePayResourceForSandwormsChoice(
+    { ...commanderRevealSandwormState, pendingAction: commanderRevealSandwormPending },
+    commanderRevealSandwormPending,
+  );
+  assert.equal(playerById(commanderRevealSandwormResolved, p1.id).resources.water, 0, "Commander Reveal sandworm payment should spend Commander water");
+  assert.equal(playerById(commanderRevealSandwormResolved, p1.id).persuasion, 0, "Commander Reveal sandworm payment should forgo Commander persuasion");
+  assert.equal(playerById(commanderRevealSandwormResolved, p3.id).deployedSandworms, 1, "Commander Reveal sandworm payment should deploy the Ally sandworm");
+  assert.equal(playerById(commanderRevealSandwormResolved, p3.id).conflict, 3, "Commander Reveal sandworm payment should add Ally strength");
+  assert.equal(commanderRevealSandwormResolved.turnUnitDeployments[p1.id], 1, "Commander Reveal sandworms should count for the Commander turn");
   const invalidVisitedSpaceIconConditionCard = {
     ...convincingArgument,
     id: "effect-spec-invalid-visited-space-icon-card",
@@ -4002,6 +4138,52 @@ try {
     "Desert Power should not gain Agent spice outside Maker spaces",
   );
   assert.equal(desertPowerNonMakerEffect.log, undefined, "Desert Power should not log outside Maker spaces");
+
+  const desertPowerRevealFixture = withActivePlayer(game, p3.id, () => ({
+    agentsReady: 0,
+    conflict: 0,
+    deployedSandworms: 0,
+    hand: [desertPower],
+    makerHooks: true,
+    persuasion: 0,
+    playArea: [],
+    resources: { solari: 0, spice: 0, water: 1 },
+  }));
+  const desertPowerRevealState = {
+    ...desertPowerRevealFixture,
+    conflict: unprotectedConflict,
+    shieldWall: false,
+  };
+  const desertPowerRevealPlan = turnActions.revealTurnPlan(
+    playerById(desertPowerRevealState, p3.id),
+    desertPowerRevealState,
+  );
+  assert.equal(desertPowerRevealPlan.persuasion, 2, "Desert Power should default to its +2 Reveal persuasion");
+  const desertPowerRevealed = turnActions.revealTurnAction(desertPowerRevealState, {
+    commanderTargets: {},
+    revealPlan: desertPowerRevealPlan,
+  });
+  assert.equal(
+    desertPowerRevealed.pendingAction?.kind,
+    "pay-resource-for-sandworms",
+    "Desert Power should queue its Reveal sandworm payment when the recipient can summon",
+  );
+  assert.equal(desertPowerRevealed.pendingAction?.persuasionCost, 2);
+  assert.equal(desertPowerRevealed.pendingAction?.source, "Desert Power");
+  const desertPowerWormed = state.resolvePayResourceForSandwormsChoice(
+    desertPowerRevealed,
+    desertPowerRevealed.pendingAction,
+  );
+  assert.equal(playerById(desertPowerWormed, p3.id).resources.water, 0, "Desert Power Reveal payment should spend 1 water");
+  assert.equal(playerById(desertPowerWormed, p3.id).persuasion, 0, "Desert Power Reveal payment should replace its persuasion");
+  assert.equal(playerById(desertPowerWormed, p3.id).deployedSandworms, 1, "Desert Power Reveal payment should summon a sandworm");
+  assert.equal(playerById(desertPowerWormed, p3.id).conflict, 3, "Desert Power sandworm should add 3 strength");
+  const desertPowerSkipped = state.skipPayResourceForSandworms(
+    desertPowerRevealed,
+    desertPowerRevealed.pendingAction,
+  );
+  assert.equal(playerById(desertPowerSkipped, p3.id).resources.water, 1, "Skipping Desert Power payment should keep water");
+  assert.equal(playerById(desertPowerSkipped, p3.id).persuasion, 2, "Skipping Desert Power payment should keep persuasion");
 
   const ecologicalSoloReveal = turnActions.revealTurnPlan(
     { ...p2, hand: [ecologicalTestingStation], playArea: [], highCouncilSeat: false },

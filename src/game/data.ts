@@ -70,6 +70,7 @@ import {
   revealGainResource,
   revealGainStrength,
   revealLoseInfluenceForIntrigues,
+  revealPayResourceForSandworms,
   revealRetreatTroopsForStrength,
   revealTrashCardForStrength,
   visitedMakerSpace,
@@ -285,6 +286,9 @@ function imperiumRevealText(card: HubCard, persuasion: number, swords: number, p
   if (card.id === covertOperationSourceId) {
     return "Gain 2 Solari.";
   }
+  if (card.id === desertPowerSourceId) {
+    return "+2 persuasion, or pay 1 water to summon 1 sandworm.";
+  }
   return printedReveal ? "Resolve printed reveal text." : revealText(persuasion, swords);
 }
 
@@ -499,10 +503,20 @@ type SimpleAgentEffectConfig = {
   gain?: Partial<Record<ResourceId, number>>;
   placeSpies?: number;
   recruitTroops?: number;
+  revealPaySandworms?: {
+    resource: ResourceId;
+    cost: number;
+    sandworms: number;
+    persuasionCost?: number;
+  };
 };
 
 const simpleAgentEffectConfigs: Record<number, SimpleAgentEffectConfig> = {
-  [desertPowerSourceId]: { conditions: [visitedMakerSpace()], gain: { spice: 2 } },
+  [desertPowerSourceId]: {
+    conditions: [visitedMakerSpace()],
+    gain: { spice: 2 },
+    revealPaySandworms: { resource: "water", cost: 1, sandworms: 1, persuasionCost: 2 },
+  },
   [imperialSpymasterSourceId]: { drawIntrigues: 1 },
   [leadershipSourceId]: { drawCards: 1 },
   [publicSpectacleSourceId]: { gainInfluence: 1, placeSpies: 1 },
@@ -534,6 +548,14 @@ function imperiumSimpleAgentEffects(card: HubCard): CardEffectSpec[] | undefined
     ) ?? []),
   ];
   const conditions = config.conditions ?? [];
+  if (config.revealPaySandworms) {
+    effects.push(revealPayResourceForSandworms(
+      config.revealPaySandworms.resource,
+      config.revealPaySandworms.cost,
+      config.revealPaySandworms.sandworms,
+      { persuasionCost: config.revealPaySandworms.persuasionCost },
+    ));
+  }
   if (config.drawIntrigues) {
     effects.push(agentDrawIntrigues(config.drawIntrigues, conditions));
   }

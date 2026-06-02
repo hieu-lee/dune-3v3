@@ -25,6 +25,7 @@ import {
   resolveAgentTrashSourceForTrades,
   resolveCardEffects,
   resolveRevealLoseInfluenceForIntrigues,
+  resolveRevealPayResourceForSandworms,
   resolveRevealPayResourceForStrengths,
   resolveRevealPayResourceForTroops,
   resolveRevealRetreatTroopsForStrength,
@@ -852,6 +853,48 @@ export function pendingActionsForRevealPayResourceForTroops(
   });
 }
 
+export function pendingActionsForRevealPayResourceForSandworms(
+  card: Card,
+  source: Player,
+  state: GameState,
+  combatRecipientId: string,
+): PendingAction[] {
+  const recipient = state.players.find((player) => player.id === combatRecipientId);
+  if (!card.effects || !source.playArea.some((candidate) => candidate.id === card.id) || !recipient) return [];
+  if (source.role === "Commander" && (recipient.team !== source.team || recipient.role !== "Ally")) return [];
+  if (source.role !== "Commander" && recipient.id !== source.id) return [];
+
+  const players = playersWithPendingCardEffect(state, source, recipient);
+  const effectState = { ...state, players };
+  return resolveRevealPayResourceForSandworms(card.effects, {
+    trigger: "reveal",
+    source,
+    target: recipient,
+    state: effectState,
+  }).flatMap((effect) => {
+    if (effect.selector !== "self" || effect.cost <= 0 || effect.sandworms <= 0 || effect.persuasionCost < 0) return [];
+    if (source.resources[effect.resource] < effect.cost) return [];
+    if (source.persuasion < effect.persuasionCost) return [];
+    if (effect.recipient !== "combat-recipient" || effect.destination !== "conflict") return [];
+    if (!canSummonSandworms(state, recipient, effect.sandworms)) return [];
+    return [{
+      kind: "pay-resource-for-sandworms",
+      ownerId: source.id,
+      recipientId: recipient.id,
+      resource: effect.resource,
+      cost: effect.cost,
+      sandworms: effect.sandworms,
+      strength: effect.sandworms * 3,
+      destination: effect.destination,
+      optional: effect.optional,
+      ...(effect.trashSource ? { trashSource: true } : {}),
+      ...(effect.persuasionCost > 0 ? { persuasionCost: effect.persuasionCost } : {}),
+      source: effect.source ?? card.name,
+      cardId: card.id,
+    }];
+  });
+}
+
 export function pendingActionsForRevealPayResourceForStrength(
   card: Card,
   source: Player,
@@ -924,6 +967,9 @@ export function pendingActionsForReveal(
   const payResourceTroopPendings = revealedCards.flatMap((card) =>
     pendingActionsForRevealPayResourceForTroops(card, source, state)
   );
+  const payResourceSandwormPendings = revealedCards.flatMap((card) =>
+    pendingActionsForRevealPayResourceForSandworms(card, source, state, combatRecipientId)
+  );
   const influenceIntriguePendings = revealedCards.flatMap((card) =>
     pendingActionsForRevealInfluenceIntrigues(card, source, state, combatRecipientId)
   );
@@ -939,6 +985,7 @@ export function pendingActionsForReveal(
     ...revealTrashCardPendings,
     ...payResourceStrengthPendings,
     ...payResourceTroopPendings,
+    ...payResourceSandwormPendings,
     ...influenceIntriguePendings,
     ...retreatTroopStrengthPendings,
     feydDeviousStrengthPending,

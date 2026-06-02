@@ -233,6 +233,7 @@ export {
   pendingActionForJessicaOtherMemories,
   pendingActionForReverendMotherJessicaRepeat,
   pendingActionsForCard,
+  pendingActionsForRevealPayResourceForSandworms,
   pendingActionsForRevealPayResourceForStrength,
   pendingActionsForRevealPayResourceForTroops,
   pendingActionsForReveal,

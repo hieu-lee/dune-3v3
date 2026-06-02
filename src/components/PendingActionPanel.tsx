@@ -822,6 +822,7 @@ export function PendingActionPanel({
           onChoose={choosePayResourceForSandworms}
           onSkip={skipPayResourceForSandwormsChoice}
           owner={pendingPayResourceSandwormsOwner}
+          persuasionCost={pendingAction.persuasionCost}
           recipient={pendingPayResourceSandwormsRecipient}
           resource={pendingAction.resource}
           sandworms={pendingAction.sandworms}

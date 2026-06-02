@@ -112,6 +112,19 @@ export type RevealPayResourceForTroops = {
   source?: string;
 };
 
+export type RevealPayResourceForSandworms = {
+  selector: PlayerSelector;
+  resource: ResourceId;
+  cost: number;
+  sandworms: number;
+  recipient: SandwormEffectRecipient;
+  destination: SandwormEffectDestination;
+  optional: true;
+  trashSource: boolean;
+  persuasionCost: number;
+  source?: string;
+};
+
 export type AgentDiscardCardForInfluenceAndDraw = {
   selector: PlayerSelector;
   drawCards: number;
@@ -173,6 +186,7 @@ export type AgentPayResourceForSandworms = {
   destination: SandwormEffectDestination;
   optional: true;
   trashSource: boolean;
+  persuasionCost: number;
   source?: string;
 };
 
@@ -867,6 +881,31 @@ export function resolveRevealPayResourceForTroops(
   });
 }
 
+export function resolveRevealPayResourceForSandworms(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): RevealPayResourceForSandworms[] {
+  specs?.forEach(validateSpec);
+  return (specs ?? []).flatMap((spec) => {
+    if (spec.trigger !== "reveal") return [];
+    if (!specApplies(spec, context)) return [];
+    return spec.effects
+      .filter((effect) => effect.kind === "pay-resource-for-sandworms")
+      .map((effect) => ({
+        selector: effect.selector,
+        resource: effect.resource,
+        cost: amountFor(effect.cost, context.source),
+        sandworms: amountFor(effect.sandworms, context.source),
+        recipient: effect.recipient,
+        destination: effect.destination,
+        optional: true,
+        trashSource: effect.trashSource ?? false,
+        persuasionCost: effect.persuasionCost !== undefined ? amountFor(effect.persuasionCost, context.source) : 0,
+        source: effect.source,
+      }));
+  });
+}
+
 export function resolveAgentDiscardCardForInfluenceAndDraws(
   specs: CardEffectSpec[] | undefined,
   context: GameEffectContext,
@@ -1014,6 +1053,7 @@ export function resolveAgentPayResourceForSandworms(
         destination: effect.destination,
         optional: true,
         trashSource: effect.trashSource ?? false,
+        persuasionCost: effect.persuasionCost !== undefined ? amountFor(effect.persuasionCost, context.source) : 0,
         source: effect.source,
       }));
   });

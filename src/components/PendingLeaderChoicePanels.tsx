@@ -474,6 +474,7 @@ type PendingPayResourceForSandwormsPanelProps = {
   onChoose: () => void;
   onSkip: () => void;
   owner?: Player;
+  persuasionCost?: number;
   recipient?: Player;
   resource: ResourceId;
   sandworms: number;
@@ -487,6 +488,7 @@ export function PendingPayResourceForSandwormsPanel({
   onChoose,
   onSkip,
   owner,
+  persuasionCost = 0,
   recipient,
   resource,
   sandworms,
@@ -498,9 +500,13 @@ export function PendingPayResourceForSandwormsPanel({
   return (
     <div className="pending-controls">
       {recipient ? (
-        <button type="button" onClick={onChoose} disabled={!owner || owner.resources[resource] < cost}>
+        <button
+          type="button"
+          onClick={onChoose}
+          disabled={!owner || owner.resources[resource] < cost || owner.persuasion < persuasionCost}
+        >
           <Droplets size={15} />
-          Spend {cost} {resourceLabel}: {recipient.leader} summons {sandworms} sandworm{sandworms === 1 ? "" : "s"} (+{strength} strength{trashSource ? ", trash" : ""})
+          Spend {cost} {resourceLabel}{persuasionCost > 0 ? ` and forgo ${persuasionCost} persuasion` : ""}: {recipient.leader} summons {sandworms} sandworm{sandworms === 1 ? "" : "s"} (+{strength} strength{trashSource ? ", trash" : ""})
         </button>
       ) : (
         <span>{source} can no longer resolve with the current table state.</span>

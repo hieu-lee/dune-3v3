@@ -42,6 +42,7 @@ export function cloneContracts(contracts: ContractCard[]) {
 export function cloneIntrigues(intrigues: IntrigueCard[]) {
   return intrigues.map((intrigue) => ({
     ...intrigue,
+    effects: cloneCardEffects(intrigue.effects),
     traits: intrigue.traits ? [...intrigue.traits] : undefined,
   }));
 }

@@ -261,6 +261,7 @@ export type GameEffectSpec =
     };
 export type CardEffectSpec = {
   trigger: GameEffectTrigger;
+  choiceId?: string;
   conditions?: GameEffectConditionSpec[];
   effects: GameEffectSpec[];
 };

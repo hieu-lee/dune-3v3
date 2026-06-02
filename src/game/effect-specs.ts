@@ -36,36 +36,51 @@ type AgentAcquireCardOptions = (
   source?: string;
 };
 
-export function agentPlayEffects(effects: GameEffectSpec[], conditions?: GameEffectConditionSpec[]): CardEffectSpec {
+type CardEffectSpecOptions = {
+  choiceId?: string;
+};
+
+function effectSpec(
+  trigger: CardEffectSpec["trigger"],
+  effects: GameEffectSpec[],
+  conditions?: GameEffectConditionSpec[],
+  options: CardEffectSpecOptions = {},
+): CardEffectSpec {
   return {
-    trigger: "agent-play",
+    trigger,
+    ...(options.choiceId !== undefined ? { choiceId: options.choiceId } : {}),
     ...(conditions && conditions.length > 0 ? { conditions } : {}),
     effects,
   };
 }
 
-export function revealEffects(effects: GameEffectSpec[], conditions?: GameEffectConditionSpec[]): CardEffectSpec {
-  return {
-    trigger: "reveal",
-    ...(conditions && conditions.length > 0 ? { conditions } : {}),
-    effects,
-  };
+export function agentPlayEffects(
+  effects: GameEffectSpec[],
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return effectSpec("agent-play", effects, conditions);
 }
 
-export function acquireEffects(effects: GameEffectSpec[], conditions?: GameEffectConditionSpec[]): CardEffectSpec {
-  return {
-    trigger: "acquire",
-    ...(conditions && conditions.length > 0 ? { conditions } : {}),
-    effects,
-  };
+export function revealEffects(
+  effects: GameEffectSpec[],
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return effectSpec("reveal", effects, conditions);
 }
 
-export function plotIntrigueEffects(effects: GameEffectSpec[], conditions?: GameEffectConditionSpec[]): CardEffectSpec {
-  return {
-    trigger: "plot-intrigue",
-    ...(conditions && conditions.length > 0 ? { conditions } : {}),
-    effects,
-  };
+export function acquireEffects(
+  effects: GameEffectSpec[],
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return effectSpec("acquire", effects, conditions);
+}
+
+export function plotIntrigueEffects(
+  effects: GameEffectSpec[],
+  conditions?: GameEffectConditionSpec[],
+  options?: CardEffectSpecOptions,
+): CardEffectSpec {
+  return effectSpec("plot-intrigue", effects, conditions, options);
 }
 
 export function plotGainResource(
@@ -96,6 +111,20 @@ export function plotSpendResource(
   conditions?: GameEffectConditionSpec[],
 ): CardEffectSpec {
   return plotIntrigueEffects([{ kind: "spend-resource", selector: "self", resource, amount }], conditions);
+}
+
+export function plotResourceExchange(
+  choiceId: string,
+  spendResource: ResourceId,
+  spendAmount: EffectAmountSpec,
+  gainResource: ResourceId,
+  gainAmount: EffectAmountSpec,
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return plotIntrigueEffects([
+    { kind: "spend-resource", selector: "self", resource: spendResource, amount: spendAmount },
+    { kind: "gain-resource", selector: "self", resource: gainResource, amount: gainAmount },
+  ], conditions, { choiceId });
 }
 
 export function plotRecruitTroops(

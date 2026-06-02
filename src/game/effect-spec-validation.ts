@@ -628,6 +628,10 @@ function validateCommanderResourceSplitOption(option: CommanderResourceSplitOpti
 
 export function validateSpec(spec: CardEffectSpec) {
   validateTrigger(spec.trigger);
+  validateSourceLabel("choiceId", spec.choiceId);
+  if (spec.choiceId !== undefined && spec.trigger !== "plot-intrigue") {
+    throw new Error(`Unsupported choiceId for ${spec.trigger}`);
+  }
   spec.conditions?.forEach(validateCondition);
   spec.effects.forEach((effect) => validateEffect(effect, spec.trigger));
 }

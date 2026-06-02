@@ -55,6 +55,7 @@ export type EffectResolverState = Partial<
 
 export type GameEffectContext = {
   trigger: GameEffectTrigger;
+  choiceId?: string;
   source: Player;
   target?: Player;
   space?: Pick<BoardSpace, "id" | "icon" | "maker">;
@@ -430,6 +431,7 @@ function conflictUnitConditionPlayer(context: GameEffectContext) {
 
 function specApplies(spec: CardEffectSpec, context: GameEffectContext) {
   return spec.trigger === context.trigger &&
+    (spec.choiceId === undefined || spec.choiceId === context.choiceId) &&
     spec.effects.every((effect) => selectorApplies(effect.selector, context)) &&
     (spec.conditions ?? []).every((condition) => conditionApplies(condition, context));
 }
@@ -809,6 +811,7 @@ export function resolveDeferredAgentConflictUnitIntrigueDraws(
   specs?.forEach(validateSpec);
   return (specs ?? []).flatMap((spec) => {
     if (spec.trigger !== "agent-play") return [];
+    if (spec.choiceId !== undefined && spec.choiceId !== context.choiceId) return [];
     if (!spec.effects.every((effect) => selectorApplies(effect.selector, context))) return [];
 
     const conflictUnitConditions = (spec.conditions ?? []).filter((condition) => condition.kind === "has-conflict-units");

@@ -732,6 +732,11 @@ export function verifyEconomyPlotIntrigues({ cards, data, game, state }) {
   assert.deepEqual(playerById(marketSpiceSold, "p2").intrigues, []);
   assert.equal(marketSpiceSold.intrigueDiscard.at(-1).id, marketOpportunity.id);
   assert.match(marketSpiceSold.log[0], /plays Market Opportunity, spends 2 spice, and gains 5 Solari/);
+  assert.equal(
+    marketSpiceSold.turnSpiceGains.p2,
+    undefined,
+    "Market Opportunity spice-to-Solari branch should not record a turn spice gain",
+  );
 
   const marketSpiceBought = state.playMarketOpportunityPlotIntrigue(
     marketOpportunityFixture,
@@ -743,6 +748,11 @@ export function verifyEconomyPlotIntrigues({ cards, data, game, state }) {
   assert.equal(playerById(marketSpiceBought, "p2").resources.solari, 0, "Market Opportunity should spend 5 Solari");
   assert.equal(marketSpiceBought.intrigueDiscard.at(-1).id, marketOpportunity.id);
   assert.match(marketSpiceBought.log[0], /plays Market Opportunity, spends 5 Solari, and gains 5 spice/);
+  assert.equal(
+    marketSpiceBought.turnSpiceGains.p2,
+    5,
+    "Market Opportunity Solari-to-spice branch should record the turn spice gain",
+  );
 
   const marketMissingSpice = {
     ...marketOpportunityFixture,

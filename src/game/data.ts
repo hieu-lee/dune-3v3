@@ -23,6 +23,7 @@ import {
   leverageSourceId,
   interstellarTradeSourceId,
   makerKeeperSourceId,
+  marketOpportunitySourceId,
   maulaPistolSourceId,
   mercenariesSourceId,
   northernWatermasterSourceId,
@@ -76,6 +77,7 @@ import {
   plotDrawIntrigues,
   plotGainResource,
   plotRecruitTroops,
+  plotResourceExchange,
   plotSpendResource,
   plotTakeContracts,
   revealGainPersuasion,
@@ -854,6 +856,12 @@ function intrigueCardEffects(card: HubCard): CardEffectSpec[] | undefined {
       plotDrawIntrigues(1),
       plotRecruitTroops("self", 2, [hasRole("Ally")]),
       plotRecruitTroops("activated-ally", 2, [hasRole("Commander")]),
+    ];
+  }
+  if (card.id === marketOpportunitySourceId) {
+    return [
+      plotResourceExchange("spice-to-solari", "spice", 2, "solari", 5),
+      plotResourceExchange("solari-to-spice", "solari", 5, "spice", 5),
     ];
   }
   if (card.id === shaddamsFavorSourceId) {

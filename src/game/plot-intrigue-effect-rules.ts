@@ -14,6 +14,7 @@ const resourceIds = ["solari", "spice", "water"] as const;
 
 type PlayTypedPlotIntrigueOptions = {
   activatedAllyOwnerId?: string;
+  choiceId?: string;
   requireActivatedAlly?: boolean;
 };
 
@@ -88,6 +89,7 @@ export function playTypedPlotIntrigue(
   const activatedAlly = activatedAllyResult.owner;
   const context = {
     trigger: "plot-intrigue" as const,
+    choiceId: options.choiceId,
     source: player,
     target: activatedAlly,
     state,

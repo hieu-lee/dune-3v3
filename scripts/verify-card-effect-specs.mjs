@@ -94,6 +94,7 @@ function withActivePlayer(game, playerId, patch) {
 
 try {
   const data = await server.ssrLoadModule("/src/game/data.ts");
+  const deckUtils = await server.ssrLoadModule("/src/game/deck-utils.ts");
   const state = await server.ssrLoadModule("/src/game/state.ts");
   const effectResolver = await server.ssrLoadModule("/src/game/effect-resolver.ts");
   const turnActions = await server.ssrLoadModule("/src/app-turn-actions.ts");
@@ -162,6 +163,7 @@ try {
   const contingencyPlan = data.intrigueCards.find((card) => card.name === "Contingency Plan");
   const intelligenceReport = data.intrigueCards.find((card) => card.name === "Intelligence Report");
   const leverage = data.intrigueCards.find((card) => card.name === "Leverage");
+  const marketOpportunity = data.intrigueCards.find((card) => card.name === "Market Opportunity");
   const mercenaries = data.intrigueCards.find((card) => card.name === "Mercenaries");
   const shaddamsFavor = data.intrigueCards.find((card) => card.name === "Shaddam's Favor");
   const commandRespect = data.muadDibCommanderCards.find((card) => card.name === "Command Respect");
@@ -231,7 +233,7 @@ try {
     wheelsWithinWheels,
   );
   assert.ok(commandRespect && prepareTheWay && spiceMustFlow && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
-  assert.ok(councilorsAmbition && contingencyPlan && intelligenceReport && leverage && mercenaries && shaddamsFavor);
+  assert.ok(councilorsAmbition && contingencyPlan && intelligenceReport && leverage && marketOpportunity && mercenaries && shaddamsFavor);
   assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && dutifulService && deliverSupplies && sietchTabr && spiceRefinery);
   assert.equal(revealSpecCards.length, 79, "Unexpected number of cards with declarative Reveal specs");
   assert.equal(
@@ -492,6 +494,117 @@ try {
     mercenariesCommanderResolved.activatedAlly.recruitedTroops,
     2,
     "Mercenaries Plot spec should route Commander troop recruitment to the activated Ally",
+  );
+  assert.ok(
+    marketOpportunity.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.choiceId === "spice-to-solari" &&
+      spec.effects.some((effect) =>
+        effect.kind === "spend-resource" &&
+        effect.selector === "self" &&
+        effect.resource === "spice" &&
+        effect.amount === 2
+      ) &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-resource" &&
+        effect.selector === "self" &&
+        effect.resource === "solari" &&
+        effect.amount === 5
+      )
+    ),
+    "Market Opportunity should carry a typed spice-to-Solari Plot choice spec",
+  );
+  assert.ok(
+    marketOpportunity.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.choiceId === "solari-to-spice" &&
+      spec.effects.some((effect) =>
+        effect.kind === "spend-resource" &&
+        effect.selector === "self" &&
+        effect.resource === "solari" &&
+        effect.amount === 5
+      ) &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-resource" &&
+        effect.selector === "self" &&
+        effect.resource === "spice" &&
+        effect.amount === 5
+      )
+    ),
+    "Market Opportunity should carry a typed Solari-to-spice Plot choice spec",
+  );
+  const marketNoChoiceResolved = effectResolver.resolveGameEffects(marketOpportunity.effects, {
+    trigger: "plot-intrigue",
+    source: p2,
+    state: game,
+  });
+  assert.deepEqual(
+    marketNoChoiceResolved.spentResources,
+    {},
+    "Market Opportunity Plot choice specs should not resolve without a selected choice",
+  );
+  assert.deepEqual(
+    marketNoChoiceResolved.revealGain,
+    {},
+    "Market Opportunity Plot choice specs should not gain resources without a selected choice",
+  );
+  const marketSpiceToSolariResolved = effectResolver.resolveGameEffects(marketOpportunity.effects, {
+    trigger: "plot-intrigue",
+    choiceId: "spice-to-solari",
+    source: p2,
+    state: game,
+  });
+  assert.equal(
+    marketSpiceToSolariResolved.spentResources.spice,
+    2,
+    "Market Opportunity spice-to-Solari spec should spend 2 spice",
+  );
+  assert.equal(
+    marketSpiceToSolariResolved.revealGain.solari,
+    5,
+    "Market Opportunity spice-to-Solari spec should gain 5 Solari",
+  );
+  assert.equal(
+    marketSpiceToSolariResolved.spentResources.solari,
+    undefined,
+    "Market Opportunity spice-to-Solari spec should not spend Solari",
+  );
+  const marketSolariToSpiceResolved = effectResolver.resolveGameEffects(marketOpportunity.effects, {
+    trigger: "plot-intrigue",
+    choiceId: "solari-to-spice",
+    source: p2,
+    state: game,
+  });
+  assert.equal(
+    marketSolariToSpiceResolved.spentResources.solari,
+    5,
+    "Market Opportunity Solari-to-spice spec should spend 5 Solari",
+  );
+  assert.equal(
+    marketSolariToSpiceResolved.revealGain.spice,
+    5,
+    "Market Opportunity Solari-to-spice spec should gain 5 spice",
+  );
+  assert.equal(
+    marketSolariToSpiceResolved.spentResources.spice,
+    undefined,
+    "Market Opportunity Solari-to-spice spec should not spend spice",
+  );
+  const [marketOpportunityClone] = deckUtils.cloneIntrigues([marketOpportunity]);
+  assert.notEqual(
+    marketOpportunityClone.effects,
+    marketOpportunity.effects,
+    "Intrigue cloning should deep-clone typed effect arrays",
+  );
+  assert.notEqual(
+    marketOpportunityClone.effects?.[0],
+    marketOpportunity.effects?.[0],
+    "Intrigue cloning should deep-clone typed effect specs",
+  );
+  assert.equal(
+    marketOpportunityClone.effects?.[0]?.choiceId,
+    "spice-to-solari",
+    "Intrigue cloning should preserve typed choice ids",
   );
   assert.ok(
     shaddamsFavor.effects?.some((spec) =>
@@ -2323,6 +2436,14 @@ try {
     ),
     /Invalid spend-resource source ""/,
     "Spend-resource specs should reject empty source labels",
+  );
+  assert.throws(
+    () => effectResolver.resolveGameEffects(
+      [{ trigger: "plot-intrigue", choiceId: "", effects: [{ kind: "draw-cards", selector: "self", amount: 1 }] }],
+      { trigger: "plot-intrigue", source: p2, state: game },
+    ),
+    /Invalid choiceId ""/,
+    "Choice specs should reject empty choice ids",
   );
   assert.throws(
     () => effectResolver.resolveGameEffects(
@@ -4178,6 +4299,18 @@ try {
     () => state.applyCardAgentEffect(invalidConflictUnitsCountCard, p2, p2),
     /Invalid has-conflict-units count "-1"/,
     "Conflict-unit conditions should require a non-negative integer threshold",
+  );
+  const choiceDeferredIntrigueDrawSpecs = [agentSpec(
+    [{ kind: "draw-intrigues", selector: "self", amount: 1 }],
+    [{ kind: "has-conflict-units", count: 2 }],
+  )].map((spec) => ({ ...spec, choiceId: "deploy-draw" }));
+  assert.throws(
+    () => effectResolver.resolveDeferredAgentConflictUnitIntrigueDraws(choiceDeferredIntrigueDrawSpecs, {
+      trigger: "agent-play",
+      source: p2,
+    }),
+    /Unsupported choiceId for agent-play/,
+    "Choice ids should stay on Plot Intrigue specs until Agent selected-choice plumbing exists",
   );
 	  const revealIntrigueDrawCard = {
 	    ...convincingArgument,

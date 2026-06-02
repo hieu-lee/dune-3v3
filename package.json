@@ -11,6 +11,7 @@
     "verify": "node scripts/verify-all.mjs",
     "verify:all": "node scripts/verify-all.mjs",
     "verify:assets": "node scripts/verify-assets.mjs",
+    "verify:browser-debug-pipeline": "node scripts/verify-browser-debug-pipeline.mjs",
     "debug:browser": "node scripts/browser-debug.mjs",
     "debug:browser:help": "node scripts/browser-debug.mjs --help",
     "debug:browser:scenarios": "node scripts/browser-debug.mjs --list-scenarios",

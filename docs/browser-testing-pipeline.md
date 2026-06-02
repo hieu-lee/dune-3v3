@@ -33,6 +33,7 @@ When reporting browser verification, say whether IAB was available only if it ma
 Use a unique concrete `--out` directory for each scripted task. Headed/manual helper commands may use their package-script defaults; rename output directories for side-by-side scripted artifacts.
 
 ```bash
+pnpm run verify:browser-debug-pipeline
 pnpm run debug:browser:help
 pnpm run debug:browser:scenarios
 pnpm run debug:game:smoke
@@ -42,11 +43,13 @@ pnpm run debug:browser:headed -- --scenario all --out artifacts/qa/browser-debug
 pnpm run debug:game
 ```
 
-Use `debug:game:smoke` before every gameplay/browser-debug commit. It is short, headless, and proves the manual capture bridge still works.
+`pnpm run verify:browser-debug-pipeline` is a static contract check that keeps the package scripts, scenario inventory, generated artifact names, debug globals, README, and this document aligned. It is included in `pnpm run verify`, but it does not replace a real browser smoke run when the browser pipeline itself changes.
+
+Use `debug:game:smoke` before every gameplay/browser-debug commit. It runs the manual scenario with `--capture-smoke`, is short and headless, and proves the manual capture bridge still works.
 
 Use `debug:browser -- --scenario all` when a change may affect several pending-action surfaces. It creates many scenario screenshots under the selected `--out` directory and records a trace unless `--no-trace` is passed.
 
-Use `debug:game` when you need to actually play in a headed browser. It keeps Chromium open until `Ctrl+C`.
+Use `debug:game` when you need to actually play in a headed browser. It runs the manual scenario with `--keep-open` and keeps Chromium open until `Ctrl+C`.
 
 ## Artifact Contract
 
@@ -224,6 +227,7 @@ For UI or pending-action work, run:
 
 ```bash
 pnpm run verify &&
+pnpm run verify:browser-debug-pipeline &&
 pnpm run build &&
 git diff --check &&
 pnpm run debug:game:smoke &&

@@ -54,6 +54,32 @@ export function verifyCombatIntrigueCatalog({ cards, data, state }) {
     "Add 2 strength; you may recall 1 spy to add 3 more strength.",
     "Find Weakness should expose its base strength and optional spy recall",
   );
+  assert.ok(
+    findWeakness.effects?.some((spec) =>
+      spec.trigger === "combat-intrigue" &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-strength" &&
+        effect.selector === "self" &&
+        effect.amount === 2
+      )
+    ),
+    "Find Weakness should carry a typed Combat Intrigue base strength spec",
+  );
+  assert.ok(
+    findWeakness.effects?.some((spec) =>
+      spec.trigger === "combat-intrigue" &&
+      spec.conditions?.some((condition) => condition.kind === "has-spy-posts" && condition.count === 1) &&
+      spec.effects.some((effect) =>
+        effect.kind === "recall-spy" &&
+        effect.selector === "self" &&
+        effect.amount === 1 &&
+        effect.strengthReward === 3 &&
+        effect.optional === true &&
+        effect.source === "Find Weakness"
+      )
+    ),
+    "Find Weakness should carry a typed optional Combat spy-recall strength spec",
+  );
   assert.equal(goToGround.combatSwords, undefined, "Go To Ground should resolve through its structured retreat and spy flow");
   assert.equal(
     goToGround.summary,
@@ -65,6 +91,21 @@ export function verifyCombatIntrigueCatalog({ cards, data, state }) {
     springTheTrap.summary,
     "Recall 2 spies to add 7 strength.",
     "Spring The Trap should expose its two-spy cost and Combat strength",
+  );
+  assert.ok(
+    springTheTrap.effects?.some((spec) =>
+      spec.trigger === "combat-intrigue" &&
+      spec.conditions?.some((condition) => condition.kind === "has-spy-posts" && condition.count === 2) &&
+      spec.effects.some((effect) =>
+        effect.kind === "recall-spy" &&
+        effect.selector === "self" &&
+        effect.amount === 2 &&
+        effect.strengthReward === 7 &&
+        effect.source === "Spring The Trap" &&
+        effect.optional !== true
+      )
+    ),
+    "Spring The Trap should carry a typed required Combat spy-recall strength spec",
   );
   assert.equal(spiceIsPower.combatSwords, 6, "Spice is Power should expose its maximum structured Combat strength");
   assert.equal(
@@ -153,13 +194,13 @@ export function verifyCombatIntrigueCatalog({ cards, data, state }) {
   );
   assert.equal(contingencyPlan.automatedCombatSwords, undefined, "Contingency Plan should not rely on automatedCombatSwords");
   assert.equal(impress.automatedCombatSwords, undefined, "Impress should resolve through typed Combat Intrigue specs");
-  assert.equal(findWeakness.automatedCombatSwords, undefined, "Find Weakness should resolve through spy-recall state");
+  assert.equal(findWeakness.automatedCombatSwords, undefined, "Find Weakness should resolve through typed Combat spy-recall state");
   assert.equal(goToGround.automatedCombatSwords, undefined, "Go To Ground should resolve through retreat and spy choices");
   assert.equal(questionableMethods.automatedCombatSwords, undefined, "Questionable Methods should resolve through Influence-loss state");
   assert.equal(spiceIsPower.automatedCombatSwords, undefined, "Spice is Power should resolve through an explicit branch choice");
   assert.equal(tacticalOption.automatedCombatSwords, undefined, "Tactical Option should resolve through an explicit branch choice");
   assert.equal(reachAgreement.automatedCombatSwords, undefined, "Reach Agreement should resolve through retreat and contract choices");
-  assert.equal(springTheTrap.automatedCombatSwords, undefined, "Spring The Trap should resolve through spy-recall state");
+  assert.equal(springTheTrap.automatedCombatSwords, undefined, "Spring The Trap should resolve through typed Combat spy-recall state");
   assert.equal(weirdingCombat.automatedCombatSwords, undefined, "Weirding Combat should resolve from state-aware Influence");
   assert.equal(devour.automatedCombatSwords, undefined, "Devour should resolve from target sandworm state");
   assert.equal(backedByChoam.automatedCombatSwords, undefined, "Backed by CHOAM should resolve from completed contract state");

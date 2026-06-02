@@ -118,6 +118,27 @@ export function combatAcquireCard(
   ], conditions);
 }
 
+export function combatRecallSpiesForStrength(
+  amount: number,
+  strength: EffectAmountSpec,
+  options: {
+    source?: string;
+    optional?: boolean;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return combatIntrigueEffects([
+    {
+      kind: "recall-spy",
+      selector: "self",
+      amount,
+      strengthReward: strength,
+      ...(options.source ? { source: options.source } : {}),
+      ...(options.optional !== undefined ? { optional: options.optional } : {}),
+    },
+  ], conditions);
+}
+
 export function plotGainResource(
   resource: ResourceId,
   amount: EffectAmountSpec,
@@ -1036,7 +1057,9 @@ export function cloneCardEffects(effects: CardEffectSpec[] | undefined): CardEff
     conditions: spec.conditions?.map((condition) => ({ ...condition })),
     effects: spec.effects.map((effect) => ({
       ...effect,
-      ...("amount" in effect ? { amount: cloneAmount(effect.amount) } : {}),
+      ...("amount" in effect && effect.amount !== undefined
+        ? { amount: cloneAmount(effect.amount) }
+        : {}),
       ...("cost" in effect
         ? { cost: cloneAmount(effect.cost) }
         : {}),

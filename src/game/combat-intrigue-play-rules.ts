@@ -4,15 +4,18 @@ import {
 } from "./combat-intrigue-rules";
 import {
   isDevourIntrigue,
-  isFindWeaknessIntrigue,
   isGoToGroundIntrigue,
   isQuestionableMethodsIntrigue,
   isReachAgreementIntrigue,
   isSpiceIsPowerIntrigue,
-  isSpringTheTrapIntrigue,
   isTacticalOptionIntrigue,
 } from "./card-identifiers";
-import { resolveAcquireCards, type AgentAcquireCard } from "./effect-resolver";
+import {
+  resolveAcquireCards,
+  resolveCombatSpyRecallForStrengths,
+  type AgentAcquireCard,
+  type CombatSpyRecallForStrength,
+} from "./effect-resolver";
 import {
   allowedInfluenceLossChoices,
 } from "./influence-loss-rules";
@@ -22,9 +25,6 @@ import {
 import {
   placeableSpySpaces,
 } from "./spy-choices";
-import {
-  spyPostCount,
-} from "./spy-posts";
 import {
   trashableCards,
 } from "./trash-rules";
@@ -40,6 +40,7 @@ export type TacticalOptionChoice = "add-strength" | { kind: "retreat-troops"; co
 export type CombatIntrigueChoice = SpiceIsPowerChoice | TacticalOptionChoice;
 
 type AcquireCardPendingAction = Extract<PendingAction, { kind: "acquire-card" }>;
+type RecallSpyPendingAction = Extract<PendingAction, { kind: "recall-spy" }>;
 type SpyPendingAction = Extract<PendingAction, { kind: "spy" }>;
 type AdvanceAfterCombatIntriguePlay = (state: GameState) => GameState;
 
@@ -111,6 +112,52 @@ function resolveCombatAcquirePendingActions(
           ? `${target.leader} ${pending.optional ? "may" : "must"} acquire ${combatAcquireCardDescription(pending)}`
           : `${target.leader} has no eligible card to acquire`,
       ],
+    };
+  }, { pendingActions: [], logTexts: [] });
+}
+
+function recallSpyPendingForCombatEffect(
+  intrigue: IntrigueCard,
+  actor: Player,
+  target: Player,
+  effect: CombatSpyRecallForStrength,
+): RecallSpyPendingAction | undefined {
+  if (effect.amount <= 0 || effect.strength <= 0) return undefined;
+  return {
+    kind: "recall-spy",
+    ownerId: actor.id,
+    combatRecipientId: target.id,
+    remaining: effect.amount,
+    strength: effect.strength,
+    source: effect.source ?? intrigue.name,
+    optional: effect.optional,
+  };
+}
+
+function combatSpyRecallDescription(pending: RecallSpyPendingAction) {
+  const countText = pending.remaining === 1 ? "a spy" : `${pending.remaining} spies`;
+  return `${pending.optional ? "may" : "must"} recall ${countText}`;
+}
+
+function resolveCombatSpyRecallPendingActions(
+  state: GameState,
+  intrigue: IntrigueCard,
+  actor: Player,
+  target: Player,
+) {
+  const effects = resolveCombatSpyRecallForStrengths(intrigue.effects, {
+    trigger: "combat-intrigue",
+    source: actor,
+    target,
+    state,
+  });
+  if (effects.length > 1) throw new Error("Unsupported multiple Combat Intrigue recall-spy effects");
+  return effects.reduce<{ pendingActions: RecallSpyPendingAction[]; logTexts: string[] }>((result, effect) => {
+    const pending = recallSpyPendingForCombatEffect(intrigue, actor, target, effect);
+    if (!pending) return result;
+    return {
+      pendingActions: [...result.pendingActions, pending],
+      logTexts: [...result.logTexts, combatSpyRecallDescription(pending)],
     };
   }, { pendingActions: [], logTexts: [] });
 }
@@ -292,33 +339,11 @@ export function resolvePlayCombatIntrigue(
   }
   const combatSwords = combatIntrigueStrength(state, actor, intrigue, target);
   const combatAcquire = resolveCombatAcquirePendingActions(state, intrigue, actor, target);
-  if (!combatSwords && combatAcquire.logTexts.length === 0) return state;
+  const combatSpyRecall = resolveCombatSpyRecallPendingActions(state, intrigue, actor, target);
+  if (!combatSwords && combatAcquire.logTexts.length === 0 && combatSpyRecall.logTexts.length === 0) return state;
   const canTrashFromDevour = isDevourIntrigue(intrigue) && target.deployedSandworms > 0 && trashableCards(target).length > 0;
   const trashPending: PendingAction | undefined = canTrashFromDevour
     ? { kind: "trash-card", ownerId: target.id, source: "Devour", optional: true }
-    : undefined;
-  const canRecallSpyForFindWeakness = isFindWeaknessIntrigue(intrigue) && spyPostCount(state, actor.id) > 0;
-  const recallSpyPending: PendingAction | undefined = canRecallSpyForFindWeakness
-    ? {
-        kind: "recall-spy",
-        ownerId: actor.id,
-        combatRecipientId: target.id,
-        remaining: 1,
-        strength: 3,
-        source: "Find Weakness",
-        optional: true,
-      }
-    : undefined;
-  const springTheTrapPending: PendingAction | undefined = isSpringTheTrapIntrigue(intrigue)
-    ? {
-        kind: "recall-spy",
-        ownerId: actor.id,
-        combatRecipientId: target.id,
-        remaining: 2,
-        strength: 7,
-        source: "Spring The Trap",
-        optional: false,
-      }
     : undefined;
   const alternateInfluenceLossOwnerIds =
     actor.role === "Commander" && allowedInfluenceLossChoices(actor).length > 0 ? [actor.id] : undefined;
@@ -336,7 +361,12 @@ export function resolvePlayCombatIntrigue(
         optional: true,
       }
     : undefined;
-  const immediateCombatSwords = isSpringTheTrapIntrigue(intrigue) ? 0 : (combatSwords ?? 0);
+  const requiredSpyRecallStrength = combatSpyRecall.pendingActions
+    .filter((pending) => !pending.optional)
+    .reduce((total, pending) => total + pending.strength, 0);
+  const immediateCombatSwords = requiredSpyRecallStrength > 0 && requiredSpyRecallStrength === combatSwords
+    ? 0
+    : (combatSwords ?? 0);
 
   const players = state.players.map((player) => {
     let next = player;
@@ -349,8 +379,9 @@ export function resolvePlayCombatIntrigue(
     return next;
   });
   const pendingActions: PendingAction[] = [];
-  const cardSpecificPending = trashPending ?? recallSpyPending ?? springTheTrapPending ?? influenceLossPending;
+  const cardSpecificPending = trashPending ?? influenceLossPending;
   if (cardSpecificPending) pendingActions.push(cardSpecificPending);
+  pendingActions.push(...combatSpyRecall.pendingActions);
   pendingActions.push(...combatAcquire.pendingActions);
   const nextState = {
     ...state,
@@ -362,23 +393,20 @@ export function resolvePlayCombatIntrigue(
   };
   const pendingText = canTrashFromDevour
     ? " and may trash a card"
-    : canRecallSpyForFindWeakness
-      ? " and may recall a spy"
-      : springTheTrapPending
-        ? " and must recall 2 spies"
-        : influenceLossPending
-          ? " and may lose 1 Influence"
+    : influenceLossPending
+      ? " and may lose 1 Influence"
       : "";
+  const spyRecallText = combatSpyRecall.logTexts.length > 0 ? ` and ${combatSpyRecall.logTexts.join(" and ")}` : "";
   const acquireText = combatAcquire.logTexts.length > 0 ? ` and ${combatAcquire.logTexts.join(" and ")}` : "";
-  const strengthText = isSpringTheTrapIntrigue(intrigue)
-    ? "preparing to add 7 strength"
+  const strengthText = immediateCombatSwords === 0 && requiredSpyRecallStrength > 0
+    ? `preparing to add ${requiredSpyRecallStrength} strength`
     : combatSwords
       ? `adding ${combatSwords} strength`
       : "resolving its effect";
   return advanceAfterCombatIntriguePlay({
     ...nextState,
     log: [
-      `${actor.leader} plays ${intrigue.name} for ${target.leader}, ${strengthText}${pendingText}${acquireText}.`,
+      `${actor.leader} plays ${intrigue.name} for ${target.leader}, ${strengthText}${pendingText}${spyRecallText}${acquireText}.`,
       ...state.log,
     ],
   });

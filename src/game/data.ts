@@ -22,6 +22,7 @@ import {
   fedaykinStilltentSourceId,
   guildEnvoySourceId,
   guildSpySourceId,
+  findWeaknessSourceId,
   hiddenMissiveSourceId,
   inHighPlacesSourceId,
   impressSourceId,
@@ -53,6 +54,7 @@ import {
   southernEldersSourceId,
   spaceTimeFoldingSourceId,
   spyNetworkSourceId,
+  springTheTrapSourceId,
   stilgarDevotedSourceId,
   theacherousManeuverSourceId,
   undercoverAssetSourceId,
@@ -82,6 +84,7 @@ import {
   agentRecruitTroops,
   combatAcquireCard,
   combatGainStrength,
+  combatRecallSpiesForStrength,
   deployedUnitsThisTurn,
   hasCompletedContracts,
   hasCardTraitInPlay,
@@ -1006,6 +1009,17 @@ function intrigueCardEffects(card: HubCard): CardEffectSpec[] | undefined {
     return [
       combatGainStrength(2),
       combatAcquireCard("discard", 3, { source: "Impress" }),
+    ];
+  }
+  if (card.id === findWeaknessSourceId) {
+    return [
+      combatGainStrength(2),
+      combatRecallSpiesForStrength(1, 3, { optional: true, source: "Find Weakness" }, [hasSpyPosts(1)]),
+    ];
+  }
+  if (card.id === springTheTrapSourceId) {
+    return [
+      combatRecallSpiesForStrength(2, 7, { source: "Spring The Trap" }, [hasSpyPosts(2)]),
     ];
   }
   if (card.id === inspireAweSourceId) {

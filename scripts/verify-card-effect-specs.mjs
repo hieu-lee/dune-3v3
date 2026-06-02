@@ -174,6 +174,7 @@ try {
   const cunning = data.intrigueCards.find((card) => card.name === "Cunning");
   const departForArrakis = data.intrigueCards.find((card) => card.name === "Depart For Arrakis");
   const distraction = data.intrigueCards.find((card) => card.name === "Distraction");
+  const findWeakness = data.intrigueCards.find((card) => card.name === "Find Weakness");
   const impress = data.intrigueCards.find((card) => card.name === "Impress");
   const imperiumPolitics = data.intrigueCards.find((card) => card.name === "Imperium Politics");
   const inspireAwe = data.intrigueCards.find((card) => card.name === "Inspire Awe");
@@ -185,6 +186,7 @@ try {
   const opportunism = data.intrigueCards.find((card) => card.name === "Opportunism");
   const shaddamsFavor = data.intrigueCards.find((card) => card.name === "Shaddam's Favor");
   const specialMission = data.intrigueCards.find((card) => card.name === "Special Mission");
+  const springTheTrap = data.intrigueCards.find((card) => card.name === "Spring The Trap");
   const sietchRitual = data.intrigueCards.find((card) => card.name === "Sietch Ritual");
   const strategicStockpiling = data.intrigueCards.find((card) => card.name === "Strategic Stockpiling");
   const weirdingCombat = data.intrigueCards.find((card) => card.name === "Weirding Combat");
@@ -255,7 +257,7 @@ try {
     wheelsWithinWheels,
   );
   assert.ok(commandRespect && prepareTheWay && spiceMustFlow && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
-  assert.ok(backedByChoam && buyAccess && callToArms && changeAllegiances && councilorsAmbition && contingencyPlan && cunning && departForArrakis && distraction && impress && imperiumPolitics && inspireAwe && intelligenceReport && leverage && manipulate && marketOpportunity && mercenaries && opportunism && shaddamsFavor && specialMission && sietchRitual && strategicStockpiling && weirdingCombat);
+  assert.ok(backedByChoam && buyAccess && callToArms && changeAllegiances && councilorsAmbition && contingencyPlan && cunning && departForArrakis && distraction && findWeakness && impress && imperiumPolitics && inspireAwe && intelligenceReport && leverage && manipulate && marketOpportunity && mercenaries && opportunism && shaddamsFavor && specialMission && springTheTrap && sietchRitual && strategicStockpiling && weirdingCombat);
   assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && dutifulService && deliverSupplies && sietchTabr && spiceRefinery);
   assert.equal(revealSpecCards.length, 79, "Unexpected number of cards with declarative Reveal specs");
   assert.equal(
@@ -403,6 +405,88 @@ try {
   assert.equal(impressAcquireEffects[0]?.destination, "discard", "Impress acquisition should go to discard");
   assert.equal(impressAcquireEffects[0]?.optional, false, "Impress acquisition should be mandatory when available");
   assert.equal(impressAcquireEffects[0]?.source, "Impress", "Impress acquire-card effect should preserve its source");
+  assert.ok(
+    hasCombatEffect(findWeakness, (effect) =>
+      effect.kind === "gain-strength" &&
+      effect.selector === "self" &&
+      effect.amount === 2
+    ),
+    "Find Weakness should carry a typed Combat Intrigue base strength spec",
+  );
+  assert.ok(
+    findWeakness.effects?.some((spec) =>
+      spec.trigger === "combat-intrigue" &&
+      spec.conditions?.some((condition) => condition.kind === "has-spy-posts" && condition.count === 1) &&
+      spec.effects.some((effect) =>
+        effect.kind === "recall-spy" &&
+        effect.selector === "self" &&
+        effect.amount === 1 &&
+        effect.strengthReward === 3 &&
+        effect.optional === true &&
+        effect.source === "Find Weakness"
+      )
+    ),
+    "Find Weakness should carry a typed optional Combat spy-recall strength spec",
+  );
+  const findWeaknessBaseCombat = effectResolver.resolveGameEffects(findWeakness.effects, {
+    trigger: "combat-intrigue",
+    source: p2,
+    state: game,
+  });
+  assert.equal(findWeaknessBaseCombat.swords, 2, "Find Weakness Combat spec should resolve its base strength");
+  assert.deepEqual(
+    effectResolver.resolveCombatSpyRecallForStrengths(findWeakness.effects, {
+      trigger: "combat-intrigue",
+      source: p2,
+      state: game,
+    }),
+    [],
+    "Find Weakness spy-recall spec should not resolve without an owned spy post",
+  );
+  const findWeaknessSpyRecallEffects = effectResolver.resolveCombatSpyRecallForStrengths(findWeakness.effects, {
+    trigger: "combat-intrigue",
+    source: p2,
+    state: { ...game, spyPosts: { [secrets.id]: p2.id }, sharedSpyPosts: {} },
+  });
+  assert.deepEqual(
+    findWeaknessSpyRecallEffects,
+    [{ selector: "self", amount: 1, strength: 3, optional: true, source: "Find Weakness" }],
+    "Find Weakness spy-recall spec should resolve with one owned spy post",
+  );
+  assert.ok(
+    springTheTrap.effects?.some((spec) =>
+      spec.trigger === "combat-intrigue" &&
+      spec.conditions?.some((condition) => condition.kind === "has-spy-posts" && condition.count === 2) &&
+      spec.effects.some((effect) =>
+        effect.kind === "recall-spy" &&
+        effect.selector === "self" &&
+        effect.amount === 2 &&
+        effect.strengthReward === 7 &&
+        effect.source === "Spring The Trap" &&
+        effect.optional !== true
+      )
+    ),
+    "Spring The Trap should carry a typed required Combat spy-recall strength spec",
+  );
+  assert.deepEqual(
+    effectResolver.resolveCombatSpyRecallForStrengths(springTheTrap.effects, {
+      trigger: "combat-intrigue",
+      source: p2,
+      state: { ...game, spyPosts: { [secrets.id]: p2.id }, sharedSpyPosts: {} },
+    }),
+    [],
+    "Spring The Trap spy-recall spec should not resolve with only one owned spy post",
+  );
+  const springTheTrapRecallEffects = effectResolver.resolveCombatSpyRecallForStrengths(springTheTrap.effects, {
+    trigger: "combat-intrigue",
+    source: p2,
+    state: { ...game, spyPosts: { [secrets.id]: p2.id, [highCouncil.id]: p2.id }, sharedSpyPosts: {} },
+  });
+  assert.deepEqual(
+    springTheTrapRecallEffects,
+    [{ selector: "self", amount: 2, strength: 7, optional: false, source: "Spring The Trap" }],
+    "Spring The Trap spy-recall spec should resolve as a required two-spy recall",
+  );
   assert.ok(
     inspireAwe.effects?.some((spec) =>
       spec.trigger === "plot-intrigue" &&
@@ -4351,7 +4435,7 @@ try {
       { trigger: "agent-play", source: p2, state: game },
     ),
     /Unsupported effect "recall-spy" for agent-play/,
-    "Recall-spy specs should stay on Plot Intrigues until other trigger resolvers support them",
+    "Recall-spy specs should stay on Plot or Combat Intrigue triggers until other trigger resolvers support them",
   );
   assert.throws(
     () => effectResolver.resolveGameEffects(
@@ -4376,6 +4460,70 @@ try {
     ),
     /Invalid recall-spy removeShieldWall "yes"/,
     "Recall-spy specs should reject non-boolean Shield Wall flags",
+  );
+  assert.throws(
+    () => effectResolver.resolveCombatSpyRecallForStrengths(
+      [{ trigger: "combat-intrigue", effects: [{ kind: "recall-spy", selector: "self", strengthReward: 3, source: "Test" }] }],
+      { trigger: "combat-intrigue", source: p2, state: game },
+    ),
+    /Invalid recall-spy amount "undefined"/,
+    "Combat recall-spy specs should require a spy count",
+  );
+  assert.throws(
+    () => effectResolver.resolveCombatSpyRecallForStrengths(
+      [{ trigger: "combat-intrigue", effects: [{ kind: "recall-spy", selector: "self", amount: 1, source: "Test" }] }],
+      { trigger: "combat-intrigue", source: p2, state: game },
+    ),
+    /Invalid recall-spy strengthReward "undefined"/,
+    "Combat recall-spy specs should require a strength reward",
+  );
+  assert.throws(
+    () => effectResolver.resolveCombatSpyRecallForStrengths(
+      [{
+        trigger: "combat-intrigue",
+        effects: [{ kind: "recall-spy", selector: "self", amount: 0, strengthReward: 3, source: "Test" }],
+      }],
+      { trigger: "combat-intrigue", source: p2, state: game },
+    ),
+    /Invalid recall-spy amount "0"/,
+    "Combat recall-spy specs should reject zero spy counts",
+  );
+  assert.throws(
+    () => effectResolver.resolveCombatSpyRecallForStrengths(
+      [{
+        trigger: "combat-intrigue",
+        effects: [{ kind: "recall-spy", selector: "self", amount: 1, strengthReward: 0, source: "Test" }],
+      }],
+      { trigger: "combat-intrigue", source: p2, state: game },
+    ),
+    /Invalid recall-spy strengthReward "0"/,
+    "Combat recall-spy specs should reject zero strength rewards",
+  );
+  assert.throws(
+    () => effectResolver.resolveCombatSpyRecallForStrengths(
+      [{
+        trigger: "combat-intrigue",
+        effects: [{
+          kind: "recall-spy",
+          selector: "self",
+          amount: 1,
+          strengthReward: 3,
+          reward: { resource: "spice", amount: 1 },
+          source: "Test",
+        }],
+      }],
+      { trigger: "combat-intrigue", source: p2, state: game },
+    ),
+    /Unsupported recall-spy reward for combat-intrigue/,
+    "Combat recall-spy specs should reject Plot-style resource rewards",
+  );
+  assert.throws(
+    () => effectResolver.resolveGameEffects(
+      [plotSpec([{ kind: "recall-spy", selector: "self", amount: 1, source: "Test" }])],
+      { trigger: "plot-intrigue", source: p2, state: game },
+    ),
+    /Unsupported recall-spy amount for plot-intrigue/,
+    "Plot recall-spy specs should reject Combat-style spy counts",
   );
   const invalidSpyPlacementSourceCard = {
     ...convincingArgument,

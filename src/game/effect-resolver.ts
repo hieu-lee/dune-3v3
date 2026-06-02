@@ -54,6 +54,14 @@ export type SpyRecallEffectResult = {
   source?: string;
 };
 
+export type CombatSpyRecallForStrength = {
+  selector: PlayerSelector;
+  amount: number;
+  strength: number;
+  optional: boolean;
+  source?: string;
+};
+
 export type EffectResolverState = Partial<
   Pick<GameState, "alliances" | "players" | "roundMakerSpaceVisits" | "sharedSpyPosts" | "spyPosts" | "turnSpiceGains" | "turnUnitDeployments">
 >;
@@ -1364,6 +1372,42 @@ export function resolveManipulateRowCards(
         selector: effect.selector,
         source: effect.source,
       }));
+  });
+}
+
+export function resolveCombatSpyRecallForStrengths(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): CombatSpyRecallForStrength[] {
+  specs?.forEach(validateSpec);
+  return (specs ?? []).flatMap((spec) => {
+    if (spec.trigger !== "combat-intrigue") return [];
+    if (!specApplies(spec, context)) return [];
+    return spec.effects
+      .filter((effect) => effect.kind === "recall-spy")
+      .flatMap((effect) => {
+        if (effect.amount === undefined || effect.strengthReward === undefined) {
+          throw new Error("Unsupported Combat Intrigue recall-spy effect without amount and strengthReward");
+        }
+        const amount = amountFor(effect.amount, context.source);
+        if (
+          context.state?.spyPosts &&
+          context.state.sharedSpyPosts &&
+          spyPostCount(
+            { spyPosts: context.state.spyPosts, sharedSpyPosts: context.state.sharedSpyPosts },
+            context.source.id,
+          ) < amount
+        ) {
+          return [];
+        }
+        return {
+          selector: effect.selector,
+          amount,
+          strength: amountFor(effect.strengthReward, context.source),
+          optional: effect.optional ?? false,
+          source: effect.source,
+        };
+      });
   });
 }
 

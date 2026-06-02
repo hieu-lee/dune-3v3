@@ -113,7 +113,7 @@ Current scenarios:
 | `home` | Desktop/mobile first-load layout. |
 | `agent-placement` | Legal card/space selection and placed Agent state transition. |
 | `card-choices` | Contract, acquire, Price is No Object Solari acquire, Dangerous Rhetoric Influence choice, Captured Mentat, Space-time Folding, Guild Envoy, Covert Operation, Ecological Testing Station, Bene Gesserit Operative spy, and empty acquire pending surfaces. |
-| `combat-intrigues` | Combat Intrigue targeting/play flow, Impress pending acquisition, plus a mobile layout screenshot. |
+| `combat-intrigues` | Combat Intrigue targeting/play flow, Impress pending acquisition, Find Weakness optional spy recall, Spring The Trap required spy recall, plus a mobile layout screenshot. |
 | `commander-reveal` | Commander reveal targeting, Call to Arms, and acquire follow-up. |
 | `control-defense` | Critical-location control defense on desktop/mobile. |
 | `conflict-vp` | Conflict VP conversion resource and spy branches. |

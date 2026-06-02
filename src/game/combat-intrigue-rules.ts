@@ -2,16 +2,13 @@ import { effectiveRequirementInfluence } from "./board-rules";
 import {
   isBackedByChoamIntrigue,
   isDevourIntrigue,
-  isFindWeaknessIntrigue,
   isQuestionableMethodsIntrigue,
   isSpiceIsPowerIntrigue,
-  isSpringTheTrapIntrigue,
   isTacticalOptionIntrigue,
   isWeirdingCombatIntrigue,
 } from "./card-identifiers";
 import { playerHasConflictUnits } from "./conflict-rules";
-import { resolveGameEffects } from "./effect-resolver";
-import { spyPostCount } from "./spy-posts";
+import { resolveCombatSpyRecallForStrengths, resolveGameEffects } from "./effect-resolver";
 import type { GameState, IntrigueCard, Player } from "./types";
 
 function allyHasUnitsInConflict(player: Player) {
@@ -48,17 +45,22 @@ export function combatIntrigueStrength(
     state,
   });
   if (resolved.swords > 0) return resolved.swords;
+  const mandatoryRecallStrength = resolveCombatSpyRecallForStrengths(intrigue.effects, {
+    trigger: "combat-intrigue",
+    source: actor,
+    target,
+    state,
+  })
+    .filter((effect) => !effect.optional)
+    .reduce((total, effect) => total + effect.strength, 0);
+  if (mandatoryRecallStrength > 0) return mandatoryRecallStrength;
   if (intrigue.automatedCombatSwords) return intrigue.automatedCombatSwords;
-  if (isFindWeaknessIntrigue(intrigue)) return 2;
   if (isQuestionableMethodsIntrigue(intrigue)) return 1;
   if (isSpiceIsPowerIntrigue(intrigue)) {
     const effectOwner = actor.role === "Commander" ? target : actor;
     return effectOwner && effectOwner.resources.spice >= 3 ? 6 : undefined;
   }
   if (isTacticalOptionIntrigue(intrigue)) return 2;
-  if (isSpringTheTrapIntrigue(intrigue)) {
-    return spyPostCount(state, actor.id) >= 2 ? 7 : undefined;
-  }
   if (isDevourIntrigue(intrigue)) {
     // In six-player Combat, Commanders play Intrigues on behalf of one Ally and apply the effects to that Ally.
     const effectOwner = actor.role === "Commander" ? target : actor;

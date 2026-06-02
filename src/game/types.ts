@@ -263,7 +263,10 @@ export type GameEffectSpec =
   | {
       kind: "recall-spy";
       selector: PlayerSelector;
+      amount?: EffectAmountSpec;
       source?: string;
+      strengthReward?: EffectAmountSpec;
+      optional?: boolean;
       reward?: {
         resource: ResourceId;
         amount: EffectAmountSpec;

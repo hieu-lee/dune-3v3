@@ -62,6 +62,92 @@ export async function runCombatIntriguesSmoke({
   await screenshot(page, captures, "combat-intrigues-impress-pending.png");
 
   await setDebugGameAndWait(page, states.commander);
+  const beforeFindWeakness = await currentGame(page);
+  const gurneyBeforeFindWeakness = playerById(beforeFindWeakness, "p3");
+  await combatCard(page, "Find Weakness").getByRole("button", { name: "Gurney Halleck (+2)" }).click();
+  await page.waitForFunction(() => {
+    const game = window.__DUNE_DEBUG__?.getGame();
+    const gurney = game?.players.find((player) => player.id === "p3");
+    const muadDib = game?.players.find((player) => player.id === "p1");
+    return Boolean(
+      game &&
+        game.pendingAction?.kind === "recall-spy" &&
+        game.pendingAction.ownerId === "p1" &&
+        game.pendingAction.combatRecipientId === "p3" &&
+        game.pendingAction.remaining === 1 &&
+        game.pendingAction.strength === 3 &&
+        game.pendingAction.source === "Find Weakness" &&
+        game.pendingAction.optional === true &&
+        gurney?.conflict === 8 &&
+        !muadDib?.intrigues.some((card) => card.name === "Find Weakness"),
+    );
+  });
+  const afterFindWeakness = await currentGame(page);
+  const gurneyAfterFindWeakness = playerById(afterFindWeakness, "p3");
+  assert.equal(
+    gurneyAfterFindWeakness.conflict,
+    gurneyBeforeFindWeakness.conflict + 2,
+    "Find Weakness should add base strength before optional spy recall",
+  );
+  assert.deepEqual(
+    afterFindWeakness.pendingAction,
+    {
+      kind: "recall-spy",
+      ownerId: "p1",
+      combatRecipientId: "p3",
+      remaining: 1,
+      strength: 3,
+      source: "Find Weakness",
+      optional: true,
+    },
+    "Find Weakness should queue an optional Commander-owned spy recall for the chosen Ally",
+  );
+  await screenshot(page, captures, "combat-intrigues-find-weakness-pending.png");
+
+  await setDebugGameAndWait(page, states.commander);
+  const beforeSpring = await currentGame(page);
+  const gurneyBeforeSpring = playerById(beforeSpring, "p3");
+  await combatCard(page, "Spring The Trap").getByRole("button", { name: "Gurney Halleck (+7)" }).click();
+  await page.waitForFunction(() => {
+    const game = window.__DUNE_DEBUG__?.getGame();
+    const gurney = game?.players.find((player) => player.id === "p3");
+    const muadDib = game?.players.find((player) => player.id === "p1");
+    return Boolean(
+      game &&
+        game.pendingAction?.kind === "recall-spy" &&
+        game.pendingAction.ownerId === "p1" &&
+        game.pendingAction.combatRecipientId === "p3" &&
+        game.pendingAction.remaining === 2 &&
+        game.pendingAction.strength === 7 &&
+        game.pendingAction.source === "Spring The Trap" &&
+        game.pendingAction.optional === false &&
+        gurney?.conflict === 6 &&
+        !muadDib?.intrigues.some((card) => card.name === "Spring The Trap"),
+    );
+  });
+  const afterSpring = await currentGame(page);
+  const gurneyAfterSpring = playerById(afterSpring, "p3");
+  assert.equal(
+    gurneyAfterSpring.conflict,
+    gurneyBeforeSpring.conflict,
+    "Spring The Trap should wait until both spy recalls resolve before adding strength",
+  );
+  assert.deepEqual(
+    afterSpring.pendingAction,
+    {
+      kind: "recall-spy",
+      ownerId: "p1",
+      combatRecipientId: "p3",
+      remaining: 2,
+      strength: 7,
+      source: "Spring The Trap",
+      optional: false,
+    },
+    "Spring The Trap should queue a required Commander-owned spy recall for the chosen Ally",
+  );
+  await screenshot(page, captures, "combat-intrigues-spring-recall-pending.png");
+
+  await setDebugGameAndWait(page, states.commander);
   const before = await currentGame(page);
   const gurneyBefore = playerById(before, "p3");
   await combatCard(page, "Tactical Option").getByRole("button", { name: "Gurney Halleck: +2" }).click();

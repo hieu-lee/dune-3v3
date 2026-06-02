@@ -57,6 +57,10 @@ function isNonNegativeInteger(value: number) {
   return Number.isInteger(value) && value >= 0;
 }
 
+function isPositiveInteger(value: number) {
+  return Number.isInteger(value) && value > 0;
+}
+
 function validateTrigger(trigger: GameEffectTrigger): asserts trigger is GameEffectTrigger {
   if (!supportedTriggers.has(trigger)) {
     throw new Error(`Unsupported effect trigger "${trigger}"`);
@@ -78,6 +82,23 @@ function validateAmount(amount: EffectAmountSpec) {
 function validateFixedAmount(label: string, amount: number) {
   if (isNonNegativeInteger(amount)) return;
   invalidSpecField(label, amount);
+}
+
+function validatePositiveFixedAmount(label: string, amount: unknown): asserts amount is number {
+  if (typeof amount === "number" && isPositiveInteger(amount)) return;
+  invalidSpecField(label, amount);
+}
+
+function validatePositiveAmount(label: string, amount: EffectAmountSpec) {
+  if (typeof amount === "number") {
+    if (isPositiveInteger(amount)) return;
+    invalidSpecField(label, amount);
+  }
+  if (amount.kind === "completed-contracts") {
+    if (amount.multiplier === undefined || isPositiveInteger(amount.multiplier)) return;
+    invalidSpecField(`${label} completed-contracts multiplier`, amount.multiplier);
+  }
+  unsupportedKind(label, amount);
 }
 
 function validateSourceLabel(label: string, value: unknown) {
@@ -666,13 +687,42 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     return;
   }
   if (effect.kind === "recall-spy") {
-    if (trigger !== "plot-intrigue") {
+    if (trigger !== "plot-intrigue" && trigger !== "combat-intrigue") {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
     }
     if (effect.selector !== "self") {
       throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
     }
     validateSourceLabel("recall-spy source", effect.source);
+    if (trigger === "combat-intrigue") {
+      const amount = effect.amount;
+      const strengthReward = effect.strengthReward;
+      if (amount === undefined) {
+        invalidSpecField("recall-spy amount", amount);
+      }
+      if (strengthReward === undefined) {
+        invalidSpecField("recall-spy strengthReward", strengthReward);
+      }
+      if (effect.reward !== undefined) {
+        throw new Error(`Unsupported recall-spy reward for ${trigger}`);
+      }
+      if (effect.removeShieldWall !== undefined) {
+        throw new Error(`Unsupported recall-spy removeShieldWall for ${trigger}`);
+      }
+      validatePositiveFixedAmount("recall-spy amount", amount);
+      validatePositiveAmount("recall-spy strengthReward", strengthReward);
+      validateOptionalBoolean("recall-spy optional", effect.optional);
+      return;
+    }
+    if (effect.amount !== undefined) {
+      throw new Error(`Unsupported recall-spy amount for ${trigger}`);
+    }
+    if (effect.strengthReward !== undefined) {
+      throw new Error(`Unsupported recall-spy strengthReward for ${trigger}`);
+    }
+    if (effect.optional !== undefined) {
+      throw new Error(`Unsupported recall-spy optional for ${trigger}`);
+    }
     if (effect.reward !== undefined) {
       if (!supportedResources.has(effect.reward.resource)) {
         throw new Error(`Unsupported effect resource "${effect.reward.resource}"`);

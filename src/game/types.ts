@@ -70,6 +70,17 @@ export type PaidRewardChoiceEffectOption =
         faction: FactionId;
         amount: EffectAmountSpec;
       };
+    }
+  | {
+      id: string;
+      resource: ResourceId;
+      cost: EffectAmountSpec;
+      reward: {
+        kind: "gain-resource";
+        selector: PaidRewardChoiceSelector;
+        resource: ResourceId;
+        amount: EffectAmountSpec;
+      };
     };
 export type PaidRewardChoicePendingOption =
   | {
@@ -91,6 +102,17 @@ export type PaidRewardChoicePendingOption =
         kind: "gain-influence";
         recipientId: string;
         faction: FactionId;
+        amount: number;
+      };
+    }
+  | {
+      id: string;
+      resource: ResourceId;
+      cost: number;
+      reward: {
+        kind: "gain-resource";
+        recipientId: string;
+        resource: ResourceId;
         amount: number;
       };
     };
@@ -157,6 +179,7 @@ export type GameEffectSpec =
       selector: "self";
       options: PaidRewardChoiceEffectOption[];
       requiredRecipient?: "activated-ally";
+      requirePayableOption?: true;
       source?: string;
     }
   | {
@@ -848,6 +871,7 @@ export type PendingAction =
       ownerId: string;
       cardId?: string;
       source: string;
+      requirePayableOption?: true;
       options: PaidRewardChoicePendingOption[];
     }
   | {
@@ -884,12 +908,6 @@ export type PendingAction =
     }
   | {
       kind: "jessica-spice-agony";
-      ownerId: string;
-      cardId: string;
-      source: string;
-    }
-  | {
-      kind: "jessica-water-of-life";
       ownerId: string;
       cardId: string;
       source: string;

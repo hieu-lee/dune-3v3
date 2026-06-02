@@ -370,6 +370,7 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     if (requiredRecipient !== undefined && requiredRecipient !== "activated-ally") {
       invalidSpecField("paid-reward-choice requiredRecipient", requiredRecipient);
     }
+    validateOptionalTrue("paid-reward-choice requirePayableOption", (effect as { requirePayableOption?: unknown }).requirePayableOption);
     if (!Array.isArray(effect.options) || effect.options.length === 0) {
       invalidSpecField("paid-reward-choice options", effect.options);
     }
@@ -401,6 +402,13 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
           throw new Error(`Unsupported effect faction "${option.reward.faction}"`);
         }
         validatePositiveAmount("paid-reward-choice influence", option.reward.amount);
+        return;
+      }
+      if (option.reward.kind === "gain-resource") {
+        if (!supportedResources.has(option.reward.resource)) {
+          throw new Error(`Unsupported effect resource "${option.reward.resource}"`);
+        }
+        validatePositiveAmount("paid-reward-choice resource", option.reward.amount);
         return;
       }
       unsupportedKind("paid-reward-choice reward", option.reward);

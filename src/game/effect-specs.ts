@@ -866,6 +866,7 @@ export function agentPayResourceForDrawCards(
 export function agentPaidRewardChoice(
   options: PaidRewardChoiceEffectOption[],
   specOptions: {
+    requirePayableOption?: true;
     requiredRecipient?: "activated-ally";
     source?: string;
   } = {},
@@ -877,6 +878,7 @@ export function agentPaidRewardChoice(
       selector: "self",
       options: clonePaidRewardChoiceOptions(options),
       ...(specOptions.requiredRecipient ? { requiredRecipient: specOptions.requiredRecipient } : {}),
+      ...(specOptions.requirePayableOption ? { requirePayableOption: true } : {}),
       ...(specOptions.source ? { source: specOptions.source } : {}),
     },
   ], conditions);
@@ -1346,6 +1348,15 @@ function clonePaidRewardChoiceOptions(options: PaidRewardChoiceEffectOption[]): 
           },
         };
       case "gain-influence":
+        return {
+          ...option,
+          cost: cloneAmount(option.cost),
+          reward: {
+            ...option.reward,
+            amount: cloneAmount(option.reward.amount),
+          },
+        };
+      case "gain-resource":
         return {
           ...option,
           cost: cloneAmount(option.cost),

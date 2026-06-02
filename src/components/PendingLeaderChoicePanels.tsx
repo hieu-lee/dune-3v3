@@ -111,34 +111,6 @@ export function PendingJessicaSpiceAgonyPanel({
   );
 }
 
-type PendingJessicaWaterOfLifePanelProps = {
-  owner?: Player;
-  onChoose: (choice: "pay" | "skip") => void;
-};
-
-export function PendingJessicaWaterOfLifePanel({
-  owner,
-  onChoose,
-}: PendingJessicaWaterOfLifePanelProps) {
-  return (
-    <div className="pending-controls">
-      {owner ? (
-        <button
-          type="button"
-          onClick={() => onChoose("pay")}
-          disabled={owner.resources.spice < 1}
-        >
-          <Droplets size={15} />
-          Spend 1 spice: +1 water
-        </button>
-      ) : (
-        <span>Water of Life can no longer resolve with the current table state.</span>
-      )}
-      <button type="button" onClick={() => onChoose("skip")}>Skip</button>
-    </div>
-  );
-}
-
 type PendingJessicaReverendMotherPanelProps = {
   owner?: Player;
   space?: BoardSpace;

@@ -259,7 +259,6 @@ export {
   resolveJessicaOtherMemoriesChoice,
   resolveJessicaReverendMotherChoice,
   resolveJessicaSpiceAgonyChoice,
-  resolveJessicaWaterOfLifeChoice,
   resolveLadyAmberDesertScoutsChoice,
 } from "./leader-pending-rules";
 
@@ -268,7 +267,6 @@ export type {
   JessicaOtherMemoriesChoice,
   JessicaReverendMotherChoice,
   JessicaSpiceAgonyChoice,
-  JessicaWaterOfLifeChoice,
   LadyAmberDesertScoutsChoice,
 } from "./leader-pending-rules";
 

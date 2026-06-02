@@ -57,14 +57,12 @@ import type {
 export type IrulanSignetRingChoice = "skip" | "acquire" | "trash";
 export type LadyAmberDesertScoutsChoice = "retreat" | "skip";
 export type JessicaSpiceAgonyChoice = "pay" | "skip";
-export type JessicaWaterOfLifeChoice = "pay" | "skip";
 export type JessicaReverendMotherChoice = "repeat" | "skip";
 export type JessicaOtherMemoriesChoice = "flip" | "skip";
 
 type IrulanSignetRingPendingAction = Extract<PendingAction, { kind: "irulan-signet-ring" }>;
 type LadyAmberDesertScoutsPendingAction = Extract<PendingAction, { kind: "amber-desert-scouts" }>;
 type JessicaSpiceAgonyPendingAction = Extract<PendingAction, { kind: "jessica-spice-agony" }>;
-type JessicaWaterOfLifePendingAction = Extract<PendingAction, { kind: "jessica-water-of-life" }>;
 type JessicaReverendMotherPendingAction = Extract<PendingAction, { kind: "jessica-reverend-mother" }>;
 type JessicaOtherMemoriesPendingAction = Extract<PendingAction, { kind: "jessica-other-memories" }>;
 
@@ -181,49 +179,6 @@ export function resolveJessicaSpiceAgonyChoice(
     log: [`${owner.leader} spends 1 spice for ${pending.source} and moves a supply troop as 1 memory.`, ...state.log],
   };
   return drawIntrigueCards(paidState, owner.id, 1, pending.source);
-}
-
-export function resolveJessicaWaterOfLifeChoice(
-  state: GameState,
-  pending: JessicaWaterOfLifePendingAction,
-  choice: JessicaWaterOfLifeChoice,
-): GameState {
-  const owner = state.players.find((player) => player.id === pending.ownerId);
-  if (
-    !owner ||
-    owner.leader !== reverendMotherJessicaLeaderName ||
-    owner.role !== "Ally" ||
-    !owner.playArea.some((card) => card.id === pending.cardId && isGenericSignetRingCard(card))
-  ) {
-    return state;
-  }
-
-  if (choice === "skip") {
-    return {
-      ...state,
-      ...advancePendingAction(state),
-      log: [`${owner.leader} declines ${pending.source}.`, ...state.log],
-    };
-  }
-
-  if (owner.resources.spice < 1) return state;
-  return {
-    ...state,
-    players: state.players.map((player) =>
-      player.id === owner.id
-        ? {
-            ...player,
-            resources: {
-              ...player.resources,
-              spice: player.resources.spice - 1,
-              water: player.resources.water + 1,
-            },
-          }
-        : player,
-    ),
-    ...advancePendingAction(state),
-    log: [`${owner.leader} spends 1 spice for ${pending.source} and gains 1 water.`, ...state.log],
-  };
 }
 
 export function resolveJessicaReverendMotherChoice(

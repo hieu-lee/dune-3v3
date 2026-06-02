@@ -3661,6 +3661,48 @@ try {
     "Generic Ally Signet Ring should carry declarative Staban Unseen Network spy spec",
   );
   assert.ok(
+    allySignet.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.conditions?.some((condition) => condition.kind === "has-leader" && condition.leader === "Reverend Mother Jessica") &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Ally") &&
+      spec.effects.some((effect) =>
+        effect.kind === "paid-reward-choice" &&
+        effect.selector === "self" &&
+        effect.source === "Water of Life" &&
+        effect.requirePayableOption === true &&
+        effect.options.length === 1 &&
+        effect.options[0].id === "water" &&
+        effect.options[0].resource === "spice" &&
+        effect.options[0].cost === 1 &&
+        effect.options[0].reward.kind === "gain-resource" &&
+        effect.options[0].reward.selector === "self" &&
+        effect.options[0].reward.resource === "water" &&
+        effect.options[0].reward.amount === 1
+      )
+    ),
+    "Generic Ally Signet Ring should carry a typed Reverend Mother Jessica Water of Life payment spec",
+  );
+  assert.deepEqual(
+    effectResolver.resolveAgentPaidRewardChoices(allySignet.effects, {
+      trigger: "agent-play",
+      source: { ...p5, leader: "Reverend Mother Jessica", role: "Ally" },
+      target: p5,
+      state: game,
+    }),
+    [{
+      selector: "self",
+      source: "Water of Life",
+      requirePayableOption: true,
+      options: [{
+        id: "water",
+        resource: "spice",
+        cost: 1,
+        reward: { kind: "gain-resource", selector: "self", resource: "water", amount: 1 },
+      }],
+    }],
+    "Water of Life paid reward spec should resolve its spice-for-water branch",
+  );
+  assert.ok(
     makerKeeper.effects?.some((spec) =>
       spec.trigger === "agent-play" &&
       spec.conditions?.some((condition) =>
@@ -6557,6 +6599,18 @@ try {
   assert.throws(
     () => state.applyCardAgentEffect(
       paidRewardChoiceCard(
+        "effect-spec-invalid-paid-reward-choice-require-payable-option-card",
+        paidRewardChoiceEffect({ requirePayableOption: false }),
+      ),
+      p4,
+      p6,
+    ),
+    /Invalid paid-reward-choice requirePayableOption "false"/,
+    "Paid reward choice specs should reject non-true requirePayableOption values",
+  );
+  assert.throws(
+    () => state.applyCardAgentEffect(
+      paidRewardChoiceCard(
         "effect-spec-invalid-paid-reward-choice-empty-options-card",
         paidRewardChoiceEffect({ options: [] }),
       ),
@@ -6707,6 +6761,44 @@ try {
     ),
     /Invalid paid-reward-choice influence "0"/,
     "Paid reward choice Influence branches should require positive reward amounts",
+  );
+  assert.throws(
+    () => state.applyCardAgentEffect(
+      paidRewardChoiceCard(
+        "effect-spec-invalid-paid-reward-choice-resource-reward-card",
+        paidRewardChoiceEffect({
+          options: [{
+            id: "water",
+            resource: "spice",
+            cost: 1,
+            reward: { kind: "gain-resource", selector: "self", resource: "melange", amount: 1 },
+          }],
+        }),
+      ),
+      p4,
+      p6,
+    ),
+    /Unsupported effect resource "melange"/,
+    "Paid reward choice resource branches should reject unsupported reward resources",
+  );
+  assert.throws(
+    () => state.applyCardAgentEffect(
+      paidRewardChoiceCard(
+        "effect-spec-invalid-paid-reward-choice-resource-amount-card",
+        paidRewardChoiceEffect({
+          options: [{
+            id: "water",
+            resource: "spice",
+            cost: 1,
+            reward: { kind: "gain-resource", selector: "self", resource: "water", amount: 0 },
+          }],
+        }),
+      ),
+      p4,
+      p6,
+    ),
+    /Invalid paid-reward-choice resource "0"/,
+    "Paid reward choice resource branches should require positive reward amounts",
   );
   assert.throws(
     () => state.applyCardAgentEffect(
@@ -8150,6 +8242,69 @@ try {
     }],
     "Generic paid reward choices should keep valid self options when no activated Ally recipient is required",
   );
+  const paidSpiceRewardCard = {
+    ...convincingArgument,
+    id: "effect-spec-paid-spice-reward-card",
+    name: "Effect Spec Paid Spice Reward",
+    effects: [agentSpec([{
+      kind: "paid-reward-choice",
+      selector: "self",
+      source: "Paid Spice Reward",
+      options: [{
+        id: "spice",
+        resource: "water",
+        cost: 1,
+        reward: { kind: "gain-resource", selector: "self", resource: "spice", amount: 2 },
+      }],
+    }])],
+  };
+  const paidSpiceRewardSource = {
+    ...p4,
+    playArea: [paidSpiceRewardCard],
+    resources: { ...p4.resources, water: 1, spice: 0 },
+  };
+  const paidSpiceRewardFixture = {
+    ...game,
+    pendingAction: undefined,
+    pendingQueue: [],
+    turnSpiceGains: {},
+    players: game.players.map((player) => player.id === paidSpiceRewardSource.id ? paidSpiceRewardSource : player),
+  };
+  const [paidSpiceRewardPending] = state.pendingActionsForCard(
+    paidSpiceRewardCard,
+    paidSpiceRewardSource,
+    paidSpiceRewardFixture,
+    paidSpiceRewardSource,
+  );
+  assert.deepEqual(
+    paidSpiceRewardPending,
+    {
+      kind: "paid-reward-choice",
+      ownerId: paidSpiceRewardSource.id,
+      cardId: paidSpiceRewardCard.id,
+      source: "Paid Spice Reward",
+      options: [{
+        id: "spice",
+        resource: "water",
+        cost: 1,
+        reward: {
+          kind: "gain-resource",
+          recipientId: paidSpiceRewardSource.id,
+          resource: "spice",
+          amount: 2,
+        },
+      }],
+    },
+    "Generic paid reward choices should queue resource reward branches",
+  );
+  const paidSpiceRewardResolved = state.resolvePaidRewardChoice(
+    { ...paidSpiceRewardFixture, pendingAction: paidSpiceRewardPending },
+    paidSpiceRewardPending,
+    "spice",
+  );
+  assert.equal(playerById(paidSpiceRewardResolved, paidSpiceRewardSource.id).resources.water, 0, "Paid spice reward should spend the payment resource");
+  assert.equal(playerById(paidSpiceRewardResolved, paidSpiceRewardSource.id).resources.spice, 2, "Paid spice reward should gain spice");
+  assert.equal(paidSpiceRewardResolved.turnSpiceGains[paidSpiceRewardSource.id], 2, "Paid spice rewards should count as turn spice gains");
 
   const rebelSupplierEffect = state.applyCardAgentEffect(
     rebelSupplier,

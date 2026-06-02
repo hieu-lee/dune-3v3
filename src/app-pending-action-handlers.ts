@@ -29,7 +29,6 @@ import {
   resolveJessicaOtherMemoriesChoice,
   resolveJessicaReverendMotherChoice,
   resolveJessicaSpiceAgonyChoice,
-  resolveJessicaWaterOfLifeChoice,
   resolveLadyAmberDesertScoutsChoice,
   resolveLoseInfluenceForIntriguesChoice,
   resolveMakerChoice,
@@ -84,7 +83,6 @@ import type {
   JessicaOtherMemoriesChoice,
   JessicaReverendMotherChoice,
   JessicaSpiceAgonyChoice,
-  JessicaWaterOfLifeChoice,
   LadyAmberDesertScoutsChoice,
   StabanUnseenNetworkChoice,
 } from "./game/state";
@@ -191,8 +189,6 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     runPending("amber-desert-scouts", (current, pending) => maybeStartCombatPhase(resolveLadyAmberDesertScoutsChoice(current, pending, choice)));
   const chooseJessicaSpiceAgony = (choice: JessicaSpiceAgonyChoice) =>
     runPending("jessica-spice-agony", (current, pending) => maybeStartCombatPhase(resolveJessicaSpiceAgonyChoice(current, pending, choice)));
-  const chooseJessicaWaterOfLife = (choice: JessicaWaterOfLifeChoice) =>
-    runPending("jessica-water-of-life", (current, pending) => maybeStartCombatPhase(resolveJessicaWaterOfLifeChoice(current, pending, choice)));
   const chooseJessicaReverendMother = (choice: JessicaReverendMotherChoice) =>
     runPending("jessica-reverend-mother", (current, pending) => maybeStartCombatPhase(resolveJessicaReverendMotherChoice(current, pending, choice)));
   const chooseJessicaOtherMemories = (choice: JessicaOtherMemoriesChoice) =>
@@ -320,7 +316,6 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     chooseJessicaOtherMemories,
     chooseJessicaReverendMother,
     chooseJessicaSpiceAgony,
-    chooseJessicaWaterOfLife,
     chooseLadyAmberDesertScouts,
     chooseLoseInfluenceForIntrigues,
     chooseMakerReward,

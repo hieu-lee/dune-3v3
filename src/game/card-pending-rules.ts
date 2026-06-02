@@ -266,11 +266,25 @@ function paidRewardChoiceRecipientFor(source: Player, target: Player | undefined
   return undefined;
 }
 
+function potentialDeferredPaidRewardResource(
+  state: GameState | undefined,
+  source: Player,
+  target: Player | undefined,
+  space: BoardSpace | undefined,
+  resource: PaidRewardChoicePendingOption["resource"],
+) {
+  if (!state || !space) return 0;
+  if (resource === "spice") return potentialDeferredMakerChoiceSpice(state, source, target, space);
+  if (resource === "water" && space.sietchTabr) return 1;
+  return 0;
+}
+
 function pendingActionForAgentPaidRewardChoice(
   card: Card,
   source: Player,
   state?: GameState,
   target?: Player,
+  space?: BoardSpace,
 ): PendingAction | undefined {
   if (!card.effects || !source.playArea.some((candidate) => candidate.id === card.id)) return undefined;
   const players = state ? playersWithPendingCardEffect(state, source, target) : undefined;
@@ -290,6 +304,8 @@ function pendingActionForAgentPaidRewardChoice(
   const options = effect.options.flatMap((option): PaidRewardChoicePendingOption[] => {
     const recipient = paidRewardChoiceRecipientFor(source, target, option.reward.selector);
     if (!recipient || option.cost <= 0) return [];
+    const deferredResource = potentialDeferredPaidRewardResource(state, source, target, space, option.resource);
+    if (effect.requirePayableOption && source.resources[option.resource] + deferredResource < option.cost) return [];
     switch (option.reward.kind) {
       case "recruit-troops":
         if (option.reward.amount <= 0 || option.reward.destination !== "garrison") return [];
@@ -317,6 +333,19 @@ function pendingActionForAgentPaidRewardChoice(
             amount: option.reward.amount,
           },
         }];
+      case "gain-resource":
+        if (option.reward.amount <= 0) return [];
+        return [{
+          id: option.id,
+          resource: option.resource,
+          cost: option.cost,
+          reward: {
+            kind: "gain-resource",
+            recipientId: recipient.id,
+            resource: option.reward.resource,
+            amount: option.reward.amount,
+          },
+        }];
       default: {
         const reward = option.reward as { kind?: unknown };
         throw new Error(`Unsupported paid-reward-choice reward "${String(reward.kind)}"`);
@@ -329,6 +358,7 @@ function pendingActionForAgentPaidRewardChoice(
         ownerId: source.id,
         cardId: card.id,
         source: effect.source ?? card.name,
+        ...(effect.requirePayableOption ? { requirePayableOption: true } : {}),
         options,
       }
     : undefined;
@@ -758,7 +788,7 @@ export function pendingActionsForCard(
   if (agentDiscardDrawPending) typedPendings.push(agentDiscardDrawPending);
   const agentGainInfluencePending = pendingActionForAgentGainInfluenceChoice(card, source, state, target);
   if (agentGainInfluencePending) typedPendings.push(agentGainInfluencePending);
-  const agentPaidRewardChoicePending = pendingActionForAgentPaidRewardChoice(card, source, state, target);
+  const agentPaidRewardChoicePending = pendingActionForAgentPaidRewardChoice(card, source, state, target, space);
   if (agentPaidRewardChoicePending) typedPendings.push(agentPaidRewardChoicePending);
   const agentOpponentDiscardPendings = pendingActionsForAgentOpponentsDiscardCards(card, source, state, target);
   typedPendings.push(...agentOpponentDiscardPendings);
@@ -810,20 +840,6 @@ export function pendingActionsForCard(
       ownerId: source.id,
       cardId: card.id,
       source: "Spice Agony",
-    }];
-  }
-  if (
-    isGenericSignetRingCard(card) &&
-    source.leader === reverendMotherJessicaLeaderName &&
-    source.role === "Ally" &&
-    source.resources.spice + (state && space ? potentialDeferredMakerChoiceSpice(state, source, target, space) : 0) >= 1 &&
-    source.playArea.some((candidate) => candidate.id === card.id && isGenericSignetRingCard(candidate))
-  ) {
-    return [{
-      kind: "jessica-water-of-life",
-      ownerId: source.id,
-      cardId: card.id,
-      source: "Water of Life",
     }];
   }
   return [];

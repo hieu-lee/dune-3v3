@@ -17,6 +17,7 @@ import {
   advancePendingAction,
 } from "./pending-actions";
 import {
+  recordTurnSpiceGain,
   recordTurnUnitDeployment,
 } from "./turn-trackers";
 import type {
@@ -69,6 +70,8 @@ function paidRewardChoiceOptionIsValid(option: PaidRewardChoicePendingOption) {
       return paymentPendingAmountIsValid(option.reward.amount) && option.reward.destination === "garrison";
     case "gain-influence":
       return Boolean(factionLabels[option.reward.faction]) && paymentPendingAmountIsValid(option.reward.amount);
+    case "gain-resource":
+      return Boolean(resourceLabels[option.reward.resource]) && paymentPendingAmountIsValid(option.reward.amount);
     default:
       return false;
   }
@@ -125,6 +128,15 @@ export function resolvePaidRewardChoice(
         case "gain-influence":
           next = adjustInfluence(next, option.reward.faction, option.reward.amount);
           break;
+        case "gain-resource":
+          next = {
+            ...next,
+            resources: {
+              ...next.resources,
+              [option.reward.resource]: next.resources[option.reward.resource] + option.reward.amount,
+            },
+          };
+          break;
         default:
           return next;
       }
@@ -138,6 +150,8 @@ export function resolvePaidRewardChoice(
         return `${recipient.leader} recruits ${option.reward.amount} troop${option.reward.amount === 1 ? "" : "s"}`;
       case "gain-influence":
         return `${recipient.leader} gains ${option.reward.amount} ${factionLabels[option.reward.faction]} Influence`;
+      case "gain-resource":
+        return `${recipient.leader} gains ${option.reward.amount} ${resourceLabels[option.reward.resource]}`;
       default:
         return undefined;
     }
@@ -157,6 +171,10 @@ export function resolvePaidRewardChoice(
       return nextState;
     case "gain-influence":
       return resolveLeaderInfluenceThresholdRewards(nextState, state.players);
+    case "gain-resource":
+      return option.reward.resource === "spice"
+        ? recordTurnSpiceGain(nextState, recipient.id, option.reward.amount)
+        : nextState;
     default:
       return state;
   }

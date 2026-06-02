@@ -32,6 +32,7 @@ import {
   gurneyHalleckLeaderName,
   ladyAmberMetulliLeaderName,
   ladyMargotFenringLeaderName,
+  reverendMotherJessicaLeaderName,
   stabanTuekLeaderName,
 } from "./leader-constants";
 import type { Card, TeamId } from "./types";
@@ -232,6 +233,21 @@ const allyStarterSpecs: StarterCardSpec[] = [
         1,
         { source: "Unseen Network", recallForSupply: true, postPlacementAction: "staban-unseen-network" },
         [hasLeader(stabanTuekLeaderName), hasRole("Ally")],
+      ),
+      agentPaidRewardChoice(
+        [{
+          id: "water",
+          resource: "spice",
+          cost: 1,
+          reward: {
+            kind: "gain-resource",
+            selector: "self",
+            resource: "water",
+            amount: 1,
+          },
+        }],
+        { requirePayableOption: true, source: "Water of Life" },
+        [hasLeader(reverendMotherJessicaLeaderName), hasRole("Ally")],
       ),
       revealGainPersuasion(1),
     ],

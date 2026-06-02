@@ -26,7 +26,6 @@ import type {
   JessicaOtherMemoriesChoice,
   JessicaReverendMotherChoice,
   JessicaSpiceAgonyChoice,
-  JessicaWaterOfLifeChoice,
   LadyAmberDesertScoutsChoice,
   StabanUnseenNetworkChoice,
 } from "../game/state";
@@ -47,7 +46,6 @@ import {
   PendingJessicaOtherMemoriesPanel,
   PendingJessicaReverendMotherPanel,
   PendingJessicaSpiceAgonyPanel,
-  PendingJessicaWaterOfLifePanel,
   PendingLadyAmberDesertScoutsPanel,
   PendingPayResourceForContractsPanel,
   PendingPayResourceForDrawCardsPanel,
@@ -93,7 +91,6 @@ type PendingActionPanelProps = {
   chooseJessicaOtherMemories: (choice: JessicaOtherMemoriesChoice) => void;
   chooseJessicaReverendMother: (choice: JessicaReverendMotherChoice) => void;
   chooseJessicaSpiceAgony: (choice: JessicaSpiceAgonyChoice) => void;
-  chooseJessicaWaterOfLife: (choice: JessicaWaterOfLifeChoice) => void;
   chooseLadyAmberDesertScouts: (choice: LadyAmberDesertScoutsChoice) => void;
   chooseMakerReward: (choice: "spice" | "sandworms") => void;
   choosePayResourceForContracts: (optionIndex: number) => void;
@@ -165,7 +162,6 @@ export function PendingActionPanel({
   chooseJessicaOtherMemories,
   chooseJessicaReverendMother,
   chooseJessicaSpiceAgony,
-  chooseJessicaWaterOfLife,
   chooseLadyAmberDesertScouts,
   chooseMakerReward,
   choosePayResourceForContracts,
@@ -391,8 +387,6 @@ export function PendingActionPanel({
       pendingJessicaSpiceAgonyOwner.resources.spice >= 1 &&
       pendingJessicaSpiceAgonyTroopSupply > 0,
   );
-  const pendingJessicaWaterOfLifeOwner =
-    pendingAction.kind === "jessica-water-of-life" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingJessicaReverendMotherOwner =
     pendingAction.kind === "jessica-reverend-mother" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingJessicaReverendMotherSpace =
@@ -501,7 +495,6 @@ export function PendingActionPanel({
           {pendingAction.kind === "staban-unseen-network" && `${pendingStabanUnseenNetworkOwner?.leader ?? "Staban Tuek"} Unseen Network`}
           {pendingAction.kind === "amber-desert-scouts" && `${pendingLadyAmberDesertScoutsOwner?.leader ?? "Lady Amber"} Desert Scouts`}
           {pendingAction.kind === "jessica-spice-agony" && `${pendingJessicaSpiceAgonyOwner?.leader ?? "Lady Jessica"} Spice Agony`}
-          {pendingAction.kind === "jessica-water-of-life" && `${pendingJessicaWaterOfLifeOwner?.leader ?? "Reverend Mother Jessica"} Water of Life`}
           {pendingAction.kind === "jessica-reverend-mother" && `${pendingJessicaReverendMotherOwner?.leader ?? "Reverend Mother Jessica"} Reverend Mother`}
           {pendingAction.kind === "jessica-other-memories" && `${pendingJessicaOtherMemoriesOwner?.leader ?? "Lady Jessica"} Other Memories`}
           {pendingAction.kind === "conflict-influence" && `${pendingConflictInfluenceOwner?.leader ?? "Player"} Conflict Influence`}
@@ -678,13 +671,6 @@ export function PendingActionPanel({
           owner={pendingJessicaSpiceAgonyOwner}
           troopSupplyLabel={troopSupplyLabel(pendingJessicaSpiceAgonyTroopSupply)}
           onChoose={chooseJessicaSpiceAgony}
-        />
-      )}
-
-      {pendingAction.kind === "jessica-water-of-life" && (
-        <PendingJessicaWaterOfLifePanel
-          owner={pendingJessicaWaterOfLifeOwner}
-          onChoose={chooseJessicaWaterOfLife}
         />
       )}
 

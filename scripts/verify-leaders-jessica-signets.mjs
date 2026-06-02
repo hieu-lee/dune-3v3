@@ -301,20 +301,33 @@ export function verifyLeaderJessicaSignets({ cards, data, game, spaces, state })
     reverendJessicaOwner,
     secrets,
   );
+  const expectedWaterOfLifePending = {
+    kind: "paid-reward-choice",
+    ownerId: ladyJessica.id,
+    cardId: allySignet.id,
+    source: "Water of Life",
+    requirePayableOption: true,
+    options: [{
+      id: "water",
+      resource: "spice",
+      cost: 1,
+      reward: {
+        kind: "gain-resource",
+        recipientId: ladyJessica.id,
+        resource: "water",
+        amount: 1,
+      },
+    }],
+  };
   assert.deepEqual(
     waterOfLifePending,
-    {
-      kind: "jessica-water-of-life",
-      ownerId: ladyJessica.id,
-      cardId: allySignet.id,
-      source: "Water of Life",
-    },
+    expectedWaterOfLifePending,
     "Reverend Mother Jessica's Signet Ring should queue Water of Life when she can pay 1 spice",
   );
-  const waterOfLifeResolved = state.resolveJessicaWaterOfLifeChoice(
+  const waterOfLifeResolved = state.resolvePaidRewardChoice(
     { ...reverendJessicaGame, pendingAction: waterOfLifePending, pendingQueue: [] },
     waterOfLifePending,
-    "pay",
+    "water",
   );
   assert.equal(playerById(waterOfLifeResolved, ladyJessica.id).resources.spice, 0, "Water of Life should spend 1 spice");
   assert.equal(playerById(waterOfLifeResolved, ladyJessica.id).resources.water, 1, "Water of Life should gain 1 water");
@@ -340,10 +353,9 @@ export function verifyLeaderJessicaSignets({ cards, data, game, spaces, state })
     undefined,
     "Water of Life should require the Signet Ring in play",
   );
-  const skippedWaterOfLife = state.resolveJessicaWaterOfLifeChoice(
+  const skippedWaterOfLife = state.skipPaidRewardChoice(
     { ...reverendJessicaGame, pendingAction: waterOfLifePending, pendingQueue: [] },
     waterOfLifePending,
-    "skip",
   );
   assert.equal(playerById(skippedWaterOfLife, ladyJessica.id).resources.spice, 1, "Skipping Water of Life should not spend spice");
   assert.equal(playerById(skippedWaterOfLife, ladyJessica.id).resources.water, 0, "Skipping Water of Life should not gain water");
@@ -368,12 +380,7 @@ export function verifyLeaderJessicaSignets({ cards, data, game, spaces, state })
   );
   assert.deepEqual(
     deferredWaterPending,
-    {
-      kind: "jessica-water-of-life",
-      ownerId: ladyJessica.id,
-      cardId: allySignet.id,
-      source: "Water of Life",
-    },
+    expectedWaterOfLifePending,
     "Water of Life should queue when a pending Maker choice can supply the 1 spice payment",
   );
   const deferredWaterMakerPending = state.pendingActionForMakerChoice(
@@ -392,10 +399,10 @@ export function verifyLeaderJessicaSignets({ cards, data, game, spaces, state })
     deferredWaterMakerPending,
     "spice",
   );
-  const afterDeferredWaterOfLife = state.resolveJessicaWaterOfLifeChoice(
+  const afterDeferredWaterOfLife = state.resolvePaidRewardChoice(
     afterWaterMakerSpice,
     deferredWaterPending,
-    "pay",
+    "water",
   );
   assert.equal(playerById(afterDeferredWaterOfLife, ladyJessica.id).resources.spice, 1, "Deferred Water of Life should spend 1 of the Maker spice");
   assert.equal(playerById(afterDeferredWaterOfLife, ladyJessica.id).resources.water, 2, "Deferred Water of Life should gain 1 water");
@@ -410,12 +417,12 @@ export function verifyLeaderJessicaSignets({ cards, data, game, spaces, state })
   );
   assert.deepEqual(afterWaterMakerWorms.pendingAction, deferredWaterPending, "Choosing Maker worms should still advance to the queued optional Water of Life");
   assert.equal(
-    state.resolveJessicaWaterOfLifeChoice(afterWaterMakerWorms, deferredWaterPending, "pay"),
+    state.resolvePaidRewardChoice(afterWaterMakerWorms, deferredWaterPending, "water"),
     afterWaterMakerWorms,
     "Deferred Water of Life should not resolve if the Maker choice did not provide spice",
   );
   assert.equal(
-    state.resolveJessicaWaterOfLifeChoice(afterWaterMakerWorms, deferredWaterPending, "skip").pendingAction,
+    state.skipPaidRewardChoice(afterWaterMakerWorms, deferredWaterPending).pendingAction,
     undefined,
     "Deferred Water of Life should remain skippable after choosing Maker worms",
   );

@@ -4,6 +4,12 @@ import type { PendingAction, Player } from "../game/types";
 
 type PaidRewardChoicePendingAction = Extract<PendingAction, { kind: "paid-reward-choice" }>;
 
+const resourceLabels = {
+  solari: "Solari",
+  spice: "spice",
+  water: "water",
+} as const;
+
 type PendingPaidRewardChoicePanelProps = {
   owner?: Player;
   pending: PaidRewardChoicePendingAction;
@@ -29,10 +35,18 @@ export function PendingPaidRewardChoicePanel({
         pending.options.map((option) => {
           const recipient = players.find((player) => player.id === option.reward.recipientId);
           const recipientLabel = recipient?.leader ?? "Player";
+          const costLabel = option.resource === "solari" ? String(option.cost) : `${option.cost} ${resourceLabels[option.resource]}`;
           const canChoose = Boolean(recipient) && resourceAmount(owner, option.resource) >= option.cost;
-          const label = option.reward.kind === "recruit-troops"
-            ? `${recipientLabel} recruits ${option.reward.amount} troop${option.reward.amount === 1 ? "" : "s"}`
-            : `${recipientLabel} +${option.reward.amount} ${factionLabels[option.reward.faction]}`;
+          const label = (() => {
+            if (option.reward.kind === "recruit-troops") {
+              return `${recipientLabel} recruits ${option.reward.amount} troop${option.reward.amount === 1 ? "" : "s"}`;
+            }
+            if (option.reward.kind === "gain-influence") {
+              return `${recipientLabel} +${option.reward.amount} ${factionLabels[option.reward.faction]}`;
+            }
+            const reward = `+${option.reward.amount} ${resourceLabels[option.reward.resource]}`;
+            return recipient?.id === owner.id ? reward : `${recipientLabel} ${reward}`;
+          })();
           return (
             <button
               type="button"
@@ -41,7 +55,7 @@ export function PendingPaidRewardChoicePanel({
               disabled={!canChoose}
             >
               <CircleDollarSign size={15} />
-              Spend {option.cost}: {label}
+              Spend {costLabel}: {label}
             </button>
           );
         })

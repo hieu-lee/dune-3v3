@@ -212,8 +212,20 @@ export type AgentPaidRewardChoice = {
           amount: number;
         };
       }
+    | {
+        id: string;
+        resource: ResourceId;
+        cost: number;
+        reward: {
+          kind: "gain-resource";
+          selector: "self" | "activated-ally";
+          resource: ResourceId;
+          amount: number;
+        };
+      }
   >;
   requiredRecipient?: "activated-ally";
+  requirePayableOption?: true;
   source?: string;
 };
 
@@ -1331,6 +1343,18 @@ function resolvePaidRewardChoiceOption(
           amount: amountFor(option.reward.amount, context.source),
         },
       };
+    case "gain-resource":
+      return {
+        id: option.id,
+        resource: option.resource,
+        cost: amountFor(option.cost, context.source),
+        reward: {
+          kind: "gain-resource",
+          selector: option.reward.selector,
+          resource: option.reward.resource,
+          amount: amountFor(option.reward.amount, context.source),
+        },
+      };
     default: {
       const reward = option.reward as { kind?: unknown };
       throw new Error(`Unsupported paid-reward-choice reward "${String(reward.kind)}"`);
@@ -1352,6 +1376,7 @@ export function resolveAgentPaidRewardChoices(
         selector: effect.selector,
         options: effect.options.map((option) => resolvePaidRewardChoiceOption(option, context)),
         ...(effect.requiredRecipient ? { requiredRecipient: effect.requiredRecipient } : {}),
+        ...(effect.requirePayableOption ? { requirePayableOption: true } : {}),
         source: effect.source,
       }));
   });

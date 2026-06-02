@@ -595,10 +595,22 @@ async function createLeaderCharacterChoiceStates(server, initialPlayableGame) {
           : player,
       ),
       pendingAction: {
-        kind: "jessica-water-of-life",
+        kind: "paid-reward-choice",
         ownerId: "p5",
         cardId: "debug-jessica-water-of-life-signet",
         source: "Water of Life",
+        requirePayableOption: true,
+        options: [{
+          id: "water",
+          resource: "spice",
+          cost: 1,
+          reward: {
+            kind: "gain-resource",
+            recipientId: "p5",
+            resource: "water",
+            amount: 1,
+          },
+        }],
       },
     },
     jessicaReverendMother: {

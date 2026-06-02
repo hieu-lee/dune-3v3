@@ -43,6 +43,7 @@ import type {
   PendingAction,
   Player,
   PostDeployIntrigueDraw,
+  ResourceId,
   Resources,
 } from "./game/types";
 
@@ -94,6 +95,20 @@ function withPostDeployIntrigueDraw(
 ) {
   if (!pending || pending.kind !== "deploy" || !draw || draw.amount <= 0) return pending;
   return { ...pending, postDeployIntrigueDraw: draw };
+}
+
+function paidRewardResourceGain(pending: PendingAction | undefined, ownerId: string, resource: ResourceId) {
+  if (pending?.kind !== "paid-reward-choice") return 0;
+  return pending.options.reduce((total, option) => {
+    if (
+      option.reward.kind === "gain-resource" &&
+      option.reward.recipientId === ownerId &&
+      option.reward.resource === resource
+    ) {
+      return total + option.reward.amount;
+    }
+    return total;
+  }, 0);
 }
 
 export function placeAgentAction(
@@ -195,7 +210,8 @@ export function placeAgentAction(
     boardInfluencePending,
   ].filter((action): action is PendingAction => Boolean(action));
   const jessicaOtherMemoriesPending = pendingActionForJessicaOtherMemories(source, selectedSpace);
-  const jessicaRepeatDeferredWater = firstCardPending?.kind === "jessica-water-of-life" ? 1 : 0;
+  const paidRewardWater = paidRewardResourceGain(firstCardPending, source.id, "water");
+  const jessicaRepeatDeferredWater = paidRewardWater;
   const jessicaReverendMotherPending = pendingActionForReverendMotherJessicaRepeat(
     current,
     source,
@@ -203,7 +219,7 @@ export function placeAgentAction(
     jessicaRepeatDeferredWater,
   );
   const prioritizedCardPending =
-    firstCardPending?.kind === "jessica-spice-agony" || firstCardPending?.kind === "jessica-water-of-life"
+    firstCardPending?.kind === "jessica-spice-agony" || paidRewardWater > 0
       ? firstCardPending
       : undefined;
   const pendingActions = prioritizedCardPending || jessicaOtherMemoriesPending || jessicaReverendMotherPending

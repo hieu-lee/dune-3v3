@@ -167,7 +167,8 @@ function pendingActionForAgentDiscardCardForDraw(
   return effects
     .map((effect): PendingAction | undefined => {
       const maxDrawCards = effect.drawCards + (effect.bonusDraw?.drawCards ?? 0);
-      if (effect.selector !== "self" || maxDrawCards <= 0) return undefined;
+      const maxIntrigues = effect.bonusIntrigues?.amount ?? 0;
+      if (effect.selector !== "self" || (maxDrawCards <= 0 && maxIntrigues <= 0)) return undefined;
       const pending: Extract<PendingAction, { kind: "discard-card-for-draw" }> = {
         kind: "discard-card-for-draw",
         ownerId: source.id,
@@ -175,6 +176,7 @@ function pendingActionForAgentDiscardCardForDraw(
         drawCards: effect.drawCards,
         optional: effect.optional,
         ...(effect.bonusDraw ? { bonusDraw: { ...effect.bonusDraw } } : {}),
+        ...(effect.bonusIntrigues ? { bonusIntrigues: { ...effect.bonusIntrigues } } : {}),
       };
       if (discardCardForDrawChoices(source, pending).length === 0) return undefined;
       return pending;

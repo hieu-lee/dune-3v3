@@ -600,6 +600,18 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
       }
       validateAmount(effect.bonusDraw.drawCards);
     }
+    if (effect.bonusIntrigues !== undefined) {
+      if (
+        typeof effect.bonusIntrigues.requiredDiscardTrait !== "string" ||
+        effect.bonusIntrigues.requiredDiscardTrait.trim().length === 0
+      ) {
+        invalidSpecField(
+          "discard-card-for-draw bonusIntrigues requiredDiscardTrait",
+          effect.bonusIntrigues.requiredDiscardTrait,
+        );
+      }
+      validateAmount(effect.bonusIntrigues.amount);
+    }
     return;
   }
   if (effect.kind === "opponents-discard-cards") {

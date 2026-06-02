@@ -1,5 +1,6 @@
 import { drawCards } from "./deck-utils";
 import { applyDiscardedFromHandTriggers } from "./discard-trigger-rules";
+import { drawIntrigueCards } from "./intrigue-deck";
 import { advancePendingAction } from "./pending-actions";
 import type { Card, GameState, PendingAction, Player } from "./types";
 
@@ -27,6 +28,13 @@ function bonusDrawFor(discardedCard: Card, pending: DiscardCardForDrawPendingAct
     : 0;
 }
 
+function bonusIntriguesFor(discardedCard: Card, pending: DiscardCardForDrawPendingAction) {
+  if (!pending.bonusIntrigues) return 0;
+  return discardedCard.traits?.includes(pending.bonusIntrigues.requiredDiscardTrait)
+    ? pending.bonusIntrigues.amount
+    : 0;
+}
+
 export function resolveDiscardCardForDraw(
   state: GameState,
   pending: DiscardCardForDrawPendingAction,
@@ -39,6 +47,7 @@ export function resolveDiscardCardForDraw(
   if (!discardedCard) return state;
 
   const requestedDraws = pending.drawCards + bonusDrawFor(discardedCard, pending);
+  const requestedIntrigues = bonusIntriguesFor(discardedCard, pending);
   const ownerAfterDiscard = {
     ...owner,
     hand: owner.hand.filter((card) => card.id !== discardedCard.id),
@@ -49,13 +58,20 @@ export function resolveDiscardCardForDraw(
     : ownerAfterDiscard;
   const drawnCards = ownerAfterDraw.hand.length - ownerAfterDiscard.hand.length;
 
-  const nextState = {
+  const nextStateWithoutLog = {
     ...state,
     players: state.players.map((player) => player.id === owner.id ? ownerAfterDraw : player),
     ...advancePendingAction(state),
+    log: state.log,
+  };
+  const nextStateWithIntrigues = requestedIntrigues > 0
+    ? drawIntrigueCards(nextStateWithoutLog, owner.id, requestedIntrigues, pending.source)
+    : nextStateWithoutLog;
+  const nextState = {
+    ...nextStateWithIntrigues,
     log: [
       `${owner.leader} resolves ${pending.source}: discards ${discardedCard.name} and ${drawnCardsText(requestedDraws, drawnCards)}.`,
-      ...state.log,
+      ...nextStateWithIntrigues.log,
     ],
   };
   return applyDiscardedFromHandTriggers(nextState, owner.id, discardedCard, { logAfterCurrentAction: true });

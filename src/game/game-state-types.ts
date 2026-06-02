@@ -235,6 +235,10 @@ export type PendingAction =
         requiredDiscardTrait: string;
         drawCards: number;
       };
+      bonusIntrigues?: {
+        requiredDiscardTrait: string;
+        amount: number;
+      };
     }
   | {
       kind: "lose-influence-for-intrigues";

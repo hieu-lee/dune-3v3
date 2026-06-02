@@ -365,6 +365,10 @@ export type GameEffectSpec =
         requiredDiscardTrait: string;
         drawCards: EffectAmountSpec;
       };
+      bonusIntrigues?: {
+        requiredDiscardTrait: string;
+        amount: EffectAmountSpec;
+      };
     }
   | {
       kind: "opponents-discard-cards";

@@ -89,6 +89,10 @@ type PendingDiscardDrawPanelProps = {
     requiredDiscardTrait: string;
     drawCards: number;
   };
+  bonusIntrigues?: {
+    requiredDiscardTrait: string;
+    amount: number;
+  };
   optional: boolean;
   owner?: Player;
   source: string;
@@ -100,6 +104,10 @@ function cardCountText(count: number) {
   return `${count} card${count === 1 ? "" : "s"}`;
 }
 
+function intrigueCountText(count: number) {
+  return `${count} Intrigue card${count === 1 ? "" : "s"}`;
+}
+
 function traitLabel(trait: string) {
   return trait.startsWith("Faction: ") ? trait.slice("Faction: ".length) : trait;
 }
@@ -108,20 +116,44 @@ function baseDrawText(drawCards: number) {
   return drawCards > 0 ? `Discard 1 card to draw ${cardCountText(drawCards)}` : "Discard 1 card";
 }
 
-function bonusDrawText(bonusDraw: PendingDiscardDrawPanelProps["bonusDraw"], baseDrawCards: number) {
-  if (!bonusDraw) return undefined;
+function bonusRewardTexts(
+  bonusDraw: PendingDiscardDrawPanelProps["bonusDraw"],
+  bonusIntrigues: PendingDiscardDrawPanelProps["bonusIntrigues"],
+  baseDrawCards: number,
+) {
   const suffix = baseDrawCards > 0 ? " more" : "";
-  return `Discard a ${traitLabel(bonusDraw.requiredDiscardTrait)} card to draw ${bonusDraw.drawCards}${suffix} card${bonusDraw.drawCards === 1 ? "" : "s"}`;
+  if (
+    bonusDraw &&
+    bonusIntrigues &&
+    bonusDraw.requiredDiscardTrait === bonusIntrigues.requiredDiscardTrait
+  ) {
+    return [
+      `Discard a ${traitLabel(bonusDraw.requiredDiscardTrait)} card to draw ${bonusDraw.drawCards}${suffix} card${bonusDraw.drawCards === 1 ? "" : "s"} and draw ${intrigueCountText(bonusIntrigues.amount)}`,
+    ];
+  }
+  return [
+    bonusDraw
+      ? `Discard a ${traitLabel(bonusDraw.requiredDiscardTrait)} card to draw ${bonusDraw.drawCards}${suffix} card${bonusDraw.drawCards === 1 ? "" : "s"}`
+      : undefined,
+    bonusIntrigues
+      ? `Discard a ${traitLabel(bonusIntrigues.requiredDiscardTrait)} card to draw ${intrigueCountText(bonusIntrigues.amount)}`
+      : undefined,
+  ].filter((part): part is string => Boolean(part));
 }
 
-function selectedDrawSuffix(totalDrawCards: number) {
-  return totalDrawCards > 0 ? ` (${cardCountText(totalDrawCards)})` : " (no cards)";
+function selectedDrawSuffix(totalDrawCards: number, totalIntrigues: number) {
+  const parts = [
+    totalDrawCards > 0 ? cardCountText(totalDrawCards) : undefined,
+    totalIntrigues > 0 ? intrigueCountText(totalIntrigues) : undefined,
+  ].filter((part): part is string => Boolean(part));
+  return parts.length > 0 ? ` (${parts.join(", ")})` : " (no cards)";
 }
 
 export function PendingDiscardDrawPanel({
   discardChoices,
   drawCards,
   bonusDraw,
+  bonusIntrigues,
   optional,
   owner,
   source,
@@ -133,15 +165,19 @@ export function PendingDiscardDrawPanel({
   const selectedBonusDraw = selectedCard && bonusDraw && selectedCard.traits?.includes(bonusDraw.requiredDiscardTrait)
     ? bonusDraw.drawCards
     : 0;
+  const selectedBonusIntrigues =
+    selectedCard && bonusIntrigues && selectedCard.traits?.includes(bonusIntrigues.requiredDiscardTrait)
+      ? bonusIntrigues.amount
+      : 0;
   const totalDrawCards = drawCards + selectedBonusDraw;
-  const bonusText = bonusDrawText(bonusDraw, drawCards);
+  const bonusTexts = bonusRewardTexts(bonusDraw, bonusIntrigues, drawCards);
 
   return (
     <div className="pending-controls trade-intrigue-grid">
       <div className="trade-intrigue-column">
         <strong>{owner?.leader ?? "Player"}</strong>
         <span>{baseDrawText(drawCards)}</span>
-        {bonusText && <span>{bonusText}</span>}
+        {bonusTexts.map((bonusText) => <span key={bonusText}>{bonusText}</span>)}
         {discardChoices.length === 0 && <span>No discardable cards</span>}
         {discardChoices.map((card) => (
           <button
@@ -165,7 +201,7 @@ export function PendingDiscardDrawPanel({
           if (selectedCard) onResolve(selectedCard.id);
         }}
       >
-        Resolve {source}{selectedCard ? selectedDrawSuffix(totalDrawCards) : ""}
+        Resolve {source}{selectedCard ? selectedDrawSuffix(totalDrawCards, selectedBonusIntrigues) : ""}
       </button>
       {optional && <button type="button" onClick={onSkip}>Skip</button>}
     </div>

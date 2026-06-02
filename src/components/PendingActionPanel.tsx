@@ -861,6 +861,7 @@ export function PendingActionPanel({
       {pendingAction.kind === "discard-card-for-draw" && (
         <PendingDiscardDrawPanel
           bonusDraw={pendingAction.bonusDraw}
+          bonusIntrigues={pendingAction.bonusIntrigues}
           discardChoices={pendingDiscardDrawChoices}
           drawCards={pendingAction.drawCards}
           optional={pendingAction.optional}

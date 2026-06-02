@@ -476,6 +476,36 @@ export async function runCardChoicesSmoke({
     "Guild Envoy should draw two cards after discarding a Spacing Guild card",
   );
 
+  await setDebugGameAndWait(page, states.guildSpy);
+  pendingText = await page.locator(".pending-panel").innerText();
+  const guildSpyDiscardName = states.guildSpy.guildSpyDiscardName;
+  const guildSpyDiscardId = states.guildSpy.guildSpyDiscardId;
+  const guildSpyDrawId = states.guildSpy.guildSpyDrawId;
+  const guildSpyIntrigueId = states.guildSpy.guildSpyIntrigueId;
+  assert.match(pendingText, /Guild Spy/i);
+  assert.match(pendingText, new RegExp(escapeRegExp(guildSpyDiscardName)));
+  assert.match(pendingText, /Intrigue card/i);
+  await screenshot(page, captures, "pending-guild-spy-discard-draw.png");
+
+  await page.locator(".pending-panel").getByRole("button", { name: guildSpyDiscardName }).click();
+  const guildSpyResolveButton = page
+    .locator(".pending-panel")
+    .getByRole("button", { name: "Resolve Guild Spy (1 card, 1 Intrigue card)" });
+  assert.equal(await guildSpyResolveButton.isVisible(), true, "Guild Spy resolve button should include card and Intrigue rewards");
+  await guildSpyResolveButton.click();
+  await waitForNoPending(page);
+  after = await currentGame(page);
+  ownerAfter = after.players.find((player) => player.id === "p2");
+  assert.equal(ownerAfter.discard.at(-1).id, guildSpyDiscardId, "Guild Spy should discard the selected card");
+  assert.ok(
+    ownerAfter.hand.some((card) => card.id === guildSpyDrawId),
+    "Guild Spy should draw one card after discarding a Spacing Guild card",
+  );
+  assert.ok(
+    ownerAfter.intrigues.some((card) => card.id === guildSpyIntrigueId),
+    "Guild Spy should draw an Intrigue after discarding a Spacing Guild card",
+  );
+
   await setDebugGameAndWait(page, states.covertOperation);
   pendingText = await page.locator(".pending-panel").innerText();
   const covertOperationDiscardName = states.covertOperation.covertOperationDiscardName;
@@ -585,6 +615,8 @@ async function createCardChoiceStates(server, initialPlayableGame) {
   assert.ok(spaceTimeFolding, "Expected Space-time Folding Imperium card");
   const guildEnvoy = data.imperiumDeck.find((card) => card.sourceId === 38);
   assert.ok(guildEnvoy, "Expected Guild Envoy Imperium card");
+  const guildSpy = data.imperiumDeck.find((card) => card.sourceId === 43);
+  assert.ok(guildSpy, "Expected Guild Spy Imperium card");
   const ecologicalTestingStation = data.imperiumDeck.find((card) => card.sourceId === 46);
   assert.ok(ecologicalTestingStation, "Expected Ecological Testing Station Imperium card");
   const covertOperation = data.imperiumDeck.find((card) => card.sourceId === 35);
@@ -622,6 +654,14 @@ async function createCardChoiceStates(server, initialPlayableGame) {
   };
   const guildEnvoyDrawOne = { ...data.allyStarterCards[3], id: "browser-guild-envoy-draw-one-card" };
   const guildEnvoyDrawTwo = { ...data.allyStarterCards[4], id: "browser-guild-envoy-draw-two-card" };
+  const guildSpyDiscard = {
+    ...spaceTimeFolding,
+    id: "browser-guild-spy-discard-card",
+    name: "Guild Spy Spacing Guild Card",
+  };
+  const guildSpyDraw = { ...data.allyStarterCards[0], id: "browser-guild-spy-draw-card" };
+  const guildSpyBoardIntrigue = { ...data.intrigueCards[0], id: "browser-guild-spy-board-intrigue-card" };
+  const guildSpyBonusIntrigue = { ...data.intrigueCards[1], id: "browser-guild-spy-bonus-intrigue-card" };
   const ecologicalTestingStationDrawOne = {
     ...data.allyStarterCards[0],
     id: "browser-ecological-testing-station-draw-one-card",
@@ -850,6 +890,34 @@ async function createCardChoiceStates(server, initialPlayableGame) {
     },
   );
   assert.equal(guildEnvoyState.pendingAction?.kind, "discard-card-for-draw", "Expected Guild Envoy discard-draw pending action");
+  const guildSpyState = turnActions.placeAgentAction(
+    {
+      ...base,
+      intrigueDeck: [guildSpyBoardIntrigue, guildSpyBonusIntrigue],
+      intrigueDiscard: [],
+      players: base.players.map((player) =>
+        player.id === ownerId
+          ? {
+              ...player,
+              agentsReady: 1,
+              deck: [guildSpyDraw],
+              discard: [],
+              hand: [guildSpy, guildSpyDiscard],
+              intrigues: [],
+              playArea: [],
+              resources: { solari: 0, spice: 0, water: 0 },
+            }
+          : player,
+      ),
+    },
+    {
+      commanderTargets: {},
+      selectedCard: guildSpy,
+      selectedSpace: spyPlaceAfterRecallSpace,
+    },
+  );
+  assert.equal(guildSpyState.pendingAction?.kind, "discard-card-for-draw", "Expected Guild Spy discard-draw pending action");
+  assert.equal(guildSpyState.pendingAction.bonusIntrigues?.amount, 1, "Expected Guild Spy Intrigue bonus in browser state");
   const ecologicalTestingStationState = turnActions.placeAgentAction(
     {
       ...base,
@@ -1379,6 +1447,13 @@ async function createCardChoiceStates(server, initialPlayableGame) {
       guildEnvoyDiscardName: guildEnvoyDiscard.name,
       guildEnvoyDrawOneId: guildEnvoyDrawOne.id,
       guildEnvoyDrawTwoId: guildEnvoyDrawTwo.id,
+    },
+    guildSpy: {
+      ...guildSpyState,
+      guildSpyDiscardId: guildSpyDiscard.id,
+      guildSpyDiscardName: guildSpyDiscard.name,
+      guildSpyDrawId: guildSpyDraw.id,
+      guildSpyIntrigueId: guildSpyBonusIntrigue.id,
     },
     ecologicalTestingStation: {
       ...ecologicalTestingStationState,

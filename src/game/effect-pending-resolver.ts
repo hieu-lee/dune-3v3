@@ -264,6 +264,14 @@ export function resolveAgentDiscardCardForDraws(
               },
             }
           : {}),
+        ...(effect.bonusIntrigues
+          ? {
+              bonusIntrigues: {
+                requiredDiscardTrait: effect.bonusIntrigues.requiredDiscardTrait,
+                amount: amountFor(effect.bonusIntrigues.amount, context.source),
+              },
+            }
+          : {}),
       }));
   });
 }

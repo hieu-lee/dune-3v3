@@ -125,6 +125,10 @@ export function agentDiscardCardForDraw(
       requiredDiscardTrait: string;
       drawCards: EffectAmountSpec;
     };
+    bonusIntrigues?: {
+      requiredDiscardTrait: string;
+      amount: EffectAmountSpec;
+    };
   } = {},
   conditions?: GameEffectConditionSpec[],
 ): CardEffectSpec {
@@ -135,6 +139,7 @@ export function agentDiscardCardForDraw(
       drawCards,
       optional: options.optional ?? false,
       ...(options.bonusDraw ? { bonusDraw: { ...options.bonusDraw } } : {}),
+      ...(options.bonusIntrigues ? { bonusIntrigues: { ...options.bonusIntrigues } } : {}),
     },
   ], conditions);
 }

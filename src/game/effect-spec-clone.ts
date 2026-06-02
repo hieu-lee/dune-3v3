@@ -69,6 +69,9 @@ export function cloneCardEffects(effects: CardEffectSpec[] | undefined): CardEff
         ...("bonusDraw" in effect && effect.bonusDraw
           ? { bonusDraw: { ...effect.bonusDraw, drawCards: cloneAmount(effect.bonusDraw.drawCards) } }
           : {}),
+        ...("bonusIntrigues" in effect && effect.bonusIntrigues
+          ? { bonusIntrigues: { ...effect.bonusIntrigues, amount: cloneAmount(effect.bonusIntrigues.amount) } }
+          : {}),
         ...("influenceAmount" in effect
           ? { influenceAmount: cloneAmount(effect.influenceAmount) }
           : {}),

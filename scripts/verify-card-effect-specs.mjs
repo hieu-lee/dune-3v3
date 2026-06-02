@@ -3405,6 +3405,7 @@ try {
       "Ecological Testing Station",
       "Fedaykin Stilltent",
       "Guild Envoy",
+      "Guild Spy",
       "Hidden Missive",
       "Imperial Spymaster",
       "In High Places",
@@ -4580,6 +4581,33 @@ try {
       )
     ),
     "Guild Envoy should carry a declarative Agent discard-for-draw spec with only a Spacing Guild bonus",
+  );
+  assert.equal(
+    guildSpy.play,
+    "Discard 1 card to draw 1 card. If you discarded a Spacing Guild card, draw 1 Intrigue card.",
+    "Guild Spy play text should preserve its conditional discard-draw Intrigue effect",
+  );
+  assert.equal(guildSpy.reveal, "+2 persuasion.", "Guild Spy should keep its fixed reveal persuasion");
+  assert.ok(
+    guildSpy.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.effects.some((effect) => effect.kind === "gain-persuasion" && effect.amount === 2)
+    ),
+    "Guild Spy should carry its printed persuasion in Reveal specs",
+  );
+  assert.ok(
+    guildSpy.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.effects.some((effect) =>
+        effect.kind === "discard-card-for-draw" &&
+        effect.selector === "self" &&
+        effect.drawCards === 1 &&
+        effect.optional === false &&
+        effect.bonusIntrigues?.requiredDiscardTrait === "Faction: Spacing Guild" &&
+        effect.bonusIntrigues?.amount === 1
+      )
+    ),
+    "Guild Spy should carry a declarative Agent discard-for-draw spec with a Spacing Guild Intrigue bonus",
   );
   assert.equal(
     spacingGuildFavor.play,
@@ -8636,6 +8664,44 @@ try {
     /Invalid effect amount "-1"/,
     "Discard-for-draw specs should reject negative bonus draw amounts",
   );
+  const invalidDiscardDrawBonusIntriguesTraitCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-discard-draw-bonus-intrigues-trait-card",
+    name: "Effect Spec Invalid Discard Draw Bonus Intrigues Trait",
+    effects: [agentSpec([{
+      kind: "discard-card-for-draw",
+      selector: "self",
+      drawCards: 1,
+      bonusIntrigues: {
+        requiredDiscardTrait: "",
+        amount: 1,
+      },
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidDiscardDrawBonusIntriguesTraitCard, p2, p2),
+    /Invalid discard-card-for-draw bonusIntrigues requiredDiscardTrait ""/,
+    "Discard-for-draw specs should reject empty bonus Intrigue trait labels",
+  );
+  const invalidDiscardDrawBonusIntriguesAmountCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-discard-draw-bonus-intrigues-amount-card",
+    name: "Effect Spec Invalid Discard Draw Bonus Intrigues Amount",
+    effects: [agentSpec([{
+      kind: "discard-card-for-draw",
+      selector: "self",
+      drawCards: 1,
+      bonusIntrigues: {
+        requiredDiscardTrait: "Faction: Spacing Guild",
+        amount: -1,
+      },
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidDiscardDrawBonusIntriguesAmountCard, p2, p2),
+    /Invalid effect amount "-1"/,
+    "Discard-for-draw specs should reject negative bonus Intrigue amounts",
+  );
   const revealOpponentDiscardCard = {
     ...convincingArgument,
     id: "effect-spec-reveal-opponent-discard-card",
@@ -10829,6 +10895,106 @@ try {
     game,
   );
   assert.equal(guildEnvoyReveal.persuasion, 1, "Guild Envoy should reveal for 1 persuasion through specs");
+
+  const guildSpyNonGuildDiscard = { ...dagger, id: "guild-spy-non-guild-discard-card", traits: [] };
+  const guildSpyDrawOne = { ...convincingArgument, id: "guild-spy-draw-one-card" };
+  const guildSpyDrawTwo = { ...convincingArgument, id: "guild-spy-draw-two-card" };
+  const guildSpyBoardIntrigue = { ...backedByChoam, id: "guild-spy-board-intrigue-card" };
+  const guildSpyBonusIntrigue = { ...buyAccess, id: "guild-spy-bonus-intrigue-card" };
+  const guildSpyNonGuildFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 1,
+    deck: [guildSpyDrawOne, guildSpyDrawTwo],
+    discard: [],
+    hand: [guildSpy, guildSpyNonGuildDiscard],
+    playArea: [],
+    resources: { solari: 0, spice: 0, water: 0 },
+  }));
+  const guildSpyNonGuildPlaced = turnActions.placeAgentAction(
+    { ...guildSpyNonGuildFixture, intrigueDeck: [guildSpyBoardIntrigue, guildSpyBonusIntrigue], intrigueDiscard: [] },
+    {
+      commanderTargets: {},
+      selectedCard: guildSpy,
+      selectedSpace: secrets,
+    },
+  );
+  assert.equal(guildSpyNonGuildPlaced.pendingAction?.kind, "discard-card-for-draw", "Guild Spy should queue discard-for-draw after Agent placement");
+  assert.equal(guildSpyNonGuildPlaced.pendingAction?.drawCards, 1, "Guild Spy should draw one card before its trait bonus");
+  assert.equal(
+    guildSpyNonGuildPlaced.pendingAction?.bonusIntrigues?.requiredDiscardTrait,
+    "Faction: Spacing Guild",
+    "Guild Spy should preserve its Spacing Guild bonus Intrigue trait",
+  );
+  assert.equal(guildSpyNonGuildPlaced.pendingAction?.bonusIntrigues?.amount, 1, "Guild Spy should draw one bonus Intrigue");
+  const guildSpyNonGuildIntriguesBefore = playerById(guildSpyNonGuildPlaced, p2.id).intrigues.length;
+  const guildSpyNonGuildResolved = state.resolveDiscardCardForDrawChoice(
+    guildSpyNonGuildPlaced,
+    guildSpyNonGuildPlaced.pendingAction,
+    guildSpyNonGuildDiscard.id,
+  );
+  const guildSpyNonGuildOwner = playerById(guildSpyNonGuildResolved, p2.id);
+  assert.equal(guildSpyNonGuildOwner.discard.at(-1).id, guildSpyNonGuildDiscard.id, "Guild Spy should discard the selected non-Guild card");
+  assert.ok(
+    guildSpyNonGuildOwner.hand.some((card) => card.id === guildSpyDrawOne.id),
+    "Guild Spy should draw one card when the discarded card is not Spacing Guild",
+  );
+  assert.equal(
+    guildSpyNonGuildOwner.hand.some((card) => card.id === guildSpyDrawTwo.id),
+    false,
+    "Guild Spy should not draw an extra card from its Intrigue bonus",
+  );
+  assert.equal(
+    guildSpyNonGuildOwner.intrigues.length,
+    guildSpyNonGuildIntriguesBefore,
+    "Guild Spy should not add an Intrigue when the discarded card is not Spacing Guild",
+  );
+  assert.equal(
+    guildSpyNonGuildOwner.intrigues.some((card) => card.id === guildSpyBonusIntrigue.id),
+    false,
+    "Guild Spy should not draw its bonus Intrigue when the discarded card is not Spacing Guild",
+  );
+  assert.match(guildSpyNonGuildResolved.log[0], /Guild Spy: discards .* and draws 1 card/);
+
+  const guildSpyGuildDiscard = { ...spaceTimeFolding, id: "guild-spy-guild-discard-card" };
+  const guildSpyGuildFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 1,
+    deck: [guildSpyDrawOne, guildSpyDrawTwo],
+    discard: [],
+    hand: [guildSpy, guildSpyGuildDiscard],
+    playArea: [],
+    resources: { solari: 0, spice: 0, water: 0 },
+  }));
+  const guildSpyGuildPlaced = turnActions.placeAgentAction(
+    { ...guildSpyGuildFixture, intrigueDeck: [guildSpyBoardIntrigue, guildSpyBonusIntrigue], intrigueDiscard: [] },
+    {
+      commanderTargets: {},
+      selectedCard: guildSpy,
+      selectedSpace: secrets,
+    },
+  );
+  const guildSpyGuildIntriguesBefore = playerById(guildSpyGuildPlaced, p2.id).intrigues.length;
+  const guildSpyGuildResolved = state.resolveDiscardCardForDrawChoice(
+    guildSpyGuildPlaced,
+    guildSpyGuildPlaced.pendingAction,
+    guildSpyGuildDiscard.id,
+  );
+  const guildSpyGuildOwner = playerById(guildSpyGuildResolved, p2.id);
+  assert.ok(
+    guildSpyGuildOwner.hand.some((card) => card.id === guildSpyDrawOne.id),
+    "Guild Spy should draw its base card after discarding a Spacing Guild card",
+  );
+  assert.equal(
+    guildSpyGuildOwner.hand.some((card) => card.id === guildSpyDrawTwo.id),
+    false,
+    "Guild Spy should not convert its Intrigue bonus into an extra card draw",
+  );
+  assert.ok(
+    guildSpyGuildOwner.intrigues.some((card) => card.id === guildSpyBonusIntrigue.id),
+    "Guild Spy should draw one Intrigue after discarding a Spacing Guild card",
+  );
+  assert.equal(guildSpyGuildOwner.intrigues.length, guildSpyGuildIntriguesBefore + 1);
+  assert.match(guildSpyGuildResolved.log[0], /Guild Spy: discards .* and draws 1 card/);
+  assert.match(guildSpyGuildResolved.log[1], /draws an Intrigue card from Guild Spy/);
+  assert.equal(guildSpyGuildResolved.intrigueDeck.some((card) => card.id === guildSpyBonusIntrigue.id), false);
 
   const spacingGuildFavorDraw = { ...convincingArgument, id: "spacing-guild-favor-agent-draw-card" };
   const spacingGuildFavorAgentEffect = state.applyCardAgentEffect(

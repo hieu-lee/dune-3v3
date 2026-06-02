@@ -166,6 +166,10 @@ export type AgentDiscardCardForDraw = {
     requiredDiscardTrait: string;
     drawCards: number;
   };
+  bonusIntrigues?: {
+    requiredDiscardTrait: string;
+    amount: number;
+  };
 };
 
 export type AgentOpponentsDiscardCards = {

@@ -385,6 +385,16 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
         attributeNumber(card, "Persuasion on reveal"),
         attributeNumber(card, "Swords"),
       ) ?? []),
+      ...(card.id === guildSpySourceId
+        ? [
+            agentDiscardCardForDraw(1, {
+              bonusIntrigues: {
+                requiredDiscardTrait: "Faction: Spacing Guild",
+                amount: 1,
+              },
+            }),
+          ]
+        : []),
       ...(card.id === inHighPlacesSourceId
         ? [
             agentDrawCards(1, inHighPlacesAgentCondition),
@@ -560,6 +570,9 @@ function imperiumPlayText(card: HubCard) {
   }
   if (card.id === guildEnvoySourceId) {
     return "Discard 1 card. If you discarded a Spacing Guild card, draw 2 cards.";
+  }
+  if (card.id === guildSpySourceId) {
+    return "Discard 1 card to draw 1 card. If you discarded a Spacing Guild card, draw 1 Intrigue card.";
   }
   if (card.id === spacingGuildFavorSourceId) {
     return "Draw 1 card. When discarded from hand, gain 2 spice.";

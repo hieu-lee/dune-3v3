@@ -1,13 +1,12 @@
 import { effectiveRequirementInfluence } from "./board-rules";
 import {
   isBackedByChoamIntrigue,
-  isSpiceIsPowerIntrigue,
   isTacticalOptionIntrigue,
   isWeirdingCombatIntrigue,
 } from "./card-identifiers";
 import { playerHasConflictUnits } from "./conflict-rules";
 import { resolveCombatSpyRecallForStrengths, resolveGameEffects } from "./effect-resolver";
-import type { GameState, IntrigueCard, Player } from "./types";
+import type { GameState, IntrigueCard, Player, ResourceId, Resources } from "./types";
 
 function allyHasUnitsInConflict(player: Player) {
   return player.role === "Ally" && playerHasConflictUnits(player);
@@ -23,6 +22,18 @@ function canActInCombat(state: GameState, player: Player) {
   if (!state.conflict) return false;
   if (allyHasUnitsInConflict(player)) return true;
   return player.role === "Commander" && commanderHasCombatAlly(state, player);
+}
+
+function spentResourceEntries(resources: Partial<Resources>) {
+  return (Object.entries(resources) as Array<[ResourceId, number | undefined]>)
+    .filter((entry): entry is [ResourceId, number] => (entry[1] ?? 0) > 0);
+}
+
+function canPayCombatSpentResources(actor: Player, target: Player | undefined, spentResources: Partial<Resources>) {
+  const entries = spentResourceEntries(spentResources);
+  if (entries.length === 0) return true;
+  const owner = actor.role === "Commander" ? target : actor;
+  return Boolean(owner && entries.every(([resource, amount]) => owner.resources[resource] >= amount));
 }
 
 export function combatIntrigueActorIds(state: GameState) {
@@ -44,7 +55,7 @@ export function combatIntrigueStrength(
     target,
     state,
   });
-  if (resolved.swords > 0) return resolved.swords;
+  if (resolved.swords > 0 && canPayCombatSpentResources(actor, target, resolved.spentResources)) return resolved.swords;
   const mandatoryRecallStrength = resolveCombatSpyRecallForStrengths(intrigue.effects, {
     trigger: "combat-intrigue",
     choiceId,
@@ -56,10 +67,6 @@ export function combatIntrigueStrength(
     .reduce((total, effect) => total + effect.strength, 0);
   if (mandatoryRecallStrength > 0) return mandatoryRecallStrength;
   if (intrigue.automatedCombatSwords) return intrigue.automatedCombatSwords;
-  if (isSpiceIsPowerIntrigue(intrigue)) {
-    const effectOwner = actor.role === "Commander" ? target : actor;
-    return effectOwner && effectOwner.resources.spice >= 3 ? 6 : undefined;
-  }
   if (isTacticalOptionIntrigue(intrigue)) return 2;
   if (isWeirdingCombatIntrigue(intrigue)) {
     return effectiveRequirementInfluence(actor, "bene", state.players) >= 3 ? 5 : 3;

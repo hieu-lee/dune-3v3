@@ -3,7 +3,6 @@ import {
   combatIntrigueTargets,
 } from "./combat-intrigue-rules";
 import {
-  isSpiceIsPowerIntrigue,
   isTacticalOptionIntrigue,
 } from "./card-identifiers";
 import {
@@ -36,10 +35,13 @@ import type {
   IntrigueCard,
   PendingAction,
   Player,
+  ResourceId,
+  Resources,
 } from "./types";
 
-export type SpiceIsPowerChoice = "spend-spice" | "retreat-troops";
-export type TacticalOptionChoice = "add-strength" | { kind: "retreat-troops"; count: number };
+type SelectedRetreatTroopsChoice = { kind: "retreat-troops"; count: number };
+export type SpiceIsPowerChoice = "spend-spice" | SelectedRetreatTroopsChoice;
+export type TacticalOptionChoice = "add-strength" | SelectedRetreatTroopsChoice;
 export type CombatIntrigueChoice = SpiceIsPowerChoice | TacticalOptionChoice;
 
 type AcquireCardPendingAction = Extract<PendingAction, { kind: "acquire-card" }>;
@@ -49,6 +51,7 @@ type RecallSpyPendingAction = Extract<PendingAction, { kind: "recall-spy" }>;
 type SpyPendingAction = Extract<PendingAction, { kind: "spy" }>;
 type TrashCardPendingAction = Extract<PendingAction, { kind: "trash-card" }>;
 type AdvanceAfterCombatIntriguePlay = (state: GameState) => GameState;
+type ResourceAdjustment = { resource: ResourceId; amount: number };
 
 function combatChoiceIdFor(choice: CombatIntrigueChoice | undefined) {
   if (choice === "add-strength" || choice === "spend-spice") return choice;
@@ -77,6 +80,46 @@ function combatEffectContext(
     source: actor,
     target,
     state,
+  };
+}
+
+function resourceAdjustments(resources: Partial<Resources>): ResourceAdjustment[] {
+  return (Object.entries(resources) as Array<[ResourceId, number | undefined]>)
+    .filter((entry): entry is [ResourceId, number] => (entry[1] ?? 0) > 0)
+    .map(([resource, amount]) => ({ resource, amount }));
+}
+
+function formatResourceAdjustments(adjustments: ResourceAdjustment[]) {
+  return adjustments.map(({ amount, resource }) => `${amount} ${resource}`).join(" and ");
+}
+
+function canSpendResourceAdjustments(player: Player, adjustments: ResourceAdjustment[]) {
+  return adjustments.every(({ resource, amount }) => player.resources[resource] >= amount);
+}
+
+function applyResourceAdjustments(player: Player, spends: ResourceAdjustment[], gains: ResourceAdjustment[]) {
+  if (spends.length === 0 && gains.length === 0) return player;
+  const resources = { ...player.resources };
+  spends.forEach(({ resource, amount }) => {
+    resources[resource] -= amount;
+  });
+  gains.forEach(({ resource, amount }) => {
+    resources[resource] += amount;
+  });
+  return { ...player, resources };
+}
+
+function resolveCombatResourceAdjustments(
+  state: GameState,
+  intrigue: IntrigueCard,
+  actor: Player,
+  target: Player,
+  combatChoice: CombatIntrigueChoice | undefined,
+) {
+  const resolved = resolveGameEffects(intrigue.effects, combatEffectContext(state, actor, target, combatChoice));
+  return {
+    spends: resourceAdjustments(resolved.spentResources),
+    gains: resourceAdjustments(resolved.revealGain),
   };
 }
 
@@ -389,45 +432,6 @@ export function resolvePlayCombatIntrigue(
   if (!resolvedTargetId || !targets.includes(resolvedTargetId)) return state;
   const target = state.players.find((player) => player.id === resolvedTargetId);
   if (!target) return state;
-  if (isSpiceIsPowerIntrigue(intrigue)) {
-    if (combatChoice !== "spend-spice" && combatChoice !== "retreat-troops") return state;
-    if (combatChoice === "spend-spice" && target.resources.spice < 3) return state;
-    if (combatChoice === "retreat-troops" && target.deployedTroops < 3) return state;
-
-    const players = state.players.map((player) => {
-      let next = player;
-      if (player.id === actor.id) {
-        next = { ...next, intrigues: next.intrigues.filter((card) => card.id !== intrigue.id) };
-      }
-      if (player.id === target.id && combatChoice === "spend-spice") {
-        next = {
-          ...next,
-          conflict: next.conflict + 6,
-          resources: { ...next.resources, spice: next.resources.spice - 3 },
-        };
-      }
-      if (player.id === target.id && combatChoice === "retreat-troops") {
-        next = {
-          ...next,
-          conflict: Math.max(0, next.conflict - 6),
-          deployedTroops: next.deployedTroops - 3,
-          garrison: next.garrison + 3,
-          resources: { ...next.resources, spice: next.resources.spice + 3 },
-        };
-      }
-      return next;
-    });
-    const logEntry = combatChoice === "spend-spice"
-      ? `${actor.leader} plays Spice is Power for ${target.leader}; ${target.leader} spends 3 spice to add 6 strength.`
-      : `${actor.leader} plays Spice is Power for ${target.leader}; ${target.leader} retreats 3 troops and gains 3 spice.`;
-    return advanceAfterCombatIntriguePlay({
-      ...state,
-      players,
-      combatPasses: [],
-      intrigueDiscard: [...state.intrigueDiscard, intrigue],
-      log: [logEntry, ...state.log],
-    });
-  }
   if (isTacticalOptionIntrigue(intrigue)) {
     const retreatCount =
       typeof combatChoice === "object" && combatChoice.kind === "retreat-troops" ? combatChoice.count : undefined;
@@ -475,10 +479,14 @@ export function resolvePlayCombatIntrigue(
   const combatSpyPlacement = resolveCombatSpyPlacementPendingActions(state, intrigue, actor, target, combatChoice);
   const combatSpyRecall = resolveCombatSpyRecallPendingActions(state, intrigue, actor, target, combatChoice);
   const combatTrash = resolveCombatTrashPendingActions(state, intrigue, actor, target, combatChoice);
+  const combatResources = resolveCombatResourceAdjustments(state, intrigue, actor, target, combatChoice);
   if (selectedRetreatChoiceRequested(combatChoice) && combatRetreat.retreats.length === 0) return state;
   if (combatRetreat.retreats.some((retreat) => retreat.count <= 0 || retreat.count > target.deployedTroops)) return state;
+  if (!canSpendResourceAdjustments(target, combatResources.spends)) return state;
   if (
     !combatSwords &&
+    combatResources.spends.length === 0 &&
+    combatResources.gains.length === 0 &&
     combatRetreat.logTexts.length === 0 &&
     combatAcquire.logTexts.length === 0 &&
     combatInfluenceLoss.logTexts.length === 0 &&
@@ -511,6 +519,9 @@ export function resolvePlayCombatIntrigue(
         garrison: next.garrison + immediateRetreat.count,
       };
     }
+    if (player.id === target.id) {
+      next = applyResourceAdjustments(next, combatResources.spends, combatResources.gains);
+    }
     return next;
   });
   const pendingActions: PendingAction[] = [];
@@ -529,12 +540,18 @@ export function resolvePlayCombatIntrigue(
     pendingQueue: pendingActions.slice(1),
   };
   const effectTexts = [
-    ...(immediateCombatSwords === 0 && requiredSpyRecallStrength > 0
-      ? [`preparing to add ${requiredSpyRecallStrength} strength`]
-      : combatSwords
-        ? [`adding ${combatSwords} strength`]
-        : []),
+    ...(combatResources.spends.length > 0 && immediateCombatSwords > 0
+      ? [`${target.leader} spends ${formatResourceAdjustments(combatResources.spends)} to add ${immediateCombatSwords} strength`]
+      : immediateCombatSwords === 0 && requiredSpyRecallStrength > 0
+        ? [`preparing to add ${requiredSpyRecallStrength} strength`]
+        : combatSwords
+          ? [`adding ${combatSwords} strength`]
+          : []),
     ...combatRetreat.logTexts,
+    ...(combatResources.spends.length > 0 && immediateCombatSwords <= 0
+      ? [`${target.leader} spends ${formatResourceAdjustments(combatResources.spends)}`]
+      : []),
+    ...(combatResources.gains.length > 0 ? [`gains ${formatResourceAdjustments(combatResources.gains)}`] : []),
     ...combatInfluenceLoss.logTexts,
     ...combatContract.logTexts,
     ...combatTrash.logTexts,

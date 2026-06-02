@@ -138,12 +138,24 @@ try {
   );
   const commanderSpiceSpend = state.startCombatPhase(commanderSpiceSpendFixture);
   assert.equal(
-    state.combatIntrigueStrength(commanderSpiceSpend, playerById(commanderSpiceSpend, "p4"), spiceIsPower),
+    state.combatIntrigueStrength(
+      commanderSpiceSpend,
+      playerById(commanderSpiceSpend, "p4"),
+      spiceIsPower,
+      undefined,
+      "spend-spice",
+    ),
     undefined,
     "Commander Spice is Power should need a target before checking spend-branch spice",
   );
   assert.equal(
-    state.combatIntrigueStrength(commanderSpiceSpend, playerById(commanderSpiceSpend, "p4"), spiceIsPower, playerById(commanderSpiceSpend, "p6")),
+    state.combatIntrigueStrength(
+      commanderSpiceSpend,
+      playerById(commanderSpiceSpend, "p4"),
+      spiceIsPower,
+      playerById(commanderSpiceSpend, "p6"),
+      "spend-spice",
+    ),
     6,
     "Commander Spice is Power should use the target Ally's spice for the spend branch",
   );
@@ -185,7 +197,7 @@ try {
     "p4",
     spiceIsPower.id,
     "p6",
-    "retreat-troops",
+    { kind: "retreat-troops", count: 3 },
   );
   assert.equal(playerById(commanderSpiceRetreated, "p6").deployedTroops, 0, "Commander Spice is Power should retreat the target Ally's troops");
   assert.equal(playerById(commanderSpiceRetreated, "p6").garrison, 3);

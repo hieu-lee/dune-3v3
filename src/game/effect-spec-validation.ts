@@ -213,7 +213,13 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
   }
   if (effect.kind === "gain-resource") {
-    if (trigger !== "agent-play" && trigger !== "reveal" && trigger !== "acquire" && trigger !== "plot-intrigue") {
+    if (
+      trigger !== "agent-play" &&
+      trigger !== "reveal" &&
+      trigger !== "acquire" &&
+      trigger !== "plot-intrigue" &&
+      trigger !== "combat-intrigue"
+    ) {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
     }
     if (!supportedResources.has(effect.resource)) {
@@ -224,7 +230,7 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     return;
   }
   if (effect.kind === "spend-resource") {
-    if (trigger !== "plot-intrigue") {
+    if (trigger !== "plot-intrigue" && trigger !== "combat-intrigue") {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
     }
     if (effect.selector !== "self") {

@@ -76,6 +76,43 @@ export async function runCombatIntriguesSmoke({
   await screenshot(page, captures, "combat-intrigues-go-to-ground-pending.png");
 
   await setDebugGameAndWait(page, states.commander);
+  const beforeSpiceIsPower = await currentGame(page);
+  const gurneyBeforeSpiceIsPower = playerById(beforeSpiceIsPower, "p3");
+  await combatCard(page, "Spice is Power").getByRole("button", { name: "Gurney Halleck: spend 3 (+6)" }).click();
+  await page.waitForFunction(() => {
+    const game = window.__DUNE_DEBUG__?.getGame();
+    const activePlayer = game?.players[game.activeSeat];
+    const gurney = game?.players.find((player) => player.id === "p3");
+    const muadDib = game?.players.find((player) => player.id === "p1");
+    return Boolean(
+      game &&
+        !game.pendingAction &&
+        activePlayer?.id === "p3" &&
+        gurney?.conflict === 12 &&
+        gurney?.resources.spice === 1 &&
+        !muadDib?.intrigues.some((card) => card.name === "Spice is Power"),
+    );
+  });
+  const afterSpiceIsPower = await currentGame(page);
+  const gurneyAfterSpiceIsPower = playerById(afterSpiceIsPower, "p3");
+  assert.equal(
+    gurneyAfterSpiceIsPower.conflict,
+    gurneyBeforeSpiceIsPower.conflict + 6,
+    "Spice is Power should add 6 strength through its typed spend branch",
+  );
+  assert.equal(
+    gurneyAfterSpiceIsPower.resources.spice,
+    gurneyBeforeSpiceIsPower.resources.spice - 3,
+    "Spice is Power should spend the recipient's spice through its typed spend branch",
+  );
+  assert.equal(
+    gurneyAfterSpiceIsPower.deployedTroops,
+    gurneyBeforeSpiceIsPower.deployedTroops,
+    "Spice is Power spend branch should not retreat troops",
+  );
+  await screenshot(page, captures, "combat-intrigues-spice-is-power-spend.png");
+
+  await setDebugGameAndWait(page, states.commander);
   const beforeImpress = await currentGame(page);
   const gurneyBeforeImpress = playerById(beforeImpress, "p3");
   await combatCard(page, "Impress").getByRole("button", { name: "Gurney Halleck: +2 + acquire" }).click();

@@ -53,6 +53,7 @@ import {
   reliableInformantSourceId,
   sardaukarSoldierSourceId,
   shaddamsFavorSourceId,
+  spiceIsPowerSourceId,
   specialMissionSourceId,
   sietchRitualSourceId,
   southernEldersSourceId,
@@ -88,10 +89,12 @@ import {
   agentRecruitTroops,
   combatAcquireCard,
   combatGainStrength,
+  combatGainResource,
   combatLoseInfluenceForStrength,
   combatPlaceSpies,
   combatRecallSpiesForStrength,
   combatRetreatTroops,
+  combatSpendResource,
   combatTakeContracts,
   combatTrashCard,
   deployedUnitsThisTurn,
@@ -1032,6 +1035,14 @@ function intrigueCardEffects(card: HubCard): CardEffectSpec[] | undefined {
     return [
       combatRetreatTroops(1, 2, { source: "Go To Ground" }, undefined, { choiceId: "retreat-troops" }),
       combatPlaceSpies(1, { source: "Go To Ground" }, undefined, { choiceId: "retreat-troops" }),
+    ];
+  }
+  if (card.id === spiceIsPowerSourceId) {
+    return [
+      combatRetreatTroops(3, 3, { source: "Spice is Power" }, undefined, { choiceId: "retreat-troops" }),
+      combatGainResource("spice", 3, { source: "Spice is Power" }, undefined, { choiceId: "retreat-troops" }),
+      combatSpendResource("spice", 3, { source: "Spice is Power" }, undefined, { choiceId: "spend-spice" }),
+      combatGainStrength(6, undefined, { choiceId: "spend-spice" }),
     ];
   }
   if (card.id === questionableMethodsSourceId) {

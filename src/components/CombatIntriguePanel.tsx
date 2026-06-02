@@ -231,7 +231,7 @@ function CombatIntrigueTarget({
                 {target.deployedTroops >= 3 && (
                   <button
                     type="button"
-                    onClick={() => onPlay(card.id, target.id, "retreat-troops")}
+                    onClick={() => onPlay(card.id, target.id, { kind: "retreat-troops", count: 3 })}
                     title={`Retreat 3 troops from ${target.leader} to gain 3 spice`}
                   >
                     {actor.role === "Commander" ? `${target.leader}: retreat 3` : "Retreat 3 troops (+3 spice)"}

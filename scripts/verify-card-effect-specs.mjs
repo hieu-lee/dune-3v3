@@ -197,6 +197,7 @@ try {
   const questionableMethods = data.intrigueCards.find((card) => card.name === "Questionable Methods");
   const reachAgreement = data.intrigueCards.find((card) => card.name === "Reach Agreement");
   const shaddamsFavor = data.intrigueCards.find((card) => card.name === "Shaddam's Favor");
+  const spiceIsPower = data.intrigueCards.find((card) => card.name === "Spice is Power");
   const specialMission = data.intrigueCards.find((card) => card.name === "Special Mission");
   const springTheTrap = data.intrigueCards.find((card) => card.name === "Spring The Trap");
   const sietchRitual = data.intrigueCards.find((card) => card.name === "Sietch Ritual");
@@ -269,7 +270,7 @@ try {
     wheelsWithinWheels,
   );
   assert.ok(commandRespect && prepareTheWay && spiceMustFlow && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
-  assert.ok(backedByChoam && buyAccess && callToArms && changeAllegiances && councilorsAmbition && contingencyPlan && cunning && departForArrakis && devour && distraction && findWeakness && goToGround && impress && imperiumPolitics && inspireAwe && intelligenceReport && leverage && manipulate && marketOpportunity && mercenaries && opportunism && questionableMethods && reachAgreement && shaddamsFavor && specialMission && springTheTrap && sietchRitual && strategicStockpiling && weirdingCombat);
+  assert.ok(backedByChoam && buyAccess && callToArms && changeAllegiances && councilorsAmbition && contingencyPlan && cunning && departForArrakis && devour && distraction && findWeakness && goToGround && impress && imperiumPolitics && inspireAwe && intelligenceReport && leverage && manipulate && marketOpportunity && mercenaries && opportunism && questionableMethods && reachAgreement && shaddamsFavor && spiceIsPower && specialMission && springTheTrap && sietchRitual && strategicStockpiling && weirdingCombat);
   assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && dutifulService && deliverSupplies && sietchTabr && spiceRefinery);
   assert.equal(revealSpecCards.length, 79, "Unexpected number of cards with declarative Reveal specs");
   assert.equal(
@@ -526,6 +527,100 @@ try {
     [],
     "Go To Ground spy-placement spec should remain gated by the selected-retreat choice",
   );
+  assert.ok(
+    spiceIsPower.effects?.some((spec) =>
+      spec.trigger === "combat-intrigue" &&
+      spec.choiceId === "retreat-troops" &&
+      spec.effects.some((effect) =>
+        effect.kind === "retreat-troops" &&
+        effect.selector === "self" &&
+        effect.min === 3 &&
+        effect.max === 3 &&
+        effect.source === "Spice is Power"
+      )
+    ),
+    "Spice is Power should carry a typed exact Combat troop-retreat spec",
+  );
+  assert.ok(
+    spiceIsPower.effects?.some((spec) =>
+      spec.trigger === "combat-intrigue" &&
+      spec.choiceId === "retreat-troops" &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-resource" &&
+        effect.selector === "self" &&
+        effect.resource === "spice" &&
+        effect.amount === 3 &&
+        effect.source === "Spice is Power"
+      )
+    ),
+    "Spice is Power should carry a typed Combat spice gain spec",
+  );
+  assert.ok(
+    spiceIsPower.effects?.some((spec) =>
+      spec.trigger === "combat-intrigue" &&
+      spec.choiceId === "spend-spice" &&
+      spec.effects.some((effect) =>
+        effect.kind === "spend-resource" &&
+        effect.selector === "self" &&
+        effect.resource === "spice" &&
+        effect.amount === 3 &&
+        effect.source === "Spice is Power"
+      )
+    ),
+    "Spice is Power should carry a typed Combat spice spend spec",
+  );
+  assert.ok(
+    spiceIsPower.effects?.some((spec) =>
+      spec.trigger === "combat-intrigue" &&
+      spec.choiceId === "spend-spice" &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-strength" &&
+        effect.selector === "self" &&
+        effect.amount === 6
+      )
+    ),
+    "Spice is Power should carry a typed spend-branch Combat strength spec",
+  );
+  const spiceIsPowerRetreatContext = {
+    trigger: "combat-intrigue",
+    choiceId: "retreat-troops",
+    selectedTroopCount: 3,
+    source: p2,
+    target: p2,
+    state: game,
+  };
+  assert.deepEqual(
+    effectResolver.resolveCombatRetreatTroops(spiceIsPower.effects, spiceIsPowerRetreatContext),
+    [{ selector: "self", count: 3, min: 3, max: 3, source: "Spice is Power" }],
+    "Spice is Power retreat branch should resolve exactly three selected troops",
+  );
+  assert.deepEqual(
+    effectResolver.resolveGameEffects(spiceIsPower.effects, spiceIsPowerRetreatContext).revealGain,
+    { spice: 3 },
+    "Spice is Power retreat branch should resolve its typed spice gain",
+  );
+  const spiceIsPowerSpendResolved = effectResolver.resolveGameEffects(spiceIsPower.effects, {
+    trigger: "combat-intrigue",
+    choiceId: "spend-spice",
+    source: p2,
+    target: p2,
+    state: game,
+  });
+  assert.equal(spiceIsPowerSpendResolved.swords, 6, "Spice is Power spend branch should resolve typed Combat strength");
+  assert.deepEqual(
+    spiceIsPowerSpendResolved.spentResources,
+    { spice: 3 },
+    "Spice is Power spend branch should resolve its typed spice spend",
+  );
+  const spiceIsPowerNoChoice = effectResolver.resolveGameEffects(spiceIsPower.effects, {
+    trigger: "combat-intrigue",
+    source: p2,
+    target: p2,
+    state: game,
+  });
+  assert.equal(spiceIsPowerNoChoice.swords, 0, "Spice is Power specs should remain choice-gated");
+  assert.deepEqual(spiceIsPowerNoChoice.revealGain, {}, "Spice is Power should not gain spice without a branch choice");
+  assert.deepEqual(spiceIsPowerNoChoice.spentResources, {}, "Spice is Power should not spend spice without a branch choice");
   assert.ok(
     hasCombatEffect(questionableMethods, (effect) =>
       effect.kind === "gain-strength" &&

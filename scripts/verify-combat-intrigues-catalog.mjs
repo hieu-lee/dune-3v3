@@ -140,6 +140,60 @@ export function verifyCombatIntrigueCatalog({ cards, data, state }) {
     "Retreat 3 troops to gain 3 spice OR spend 3 spice to add 6 strength.",
     "Spice is Power should expose both printed Combat branches",
   );
+  assert.ok(
+    spiceIsPower.effects?.some((spec) =>
+      spec.trigger === "combat-intrigue" &&
+      spec.choiceId === "retreat-troops" &&
+      spec.effects.some((effect) =>
+        effect.kind === "retreat-troops" &&
+        effect.selector === "self" &&
+        effect.min === 3 &&
+        effect.max === 3 &&
+        effect.source === "Spice is Power"
+      )
+    ),
+    "Spice is Power should carry a typed exact Combat troop-retreat spec",
+  );
+  assert.ok(
+    spiceIsPower.effects?.some((spec) =>
+      spec.trigger === "combat-intrigue" &&
+      spec.choiceId === "retreat-troops" &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-resource" &&
+        effect.selector === "self" &&
+        effect.resource === "spice" &&
+        effect.amount === 3 &&
+        effect.source === "Spice is Power"
+      )
+    ),
+    "Spice is Power should carry a typed Combat spice gain spec",
+  );
+  assert.ok(
+    spiceIsPower.effects?.some((spec) =>
+      spec.trigger === "combat-intrigue" &&
+      spec.choiceId === "spend-spice" &&
+      spec.effects.some((effect) =>
+        effect.kind === "spend-resource" &&
+        effect.selector === "self" &&
+        effect.resource === "spice" &&
+        effect.amount === 3 &&
+        effect.source === "Spice is Power"
+      )
+    ),
+    "Spice is Power should carry a typed Combat spice spend spec",
+  );
+  assert.ok(
+    spiceIsPower.effects?.some((spec) =>
+      spec.trigger === "combat-intrigue" &&
+      spec.choiceId === "spend-spice" &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-strength" &&
+        effect.selector === "self" &&
+        effect.amount === 6
+      )
+    ),
+    "Spice is Power should carry a typed spend-branch Combat strength spec",
+  );
   assert.equal(tacticalOption.combatSwords, 2, "Tactical Option should expose its structured Combat strength");
   assert.equal(
     tacticalOption.summary,
@@ -316,7 +370,7 @@ export function verifyCombatIntrigueCatalog({ cards, data, state }) {
   assert.equal(findWeakness.automatedCombatSwords, undefined, "Find Weakness should resolve through typed Combat spy-recall state");
   assert.equal(goToGround.automatedCombatSwords, undefined, "Go To Ground should resolve through typed Combat retreat and spy-placement specs");
   assert.equal(questionableMethods.automatedCombatSwords, undefined, "Questionable Methods should resolve through typed Combat Influence-loss state");
-  assert.equal(spiceIsPower.automatedCombatSwords, undefined, "Spice is Power should resolve through an explicit branch choice");
+  assert.equal(spiceIsPower.automatedCombatSwords, undefined, "Spice is Power should resolve through typed Combat resource and retreat branch specs");
   assert.equal(tacticalOption.automatedCombatSwords, undefined, "Tactical Option should resolve through an explicit branch choice");
   assert.equal(reachAgreement.automatedCombatSwords, undefined, "Reach Agreement should resolve through typed Combat retreat and contract specs");
   assert.equal(springTheTrap.automatedCombatSwords, undefined, "Spring The Trap should resolve through typed Combat spy-recall state");

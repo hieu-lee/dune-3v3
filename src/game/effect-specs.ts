@@ -100,6 +100,46 @@ export function combatGainStrength(
   return combatIntrigueEffects([{ kind: "gain-strength", selector: "self", amount }], conditions, options);
 }
 
+export function combatGainResource(
+  resource: ResourceId,
+  amount: EffectAmountSpec,
+  options: {
+    source?: string;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+  specOptions?: CardEffectSpecOptions,
+): CardEffectSpec {
+  return combatIntrigueEffects([
+    {
+      kind: "gain-resource",
+      selector: "self",
+      resource,
+      amount,
+      ...(options.source ? { source: options.source } : {}),
+    },
+  ], conditions, specOptions);
+}
+
+export function combatSpendResource(
+  resource: ResourceId,
+  amount: EffectAmountSpec,
+  options: {
+    source?: string;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+  specOptions?: CardEffectSpecOptions,
+): CardEffectSpec {
+  return combatIntrigueEffects([
+    {
+      kind: "spend-resource",
+      selector: "self",
+      resource,
+      amount,
+      ...(options.source ? { source: options.source } : {}),
+    },
+  ], conditions, specOptions);
+}
+
 export function combatAcquireCard(
   destination: AcquireCardDestination,
   maxCost: EffectAmountSpec,

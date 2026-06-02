@@ -14,6 +14,17 @@ export function verifyCombatIntrigueRetreatBranches({ cards: { spiceIsPower, tac
   const spiceSpendCombat = state.startCombatPhase(spiceSpendFixture);
   assert.equal(
     state.combatIntrigueStrength(spiceSpendCombat, playerById(spiceSpendCombat, "p2"), spiceIsPower),
+    undefined,
+    "Spice is Power should require an explicit branch choice before exposing strength",
+  );
+  assert.equal(
+    state.combatIntrigueStrength(
+      spiceSpendCombat,
+      playerById(spiceSpendCombat, "p2"),
+      spiceIsPower,
+      playerById(spiceSpendCombat, "p2"),
+      "spend-spice",
+    ),
     6,
     "Spice is Power should expose the spend branch when the recipient has 3 spice",
   );
@@ -40,7 +51,13 @@ export function verifyCombatIntrigueRetreatBranches({ cards: { spiceIsPower, tac
   );
   const spiceDryCombat = state.startCombatPhase(spiceDryFixture);
   assert.equal(
-    state.combatIntrigueStrength(spiceDryCombat, playerById(spiceDryCombat, "p2"), spiceIsPower),
+    state.combatIntrigueStrength(
+      spiceDryCombat,
+      playerById(spiceDryCombat, "p2"),
+      spiceIsPower,
+      playerById(spiceDryCombat, "p2"),
+      "spend-spice",
+    ),
     undefined,
     "Spice is Power should not expose the spend branch before the recipient has 3 spice",
   );
@@ -65,7 +82,22 @@ export function verifyCombatIntrigueRetreatBranches({ cards: { spiceIsPower, tac
     ),
   );
   const spiceRetreatCombat = state.startCombatPhase(spiceRetreatFixture);
-  const spiceRetreatPlayed = state.playCombatIntrigue(spiceRetreatCombat, "p2", spiceIsPower.id, undefined, "retreat-troops");
+  assert.equal(
+    state.playCombatIntrigue(spiceRetreatCombat, "p2", spiceIsPower.id, undefined, "retreat-troops"),
+    spiceRetreatCombat,
+    "Spice is Power should reject the legacy retreat branch string without an explicit troop count",
+  );
+  assert.equal(
+    state.playCombatIntrigue(spiceRetreatCombat, "p2", spiceIsPower.id, undefined, { kind: "retreat-troops", count: 2 }),
+    spiceRetreatCombat,
+    "Spice is Power retreat branch should require exactly 3 troops",
+  );
+  assert.equal(
+    state.playCombatIntrigue(spiceRetreatCombat, "p2", spiceIsPower.id, undefined, { kind: "retreat-troops", count: 3.5 }),
+    spiceRetreatCombat,
+    "Spice is Power retreat branch should reject fractional troop counts",
+  );
+  const spiceRetreatPlayed = state.playCombatIntrigue(spiceRetreatCombat, "p2", spiceIsPower.id, undefined, { kind: "retreat-troops", count: 3 });
   assert.equal(playerById(spiceRetreatPlayed, "p2").deployedTroops, 0, "Spice is Power should retreat three troops");
   assert.equal(playerById(spiceRetreatPlayed, "p2").garrison, 4, "Spice is Power should return retreated troops to garrison");
   assert.equal(playerById(spiceRetreatPlayed, "p2").resources.spice, 3, "Spice is Power retreat branch should gain 3 spice");
@@ -86,7 +118,7 @@ export function verifyCombatIntrigueRetreatBranches({ cards: { spiceIsPower, tac
     "p2",
     spiceIsPower.id,
     undefined,
-    "retreat-troops",
+    { kind: "retreat-troops", count: 3 },
   );
   assert.equal(spiceLastActorPlayed.phase, "playing", "Retreating the last units should resolve Combat instead of leaving no actors");
   assert.equal(spiceLastActorPlayed.round, spiceLastActorFixture.round + 1);

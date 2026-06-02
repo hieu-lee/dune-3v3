@@ -143,7 +143,7 @@ try {
   );
   assert.ok(commandRespect && prepareTheWay && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
   assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && dutifulService && deliverSupplies);
-  assert.equal(revealSpecCards.length, 36, "Unexpected number of cards with declarative Reveal specs");
+  assert.equal(revealSpecCards.length, 37, "Unexpected number of cards with declarative Reveal specs");
   assert.deepEqual(
     [
       ...data.reserveMarket,
@@ -178,6 +178,7 @@ try {
       calculus,
       capturedMentat,
       fedaykinStilltent,
+      northernWatermaster,
       reliableInformant,
 	    beneGesseritOperative,
 	    chani,
@@ -533,6 +534,30 @@ try {
       spec.effects.some((effect) => effect.kind === "gain-resource" && effect.resource === "water" && effect.amount === 1)
     ),
     "Northern Watermaster should carry a water Agent spec",
+  );
+  assert.equal(
+    northernWatermaster.reveal,
+    "+1 persuasion. Fremen Bond: gain 2 spice.",
+    "Northern Watermaster reveal text should include its Fremen Bond spice reward",
+  );
+  assert.ok(
+    northernWatermaster.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.effects.some((effect) => effect.kind === "gain-persuasion" && effect.amount === 1)
+    ),
+    "Northern Watermaster should carry its printed persuasion in Reveal specs",
+  );
+  assert.ok(
+    northernWatermaster.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.conditions?.some((condition) =>
+        condition.kind === "has-card-trait-in-play" &&
+        condition.trait === "Faction: Fremen" &&
+        condition.count === 2
+      ) &&
+      spec.effects.some((effect) => effect.kind === "gain-resource" && effect.resource === "spice" && effect.amount === 2)
+    ),
+    "Northern Watermaster should carry a Fremen Bond Reveal spice spec",
   );
   assert.ok(
     paracompass.effects?.some((spec) =>
@@ -2881,6 +2906,31 @@ try {
   );
   assert.deepEqual(northernWatermasterEffect.source.resources, { solari: 0, spice: 0, water: 1 }, "Northern Watermaster should gain 1 Agent water");
   assert.match(northernWatermasterEffect.log ?? "", /Northern Watermaster: gains 1 water/);
+  const northernSoloReveal = turnActions.revealTurnPlan(
+    { ...p2, hand: [northernWatermaster], highCouncilSeat: false },
+    game,
+  );
+  assert.equal(northernSoloReveal.persuasion, 1, "Northern Watermaster should always reveal for 1 persuasion");
+  assert.deepEqual(northernSoloReveal.revealGain, {}, "Northern Watermaster Fremen Bond should not trigger by itself");
+  const northernHandBondReveal = turnActions.revealTurnPlan(
+    { ...p2, hand: [northernWatermaster, fremenSupportCard], highCouncilSeat: false },
+    game,
+  );
+  assert.equal(northernHandBondReveal.persuasion, 1, "Northern Watermaster Fremen Bond support should not add persuasion");
+  assert.deepEqual(
+    northernHandBondReveal.revealGain,
+    { spice: 2 },
+    "Northern Watermaster Fremen Bond should gain 2 spice with another revealed Fremen card",
+  );
+  const northernPlayAreaBondReveal = turnActions.revealTurnPlan(
+    { ...p2, hand: [northernWatermaster], playArea: [fremenSupportCard], highCouncilSeat: false },
+    game,
+  );
+  assert.deepEqual(
+    northernPlayAreaBondReveal.revealGain,
+    { spice: 2 },
+    "Northern Watermaster Fremen Bond should count a Fremen card already in play",
+  );
   const paracompassEffect = state.applyCardAgentEffect(
     paracompass,
     { ...p2, resources: { solari: 0, spice: 0, water: 0 } },

@@ -220,6 +220,9 @@ function imperiumRevealText(card: HubCard, persuasion: number, swords: number, p
   if (card.id === fedaykinStilltentSourceId) {
     return "Gain 1 water.";
   }
+  if (card.id === northernWatermasterSourceId) {
+    return "+1 persuasion. Fremen Bond: gain 2 spice.";
+  }
   if (card.id === doubleAgentSourceId) {
     return "+1 persuasion and +1 strength.";
   }
@@ -313,7 +316,11 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
     return [agentDrawCards(1)];
   }
   if (card.id === northernWatermasterSourceId) {
-    return [agentGainResource("water", 1)];
+    return [
+      revealGainPersuasion(1),
+      revealGainResource("spice", 2, [hasCardTraitInPlay("Faction: Fremen", 2)]),
+      agentGainResource("water", 1),
+    ];
   }
   if (card.id === paracompassSourceId) {
     return [agentGainResource("solari", 2)];

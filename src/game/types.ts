@@ -261,6 +261,16 @@ export type GameEffectSpec =
   | { kind: "move-card-to-throne-row"; selector: PlayerSelector; source?: string }
   | { kind: "manipulate-row-card"; selector: PlayerSelector; source?: string }
   | {
+      kind: "recall-spy";
+      selector: PlayerSelector;
+      source?: string;
+      reward?: {
+        resource: ResourceId;
+        amount: EffectAmountSpec;
+      };
+      removeShieldWall?: boolean;
+    }
+  | {
       kind: "place-spies";
       selector: PlayerSelector;
       amount: EffectAmountSpec;

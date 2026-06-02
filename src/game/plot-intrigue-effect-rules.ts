@@ -14,9 +14,12 @@ import {
 } from "./leader-rewards";
 import { acquirableCardsForPending, activatedAllyEffectOwner } from "./market-rules";
 import { pendingActionForSpyPlacements } from "./spy-effect-pending-rules";
+import { playerHasSpyPost, removeSpyPostOwner } from "./spy-posts";
 import { trashableCardsForPending } from "./trash-rules";
+import { boardSpaces } from "./data";
 import type {
   AcquireCardDestination,
+  BoardSpace,
   Card,
   FactionId,
   GameState,
@@ -34,6 +37,7 @@ type PlayTypedPlotIntrigueOptions = {
   discardCardId?: string;
   requireActivatedAlly?: boolean;
   targetCardId?: string;
+  targetSpaceId?: string;
 };
 
 type TypedPlotIntrigueOutcome = {
@@ -42,6 +46,7 @@ type TypedPlotIntrigueOutcome = {
   cardsDrawn: number;
   discardedCard?: Card;
   manipulatedCard?: Card;
+  recalledSpySpace?: BoardSpace;
 };
 
 type AcquireCardPendingAction = Extract<PendingAction, { kind: "acquire-card" }>;
@@ -171,6 +176,22 @@ function rowManipulationFor(
   return { card: manipulatedCard, imperiumRow, marketDeck };
 }
 
+function selectedSpyRecallFor(
+  state: GameState,
+  player: Player,
+  recalls: ReturnType<typeof resolveGameEffects>["spyRecalls"],
+): { space: BoardSpace; spyPosts: GameState["spyPosts"]; sharedSpyPosts: GameState["sharedSpyPosts"] } | undefined {
+  if (recalls.length === 0) return undefined;
+  if (recalls.length > 1) throw new Error("Unsupported multiple Plot Intrigue spy recall effects");
+  const [recall] = recalls;
+  const space = boardSpaces.find((candidate) => candidate.id === recall.spaceId);
+  if (!space || !playerHasSpyPost(state, space.id, player.id)) return undefined;
+  return {
+    space,
+    ...removeSpyPostOwner(state, space.id, player.id),
+  };
+}
+
 function canApplyInfluenceAdjustments(
   source: Player,
   activatedAlly: Player | undefined,
@@ -230,6 +251,10 @@ export function playTypedPlotIntrigue(
   if (!player || player.id !== playerId) return state;
   const intrigue = player.intrigues.find((card) => card.id === intrigueId);
   if (!intrigue || !isExpectedIntrigue(intrigue)) return state;
+  const targetSpace = options.targetSpaceId
+    ? boardSpaces.find((space) => space.id === options.targetSpaceId)
+    : undefined;
+  if (options.targetSpaceId && !targetSpace) return state;
 
   const activatedAllyResult = options.requireActivatedAlly || options.activatedAllyOwnerId
     ? activatedAllyEffectOwner(state, player, options.activatedAllyOwnerId)
@@ -241,6 +266,7 @@ export function playTypedPlotIntrigue(
     choiceId: options.choiceId,
     source: player,
     target: activatedAlly,
+    ...(targetSpace ? { space: targetSpace } : {}),
     state,
   };
   const resolved = resolveGameEffects(intrigue.effects, context);
@@ -261,6 +287,8 @@ export function playTypedPlotIntrigue(
   const [rowManipulationEffect] = rowManipulationEffects;
   const discardedCard = selectedDiscardCardFor(player, discardEffect, options.discardCardId);
   if (discardEffect && !discardedCard) return state;
+  const spyRecall = selectedSpyRecallFor(state, player, resolved.spyRecalls);
+  if (resolved.spyRecalls.length > 0 && !spyRecall) return state;
   const acquirePending = acquireCardPendingFor(state, player, intrigue, acquireEffect);
   const contractPending = publicContractPendingFor(state, player, intrigue, contractEffect);
   const spyPending = pendingActionForSpyPlacements(intrigue.name, player, resolved.spyPlacements, state);
@@ -274,6 +302,7 @@ export function playTypedPlotIntrigue(
   const hasIntrigueDraw = resolved.intriguesToDraw > 0;
   const hasResourceSpend = hasResourceSpends(resolved.spentResources);
   const hasInfluenceAdjustment = hasInfluenceAdjustments(resolved.influenceAdjustments);
+  const hasSpyRecall = Boolean(spyRecall);
   const hasVpGain = resolved.vp > 0;
   const hasAcquireRecruitBonus = resolved.acquireRecruitBonus > 0;
   if (resolved.acquireRecruitBonus > 1) {
@@ -287,6 +316,8 @@ export function playTypedPlotIntrigue(
     !hasInfluenceAdjustment &&
     !hasVpGain &&
     !hasTroopRecruits &&
+    !hasSpyRecall &&
+    !resolved.removeShieldWall &&
     !hasCardDraw &&
     !hasIntrigueDraw &&
     !hasAcquireRecruitBonus &&
@@ -306,6 +337,7 @@ export function playTypedPlotIntrigue(
     cardsDrawn: 0,
     discardedCard,
     manipulatedCard: rowManipulation?.card,
+    recalledSpySpace: spyRecall?.space,
   };
   let sourceAfterEffects: Player | undefined;
   const players = state.players.map((candidate) => {
@@ -320,6 +352,7 @@ export function playTypedPlotIntrigue(
         manipulatedCards: rowManipulation
           ? [...candidate.manipulatedCards, rowManipulation.card]
           : candidate.manipulatedCards,
+        spies: candidate.spies + (hasSpyRecall ? 1 : 0),
         intrigues: candidate.intrigues.filter((card) => card.id !== intrigue.id),
       };
       if (resolved.vp > 0) {
@@ -353,6 +386,9 @@ export function playTypedPlotIntrigue(
     players,
     imperiumRow: rowManipulation?.imperiumRow ?? state.imperiumRow,
     marketDeck: rowManipulation?.marketDeck ?? state.marketDeck,
+    shieldWall: resolved.removeShieldWall ? false : state.shieldWall,
+    spyPosts: spyRecall?.spyPosts ?? state.spyPosts,
+    sharedSpyPosts: spyRecall?.sharedSpyPosts ?? state.sharedSpyPosts,
     pendingAction: pendingActions[0],
     pendingQueue: pendingActions.slice(1),
   };

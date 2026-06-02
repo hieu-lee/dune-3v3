@@ -375,6 +375,53 @@ export async function runTableChoicesSmoke({
   assert.match(specialMissionAfter.log[0], /places a spy near .* from Special Mission/);
   await screenshot(page, captures, "special-mission-after-spy.png");
 
+  await setDebugGameAndWait(page, states.specialMissionRecallSpy);
+  await waitForActiveIntrigue(page, "Special Mission");
+  const specialMissionRecallCard = page.locator(".intrigue-card").filter({ hasText: "Special Mission" });
+  const specialMissionRecallButton = specialMissionRecallCard.getByRole("button", {
+    name: `${states.specialMissionRecallSpaceName} -> Wall + 2 Spice`,
+  });
+  assert.equal(await specialMissionRecallButton.count(), 1, "Expected one Special Mission recall-spy button");
+  assert.equal(await specialMissionRecallButton.isEnabled(), true, "Special Mission recall-spy should be playable");
+  await screenshot(page, captures, "special-mission-recall-ready.png");
+
+  const specialMissionRecallBefore = await currentGame(page);
+  const specialMissionRecallOwnerBefore = specialMissionRecallBefore.players.find((player) => player.id === "p2");
+  assert.ok(specialMissionRecallOwnerBefore, "Expected Feyd before Special Mission recall");
+  await specialMissionRecallButton.click();
+  await waitForNoPending(page);
+  const specialMissionRecallAfter = await currentGame(page);
+  const specialMissionRecallOwnerAfter = specialMissionRecallAfter.players.find((player) => player.id === "p2");
+  assert.ok(specialMissionRecallOwnerAfter, "Expected Feyd after Special Mission recall");
+  assert.equal(
+    specialMissionRecallAfter.spyPosts[states.specialMissionRecallSpaceId],
+    undefined,
+    "Special Mission recall should remove the selected spy post",
+  );
+  assert.equal(
+    specialMissionRecallOwnerAfter.spies,
+    specialMissionRecallOwnerBefore.spies + 1,
+    "Special Mission recall should return the spy to supply",
+  );
+  assert.equal(
+    specialMissionRecallOwnerAfter.resources.spice,
+    specialMissionRecallOwnerBefore.resources.spice + 2,
+    "Special Mission recall should gain 2 spice",
+  );
+  assert.equal(specialMissionRecallAfter.turnSpiceGains.p2, (specialMissionRecallBefore.turnSpiceGains.p2 ?? 0) + 2);
+  assert.equal(specialMissionRecallAfter.shieldWall, false, "Special Mission recall should remove the Shield Wall");
+  assert.equal(
+    specialMissionRecallOwnerAfter.intrigues.some((card) => card.name === "Special Mission"),
+    false,
+    "Special Mission recall browser flow should discard the played Intrigue",
+  );
+  assert.equal(specialMissionRecallAfter.intrigueDiscard.at(-1)?.name, "Special Mission");
+  assert.match(
+    specialMissionRecallAfter.log[0],
+    new RegExp(`plays Special Mission, recalls a spy from ${escapeRegExp(states.specialMissionRecallSpaceName)}, removes the Shield Wall, and gains 2 spice`),
+  );
+  await screenshot(page, captures, "special-mission-after-recall.png");
+
   await setDebugGameAndWait(page, states.changeAllegiancesAlly);
   await waitForActiveIntrigue(page, "Change Allegiances");
   const allyChangeCard = page.locator(".intrigue-card").filter({ hasText: "Change Allegiances" });
@@ -929,6 +976,36 @@ async function createTableChoiceStates(server, initialPlayableGame) {
   assert.ok(specialMissionPlayer, "Expected Feyd for Special Mission browser debug state");
   const specialMissionSpySpace = state.specialMissionCitySpySpaces(specialMissionPlaceSpy, specialMissionPlayer)[0];
   assert.ok(specialMissionSpySpace, "Expected a legal Special Mission City spy post for browser debug state");
+  const specialMissionRecallSeedSpace = data.boardSpaces.find((space) => space.icon !== "city");
+  assert.ok(specialMissionRecallSeedSpace, "Expected a non-City space for Special Mission recall browser debug state");
+  const specialMissionRecallSpy = {
+    ...base,
+    activeSeat: feydSeat,
+    intrigueDiscard: [],
+    shieldWall: true,
+    sharedSpyPosts: {},
+    spyPosts: { [specialMissionRecallSeedSpace.id]: "p2" },
+    turnSpiceGains: {},
+    players: base.players.map((player) =>
+      player.id === "p2"
+        ? {
+            ...player,
+            hand: [],
+            intrigues: [cloneCard(specialMission)],
+            resources: { ...player.resources, spice: 0 },
+            revealed: false,
+            spies: 2,
+          }
+        : { ...player, intrigues: [] }
+    ),
+  };
+  const specialMissionRecallPlayer = specialMissionRecallSpy.players.find((player) => player.id === "p2");
+  assert.ok(specialMissionRecallPlayer, "Expected Feyd for Special Mission recall browser debug state");
+  const specialMissionRecallSpace = state.specialMissionRecallSpySpaces(
+    specialMissionRecallSpy,
+    specialMissionRecallPlayer,
+  ).find((space) => space.id === specialMissionRecallSeedSpace.id);
+  assert.ok(specialMissionRecallSpace, "Expected a legal Special Mission recall spy post for browser debug state");
 
   return {
     revealAdjust: {
@@ -1133,6 +1210,9 @@ async function createTableChoiceStates(server, initialPlayableGame) {
     specialMissionPlaceSpy,
     specialMissionSpySpaceId: specialMissionSpySpace.id,
     specialMissionSpySpaceName: specialMissionSpySpace.name,
+    specialMissionRecallSpy,
+    specialMissionRecallSpaceId: specialMissionRecallSpace.id,
+    specialMissionRecallSpaceName: specialMissionRecallSpace.name,
     changeAllegiancesAlly: {
       ...base,
       activeSeat: feydSeat,

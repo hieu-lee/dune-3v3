@@ -723,6 +723,66 @@ try {
     "Special Mission Plot place-spy choice should resolve a mandatory City spy placement",
   );
   assert.ok(
+    specialMission.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.choiceId === "recall-spy" &&
+      spec.effects.some((effect) =>
+        effect.kind === "recall-spy" &&
+        effect.selector === "self" &&
+        effect.source === "Special Mission" &&
+        effect.reward?.resource === "spice" &&
+        effect.reward?.amount === 2 &&
+        effect.removeShieldWall === true
+      )
+    ),
+    "Special Mission should carry a typed Plot spy recall reward spec",
+  );
+  const specialMissionRecallWithoutSpaceResolved = effectResolver.resolveGameEffects(specialMission.effects, {
+    trigger: "plot-intrigue",
+    choiceId: "recall-spy",
+    source: p2,
+    state: game,
+  });
+  assert.deepEqual(
+    specialMissionRecallWithoutSpaceResolved.spyRecalls,
+    [],
+    "Special Mission Plot recall choice should not recall a spy without a selected space",
+  );
+  assert.deepEqual(
+    specialMissionRecallWithoutSpaceResolved.revealGain,
+    {},
+    "Special Mission Plot recall choice should not gain spice without a selected space",
+  );
+  assert.equal(
+    specialMissionRecallWithoutSpaceResolved.removeShieldWall,
+    false,
+    "Special Mission Plot recall choice should not remove the Shield Wall without a selected space",
+  );
+  const specialMissionRecallSpace = data.boardSpaces.find((space) => space.icon !== "city");
+  assert.ok(specialMissionRecallSpace, "Expected a non-City space for Special Mission recall spec verification");
+  const specialMissionRecallResolved = effectResolver.resolveGameEffects(specialMission.effects, {
+    trigger: "plot-intrigue",
+    choiceId: "recall-spy",
+    source: p2,
+    space: specialMissionRecallSpace,
+    state: game,
+  });
+  assert.deepEqual(
+    specialMissionRecallResolved.spyRecalls,
+    [{ spaceId: specialMissionRecallSpace.id, source: "Special Mission" }],
+    "Special Mission Plot recall choice should resolve the selected spy recall",
+  );
+  assert.deepEqual(
+    specialMissionRecallResolved.revealGain,
+    { spice: 2 },
+    "Special Mission Plot recall choice should resolve its spice reward",
+  );
+  assert.equal(
+    specialMissionRecallResolved.removeShieldWall,
+    true,
+    "Special Mission Plot recall choice should resolve Shield Wall removal",
+  );
+  assert.ok(
     hasPlotEffect(leverage, (effect) =>
       effect.kind === "gain-resource" &&
       effect.selector === "self" &&
@@ -4150,6 +4210,38 @@ try {
     }),
     /Unsupported effect selector "activated-ally" for plot-intrigue/,
     "Manipulate-row-card specs should currently target only the source player",
+  );
+  assert.throws(
+    () => effectResolver.resolveGameEffects(
+      [agentSpec([{ kind: "recall-spy", selector: "self", source: "Test" }])],
+      { trigger: "agent-play", source: p2, state: game },
+    ),
+    /Unsupported effect "recall-spy" for agent-play/,
+    "Recall-spy specs should stay on Plot Intrigues until other trigger resolvers support them",
+  );
+  assert.throws(
+    () => effectResolver.resolveGameEffects(
+      [plotSpec([{ kind: "recall-spy", selector: "activated-ally", source: "Test" }])],
+      { trigger: "plot-intrigue", source: p2, target: p4, state: game },
+    ),
+    /Unsupported effect selector "activated-ally" for plot-intrigue/,
+    "Recall-spy specs should currently target only the source player",
+  );
+  assert.throws(
+    () => effectResolver.resolveGameEffects(
+      [plotSpec([{ kind: "recall-spy", selector: "self", reward: { resource: "intrigue", amount: 1 } }])],
+      { trigger: "plot-intrigue", source: p2, state: game },
+    ),
+    /Unsupported effect resource "intrigue"/,
+    "Recall-spy specs should reject unsupported reward resources",
+  );
+  assert.throws(
+    () => effectResolver.resolveGameEffects(
+      [plotSpec([{ kind: "recall-spy", selector: "self", removeShieldWall: "yes" }])],
+      { trigger: "plot-intrigue", source: p2, state: game },
+    ),
+    /Invalid recall-spy removeShieldWall "yes"/,
+    "Recall-spy specs should reject non-boolean Shield Wall flags",
   );
   const invalidSpyPlacementSourceCard = {
     ...convincingArgument,

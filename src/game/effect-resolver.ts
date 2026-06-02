@@ -49,6 +49,11 @@ export type SpyPlacementEffectResult = {
   postPlacementAction?: "staban-unseen-network";
 };
 
+export type SpyRecallEffectResult = {
+  spaceId: string;
+  source?: string;
+};
+
 export type EffectResolverState = Partial<
   Pick<GameState, "alliances" | "players" | "roundMakerSpaceVisits" | "sharedSpyPosts" | "spyPosts" | "turnSpiceGains" | "turnUnitDeployments">
 >;
@@ -293,6 +298,8 @@ export type GameEffectResult = PlayerEffectResult & {
   influenceAdjustments: InfluenceAdjustmentEffect[];
   influenceLosses: Partial<Record<FactionId, number>>;
   persuasion: number;
+  removeShieldWall: boolean;
+  spyRecalls: SpyRecallEffectResult[];
   swords: number;
   vp: number;
 };
@@ -318,9 +325,11 @@ const emptyEffectResult: GameEffectResult = {
   intriguesToDraw: 0,
   recruitedTroops: 0,
   persuasion: 0,
+  removeShieldWall: false,
   revealGain: {},
   spentResources: {},
   spyPlacements: [],
+  spyRecalls: [],
   swords: 0,
   vp: 0,
   activatedAlly: emptyPlayerEffectResult,
@@ -800,6 +809,27 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
   if (effect.kind === "manipulate-row-card") {
     return result;
   }
+  if (effect.kind === "recall-spy") {
+    if (effect.selector !== "self") {
+      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
+    if (!context.space?.id) return result;
+    const rewardAmount = effect.reward ? amountFor(effect.reward.amount, context.source) : 0;
+    const withRecall = {
+      ...result,
+      removeShieldWall: result.removeShieldWall || effect.removeShieldWall === true,
+      spyRecalls: [
+        ...result.spyRecalls,
+        {
+          spaceId: context.space.id,
+          source: effect.source,
+        },
+      ],
+    };
+    return effect.reward
+      ? addSelectedRevealGain(withRecall, effect.selector, effect.reward.resource, rewardAmount, effect.source)
+      : withRecall;
+  }
   if (effect.kind === "place-spies") {
     const amount = amountFor(effect.amount, context.source);
     return addSelectedSpyPlacement(result, effect.selector, {
@@ -853,6 +883,7 @@ function mergeEffectResult(result: GameEffectResult, next: GameEffectResult): Ga
       next.recruitedTroopsSource,
     ),
     persuasion: result.persuasion + next.persuasion,
+    removeShieldWall: result.removeShieldWall || next.removeShieldWall,
     revealGain: Object.entries(next.revealGain).reduce(
       (gain, [resource, amount]) => addRevealGain(gain, resource as ResourceId, amount ?? 0),
       result.revealGain,
@@ -868,6 +899,7 @@ function mergeEffectResult(result: GameEffectResult, next: GameEffectResult): Ga
       result.spentResources,
     ),
     spyPlacements: [...result.spyPlacements, ...next.spyPlacements],
+    spyRecalls: [...result.spyRecalls, ...next.spyRecalls],
     swords: result.swords + next.swords,
     vp: result.vp + next.vp,
     activatedAlly: mergePlayerEffectResult(result.activatedAlly, next.activatedAlly),
@@ -1447,9 +1479,11 @@ function legacyRevealResult(card: Card): GameEffectResult {
     intriguesToDraw: 0,
     recruitedTroops: 0,
     persuasion: card.persuasion,
+    removeShieldWall: false,
     revealGain: card.revealGain ? { ...card.revealGain } : {},
     spentResources: {},
     spyPlacements: [],
+    spyRecalls: [],
     swords: card.swords,
     vp: 0,
     activatedAlly: emptyPlayerEffectResult,
@@ -1485,9 +1519,11 @@ function legacyAcquireResult(card: Card): GameEffectResult {
     intriguesToDraw: 0,
     recruitedTroops: 0,
     persuasion: 0,
+    removeShieldWall: false,
     revealGain: {},
     spentResources: {},
     spyPlacements: [],
+    spyRecalls: [],
     swords: 0,
     vp: card.acquired ?? 0,
     activatedAlly: emptyPlayerEffectResult,

@@ -102,6 +102,7 @@ import {
   plotPayResourceForInfluence,
   plotPayResourceForInfluenceGains,
   plotPlaceSpies,
+  plotRecallSpy,
   plotRecruitTroops,
   plotResourceExchange,
   plotShiftInfluence,
@@ -1047,6 +1048,11 @@ function intrigueCardEffects(card: HubCard): CardEffectSpec[] | undefined {
         placementIcon: "city",
         source: "Special Mission",
       }, undefined, { choiceId: "place-spy" }),
+      plotRecallSpy({
+        reward: { resource: "spice", amount: 2 },
+        removeShieldWall: true,
+        source: "Special Mission",
+      }, undefined, { choiceId: "recall-spy" }),
     ];
   }
   if (card.id === leverageSourceId) {

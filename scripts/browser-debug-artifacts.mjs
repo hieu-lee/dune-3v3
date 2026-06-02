@@ -117,6 +117,8 @@ const generatedScreenshotNames = [
   "special-mission-ready.png",
   "pending-special-mission-city-spy.png",
   "special-mission-after-spy.png",
+  "special-mission-recall-ready.png",
+  "special-mission-after-recall.png",
   "change-allegiances-ally-ready.png",
   "change-allegiances-ally-after.png",
   "change-allegiances-commander-ready.png",

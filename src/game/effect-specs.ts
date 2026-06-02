@@ -357,6 +357,21 @@ export function plotPlaceSpies(
   return plotIntrigueEffects([{ kind: "place-spies", selector: "self", amount, ...options }], conditions, specOptions);
 }
 
+export function plotRecallSpy(
+  options: {
+    source?: string;
+    reward?: {
+      resource: ResourceId;
+      amount: EffectAmountSpec;
+    };
+    removeShieldWall?: boolean;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+  specOptions?: CardEffectSpecOptions,
+): CardEffectSpec {
+  return plotIntrigueEffects([{ kind: "recall-spy", selector: "self", ...options }], conditions, specOptions);
+}
+
 export function acquireGainResource(
   resource: ResourceId,
   amount: EffectAmountSpec,

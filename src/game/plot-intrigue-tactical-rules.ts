@@ -19,9 +19,6 @@ import {
   specialMissionRecallSpySpaces,
 } from "./spy-pending-rules";
 import {
-  removeSpyPostOwner,
-} from "./spy-posts";
-import {
   recordTurnSpiceGain,
   recordTurnUnitDeployment,
 } from "./turn-trackers";
@@ -61,29 +58,18 @@ export function playSpecialMissionPlotIntrigue(
   if (choice.kind === "recall-spy") {
     const space = specialMissionRecallSpySpaces(state, player).find((candidate) => candidate.id === choice.spaceId);
     if (!space) return state;
-    const { spyPosts, sharedSpyPosts } = removeSpyPostOwner(state, space.id, player.id);
-    const shieldWallText = state.shieldWall ? ", removes the Shield Wall," : "";
-    return recordTurnSpiceGain({
-      ...state,
-      shieldWall: false,
-      spyPosts,
-      sharedSpyPosts,
-      players: state.players.map((candidate) =>
-        candidate.id === player.id
-          ? {
-              ...candidate,
-              resources: { ...candidate.resources, spice: candidate.resources.spice + 2 },
-              spies: candidate.spies + 1,
-              intrigues: candidate.intrigues.filter((card) => card.id !== intrigue.id),
-            }
-          : candidate,
-      ),
-      intrigueDiscard: [...state.intrigueDiscard, intrigue],
-      log: [
-        `${player.leader} plays Special Mission, recalls a spy from ${space.name}${shieldWallText} and gains 2 spice.`,
-        ...state.log,
-      ],
-    }, player.id, 2);
+    const nextState = playTypedPlotIntrigue(
+      state,
+      playerId,
+      intrigueId,
+      isSpecialMissionIntrigue,
+      (actor, _contractPending, _activatedAlly, resolved, outcome) => {
+        const shieldWallText = state.shieldWall && resolved.removeShieldWall ? ", removes the Shield Wall," : "";
+        return `${actor.leader} plays Special Mission, recalls a spy from ${outcome.recalledSpySpace?.name ?? space.name}${shieldWallText} and gains 2 spice.`;
+      },
+      { choiceId: "recall-spy", targetSpaceId: space.id },
+    );
+    return nextState !== state ? recordTurnSpiceGain(nextState, player.id, 2) : nextState;
   }
 
   return state;

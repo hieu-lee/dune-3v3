@@ -20,6 +20,7 @@ import {
   imperialSpymasterSourceId,
   junctionHeadquartersSourceId,
   leadershipSourceId,
+  longLiveTheFightersSourceId,
   makerKeeperSourceId,
   maulaPistolSourceId,
   northernWatermasterSourceId,
@@ -69,6 +70,7 @@ import {
   agentPlaceSpies,
   agentRecallAgent,
   agentRecruitTroops,
+  agentSelectTopDeckCards,
   agentTrashCards,
   agentTrashIntrigueForReward,
   agentTrashSource,
@@ -362,6 +364,19 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
       agentDrawIntrigues(1, [hasConflictUnits(3)]),
       revealGainPersuasion(2, [hasCardTraitInPlay("Faction: Fremen", 2)]),
       revealRetreatTroopsForStrength(2, 4),
+    ];
+  }
+  if (card.id === longLiveTheFightersSourceId) {
+    return [
+      agentSelectTopDeckCards({
+        lookCards: 3,
+        drawCards: 1,
+        discardCards: 1,
+        trashCards: 1,
+        minimumDeckCards: 3,
+      }),
+      revealGainPersuasion(2),
+      revealGainStrength(3),
     ];
   }
   if (card.id === maulaPistolSourceId) {
@@ -661,6 +676,9 @@ function imperiumPlayText(card: HubCard) {
   }
   if (card.id === steersmanSourceId) {
     return "Draw 1 card. Recall Agent.";
+  }
+  if (card.id === longLiveTheFightersSourceId) {
+    return "If your deck has three or more cards, look at the top three cards. Draw one, discard one, and trash one.";
   }
   return summarizeAttributes(card);
 }

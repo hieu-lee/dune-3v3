@@ -18,6 +18,7 @@ import {
   playerTroopSupply,
   recallableSpySpaces,
   recallableSpySupplySpaces,
+  topDeckSelectionCards,
   trashIntrigueForRewardChoices,
   trashableCardsForPending,
 } from "../game/state";
@@ -26,6 +27,7 @@ import type {
   LeaderTransitionChoice,
   RepeatBoardSpaceChoice,
   StabanUnseenNetworkChoice,
+  TopDeckSelectionChoice,
 } from "../game/state";
 import type { FactionId, GameState, PendingAction, Player, TradeGoodId, TrashCardZone } from "../game/types";
 import { PendingBoardInfluenceChoicePanel, PendingOptionalSpacePaymentPanel } from "./PendingBoardChoicePanels";
@@ -70,6 +72,7 @@ import { PendingTeamResourcePaymentSection } from "./PendingTeamResourcePaymentS
 import { PendingTradePanel } from "./PendingTradePanel";
 import { PendingTrashIntriguePanel } from "./PendingTrashIntriguePanel";
 import { PendingTrashPanel } from "./PendingTrashPanel";
+import { PendingTopDeckSelectionPanel } from "./PendingTopDeckSelectionPanel";
 
 type PendingActionPanelProps = {
   game: GameState;
@@ -102,6 +105,7 @@ type PendingActionPanelProps = {
   chooseStabanUnseenNetwork: (choice: StabanUnseenNetworkChoice) => void;
   chooseTeamResourcePayment: () => void;
   chooseThroneRowCard: (cardId: string) => void;
+  chooseTopDeckSelection: (choice: TopDeckSelectionChoice) => void;
   chooseTrashIntrigueForReward: (intrigueId: string) => void;
   chooseTrashSourceForTrade: (partnerId: string) => void;
   clearPendingAction: () => void;
@@ -135,6 +139,7 @@ type PendingActionPanelProps = {
   skipRecall: () => void;
   skipRetreatTroopsForStrengthChoice: () => void;
   skipTeamResourcePaymentChoice: () => void;
+  skipTopDeckSelection: () => void;
   skipTrash: () => void;
   skipTrashIntrigueForRewardChoice: () => void;
   skipTrashSourceForTradeChoice: () => void;
@@ -175,6 +180,7 @@ export function PendingActionPanel({
   chooseStabanUnseenNetwork,
   chooseTeamResourcePayment,
   chooseThroneRowCard,
+  chooseTopDeckSelection,
   chooseTrashIntrigueForReward,
   chooseTrashSourceForTrade,
   clearPendingAction,
@@ -208,6 +214,7 @@ export function PendingActionPanel({
   skipRecall,
   skipRetreatTroopsForStrengthChoice,
   skipTeamResourcePaymentChoice,
+  skipTopDeckSelection,
   skipTrash,
   skipTrashIntrigueForRewardChoice,
   skipTrashSourceForTradeChoice,
@@ -254,6 +261,12 @@ export function PendingActionPanel({
     pendingAction.kind === "trash-intrigue-for-reward"
       ? canPayTrashIntrigueForReward(pendingTrashIntrigueOwner, pendingAction)
       : true;
+  const pendingTopDeckSelectionOwner =
+    pendingAction.kind === "top-deck-selection" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
+  const pendingTopDeckSelectionCards =
+    pendingAction.kind === "top-deck-selection" && pendingTopDeckSelectionOwner
+      ? topDeckSelectionCards(pendingTopDeckSelectionOwner, pendingAction)
+      : [];
   const pendingDiscardHandCardOwner =
     pendingAction.kind === "discard-hand-card" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingDiscardHandCardChoices =
@@ -486,6 +499,7 @@ export function PendingActionPanel({
           {pendingAction.kind === "acquire-card" && `${pendingAcquireOwner?.leader ?? "Player"} acquisition from ${pendingAction.source}`}
           {pendingAction.kind === "discard-card-for-influence-and-draw" && `${pendingDiscardInfluenceDrawOwner?.leader ?? "Player"} ${pendingAction.source}`}
           {pendingAction.kind === "discard-card-for-draw" && `${pendingDiscardDrawOwner?.leader ?? "Player"} ${pendingAction.source}`}
+          {pendingAction.kind === "top-deck-selection" && `${pendingTopDeckSelectionOwner?.leader ?? "Player"} ${pendingAction.source}`}
           {pendingAction.kind === "trash-intrigue-for-reward" && `${pendingTrashIntrigueOwner?.leader ?? "Player"} ${pendingAction.source}`}
           {pendingAction.kind === "discard-hand-card" && `${pendingDiscardHandCardOwner?.leader ?? "Player"} ${pendingAction.source}`}
           {pendingAction.kind === "lose-influence-for-intrigues" && `${pendingInfluenceIntrigueOwner?.leader ?? "Player"} ${pendingAction.source} reveal`}
@@ -891,6 +905,16 @@ export function PendingActionPanel({
           source={pendingAction.source}
           onResolve={chooseDiscardCardForDraw}
           onSkip={skipDiscardCardForDrawChoice}
+        />
+      )}
+
+      {pendingAction.kind === "top-deck-selection" && (
+        <PendingTopDeckSelectionPanel
+          cards={pendingTopDeckSelectionCards}
+          owner={pendingTopDeckSelectionOwner}
+          pending={pendingAction}
+          onResolve={chooseTopDeckSelection}
+          onSkip={skipTopDeckSelection}
         />
       )}
 

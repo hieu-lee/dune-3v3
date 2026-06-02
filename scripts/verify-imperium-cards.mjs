@@ -276,6 +276,41 @@ try {
   assert.deepEqual(chani.traits, ["Faction: Fremen"], "Chani should keep her Fremen trait");
   assert.match(chani.play, /three or more units.*draw 1 Intrigue/i);
   assert.match(chani.reveal, /Fremen Bond.*\+2 persuasion.*retreat two troops.*4 strength/i);
+  const longLiveTheFighters = data.imperiumDeck.find((card) => card.name === "Long Live the Fighters");
+  assert.ok(longLiveTheFighters, "Imperium deck should include Long Live the Fighters");
+  assert.deepEqual(
+    longLiveTheFighters.effects?.filter((spec) => spec.trigger === "agent-play"),
+    [
+      {
+        trigger: "agent-play",
+        effects: [
+          {
+            kind: "select-top-deck-cards",
+            selector: "self",
+            lookCards: 3,
+            drawCards: 1,
+            discardCards: 1,
+            trashCards: 1,
+            minimumDeckCards: 3,
+          },
+        ],
+      },
+    ],
+    "Long Live the Fighters should model its Agent top-deck selection as a typed effect",
+  );
+  assert.ok(
+    longLiveTheFighters.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.effects.some((effect) => effect.kind === "gain-persuasion" && effect.amount === 2)
+    ) &&
+      longLiveTheFighters.effects?.some((spec) =>
+        spec.trigger === "reveal" &&
+        spec.effects.some((effect) => effect.kind === "gain-strength" && effect.amount === 3)
+      ),
+    "Long Live the Fighters should carry typed Reveal persuasion and strength effects",
+  );
+  assert.match(longLiveTheFighters.play, /deck has three or more cards.*top three cards.*Draw one.*discard one.*trash one/i);
+  assert.match(longLiveTheFighters.reveal, /\+2 persuasion.*3 strength/i);
   const prepareTheWay = data.reserveMarket.find((card) => card.sourceId === 537);
   assert.ok(prepareTheWay, "Reserve market should include Prepare The Way");
   const spiceMustFlow = data.reserveMarket.find((card) => card.sourceId === 538);
@@ -513,7 +548,7 @@ try {
     ),
     "Shishakli should model its Fremen Bond Reveal Influence as a typed effect",
   );
-  for (const name of ["Bene Gesserit Operative", "Branching Path", "Calculus of Power", "Cargo Runner", "Chani, Clever Tactician", "Guild Spy", "In High Places", "Junction Headquarters", "Maker Keeper", "Maula Pistol", "Northern Watermaster", "Overthrow", "Paracompass", "Price is No Object", "Shishakli", "Steersman"]) {
+  for (const name of ["Bene Gesserit Operative", "Branching Path", "Calculus of Power", "Cargo Runner", "Chani, Clever Tactician", "Guild Spy", "In High Places", "Junction Headquarters", "Long Live the Fighters", "Maker Keeper", "Maula Pistol", "Northern Watermaster", "Overthrow", "Paracompass", "Price is No Object", "Shishakli", "Steersman"]) {
     const card = data.imperiumDeck.find((candidate) => candidate.name === name);
     assert.ok(card?.effects?.some((spec) => spec.trigger === "agent-play"), `${name} should use a structured Agent effect`);
   }
@@ -1322,6 +1357,108 @@ try {
     false,
     "Prepare The Way should not log a draw when the threshold is unmet",
   );
+
+  const longLiveDraw = { ...calculusTrashTarget, id: "long-live-imperium-draw-card", name: "Long Live Imperium Draw" };
+  const longLiveDiscard = { ...capturedMentat, id: "long-live-imperium-discard-card", name: "Long Live Imperium Discard" };
+  const longLiveTrash = { ...fremenBondSupport, id: "long-live-imperium-trash-card", name: "Long Live Imperium Trash" };
+  const longLiveRemaining = { ...calculusBlockedTarget, id: "long-live-imperium-remaining-card", name: "Long Live Imperium Remaining" };
+  const longLiveSpace = {
+    id: "long-live-imperium-test-space",
+    name: "Long Live Imperium Test Space",
+    zone: "City",
+    icon: "city",
+    detail: "Verifier-only city space without board pending rewards.",
+  };
+  const longLivePlaced = turnActions.placeAgentAction(
+    withActivePlayer(game, p2.id, () => ({
+      agentsReady: 1,
+      deck: [longLiveDraw, longLiveDiscard, longLiveTrash, longLiveRemaining],
+      discard: [],
+      hand: [longLiveTheFighters],
+      playArea: [],
+      resources: { solari: 0, spice: 0, water: 0 },
+    })),
+    {
+      commanderTargets: {},
+      selectedCard: longLiveTheFighters,
+      selectedSpace: longLiveSpace,
+    },
+  );
+  assert.equal(longLivePlaced.pendingAction?.kind, "top-deck-selection", "Long Live the Fighters should queue top-deck selection");
+  assert.deepEqual(
+    state.topDeckSelectionCards(playerById(longLivePlaced, p2.id), longLivePlaced.pendingAction).map((card) => card.id),
+    [longLiveDraw.id, longLiveDiscard.id, longLiveTrash.id],
+    "Long Live the Fighters should expose the inspected top three cards",
+  );
+  assert.deepEqual(
+    longLivePlaced.pendingAction.inspectedCards.map((card) => card.id),
+    [longLiveDraw.id, longLiveDiscard.id, longLiveTrash.id],
+    "Long Live the Fighters should reserve inspected cards on its pending action",
+  );
+  assert.deepEqual(
+    playerById(longLivePlaced, p2.id).deck.map((card) => card.id),
+    [longLiveRemaining.id],
+    "Long Live the Fighters should remove inspected cards from the deck while pending",
+  );
+  assert.equal(
+    state.skipTopDeckSelectionChoice(longLivePlaced, longLivePlaced.pendingAction),
+    longLivePlaced,
+    "Long Live the Fighters should not skip while the inspected cards are still available",
+  );
+  const { inspectedCards: _longLiveInspectedCards, ...longLiveLegacyPendingAction } = longLivePlaced.pendingAction;
+  const longLiveStalePendingState = {
+    ...longLivePlaced,
+    pendingAction: longLiveLegacyPendingAction,
+    players: longLivePlaced.players.map((player) =>
+      player.id === p2.id
+        ? {
+            ...player,
+            deck: [longLiveDraw, longLiveDiscard],
+            discard: [],
+            hand: [],
+            playArea: [longLiveTheFighters],
+          }
+        : player,
+    ),
+  };
+  const longLiveStaleSkipped = state.skipTopDeckSelectionChoice(
+    longLiveStalePendingState,
+    longLiveStalePendingState.pendingAction,
+  );
+  assert.equal(longLiveStaleSkipped.pendingAction, undefined, "Long Live the Fighters should skip a stale top-deck pending action");
+  assert.deepEqual(
+    playerById(longLiveStaleSkipped, p2.id).deck.map((card) => card.id),
+    [longLiveDraw.id, longLiveDiscard.id],
+    "Long Live the Fighters stale skip should leave the shortened deck untouched",
+  );
+  assert.match(longLiveStaleSkipped.log[0], /cannot resolve Long Live the Fighters: fewer than 3 cards remain in deck\./);
+  const longLiveResolved = state.resolveTopDeckSelectionChoice(
+    longLivePlaced,
+    longLivePlaced.pendingAction,
+    { drawIndex: 1, discardIndex: 0, trashIndex: 2 },
+  );
+  const longLiveOwner = playerById(longLiveResolved, p2.id);
+  assert.equal(longLiveResolved.pendingAction, undefined);
+  assert.ok(longLiveOwner.hand.some((card) => card.id === longLiveDiscard.id), "Long Live the Fighters should draw the selected inspected card");
+  assert.equal(longLiveOwner.discard.at(-1)?.id, longLiveDraw.id, "Long Live the Fighters should discard the selected inspected card");
+  assert.deepEqual(longLiveOwner.deck.map((card) => card.id), [longLiveRemaining.id], "Long Live the Fighters should leave only uninspected cards in deck");
+  assert.equal(
+    [...longLiveOwner.hand, ...longLiveOwner.discard, ...longLiveOwner.deck, ...longLiveOwner.playArea].some((card) => card.id === longLiveTrash.id),
+    false,
+    "Long Live the Fighters should trash the selected inspected card",
+  );
+  const longLiveShortDeckPlaced = turnActions.placeAgentAction(
+    withActivePlayer(game, p2.id, () => ({
+      agentsReady: 1,
+      deck: [longLiveDraw, longLiveDiscard],
+      discard: [],
+      hand: [longLiveTheFighters],
+      playArea: [],
+      resources: { solari: 0, spice: 0, water: 0 },
+    })),
+    { commanderTargets: {}, selectedCard: longLiveTheFighters, selectedSpace: longLiveSpace },
+  );
+  assert.equal(longLiveShortDeckPlaced.pendingAction, undefined, "Long Live the Fighters should not queue with fewer than three deck cards");
 
   const calculusAgentTrashTarget = { ...calculusTrashTarget, id: "calculus-agent-trash-target" };
   const calculusAgentSpace = {

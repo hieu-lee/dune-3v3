@@ -431,19 +431,23 @@ export {
   resolveRetreatTroopsForStrength,
   resolveSietchTabrChoice,
   resolveStabanUnseenNetworkChoice,
+  resolveTopDeckSelectionChoice,
   skipControlDefenseTroop,
   skipDiscardCardForDraw,
   skipDiscardCardForInfluenceAndDraw,
   skipLoseInfluenceForIntrigues,
   skipOptionalSpacePayment,
   skipRetreatTroopsForStrength,
+  skipTopDeckSelectionChoice,
   skipTrashIntrigueForReward,
   skipTrashCard,
   takeChoamContract,
   trashPlayerCard,
 } from "./state-pending-actions";
+export { topDeckSelectionCards } from "./top-deck-selection-rules";
 
 export type {
   CunningPlotChoice,
   StabanUnseenNetworkChoice,
 } from "./state-pending-actions";
+export type { TopDeckSelectionChoice } from "./top-deck-selection-rules";

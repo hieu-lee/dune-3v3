@@ -145,6 +145,31 @@ export function agentDiscardCardForDraw(
   ], conditions);
 }
 
+export function agentSelectTopDeckCards(
+  options: {
+    lookCards: EffectAmountSpec;
+    drawCards: EffectAmountSpec;
+    discardCards: EffectAmountSpec;
+    trashCards: EffectAmountSpec;
+    minimumDeckCards?: EffectAmountSpec;
+    source?: string;
+  },
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return agentPlayEffects([
+    {
+      kind: "select-top-deck-cards",
+      selector: "self",
+      lookCards: options.lookCards,
+      drawCards: options.drawCards,
+      discardCards: options.discardCards,
+      trashCards: options.trashCards,
+      ...(options.minimumDeckCards !== undefined ? { minimumDeckCards: options.minimumDeckCards } : {}),
+      ...(options.source ? { source: options.source } : {}),
+    },
+  ], conditions);
+}
+
 export function agentTrashIntrigueForReward(
   options: {
     cost?: Partial<Record<ResourceId, EffectAmountSpec>>;

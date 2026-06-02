@@ -172,6 +172,16 @@ export type AgentDiscardCardForDraw = {
   };
 };
 
+export type AgentTopDeckSelection = {
+  selector: PlayerSelector;
+  lookCards: number;
+  drawCards: number;
+  discardCards: number;
+  trashCards: number;
+  minimumDeckCards: number;
+  source?: string;
+};
+
 export type AgentTrashIntrigueForReward = {
   selector: PlayerSelector;
   cost: Partial<Resources>;

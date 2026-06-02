@@ -506,6 +506,110 @@ export async function runCardChoicesSmoke({
     "Guild Spy should draw an Intrigue after discarding a Spacing Guild card",
   );
 
+  await setDebugGameAndWait(page, states.longLiveTheFighters);
+  pendingText = await page.locator(".pending-panel").innerText();
+  const longLiveDrawnName = states.longLiveTheFighters.longLiveDrawnName;
+  const longLiveDrawnId = states.longLiveTheFighters.longLiveDrawnId;
+  const longLiveDiscardedName = states.longLiveTheFighters.longLiveDiscardedName;
+  const longLiveDiscardedId = states.longLiveTheFighters.longLiveDiscardedId;
+  const longLiveTrashedName = states.longLiveTheFighters.longLiveTrashedName;
+  const longLiveTrashedId = states.longLiveTheFighters.longLiveTrashedId;
+  const longLiveRemainingId = states.longLiveTheFighters.longLiveRemainingId;
+  assert.match(pendingText, /Long Live the Fighters/i);
+  assert.match(pendingText, /Look at the top 3 cards/i);
+  assert.match(pendingText, new RegExp(escapeRegExp(longLiveDrawnName)));
+  assert.match(pendingText, new RegExp(escapeRegExp(longLiveDiscardedName)));
+  assert.match(pendingText, new RegExp(escapeRegExp(longLiveTrashedName)));
+  const longLiveResolveButton = page.locator(".pending-panel").getByRole("button", { name: "Resolve Long Live the Fighters" });
+  assert.equal(await longLiveResolveButton.isDisabled(), true, "Long Live resolve button should wait for draw/discard/trash assignments");
+  await screenshot(page, captures, "pending-long-live-top-deck.png");
+
+  const longLiveMobileViewport = { width: 390, height: 900 };
+  await page.setViewportSize(longLiveMobileViewport);
+  await setDebugGameAndWait(page, states.longLiveTheFighters);
+  const longLiveMobileScrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+  assert.ok(
+    longLiveMobileScrollWidth <= longLiveMobileViewport.width,
+    `Long Live mobile pending panel should not overflow horizontally (${longLiveMobileScrollWidth}px)`,
+  );
+  await screenshot(page, captures, "pending-long-live-top-deck-mobile.png");
+  const longLiveTabletViewport = { width: 900, height: 1000 };
+  await page.setViewportSize(longLiveTabletViewport);
+  await setDebugGameAndWait(page, states.longLiveTheFighters);
+  const longLiveTabletScrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+  assert.ok(
+    longLiveTabletScrollWidth <= longLiveTabletViewport.width,
+    `Long Live tablet pending panel should not overflow horizontally (${longLiveTabletScrollWidth}px)`,
+  );
+  await screenshot(page, captures, "pending-long-live-top-deck-tablet.png");
+  await page.setViewportSize({ width: 1440, height: 1100 });
+  await setDebugGameAndWait(page, states.longLiveTheFighters);
+
+  const longLiveTopDeckCard = (name) => page.locator(".top-deck-selection-card").filter({ hasText: name });
+  await longLiveTopDeckCard(longLiveDrawnName)
+    .getByRole("button", { name: new RegExp(`^Draw ${escapeRegExp(longLiveDrawnName)}$`) })
+    .click();
+  await longLiveTopDeckCard(longLiveDiscardedName)
+    .getByRole("button", { name: new RegExp(`^Discard ${escapeRegExp(longLiveDiscardedName)}$`) })
+    .click();
+  await longLiveTopDeckCard(longLiveTrashedName)
+    .getByRole("button", { name: new RegExp(`^Trash ${escapeRegExp(longLiveTrashedName)}$`) })
+    .click();
+  assert.equal(await longLiveResolveButton.isDisabled(), false, "Long Live resolve button should enable after all roles are assigned");
+  await screenshot(page, captures, "pending-long-live-top-deck-selected.png");
+  await setDebugGameAndWait(page, states.longLiveTheFightersAlternate);
+  const alternateResolveButton = page.locator(".pending-panel").getByRole("button", { name: "Resolve Long Live the Fighters" });
+  assert.equal(await alternateResolveButton.isDisabled(), true, "Long Live selections should reset when inspected pending cards change");
+  assert.equal(
+    await page.locator(".top-deck-selection-roles button.selected").count(),
+    0,
+    "Long Live should not carry selected role styling across inspected pending cards",
+  );
+
+  await setDebugGameAndWait(page, states.longLiveTheFighters);
+  await longLiveTopDeckCard(longLiveDrawnName)
+    .getByRole("button", { name: new RegExp(`^Draw ${escapeRegExp(longLiveDrawnName)}$`) })
+    .click();
+  await longLiveTopDeckCard(longLiveDiscardedName)
+    .getByRole("button", { name: new RegExp(`^Discard ${escapeRegExp(longLiveDiscardedName)}$`) })
+    .click();
+  await longLiveTopDeckCard(longLiveTrashedName)
+    .getByRole("button", { name: new RegExp(`^Trash ${escapeRegExp(longLiveTrashedName)}$`) })
+    .click();
+  await longLiveResolveButton.click();
+  await waitForNoPending(page);
+  after = await currentGame(page);
+  ownerAfter = after.players.find((player) => player.id === "p2");
+  assert.ok(ownerAfter.hand.some((card) => card.id === longLiveDrawnId), "Long Live should draw the selected inspected card");
+  assert.equal(ownerAfter.discard.at(-1).id, longLiveDiscardedId, "Long Live should discard the selected inspected card");
+  assert.deepEqual(ownerAfter.deck.map((card) => card.id), [longLiveRemainingId], "Long Live should leave only uninspected cards in deck");
+  assert.equal(
+    [...ownerAfter.hand, ...ownerAfter.discard, ...ownerAfter.deck, ...ownerAfter.playArea].some((card) => card.id === longLiveTrashedId),
+    false,
+    "Long Live should trash the selected inspected card",
+  );
+
+  await setDebugGameAndWait(page, states.longLiveTheFightersStale);
+  pendingText = await page.locator(".pending-panel").innerText();
+  assert.match(pendingText, /Long Live the Fighters/i);
+  assert.match(pendingText, /Not enough deck cards/i);
+  assert.equal(
+    await page.locator(".top-deck-selection-roles button").count(),
+    0,
+    "Stale Long Live pending choices should not expose inactive role buttons",
+  );
+  await screenshot(page, captures, "pending-long-live-top-deck-stale.png");
+
+  await page.locator(".pending-panel").getByRole("button", { name: "Skip Long Live the Fighters" }).click();
+  await waitForNoPending(page);
+  after = await currentGame(page);
+  ownerAfter = after.players.find((player) => player.id === "p2");
+  assert.deepEqual(
+    ownerAfter.deck.map((card) => card.id),
+    [states.longLiveTheFightersStale.longLiveDiscardedId, states.longLiveTheFightersStale.longLiveDrawnId],
+    "Skipping a stale Long Live top-deck choice should leave the remaining deck intact",
+  );
+
   await setDebugGameAndWait(page, states.branchingPath);
   pendingText = await page.locator(".pending-panel").innerText();
   const branchingPathTrashName = states.branchingPath.branchingPathTrashName;
@@ -758,6 +862,8 @@ async function createCardChoiceStates(server, initialPlayableGame) {
   assert.ok(guildEnvoy, "Expected Guild Envoy Imperium card");
   const guildSpy = data.imperiumDeck.find((card) => card.sourceId === 43);
   assert.ok(guildSpy, "Expected Guild Spy Imperium card");
+  const longLiveTheFighters = data.imperiumDeck.find((card) => card.sourceId === 74);
+  assert.ok(longLiveTheFighters, "Expected Long Live the Fighters Imperium card");
   const branchingPath = data.imperiumDeck.find((card) => card.sourceId === 45);
   assert.ok(branchingPath, "Expected Branching Path Imperium card");
   const junctionHeadquarters = data.imperiumDeck.find((card) => card.sourceId === 68);
@@ -815,6 +921,26 @@ async function createCardChoiceStates(server, initialPlayableGame) {
   const guildSpyDraw = { ...data.allyStarterCards[0], id: "browser-guild-spy-draw-card" };
   const guildSpyBoardIntrigue = { ...data.intrigueCards[0], id: "browser-guild-spy-board-intrigue-card" };
   const guildSpyBonusIntrigue = { ...data.intrigueCards[1], id: "browser-guild-spy-bonus-intrigue-card" };
+  const longLiveDiscarded = {
+    ...data.allyStarterCards[0],
+    id: "browser-long-live-discarded-card",
+    name: "Long Live Browser Discard",
+  };
+  const longLiveDrawn = {
+    ...data.allyStarterCards[1],
+    id: "browser-long-live-drawn-card",
+    name: "Long Live Browser Draw",
+  };
+  const longLiveTrashed = {
+    ...data.allyStarterCards[2],
+    id: "browser-long-live-trashed-card",
+    name: "Long Live Browser Trash",
+  };
+  const longLiveRemaining = {
+    ...data.allyStarterCards[3],
+    id: "browser-long-live-remaining-card",
+    name: "Long Live Browser Remaining",
+  };
   const branchingPathTrashIntrigue = {
     ...data.intrigueCards[2],
     id: "browser-branching-path-trash-intrigue",
@@ -914,6 +1040,13 @@ async function createCardChoiceStates(server, initialPlayableGame) {
     phase: "playing",
     pendingAction: undefined,
     pendingQueue: [],
+  };
+  const longLiveSpace = {
+    id: "browser-long-live-test-space",
+    name: "Browser Long Live Test Space",
+    zone: "City",
+    icon: "city",
+    detail: "Browser-debug city space without board pending rewards.",
   };
   const beneGesseritOperativeAgentBase = {
     ...base,
@@ -1089,6 +1222,71 @@ async function createCardChoiceStates(server, initialPlayableGame) {
   );
   assert.equal(guildSpyState.pendingAction?.kind, "discard-card-for-draw", "Expected Guild Spy discard-draw pending action");
   assert.equal(guildSpyState.pendingAction.bonusIntrigues?.amount, 1, "Expected Guild Spy Intrigue bonus in browser state");
+  const longLiveTheFightersState = turnActions.placeAgentAction(
+    {
+      ...base,
+      players: base.players.map((player) =>
+        player.id === ownerId
+          ? {
+              ...player,
+              agentsReady: 1,
+              deck: [longLiveDiscarded, longLiveDrawn, longLiveTrashed, longLiveRemaining],
+              discard: [],
+              hand: [longLiveTheFighters],
+              playArea: [],
+              resources: { solari: 0, spice: 0, water: 0 },
+            }
+          : player,
+      ),
+    },
+    {
+      commanderTargets: {},
+      selectedCard: longLiveTheFighters,
+      selectedSpace: longLiveSpace,
+    },
+  );
+  assert.equal(
+    longLiveTheFightersState.pendingAction?.kind,
+    "top-deck-selection",
+    "Expected Long Live the Fighters top-deck selection pending action",
+  );
+  assert.deepEqual(
+    state.topDeckSelectionCards(
+      longLiveTheFightersState.players.find((player) => player.id === ownerId),
+      longLiveTheFightersState.pendingAction,
+    ).map((card) => card.id),
+    [longLiveDiscarded.id, longLiveDrawn.id, longLiveTrashed.id],
+    "Expected Long Live browser state to expose top three deck cards",
+  );
+  assert.deepEqual(
+    longLiveTheFightersState.players.find((player) => player.id === ownerId)?.deck.map((card) => card.id),
+    [longLiveRemaining.id],
+    "Expected Long Live browser state to reserve inspected top-deck cards",
+  );
+  const longLiveTheFightersAlternateState = {
+    ...longLiveTheFightersState,
+    pendingAction: {
+      ...longLiveTheFightersState.pendingAction,
+      inspectedCards: [longLiveDrawn, longLiveDiscarded, longLiveTrashed],
+    },
+  };
+  const { inspectedCards: _longLiveBrowserInspectedCards, ...longLiveBrowserLegacyPendingAction } =
+    longLiveTheFightersState.pendingAction;
+  const longLiveTheFightersStaleState = {
+    ...longLiveTheFightersState,
+    pendingAction: longLiveBrowserLegacyPendingAction,
+    players: longLiveTheFightersState.players.map((player) =>
+      player.id === ownerId
+        ? {
+            ...player,
+            deck: [longLiveDiscarded, longLiveDrawn],
+            discard: [],
+            hand: [],
+            playArea: [longLiveTheFighters],
+          }
+        : player,
+    ),
+  };
   const branchingPathState = turnActions.placeAgentAction(
     {
       ...base,
@@ -1741,6 +1939,24 @@ async function createCardChoiceStates(server, initialPlayableGame) {
       guildSpyDiscardName: guildSpyDiscard.name,
       guildSpyDrawId: guildSpyDraw.id,
       guildSpyIntrigueId: guildSpyBonusIntrigue.id,
+    },
+    longLiveTheFighters: {
+      ...longLiveTheFightersState,
+      longLiveDiscardedId: longLiveDiscarded.id,
+      longLiveDiscardedName: longLiveDiscarded.name,
+      longLiveDrawnId: longLiveDrawn.id,
+      longLiveDrawnName: longLiveDrawn.name,
+      longLiveRemainingId: longLiveRemaining.id,
+      longLiveTrashedId: longLiveTrashed.id,
+      longLiveTrashedName: longLiveTrashed.name,
+    },
+    longLiveTheFightersAlternate: {
+      ...longLiveTheFightersAlternateState,
+    },
+    longLiveTheFightersStale: {
+      ...longLiveTheFightersStaleState,
+      longLiveDiscardedId: longLiveDiscarded.id,
+      longLiveDrawnId: longLiveDrawn.id,
     },
     branchingPath: {
       ...branchingPathState,

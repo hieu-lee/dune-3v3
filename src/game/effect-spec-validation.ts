@@ -645,6 +645,50 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     }
     return;
   }
+  if (effect.kind === "select-top-deck-cards") {
+    if (trigger !== "agent-play") {
+      throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
+    }
+    if (effect.selector !== "self") {
+      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
+    validatePositiveAmount("select-top-deck-cards lookCards", effect.lookCards);
+    validatePositiveAmount("select-top-deck-cards drawCards", effect.drawCards);
+    validatePositiveAmount("select-top-deck-cards discardCards", effect.discardCards);
+    validatePositiveAmount("select-top-deck-cards trashCards", effect.trashCards);
+    if (effect.minimumDeckCards !== undefined) {
+      validatePositiveAmount("select-top-deck-cards minimumDeckCards", effect.minimumDeckCards);
+    }
+    if (effect.lookCards !== 3) {
+      invalidSpecField("select-top-deck-cards lookCards", effect.lookCards);
+    }
+    if (effect.drawCards !== 1) {
+      invalidSpecField("select-top-deck-cards drawCards", effect.drawCards);
+    }
+    if (effect.discardCards !== 1) {
+      invalidSpecField("select-top-deck-cards discardCards", effect.discardCards);
+    }
+    if (effect.trashCards !== 1) {
+      invalidSpecField("select-top-deck-cards trashCards", effect.trashCards);
+    }
+    if (effect.minimumDeckCards !== undefined && effect.minimumDeckCards !== 3) {
+      invalidSpecField("select-top-deck-cards minimumDeckCards", effect.minimumDeckCards);
+    }
+    if (
+      typeof effect.lookCards === "number" &&
+      typeof effect.drawCards === "number" &&
+      typeof effect.discardCards === "number" &&
+      typeof effect.trashCards === "number" &&
+      effect.drawCards + effect.discardCards + effect.trashCards !== effect.lookCards
+    ) {
+      invalidSpecField(
+        "select-top-deck-cards assignment count",
+        `${effect.drawCards}+${effect.discardCards}+${effect.trashCards}/${effect.lookCards}`,
+      );
+    }
+    validateSourceLabel("select-top-deck-cards source", effect.source);
+    return;
+  }
   if (effect.kind === "trash-intrigue-for-reward") {
     if (trigger !== "agent-play") {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);

@@ -241,6 +241,16 @@ export type PendingAction =
       };
     }
   | {
+      kind: "top-deck-selection";
+      ownerId: string;
+      source: string;
+      lookCards: number;
+      drawCards: number;
+      discardCards: number;
+      trashCards: number;
+      inspectedCards?: Card[];
+    }
+  | {
       kind: "trash-intrigue-for-reward";
       ownerId: string;
       source: string;

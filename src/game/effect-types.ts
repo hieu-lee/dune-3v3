@@ -371,6 +371,16 @@ export type GameEffectSpec =
       };
     }
   | {
+      kind: "select-top-deck-cards";
+      selector: PlayerSelector;
+      lookCards: EffectAmountSpec;
+      drawCards: EffectAmountSpec;
+      discardCards: EffectAmountSpec;
+      trashCards: EffectAmountSpec;
+      minimumDeckCards?: EffectAmountSpec;
+      source?: string;
+    }
+  | {
       kind: "trash-intrigue-for-reward";
       selector: PlayerSelector;
       cost?: Partial<Record<ResourceId, EffectAmountSpec>>;

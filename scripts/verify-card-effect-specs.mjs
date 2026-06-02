@@ -176,6 +176,7 @@ try {
   const cargoRunner = data.imperiumDeck.find((card) => card.name === "Cargo Runner");
   const chani = data.imperiumDeck.find((card) => card.name === "Chani, Clever Tactician");
   const leadership = data.imperiumDeck.find((card) => card.name === "Leadership");
+  const longLiveTheFighters = data.imperiumDeck.find((card) => card.name === "Long Live the Fighters");
   const makerKeeper = data.imperiumDeck.find((card) => card.name === "Maker Keeper");
   const maulaPistol = data.imperiumDeck.find((card) => card.name === "Maula Pistol");
   const northernWatermaster = data.imperiumDeck.find((card) => card.name === "Northern Watermaster");
@@ -287,6 +288,7 @@ try {
     cargoRunner &&
     chani &&
     leadership &&
+    longLiveTheFighters &&
     makerKeeper &&
     maulaPistol &&
     northernWatermaster &&
@@ -3550,6 +3552,7 @@ try {
       "In High Places",
       "Junction Headquarters",
       "Leadership",
+      "Long Live the Fighters",
       "Maker Keeper",
       "Maula Pistol",
       "Northern Watermaster",
@@ -4789,6 +4792,38 @@ try {
       )
     ),
     "Guild Spy should carry a declarative Agent discard-for-draw spec with a Spacing Guild Intrigue bonus",
+  );
+  assert.equal(
+    longLiveTheFighters.play,
+    "If your deck has three or more cards, look at the top three cards. Draw one, discard one, and trash one.",
+    "Long Live the Fighters play text should preserve its top-deck selection effect",
+  );
+  assert.equal(longLiveTheFighters.reveal, "+2 persuasion and +3 strength.", "Long Live the Fighters should keep its fixed reveal rewards");
+  assert.ok(
+    longLiveTheFighters.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.effects.some((effect) =>
+        effect.kind === "select-top-deck-cards" &&
+        effect.selector === "self" &&
+        effect.lookCards === 3 &&
+        effect.drawCards === 1 &&
+        effect.discardCards === 1 &&
+        effect.trashCards === 1 &&
+        effect.minimumDeckCards === 3
+      )
+    ),
+    "Long Live the Fighters should carry a declarative Agent top-deck selection spec",
+  );
+  assert.ok(
+    longLiveTheFighters.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.effects.some((effect) => effect.kind === "gain-persuasion" && effect.amount === 2)
+    ) &&
+      longLiveTheFighters.effects?.some((spec) =>
+        spec.trigger === "reveal" &&
+        spec.effects.some((effect) => effect.kind === "gain-strength" && effect.amount === 3)
+      ),
+    "Long Live the Fighters should carry typed Reveal persuasion and strength specs",
   );
   assert.deepEqual(
     branchingPath.effects?.filter((spec) => spec.trigger === "agent-play"),
@@ -9026,6 +9061,100 @@ try {
     /Invalid effect amount "-1"/,
     "Discard-for-draw specs should reject negative bonus Intrigue amounts",
   );
+  const topDeckSelectionCard = {
+    ...convincingArgument,
+    id: "effect-spec-top-deck-selection-card",
+    name: "Effect Spec Top Deck Selection",
+    effects: [agentSpec([{
+      kind: "select-top-deck-cards",
+      selector: "self",
+      lookCards: 3,
+      drawCards: 1,
+      discardCards: 1,
+      trashCards: 1,
+      minimumDeckCards: 3,
+    }])],
+  };
+  const topDeckSelections = effectResolver.resolveAgentTopDeckSelections(topDeckSelectionCard.effects, {
+    trigger: "agent-play",
+    source: p2,
+    target: p2,
+    state: game,
+  });
+  assert.equal(topDeckSelections.length, 1, "Top-deck selection specs should resolve for Agent play");
+  assert.equal(topDeckSelections[0].selector, "self");
+  assert.equal(topDeckSelections[0].lookCards, 3);
+  assert.equal(topDeckSelections[0].drawCards, 1);
+  assert.equal(topDeckSelections[0].discardCards, 1);
+  assert.equal(topDeckSelections[0].trashCards, 1);
+  assert.equal(topDeckSelections[0].minimumDeckCards, 3);
+  const revealTopDeckSelectionCard = {
+    ...convincingArgument,
+    id: "effect-spec-reveal-top-deck-selection-card",
+    name: "Effect Spec Reveal Top Deck Selection",
+    effects: [revealSpec([{
+      kind: "select-top-deck-cards",
+      selector: "self",
+      lookCards: 3,
+      drawCards: 1,
+      discardCards: 1,
+      trashCards: 1,
+      minimumDeckCards: 3,
+    }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [revealTopDeckSelectionCard], highCouncilSeat: false }),
+    /Unsupported effect "select-top-deck-cards" for reveal/,
+    "Top-deck selection specs should stay in Agent play until other trigger resolvers support them",
+  );
+  const invalidTopDeckSelectionSelectorCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-top-deck-selection-selector-card",
+    name: "Effect Spec Invalid Top Deck Selection Selector",
+    effects: [agentSpec([{
+      kind: "select-top-deck-cards",
+      selector: "activated-ally",
+      lookCards: 3,
+      drawCards: 1,
+      discardCards: 1,
+      trashCards: 1,
+      minimumDeckCards: 3,
+    }])],
+  };
+  assert.throws(
+    () => effectResolver.resolveAgentTopDeckSelections(invalidTopDeckSelectionSelectorCard.effects, {
+      trigger: "agent-play",
+      source: p2,
+      target: p2,
+      state: game,
+    }),
+    /Unsupported effect selector "activated-ally" for select-top-deck-cards/,
+    "Top-deck selection specs should reject activated Ally selectors",
+  );
+  const invalidTopDeckSelectionAmountCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-top-deck-selection-amount-card",
+    name: "Effect Spec Invalid Top Deck Selection Amount",
+    effects: [agentSpec([{
+      kind: "select-top-deck-cards",
+      selector: "self",
+      lookCards: 3,
+      drawCards: 2,
+      discardCards: 1,
+      trashCards: 1,
+      minimumDeckCards: 3,
+    }])],
+  };
+  assert.throws(
+    () => effectResolver.resolveAgentTopDeckSelections(invalidTopDeckSelectionAmountCard.effects, {
+      trigger: "agent-play",
+      source: p2,
+      target: p2,
+      state: game,
+    }),
+    /Invalid select-top-deck-cards drawCards "2"/,
+    "Top-deck selection specs should reject unsupported card-assignment shapes",
+  );
   const revealTrashIntrigueRewardCard = {
     ...convincingArgument,
     id: "effect-spec-reveal-trash-intrigue-reward-card",
@@ -9846,6 +9975,148 @@ try {
   );
   assert.equal(leadershipEffect.source.hand[0]?.id, leadershipDraw.id, "Leadership Agent spec should draw 1 card");
   assert.match(leadershipEffect.log ?? "", /Leadership: draws 1 card/);
+
+  const longLiveDraw = { ...dagger, id: "long-live-draw-card", name: "Long Live Draw" };
+  const longLiveDiscard = { ...convincingArgument, id: "long-live-discard-card", name: "Long Live Discard" };
+  const longLiveTrash = { ...reconnaissance, id: "long-live-trash-card", name: "Long Live Trash" };
+  const longLiveFourth = { ...dagger, id: "long-live-fourth-card", name: "Long Live Fourth" };
+  const longLiveSpace = {
+    id: "long-live-test-space",
+    name: "Long Live Test Space",
+    zone: "City",
+    icon: "city",
+    detail: "Verifier-only city space without board pending rewards.",
+  };
+  const longLivePlaced = turnActions.placeAgentAction(
+    withActivePlayer(game, p2.id, () => ({
+      agentsReady: 1,
+      deck: [longLiveDraw, longLiveDiscard, longLiveTrash, longLiveFourth],
+      discard: [],
+      hand: [longLiveTheFighters],
+      playArea: [],
+      resources: { solari: 0, spice: 0, water: 0 },
+    })),
+    {
+      commanderTargets: {},
+      selectedCard: longLiveTheFighters,
+      selectedSpace: longLiveSpace,
+    },
+  );
+  assert.equal(longLivePlaced.pendingAction?.kind, "top-deck-selection", "Long Live the Fighters should queue top-deck selection after Agent placement");
+  assert.equal(longLivePlaced.pendingAction.ownerId, p2.id);
+  assert.equal(longLivePlaced.pendingAction.source, "Long Live the Fighters");
+  assert.equal(longLivePlaced.pendingAction.lookCards, 3);
+  assert.equal(longLivePlaced.pendingAction.drawCards, 1);
+  assert.equal(longLivePlaced.pendingAction.discardCards, 1);
+  assert.equal(longLivePlaced.pendingAction.trashCards, 1);
+  assert.deepEqual(
+    state.topDeckSelectionCards(playerById(longLivePlaced, p2.id), longLivePlaced.pendingAction).map((card) => card.id),
+    [longLiveDraw.id, longLiveDiscard.id, longLiveTrash.id],
+    "Long Live the Fighters should inspect the top three cards only",
+  );
+  assert.deepEqual(
+    longLivePlaced.pendingAction.inspectedCards.map((card) => card.id),
+    [longLiveDraw.id, longLiveDiscard.id, longLiveTrash.id],
+    "Long Live the Fighters should reserve the inspected cards in the pending action",
+  );
+  assert.deepEqual(
+    playerById(longLivePlaced, p2.id).deck.map((card) => card.id),
+    [longLiveFourth.id],
+    "Long Live the Fighters should remove reserved inspected cards from the draw deck while pending",
+  );
+  const longLiveInvalidChoice = state.resolveTopDeckSelectionChoice(
+    longLivePlaced,
+    longLivePlaced.pendingAction,
+    { drawIndex: 0, discardIndex: 0, trashIndex: 2 },
+  );
+  assert.equal(
+    longLiveInvalidChoice,
+    longLivePlaced,
+    "Long Live the Fighters should reject duplicate top-deck assignments",
+  );
+  assert.equal(
+    state.skipTopDeckSelectionChoice(longLivePlaced, longLivePlaced.pendingAction),
+    longLivePlaced,
+    "Long Live the Fighters should not skip while the top-deck selection is still resolvable",
+  );
+  const { inspectedCards: _longLiveInspectedCards, ...longLiveLegacyPendingAction } = longLivePlaced.pendingAction;
+  const longLiveStalePendingState = {
+    ...longLivePlaced,
+    pendingAction: longLiveLegacyPendingAction,
+    players: longLivePlaced.players.map((player) =>
+      player.id === p2.id
+        ? {
+            ...player,
+            deck: [longLiveDraw, longLiveDiscard],
+            discard: [],
+            hand: [],
+            playArea: [longLiveTheFighters],
+          }
+        : player,
+    ),
+  };
+  const longLiveStaleSkipped = state.skipTopDeckSelectionChoice(
+    longLiveStalePendingState,
+    longLiveStalePendingState.pendingAction,
+  );
+  assert.equal(
+    longLiveStaleSkipped.pendingAction,
+    undefined,
+    "Long Live the Fighters should skip a stale top-deck selection when fewer than three cards remain",
+  );
+  assert.deepEqual(
+    playerById(longLiveStaleSkipped, p2.id).deck.map((card) => card.id),
+    [longLiveDraw.id, longLiveDiscard.id],
+    "Long Live the Fighters stale skip should preserve remaining deck cards",
+  );
+  assert.match(
+    longLiveStaleSkipped.log[0],
+    /cannot resolve Long Live the Fighters: fewer than 3 cards remain in deck\./,
+  );
+  const longLiveResolved = state.resolveTopDeckSelectionChoice(
+    longLivePlaced,
+    longLivePlaced.pendingAction,
+    { drawIndex: 1, discardIndex: 0, trashIndex: 2 },
+  );
+  assert.equal(longLiveResolved.pendingAction, undefined, "Resolving Long Live the Fighters should clear its pending action");
+  const longLiveOwner = playerById(longLiveResolved, p2.id);
+  assert.ok(longLiveOwner.hand.some((card) => card.id === longLiveDiscard.id), "Long Live the Fighters should draw the selected top-deck card");
+  assert.equal(longLiveOwner.discard.at(-1)?.id, longLiveDraw.id, "Long Live the Fighters should discard the selected top-deck card");
+  assert.deepEqual(longLiveOwner.deck.map((card) => card.id), [longLiveFourth.id], "Long Live the Fighters should remove all inspected cards from deck");
+  assert.equal(
+    [...longLiveOwner.hand, ...longLiveOwner.discard, ...longLiveOwner.deck, ...longLiveOwner.playArea].some((card) => card.id === longLiveTrash.id),
+    false,
+    "Long Live the Fighters should trash the selected top-deck card",
+  );
+  assert.match(
+    longLiveResolved.log[0],
+    /resolves Long Live the Fighters: draws 1 card, discards Long Live Draw, and trashes Long Live Trash\./,
+  );
+  const longLiveShortDeckPlaced = turnActions.placeAgentAction(
+    withActivePlayer(game, p2.id, () => ({
+      agentsReady: 1,
+      deck: [longLiveDraw, longLiveDiscard],
+      discard: [],
+      hand: [longLiveTheFighters],
+      playArea: [],
+      resources: { solari: 0, spice: 0, water: 0 },
+    })),
+    {
+      commanderTargets: {},
+      selectedCard: longLiveTheFighters,
+      selectedSpace: longLiveSpace,
+    },
+  );
+  assert.equal(
+    longLiveShortDeckPlaced.pendingAction,
+    undefined,
+    "Long Live the Fighters should not queue top-deck selection with fewer than three deck cards",
+  );
+  assert.deepEqual(
+    playerById(longLiveShortDeckPlaced, p2.id).deck.map((card) => card.id),
+    [longLiveDraw.id, longLiveDiscard.id],
+    "Long Live the Fighters should leave short decks unchanged",
+  );
 
   for (const card of [imperialSpymaster, sardaukarSoldier]) {
     const intrigueEffect = state.applyCardAgentEffect(card, p2, p2, game);

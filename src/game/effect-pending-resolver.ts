@@ -25,6 +25,7 @@ import type {
   AgentPayTeamResourceForVp,
   AgentTrashIntrigueForReward,
   AgentTrashSourceForTrade,
+  AgentTopDeckSelection,
   CombatInfluenceLossForStrength,
   CombatRetreatTroops,
   CombatSpyRecallForStrength,
@@ -290,6 +291,39 @@ export function resolveAgentDiscardCardForDraws(
             }
           : {}),
       }));
+  });
+}
+
+export function resolveAgentTopDeckSelections(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): AgentTopDeckSelection[] {
+  specs?.forEach(validateSpec);
+  return (specs ?? []).flatMap((spec) => {
+    if (spec.trigger !== "agent-play") return [];
+    if (!specApplies(spec, context)) return [];
+    return spec.effects
+      .filter((effect) => effect.kind === "select-top-deck-cards")
+      .map((effect) => {
+        const lookCards = amountFor(effect.lookCards, context.source);
+        const drawCards = amountFor(effect.drawCards, context.source);
+        const discardCards = amountFor(effect.discardCards, context.source);
+        const trashCards = amountFor(effect.trashCards, context.source);
+        if (drawCards + discardCards + trashCards !== lookCards) {
+          throw new Error(`Unsupported select-top-deck-cards assignment count "${drawCards}+${discardCards}+${trashCards}/${lookCards}"`);
+        }
+        return {
+          selector: effect.selector,
+          lookCards,
+          drawCards,
+          discardCards,
+          trashCards,
+          minimumDeckCards: effect.minimumDeckCards === undefined
+            ? lookCards
+            : amountFor(effect.minimumDeckCards, context.source),
+          source: effect.source,
+        };
+      });
   });
 }
 

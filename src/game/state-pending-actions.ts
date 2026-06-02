@@ -67,6 +67,11 @@ import {
   skipRetreatTroopsForStrength as resolveSkipRetreatTroopsForStrength,
 } from "./troop-retreat-rules";
 import { skipTrashCard as resolveSkipTrashCard, trashPlayerCard as resolveTrashPlayerCard } from "./trash-rules";
+import {
+  resolveTopDeckSelection as resolveTopDeckSelectionForPending,
+  skipTopDeckSelection as resolveSkipTopDeckSelection,
+  type TopDeckSelectionChoice,
+} from "./top-deck-selection-rules";
 import type {
   FactionId,
   GameState,
@@ -122,6 +127,7 @@ type TrashCardPendingAction = Extract<PendingAction, { kind: "trash-card" }>;
 type DiscardCardForInfluenceAndDrawPendingAction = Extract<PendingAction, { kind: "discard-card-for-influence-and-draw" }>;
 type DiscardCardForDrawPendingAction = Extract<PendingAction, { kind: "discard-card-for-draw" }>;
 type TrashIntrigueForRewardPendingAction = Extract<PendingAction, { kind: "trash-intrigue-for-reward" }>;
+type TopDeckSelectionPendingAction = Extract<PendingAction, { kind: "top-deck-selection" }>;
 type DiscardHandCardPendingAction = Extract<PendingAction, { kind: "discard-hand-card" }>;
 type LoseInfluenceForIntriguesPendingAction = Extract<PendingAction, { kind: "lose-influence-for-intrigues" }>;
 type BoardInfluenceChoicePendingAction = Extract<PendingAction, { kind: "board-influence-choice" }>;
@@ -279,6 +285,21 @@ export function skipDiscardCardForDraw(
   pending: DiscardCardForDrawPendingAction,
 ): GameState {
   return continueAfterResolvedConflictReward(resolveSkipDiscardCardForDraw(state, pending));
+}
+
+export function resolveTopDeckSelectionChoice(
+  state: GameState,
+  pending: TopDeckSelectionPendingAction,
+  choice: TopDeckSelectionChoice,
+): GameState {
+  return continueAfterResolvedConflictReward(resolveTopDeckSelectionForPending(state, pending, choice));
+}
+
+export function skipTopDeckSelectionChoice(
+  state: GameState,
+  pending: TopDeckSelectionPendingAction,
+): GameState {
+  return continueAfterResolvedConflictReward(resolveSkipTopDeckSelection(state, pending));
 }
 
 export function resolveTrashIntrigueForRewardChoice(

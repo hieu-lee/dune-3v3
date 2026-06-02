@@ -25,6 +25,7 @@ import {
   resolveAgentPayTeamResourceForVps,
   resolveAgentTrashIntrigueForRewards,
   resolveAgentTrashSourceForTrades,
+  resolveAgentTopDeckSelections,
   resolveTrashCardEffects,
   resolveCardEffects,
   resolveAgentAcquireCards,
@@ -1083,6 +1084,40 @@ function pendingActionForAgentTrashCard(
     .find((pending): pending is PendingAction => Boolean(pending));
 }
 
+function pendingActionForAgentTopDeckSelection(
+  card: Card,
+  source: Player,
+  state?: GameState,
+  target?: Player,
+  space?: BoardSpace,
+): PendingAction | undefined {
+  if (!card.effects || !source.playArea.some((candidate) => candidate.id === card.id)) return undefined;
+  const players = state ? playersWithPendingCardEffect(state, source, target) : undefined;
+  const effectState = state && players ? { ...state, players } : undefined;
+  const effects = resolveAgentTopDeckSelections(card.effects, {
+    trigger: "agent-play",
+    source,
+    target,
+    space,
+    state: effectState,
+  });
+  return effects
+    .map((effect): PendingAction | undefined => {
+      if (effect.selector !== "self") return undefined;
+      if (source.deck.length < effect.minimumDeckCards || source.deck.length < effect.lookCards) return undefined;
+      return {
+        kind: "top-deck-selection",
+        ownerId: source.id,
+        source: effect.source ?? card.name,
+        lookCards: effect.lookCards,
+        drawCards: effect.drawCards,
+        discardCards: effect.discardCards,
+        trashCards: effect.trashCards,
+      };
+    })
+    .find((pending): pending is PendingAction => Boolean(pending));
+}
+
 export function pendingActionsForCard(
   card: Card,
   source: Player,
@@ -1128,6 +1163,8 @@ export function pendingActionsForCard(
   if (agentCommanderResourceSplitPending) typedPendings.push(agentCommanderResourceSplitPending);
   const agentTrashSourceForTradePending = pendingActionForAgentTrashSourceForTrade(card, source, state, target);
   if (agentTrashSourceForTradePending) typedPendings.push(agentTrashSourceForTradePending);
+  const agentTopDeckSelectionPending = pendingActionForAgentTopDeckSelection(card, source, state, target, space);
+  if (agentTopDeckSelectionPending) typedPendings.push(agentTopDeckSelectionPending);
   const agentTrashCardPending = pendingActionForAgentTrashCard(card, source, state, target, space);
   if (agentTrashCardPending) typedPendings.push(agentTrashCardPending);
   const agentTrashSourceCardPending = pendingActionForAgentTrashSourceCard(card, source, state, target, space);

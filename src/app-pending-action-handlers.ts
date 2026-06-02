@@ -43,6 +43,7 @@ import {
   resolveSietchTabrChoice,
   resolveStabanUnseenNetworkChoice,
   resolveTeamResourcePaymentChoice,
+  resolveTopDeckSelectionChoice,
   resolveTrashIntrigueForRewardChoice,
   resolveTrashSourceForTradeChoice,
   scoreGurneyAlwaysSmiling,
@@ -64,6 +65,7 @@ import {
   skipRecallSpy,
   skipRetreatTroopsForStrength,
   skipTeamResourcePayment,
+  skipTopDeckSelectionChoice,
   skipTrashCard,
   skipTrashIntrigueForReward,
   skipTrashSourceForTrade,
@@ -85,6 +87,7 @@ import type {
   LeaderTransitionChoice,
   RepeatBoardSpaceChoice,
   StabanUnseenNetworkChoice,
+  TopDeckSelectionChoice,
 } from "./game/state";
 
 type SetGame = Dispatch<SetStateAction<GameState>>;
@@ -274,6 +277,14 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     runPending("discard-card-for-draw", (current, pending) =>
       maybeStartCombatPhase(skipDiscardCardForDraw(current, pending))
     );
+  const chooseTopDeckSelection = (choice: TopDeckSelectionChoice) =>
+    runPending("top-deck-selection", (current, pending) =>
+      maybeStartCombatPhase(resolveTopDeckSelectionChoice(current, pending, choice))
+    );
+  const skipTopDeckSelection = () =>
+    runPending("top-deck-selection", (current, pending) =>
+      maybeStartCombatPhase(skipTopDeckSelectionChoice(current, pending))
+    );
   const chooseTrashIntrigueForReward = (intrigueId: string) =>
     runPending("trash-intrigue-for-reward", (current, pending) =>
       maybeStartCombatPhase(resolveTrashIntrigueForRewardChoice(current, pending, intrigueId))
@@ -342,6 +353,7 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     chooseTrashIntrigueForReward,
     chooseTrashSourceForTrade,
     chooseThroneRowCard,
+    chooseTopDeckSelection,
     clearPendingAction,
     collectContractFallback,
     deployControlDefense,
@@ -373,6 +385,7 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     skipRecall,
     skipRetreatTroopsForStrengthChoice,
     skipTeamResourcePaymentChoice,
+    skipTopDeckSelection,
     skipTrash,
     skipTrashIntrigueForRewardChoice,
     skipTrashSourceForTradeChoice,

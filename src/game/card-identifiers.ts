@@ -68,6 +68,7 @@ export const hiddenMissiveSourceId = 21;
 export const wheelsWithinWheelsSourceId = 22;
 export const imperialSpymasterSourceId = 24;
 export const leadershipSourceId = 63;
+export const longLiveTheFightersSourceId = 74;
 export const publicSpectacleSourceId = 55;
 export const rebelSupplierSourceId = 40;
 export const sardaukarSoldierSourceId = 15;

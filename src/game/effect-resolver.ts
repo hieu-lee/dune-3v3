@@ -376,6 +376,9 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
   if (effect.kind === "discard-card-for-draw") {
     return result;
   }
+  if (effect.kind === "select-top-deck-cards") {
+    return result;
+  }
   if (effect.kind === "trash-intrigue-for-reward") {
     return result;
   }

@@ -54,6 +54,24 @@ import type {
 type CommanderTargets = Record<string, string>;
 type BoardInfluenceChoicePendingAction = Extract<PendingAction, { kind: "board-influence-choice" }>;
 
+function reserveTopDeckSelectionCards(
+  players: Player[],
+  pendingActions: PendingAction[],
+): { players: Player[]; pendingActions: PendingAction[] } {
+  let nextPlayers = players;
+  const nextPendingActions = pendingActions.map((action) => {
+    if (action.kind !== "top-deck-selection" || action.inspectedCards) return action;
+    const owner = nextPlayers.find((player) => player.id === action.ownerId);
+    if (!owner || owner.deck.length < action.lookCards) return action;
+    const inspectedCards = owner.deck.slice(0, action.lookCards);
+    nextPlayers = nextPlayers.map((player) =>
+      player.id === owner.id ? { ...player, deck: player.deck.slice(action.lookCards) } : player
+    );
+    return { ...action, inspectedCards };
+  });
+  return { players: nextPlayers, pendingActions: nextPendingActions };
+}
+
 export function activatedAllyIdFor(player: Player, players: Player[], commanderTargets: CommanderTargets) {
   if (player.role !== "Commander") return player.id;
   if (player.revealed && player.revealActivatedAllyId) return player.revealActivatedAllyId;
@@ -339,12 +357,15 @@ export function placeAgentAction(
         : makerChoicePending,
     );
   }
+  const topDeckReservations = reserveTopDeckSelectionCards(players, pendingActions);
+  players = topDeckReservations.players;
+  const stateAfterTopDeckReservations = { ...controlledPostEffectState, players, conflictDeploymentBlock };
   const pending = queuePendingActions(
-    controlledPostEffectState,
-    pendingActions,
+    stateAfterTopDeckReservations,
+    topDeckReservations.pendingActions,
   );
   const nextState: GameState = {
-    ...controlledPostEffectState,
+    ...stateAfterTopDeckReservations,
     agentTurnComplete: true,
     players,
     spaces: agentPlacementSpaces(current.spaces, selectedSpace, target, cardAgentEffect.recalledAgents),

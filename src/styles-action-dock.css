@@ -156,6 +156,62 @@
   overflow-wrap: anywhere;
 }
 
+.top-deck-selection {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(180px, 0.6fr) minmax(0, 1.4fr) auto;
+  align-items: stretch;
+}
+
+.top-deck-selection-summary {
+  min-width: 0;
+}
+
+.top-deck-selection-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.top-deck-selection-card {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  padding: 8px;
+  border: 1px solid rgba(255, 246, 230, 0.14);
+  border-radius: 8px;
+  background: rgba(8, 7, 6, 0.22);
+}
+
+.top-deck-selection-card img {
+  width: 48px;
+  aspect-ratio: 63 / 88;
+  object-fit: contain;
+  border-radius: 4px;
+  background: rgba(8, 7, 6, 0.64);
+}
+
+.top-deck-selection-card strong {
+  min-width: 0;
+  color: #f7e7c8;
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+
+.top-deck-selection-roles {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.top-deck-selection-roles button {
+  min-width: 0;
+  padding: 0 6px;
+}
+
 .discard-influence-column button {
   grid-template-columns: minmax(0, 1fr);
 }
@@ -480,6 +536,18 @@
     grid-template-columns: 1fr;
   }
 }
+@media (max-width: 1024px) {
+  .pending-panel {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .top-deck-selection {
+    grid-template-columns: 1fr;
+  }
+  .top-deck-selection-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
 @media (max-width: 760px) {
   .pending-panel {
     align-items: stretch;
@@ -488,6 +556,8 @@
   .card-row,
   .market-row,
   .trade-intrigue-grid,
+  .top-deck-selection,
+  .top-deck-selection-grid,
   .support-grid,
   .threaten-spice-grid,
   .support-target {

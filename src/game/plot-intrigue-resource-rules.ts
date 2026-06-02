@@ -3,7 +3,6 @@ import {
 } from "./data";
 import {
   effectiveFremenIconInfluence,
-  effectiveRequirementInfluence,
 } from "./board-rules";
 import {
   isBackedByChoamIntrigue,
@@ -143,52 +142,24 @@ export function playStrategicStockpilingPlotIntrigue(
   intrigueId: string,
   choice: StrategicStockpilingChoice,
 ): GameState {
-  if (state.phase !== "playing" || state.pendingAction || state.pendingQueue.length > 0) return state;
-  const player = state.players[state.activeSeat];
-  if (!player || player.id !== playerId) return state;
-  const intrigue = player.intrigues.find((card) => card.id === intrigueId);
-  if (!intrigue || !isStrategicStockpilingIntrigue(intrigue)) return state;
-
-  const spendSpice = choice === "spice" || choice === "both";
-  const spendWater = choice === "water" || choice === "both";
-  if (!spendSpice && !spendWater) return state;
-  if (spendSpice && player.resources.spice < 5) return state;
-  if (
-    spendWater &&
-    (player.resources.water < 3 || effectiveRequirementInfluence(player, "spacing", state.players) < 3)
-  ) {
-    return state;
-  }
-
-  const vp = (spendSpice ? 1 : 0) + (spendWater ? 1 : 0);
-  const players = state.players.map((candidate) =>
-    candidate.id === player.id
-      ? {
-          ...candidate,
-          vp: candidate.vp + vp,
-          resources: {
-            ...candidate.resources,
-            spice: candidate.resources.spice - (spendSpice ? 5 : 0),
-            water: candidate.resources.water - (spendWater ? 3 : 0),
-          },
-          intrigues: candidate.intrigues.filter((card) => card.id !== intrigue.id),
-        }
-      : candidate,
+  if (choice !== "spice" && choice !== "water" && choice !== "both") return state;
+  return playTypedPlotIntrigue(
+    state,
+    playerId,
+    intrigueId,
+    isStrategicStockpilingIntrigue,
+    (player, _contractPending, _activatedAlly, resolved) => {
+      const spendSpice = (resolved.spentResources.spice ?? 0) > 0;
+      const spendWater = (resolved.spentResources.water ?? 0) > 0;
+      const paymentText = spendSpice && spendWater
+        ? "spends 5 spice and 3 water"
+        : spendSpice
+          ? "spends 5 spice"
+          : "spends 3 water";
+      return `${player.leader} plays Strategic Stockpiling, ${paymentText}, and gains ${resolved.vp} VP.`;
+    },
+    { choiceId: choice },
   );
-  const paymentText = spendSpice && spendWater
-    ? "spends 5 spice and 3 water"
-    : spendSpice
-      ? "spends 5 spice"
-      : "spends 3 water";
-  return {
-    ...state,
-    players,
-    intrigueDiscard: [...state.intrigueDiscard, intrigue],
-    log: [
-      `${player.leader} plays Strategic Stockpiling, ${paymentText}, and gains ${vp} VP.`,
-      ...state.log,
-    ],
-  };
 }
 
 export function playShaddamsFavorPlotIntrigue(

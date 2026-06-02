@@ -199,7 +199,7 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     return;
   }
   if (effect.kind === "gain-vp") {
-    if (trigger !== "acquire") {
+    if (trigger !== "acquire" && trigger !== "plot-intrigue") {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
     }
     if (effect.selector !== "self") {

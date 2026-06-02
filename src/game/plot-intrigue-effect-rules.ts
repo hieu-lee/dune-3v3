@@ -103,10 +103,12 @@ export function playTypedPlotIntrigue(
   const hasCardDraw = resolved.cardsToDraw > 0;
   const hasIntrigueDraw = resolved.intriguesToDraw > 0;
   const hasResourceSpend = hasResourceSpends(resolved.spentResources);
+  const hasVpGain = resolved.vp > 0;
   if (!canSpendResources(player.resources, resolved.spentResources)) return state;
   if (
     !hasResourceGains(resolved.revealGain) &&
     !hasResourceSpend &&
+    !hasVpGain &&
     !hasTroopRecruits &&
     !hasCardDraw &&
     !hasIntrigueDraw &&
@@ -120,6 +122,7 @@ export function playTypedPlotIntrigue(
     if (candidate.id === player.id) {
       let next = {
         ...candidate,
+        vp: candidate.vp + resolved.vp,
         resources: applyResourceChanges(candidate.resources, resolved.revealGain, resolved.spentResources),
         garrison: candidate.garrison + resolved.recruitedTroops,
         intrigues: candidate.intrigues.filter((card) => card.id !== intrigue.id),

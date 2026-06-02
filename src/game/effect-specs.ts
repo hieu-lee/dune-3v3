@@ -127,6 +127,18 @@ export function plotResourceExchange(
   ], conditions, { choiceId });
 }
 
+export function plotPayResourcesForVp(
+  choiceId: string,
+  costs: Array<{ resource: ResourceId; amount: EffectAmountSpec }>,
+  vp: EffectAmountSpec,
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return plotIntrigueEffects([
+    ...costs.map(({ resource, amount }) => ({ kind: "spend-resource" as const, selector: "self" as const, resource, amount })),
+    { kind: "gain-vp", selector: "self", amount: vp },
+  ], conditions, { choiceId });
+}
+
 export function plotRecruitTroops(
   selector: PlayerSelector,
   amount: EffectAmountSpec,

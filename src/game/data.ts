@@ -44,6 +44,7 @@ import {
   undercoverAssetSourceId,
   smugglersHarvesterSourceId,
   spiceMustFlowSourceId,
+  strategicStockpilingSourceId,
   strikeFleetSourceId,
   subversiveAdvisorSourceId,
   wheelsWithinWheelsSourceId,
@@ -76,6 +77,7 @@ import {
   plotDrawCards,
   plotDrawIntrigues,
   plotGainResource,
+  plotPayResourcesForVp,
   plotRecruitTroops,
   plotResourceExchange,
   plotSpendResource,
@@ -862,6 +864,16 @@ function intrigueCardEffects(card: HubCard): CardEffectSpec[] | undefined {
     return [
       plotResourceExchange("spice-to-solari", "spice", 2, "solari", 5),
       plotResourceExchange("solari-to-spice", "solari", 5, "spice", 5),
+    ];
+  }
+  if (card.id === strategicStockpilingSourceId) {
+    return [
+      plotPayResourcesForVp("spice", [{ resource: "spice", amount: 5 }], 1),
+      plotPayResourcesForVp("water", [{ resource: "water", amount: 3 }], 1, [hasInfluence("spacing", 3)]),
+      plotPayResourcesForVp("both", [
+        { resource: "spice", amount: 5 },
+        { resource: "water", amount: 3 },
+      ], 2, [hasInfluence("spacing", 3)]),
     ];
   }
   if (card.id === shaddamsFavorSourceId) {

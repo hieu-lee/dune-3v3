@@ -56,6 +56,31 @@ try {
     "Interstellar Trade should have structured reveal persuasion instead of manual printed reveal handling",
   );
   assert.match(interstellarTrade.reveal, /completed contract/, "Interstellar Trade should describe its contract reveal text");
+  assert.ok(
+    interstellarTrade.effects?.some((spec) =>
+      spec.trigger === "acquire" &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-influence-choice" &&
+        effect.selector === "self" &&
+        effect.amount === 1 &&
+        effect.source === "Interstellar Trade"
+      )
+    ),
+    "Interstellar Trade should carry a typed acquire Influence-choice effect",
+  );
+  assert.ok(
+    interstellarTrade.effects?.some((spec) =>
+      spec.trigger === "acquire" &&
+      spec.effects.some((effect) =>
+        effect.kind === "take-contracts" &&
+        effect.selector === "self" &&
+        effect.amount === 1 &&
+        effect.sourcePool === "public-offer" &&
+        effect.source === "Interstellar Trade"
+      )
+    ),
+    "Interstellar Trade should carry a typed acquire public contract effect",
+  );
   const calculus = data.imperiumDeck.find((card) => card.name === "Calculus of Power");
   assert.ok(calculus, "Imperium deck should include Calculus of Power");
   assert.equal(state.isCalculusOfPowerCard(calculus), true, "Calculus of Power should be recognized");
@@ -1847,6 +1872,107 @@ try {
     playerById(afterLateCompletion, p2.id).persuasion,
     2,
     "Interstellar Trade persuasion should be fixed by the reveal plan and not re-count later contract completions",
+  );
+  const interstellarAcquireReplacement = data.imperiumDeck.find((card) => card.id !== interstellarTrade.id);
+  const interstellarAcquireContract = data.standardContracts[4];
+  const interstellarAcquireContractReplacement = data.standardContracts[5];
+  assert.ok(interstellarAcquireReplacement, "Expected an Imperium Row replacement for Interstellar Trade acquisition coverage");
+  assert.ok(interstellarAcquireContract, "Expected a public contract for Interstellar Trade acquisition coverage");
+  assert.ok(
+    interstellarAcquireContractReplacement,
+    "Expected a public contract replacement for Interstellar Trade acquisition coverage",
+  );
+  const interstellarAcquireBase = withActivePlayer(game, p2.id, () => ({
+    contracts: [],
+    discard: [],
+    hand: [],
+    influence: { ...p2.influence, bene: 1 },
+    persuasion: interstellarTrade.cost,
+    playArea: [],
+    revealed: true,
+    resources: { solari: 0, spice: 0, water: 0 },
+    vp: 0,
+  }));
+  const interstellarAcquireFixture = {
+    ...interstellarAcquireBase,
+    imperiumRow: [interstellarTrade],
+    marketDeck: [interstellarAcquireReplacement],
+    contractOffer: [interstellarAcquireContract],
+    contractDeck: [interstellarAcquireContractReplacement],
+  };
+  const interstellarAcquired = state.acquireMarketCard(interstellarAcquireFixture, p2.id, interstellarTrade.id);
+  assert.equal(playerById(interstellarAcquired, p2.id).discard.at(-1)?.id, interstellarTrade.id);
+  assert.equal(playerById(interstellarAcquired, p2.id).persuasion, 0);
+  assert.equal(interstellarAcquired.pendingAction?.kind, "board-influence-choice");
+  assert.equal(interstellarAcquired.pendingAction.sourceTrigger, "acquire");
+  assert.equal(interstellarAcquired.pendingAction.source, "Interstellar Trade");
+  assert.equal(interstellarAcquired.pendingAction.cardId, interstellarTrade.id);
+  assert.deepEqual(
+    interstellarAcquired.pendingAction.choices.map((choice) => `${choice.ownerId}:${choice.faction}`),
+    [`${p2.id}:greatHouses`, `${p2.id}:spacing`, `${p2.id}:bene`, `${p2.id}:fringeWorlds`],
+    "Interstellar Trade should offer main-board Influence choices to an Ally buyer",
+  );
+  assert.deepEqual(
+    interstellarAcquired.pendingQueue,
+    [{ kind: "contract", ownerId: p2.id, source: "Interstellar Trade", publicOnly: true }],
+    "Interstellar Trade should queue its face-up CHOAM contract after the Influence choice",
+  );
+  const forgedInterstellarAcquirePending = {
+    ...interstellarAcquired.pendingAction,
+    cardId: "missing-interstellar-trade-card",
+  };
+  const forgedInterstellarAcquireFixture = {
+    ...interstellarAcquired,
+    pendingAction: forgedInterstellarAcquirePending,
+  };
+  const forgedInterstellarAcquireResolved = state.resolveBoardInfluenceChoice(
+    forgedInterstellarAcquireFixture,
+    forgedInterstellarAcquirePending,
+    p2.id,
+    "bene",
+  );
+  assert.equal(
+    forgedInterstellarAcquireResolved,
+    forgedInterstellarAcquireFixture,
+    "Acquire Influence pendings should require the acquired source card to carry the matching spec",
+  );
+  const interstellarInfluenceResolved = state.resolveBoardInfluenceChoice(
+    interstellarAcquired,
+    interstellarAcquired.pendingAction,
+    p2.id,
+    "bene",
+  );
+  assert.equal(playerById(interstellarInfluenceResolved, p2.id).influence.bene, 2);
+  assert.equal(playerById(interstellarInfluenceResolved, p2.id).vp, 1);
+  assert.equal(interstellarInfluenceResolved.pendingAction?.kind, "contract");
+  const interstellarContractResolved = state.takeChoamContract(
+    interstellarInfluenceResolved,
+    interstellarInfluenceResolved.pendingAction,
+    interstellarAcquireContract.id,
+  );
+  assert.equal(interstellarContractResolved.pendingAction, undefined);
+  assert.equal(playerById(interstellarContractResolved, p2.id).contracts.at(-1)?.card.id, interstellarAcquireContract.id);
+  assert.deepEqual(
+    interstellarContractResolved.contractOffer.map((contract) => contract.id),
+    [interstellarAcquireContractReplacement.id],
+    "Interstellar Trade contract acquisition should refill the public offer",
+  );
+  const noPublicInterstellarAcquired = state.acquireMarketCard(
+    {
+      ...interstellarAcquireBase,
+      imperiumRow: [interstellarTrade],
+      marketDeck: [interstellarAcquireReplacement],
+      contractOffer: [],
+      contractDeck: [],
+    },
+    p2.id,
+    interstellarTrade.id,
+  );
+  assert.equal(noPublicInterstellarAcquired.pendingAction?.kind, "board-influence-choice");
+  assert.deepEqual(
+    noPublicInterstellarAcquired.pendingQueue,
+    [],
+    "Interstellar Trade should not queue a contract choice when no face-up contracts remain",
   );
 
   const calculusFixture = withActivePlayer(game, p2.id, () => ({

@@ -703,6 +703,7 @@ export type PendingAction =
   | {
       kind: "board-influence-choice";
       source: string;
+      sourceTrigger?: "acquire";
       amount?: number;
       trashSource?: boolean;
       cardId?: string;

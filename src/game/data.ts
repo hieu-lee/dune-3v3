@@ -76,9 +76,11 @@ import {
 } from "./card-identifiers";
 import {
   acquireDrawIntrigues,
+  acquireGainInfluenceChoice,
   acquireGainResource,
   acquireGainVp,
   acquirePlaceSpies,
+  acquireTakeContracts,
   agentAcquireCard,
   agentDiscardCardForDraw,
   agentDiscardCardForInfluenceAndDraw,
@@ -492,7 +494,11 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
     ];
   }
   if (card.id === interstellarTradeSourceId) {
-    return [revealGainPersuasion({ kind: "completed-contracts" })];
+    return [
+      acquireGainInfluenceChoice(1, { source: "Interstellar Trade" }),
+      acquireTakeContracts(1, { source: "Interstellar Trade" }),
+      revealGainPersuasion({ kind: "completed-contracts" }),
+    ];
   }
   if (card.id === calculusOfPowerSourceId) {
     return [

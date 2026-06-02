@@ -1,12 +1,13 @@
 import { advancePendingAction } from "./pending-actions";
 import { canPay } from "./board-rules";
 import { boardSpaces, factionIds, factionLabels } from "./data";
-import { resolveAgentGainInfluenceChoices } from "./effect-resolver";
+import { resolveGainInfluenceChoices } from "./effect-resolver";
 import { adjustInfluenceAndResolveThresholdRewards } from "./leader-rewards";
 import { pendingActionForBoardInfluenceChoice } from "./placement-rules";
 import { recordTurnSpiceGain } from "./turn-trackers";
 import { changeAllegiancesGainChoices } from "./influence-choices";
 import { influenceEffectOwnerForChoice } from "./influence-loss-rules";
+import type { GameEffectTrigger } from "./types";
 import type { Card, FactionId, GameState, PendingAction, Player, ResourceId } from "./types";
 
 type BoardInfluenceChoicePendingAction = Extract<PendingAction, { kind: "board-influence-choice" }>;
@@ -22,14 +23,21 @@ function boardInfluenceChoiceIsValid(choice: unknown): choice is { ownerId: stri
 
 function boardInfluenceChoicePendingIsValid(pending: BoardInfluenceChoicePendingAction) {
   const hasSourceCard = pending.cardId !== undefined || pending.cardOwnerId !== undefined;
+  const isAcquireSource = pending.sourceTrigger === "acquire";
   return typeof pending.source === "string" &&
     pending.source.trim().length > 0 &&
+    (pending.sourceTrigger === undefined || pending.sourceTrigger === "acquire") &&
     (pending.amount === undefined || (Number.isInteger(pending.amount) && pending.amount > 0)) &&
     (pending.trashSource === undefined || typeof pending.trashSource === "boolean") &&
-    (pending.trashSource !== true || hasSourceCard) &&
+    (pending.trashSource !== true || (hasSourceCard && !isAcquireSource)) &&
     (!hasSourceCard || (typeof pending.cardId === "string" && typeof pending.cardOwnerId === "string")) &&
     (!hasSourceCard || pending.targetOwnerId === undefined || typeof pending.targetOwnerId === "string") &&
-    (hasSourceCard || (pending.amount === undefined && pending.trashSource === undefined && typeof pending.spaceId === "string")) &&
+    (isAcquireSource || hasSourceCard || (
+      pending.amount === undefined &&
+      pending.trashSource === undefined &&
+      typeof pending.spaceId === "string"
+    )) &&
+    (!isAcquireSource || (hasSourceCard && pending.spaceId === undefined && pending.targetOwnerId === undefined)) &&
     Array.isArray(pending.choices) &&
     pending.choices.every(boardInfluenceChoiceIsValid);
 }
@@ -88,6 +96,13 @@ function sourceCardPlacementMetadataMatches(
   sourceCard: Card,
   pending: BoardInfluenceChoicePendingAction,
 ) {
+  if (pending.sourceTrigger === "acquire") {
+    return pending.spaceId === undefined &&
+      pending.targetOwnerId === undefined &&
+      pending.trashSource !== true &&
+      (sourceOwner.hand.some((card) => card.id === sourceCard.id) ||
+        sourceOwner.discard.some((card) => card.id === sourceCard.id));
+  }
   if (!sourceCard.agentPlacementSpaceId || pending.spaceId !== sourceCard.agentPlacementSpaceId) return false;
   if (sourceOwner.role === "Commander") {
     return typeof pending.targetOwnerId === "string" &&
@@ -104,8 +119,9 @@ function sourceCardSupportsInfluenceChoice(
   sourceCard: Card,
   amount: number,
 ) {
-  const effects = resolveAgentGainInfluenceChoices(sourceCard.effects, {
-    trigger: "agent-play",
+  const trigger: GameEffectTrigger = pending.sourceTrigger ?? "agent-play";
+  const effects = resolveGainInfluenceChoices(sourceCard.effects, {
+    trigger,
     source: sourceOwner,
     state,
   });
@@ -140,7 +156,9 @@ export function resolveBoardInfluenceChoice(
     ? state.players.find((player) => player.id === pending.cardOwnerId)
     : undefined;
   const sourceCard = sourceOwner && pending.cardId
-    ? sourceOwner.playArea.find((card) => card.id === pending.cardId)
+    ? pending.sourceTrigger === "acquire"
+      ? [...sourceOwner.hand, ...sourceOwner.discard].find((card) => card.id === pending.cardId)
+      : sourceOwner.playArea.find((card) => card.id === pending.cardId)
     : undefined;
   const hasSourceCard = pending.cardId !== undefined || pending.cardOwnerId !== undefined;
   if (hasSourceCard && (

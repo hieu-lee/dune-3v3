@@ -40,6 +40,14 @@ function combatSpec(effects, conditions) {
   };
 }
 
+function acquireSpec(effects, conditions) {
+  return {
+    trigger: "acquire",
+    ...(conditions ? { conditions } : {}),
+    effects,
+  };
+}
+
 function hasRevealSpec(card) {
   return card.effects?.some((spec) => spec.trigger === "reveal") ?? false;
 }
@@ -54,6 +62,10 @@ function hasAgentPlaySpec(card) {
 
 function hasAgentEffect(card, predicate) {
   return card.effects?.some((spec) => spec.trigger === "agent-play" && spec.effects.some(predicate)) ?? false;
+}
+
+function hasAcquireEffect(card, predicate) {
+  return card.effects?.some((spec) => spec.trigger === "acquire" && spec.effects.some(predicate)) ?? false;
 }
 
 function hasPlotEffect(card, predicate) {
@@ -307,6 +319,7 @@ try {
     [
       "Guild Spy",
       "In High Places",
+      "Interstellar Trade",
       "Overthrow",
       "Price is No Object",
       "Spy Network",
@@ -3260,6 +3273,29 @@ try {
     ),
     "The Spice Must Flow should use a typed acquire spice effect",
   );
+  assert.ok(
+    hasAcquireEffect(
+      interstellarTrade,
+      (effect) =>
+        effect.kind === "gain-influence-choice" &&
+        effect.selector === "self" &&
+        effect.amount === 1 &&
+        effect.source === "Interstellar Trade",
+    ),
+    "Interstellar Trade should use a typed acquire Influence-choice effect",
+  );
+  assert.ok(
+    hasAcquireEffect(
+      interstellarTrade,
+      (effect) =>
+        effect.kind === "take-contracts" &&
+        effect.selector === "self" &&
+        effect.amount === 1 &&
+        effect.sourcePool === "public-offer" &&
+        effect.source === "Interstellar Trade",
+    ),
+    "Interstellar Trade should use a typed acquire face-up contract effect",
+  );
   assert.deepEqual(
     marketAndImperiumCards.filter(hasAgentPlaySpec).map((card) => card.name).sort(),
     [
@@ -5449,6 +5485,14 @@ try {
     /Invalid combat take-contracts optional "true"/,
     "Combat take-contract specs should remain mandatory until an optional Combat contract UI exists",
   );
+  assert.throws(
+    () => effectResolver.resolveTakeContracts(
+      [acquireSpec([{ kind: "take-contracts", selector: "self", amount: 1, sourcePool: "public-offer", optional: true }])],
+      { trigger: "acquire", source: p2, state: game },
+    ),
+    /Invalid acquire take-contracts optional "true"/,
+    "Acquire take-contract specs should remain mandatory",
+  );
   const invalidDrawCardsSourceCard = {
     ...convincingArgument,
     id: "effect-spec-invalid-draw-cards-source-card",
@@ -6611,6 +6655,19 @@ try {
     () => state.applyCardAgentEffect(invalidGainInfluenceChoiceTrashSourceCard, p2, p2),
     /Invalid gain-influence-choice trashSource "true"/,
     "Gain-Influence choice specs should reject non-boolean trashSource values",
+  );
+  assert.throws(
+    () => effectResolver.resolveGainInfluenceChoices(
+      [acquireSpec([{
+        kind: "gain-influence-choice",
+        selector: "self",
+        amount: 1,
+        trashSource: true,
+      }])],
+      { trigger: "acquire", source: p2, state: game },
+    ),
+    /Invalid acquire gain-influence-choice trashSource "true"/,
+    "Acquire Influence choice specs should not trash the newly acquired source card",
   );
   const paidRewardChoiceBaseOption = {
     id: "troop",
@@ -8315,6 +8372,24 @@ try {
     highCouncilSeat: false,
   }, game);
   assert.equal(interstellarReveal.persuasion, 2, "Interstellar Trade should use completed-contract amount specs");
+  assert.deepEqual(
+    effectResolver.resolveGainInfluenceChoices(interstellarTrade.effects, {
+      trigger: "acquire",
+      source: p2,
+      state: game,
+    }),
+    [{ selector: "self", amount: 1, trashSource: false, source: "Interstellar Trade" }],
+    "Interstellar Trade acquire Influence choice should resolve from typed specs",
+  );
+  assert.deepEqual(
+    effectResolver.resolveTakeContracts(interstellarTrade.effects, {
+      trigger: "acquire",
+      source: p2,
+      state: game,
+    }),
+    [{ selector: "self", amount: 1, sourcePool: "public-offer", optional: false, source: "Interstellar Trade" }],
+    "Interstellar Trade acquire contract bonus should resolve from typed specs",
+  );
 
   const beneReveal = turnActions.revealTurnPlan(
     { ...p2, hand: [beneGesseritOperative], highCouncilSeat: false },

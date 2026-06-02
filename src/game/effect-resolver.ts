@@ -1339,9 +1339,17 @@ export function resolveAgentGainInfluenceChoices(
   specs: CardEffectSpec[] | undefined,
   context: GameEffectContext,
 ): AgentGainInfluenceChoice[] {
+  if (context.trigger !== "agent-play") return [];
+  return resolveGainInfluenceChoices(specs, context);
+}
+
+export function resolveGainInfluenceChoices(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): AgentGainInfluenceChoice[] {
   specs?.forEach(validateSpec);
   return (specs ?? []).flatMap((spec) => {
-    if (spec.trigger !== "agent-play") return [];
+    if (spec.trigger !== context.trigger) return [];
     if (!specApplies(spec, context)) return [];
     return spec.effects
       .filter((effect) => effect.kind === "gain-influence-choice")

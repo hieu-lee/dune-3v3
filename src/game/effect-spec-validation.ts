@@ -227,7 +227,9 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     effect.kind !== "gain-resource" &&
     effect.kind !== "gain-vp" &&
     effect.kind !== "place-spies" &&
-    effect.kind !== "draw-intrigues"
+    effect.kind !== "draw-intrigues" &&
+    effect.kind !== "gain-influence-choice" &&
+    effect.kind !== "take-contracts"
   ) {
     throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
   }
@@ -346,7 +348,7 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     return;
   }
   if (effect.kind === "gain-influence-choice") {
-    if (trigger !== "agent-play") {
+    if (trigger !== "agent-play" && trigger !== "acquire") {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
     }
     if (effect.selector !== "self") {
@@ -354,6 +356,9 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     }
     validateAmount(effect.amount);
     validateOptionalBoolean("gain-influence-choice trashSource", (effect as { trashSource?: unknown }).trashSource);
+    if (trigger === "acquire" && effect.trashSource === true) {
+      invalidSpecField("acquire gain-influence-choice trashSource", effect.trashSource);
+    }
     validateSourceLabel("gain-influence-choice source", effect.source);
     return;
   }
@@ -822,7 +827,7 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     return;
   }
   if (effect.kind === "take-contracts") {
-    if (trigger !== "plot-intrigue" && trigger !== "combat-intrigue") {
+    if (trigger !== "plot-intrigue" && trigger !== "combat-intrigue" && trigger !== "acquire") {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
     }
     if (effect.selector !== "self") {
@@ -837,8 +842,8 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
       invalidSpecField("take-contracts amount", effect.amount);
     }
     validateOptionalTrue("take-contracts optional", (effect as { optional?: unknown }).optional);
-    if (trigger === "combat-intrigue" && effect.optional === true) {
-      invalidSpecField("combat take-contracts optional", effect.optional);
+    if ((trigger === "combat-intrigue" || trigger === "acquire") && effect.optional === true) {
+      invalidSpecField(`${trigger === "combat-intrigue" ? "combat" : "acquire"} take-contracts optional`, effect.optional);
     }
     return;
   }

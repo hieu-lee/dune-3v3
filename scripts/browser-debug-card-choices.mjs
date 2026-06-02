@@ -161,6 +161,42 @@ export async function runCardChoicesSmoke({
   assert.equal(after.spyPosts[states.acquireSpyNetwork.spySpaceId], "p2", "Spy Network acquire bonus should place the chosen spy");
   assert.equal(ownerAfter.discard.at(-1).name, "Spy Network", "Spy Network should remain acquired after resolving its spy bonus");
 
+  await setDebugGameAndWait(page, states.acquireInterstellarTrade);
+  pendingText = await page.locator(".pending-panel").innerText();
+  assert.match(pendingText, /Interstellar Trade/i);
+  assert.match(pendingText, /Choose Influence/i);
+  assert.match(pendingText, /BG/i);
+  await screenshot(page, captures, "pending-acquire-interstellar-trade-influence.png");
+
+  before = await currentGame(page);
+  ownerBefore = before.players.find((player) => player.id === "p2");
+  await page.locator(".pending-panel").getByRole("button", { name: /BG/ }).click();
+  await page.waitForFunction(() => window.__DUNE_DEBUG__?.getGame()?.pendingAction?.kind === "contract");
+  after = await currentGame(page);
+  ownerAfter = after.players.find((player) => player.id === "p2");
+  assert.equal(ownerAfter.influence.bene, ownerBefore.influence.bene + 1, "Interstellar Trade acquire bonus should gain chosen Influence");
+  assert.equal(after.pendingAction?.source, "Interstellar Trade", "Interstellar Trade should queue its contract after Influence");
+
+  pendingText = await page.locator(".pending-panel").innerText();
+  const interstellarContractName = after.contractOffer[0].name;
+  assert.match(pendingText, /CHOAM contract/i);
+  assert.match(pendingText, new RegExp(escapeRegExp(interstellarContractName)));
+  await screenshot(page, captures, "pending-acquire-interstellar-trade-contract.png");
+
+  const contractBefore = after;
+  await page.locator(".pending-panel").getByRole("button", { name: interstellarContractName }).click();
+  await waitForNoPending(page);
+  after = await currentGame(page);
+  ownerAfter = after.players.find((player) => player.id === "p2");
+  assert.equal(ownerAfter.contracts.length, ownerBefore.contracts.length + 1, "Interstellar Trade should add one CHOAM contract");
+  assert.equal(ownerAfter.contracts.at(-1).card.name, interstellarContractName, "Interstellar Trade should take the selected contract");
+  assert.equal(
+    after.contractOffer.length,
+    contractBefore.contractOffer.length,
+    "Interstellar Trade should refill the public contract offer after taking a contract",
+  );
+  assert.equal(ownerAfter.discard.at(-1).name, "Interstellar Trade", "Interstellar Trade should remain acquired after its bonuses");
+
   await setDebugGameAndWait(page, states.beneGesseritOperativeSpy);
   pendingText = await page.locator(".pending-panel").innerText();
   assert.match(pendingText, /Bene Gesserit Operative/i);
@@ -364,6 +400,10 @@ async function createCardChoiceStates(server, initialPlayableGame) {
   assert.ok(spyNetwork, "Expected Spy Network Imperium card");
   const spyNetworkReplacement = data.imperiumDeck.find((card) => card.id !== spyNetwork.id);
   assert.ok(spyNetworkReplacement, "Expected Spy Network replacement card");
+  const interstellarTrade = data.imperiumDeck.find((card) => card.sourceId === 184);
+  assert.ok(interstellarTrade, "Expected Interstellar Trade Imperium card");
+  const interstellarTradeReplacement = data.imperiumDeck.find((card) => card.id !== interstellarTrade.id);
+  assert.ok(interstellarTradeReplacement, "Expected Interstellar Trade replacement card");
   const beneGesseritOperative = data.imperiumDeck.find((card) => card.sourceId === 30);
   assert.ok(beneGesseritOperative, "Expected Bene Gesserit Operative Imperium card");
   const dangerousRhetoric = data.imperiumDeck.find((card) => card.sourceId === 44);
@@ -700,6 +740,39 @@ async function createCardChoiceStates(server, initialPlayableGame) {
     "spy",
     "Expected Spy Network purchase to queue a spy placement pending action",
   );
+  const acquireInterstellarTradeState = state.acquireMarketCard(
+    {
+      ...base,
+      imperiumRow: [interstellarTrade],
+      marketDeck: [interstellarTradeReplacement],
+      spyPosts: {},
+      sharedSpyPosts: {},
+      players: base.players.map((player) =>
+        player.id === ownerId
+          ? {
+              ...player,
+              contracts: [],
+              discard: [],
+              influence: { ...player.influence, bene: 1 },
+              persuasion: interstellarTrade.cost,
+              revealed: true,
+            }
+          : player,
+      ),
+    },
+    ownerId,
+    interstellarTrade.id,
+  );
+  assert.equal(
+    acquireInterstellarTradeState.pendingAction?.kind,
+    "board-influence-choice",
+    "Expected Interstellar Trade purchase to queue an Influence choice first",
+  );
+  assert.deepEqual(
+    acquireInterstellarTradeState.pendingQueue.map((pending) => pending.kind),
+    ["contract"],
+    "Expected Interstellar Trade purchase to queue a contract after Influence",
+  );
   const contractOptionalState = state.playLeveragePlotIntrigue(
     {
       ...base,
@@ -781,6 +854,7 @@ async function createCardChoiceStates(server, initialPlayableGame) {
       spySpaceId: spySpace.id,
       spySpaceName: spySpace.name,
     },
+    acquireInterstellarTrade: acquireInterstellarTradeState,
     beneGesseritOperativeSpy: {
       ...beneGesseritOperativeSpyState,
       spySpaceId: spySpace.id,

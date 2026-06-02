@@ -1,11 +1,12 @@
 import {
   addAcquiredCard,
+  acquiredCardIdFor,
   acquireCardPendingIsValid,
   acquireRewardParts,
   callToArmsRecruitOwner,
   drawAcquireIntrigues,
   formatAcquireOutcome,
-  pendingActionForAcquireSpyReward,
+  pendingActionsForAcquireRewards,
   recordAcquireSpiceGain,
 } from "./market-rules";
 import {
@@ -317,6 +318,8 @@ export function resolveAcquireCardForPending(
       })
     : state.imperiumRow;
   const throneRow = throneCard ? state.throneRow.filter((candidate) => candidate.id !== card.id) : state.throneRow;
+  const fromReserve = Boolean(reserveCard);
+  const acquiredCardId = acquiredCardIdFor(owner, card, fromReserve);
   const callToArmsRecruit = state.phase === "playing" && owner.revealed
     ? callToArmsRecruitOwner(state, owner, callToArmsRecruitOwnerId)
     : { valid: true, owner: undefined };
@@ -327,7 +330,7 @@ export function resolveAcquireCardForPending(
     let next = player;
     if (player.id === owner.id) {
       next = spendAcquireCardPayment(
-        addAcquiredCard(player, card, Boolean(reserveCard), pending.destination, 0, acquireReward),
+        addAcquiredCard(player, card, fromReserve, pending.destination, 0, acquireReward),
         pending,
         cardCost,
       );
@@ -363,8 +366,13 @@ export function resolveAcquireCardForPending(
     ],
   }, owner.id, acquireReward);
   const acquiredState = drawAcquireIntrigues(acquiredStateBase, owner.id, card, acquireReward);
-  const acquireSpyPending = pendingActionForAcquireSpyReward(acquiredState, owner.id, card, acquireReward);
-  return finishPendingResolution(prependPendingAction(acquiredState, acquireSpyPending));
+  const pendingActions = pendingActionsForAcquireRewards(acquiredState, owner.id, card, acquiredCardId, acquireReward);
+  return finishPendingResolution(
+    pendingActions.reduceRight(
+      (nextState, pendingAction) => prependPendingAction(nextState, pendingAction),
+      acquiredState,
+    ),
+  );
 }
 
 export function resolveChoamContractFallback(

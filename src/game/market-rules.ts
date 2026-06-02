@@ -1,5 +1,12 @@
 import { canMoveCardToThroneRow } from "./card-identifiers";
-import { resolveCardAcquireEffects, type GameEffectResult } from "./effect-resolver";
+import {
+  resolveCardAcquireEffects,
+  resolveGainInfluenceChoices,
+  resolveTakeContracts,
+  type GameEffectResult,
+} from "./effect-resolver";
+import { changeAllegiancesGainChoices } from "./influence-choices";
+import { influenceEffectOwnerForChoice } from "./influence-loss-rules";
 import { drawIntrigueCards } from "./intrigue-deck";
 import { advancePendingAction, queuePendingActions } from "./pending-actions";
 import { defaultActivatedAllyId } from "./placement-rules";
@@ -73,6 +80,80 @@ export function pendingActionForAcquireSpyReward(
   return owner ? pendingActionForSpyPlacements(card.name, owner, acquireReward.spyPlacements, state) : undefined;
 }
 
+function pendingActionForAcquireInfluenceChoice(
+  state: GameState,
+  playerId: string,
+  card: Card,
+  acquiredCardId: string,
+): PendingAction | undefined {
+  const owner = state.players.find((player) => player.id === playerId);
+  if (!owner || !card.effects) return undefined;
+  const effects = resolveGainInfluenceChoices(card.effects, {
+    trigger: "acquire",
+    source: owner,
+    state,
+  });
+  return effects
+    .map((effect): PendingAction | undefined => {
+      if (effect.selector !== "self" || effect.amount <= 0 || effect.trashSource) return undefined;
+      const choices = changeAllegiancesGainChoices(owner).flatMap((faction) => {
+        const ownerResult = influenceEffectOwnerForChoice(state, owner, faction);
+        return ownerResult.valid && ownerResult.owner ? [{ ownerId: ownerResult.owner.id, faction }] : [];
+      });
+      if (choices.length === 0) return undefined;
+      return {
+        kind: "board-influence-choice",
+        sourceTrigger: "acquire",
+        source: effect.source ?? card.name,
+        amount: effect.amount,
+        cardId: acquiredCardId,
+        cardOwnerId: owner.id,
+        choices,
+      };
+    })
+    .find((pending): pending is PendingAction => Boolean(pending));
+}
+
+function pendingActionForAcquireContract(
+  state: GameState,
+  playerId: string,
+  card: Card,
+): PendingAction | undefined {
+  const owner = state.players.find((player) => player.id === playerId);
+  if (!owner || !card.effects || state.contractOffer.length === 0) return undefined;
+  const effects = resolveTakeContracts(card.effects, {
+    trigger: "acquire",
+    source: owner,
+    state,
+  });
+  const effect = effects.find((candidate) =>
+    candidate.selector === "self" &&
+    candidate.amount === 1 &&
+    candidate.sourcePool === "public-offer"
+  );
+  if (!effect) return undefined;
+  return {
+    kind: "contract",
+    ownerId: owner.id,
+    source: effect.source ?? card.name,
+    publicOnly: true,
+  };
+}
+
+export function pendingActionsForAcquireRewards(
+  state: GameState,
+  playerId: string,
+  card: Card,
+  acquiredCardId: string,
+  acquireReward: GameEffectResult,
+): PendingAction[] {
+  return [
+    pendingActionForAcquireInfluenceChoice(state, playerId, card, acquiredCardId),
+    pendingActionForAcquireContract(state, playerId, card),
+    pendingActionForAcquireSpyReward(state, playerId, card, acquireReward),
+  ].filter((action): action is PendingAction => Boolean(action));
+}
+
 export function manipulateAcquisitionCost(card: Card) {
   return Math.max(0, (card.cost ?? 0) - 1);
 }
@@ -99,6 +180,10 @@ export function acquireCardPendingIsValid(pending: AcquireCardPendingAction) {
     && (pending.optional === undefined || typeof pending.optional === "boolean");
 }
 
+export function acquiredCardIdFor(player: Player, card: Card, fromReserve: boolean) {
+  return fromReserve ? `${card.id}-${player.id}-${player.purchaseSequence + 1}` : card.id;
+}
+
 export function addAcquiredCard(
   player: Player,
   card: Card,
@@ -109,7 +194,7 @@ export function addAcquiredCard(
 ): Player {
   const purchaseSequence = player.purchaseSequence + 1;
   const acquiredCard = fromReserve
-    ? { ...card, id: `${card.id}-${player.id}-${purchaseSequence}` }
+    ? { ...card, id: acquiredCardIdFor(player, card, fromReserve) }
     : card;
   const destinationCards = destination === "hand" ? player.hand : player.discard;
   return {
@@ -168,6 +253,7 @@ export function acquireMarketCard(
   if (throneCard && buyer.team !== "shaddam") return state;
 
   const fromReserve = Boolean(reserveCard);
+  const acquiredCardId = acquiredCardIdFor(buyer, card, fromReserve);
   const [replacement, ...marketDeckAfterDraw] = state.marketDeck;
   const marketDeck = rowCard ? marketDeckAfterDraw : state.marketDeck;
   const imperiumRow = rowCard
@@ -217,10 +303,12 @@ export function acquireMarketCard(
     ],
   }, buyer.id, acquireReward);
   const acquiredState = drawAcquireIntrigues(acquiredStateBase, buyer.id, card, acquireReward);
-  const acquireSpyPending = pendingActionForAcquireSpyReward(acquiredState, buyer.id, card, acquireReward);
   return {
     ...acquiredState,
-    ...queuePendingActions(acquiredState, acquireSpyPending ? [acquireSpyPending] : []),
+    ...queuePendingActions(
+      acquiredState,
+      pendingActionsForAcquireRewards(acquiredState, buyer.id, card, acquiredCardId, acquireReward),
+    ),
   };
 }
 

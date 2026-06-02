@@ -267,6 +267,7 @@ type PlayerEffectResult = {
 };
 
 export type GameEffectResult = PlayerEffectResult & {
+  acquireRecruitBonus: number;
   activatedAlly: PlayerEffectResult;
   influenceLosses: Partial<Record<FactionId, number>>;
   persuasion: number;
@@ -285,6 +286,7 @@ const emptyPlayerEffectResult: PlayerEffectResult = {
 };
 
 const emptyEffectResult: GameEffectResult = {
+  acquireRecruitBonus: 0,
   cardsToDraw: 0,
   blocksDeploymentsThisTurn: false,
   influenceLosses: {},
@@ -660,6 +662,13 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
     const amount = amountFor(effect.amount, context.source);
     return addSelectedIntriguesToDraw(result, effect.selector, amount);
   }
+  if (effect.kind === "activate-acquire-recruit-bonus") {
+    if (effect.selector !== "self") {
+      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
+    const amount = amountFor(effect.amount, context.source);
+    return { ...result, acquireRecruitBonus: result.acquireRecruitBonus + amount };
+  }
   if (effect.kind === "gain-influence-choice") {
     return result;
   }
@@ -753,6 +762,7 @@ export function resolveGameEffects(specs: CardEffectSpec[] | undefined, context:
 
 function mergeEffectResult(result: GameEffectResult, next: GameEffectResult): GameEffectResult {
   return {
+    acquireRecruitBonus: result.acquireRecruitBonus + next.acquireRecruitBonus,
     cardsToDraw: result.cardsToDraw + next.cardsToDraw,
     drawCardsSource: mergeEffectSourceLabel(
       result.cardsToDraw > 0,
@@ -1305,6 +1315,7 @@ export function resolveAgentTrashSourceForTrades(
 
 function legacyRevealResult(card: Card): GameEffectResult {
   return {
+    acquireRecruitBonus: 0,
     cardsToDraw: 0,
     blocksDeploymentsThisTurn: false,
     influenceLosses: {},
@@ -1340,6 +1351,7 @@ export function resolveCardRevealEffects(
 
 function legacyAcquireResult(card: Card): GameEffectResult {
   return {
+    acquireRecruitBonus: 0,
     cardsToDraw: 0,
     blocksDeploymentsThisTurn: false,
     influenceLosses: {},

@@ -3,6 +3,7 @@ import {
   backedByChoamSourceId,
   beneGesseritOperativeSourceId,
   calculusOfPowerSourceId,
+  callToArmsSourceId,
   cargoRunnerSourceId,
   capturedMentatSourceId,
   chaniCleverTacticianSourceId,
@@ -78,6 +79,7 @@ import {
   hasSpyPosts,
   hasSwordmasterBonus,
   gainedSpiceThisTurn,
+  plotActivateAcquireRecruitBonus,
   plotDrawCards,
   plotDrawIntrigues,
   plotGainResource,
@@ -855,6 +857,9 @@ function intrigueCardEffects(card: HubCard): CardEffectSpec[] | undefined {
     return influenceLossFactions.map((faction) =>
       plotLoseInfluenceForResource(faction, faction, 1, "solari", 4),
     );
+  }
+  if (card.id === callToArmsSourceId) {
+    return [plotActivateAcquireRecruitBonus(1)];
   }
   if (card.id === councilorsAmbitionSourceId) {
     return [plotGainResource("water", 2, [hasHighCouncilSeat()])];

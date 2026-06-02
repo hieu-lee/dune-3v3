@@ -160,6 +160,7 @@ try {
   const prepareTheWay = data.reserveMarket.find((card) => card.sourceId === 537);
   const spiceMustFlow = data.reserveMarket.find((card) => card.sourceId === 538);
   const backedByChoam = data.intrigueCards.find((card) => card.name === "Backed by CHOAM");
+  const callToArms = data.intrigueCards.find((card) => card.name === "Call to Arms");
   const councilorsAmbition = data.intrigueCards.find((card) => card.name === "Councilor's Ambition");
   const contingencyPlan = data.intrigueCards.find((card) => card.name === "Contingency Plan");
   const departForArrakis = data.intrigueCards.find((card) => card.name === "Depart For Arrakis");
@@ -237,7 +238,7 @@ try {
     wheelsWithinWheels,
   );
   assert.ok(commandRespect && prepareTheWay && spiceMustFlow && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
-  assert.ok(backedByChoam && councilorsAmbition && contingencyPlan && departForArrakis && distraction && intelligenceReport && leverage && marketOpportunity && mercenaries && shaddamsFavor && strategicStockpiling);
+  assert.ok(backedByChoam && callToArms && councilorsAmbition && contingencyPlan && departForArrakis && distraction && intelligenceReport && leverage && marketOpportunity && mercenaries && shaddamsFavor && strategicStockpiling);
   assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && dutifulService && deliverSupplies && sietchTabr && spiceRefinery);
   assert.equal(revealSpecCards.length, 79, "Unexpected number of cards with declarative Reveal specs");
   assert.equal(
@@ -620,6 +621,32 @@ try {
   assert.equal(backedSpacingResolved.influenceLosses.spacing, 1, "Backed by CHOAM Spacing Guild choice should lose 1 Spacing Influence");
   assert.equal(backedSpacingResolved.influenceLosses.bene, undefined, "Backed by CHOAM Spacing Guild choice should not lose Bene Gesserit Influence");
   assert.equal(backedSpacingResolved.revealGain.solari, 4, "Backed by CHOAM Spacing Guild choice should gain 4 Solari");
+  assert.ok(
+    callToArms.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.effects.some((effect) =>
+        effect.kind === "activate-acquire-recruit-bonus" &&
+        effect.selector === "self" &&
+        effect.amount === 1
+      )
+    ),
+    "Call to Arms should carry a typed Plot acquire-recruit bonus activation spec",
+  );
+  const callToArmsPlotResolved = effectResolver.resolveGameEffects(callToArms.effects, {
+    trigger: "plot-intrigue",
+    source: p2,
+    state: game,
+  });
+  assert.equal(
+    callToArmsPlotResolved.acquireRecruitBonus,
+    1,
+    "Call to Arms Plot spec should resolve one acquisition recruit bonus",
+  );
+  assert.equal(
+    callToArmsPlotResolved.recruitedTroops,
+    0,
+    "Call to Arms Plot spec should not recruit immediately",
+  );
   assert.ok(
     departForArrakis.effects?.some((spec) =>
       spec.trigger === "plot-intrigue" &&
@@ -2529,6 +2556,25 @@ try {
     () => turnActions.revealTurnPlan({ ...p2, hand: [invalidRevealLoseInfluenceCard], highCouncilSeat: false }),
     /Unsupported effect "lose-influence" for reveal/,
     "Influence-loss effects should stay on Plot specs until other triggers can apply them",
+  );
+  const invalidRevealAcquireRecruitBonusCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-reveal-acquire-recruit-bonus-card",
+    name: "Effect Spec Invalid Reveal Acquire Recruit Bonus",
+    effects: [revealSpec([{ kind: "activate-acquire-recruit-bonus", selector: "self", amount: 1 }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [invalidRevealAcquireRecruitBonusCard], highCouncilSeat: false }),
+    /Unsupported effect "activate-acquire-recruit-bonus" for reveal/,
+    "Acquire-recruit bonus activation should stay on Plot specs",
+  );
+  assert.throws(
+    () => effectResolver.resolveGameEffects(
+      [{ trigger: "plot-intrigue", effects: [{ kind: "activate-acquire-recruit-bonus", selector: "self", amount: 2 }] }],
+      { trigger: "plot-intrigue", source: p2, state: game },
+    ),
+    /Invalid activate-acquire-recruit-bonus amount "2"/,
+    "Acquire-recruit bonus activation currently supports exactly one troop per acquisition",
   );
   const invalidAcquirePersuasionCard = {
     ...convincingArgument,

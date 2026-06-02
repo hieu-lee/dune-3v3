@@ -108,6 +108,14 @@ export function plotDrawIntrigues(
   return plotIntrigueEffects([{ kind: "draw-intrigues", selector: "self", amount }], conditions, options);
 }
 
+export function plotActivateAcquireRecruitBonus(
+  amount: EffectAmountSpec,
+  conditions?: GameEffectConditionSpec[],
+  options?: CardEffectSpecOptions,
+): CardEffectSpec {
+  return plotIntrigueEffects([{ kind: "activate-acquire-recruit-bonus", selector: "self", amount }], conditions, options);
+}
+
 export function plotSpendResource(
   resource: ResourceId,
   amount: EffectAmountSpec,

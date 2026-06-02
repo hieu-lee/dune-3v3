@@ -127,6 +127,10 @@ export function playTypedPlotIntrigue(
   const hasResourceSpend = hasResourceSpends(resolved.spentResources);
   const hasInfluenceLoss = hasInfluenceLosses(resolved.influenceLosses);
   const hasVpGain = resolved.vp > 0;
+  const hasAcquireRecruitBonus = resolved.acquireRecruitBonus > 0;
+  if (resolved.acquireRecruitBonus > 1) {
+    throw new Error(`Unsupported Plot Intrigue acquire-recruit bonus amount ${resolved.acquireRecruitBonus}`);
+  }
   if (!canSpendResources(player.resources, resolved.spentResources)) return state;
   if (!canLoseInfluence(player, resolved.influenceLosses)) return state;
   if (
@@ -137,6 +141,7 @@ export function playTypedPlotIntrigue(
     !hasTroopRecruits &&
     !hasCardDraw &&
     !hasIntrigueDraw &&
+    !hasAcquireRecruitBonus &&
     !contractPending &&
     !spyPending
   ) {
@@ -150,6 +155,7 @@ export function playTypedPlotIntrigue(
       let next = {
         ...candidate,
         resources: applyResourceChanges(candidate.resources, resolved.revealGain, resolved.spentResources),
+        callToArmsActive: hasAcquireRecruitBonus ? true : candidate.callToArmsActive,
         garrison: candidate.garrison + resolved.recruitedTroops,
         intrigues: candidate.intrigues.filter((card) => card.id !== intrigue.id),
       };

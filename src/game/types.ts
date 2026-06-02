@@ -81,6 +81,7 @@ export type GameEffectSpec =
   | { kind: "gain-vp"; selector: PlayerSelector; amount: EffectAmountSpec }
   | { kind: "draw-cards"; selector: PlayerSelector; amount: EffectAmountSpec; source?: string }
   | { kind: "draw-intrigues"; selector: PlayerSelector; amount: EffectAmountSpec }
+  | { kind: "activate-acquire-recruit-bonus"; selector: PlayerSelector; amount: EffectAmountSpec }
   | {
       kind: "gain-influence-choice";
       selector: PlayerSelector;

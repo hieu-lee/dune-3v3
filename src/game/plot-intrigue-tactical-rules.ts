@@ -13,6 +13,7 @@ import {
 import {
   activatedAllyEffectOwner,
 } from "./market-rules";
+import { playTypedPlotIntrigue } from "./plot-intrigue-effect-rules";
 import {
   canPlaySpecialMissionPlaceSpy,
   specialMissionRecallSpySpaces,
@@ -219,28 +220,12 @@ export function playCallToArmsPlotIntrigue(
   playerId: string,
   intrigueId: string,
 ): GameState {
-  if (state.phase !== "playing" || state.pendingAction || state.pendingQueue.length > 0) return state;
-  const player = state.players[state.activeSeat];
-  if (!player || player.id !== playerId) return state;
-  const intrigue = player.intrigues.find((card) => card.id === intrigueId);
-  if (!intrigue || !isCallToArmsIntrigue(intrigue)) return state;
-
-  const players = state.players.map((candidate) =>
-    candidate.id === player.id
-      ? {
-          ...candidate,
-          callToArmsActive: true,
-          intrigues: candidate.intrigues.filter((card) => card.id !== intrigue.id),
-        }
-      : candidate,
-  );
-  return {
-    ...state,
-    players,
-    intrigueDiscard: [...state.intrigueDiscard, intrigue],
-    log: [
+  return playTypedPlotIntrigue(
+    state,
+    playerId,
+    intrigueId,
+    isCallToArmsIntrigue,
+    (player) =>
       `${player.leader} plays Call to Arms; acquisitions during this Reveal turn will recruit 1 troop.`,
-      ...state.log,
-    ],
-  };
+  );
 }

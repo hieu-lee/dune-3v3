@@ -114,7 +114,7 @@ function imperiumRevealText(card: HubCard, persuasion: number, swords: number, p
     return "+2 persuasion.";
   }
   if (card.id === smugglersHarvesterSourceId) {
-    return "If you sent an Agent to a Maker board space this turn, gain 1 spice. +1 persuasion.";
+    return "+1 persuasion.";
   }
   if (card.id === interstellarTradeSourceId) {
     return "+1 persuasion for each completed contract.";
@@ -158,6 +158,9 @@ function imperiumRevealText(card: HubCard, persuasion: number, swords: number, p
   if (card.id === desertPowerSourceId) {
     return "+2 persuasion, or pay 1 water to summon 1 sandworm.";
   }
+  if (card.id === smugglersHavenSourceId) {
+    return "+1 persuasion. If you are spying on a Maker board space, gain 2 spice.";
+  }
   return printedReveal ? "Resolve printed reveal text." : revealText(persuasion, swords);
 }
 
@@ -167,8 +170,8 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
 
   if (card.id === smugglersHarvesterSourceId) {
     return [
+      agentGainResource("spice", 1, [visitedMakerSpace()]),
       revealGainPersuasion(1),
-      revealGainResource("spice", 1, [visitedMakerSpace()]),
     ];
   }
   if (card.id === interstellarTradeSourceId) {
@@ -243,8 +246,8 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
   }
   if (card.id === smugglersHavenSourceId) {
     return [
-      agentGainResource("spice", 2, [hasSpyPostOnMakerSpace()]),
       revealGainPersuasion(1),
+      revealGainResource("spice", 2, [hasSpyPostOnMakerSpace()]),
     ];
   }
   if (card.id === hiddenMissiveSourceId) {
@@ -473,6 +476,9 @@ function fixedRevealEffects(
 }
 
 function imperiumPlayText(card: HubCard) {
+  if (card.id === smugglersHarvesterSourceId) {
+    return "If you sent an Agent to a Maker board space this turn, gain 1 spice.";
+  }
   if (card.id === doubleAgentSourceId) {
     return "If you have a spy on the board space you sent an Agent to this turn, you may place a spy on the same observation post as another player's spy.";
   }
@@ -492,7 +498,7 @@ function imperiumPlayText(card: HubCard) {
     return "Gain 1 Solari on Emperor, Bene Gesserit, or Spacing Guild board spaces.";
   }
   if (card.id === smugglersHavenSourceId) {
-    return "If you are spying on a Maker board space, gain 2 spice.";
+    return "Pay 4 spice to summon 1 sandworm.";
   }
   if (card.id === spaceTimeFoldingSourceId) {
     return "Discard 1 card to draw 1 card. If you discarded a Spacing Guild card, draw 1 more card.";

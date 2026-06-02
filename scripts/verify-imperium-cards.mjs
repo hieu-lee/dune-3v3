@@ -46,7 +46,8 @@ try {
   const smuggler = data.imperiumDeck.find((card) => card.name === "Smuggler's Harvester");
   assert.ok(smuggler, "Imperium deck should include Smuggler's Harvester");
   assert.equal(state.isSmugglersHarvesterCard(smuggler), true, "Smuggler's Harvester should be recognized");
-  assert.match(smuggler.reveal, /Maker board space/, "Smuggler's Harvester should show its conditional Reveal text");
+  assert.match(smuggler.play, /Maker board space/, "Smuggler's Harvester should show its conditional Agent text");
+  assert.equal(smuggler.reveal, "+1 persuasion.", "Smuggler's Harvester should reveal for fixed persuasion only");
   const interstellarTrade = data.imperiumDeck.find((card) => card.name === "Interstellar Trade");
   assert.ok(interstellarTrade, "Imperium deck should include Interstellar Trade");
   assert.equal(state.isInterstellarTradeCard(interstellarTrade), true, "Interstellar Trade should be recognized");
@@ -1770,19 +1771,20 @@ try {
     resources: { solari: 0, spice: 0, water: 0 },
   }));
   const noMakerPlan = turnActions.revealTurnPlan(playerById(noMakerReveal, p2.id), noMakerReveal);
-  assert.equal(noMakerPlan.revealGain.spice ?? 0, 0, "Smuggler's Harvester should not pay without a Maker visit");
+  assert.equal(noMakerPlan.persuasion, 1, "Smuggler's Harvester should reveal for 1 persuasion");
+  assert.equal(noMakerPlan.revealGain.spice ?? 0, 0, "Smuggler's Harvester should not pay spice on Reveal");
 
   const makerAgentFixture = withActivePlayer(game, p2.id, () => ({
     agentsReady: 1,
     discard: [],
     garrison: 0,
-    hand: [dune, smuggler],
+    hand: [smuggler],
     playArea: [],
     resources: { solari: 0, spice: 0, water: 0 },
   }));
   const afterMakerAgent = turnActions.placeAgentAction(makerAgentFixture, {
     commanderTargets: {},
-    selectedCard: dune,
+    selectedCard: smuggler,
     selectedSpace: imperialBasin,
   });
   assert.equal(
@@ -1790,30 +1792,34 @@ try {
     true,
     "Sending an Agent to a Maker board space should mark that player for round reveal checks",
   );
-  assert.equal(playerById(afterMakerAgent, p2.id).resources.spice, 1, "Imperial Basin should pay its base spice");
+  assert.equal(
+    playerById(afterMakerAgent, p2.id).resources.spice,
+    2,
+    "Imperial Basin plus Smuggler's Harvester should pay 2 total spice",
+  );
   assert.deepEqual(afterMakerAgent.pendingAction, undefined, "Zero garrison should avoid a deployment pending action");
 
-  const revealFixture = {
-    ...afterMakerAgent,
-    activeSeat: makerAgentFixture.activeSeat,
-    agentTurnComplete: false,
-    turnSpiceGains: {},
-    turnReverendMotherJessicaRepeats: {},
-    turnUnitDeployments: {},
-    players: afterMakerAgent.players.map((player) =>
-      player.id === p2.id ? { ...player, agentsReady: 0, revealed: false, persuasion: 0 } : player,
-    ),
-  };
+  const revealFixture = withActivePlayer(
+    { ...game, roundMakerSpaceVisits: { [p2.id]: [imperialBasin.id] } },
+    p2.id,
+    () => ({
+      agentsReady: 0,
+      discard: [],
+      hand: [smuggler],
+      playArea: [],
+      resources: { solari: 0, spice: 0, water: 0 },
+    }),
+  );
   const makerPlan = turnActions.revealTurnPlan(playerById(revealFixture, p2.id), revealFixture);
   assert.equal(makerPlan.persuasion, 1, "Smuggler's Harvester should still reveal for 1 persuasion");
-  assert.equal(makerPlan.revealGain.spice, 1, "Smuggler's Harvester should add 1 reveal spice after a Maker visit");
+  assert.equal(makerPlan.revealGain.spice ?? 0, 0, "Smuggler's Harvester should not add reveal spice after a Maker visit");
 
   const revealed = turnActions.revealTurnAction(revealFixture, {
     commanderTargets: {},
     revealPlan: makerPlan,
   });
-  assert.equal(playerById(revealed, p2.id).resources.spice, 2, "Smuggler's Harvester should add 1 spice on Reveal");
-  assert.equal(revealed.turnSpiceGains[p2.id], 1, "Smuggler's Harvester reveal spice should count as turn spice gain");
+  assert.equal(playerById(revealed, p2.id).resources.spice, 0, "Smuggler's Harvester should not add spice on Reveal");
+  assert.equal(revealed.turnSpiceGains[p2.id] ?? 0, 0, "Smuggler's Harvester Reveal should not count spice gain");
   assert.equal(playerById(revealed, p2.id).persuasion, 1);
   assert.deepEqual(playerById(revealed, p2.id).hand, [], "Reveal should move Smuggler's Harvester from hand");
   assert.ok(

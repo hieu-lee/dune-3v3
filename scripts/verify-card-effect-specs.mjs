@@ -3326,7 +3326,7 @@ try {
       "Rebel Supplier",
       "Reliable Informant",
       "Sardaukar Soldier",
-      "Smuggler's Haven",
+      "Smuggler's Harvester",
       "Southern Elders",
       "Space-time Folding",
       "Stilgar, The Devoted",
@@ -4451,13 +4451,41 @@ try {
     "Double Agent should carry fixed Reveal persuasion and strength specs",
   );
   assert.equal(
+    smuggler.play,
+    "If you sent an Agent to a Maker board space this turn, gain 1 spice.",
+    "Smuggler's Harvester play text should expose its Maker-space Agent reward",
+  );
+  assert.equal(smuggler.reveal, "+1 persuasion.", "Smuggler's Harvester reveal text should be fixed persuasion only");
+  assert.ok(
+    smuggler.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.conditions?.some((condition) => condition.kind === "visited-maker-space") &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-resource" &&
+        effect.selector === "self" &&
+        effect.resource === "spice" &&
+        effect.amount === 1
+      )
+    ),
+    "Smuggler's Harvester should carry a current-Agent Maker-space gated Agent spice spec",
+  );
+  assert.ok(
+    hasRevealEffect(smuggler, (effect) => effect.kind === "gain-persuasion" && effect.amount === 1),
+    "Smuggler's Harvester should carry its fixed Reveal persuasion spec",
+  );
+  assert.equal(
     smugglersHaven.play,
-    "If you are spying on a Maker board space, gain 2 spice.",
-    "Smuggler's Haven play text should include its Maker-space spy condition",
+    "Pay 4 spice to summon 1 sandworm.",
+    "Smuggler's Haven play text should expose its Agent sandworm payment",
+  );
+  assert.equal(
+    smugglersHaven.reveal,
+    "+1 persuasion. If you are spying on a Maker board space, gain 2 spice.",
+    "Smuggler's Haven reveal text should include its Maker-space spy condition",
   );
   assert.ok(
     smugglersHaven.effects?.some((spec) =>
-      spec.trigger === "agent-play" &&
+      spec.trigger === "reveal" &&
       spec.conditions?.some((condition) => condition.kind === "has-spy-post-on-maker-space") &&
       spec.effects.some((effect) =>
         effect.kind === "gain-resource" &&
@@ -4466,7 +4494,7 @@ try {
         effect.amount === 2
       )
     ),
-    "Smuggler's Haven should carry an owned Maker-space spy-post gated Agent spice spec",
+    "Smuggler's Haven should carry an owned Maker-space spy-post gated Reveal spice spec",
   );
   assert.ok(
     hasRevealEffect(smugglersHaven, (effect) => effect.kind === "gain-persuasion" && effect.amount === 1),
@@ -8714,12 +8742,43 @@ try {
 
   const noMakerReveal = turnActions.revealTurnPlan({ ...p2, hand: [smuggler], highCouncilSeat: false }, game);
   assert.equal(noMakerReveal.persuasion, 1, "Smuggler's Harvester spec should include base persuasion");
-  assert.equal(noMakerReveal.revealGain.spice ?? 0, 0, "Smuggler's Harvester should not gain spice without a Maker visit");
+  assert.equal(noMakerReveal.revealGain.spice ?? 0, 0, "Smuggler's Harvester should not gain spice on Reveal");
   const makerReveal = turnActions.revealTurnPlan(
     { ...p2, hand: [smuggler], highCouncilSeat: false },
     { ...game, roundMakerSpaceVisits: { [p2.id]: [imperialBasin.id] } },
   );
-  assert.equal(makerReveal.revealGain.spice, 1, "Smuggler's Harvester should gain spice after a Maker visit");
+  assert.equal(makerReveal.revealGain.spice ?? 0, 0, "Smuggler's Harvester Maker-space spice should stay on Agent play");
+  const smugglerMakerAgentEffect = state.applyCardAgentEffect(
+    smuggler,
+    { ...p2, resources: { solari: 0, spice: 0, water: 0 } },
+    p2,
+    game,
+    imperialBasin,
+  );
+  assert.deepEqual(
+    smugglerMakerAgentEffect.source.resources,
+    { solari: 0, spice: 1, water: 0 },
+    "Smuggler's Harvester should gain 1 Agent spice on a Maker space",
+  );
+  assert.equal(
+    smugglerMakerAgentEffect.sourceSpiceGained,
+    1,
+    "Smuggler's Harvester Agent spice should be tracked as turn spice gain",
+  );
+  assert.match(smugglerMakerAgentEffect.log ?? "", /Smuggler's Harvester: gains 1 spice/);
+  const smugglerNonMakerAgentEffect = state.applyCardAgentEffect(
+    smuggler,
+    { ...p2, resources: { solari: 0, spice: 0, water: 0 } },
+    p2,
+    game,
+    deliverSupplies,
+  );
+  assert.deepEqual(
+    smugglerNonMakerAgentEffect.source.resources,
+    { solari: 0, spice: 0, water: 0 },
+    "Smuggler's Harvester should not gain Agent spice on a non-Maker space",
+  );
+  assert.equal(smugglerNonMakerAgentEffect.log, undefined, "Smuggler's Harvester should not log on non-Maker spaces");
 
   const completedContracts = data.standardContracts.slice(0, 2).map((card, index) => ({
     card,
@@ -10074,76 +10133,67 @@ try {
   );
   assert.equal(reliableInformantReveal.persuasion, 1, "Reliable Informant should reveal for 1 persuasion");
   assert.deepEqual(reliableInformantReveal.revealGain, { solari: 1 }, "Reliable Informant should reveal for 1 Solari");
-  const smugglersHavenSpiedMakerEffect = state.applyCardAgentEffect(
-    smugglersHaven,
-    { ...p2, resources: { solari: 0, spice: 0, water: 0 } },
-    p2,
-    {
-      ...game,
-      spyPosts: { [imperialBasin.id]: p2.id },
-    },
-    deliverSupplies,
+  const smugglersHavenSpiedMakerReveal = turnActions.revealTurnPlan(
+    { ...p2, hand: [smugglersHaven], highCouncilSeat: false },
+    { ...game, spyPosts: { [imperialBasin.id]: p2.id } },
   );
-  assert.deepEqual(
-    smugglersHavenSpiedMakerEffect.source.resources,
-    { solari: 0, spice: 2, water: 0 },
-    "Smuggler's Haven should gain 2 Agent spice when the player has a spy on any Maker space",
-  );
+  assert.equal(smugglersHavenSpiedMakerReveal.persuasion, 1, "Smuggler's Haven should reveal for 1 persuasion");
   assert.equal(
-    smugglersHavenSpiedMakerEffect.sourceSpiceGained,
+    smugglersHavenSpiedMakerReveal.revealGain.spice,
     2,
-    "Smuggler's Haven Agent spice should be tracked as turn spice gain",
+    "Smuggler's Haven should gain 2 Reveal spice when the player has a spy on any Maker space",
   );
-  assert.match(smugglersHavenSpiedMakerEffect.log ?? "", /Smuggler's Haven: gains 2 spice/);
-  const smugglersHavenUnspiedMakerEffect = state.applyCardAgentEffect(
-    smugglersHaven,
-    { ...p2, resources: { solari: 0, spice: 0, water: 0 } },
-    p2,
-    game,
-    deliverSupplies,
-  );
-  assert.deepEqual(
-    smugglersHavenUnspiedMakerEffect.source.resources,
-    { solari: 0, spice: 0, water: 0 },
-    "Smuggler's Haven should not gain Agent spice without the player's Maker-space spy",
-  );
-  assert.equal(smugglersHavenUnspiedMakerEffect.log, undefined, "Smuggler's Haven should not log without its spy condition");
-  const smugglersHavenOpponentSpiedMakerEffect = state.applyCardAgentEffect(
-    smugglersHaven,
-    { ...p2, resources: { solari: 0, spice: 0, water: 0 } },
-    p2,
+  const smugglersHavenRevealFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 0,
+    discard: [],
+    hand: [smugglersHaven],
+    playArea: [],
+    resources: { solari: 0, spice: 0, water: 0 },
+  }));
+  const smugglersHavenRevealed = turnActions.revealTurnAction(
+    { ...smugglersHavenRevealFixture, spyPosts: { [imperialBasin.id]: p2.id } },
     {
-      ...game,
-      spyPosts: { [imperialBasin.id]: p1.id },
+      commanderTargets: {},
+      revealPlan: smugglersHavenSpiedMakerReveal,
     },
-    deliverSupplies,
-  );
-  assert.deepEqual(
-    smugglersHavenOpponentSpiedMakerEffect.source.resources,
-    { solari: 0, spice: 0, water: 0 },
-    "Smuggler's Haven should not gain Agent spice from another player's Maker-space spy",
   );
   assert.equal(
-    smugglersHavenOpponentSpiedMakerEffect.log,
-    undefined,
-    "Smuggler's Haven should not log for another player's Maker-space spy",
+    playerById(smugglersHavenRevealed, p2.id).resources.spice,
+    2,
+    "Smuggler's Haven should add its Maker-spy spice during Reveal resolution",
   );
-  const smugglersHavenSpiedNonMakerEffect = state.applyCardAgentEffect(
-    smugglersHaven,
-    { ...p2, resources: { solari: 0, spice: 0, water: 0 } },
-    p2,
-    {
-      ...game,
-      spyPosts: { [deliverSupplies.id]: p2.id },
-    },
-    deliverSupplies,
+  assert.equal(
+    smugglersHavenRevealed.turnSpiceGains[p2.id],
+    2,
+    "Smuggler's Haven Reveal spice should be tracked as turn spice gain",
   );
-  assert.deepEqual(
-    smugglersHavenSpiedNonMakerEffect.source.resources,
-    { solari: 0, spice: 0, water: 0 },
-    "Smuggler's Haven should not gain Agent spice from a spy on a non-Maker space",
+  const smugglersHavenUnspiedMakerReveal = turnActions.revealTurnPlan(
+    { ...p2, hand: [smugglersHaven], highCouncilSeat: false },
+    game,
   );
-  assert.equal(smugglersHavenSpiedNonMakerEffect.log, undefined, "Smuggler's Haven should not log on non-Maker spaces");
+  assert.equal(
+    smugglersHavenUnspiedMakerReveal.revealGain.spice ?? 0,
+    0,
+    "Smuggler's Haven should not gain Reveal spice without the player's Maker-space spy",
+  );
+  const smugglersHavenOpponentSpiedMakerReveal = turnActions.revealTurnPlan(
+    { ...p2, hand: [smugglersHaven], highCouncilSeat: false },
+    { ...game, spyPosts: { [imperialBasin.id]: p1.id } },
+  );
+  assert.equal(
+    smugglersHavenOpponentSpiedMakerReveal.revealGain.spice ?? 0,
+    0,
+    "Smuggler's Haven should not gain Reveal spice from another player's Maker-space spy",
+  );
+  const smugglersHavenSpiedNonMakerReveal = turnActions.revealTurnPlan(
+    { ...p2, hand: [smugglersHaven], highCouncilSeat: false },
+    { ...game, spyPosts: { [deliverSupplies.id]: p2.id } },
+  );
+  assert.equal(
+    smugglersHavenSpiedNonMakerReveal.revealGain.spice ?? 0,
+    0,
+    "Smuggler's Haven should not gain Reveal spice from a spy on a non-Maker space",
+  );
   const spaceTimeNonGuildDiscard = { ...dagger, id: "space-time-non-guild-discard-card" };
   const spaceTimeDrawOne = { ...convincingArgument, id: "space-time-draw-one-card" };
   const spaceTimeDrawTwo = { ...convincingArgument, id: "space-time-draw-two-card" };

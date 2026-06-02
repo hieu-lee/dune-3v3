@@ -117,16 +117,20 @@ try {
   const ecologicalTestingStation = data.imperiumDeck.find((card) => card.name === "Ecological Testing Station");
   const cargoRunner = data.imperiumDeck.find((card) => card.name === "Cargo Runner");
   const chani = data.imperiumDeck.find((card) => card.name === "Chani, Clever Tactician");
+  const leadership = data.imperiumDeck.find((card) => card.name === "Leadership");
   const makerKeeper = data.imperiumDeck.find((card) => card.name === "Maker Keeper");
   const maulaPistol = data.imperiumDeck.find((card) => card.name === "Maula Pistol");
   const northernWatermaster = data.imperiumDeck.find((card) => card.name === "Northern Watermaster");
   const paracompass = data.imperiumDeck.find((card) => card.name === "Paracompass");
+  const publicSpectacle = data.imperiumDeck.find((card) => card.name === "Public Spectacle");
   const rebelSupplier = data.imperiumDeck.find((card) => card.name === "Rebel Supplier");
   const reliableInformant = data.imperiumDeck.find((card) => card.name === "Reliable Informant");
   const sardaukarSoldier = data.imperiumDeck.find((card) => card.name === "Sardaukar Soldier");
   const southernElders = data.imperiumDeck.find((card) => card.name === "Southern Elders");
   const spaceTimeFolding = data.imperiumDeck.find((card) => card.name === "Space-time Folding");
   const stilgar = data.imperiumDeck.find((card) => card.name === "Stilgar, The Devoted");
+  const theacherousManeuver = data.imperiumDeck.find((card) => card.name === "Theacherous Maneuver");
+  const undercoverAsset = data.imperiumDeck.find((card) => card.name === "Undercover Asset");
   const guildEnvoy = data.imperiumDeck.find((card) => card.name === "Guild Envoy");
   const guildSpy = data.imperiumDeck.find((card) => card.name === "Guild Spy");
   const inHighPlaces = data.imperiumDeck.find((card) => card.name === "In High Places");
@@ -179,16 +183,20 @@ try {
     ecologicalTestingStation &&
     cargoRunner &&
     chani &&
+    leadership &&
     makerKeeper &&
     maulaPistol &&
     northernWatermaster &&
     paracompass &&
+    publicSpectacle &&
     rebelSupplier &&
     reliableInformant &&
     sardaukarSoldier &&
     southernElders &&
     spaceTimeFolding &&
     stilgar &&
+    theacherousManeuver &&
+    undercoverAsset &&
     guildEnvoy &&
     guildSpy &&
     inHighPlaces &&
@@ -329,18 +337,22 @@ try {
       "Guild Envoy",
       "Hidden Missive",
       "Imperial Spymaster",
+      "Leadership",
       "Maker Keeper",
       "Maula Pistol",
       "Northern Watermaster",
       "Paracompass",
       "Prepare The Way",
       "Price is No Object",
+      "Public Spectacle",
       "Rebel Supplier",
       "Reliable Informant",
       "Sardaukar Soldier",
       "Southern Elders",
       "Space-time Folding",
       "Stilgar, The Devoted",
+      "Theacherous Maneuver",
+      "Undercover Asset",
       "Wheels Within Wheels",
     ],
     "Unexpected cards with declarative Agent-play specs",
@@ -375,12 +387,20 @@ try {
     sardaukarSoldier,
     southernElders,
     stilgar,
+    leadership,
+    publicSpectacle,
+    theacherousManeuver,
+    undercoverAsset,
   ]) {
     assert.ok(
       card.effects?.some((spec) => spec.trigger === "reveal"),
       `${card.name} should carry a declarative Reveal effect spec`,
     );
   }
+  assert.ok(
+    hasAgentEffect(leadership, (effect) => effect.kind === "draw-cards" && effect.selector === "self" && effect.amount === 1),
+    "Leadership should carry a declarative Agent draw-card spec",
+  );
   for (const card of [imperialSpymaster, sardaukarSoldier]) {
     assert.ok(
       hasAgentEffect(
@@ -388,6 +408,36 @@ try {
         (effect) => effect.kind === "draw-intrigues" && effect.selector === "self" && effect.amount === 1,
       ),
       `${card.name} should carry a declarative Agent Intrigue draw spec`,
+    );
+  }
+  for (const card of [publicSpectacle, theacherousManeuver]) {
+    assert.ok(
+      hasAgentEffect(
+        card,
+        (effect) => effect.kind === "gain-influence-choice" && effect.selector === "self" && effect.amount === 1,
+      ),
+      `${card.name} should carry a declarative Agent Influence-choice spec`,
+    );
+  }
+  assert.ok(
+    hasAgentEffect(
+      theacherousManeuver,
+      (effect) => effect.kind === "draw-intrigues" && effect.selector === "self" && effect.amount === 1,
+    ),
+    "Theacherous Maneuver should carry a declarative Agent Intrigue draw spec",
+  );
+  for (const card of [publicSpectacle, undercoverAsset]) {
+    assert.ok(
+      hasAgentEffect(
+        card,
+        (effect) =>
+          effect.kind === "place-spies" &&
+          effect.selector === "self" &&
+          effect.amount === 1 &&
+          effect.recallForSupply === true &&
+          effect.mustPlace === true,
+      ),
+      `${card.name} should carry a declarative Agent spy-placement spec`,
     );
   }
   assert.ok(
@@ -3771,10 +3821,94 @@ try {
   assert.equal(maulaPistolEffect.source.hand[0]?.id, maulaDraw.id, "Maula Pistol Agent spec should draw 1 card");
   assert.match(maulaPistolEffect.log ?? "", /Maula Pistol: draws 1 card/);
 
+  const leadershipDraw = { ...dagger, id: "leadership-agent-draw-fixture" };
+  const leadershipEffect = state.applyCardAgentEffect(
+    leadership,
+    { ...p2, deck: [leadershipDraw], discard: [], hand: [] },
+    p2,
+    game,
+  );
+  assert.equal(leadershipEffect.source.hand[0]?.id, leadershipDraw.id, "Leadership Agent spec should draw 1 card");
+  assert.match(leadershipEffect.log ?? "", /Leadership: draws 1 card/);
+
   for (const card of [imperialSpymaster, sardaukarSoldier]) {
     const intrigueEffect = state.applyCardAgentEffect(card, p2, p2, game);
     assert.equal(intrigueEffect.sourceIntriguesToDraw, 1, `${card.name} Agent spec should draw 1 Intrigue`);
   }
+  const theacherousManeuverEffect = state.applyCardAgentEffect(theacherousManeuver, p2, p2, game);
+  assert.equal(
+    theacherousManeuverEffect.sourceIntriguesToDraw,
+    1,
+    "Theacherous Maneuver Agent spec should draw 1 Intrigue",
+  );
+
+  const pendingPrimitiveSource = (card, patch = {}) => ({
+    ...p2,
+    hand: [],
+    influence: { ...p2.influence, bene: 1 },
+    playArea: [card],
+    spies: 1,
+    ...patch,
+  });
+  const pendingPrimitiveFixture = (source) => ({
+    ...game,
+    pendingAction: undefined,
+    pendingQueue: [],
+    sharedSpyPosts: {},
+    spyPosts: {},
+    players: game.players.map((player) => player.id === source.id ? source : player),
+  });
+
+  const undercoverSource = pendingPrimitiveSource(undercoverAsset);
+  const undercoverPendings = state.pendingActionsForCard(
+    undercoverAsset,
+    undercoverSource,
+    pendingPrimitiveFixture(undercoverSource),
+  );
+  assert.deepEqual(
+    undercoverPendings.map((pending) => pending.kind),
+    ["spy"],
+    "Undercover Asset should queue a typed spy placement",
+  );
+  assert.equal(undercoverPendings[0].ownerId, p2.id, "Undercover Asset spy placement should target the source player");
+  assert.equal(undercoverPendings[0].source, "Undercover Asset");
+
+  const publicSpectacleSource = pendingPrimitiveSource(publicSpectacle);
+  const publicSpectaclePendings = state.pendingActionsForCard(
+    publicSpectacle,
+    publicSpectacleSource,
+    pendingPrimitiveFixture(publicSpectacleSource),
+  );
+  assert.deepEqual(
+    publicSpectaclePendings.map((pending) => pending.kind),
+    ["spy", "board-influence-choice"],
+    "Public Spectacle should compose spy placement before its typed Influence choice",
+  );
+  assert.equal(publicSpectaclePendings[0].ownerId, p2.id, "Public Spectacle spy placement should target the source player");
+  assert.equal(publicSpectaclePendings[0].source, "Public Spectacle");
+  assert.equal(publicSpectaclePendings[1].source, "Public Spectacle");
+  assert.equal(publicSpectaclePendings[1].amount, 1);
+  assert.equal(publicSpectaclePendings[1].cardId, publicSpectacle.id);
+  assert.equal(publicSpectaclePendings[1].cardOwnerId, p2.id);
+  assert.equal(publicSpectaclePendings[1].trashSource, undefined, "Public Spectacle should not trash itself after Influence");
+  assert.ok(publicSpectaclePendings[1].choices.length > 0, "Public Spectacle should expose at least one Influence choice");
+
+  const theacherousManeuverSource = pendingPrimitiveSource(theacherousManeuver);
+  const theacherousManeuverPendings = state.pendingActionsForCard(
+    theacherousManeuver,
+    theacherousManeuverSource,
+    pendingPrimitiveFixture(theacherousManeuverSource),
+  );
+  assert.deepEqual(
+    theacherousManeuverPendings.map((pending) => pending.kind),
+    ["board-influence-choice"],
+    "Theacherous Maneuver should queue a typed Influence choice",
+  );
+  assert.equal(theacherousManeuverPendings[0].source, "Theacherous Maneuver");
+  assert.equal(theacherousManeuverPendings[0].amount, 1);
+  assert.equal(theacherousManeuverPendings[0].cardId, theacherousManeuver.id);
+  assert.equal(theacherousManeuverPendings[0].cardOwnerId, p2.id);
+  assert.ok(theacherousManeuverPendings[0].choices.length > 0, "Theacherous Maneuver should expose Influence choices");
 
   const rebelSupplierEffect = state.applyCardAgentEffect(
     rebelSupplier,

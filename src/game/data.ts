@@ -15,6 +15,7 @@ import {
   hiddenMissiveSourceId,
   inHighPlacesSourceId,
   imperialSpymasterSourceId,
+  leadershipSourceId,
   interstellarTradeSourceId,
   makerKeeperSourceId,
   maulaPistolSourceId,
@@ -23,6 +24,7 @@ import {
   paracompassSourceId,
   prepareTheWaySourceId,
   priceIsNoObjectSourceId,
+  publicSpectacleSourceId,
   rebelSupplierSourceId,
   reliableInformantSourceId,
   sardaukarSoldierSourceId,
@@ -30,6 +32,8 @@ import {
   spaceTimeFoldingSourceId,
   spyNetworkSourceId,
   stilgarDevotedSourceId,
+  theacherousManeuverSourceId,
+  undercoverAssetSourceId,
   smugglersHarvesterSourceId,
   spiceMustFlowSourceId,
   strikeFleetSourceId,
@@ -486,17 +490,24 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
 }
 
 type SimpleAgentEffectConfig = {
+  drawCards?: number;
   drawIntrigues?: number;
+  gainInfluence?: number;
   gain?: Partial<Record<ResourceId, number>>;
+  placeSpies?: number;
   recruitTroops?: number;
 };
 
 const simpleAgentEffectConfigs: Record<number, SimpleAgentEffectConfig> = {
   [imperialSpymasterSourceId]: { drawIntrigues: 1 },
+  [leadershipSourceId]: { drawCards: 1 },
+  [publicSpectacleSourceId]: { gainInfluence: 1, placeSpies: 1 },
   [rebelSupplierSourceId]: { gain: { spice: 1 }, recruitTroops: 2 },
   [sardaukarSoldierSourceId]: { drawIntrigues: 1 },
   [southernEldersSourceId]: { gain: { water: 1 }, recruitTroops: 2 },
   [stilgarDevotedSourceId]: { recruitTroops: 2 },
+  [theacherousManeuverSourceId]: { drawIntrigues: 1, gainInfluence: 1 },
+  [undercoverAssetSourceId]: { placeSpies: 1 },
 };
 
 function agentRecruitTroopsForActivatedOwner(amount: number): CardEffectSpec[] {
@@ -517,6 +528,15 @@ function imperiumSimpleAgentEffects(card: HubCard): CardEffectSpec[] | undefined
   ];
   if (config.drawIntrigues) {
     effects.push(agentDrawIntrigues(config.drawIntrigues));
+  }
+  if (config.drawCards) {
+    effects.push(agentDrawCards(config.drawCards));
+  }
+  if (config.gainInfluence) {
+    effects.push(agentGainInfluenceChoice(config.gainInfluence));
+  }
+  if (config.placeSpies) {
+    effects.push(agentPlaceSpies("self", config.placeSpies, { recallForSupply: true, mustPlace: true }));
   }
   for (const resource of ["solari", "spice", "water"] as const) {
     const amount = config.gain?.[resource] ?? 0;

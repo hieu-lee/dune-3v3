@@ -182,6 +182,7 @@ try {
   const cunning = data.intrigueCards.find((card) => card.name === "Cunning");
   const departForArrakis = data.intrigueCards.find((card) => card.name === "Depart For Arrakis");
   const detonation = data.intrigueCards.find((card) => card.name === "Detonation");
+  const unexpectedAllies = data.intrigueCards.find((card) => card.name === "Unexpected Allies");
   const devour = data.intrigueCards.find((card) => card.name === "Devour");
   const distraction = data.intrigueCards.find((card) => card.name === "Distraction");
   const findWeakness = data.intrigueCards.find((card) => card.name === "Find Weakness");
@@ -272,7 +273,7 @@ try {
     wheelsWithinWheels,
   );
   assert.ok(commandRespect && prepareTheWay && spiceMustFlow && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
-  assert.ok(backedByChoam && buyAccess && callToArms && changeAllegiances && councilorsAmbition && contingencyPlan && cunning && departForArrakis && detonation && devour && distraction && findWeakness && goToGround && impress && imperiumPolitics && inspireAwe && intelligenceReport && leverage && manipulate && marketOpportunity && mercenaries && opportunism && questionableMethods && reachAgreement && shaddamsFavor && spiceIsPower && specialMission && springTheTrap && tacticalOption && sietchRitual && strategicStockpiling && weirdingCombat);
+  assert.ok(backedByChoam && buyAccess && callToArms && changeAllegiances && councilorsAmbition && contingencyPlan && cunning && departForArrakis && detonation && unexpectedAllies && devour && distraction && findWeakness && goToGround && impress && imperiumPolitics && inspireAwe && intelligenceReport && leverage && manipulate && marketOpportunity && mercenaries && opportunism && questionableMethods && reachAgreement && shaddamsFavor && spiceIsPower && specialMission && springTheTrap && tacticalOption && sietchRitual && strategicStockpiling && weirdingCombat);
   assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && dutifulService && deliverSupplies && sietchTabr && spiceRefinery);
   assert.equal(revealSpecCards.length, 79, "Unexpected number of cards with declarative Reveal specs");
   assert.equal(
@@ -2573,6 +2574,146 @@ try {
     "Detonation deploy branch should remain choice-gated",
   );
   assert.ok(
+    unexpectedAllies.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.choiceId === "summon" &&
+      spec.effects.some((effect) =>
+        effect.kind === "spend-resource" &&
+        effect.selector === "self" &&
+        effect.resource === "water" &&
+        effect.amount === 2
+      )
+    ),
+    "Unexpected Allies should carry a typed water-spend summon branch spec",
+  );
+  assert.ok(
+    unexpectedAllies.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.choiceId === "summon" &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Ally") &&
+      spec.effects.some((effect) =>
+        effect.kind === "summon-sandworms" &&
+        effect.selector === "self" &&
+        effect.amount === 1 &&
+        effect.source === "Unexpected Allies"
+      )
+    ),
+    "Unexpected Allies should carry a typed Ally sandworm summon spec",
+  );
+  assert.ok(
+    unexpectedAllies.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.choiceId === "summon" &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Commander") &&
+      spec.effects.some((effect) =>
+        effect.kind === "summon-sandworms" &&
+        effect.selector === "activated-ally" &&
+        effect.amount === 1 &&
+        effect.source === "Unexpected Allies"
+      )
+    ),
+    "Unexpected Allies should carry a typed Commander activated-Ally sandworm summon spec",
+  );
+  assert.ok(
+    unexpectedAllies.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.choiceId === "remove-shield-wall" &&
+      spec.effects.some((effect) =>
+        effect.kind === "spend-resource" &&
+        effect.selector === "self" &&
+        effect.resource === "water" &&
+        effect.amount === 2
+      )
+    ) &&
+    unexpectedAllies.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.choiceId === "remove-shield-wall" &&
+      spec.effects.some((effect) =>
+        effect.kind === "remove-shield-wall" &&
+        effect.selector === "self" &&
+        effect.source === "Unexpected Allies"
+      )
+    ),
+    "Unexpected Allies should carry a typed remove-Shield-Wall branch with water spend",
+  );
+  assert.deepEqual(
+    effectResolver.resolveGameEffects(unexpectedAllies.effects, {
+      trigger: "plot-intrigue",
+      choiceId: "summon",
+      source: p2,
+      state: game,
+    }).spentResources,
+    { water: 2 },
+    "Unexpected Allies summon branch should resolve the typed water cost",
+  );
+  assert.equal(
+    effectResolver.resolveGameEffects(unexpectedAllies.effects, {
+      trigger: "plot-intrigue",
+      choiceId: "summon",
+      source: p2,
+      state: game,
+    }).removeShieldWall,
+    false,
+    "Unexpected Allies summon branch should not remove the Shield Wall",
+  );
+  assert.deepEqual(
+    effectResolver.resolvePlotSummonSandworms(unexpectedAllies.effects, {
+      trigger: "plot-intrigue",
+      choiceId: "summon",
+      source: p2,
+      state: game,
+    }),
+    [{ selector: "self", amount: 1, source: "Unexpected Allies" }],
+    "Unexpected Allies Ally summon branch should resolve a self sandworm summon effect",
+  );
+  const unexpectedAlliesWallResolved = effectResolver.resolveGameEffects(unexpectedAllies.effects, {
+    trigger: "plot-intrigue",
+    choiceId: "remove-shield-wall",
+    source: p4,
+    target: p6,
+    state: game,
+  });
+  assert.deepEqual(
+    unexpectedAlliesWallResolved.spentResources,
+    { water: 2 },
+    "Unexpected Allies remove-wall branch should resolve the typed water cost",
+  );
+  assert.equal(
+    unexpectedAlliesWallResolved.removeShieldWall,
+    true,
+    "Unexpected Allies remove-wall branch should resolve typed Shield Wall removal",
+  );
+  assert.deepEqual(
+    effectResolver.resolvePlotSummonSandworms(unexpectedAllies.effects, {
+      trigger: "plot-intrigue",
+      choiceId: "remove-shield-wall",
+      source: p4,
+      target: p6,
+      state: game,
+    }),
+    [{ selector: "activated-ally", amount: 1, source: "Unexpected Allies" }],
+    "Unexpected Allies Commander remove-wall branch should resolve an activated-Ally sandworm summon effect",
+  );
+  assert.deepEqual(
+    effectResolver.resolvePlotSummonSandworms(unexpectedAllies.effects, {
+      trigger: "plot-intrigue",
+      choiceId: "remove-shield-wall",
+      source: p4,
+      state: game,
+    }),
+    [],
+    "Unexpected Allies Commander sandworm summon should require an activated Ally target",
+  );
+  assert.deepEqual(
+    effectResolver.resolvePlotSummonSandworms(unexpectedAllies.effects, {
+      trigger: "plot-intrigue",
+      source: p2,
+      state: game,
+    }),
+    [],
+    "Unexpected Allies summon branches should remain choice-gated",
+  );
+  assert.ok(
     departForArrakis.effects?.some((spec) =>
       spec.trigger === "plot-intrigue" &&
       spec.choiceId === "draw" &&
@@ -4564,6 +4705,46 @@ try {
     ),
     /Invalid deploy-troops source ""/,
     "Deploy-troops specs should reject empty source labels",
+  );
+  assert.throws(
+    () => effectResolver.resolvePlotSummonSandworms(
+      [agentSpec([{ kind: "summon-sandworms", selector: "self", amount: 1, source: "Test" }])],
+      { trigger: "agent-play", source: p2, state: game },
+    ),
+    /Unsupported effect "summon-sandworms" for agent-play/,
+    "Summon-sandworms specs should stay on Plot Intrigues",
+  );
+  assert.throws(
+    () => effectResolver.resolvePlotSummonSandworms(
+      [plotSpec([{ kind: "summon-sandworms", selector: "opponent", amount: 1, source: "Test" }])],
+      { trigger: "plot-intrigue", source: p2, state: game },
+    ),
+    /Unsupported effect selector "opponent" for summon-sandworms/,
+    "Summon-sandworms specs should reject unsupported selectors",
+  );
+  assert.throws(
+    () => effectResolver.resolvePlotSummonSandworms(
+      [plotSpec([{ kind: "summon-sandworms", selector: "self", amount: 0, source: "Test" }])],
+      { trigger: "plot-intrigue", source: p2, state: game },
+    ),
+    /Invalid summon-sandworms amount "0"/,
+    "Summon-sandworms specs should require a positive amount",
+  );
+  assert.throws(
+    () => effectResolver.resolvePlotSummonSandworms(
+      [plotSpec([{ kind: "summon-sandworms", selector: "self", amount: { kind: "completed-contracts" }, source: "Test" }])],
+      { trigger: "plot-intrigue", source: p2, state: game },
+    ),
+    /Invalid summon-sandworms amount "\[object Object\]"/,
+    "Summon-sandworms specs should reject dynamic amounts",
+  );
+  assert.throws(
+    () => effectResolver.resolvePlotSummonSandworms(
+      [plotSpec([{ kind: "summon-sandworms", selector: "self", amount: 1, source: "" }])],
+      { trigger: "plot-intrigue", source: p2, state: game },
+    ),
+    /Invalid summon-sandworms source ""/,
+    "Summon-sandworms specs should reject empty source labels",
   );
   const invalidAcquirePersuasionCard = {
     ...convincingArgument,

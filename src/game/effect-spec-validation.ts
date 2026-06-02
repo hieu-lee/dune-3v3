@@ -214,6 +214,7 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
       (
         effect.kind === "recruit-troops" ||
         effect.kind === "deploy-troops" ||
+        effect.kind === "summon-sandworms" ||
         effect.kind === "gain-influence" ||
         effect.kind === "lose-influence"
       )
@@ -399,6 +400,17 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     }
     validatePositiveFixedAmount("deploy-troops max", effect.max);
     validateSourceLabel("deploy-troops source", effect.source);
+    return;
+  }
+  if (effect.kind === "summon-sandworms") {
+    if (trigger !== "plot-intrigue") {
+      throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
+    }
+    if (effect.selector !== "self" && effect.selector !== "activated-ally") {
+      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
+    validatePositiveFixedAmount("summon-sandworms amount", effect.amount);
+    validateSourceLabel("summon-sandworms source", effect.source);
     return;
   }
   if (effect.kind === "retreat-troops-for-strength") {

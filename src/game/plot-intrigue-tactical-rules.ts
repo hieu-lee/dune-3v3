@@ -1,18 +1,9 @@
 import {
-  conflictProtectedByShieldWall,
-} from "./critical-locations";
-import {
-  conflictDeploymentBlockedFor,
-} from "./conflict-rules";
-import {
   isCallToArmsIntrigue,
   isDetonationIntrigue,
   isSpecialMissionIntrigue,
   isUnexpectedAlliesIntrigue,
 } from "./card-identifiers";
-import {
-  activatedAllyEffectOwner,
-} from "./market-rules";
 import { playTypedPlotIntrigue } from "./plot-intrigue-effect-rules";
 import {
   canPlaySpecialMissionPlaceSpy,
@@ -20,7 +11,6 @@ import {
 } from "./spy-pending-rules";
 import {
   recordTurnSpiceGain,
-  recordTurnUnitDeployment,
 } from "./turn-trackers";
 import type {
   GameState,
@@ -127,53 +117,27 @@ export function playUnexpectedAlliesIntrigue(
   removeShieldWall: boolean,
   sandwormOwnerId?: string,
 ): GameState {
-  if (state.phase !== "playing" || state.pendingAction || state.pendingQueue.length > 0) return state;
-  const player = state.players[state.activeSeat];
-  if (!player || player.id !== playerId) return state;
-  const intrigue = player.intrigues.find((card) => card.id === intrigueId);
-  if (!intrigue || !isUnexpectedAlliesIntrigue(intrigue)) return state;
-  if (!state.conflict || player.resources.water < 2) return state;
-  if (state.shieldWall && conflictProtectedByShieldWall(state.conflict) && !removeShieldWall) return state;
-
-  const sandwormOwnerResult = activatedAllyEffectOwner(state, player, sandwormOwnerId);
-  if (!sandwormOwnerResult.valid || !sandwormOwnerResult.owner) return state;
-  const sandwormOwner = sandwormOwnerResult.owner;
-  if (conflictDeploymentBlockedFor(state, player.id, sandwormOwner.id)) return state;
-
-  const removedShieldWall = removeShieldWall && state.shieldWall;
-  const ownerLabel = sandwormOwner.id !== player.id ? ` for ${sandwormOwner.leader}` : "";
-  const shieldLabel = removedShieldWall ? " removes the Shield Wall," : "";
-
-  const players = state.players.map((candidate) => {
-    let next = candidate;
-    if (candidate.id === player.id) {
-      next = {
-        ...next,
-        resources: { ...next.resources, water: next.resources.water - 2 },
-        intrigues: next.intrigues.filter((card) => card.id !== intrigue.id),
-      };
-    }
-    if (candidate.id === sandwormOwner.id) {
-      next = {
-        ...next,
-        conflict: next.conflict + 3,
-        deployedSandworms: next.deployedSandworms + 1,
-      };
-    }
-    return next;
-  });
-
-  const nextState = {
-    ...state,
-    shieldWall: removedShieldWall ? false : state.shieldWall,
-    players,
-    intrigueDiscard: [...state.intrigueDiscard, intrigue],
-    log: [
-      `${player.leader} plays Unexpected Allies${ownerLabel}, spends 2 water,${shieldLabel} and summons 1 sandworm.`,
-      ...state.log,
-    ],
-  };
-  return recordTurnUnitDeployment(nextState, player.id, 1);
+  const choiceId = removeShieldWall ? "remove-shield-wall" : "summon";
+  const actor = state.players[state.activeSeat];
+  return playTypedPlotIntrigue(
+    state,
+    playerId,
+    intrigueId,
+    isUnexpectedAlliesIntrigue,
+    (player, _contractPending, _activatedAlly, resolved, outcome) => {
+      const summonOwner = outcome.summonOwner;
+      const ownerLabel = summonOwner && summonOwner.id !== player.id ? ` for ${summonOwner.leader}` : "";
+      const shieldLabel = state.shieldWall && resolved.removeShieldWall ? " removes the Shield Wall," : "";
+      const summoned = outcome.summonedSandworms ?? 1;
+      return `${player.leader} plays Unexpected Allies${ownerLabel}, spends 2 water,${shieldLabel} and summons ${summoned} sandworm${summoned === 1 ? "" : "s"}.`;
+    },
+    {
+      choiceId,
+      ...(actor?.role === "Commander"
+        ? { requireActivatedAlly: true, activatedAllyOwnerId: sandwormOwnerId }
+        : {}),
+    },
+  );
 }
 
 export function playCallToArmsPlotIntrigue(

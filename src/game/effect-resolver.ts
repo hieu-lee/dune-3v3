@@ -209,6 +209,12 @@ export type PlotDeployTroops = {
   source?: string;
 };
 
+export type PlotSummonSandworms = {
+  selector: "self" | "activated-ally";
+  amount: number;
+  source?: string;
+};
+
 export type AgentGainInfluenceChoice = {
   selector: PlayerSelector;
   amount: number;
@@ -809,6 +815,9 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
     return addSelectedRecruitedTroops(result, effect.selector, amount, effect.source);
   }
   if (effect.kind === "deploy-troops") {
+    return result;
+  }
+  if (effect.kind === "summon-sandworms") {
     return result;
   }
   if (effect.kind === "retreat-troops-for-strength") {
@@ -1507,6 +1516,24 @@ export function resolvePlotDeployTroops(
       .map((effect) => ({
         selector: effect.selector,
         max: effect.max,
+        source: effect.source,
+      }));
+  });
+}
+
+export function resolvePlotSummonSandworms(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): PlotSummonSandworms[] {
+  specs?.forEach(validateSpec);
+  return (specs ?? []).flatMap((spec) => {
+    if (spec.trigger !== "plot-intrigue") return [];
+    if (!specApplies(spec, context)) return [];
+    return spec.effects
+      .filter((effect) => effect.kind === "summon-sandworms")
+      .map((effect) => ({
+        selector: effect.selector,
+        amount: effect.amount,
         source: effect.source,
       }));
   });

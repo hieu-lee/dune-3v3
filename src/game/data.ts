@@ -65,6 +65,7 @@ import {
   tacticalOptionSourceId,
   theacherousManeuverSourceId,
   undercoverAssetSourceId,
+  unexpectedAlliesSourceId,
   smugglersHarvesterSourceId,
   spiceMustFlowSourceId,
   strategicStockpilingSourceId,
@@ -136,6 +137,7 @@ import {
   plotSpendResource,
   plotTakeContracts,
   plotTrashCard,
+  plotSummonSandworms,
   revealGainPersuasion,
   revealPlaceSpies,
   revealGainResource,
@@ -1020,6 +1022,17 @@ function intrigueCardEffects(card: HubCard): CardEffectSpec[] | undefined {
       plotRemoveShieldWall({ source: "Detonation" }, undefined, { choiceId: "shield-wall" }),
       plotDeployTroops("self", 4, { source: "Detonation" }, [hasRole("Ally")], { choiceId: "deploy" }),
       plotDeployTroops("activated-ally", 4, { source: "Detonation" }, [hasRole("Commander")], { choiceId: "deploy" }),
+    ];
+  }
+  if (card.id === unexpectedAlliesSourceId) {
+    return [
+      plotSpendResource("water", 2, undefined, { choiceId: "summon" }),
+      plotSummonSandworms("self", 1, { source: "Unexpected Allies" }, [hasRole("Ally")], { choiceId: "summon" }),
+      plotSummonSandworms("activated-ally", 1, { source: "Unexpected Allies" }, [hasRole("Commander")], { choiceId: "summon" }),
+      plotSpendResource("water", 2, undefined, { choiceId: "remove-shield-wall" }),
+      plotRemoveShieldWall({ source: "Unexpected Allies" }, undefined, { choiceId: "remove-shield-wall" }),
+      plotSummonSandworms("self", 1, { source: "Unexpected Allies" }, [hasRole("Ally")], { choiceId: "remove-shield-wall" }),
+      plotSummonSandworms("activated-ally", 1, { source: "Unexpected Allies" }, [hasRole("Commander")], { choiceId: "remove-shield-wall" }),
     ];
   }
   if (card.id === councilorsAmbitionSourceId) {

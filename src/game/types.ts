@@ -117,6 +117,7 @@ export type GameEffectSpec =
     }
   | { kind: "recruit-troops"; selector: PlayerSelector; amount: EffectAmountSpec; source?: string }
   | { kind: "deploy-troops"; selector: "self" | "activated-ally"; max: number; source?: string }
+  | { kind: "summon-sandworms"; selector: "self" | "activated-ally"; amount: number; source?: string }
   | {
       kind: "retreat-troops-for-strength";
       selector: PlayerSelector;

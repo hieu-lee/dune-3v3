@@ -43,6 +43,7 @@ type CardEffectSpecOptions = {
 };
 
 type PlotDeployTroopSelector = Extract<PlayerSelector, "self" | "activated-ally">;
+type PlotSummonSandwormSelector = Extract<PlayerSelector, "self" | "activated-ally">;
 
 function effectSpec(
   trigger: CardEffectSpec["trigger"],
@@ -536,6 +537,25 @@ export function plotRemoveShieldWall(
     {
       kind: "remove-shield-wall",
       selector: "self",
+      ...(options.source ? { source: options.source } : {}),
+    },
+  ], conditions, specOptions);
+}
+
+export function plotSummonSandworms(
+  selector: PlotSummonSandwormSelector,
+  amount: number,
+  options: {
+    source?: string;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+  specOptions?: CardEffectSpecOptions,
+): CardEffectSpec {
+  return plotIntrigueEffects([
+    {
+      kind: "summon-sandworms",
+      selector,
+      amount,
       ...(options.source ? { source: options.source } : {}),
     },
   ], conditions, specOptions);
@@ -1248,39 +1268,42 @@ export function cloneCardEffects(effects: CardEffectSpec[] | undefined): CardEff
   return effects?.map((spec) => ({
     ...spec,
     conditions: spec.conditions?.map((condition) => ({ ...condition })),
-    effects: spec.effects.map((effect) => ({
-      ...effect,
-      ...("amount" in effect && effect.amount !== undefined
-        ? { amount: cloneAmount(effect.amount) }
-        : {}),
-      ...("cost" in effect
-        ? { cost: cloneAmount(effect.cost) }
-        : {}),
-      ...("strength" in effect
-        ? { strength: cloneAmount(effect.strength) }
-        : {}),
-      ...("strengthReward" in effect && effect.strengthReward !== undefined
-        ? { strengthReward: cloneAmount(effect.strengthReward) }
-        : {}),
-      ...("spiceRewardCostThreshold" in effect && effect.spiceRewardCostThreshold !== undefined
-        ? { spiceRewardCostThreshold: cloneAmount(effect.spiceRewardCostThreshold) }
-        : {}),
-      ...("spiceReward" in effect && effect.spiceReward !== undefined
-        ? { spiceReward: cloneAmount(effect.spiceReward) }
-        : {}),
-      ...("drawCards" in effect
-        ? { drawCards: cloneAmount(effect.drawCards) }
-        : {}),
-      ...("bonusDraw" in effect && effect.bonusDraw
-        ? { bonusDraw: { ...effect.bonusDraw, drawCards: cloneAmount(effect.bonusDraw.drawCards) } }
-        : {}),
-      ...("influenceAmount" in effect
-        ? { influenceAmount: cloneAmount(effect.influenceAmount) }
-        : {}),
-      ...("options" in effect
-        ? { options: effect.options.map((option) => ({ ...option })) }
-        : {}),
-    })),
+    effects: spec.effects.map((effect): GameEffectSpec => {
+      if (effect.kind === "summon-sandworms") return { ...effect };
+      return {
+        ...effect,
+        ...("amount" in effect && effect.amount !== undefined
+          ? { amount: cloneAmount(effect.amount) }
+          : {}),
+        ...("cost" in effect
+          ? { cost: cloneAmount(effect.cost) }
+          : {}),
+        ...("strength" in effect
+          ? { strength: cloneAmount(effect.strength) }
+          : {}),
+        ...("strengthReward" in effect && effect.strengthReward !== undefined
+          ? { strengthReward: cloneAmount(effect.strengthReward) }
+          : {}),
+        ...("spiceRewardCostThreshold" in effect && effect.spiceRewardCostThreshold !== undefined
+          ? { spiceRewardCostThreshold: cloneAmount(effect.spiceRewardCostThreshold) }
+          : {}),
+        ...("spiceReward" in effect && effect.spiceReward !== undefined
+          ? { spiceReward: cloneAmount(effect.spiceReward) }
+          : {}),
+        ...("drawCards" in effect
+          ? { drawCards: cloneAmount(effect.drawCards) }
+          : {}),
+        ...("bonusDraw" in effect && effect.bonusDraw
+          ? { bonusDraw: { ...effect.bonusDraw, drawCards: cloneAmount(effect.bonusDraw.drawCards) } }
+          : {}),
+        ...("influenceAmount" in effect
+          ? { influenceAmount: cloneAmount(effect.influenceAmount) }
+          : {}),
+        ...("options" in effect
+          ? { options: effect.options.map((option) => ({ ...option })) }
+          : {}),
+      };
+    }),
   }));
 }
 

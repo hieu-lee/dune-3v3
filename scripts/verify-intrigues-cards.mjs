@@ -103,7 +103,7 @@ const summaryExpectations = {
     "Intelligence Report should expose its conditional card draw",
   ],
   leverage: [
-    "If you gained spice this turn, gain 1 Solari and take a face-up CHOAM contract.",
+    "If you gained spice this turn, gain 1 Solari and may take a face-up CHOAM contract.",
     "Leverage should expose its spice-gated Solari and contract effect",
   ],
   manipulate: [

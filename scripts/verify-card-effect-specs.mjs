@@ -24,6 +24,14 @@ function agentSpec(effects, conditions) {
   };
 }
 
+function plotSpec(effects, conditions) {
+  return {
+    trigger: "plot-intrigue",
+    ...(conditions ? { conditions } : {}),
+    effects,
+  };
+}
+
 function hasRevealSpec(card) {
   return card.effects?.some((spec) => spec.trigger === "reveal") ?? false;
 }
@@ -38,6 +46,10 @@ function hasAgentPlaySpec(card) {
 
 function hasAgentEffect(card, predicate) {
   return card.effects?.some((spec) => spec.trigger === "agent-play" && spec.effects.some(predicate)) ?? false;
+}
+
+function hasPlotEffect(card, predicate) {
+  return card.effects?.some((spec) => spec.trigger === "plot-intrigue" && spec.effects.some(predicate)) ?? false;
 }
 
 function hasRevealEffect(card, predicate) {
@@ -83,6 +95,7 @@ function withActivePlayer(game, playerId, patch) {
 try {
   const data = await server.ssrLoadModule("/src/game/data.ts");
   const state = await server.ssrLoadModule("/src/game/state.ts");
+  const effectResolver = await server.ssrLoadModule("/src/game/effect-resolver.ts");
   const turnActions = await server.ssrLoadModule("/src/app-turn-actions.ts");
 
   const game = state.initialGame();
@@ -144,6 +157,7 @@ try {
   const wheelsWithinWheels = data.imperiumDeck.find((card) => card.name === "Wheels Within Wheels");
   const prepareTheWay = data.reserveMarket.find((card) => card.sourceId === 537);
   const spiceMustFlow = data.reserveMarket.find((card) => card.sourceId === 538);
+  const leverage = data.intrigueCards.find((card) => card.name === "Leverage");
   const commandRespect = data.muadDibCommanderCards.find((card) => card.name === "Command Respect");
   const limitedLandsraadAccess = data.muadDibCommanderCards.find((card) => card.name === "Limited Landsraad Access");
   const demandAttention = data.muadDibCommanderCards.find((card) => card.name === "Demand Attention");
@@ -211,6 +225,7 @@ try {
     wheelsWithinWheels,
   );
   assert.ok(commandRespect && prepareTheWay && spiceMustFlow && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
+  assert.ok(leverage);
   assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && dutifulService && deliverSupplies && sietchTabr && spiceRefinery);
   assert.equal(revealSpecCards.length, 79, "Unexpected number of cards with declarative Reveal specs");
   assert.equal(
@@ -252,6 +267,55 @@ try {
       "The Spice Must Flow",
     ],
     "Only implemented acquisition reward cards should currently carry declarative Acquire specs",
+  );
+  assert.ok(
+    hasPlotEffect(leverage, (effect) =>
+      effect.kind === "gain-resource" &&
+      effect.selector === "self" &&
+      effect.resource === "solari" &&
+      effect.amount === 1
+    ),
+    "Leverage should carry a typed Plot Intrigue Solari gain spec",
+  );
+  assert.ok(
+    leverage.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.conditions?.some((condition) => condition.kind === "gained-spice-this-turn") &&
+      spec.effects.some((effect) =>
+        effect.kind === "take-contracts" &&
+        effect.selector === "self" &&
+        effect.amount === 1 &&
+        effect.sourcePool === "public-offer" &&
+        effect.optional === true &&
+        effect.source === "Leverage"
+      )
+    ),
+    "Leverage should carry a typed Plot Intrigue public-contract pending spec gated by turn spice gain",
+  );
+  const leveragePlotResolved = effectResolver.resolveGameEffects(leverage.effects, {
+    trigger: "plot-intrigue",
+    source: p2,
+    state: { turnSpiceGains: { [p2.id]: 1 } },
+  });
+  assert.equal(leveragePlotResolved.revealGain.solari, 1, "Leverage Plot spec should resolve its Solari gain after a spice gain");
+  const leverageContractEffects = effectResolver.resolveTakeContracts(leverage.effects, {
+    trigger: "plot-intrigue",
+    source: p2,
+    state: { turnSpiceGains: { [p2.id]: 1 } },
+  });
+  assert.deepEqual(
+    leverageContractEffects,
+    [{ selector: "self", amount: 1, sourcePool: "public-offer", optional: true, source: "Leverage" }],
+    "Leverage Plot spec should resolve a reusable optional public-contract effect",
+  );
+  assert.deepEqual(
+    effectResolver.resolveTakeContracts(leverage.effects, {
+      trigger: "plot-intrigue",
+      source: p2,
+      state: { turnSpiceGains: {} },
+    }),
+    [],
+    "Leverage Plot contract spec should not resolve without a turn spice gain",
   );
   for (const card of [guildSpy, inHighPlaces, spyNetwork, strikeFleet, subversiveAdvisor]) {
     assert.ok(
@@ -1979,6 +2043,30 @@ try {
     () => state.applyCardAgentEffect(invalidGainResourceSourceCard, p2, p2),
     /Invalid gain-resource source ""/,
     "Resource gain specs should reject empty source labels",
+  );
+  assert.throws(
+    () => effectResolver.resolveGameEffects(
+      [agentSpec([{ kind: "take-contracts", selector: "self", amount: 1, sourcePool: "public-offer" }])],
+      { trigger: "agent-play", source: p2, state: game },
+    ),
+    /Unsupported effect "take-contracts" for agent-play/,
+    "Take-contract specs should stay on Plot Intrigue until other trigger resolvers support them",
+  );
+  assert.throws(
+    () => effectResolver.resolveTakeContracts(
+      [plotSpec([{ kind: "take-contracts", selector: "activated-ally", amount: 1, sourcePool: "public-offer" }])],
+      { trigger: "plot-intrigue", source: p2, state: game },
+    ),
+    /Unsupported effect selector "activated-ally" for plot-intrigue/,
+    "Take-contract specs should reject activated Ally selectors",
+  );
+  assert.throws(
+    () => effectResolver.resolveTakeContracts(
+      [plotSpec([{ kind: "take-contracts", selector: "self", amount: 1, sourcePool: "reserved" }])],
+      { trigger: "plot-intrigue", source: p2, state: game },
+    ),
+    /Invalid take-contracts sourcePool "reserved"/,
+    "Take-contract specs should reject unsupported contract source pools",
   );
   const invalidDrawCardsSourceCard = {
     ...convincingArgument,

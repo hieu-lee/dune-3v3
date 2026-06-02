@@ -17,6 +17,7 @@ import {
   inHighPlacesSourceId,
   imperialSpymasterSourceId,
   leadershipSourceId,
+  leverageSourceId,
   interstellarTradeSourceId,
   makerKeeperSourceId,
   maulaPistolSourceId,
@@ -65,6 +66,9 @@ import {
   hasRole,
   hasSpyPosts,
   hasSwordmasterBonus,
+  gainedSpiceThisTurn,
+  plotGainResource,
+  plotTakeContracts,
   revealGainPersuasion,
   revealPlaceSpies,
   revealGainResource,
@@ -163,7 +167,7 @@ const intrigueSummariesByCatalogId: Partial<Record<number, string>> = {
   134: "Spend 2 Solari and lose 2 Influence to gain 1 VP.",
   143: "Remove and replace a card in the Imperium Row; during your Reveal turn this round, you may acquire it for 1 Persuasion less.",
   144: "After you deploy three or more units to the Conflict in a single turn, place a spy on the same observation post as another player's spy.",
-  447: "If you gained spice this turn, gain 1 Solari and take a face-up CHOAM contract.",
+  447: "If you gained spice this turn, gain 1 Solari and may take a face-up CHOAM contract.",
   135: "Lose 1 Influence to gain 1 Influence; you may also spend 3 spice to gain 1 Influence.",
   136: "Place 1 spy on a City observation post OR recall 1 spy to remove the Shield Wall and gain 2 spice.",
   131: "Remove the Shield Wall OR deploy up to four troops from your garrison to the Conflict.",
@@ -816,6 +820,16 @@ export const conflictCards: ConflictCard[] = catalog.cards
   .filter((card) => card.type === "conflict")
   .map(toConflictCard);
 
+function intrigueCardEffects(card: HubCard): CardEffectSpec[] | undefined {
+  if (card.id === leverageSourceId) {
+    return [
+      plotGainResource("solari", 1, [gainedSpiceThisTurn()]),
+      plotTakeContracts(1, { optional: true, source: "Leverage" }, [gainedSpiceThisTurn()]),
+    ];
+  }
+  return undefined;
+}
+
 function toIntrigueCard(card: HubCard): IntrigueCard {
   const battleIcon = intrigueBattleIconsByCatalogId[card.id];
   const combatSwords = attributeNumber(card, "Swords");
@@ -824,6 +838,7 @@ function toIntrigueCard(card: HubCard): IntrigueCard {
     id: `intrigue-${card.id}`,
     name: card.name,
     summary: intrigueSummariesByCatalogId[card.id] ?? summarizeAttributes(card),
+    effects: intrigueCardEffects(card),
     battleIcon,
     combatSwords: combatSwords > 0 ? combatSwords : undefined,
     automatedCombatSwords,

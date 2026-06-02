@@ -363,7 +363,7 @@ function applyRankReward(state: GameState, conflict: ConflictCard, assignment: L
         ? `${owner.leader} may gain ${influencePendingActions.reduce((sum, action) => sum + action.remaining, 0)} Influence from the ${rankLabel} reward on ${conflict.name}${multiplier > 1 ? " with sandworm doubling" : ""}.`
         : undefined,
       contractPendingActions.length > 0
-        ? `${owner.leader} may take ${contractPendingActions.length} face-up CHOAM contract${contractPendingActions.length === 1 ? "" : "s"} from the ${rankLabel} reward on ${conflict.name}${multiplier > 1 ? " with sandworm doubling" : ""}.`
+        ? `${owner.leader} must take ${contractPendingActions.length} face-up CHOAM contract${contractPendingActions.length === 1 ? "" : "s"} from the ${rankLabel} reward on ${conflict.name}${multiplier > 1 ? " with sandworm doubling" : ""}.`
         : undefined,
       trashPendingActions.length > 0
         ? `${owner.leader} must trash ${trashPendingActions.length} card${trashPendingActions.length === 1 ? "" : "s"} from the ${rankLabel} reward on ${conflict.name}${multiplier > 1 ? " with sandworm doubling" : ""}.`
@@ -462,7 +462,7 @@ function awardConflictToWinner(
         ? `${winner.leader} may gain ${influencePendingActions.reduce((sum, action) => sum + action.remaining, 0)} Influence from ${conflict.name}${multiplier > 1 ? " with sandworm doubling" : ""}.`
         : undefined,
       contractPendingActions.length > 0
-        ? `${winner.leader} may take ${contractPendingActions.length} face-up CHOAM contract${contractPendingActions.length === 1 ? "" : "s"} from ${conflict.name}${multiplier > 1 ? " with sandworm doubling" : ""}.`
+        ? `${winner.leader} must take ${contractPendingActions.length} face-up CHOAM contract${contractPendingActions.length === 1 ? "" : "s"} from ${conflict.name}${multiplier > 1 ? " with sandworm doubling" : ""}.`
         : undefined,
       trashPendingActions.length > 0
         ? `${winner.leader} must trash ${trashPendingActions.length} card${trashPendingActions.length === 1 ? "" : "s"} from ${conflict.name}${multiplier > 1 ? " with sandworm doubling" : ""}.`

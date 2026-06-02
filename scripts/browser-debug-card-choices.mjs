@@ -33,6 +33,27 @@ export async function runCardChoicesSmoke({
   assert.equal(ownerAfter.contracts.length, ownerBefore.contracts.length + 1, "Contract choice should add one contract");
   assert.equal(ownerAfter.contracts.at(-1).card.name, contractName, "Contract choice should take the selected contract");
 
+  await setDebugGameAndWait(page, states.contractOptional);
+  pendingText = await page.locator(".pending-panel").innerText();
+  const optionalContractName = states.contractOptional.contractOffer[0].name;
+  before = await currentGame(page);
+  assert.equal(before.pendingAction?.source, "Leverage", "Optional contract browser state should come from Leverage");
+  assert.match(pendingText, new RegExp(escapeRegExp(optionalContractName)));
+  assert.match(pendingText, /Skip/i);
+  await screenshot(page, captures, "pending-contract-optional-skip.png");
+
+  ownerBefore = before.players.find((player) => player.id === "p2");
+  await page.locator(".pending-panel").getByRole("button", { name: "Skip" }).click();
+  await waitForNoPending(page);
+  after = await currentGame(page);
+  ownerAfter = after.players.find((player) => player.id === "p2");
+  assert.equal(ownerAfter.contracts.length, ownerBefore.contracts.length, "Skipping optional contract should not add a contract");
+  assert.deepEqual(
+    after.contractOffer.map((contract) => contract.id),
+    before.contractOffer.map((contract) => contract.id),
+    "Skipping optional contract should leave the public offer unchanged",
+  );
+
   await setDebugGameAndWait(page, states.contractFallback);
   pendingText = await page.locator(".pending-panel").innerText();
   assert.match(pendingText, /CHOAM contract/i);
@@ -359,6 +380,8 @@ async function createCardChoiceStates(server, initialPlayableGame) {
   assert.ok(ecologicalTestingStation, "Expected Ecological Testing Station Imperium card");
   const covertOperation = data.imperiumDeck.find((card) => card.sourceId === 35);
   assert.ok(covertOperation, "Expected Covert Operation Imperium card");
+  const leverage = data.intrigueCards.find((card) => card.sourceId === 447);
+  assert.ok(leverage, "Expected Leverage Intrigue card");
   const spySpace = data.boardSpaces.find((space) => space.id === "high-council");
   assert.ok(spySpace, "Expected High Council spy placement space");
   const spyPlaceAfterRecallSpace = data.boardSpaces.find((space) => space.id === "secrets");
@@ -677,6 +700,29 @@ async function createCardChoiceStates(server, initialPlayableGame) {
     "spy",
     "Expected Spy Network purchase to queue a spy placement pending action",
   );
+  const contractOptionalState = state.playLeveragePlotIntrigue(
+    {
+      ...base,
+      turnSpiceGains: { [ownerId]: 1 },
+      players: base.players.map((player) =>
+        player.id === ownerId
+          ? {
+              ...player,
+              contracts: [],
+              intrigues: [leverage],
+              resources: { ...player.resources, solari: 0 },
+            }
+          : { ...player, intrigues: [] },
+      ),
+    },
+    ownerId,
+    leverage.id,
+  );
+  assert.deepEqual(
+    contractOptionalState.pendingAction,
+    { kind: "contract", ownerId, source: "Leverage", publicOnly: true, optional: true },
+    "Expected Leverage to queue an optional public contract pending action",
+  );
 
   return {
     contractPublic: {
@@ -687,6 +733,7 @@ async function createCardChoiceStates(server, initialPlayableGame) {
         source: "Browser debug contract",
       },
     },
+    contractOptional: contractOptionalState,
     contractFallback: {
       ...base,
       contractOffer: [],

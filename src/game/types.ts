@@ -69,7 +69,8 @@ export type GameEffectConditionSpec =
   | { kind: "has-high-council-seat" }
   | { kind: "has-swordmaster-bonus" }
   | { kind: "has-leader"; leader: string }
-  | { kind: "has-alliance"; faction?: FactionId };
+  | { kind: "has-alliance"; faction?: FactionId }
+  | { kind: "gained-spice-this-turn" };
 export type GameEffectSpec =
   | { kind: "gain-resource"; selector: PlayerSelector; resource: ResourceId; amount: EffectAmountSpec; source?: string }
   | { kind: "gain-persuasion"; selector: PlayerSelector; amount: EffectAmountSpec }
@@ -210,6 +211,14 @@ export type GameEffectSpec =
       source?: string;
     }
   | {
+      kind: "take-contracts";
+      selector: PlayerSelector;
+      amount: EffectAmountSpec;
+      sourcePool: ContractEffectSourcePool;
+      optional?: true;
+      source?: string;
+    }
+  | {
       kind: "pay-team-resource-for-vp";
       selector: PlayerSelector;
       resource: ResourceId;
@@ -323,6 +332,7 @@ export type IntrigueCard = {
   id: string;
   name: string;
   summary: string;
+  effects?: CardEffectSpec[];
   battleIcon?: BattleIconId;
   combatSwords?: number;
   automatedCombatSwords?: number;
@@ -595,6 +605,7 @@ export type PendingAction =
       source: string;
       spaceId?: string;
       publicOnly?: boolean;
+      optional?: true;
     }
   | ({
       kind: "acquire-card";

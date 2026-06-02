@@ -60,6 +60,43 @@ export function acquireEffects(effects: GameEffectSpec[], conditions?: GameEffec
   };
 }
 
+export function plotIntrigueEffects(effects: GameEffectSpec[], conditions?: GameEffectConditionSpec[]): CardEffectSpec {
+  return {
+    trigger: "plot-intrigue",
+    ...(conditions && conditions.length > 0 ? { conditions } : {}),
+    effects,
+  };
+}
+
+export function plotGainResource(
+  resource: ResourceId,
+  amount: EffectAmountSpec,
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return plotIntrigueEffects([{ kind: "gain-resource", selector: "self", resource, amount }], conditions);
+}
+
+export function plotTakeContracts(
+  amount: EffectAmountSpec,
+  options: {
+    sourcePool?: ContractEffectSourcePool;
+    optional?: true;
+    source?: string;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return plotIntrigueEffects([
+    {
+      kind: "take-contracts",
+      selector: "self",
+      amount,
+      sourcePool: options.sourcePool ?? "public-offer",
+      ...(options.optional ? { optional: true } : {}),
+      ...(options.source ? { source: options.source } : {}),
+    },
+  ], conditions);
+}
+
 export function acquireGainResource(
   resource: ResourceId,
   amount: EffectAmountSpec,
@@ -673,6 +710,10 @@ export function hasLeader(leader: string) {
 
 export function hasAlliance(faction?: FactionId) {
   return faction ? ({ kind: "has-alliance", faction } as const) : ({ kind: "has-alliance" } as const);
+}
+
+export function gainedSpiceThisTurn() {
+  return { kind: "gained-spice-this-turn" } as const;
 }
 
 export function cloneCardEffects(effects: CardEffectSpec[] | undefined): CardEffectSpec[] | undefined {

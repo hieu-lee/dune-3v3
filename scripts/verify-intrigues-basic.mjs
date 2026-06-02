@@ -195,14 +195,22 @@ export function verifyBasicPlotIntrigues({ cards, data, game, state }) {
   assert.equal(leveraged.intrigueDiscard.at(-1).id, leverage.id);
   assert.deepEqual(
     leveraged.pendingAction,
-    { kind: "contract", ownerId: "p2", source: "Leverage", publicOnly: true },
-    "Leverage should queue a public-only contract choice",
+    { kind: "contract", ownerId: "p2", source: "Leverage", publicOnly: true, optional: true },
+    "Leverage should queue an optional public-only contract choice",
   );
   assert.match(leveraged.log[0], /plays Leverage, gains 1 Solari and may take a face-up CHOAM contract/);
   const leverageContractTaken = state.takeChoamContract(leveraged, leveraged.pendingAction, leverageContract.id);
   assert.equal(playerById(leverageContractTaken, "p2").contracts.at(-1).card.id, leverageContract.id);
   assert.deepEqual(leverageContractTaken.contractOffer.map((contract) => contract.id), [leverageReplacement.id]);
   assert.equal(leverageContractTaken.pendingAction, undefined);
+  const leverageSkippedContract = state.finishPendingAction(leveraged);
+  assert.equal(leverageSkippedContract.pendingAction, undefined, "Optional Leverage contract choice should be skippable");
+  assert.equal(playerById(leverageSkippedContract, "p2").contracts.length, 0, "Skipping Leverage contract should not take a contract");
+  assert.deepEqual(
+    leverageSkippedContract.contractOffer.map((contract) => contract.id),
+    [leverageContract.id],
+    "Skipping Leverage contract should leave the public offer unchanged",
+  );
   const shaddamReserved = playerById(game, "p4").reservedContracts[0];
   assert.ok(shaddamReserved, "Expected a reserved Shaddam contract");
   const reservedLeverage = {

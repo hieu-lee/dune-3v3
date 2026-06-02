@@ -19,7 +19,7 @@ import {
   distractionSpyPending,
 } from "./spy-pending-rules";
 import { spyPostCount } from "./spy-posts";
-import { hasGainedSpiceThisTurn } from "./turn-trackers";
+import { resolveGameEffects, resolveTakeContracts } from "./effect-resolver";
 import { trashableCards } from "./trash-rules";
 import type {
   GameState,
@@ -107,21 +107,42 @@ export function playLeveragePlotIntrigue(
 ): GameState {
   if (state.phase !== "playing" || state.pendingAction || state.pendingQueue.length > 0) return state;
   const player = state.players[state.activeSeat];
-  if (!player || player.id !== playerId || !hasGainedSpiceThisTurn(state, player.id)) return state;
+  if (!player || player.id !== playerId) return state;
   const intrigue = player.intrigues.find((card) => card.id === intrigueId);
   if (!intrigue || !isLeverageIntrigue(intrigue)) return state;
+  const context = {
+    trigger: "plot-intrigue" as const,
+    source: player,
+    state,
+  };
+  const resolved = resolveGameEffects(intrigue.effects, context);
+  const [contractEffect] = resolveTakeContracts(intrigue.effects, context);
+  if ((resolved.revealGain.solari ?? 0) <= 0) return state;
 
   const players = state.players.map((candidate) =>
     candidate.id === player.id
       ? {
           ...candidate,
-          resources: { ...candidate.resources, solari: candidate.resources.solari + 1 },
+          resources: {
+            ...candidate.resources,
+            solari: candidate.resources.solari + (resolved.revealGain.solari ?? 0),
+          },
           intrigues: candidate.intrigues.filter((card) => card.id !== intrigue.id),
         }
       : candidate,
   );
-  const contractPending: PendingAction | undefined = state.contractOffer.length > 0
-    ? { kind: "contract", ownerId: player.id, source: "Leverage", publicOnly: true }
+  const contractPending: PendingAction | undefined = contractEffect &&
+    contractEffect.selector === "self" &&
+    contractEffect.amount > 0 &&
+    contractEffect.sourcePool === "public-offer" &&
+    state.contractOffer.length > 0
+    ? {
+        kind: "contract",
+        ownerId: player.id,
+        source: contractEffect.source ?? intrigue.name,
+        publicOnly: true,
+        ...(contractEffect.optional ? { optional: true } : {}),
+      }
     : undefined;
   const contractText = contractPending ? " and may take a face-up CHOAM contract" : "";
 

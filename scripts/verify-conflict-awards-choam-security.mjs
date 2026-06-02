@@ -47,7 +47,7 @@ export function verifyChoamSecurityConflictAwards({
   assert.equal(choamSecurityPending.round, choamSecurityReward.round, "Contract choice should pause before next round");
   assert.ok(
     choamSecurityPending.log.some((entry) =>
-      entry.includes("may take 1 face-up CHOAM contract") &&
+      entry.includes("must take 1 face-up CHOAM contract") &&
       entry.includes("CHOAM Security")
     ),
     "CHOAM Security should log the pending public contract choice",

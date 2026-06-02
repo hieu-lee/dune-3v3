@@ -149,6 +149,7 @@ function validateCondition(condition: GameEffectConditionSpec) {
     if (condition.faction === undefined || supportedFactions.has(condition.faction)) return;
     throw new Error(`Unsupported effect faction "${condition.faction}"`);
   }
+  if (condition.kind === "gained-spice-this-turn") return;
   unsupportedKind("effect condition", condition);
 }
 
@@ -169,6 +170,9 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
   }
   if (effect.kind === "gain-resource") {
+    if (trigger !== "agent-play" && trigger !== "reveal" && trigger !== "acquire" && trigger !== "plot-intrigue") {
+      throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
+    }
     if (!supportedResources.has(effect.resource)) {
       throw new Error(`Unsupported effect resource "${effect.resource}"`);
     }
@@ -474,6 +478,22 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     validateAmount(effect.contractCount);
     validateOptionalTrue("pay-resource-for-contracts optional", (effect as { optional?: unknown }).optional);
     validateOptionalBoolean("pay-resource-for-contracts trashSource", (effect as { trashSource?: unknown }).trashSource);
+    return;
+  }
+  if (effect.kind === "take-contracts") {
+    if (trigger !== "plot-intrigue") {
+      throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
+    }
+    if (effect.selector !== "self") {
+      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
+    const sourcePool = (effect as { sourcePool?: unknown }).sourcePool;
+    if (sourcePool !== "public-offer") {
+      invalidSpecField("take-contracts sourcePool", sourcePool);
+    }
+    validateSourceLabel("take-contracts source", effect.source);
+    validateAmount(effect.amount);
+    validateOptionalTrue("take-contracts optional", (effect as { optional?: unknown }).optional);
     return;
   }
   if (effect.kind === "pay-team-resource-for-vp") {

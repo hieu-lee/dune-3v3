@@ -11,17 +11,21 @@ const resourceLabels: Record<ResourceId, string> = {
 
 type PendingContractPanelProps = {
   contractOffer: ContractCard[];
+  optional?: boolean;
   publicOnly?: boolean;
   reservedContracts: ContractCard[];
   onCollectFallback: () => void;
+  onSkip?: () => void;
   onTakeContract: (contractId: string) => void;
 };
 
 export function PendingContractPanel({
   contractOffer,
+  optional,
   publicOnly,
   reservedContracts,
   onCollectFallback,
+  onSkip,
   onTakeContract,
 }: PendingContractPanelProps) {
   const noContractsAvailable = contractOffer.length === 0 && reservedContracts.length === 0;
@@ -47,6 +51,7 @@ export function PendingContractPanel({
           Collect 2 Solari
         </button>
       )}
+      {optional && onSkip && <button type="button" onClick={onSkip}>Skip</button>}
     </div>
   );
 }

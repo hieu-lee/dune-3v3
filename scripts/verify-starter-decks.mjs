@@ -290,14 +290,18 @@ try {
     [criticalShipmentsPending],
     "Critical Shipments should be queued after the spice-space choice",
   );
-  const skippedContractState = state.finishPendingAction(queuedCriticalShipmentsState);
+  const resolvedContractState = state.takeChoamContract(
+    queuedCriticalShipmentsState,
+    contractPending,
+    queuedCriticalShipmentsState.contractOffer[0].id,
+  );
   assert.deepEqual(
-    skippedContractState.pendingAction,
+    resolvedContractState.pendingAction,
     criticalShipmentsPending,
-    "Finishing the spice-space choice should expose Critical Shipments next",
+    "Resolving the spice-space contract choice should expose Critical Shipments next",
   );
   const queuedCriticalShipmentsSplit = state.resolveCommanderResourceSplitChoice(
-    skippedContractState,
+    resolvedContractState,
     criticalShipmentsPending,
     1,
   );

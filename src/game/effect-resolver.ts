@@ -1,4 +1,4 @@
-import { hasVisitedMakerSpaceThisRound } from "./turn-trackers";
+import { hasGainedSpiceThisTurn, hasVisitedMakerSpaceThisRound } from "./turn-trackers";
 import {
   effectiveEmperorIconInfluence,
   effectiveFremenIconInfluence,
@@ -50,7 +50,7 @@ export type SpyPlacementEffectResult = {
 };
 
 export type EffectResolverState = Partial<
-  Pick<GameState, "alliances" | "players" | "roundMakerSpaceVisits" | "sharedSpyPosts" | "spyPosts">
+  Pick<GameState, "alliances" | "players" | "roundMakerSpaceVisits" | "sharedSpyPosts" | "spyPosts" | "turnSpiceGains">
 >;
 
 export type GameEffectContext = {
@@ -199,6 +199,14 @@ export type AgentPayResourceForContracts = {
   sourcePool: ContractEffectSourcePool;
   optional: true;
   trashSource: boolean;
+  source?: string;
+};
+
+export type TakeContractsEffect = {
+  selector: PlayerSelector;
+  amount: number;
+  sourcePool: ContractEffectSourcePool;
+  optional: boolean;
   source?: string;
 };
 
@@ -386,6 +394,11 @@ function conditionApplies(condition: GameEffectConditionSpec, context: GameEffec
     if (!context.state?.alliances) return false;
     if (condition.faction) return context.state.alliances[condition.faction] === context.source.id;
     return Object.values(context.state.alliances).includes(context.source.id);
+  }
+  if (condition.kind === "gained-spice-this-turn") {
+    return context.state?.turnSpiceGains
+      ? hasGainedSpiceThisTurn({ turnSpiceGains: context.state.turnSpiceGains }, context.source.id)
+      : false;
   }
   return unsupportedKind("effect condition", condition);
 }
@@ -621,6 +634,9 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
     return result;
   }
   if (effect.kind === "pay-resource-for-contracts") {
+    return result;
+  }
+  if (effect.kind === "take-contracts") {
     return result;
   }
   if (effect.kind === "pay-team-resource-for-vp") {
@@ -1078,6 +1094,26 @@ export function resolveAgentPayResourceForContracts(
         sourcePool: effect.sourcePool,
         optional: true,
         trashSource: effect.trashSource ?? false,
+        source: effect.source,
+      }));
+  });
+}
+
+export function resolveTakeContracts(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): TakeContractsEffect[] {
+  specs?.forEach(validateSpec);
+  return (specs ?? []).flatMap((spec) => {
+    if (spec.trigger !== context.trigger) return [];
+    if (!specApplies(spec, context)) return [];
+    return spec.effects
+      .filter((effect) => effect.kind === "take-contracts")
+      .map((effect) => ({
+        selector: effect.selector,
+        amount: amountFor(effect.amount, context.source),
+        sourcePool: effect.sourcePool,
+        optional: effect.optional === true,
         source: effect.source,
       }));
   });

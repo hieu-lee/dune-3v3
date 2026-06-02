@@ -57,7 +57,7 @@ Private web-table implementation for a six-player `Dune: Imperium - Uprising` te
 - Contingency Plan can be played as a Plot Intrigue for 2 Solari or as a Combat Intrigue for 3 strength.
 - Inspire Awe can be played as a Plot Intrigue to acquire a card that costs 3 or less, placing it in hand when the player has a sandworm in the Conflict.
 - Manipulate can be played as a Plot Intrigue to remove and replace an Imperium Row card, then acquire that removed card for 1 less during that player's Reveal turn.
-- Leverage can be played as a Plot Intrigue after gaining spice that turn to gain 1 Solari and take a face-up CHOAM contract.
+- Leverage can be played as a Plot Intrigue after gaining spice that turn to gain 1 Solari and may take a face-up CHOAM contract.
 - Distraction can be played after deploying three or more units in a turn to place a spy on another player's occupied observation post.
 - Intelligence Report can be played as a Plot Intrigue to draw 1 card, or 2 cards with two or more own spies on the board.
 - Cunning can be played as a Plot Intrigue to draw 1 card, or spend 1 spice to draw 1 card and trash 1 card.

@@ -86,6 +86,15 @@ try {
   const publicDeckIds = game.contractDeck.map((contract) => contract.id);
   const sardaukar = shaddam.reservedContracts.find((contract) => contract.name === "Sardaukar I");
   assert.ok(sardaukar, "Shaddam should reserve Sardaukar I");
+  const mandatoryContractPending = {
+    ...game,
+    pendingAction: { kind: "contract", ownerId: ally.id, source: "Test Contract Space", spaceId: "accept-contract" },
+  };
+  assert.equal(
+    state.finishPendingAction(mandatoryContractPending),
+    mandatoryContractPending,
+    "Mandatory CHOAM contract choices must not be skippable through finishPendingAction",
+  );
 
   const next = state.takeChoamContract(
     game,

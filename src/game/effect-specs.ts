@@ -97,6 +97,27 @@ export function combatGainStrength(
   return combatIntrigueEffects([{ kind: "gain-strength", selector: "self", amount }], conditions);
 }
 
+export function combatAcquireCard(
+  destination: AcquireCardDestination,
+  maxCost: EffectAmountSpec,
+  options: {
+    source?: string;
+    optional?: boolean;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return combatIntrigueEffects([
+    {
+      kind: "acquire-card",
+      selector: "self",
+      maxCost,
+      destination,
+      ...(options.source ? { source: options.source } : {}),
+      ...(options.optional ? { optional: true } : {}),
+    },
+  ], conditions);
+}
+
 export function plotGainResource(
   resource: ResourceId,
   amount: EffectAmountSpec,

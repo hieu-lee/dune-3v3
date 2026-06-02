@@ -24,6 +24,30 @@ export function verifyCombatIntrigueCatalog({ cards, data, state }) {
     "Add 2 strength, then acquire a card that costs 3 or less.",
     "Impress should expose its strength and acquisition effect",
   );
+  assert.ok(
+    impress.effects?.some((spec) =>
+      spec.trigger === "combat-intrigue" &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-strength" &&
+        effect.selector === "self" &&
+        effect.amount === 2
+      )
+    ),
+    "Impress should carry a typed Combat Intrigue strength spec",
+  );
+  assert.ok(
+    impress.effects?.some((spec) =>
+      spec.trigger === "combat-intrigue" &&
+      spec.effects.some((effect) =>
+        effect.kind === "acquire-card" &&
+        effect.selector === "self" &&
+        effect.maxCost === 3 &&
+        effect.destination === "discard" &&
+        effect.source === "Impress"
+      )
+    ),
+    "Impress should carry a typed Combat Intrigue acquire-card spec",
+  );
   assert.equal(findWeakness.combatSwords, 5, "Find Weakness should expose its maximum structured Combat strength");
   assert.equal(
     findWeakness.summary,
@@ -128,7 +152,7 @@ export function verifyCombatIntrigueCatalog({ cards, data, state }) {
     "Weirding Combat should carry typed base and Bene Gesserit threshold Combat strength specs",
   );
   assert.equal(contingencyPlan.automatedCombatSwords, undefined, "Contingency Plan should not rely on automatedCombatSwords");
-  assert.equal(impress.automatedCombatSwords, undefined, "Impress has extra printed text and should not auto-resolve");
+  assert.equal(impress.automatedCombatSwords, undefined, "Impress should resolve through typed Combat Intrigue specs");
   assert.equal(findWeakness.automatedCombatSwords, undefined, "Find Weakness should resolve through spy-recall state");
   assert.equal(goToGround.automatedCombatSwords, undefined, "Go To Ground should resolve through retreat and spy choices");
   assert.equal(questionableMethods.automatedCombatSwords, undefined, "Questionable Methods should resolve through Influence-loss state");

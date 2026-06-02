@@ -174,6 +174,7 @@ try {
   const cunning = data.intrigueCards.find((card) => card.name === "Cunning");
   const departForArrakis = data.intrigueCards.find((card) => card.name === "Depart For Arrakis");
   const distraction = data.intrigueCards.find((card) => card.name === "Distraction");
+  const impress = data.intrigueCards.find((card) => card.name === "Impress");
   const imperiumPolitics = data.intrigueCards.find((card) => card.name === "Imperium Politics");
   const inspireAwe = data.intrigueCards.find((card) => card.name === "Inspire Awe");
   const intelligenceReport = data.intrigueCards.find((card) => card.name === "Intelligence Report");
@@ -254,7 +255,7 @@ try {
     wheelsWithinWheels,
   );
   assert.ok(commandRespect && prepareTheWay && spiceMustFlow && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
-  assert.ok(backedByChoam && buyAccess && callToArms && changeAllegiances && councilorsAmbition && contingencyPlan && cunning && departForArrakis && distraction && imperiumPolitics && inspireAwe && intelligenceReport && leverage && manipulate && marketOpportunity && mercenaries && opportunism && shaddamsFavor && specialMission && sietchRitual && strategicStockpiling && weirdingCombat);
+  assert.ok(backedByChoam && buyAccess && callToArms && changeAllegiances && councilorsAmbition && contingencyPlan && cunning && departForArrakis && distraction && impress && imperiumPolitics && inspireAwe && intelligenceReport && leverage && manipulate && marketOpportunity && mercenaries && opportunism && shaddamsFavor && specialMission && sietchRitual && strategicStockpiling && weirdingCombat);
   assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && dutifulService && deliverSupplies && sietchTabr && spiceRefinery);
   assert.equal(revealSpecCards.length, 79, "Unexpected number of cards with declarative Reveal specs");
   assert.equal(
@@ -367,6 +368,41 @@ try {
     3,
     "Contingency Plan Combat spec should resolve its strength",
   );
+  assert.ok(
+    hasCombatEffect(impress, (effect) =>
+      effect.kind === "gain-strength" &&
+      effect.selector === "self" &&
+      effect.amount === 2
+    ),
+    "Impress should carry a typed Combat Intrigue strength spec",
+  );
+  assert.ok(
+    hasCombatEffect(impress, (effect) =>
+      effect.kind === "acquire-card" &&
+      effect.selector === "self" &&
+      effect.maxCost === 3 &&
+      effect.destination === "discard" &&
+      effect.source === "Impress"
+    ),
+    "Impress should carry a typed Combat Intrigue acquire-card spec",
+  );
+  const impressCombatResolved = effectResolver.resolveGameEffects(impress.effects, {
+    trigger: "combat-intrigue",
+    source: p2,
+    state: game,
+  });
+  assert.equal(impressCombatResolved.swords, 2, "Impress Combat spec should resolve its strength");
+  const impressAcquireEffects = effectResolver.resolveAcquireCards(impress.effects, {
+    trigger: "combat-intrigue",
+    source: p2,
+    state: game,
+  });
+  assert.equal(impressAcquireEffects.length, 1, "Impress Combat spec should resolve one acquire-card effect");
+  assert.equal(impressAcquireEffects[0]?.selector, "self", "Impress acquisition should target self in the card spec");
+  assert.equal(impressAcquireEffects[0]?.maxCost, 3, "Impress acquisition should cap card cost at 3");
+  assert.equal(impressAcquireEffects[0]?.destination, "discard", "Impress acquisition should go to discard");
+  assert.equal(impressAcquireEffects[0]?.optional, false, "Impress acquisition should be mandatory when available");
+  assert.equal(impressAcquireEffects[0]?.source, "Impress", "Impress acquire-card effect should preserve its source");
   assert.ok(
     inspireAwe.effects?.some((spec) =>
       spec.trigger === "plot-intrigue" &&

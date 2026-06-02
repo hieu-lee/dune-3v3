@@ -6,13 +6,13 @@ import {
   isDevourIntrigue,
   isFindWeaknessIntrigue,
   isGoToGroundIntrigue,
-  isImpressIntrigue,
   isQuestionableMethodsIntrigue,
   isReachAgreementIntrigue,
   isSpiceIsPowerIntrigue,
   isSpringTheTrapIntrigue,
   isTacticalOptionIntrigue,
 } from "./card-identifiers";
+import { resolveAcquireCards, type AgentAcquireCard } from "./effect-resolver";
 import {
   allowedInfluenceLossChoices,
 } from "./influence-loss-rules";
@@ -30,7 +30,9 @@ import {
 } from "./trash-rules";
 import type {
   GameState,
+  IntrigueCard,
   PendingAction,
+  Player,
 } from "./types";
 
 export type SpiceIsPowerChoice = "spend-spice" | "retreat-troops";
@@ -40,6 +42,78 @@ export type CombatIntrigueChoice = SpiceIsPowerChoice | TacticalOptionChoice;
 type AcquireCardPendingAction = Extract<PendingAction, { kind: "acquire-card" }>;
 type SpyPendingAction = Extract<PendingAction, { kind: "spy" }>;
 type AdvanceAfterCombatIntriguePlay = (state: GameState) => GameState;
+
+function acquirePendingForCombatEffect(
+  intrigue: IntrigueCard,
+  target: Player,
+  effect: AgentAcquireCard,
+): AcquireCardPendingAction | undefined {
+  const base = {
+    kind: "acquire-card" as const,
+    ownerId: target.id,
+    source: effect.source ?? intrigue.name,
+    destination: effect.destination,
+    ...(effect.minCost !== undefined ? { minCost: effect.minCost } : {}),
+    ...(effect.optional ? { optional: true } : {}),
+  };
+  if (effect.paymentResource !== undefined) {
+    return {
+      ...base,
+      ...(effect.maxCost !== undefined ? { maxCost: effect.maxCost } : {}),
+      paymentResource: effect.paymentResource,
+    };
+  }
+  if (effect.maxCost !== undefined) {
+    return {
+      ...base,
+      maxCost: effect.maxCost,
+    };
+  }
+  return undefined;
+}
+
+function combatAcquireCardDescription(pending: AcquireCardPendingAction) {
+  const costText = pending.minCost !== undefined && pending.maxCost !== undefined
+    ? pending.minCost === pending.maxCost
+      ? ` that costs ${pending.maxCost}`
+      : ` that costs ${pending.minCost} to ${pending.maxCost}`
+    : pending.maxCost !== undefined
+      ? ` that costs ${pending.maxCost} or less`
+      : pending.minCost !== undefined
+        ? ` that costs at least ${pending.minCost}`
+        : "";
+  const paymentText = pending.paymentResource ? ` with ${pending.paymentResource}` : "";
+  return `a card${costText}${paymentText}`;
+}
+
+function resolveCombatAcquirePendingActions(
+  state: GameState,
+  intrigue: IntrigueCard,
+  actor: Player,
+  target: Player,
+) {
+  const effects = resolveAcquireCards(intrigue.effects, {
+    trigger: "combat-intrigue",
+    source: actor,
+    target,
+    state,
+  });
+  if (effects.length > 1) throw new Error("Unsupported multiple Combat Intrigue acquire-card effects");
+  return effects.reduce<{ pendingActions: AcquireCardPendingAction[]; logTexts: string[] }>((result, effect) => {
+    const pending = acquirePendingForCombatEffect(intrigue, target, effect);
+    if (!pending) return result;
+    const canAcquire = acquirableCardsForPending(state, pending).length > 0;
+    return {
+      pendingActions: canAcquire ? [...result.pendingActions, pending] : result.pendingActions,
+      logTexts: [
+        ...result.logTexts,
+        canAcquire
+          ? `${target.leader} ${pending.optional ? "may" : "must"} acquire ${combatAcquireCardDescription(pending)}`
+          : `${target.leader} has no eligible card to acquire`,
+      ],
+    };
+  }, { pendingActions: [], logTexts: [] });
+}
 
 export function resolvePlayCombatIntrigue(
   state: GameState,
@@ -60,40 +134,6 @@ export function resolvePlayCombatIntrigue(
   if (!resolvedTargetId || !targets.includes(resolvedTargetId)) return state;
   const target = state.players.find((player) => player.id === resolvedTargetId);
   if (!target) return state;
-  if (isImpressIntrigue(intrigue)) {
-    const acquirePending: AcquireCardPendingAction = {
-      kind: "acquire-card",
-      ownerId: target.id,
-      source: "Impress",
-      maxCost: 3,
-      destination: "discard",
-    };
-    const canAcquire = acquirableCardsForPending(state, acquirePending).length > 0;
-    const players = state.players.map((player) => {
-      let next = player;
-      if (player.id === actor.id) {
-        next = { ...next, intrigues: next.intrigues.filter((card) => card.id !== intrigue.id) };
-      }
-      if (player.id === target.id) {
-        next = { ...next, conflict: next.conflict + 2 };
-      }
-      return next;
-    });
-    const acquireText = canAcquire
-      ? ` and ${target.leader} must acquire a card that costs 3 or less`
-      : ` and ${target.leader} has no eligible card to acquire`;
-    return advanceAfterCombatIntriguePlay({
-      ...state,
-      players,
-      combatPasses: [],
-      intrigueDiscard: [...state.intrigueDiscard, intrigue],
-      pendingAction: canAcquire ? acquirePending : undefined,
-      log: [
-        `${actor.leader} plays Impress for ${target.leader}, adding 2 strength${acquireText}.`,
-        ...state.log,
-      ],
-    });
-  }
   if (isGoToGroundIntrigue(intrigue)) {
     const retreatCount =
       typeof combatChoice === "object" && combatChoice.kind === "retreat-troops" ? combatChoice.count : undefined;
@@ -251,7 +291,8 @@ export function resolvePlayCombatIntrigue(
     });
   }
   const combatSwords = combatIntrigueStrength(state, actor, intrigue, target);
-  if (!combatSwords) return state;
+  const combatAcquire = resolveCombatAcquirePendingActions(state, intrigue, actor, target);
+  if (!combatSwords && combatAcquire.logTexts.length === 0) return state;
   const canTrashFromDevour = isDevourIntrigue(intrigue) && target.deployedSandworms > 0 && trashableCards(target).length > 0;
   const trashPending: PendingAction | undefined = canTrashFromDevour
     ? { kind: "trash-card", ownerId: target.id, source: "Devour", optional: true }
@@ -295,7 +336,7 @@ export function resolvePlayCombatIntrigue(
         optional: true,
       }
     : undefined;
-  const immediateCombatSwords = isSpringTheTrapIntrigue(intrigue) ? 0 : combatSwords;
+  const immediateCombatSwords = isSpringTheTrapIntrigue(intrigue) ? 0 : (combatSwords ?? 0);
 
   const players = state.players.map((player) => {
     let next = player;
@@ -307,12 +348,17 @@ export function resolvePlayCombatIntrigue(
     }
     return next;
   });
+  const pendingActions: PendingAction[] = [];
+  const cardSpecificPending = trashPending ?? recallSpyPending ?? springTheTrapPending ?? influenceLossPending;
+  if (cardSpecificPending) pendingActions.push(cardSpecificPending);
+  pendingActions.push(...combatAcquire.pendingActions);
   const nextState = {
     ...state,
     players,
     combatPasses: [],
     intrigueDiscard: [...state.intrigueDiscard, intrigue],
-    pendingAction: trashPending ?? recallSpyPending ?? springTheTrapPending ?? influenceLossPending,
+    pendingAction: pendingActions[0],
+    pendingQueue: pendingActions.slice(1),
   };
   const pendingText = canTrashFromDevour
     ? " and may trash a card"
@@ -323,13 +369,16 @@ export function resolvePlayCombatIntrigue(
         : influenceLossPending
           ? " and may lose 1 Influence"
       : "";
+  const acquireText = combatAcquire.logTexts.length > 0 ? ` and ${combatAcquire.logTexts.join(" and ")}` : "";
   const strengthText = isSpringTheTrapIntrigue(intrigue)
     ? "preparing to add 7 strength"
-    : `adding ${combatSwords} strength`;
+    : combatSwords
+      ? `adding ${combatSwords} strength`
+      : "resolving its effect";
   return advanceAfterCombatIntriguePlay({
     ...nextState,
     log: [
-      `${actor.leader} plays ${intrigue.name} for ${target.leader}, ${strengthText}${pendingText}.`,
+      `${actor.leader} plays ${intrigue.name} for ${target.leader}, ${strengthText}${pendingText}${acquireText}.`,
       ...state.log,
     ],
   });

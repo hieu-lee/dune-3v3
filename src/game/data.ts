@@ -24,6 +24,7 @@ import {
   guildSpySourceId,
   hiddenMissiveSourceId,
   inHighPlacesSourceId,
+  impressSourceId,
   imperiumPoliticsSourceId,
   imperialSpymasterSourceId,
   inspireAweSourceId,
@@ -79,6 +80,7 @@ import {
   agentPayResourceForDrawCards,
   agentPlaceSpies,
   agentRecruitTroops,
+  combatAcquireCard,
   combatGainStrength,
   deployedUnitsThisTurn,
   hasCompletedContracts,
@@ -998,6 +1000,12 @@ function intrigueCardEffects(card: HubCard): CardEffectSpec[] | undefined {
     return [
       plotGainResource("solari", 2),
       combatGainStrength(3),
+    ];
+  }
+  if (card.id === impressSourceId) {
+    return [
+      combatGainStrength(2),
+      combatAcquireCard("discard", 3, { source: "Impress" }),
     ];
   }
   if (card.id === inspireAweSourceId) {

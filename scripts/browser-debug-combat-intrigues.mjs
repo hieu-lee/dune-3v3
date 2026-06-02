@@ -32,6 +32,36 @@ export async function runCombatIntriguesSmoke({
 
   await page.setViewportSize({ width: 1440, height: 1100 });
   await page.evaluate(() => window.scrollTo(0, 0));
+
+  const beforeImpress = await currentGame(page);
+  const gurneyBeforeImpress = playerById(beforeImpress, "p3");
+  await combatCard(page, "Impress").getByRole("button", { name: "Gurney Halleck: +2 + acquire" }).click();
+  await page.waitForFunction(() => {
+    const game = window.__DUNE_DEBUG__?.getGame();
+    const gurney = game?.players.find((player) => player.id === "p3");
+    const muadDib = game?.players.find((player) => player.id === "p1");
+    return Boolean(
+      game &&
+        game.pendingAction?.kind === "acquire-card" &&
+        game.pendingAction.ownerId === "p3" &&
+        game.pendingAction.source === "Impress" &&
+        game.pendingAction.maxCost === 3 &&
+        game.pendingAction.destination === "discard" &&
+        gurney?.conflict === 8 &&
+        !muadDib?.intrigues.some((card) => card.name === "Impress"),
+    );
+  });
+  const afterImpress = await currentGame(page);
+  const gurneyAfterImpress = playerById(afterImpress, "p3");
+  assert.equal(gurneyAfterImpress.conflict, gurneyBeforeImpress.conflict + 2, "Impress should add 2 strength");
+  assert.deepEqual(
+    afterImpress.pendingAction,
+    { kind: "acquire-card", ownerId: "p3", source: "Impress", maxCost: 3, destination: "discard" },
+    "Impress should queue a mandatory acquire-card pending action for the chosen Ally",
+  );
+  await screenshot(page, captures, "combat-intrigues-impress-pending.png");
+
+  await setDebugGameAndWait(page, states.commander);
   const before = await currentGame(page);
   const gurneyBefore = playerById(before, "p3");
   await combatCard(page, "Tactical Option").getByRole("button", { name: "Gurney Halleck: +2" }).click();

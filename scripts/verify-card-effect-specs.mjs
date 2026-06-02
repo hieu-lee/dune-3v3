@@ -194,6 +194,7 @@ try {
   const mercenaries = data.intrigueCards.find((card) => card.name === "Mercenaries");
   const opportunism = data.intrigueCards.find((card) => card.name === "Opportunism");
   const questionableMethods = data.intrigueCards.find((card) => card.name === "Questionable Methods");
+  const reachAgreement = data.intrigueCards.find((card) => card.name === "Reach Agreement");
   const shaddamsFavor = data.intrigueCards.find((card) => card.name === "Shaddam's Favor");
   const specialMission = data.intrigueCards.find((card) => card.name === "Special Mission");
   const springTheTrap = data.intrigueCards.find((card) => card.name === "Spring The Trap");
@@ -267,7 +268,7 @@ try {
     wheelsWithinWheels,
   );
   assert.ok(commandRespect && prepareTheWay && spiceMustFlow && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
-  assert.ok(backedByChoam && buyAccess && callToArms && changeAllegiances && councilorsAmbition && contingencyPlan && cunning && departForArrakis && devour && distraction && findWeakness && impress && imperiumPolitics && inspireAwe && intelligenceReport && leverage && manipulate && marketOpportunity && mercenaries && opportunism && questionableMethods && shaddamsFavor && specialMission && springTheTrap && sietchRitual && strategicStockpiling && weirdingCombat);
+  assert.ok(backedByChoam && buyAccess && callToArms && changeAllegiances && councilorsAmbition && contingencyPlan && cunning && departForArrakis && devour && distraction && findWeakness && impress && imperiumPolitics && inspireAwe && intelligenceReport && leverage && manipulate && marketOpportunity && mercenaries && opportunism && questionableMethods && reachAgreement && shaddamsFavor && specialMission && springTheTrap && sietchRitual && strategicStockpiling && weirdingCombat);
   assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && dutifulService && deliverSupplies && sietchTabr && spiceRefinery);
   assert.equal(revealSpecCards.length, 79, "Unexpected number of cards with declarative Reveal specs");
   assert.equal(
@@ -490,6 +491,28 @@ try {
     state: game,
   });
   assert.equal(questionableCombatResolved.swords, 1, "Questionable Methods Combat spec should resolve its base strength");
+  const choiceGatedCombatStrength = {
+    ...questionableMethods,
+    id: "effect-spec-choice-gated-combat-strength-card",
+    name: "Effect Spec Choice Gated Combat Strength",
+    combatSwords: undefined,
+    automatedCombatSwords: undefined,
+    effects: [{
+      trigger: "combat-intrigue",
+      choiceId: "add-strength",
+      effects: [{ kind: "gain-strength", selector: "self", amount: 2 }],
+    }],
+  };
+  assert.equal(
+    state.combatIntrigueStrength(game, p2, choiceGatedCombatStrength),
+    undefined,
+    "Choice-gated Combat strength should not resolve without its selected choice",
+  );
+  assert.equal(
+    state.combatIntrigueStrength(game, p2, choiceGatedCombatStrength, undefined, "add-strength"),
+    2,
+    "Choice-gated Combat strength should resolve when gameplay supplies the selected choice",
+  );
   assert.deepEqual(
     effectResolver.resolveCombatInfluenceLossForStrengths(questionableMethods.effects, {
       trigger: "combat-intrigue",
@@ -507,6 +530,69 @@ try {
       source: "Questionable Methods",
     }],
     "Questionable Methods Influence-loss spec should resolve with recipient and Commander-personal owner routing",
+  );
+  assert.ok(
+    reachAgreement.effects?.some((spec) =>
+      spec.trigger === "combat-intrigue" &&
+      spec.choiceId === "retreat-troops" &&
+      spec.effects.some((effect) =>
+        effect.kind === "retreat-troops" &&
+        effect.selector === "self" &&
+        effect.min === 1 &&
+        effect.max === 2 &&
+        effect.source === "Reach Agreement"
+      )
+    ),
+    "Reach Agreement should carry a typed selected Combat troop-retreat spec",
+  );
+  assert.ok(
+    reachAgreement.effects?.some((spec) =>
+      spec.trigger === "combat-intrigue" &&
+      spec.choiceId === "retreat-troops" &&
+      spec.effects.some((effect) =>
+        effect.kind === "take-contracts" &&
+        effect.selector === "self" &&
+        effect.amount === 1 &&
+        effect.sourcePool === "public-offer" &&
+        effect.optional !== true &&
+        effect.source === "Reach Agreement"
+      )
+    ),
+    "Reach Agreement should carry a typed Combat contract pending spec",
+  );
+  const reachAgreementCombatContext = {
+    trigger: "combat-intrigue",
+    choiceId: "retreat-troops",
+    selectedTroopCount: 2,
+    source: p2,
+    target: p2,
+    state: game,
+  };
+  assert.deepEqual(
+    effectResolver.resolveCombatRetreatTroops(reachAgreement.effects, reachAgreementCombatContext),
+    [{ selector: "self", count: 2, min: 1, max: 2, source: "Reach Agreement" }],
+    "Reach Agreement selected retreat spec should resolve the chosen troop count",
+  );
+  assert.deepEqual(
+    effectResolver.resolveCombatRetreatTroops(reachAgreement.effects, {
+      ...reachAgreementCombatContext,
+      selectedTroopCount: undefined,
+    }),
+    [],
+    "Reach Agreement selected retreat spec should require a selected troop count",
+  );
+  assert.deepEqual(
+    effectResolver.resolveTakeContracts(reachAgreement.effects, reachAgreementCombatContext),
+    [{ selector: "self", amount: 1, sourcePool: "public-offer", optional: false, source: "Reach Agreement" }],
+    "Reach Agreement contract spec should resolve through the reusable take-contracts resolver",
+  );
+  assert.deepEqual(
+    effectResolver.resolveTakeContracts(reachAgreement.effects, {
+      ...reachAgreementCombatContext,
+      choiceId: undefined,
+    }),
+    [],
+    "Reach Agreement contract spec should remain gated by its selected-retreat choice",
   );
   assert.ok(
     springTheTrap.effects?.some((spec) =>
@@ -4528,7 +4614,7 @@ try {
       { trigger: "agent-play", source: p2, state: game },
     ),
     /Unsupported effect "take-contracts" for agent-play/,
-    "Take-contract specs should stay on Plot Intrigue until other trigger resolvers support them",
+    "Take-contract specs should stay on typed Plot or Combat Intrigue resolvers",
   );
   assert.throws(
     () => effectResolver.resolveTakeContracts(
@@ -4545,6 +4631,38 @@ try {
     ),
     /Invalid take-contracts sourcePool "reserved"/,
     "Take-contract specs should reject unsupported contract source pools",
+  );
+  assert.throws(
+    () => effectResolver.resolveTakeContracts(
+      [plotSpec([{ kind: "take-contracts", selector: "self", amount: 0, sourcePool: "public-offer" }])],
+      { trigger: "plot-intrigue", source: p2, state: game },
+    ),
+    /Invalid take-contracts amount "0"/,
+    "Take-contract specs should reject zero contract amounts",
+  );
+  assert.throws(
+    () => effectResolver.resolveTakeContracts(
+      [plotSpec([{ kind: "take-contracts", selector: "self", amount: 2, sourcePool: "public-offer" }])],
+      { trigger: "plot-intrigue", source: p2, state: game },
+    ),
+    /Invalid take-contracts amount "2"/,
+    "Take-contract specs should reject unsupported multi-contract amounts",
+  );
+  assert.throws(
+    () => effectResolver.resolveTakeContracts(
+      [plotSpec([{ kind: "take-contracts", selector: "self", amount: { kind: "completed-contracts" }, sourcePool: "public-offer" }])],
+      { trigger: "plot-intrigue", source: p2, state: game },
+    ),
+    /Invalid take-contracts amount "\[object Object\]"/,
+    "Take-contract specs should reject dynamic contract amounts",
+  );
+  assert.throws(
+    () => effectResolver.resolveTakeContracts(
+      [combatSpec([{ kind: "take-contracts", selector: "self", amount: 1, sourcePool: "public-offer", optional: true }])],
+      { trigger: "combat-intrigue", source: p2, state: game },
+    ),
+    /Invalid combat take-contracts optional "true"/,
+    "Combat take-contract specs should remain mandatory until an optional Combat contract UI exists",
   );
   const invalidDrawCardsSourceCard = {
     ...convincingArgument,
@@ -6747,6 +6865,38 @@ try {
 	    /Invalid effect amount "-4"/,
 	    "Retreat-for-strength specs should require non-negative strength",
 	  );
+  assert.throws(
+    () => effectResolver.resolveCombatRetreatTroops(
+      [agentSpec([{ kind: "retreat-troops", selector: "self", min: 1, max: 2 }])],
+      { trigger: "agent-play", source: p2, state: game },
+    ),
+    /Unsupported effect "retreat-troops" for agent-play/,
+    "Selected retreat specs should stay on Combat Intrigues",
+  );
+  assert.throws(
+    () => effectResolver.resolveCombatRetreatTroops(
+      [combatSpec([{ kind: "retreat-troops", selector: "activated-ally", min: 1, max: 2 }])],
+      { trigger: "combat-intrigue", source: p2, state: game },
+    ),
+    /Unsupported effect selector "activated-ally" for combat-intrigue/,
+    "Combat selected retreat specs should reject activated Ally selectors",
+  );
+  assert.throws(
+    () => effectResolver.resolveCombatRetreatTroops(
+      [combatSpec([{ kind: "retreat-troops", selector: "self", min: 0, max: 2 }])],
+      { trigger: "combat-intrigue", source: p2, state: game },
+    ),
+    /Invalid retreat-troops min "0"/,
+    "Combat selected retreat specs should require positive minimum troop counts",
+  );
+  assert.throws(
+    () => effectResolver.resolveCombatRetreatTroops(
+      [combatSpec([{ kind: "retreat-troops", selector: "self", min: 2, max: 1 }])],
+      { trigger: "combat-intrigue", source: p2, state: game },
+    ),
+    /Invalid retreat-troops bounds "2-1"/,
+    "Combat selected retreat specs should reject inverted troop-count bounds",
+  );
 	  const unsupportedEffectCard = {
     ...convincingArgument,
     id: "effect-spec-unsupported-effect-card",

@@ -82,6 +82,24 @@ try {
     ally.resources.solari + 2,
     "Players without reserved contracts can collect the no-public-contract fallback",
   );
+  const publicOnlyBlockedFallback = state.collectChoamContractFallback(
+    emptyPublicContracts,
+    { kind: "contract", ownerId: ally.id, source: "Test Public Contract", publicOnly: true },
+  );
+  assert.equal(
+    publicOnlyBlockedFallback,
+    emptyPublicContracts,
+    "Public-only CHOAM contract choices should not fall back unless explicitly allowed",
+  );
+  const publicOnlyAllowedFallback = state.collectChoamContractFallback(
+    emptyPublicContracts,
+    { kind: "contract", ownerId: shaddam.id, source: "Reach Agreement", publicOnly: true, allowFallback: true },
+  );
+  assert.equal(
+    publicOnlyAllowedFallback.players.find((player) => player.id === shaddam.id)?.resources.solari,
+    shaddam.resources.solari + 2,
+    "Public-only CHOAM contract choices with fallback should ignore reserved contracts when no public contracts remain",
+  );
 
   const publicOfferIds = game.contractOffer.map((contract) => contract.id);
   const publicDeckIds = game.contractDeck.map((contract) => contract.id);
@@ -113,6 +131,16 @@ try {
   );
   assert.equal(nextShaddam.contracts.at(-1)?.card.name, "Sardaukar I");
   assert.equal(nextShaddam.contracts.at(-1)?.takenAtSpaceId, "accept-contract");
+  const publicOnlyReservedBlocked = state.takeChoamContract(
+    game,
+    { kind: "contract", ownerId: shaddam.id, source: "Reach Agreement", publicOnly: true, allowFallback: true },
+    sardaukar.id,
+  );
+  assert.equal(
+    publicOnlyReservedBlocked,
+    game,
+    "Public-only CHOAM contract choices with fallback should still reject reserved contracts",
+  );
 
   const completed = state.setChoamContractCompleted(next, shaddam.id, sardaukar.id, true);
   assert.equal(

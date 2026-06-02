@@ -226,6 +226,50 @@ export async function runCombatIntriguesSmoke({
   await screenshot(page, captures, "combat-intrigues-questionable-methods-pending.png");
 
   await setDebugGameAndWait(page, states.commander);
+  const beforeReachAgreement = await currentGame(page);
+  const gurneyBeforeReachAgreement = playerById(beforeReachAgreement, "p3");
+  await combatCard(page, "Reach Agreement").getByRole("button", { name: "Gurney Halleck: retreat 2 + contract" }).click();
+  await page.waitForFunction(() => {
+    const game = window.__DUNE_DEBUG__?.getGame();
+    const gurney = game?.players.find((player) => player.id === "p3");
+    const muadDib = game?.players.find((player) => player.id === "p1");
+    return Boolean(
+      game &&
+        game.pendingAction?.kind === "contract" &&
+        game.pendingAction.ownerId === "p3" &&
+        game.pendingAction.source === "Reach Agreement" &&
+        game.pendingAction.publicOnly === true &&
+        game.pendingAction.allowFallback === true &&
+        gurney?.conflict === 2 &&
+        gurney?.deployedTroops === 1 &&
+        !muadDib?.intrigues.some((card) => card.name === "Reach Agreement"),
+    );
+  });
+  const afterReachAgreement = await currentGame(page);
+  const gurneyAfterReachAgreement = playerById(afterReachAgreement, "p3");
+  assert.equal(
+    gurneyAfterReachAgreement.conflict,
+    gurneyBeforeReachAgreement.conflict - 4,
+    "Reach Agreement should remove the chosen troops' strength",
+  );
+  assert.equal(
+    gurneyAfterReachAgreement.deployedTroops,
+    gurneyBeforeReachAgreement.deployedTroops - 2,
+    "Reach Agreement should retreat the selected troop count",
+  );
+  assert.equal(
+    gurneyAfterReachAgreement.garrison,
+    gurneyBeforeReachAgreement.garrison + 2,
+    "Reach Agreement should return retreated troops to the recipient's garrison",
+  );
+  assert.deepEqual(
+    afterReachAgreement.pendingAction,
+    { kind: "contract", ownerId: "p3", source: "Reach Agreement", publicOnly: true, allowFallback: true },
+    "Reach Agreement should queue a mandatory public contract pending action with fallback for the chosen Ally",
+  );
+  await screenshot(page, captures, "combat-intrigues-reach-agreement-pending.png");
+
+  await setDebugGameAndWait(page, states.commander);
   const before = await currentGame(page);
   const gurneyBefore = playerById(before, "p3");
   await combatCard(page, "Tactical Option").getByRole("button", { name: "Gurney Halleck: +2" }).click();
@@ -288,6 +332,8 @@ async function createCombatIntrigueStates(server, initialPlayableGame) {
     combatPasses: [],
     pendingAction: undefined,
     pendingQueue: [],
+    contractOffer: [data.standardContracts[2]],
+    contractDeck: data.standardContracts.slice(3, 5),
     spyPosts: {
       ...game.spyPosts,
       arrakeen: "p1",

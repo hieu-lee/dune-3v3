@@ -125,6 +125,35 @@ export function verifyCombatIntrigueCatalog({ cards, data, state }) {
     "Retreat 1 or 2 troops, then take a face-up CHOAM contract.",
     "Reach Agreement should expose its retreat and contract effect",
   );
+  assert.ok(
+    reachAgreement.effects?.some((spec) =>
+      spec.trigger === "combat-intrigue" &&
+      spec.choiceId === "retreat-troops" &&
+      spec.effects.some((effect) =>
+        effect.kind === "retreat-troops" &&
+        effect.selector === "self" &&
+        effect.min === 1 &&
+        effect.max === 2 &&
+        effect.source === "Reach Agreement"
+      )
+    ),
+    "Reach Agreement should carry a typed selected Combat troop-retreat spec",
+  );
+  assert.ok(
+    reachAgreement.effects?.some((spec) =>
+      spec.trigger === "combat-intrigue" &&
+      spec.choiceId === "retreat-troops" &&
+      spec.effects.some((effect) =>
+        effect.kind === "take-contracts" &&
+        effect.selector === "self" &&
+        effect.amount === 1 &&
+        effect.sourcePool === "public-offer" &&
+        effect.source === "Reach Agreement" &&
+        effect.optional !== true
+      )
+    ),
+    "Reach Agreement should carry a typed Combat contract pending spec",
+  );
   assert.equal(questionableMethods.combatSwords, 5, "Questionable Methods should expose its maximum structured Combat strength");
   assert.equal(
     questionableMethods.summary,
@@ -262,7 +291,7 @@ export function verifyCombatIntrigueCatalog({ cards, data, state }) {
   assert.equal(questionableMethods.automatedCombatSwords, undefined, "Questionable Methods should resolve through typed Combat Influence-loss state");
   assert.equal(spiceIsPower.automatedCombatSwords, undefined, "Spice is Power should resolve through an explicit branch choice");
   assert.equal(tacticalOption.automatedCombatSwords, undefined, "Tactical Option should resolve through an explicit branch choice");
-  assert.equal(reachAgreement.automatedCombatSwords, undefined, "Reach Agreement should resolve through retreat and contract choices");
+  assert.equal(reachAgreement.automatedCombatSwords, undefined, "Reach Agreement should resolve through typed Combat retreat and contract specs");
   assert.equal(springTheTrap.automatedCombatSwords, undefined, "Spring The Trap should resolve through typed Combat spy-recall state");
   assert.equal(weirdingCombat.automatedCombatSwords, undefined, "Weirding Combat should resolve from state-aware Influence");
   assert.equal(devour.automatedCombatSwords, undefined, "Devour should resolve from target sandworm state");

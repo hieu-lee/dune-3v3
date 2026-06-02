@@ -370,6 +370,21 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     validateAmount(effect.strength);
     return;
   }
+  if (effect.kind === "retreat-troops") {
+    if (trigger !== "combat-intrigue") {
+      throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
+    }
+    if (effect.selector !== "self") {
+      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
+    validatePositiveFixedAmount("retreat-troops min", effect.min);
+    validatePositiveFixedAmount("retreat-troops max", effect.max);
+    if (effect.min > effect.max) {
+      invalidSpecField("retreat-troops bounds", `${effect.min}-${effect.max}`);
+    }
+    validateSourceLabel("retreat-troops source", effect.source);
+    return;
+  }
   if (effect.kind === "trash-card") {
     if (trigger !== "reveal" && trigger !== "plot-intrigue" && trigger !== "combat-intrigue") {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
@@ -624,7 +639,7 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     return;
   }
   if (effect.kind === "take-contracts") {
-    if (trigger !== "plot-intrigue") {
+    if (trigger !== "plot-intrigue" && trigger !== "combat-intrigue") {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
     }
     if (effect.selector !== "self") {
@@ -635,8 +650,13 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
       invalidSpecField("take-contracts sourcePool", sourcePool);
     }
     validateSourceLabel("take-contracts source", effect.source);
-    validateAmount(effect.amount);
+    if (effect.amount !== 1) {
+      invalidSpecField("take-contracts amount", effect.amount);
+    }
     validateOptionalTrue("take-contracts optional", (effect as { optional?: unknown }).optional);
+    if (trigger === "combat-intrigue" && effect.optional === true) {
+      invalidSpecField("combat take-contracts optional", effect.optional);
+    }
     return;
   }
   if (effect.kind === "pay-team-resource-for-vp") {
@@ -810,7 +830,7 @@ function validateCommanderResourceSplitOption(option: CommanderResourceSplitOpti
 export function validateSpec(spec: CardEffectSpec) {
   validateTrigger(spec.trigger);
   validateSourceLabel("choiceId", spec.choiceId);
-  if (spec.choiceId !== undefined && spec.trigger !== "plot-intrigue") {
+  if (spec.choiceId !== undefined && spec.trigger !== "plot-intrigue" && spec.trigger !== "combat-intrigue") {
     throw new Error(`Unsupported choiceId for ${spec.trigger}`);
   }
   spec.conditions?.forEach((condition) => validateCondition(condition, spec.trigger));

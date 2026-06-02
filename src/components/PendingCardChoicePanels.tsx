@@ -11,6 +11,7 @@ const resourceLabels: Record<ResourceId, string> = {
 
 type PendingContractPanelProps = {
   contractOffer: ContractCard[];
+  allowFallback?: boolean;
   optional?: boolean;
   publicOnly?: boolean;
   reservedContracts: ContractCard[];
@@ -21,6 +22,7 @@ type PendingContractPanelProps = {
 
 export function PendingContractPanel({
   contractOffer,
+  allowFallback,
   optional,
   publicOnly,
   reservedContracts,
@@ -45,7 +47,7 @@ export function PendingContractPanel({
           <span>{contract.name}</span>
         </button>
       ))}
-      {noContractsAvailable && !publicOnly && (
+      {noContractsAvailable && (!publicOnly || allowFallback) && (
         <button type="button" onClick={onCollectFallback}>
           <CircleDollarSign size={15} />
           Collect 2 Solari

@@ -29,6 +29,16 @@ export function verifyCombatIntrigueReachAgreement({ cards: { reachAgreement }, 
     "Reach Agreement should require an explicit retreat count",
   );
   assert.equal(
+    state.playCombatIntrigue(reachAgreementCombat, "p2", reachAgreement.id, undefined, "retreat-troops"),
+    reachAgreementCombat,
+    "Reach Agreement should reject the legacy retreat branch string without an explicit troop count",
+  );
+  assert.equal(
+    state.playCombatIntrigue(reachAgreementCombat, "p2", reachAgreement.id, undefined, { kind: "retreat-troops" }),
+    reachAgreementCombat,
+    "Reach Agreement should reject malformed retreat choices without an explicit troop count",
+  );
+  assert.equal(
     state.playCombatIntrigue(reachAgreementCombat, "p2", reachAgreement.id, undefined, { kind: "retreat-troops", count: 0 }),
     reachAgreementCombat,
     "Reach Agreement should reject zero troops",
@@ -59,6 +69,8 @@ export function verifyCombatIntrigueReachAgreement({ cards: { reachAgreement }, 
     kind: "contract",
     ownerId: "p2",
     source: "Reach Agreement",
+    publicOnly: true,
+    allowFallback: true,
   });
   assert.equal(
     reachAgreementPlayed.players[reachAgreementPlayed.activeSeat].id,
@@ -155,6 +167,8 @@ export function verifyCombatIntrigueReachAgreement({ cards: { reachAgreement }, 
     kind: "contract",
     ownerId: "p2",
     source: "Reach Agreement",
+    publicOnly: true,
+    allowFallback: true,
   });
   assert.equal(playerById(reachAgreementLastActorPlayed, "p2").deployedTroops, 0);
   assert.deepEqual(

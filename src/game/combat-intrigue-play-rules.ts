@@ -4,18 +4,21 @@ import {
 } from "./combat-intrigue-rules";
 import {
   isGoToGroundIntrigue,
-  isReachAgreementIntrigue,
   isSpiceIsPowerIntrigue,
   isTacticalOptionIntrigue,
 } from "./card-identifiers";
 import {
   resolveAcquireCards,
   resolveCombatInfluenceLossForStrengths,
+  resolveCombatRetreatTroops,
   resolveCombatSpyRecallForStrengths,
+  resolveTakeContracts,
   resolveTrashCardEffects,
   type AgentAcquireCard,
   type CombatInfluenceLossForStrength,
+  type CombatRetreatTroops,
   type CombatSpyRecallForStrength,
+  type TakeContractsEffect,
   type TrashCardEffect,
 } from "./effect-resolver";
 import {
@@ -42,11 +45,42 @@ export type TacticalOptionChoice = "add-strength" | { kind: "retreat-troops"; co
 export type CombatIntrigueChoice = SpiceIsPowerChoice | TacticalOptionChoice;
 
 type AcquireCardPendingAction = Extract<PendingAction, { kind: "acquire-card" }>;
+type ContractPendingAction = Extract<PendingAction, { kind: "contract" }>;
 type LoseInfluencePendingAction = Extract<PendingAction, { kind: "lose-influence" }>;
 type RecallSpyPendingAction = Extract<PendingAction, { kind: "recall-spy" }>;
 type SpyPendingAction = Extract<PendingAction, { kind: "spy" }>;
 type TrashCardPendingAction = Extract<PendingAction, { kind: "trash-card" }>;
 type AdvanceAfterCombatIntriguePlay = (state: GameState) => GameState;
+
+function combatChoiceIdFor(choice: CombatIntrigueChoice | undefined) {
+  if (choice === "add-strength" || choice === "spend-spice") return choice;
+  if (typeof choice === "object" && choice.kind === "retreat-troops") return "retreat-troops";
+  return undefined;
+}
+
+function selectedTroopCountFor(choice: CombatIntrigueChoice | undefined) {
+  return typeof choice === "object" && choice.kind === "retreat-troops" ? choice.count : undefined;
+}
+
+function selectedRetreatChoiceRequested(choice: CombatIntrigueChoice | undefined) {
+  return typeof choice === "object" && choice.kind === "retreat-troops";
+}
+
+function combatEffectContext(
+  state: GameState,
+  actor: Player,
+  target: Player,
+  combatChoice: CombatIntrigueChoice | undefined,
+) {
+  return {
+    trigger: "combat-intrigue" as const,
+    choiceId: combatChoiceIdFor(combatChoice),
+    selectedTroopCount: selectedTroopCountFor(combatChoice),
+    source: actor,
+    target,
+    state,
+  };
+}
 
 function acquirePendingForCombatEffect(
   intrigue: IntrigueCard,
@@ -96,13 +130,9 @@ function resolveCombatAcquirePendingActions(
   intrigue: IntrigueCard,
   actor: Player,
   target: Player,
+  combatChoice: CombatIntrigueChoice | undefined,
 ) {
-  const effects = resolveAcquireCards(intrigue.effects, {
-    trigger: "combat-intrigue",
-    source: actor,
-    target,
-    state,
-  });
+  const effects = resolveAcquireCards(intrigue.effects, combatEffectContext(state, actor, target, combatChoice));
   if (effects.length > 1) throw new Error("Unsupported multiple Combat Intrigue acquire-card effects");
   return effects.reduce<{ pendingActions: AcquireCardPendingAction[]; logTexts: string[] }>((result, effect) => {
     const pending = acquirePendingForCombatEffect(intrigue, target, effect);
@@ -148,13 +178,9 @@ function resolveCombatSpyRecallPendingActions(
   intrigue: IntrigueCard,
   actor: Player,
   target: Player,
+  combatChoice: CombatIntrigueChoice | undefined,
 ) {
-  const effects = resolveCombatSpyRecallForStrengths(intrigue.effects, {
-    trigger: "combat-intrigue",
-    source: actor,
-    target,
-    state,
-  });
+  const effects = resolveCombatSpyRecallForStrengths(intrigue.effects, combatEffectContext(state, actor, target, combatChoice));
   if (effects.length > 1) throw new Error("Unsupported multiple Combat Intrigue recall-spy effects");
   return effects.reduce<{ pendingActions: RecallSpyPendingAction[]; logTexts: string[] }>((result, effect) => {
     const pending = recallSpyPendingForCombatEffect(intrigue, actor, target, effect);
@@ -206,13 +232,9 @@ function resolveCombatInfluenceLossPendingActions(
   intrigue: IntrigueCard,
   actor: Player,
   target: Player,
+  combatChoice: CombatIntrigueChoice | undefined,
 ) {
-  const effects = resolveCombatInfluenceLossForStrengths(intrigue.effects, {
-    trigger: "combat-intrigue",
-    source: actor,
-    target,
-    state,
-  });
+  const effects = resolveCombatInfluenceLossForStrengths(intrigue.effects, combatEffectContext(state, actor, target, combatChoice));
   if (effects.length > 1) throw new Error("Unsupported multiple Combat Intrigue lose-influence-for-strength effects");
   return effects.reduce<{ pendingActions: LoseInfluencePendingAction[]; logTexts: string[] }>((result, effect) => {
     const pending = influenceLossPendingForCombatEffect(intrigue, actor, target, effect);
@@ -250,13 +272,9 @@ function resolveCombatTrashPendingActions(
   intrigue: IntrigueCard,
   actor: Player,
   target: Player,
+  combatChoice: CombatIntrigueChoice | undefined,
 ) {
-  const effects = resolveTrashCardEffects(intrigue.effects, {
-    trigger: "combat-intrigue",
-    source: actor,
-    target,
-    state,
-  });
+  const effects = resolveTrashCardEffects(intrigue.effects, combatEffectContext(state, actor, target, combatChoice));
   if (effects.length > 1) throw new Error("Unsupported multiple Combat Intrigue trash-card effects");
   return effects.reduce<{ pendingActions: TrashCardPendingAction[]; logTexts: string[] }>((result, effect) => {
     const pending = trashCardPendingForCombatEffect(intrigue, target, effect);
@@ -265,6 +283,67 @@ function resolveCombatTrashPendingActions(
     return {
       pendingActions: canTrash ? [...result.pendingActions, pending] : result.pendingActions,
       logTexts: canTrash ? [...result.logTexts, combatTrashDescription(pending)] : result.logTexts,
+    };
+  }, { pendingActions: [], logTexts: [] });
+}
+
+function resolveCombatRetreatActions(
+  state: GameState,
+  intrigue: IntrigueCard,
+  actor: Player,
+  target: Player,
+  combatChoice: CombatIntrigueChoice | undefined,
+) {
+  const effects = resolveCombatRetreatTroops(intrigue.effects, combatEffectContext(state, actor, target, combatChoice));
+  if (effects.length > 1) throw new Error("Unsupported multiple Combat Intrigue retreat-troops effects");
+  return effects.reduce<{ retreats: CombatRetreatTroops[]; logTexts: string[] }>((result, effect) => {
+    if (effect.selector !== "self") return result;
+    return {
+      retreats: [...result.retreats, effect],
+      logTexts: [
+        ...result.logTexts,
+        `${target.leader} retreats ${effect.count} ${effect.count === 1 ? "troop" : "troops"}`,
+      ],
+    };
+  }, { retreats: [], logTexts: [] });
+}
+
+function contractPendingForCombatEffect(
+  intrigue: IntrigueCard,
+  target: Player,
+  effect: TakeContractsEffect,
+): ContractPendingAction | undefined {
+  if (effect.selector !== "self" || effect.sourcePool !== "public-offer") return undefined;
+  if (effect.amount !== 1) throw new Error(`Unsupported Combat Intrigue contract amount ${effect.amount}`);
+  return {
+    kind: "contract",
+    ownerId: target.id,
+    source: effect.source ?? intrigue.name,
+    publicOnly: true,
+    allowFallback: true,
+    ...(effect.optional ? { optional: true } : {}),
+  };
+}
+
+function combatContractDescription(pending: ContractPendingAction) {
+  return pending.optional ? "may take a CHOAM contract" : "takes a CHOAM contract";
+}
+
+function resolveCombatContractPendingActions(
+  state: GameState,
+  intrigue: IntrigueCard,
+  actor: Player,
+  target: Player,
+  combatChoice: CombatIntrigueChoice | undefined,
+) {
+  const effects = resolveTakeContracts(intrigue.effects, combatEffectContext(state, actor, target, combatChoice));
+  if (effects.length > 1) throw new Error("Unsupported multiple Combat Intrigue take-contracts effects");
+  return effects.reduce<{ pendingActions: ContractPendingAction[]; logTexts: string[] }>((result, effect) => {
+    const pending = contractPendingForCombatEffect(intrigue, target, effect);
+    if (!pending) return result;
+    return {
+      pendingActions: [...result.pendingActions, pending],
+      logTexts: [...result.logTexts, combatContractDescription(pending)],
     };
   }, { pendingActions: [], logTexts: [] });
 }
@@ -406,53 +485,21 @@ export function resolvePlayCombatIntrigue(
       log: [logEntry, ...state.log],
     });
   }
-  if (isReachAgreementIntrigue(intrigue)) {
-    const retreatCount =
-      typeof combatChoice === "object" && combatChoice.kind === "retreat-troops" ? combatChoice.count : undefined;
-    if (
-      !Number.isInteger(retreatCount) ||
-      (retreatCount ?? 0) < 1 ||
-      (retreatCount ?? 0) > 2 ||
-      (retreatCount ?? 0) > target.deployedTroops
-    ) return state;
-    const count = retreatCount ?? 0;
-
-    const players = state.players.map((player) => {
-      let next = player;
-      if (player.id === actor.id) {
-        next = { ...next, intrigues: next.intrigues.filter((card) => card.id !== intrigue.id) };
-      }
-      if (player.id === target.id) {
-        next = {
-          ...next,
-          conflict: Math.max(0, next.conflict - count * 2),
-          deployedTroops: next.deployedTroops - count,
-          garrison: next.garrison + count,
-        };
-      }
-      return next;
-    });
-    return advanceAfterCombatIntriguePlay({
-      ...state,
-      players,
-      combatPasses: [],
-      intrigueDiscard: [...state.intrigueDiscard, intrigue],
-      pendingAction: { kind: "contract", ownerId: target.id, source: "Reach Agreement" },
-      log: [
-        `${actor.leader} plays Reach Agreement for ${target.leader}; ${target.leader} retreats ${count} ${count === 1 ? "troop" : "troops"} and takes a CHOAM contract.`,
-        ...state.log,
-      ],
-    });
-  }
-  const combatSwords = combatIntrigueStrength(state, actor, intrigue, target);
-  const combatAcquire = resolveCombatAcquirePendingActions(state, intrigue, actor, target);
-  const combatInfluenceLoss = resolveCombatInfluenceLossPendingActions(state, intrigue, actor, target);
-  const combatSpyRecall = resolveCombatSpyRecallPendingActions(state, intrigue, actor, target);
-  const combatTrash = resolveCombatTrashPendingActions(state, intrigue, actor, target);
+  const combatSwords = combatIntrigueStrength(state, actor, intrigue, target, combatChoiceIdFor(combatChoice));
+  const combatRetreat = resolveCombatRetreatActions(state, intrigue, actor, target, combatChoice);
+  const combatAcquire = resolveCombatAcquirePendingActions(state, intrigue, actor, target, combatChoice);
+  const combatInfluenceLoss = resolveCombatInfluenceLossPendingActions(state, intrigue, actor, target, combatChoice);
+  const combatContract = resolveCombatContractPendingActions(state, intrigue, actor, target, combatChoice);
+  const combatSpyRecall = resolveCombatSpyRecallPendingActions(state, intrigue, actor, target, combatChoice);
+  const combatTrash = resolveCombatTrashPendingActions(state, intrigue, actor, target, combatChoice);
+  if (selectedRetreatChoiceRequested(combatChoice) && combatRetreat.retreats.length === 0) return state;
+  if (combatRetreat.retreats.some((retreat) => retreat.count <= 0 || retreat.count > target.deployedTroops)) return state;
   if (
     !combatSwords &&
+    combatRetreat.logTexts.length === 0 &&
     combatAcquire.logTexts.length === 0 &&
     combatInfluenceLoss.logTexts.length === 0 &&
+    combatContract.logTexts.length === 0 &&
     combatSpyRecall.logTexts.length === 0 &&
     combatTrash.logTexts.length === 0
   ) return state;
@@ -462,6 +509,7 @@ export function resolvePlayCombatIntrigue(
   const immediateCombatSwords = requiredSpyRecallStrength > 0 && requiredSpyRecallStrength === combatSwords
     ? 0
     : (combatSwords ?? 0);
+  const immediateRetreat = combatRetreat.retreats[0];
 
   const players = state.players.map((player) => {
     let next = player;
@@ -471,10 +519,19 @@ export function resolvePlayCombatIntrigue(
     if (immediateCombatSwords > 0 && player.id === target.id) {
       next = { ...next, conflict: next.conflict + immediateCombatSwords };
     }
+    if (immediateRetreat && player.id === target.id) {
+      next = {
+        ...next,
+        conflict: Math.max(0, next.conflict - immediateRetreat.count * 2),
+        deployedTroops: next.deployedTroops - immediateRetreat.count,
+        garrison: next.garrison + immediateRetreat.count,
+      };
+    }
     return next;
   });
   const pendingActions: PendingAction[] = [];
   pendingActions.push(...combatInfluenceLoss.pendingActions);
+  pendingActions.push(...combatContract.pendingActions);
   pendingActions.push(...combatTrash.pendingActions);
   pendingActions.push(...combatSpyRecall.pendingActions);
   pendingActions.push(...combatAcquire.pendingActions);
@@ -486,19 +543,25 @@ export function resolvePlayCombatIntrigue(
     pendingAction: pendingActions[0],
     pendingQueue: pendingActions.slice(1),
   };
-  const influenceLossText = combatInfluenceLoss.logTexts.length > 0 ? ` and ${combatInfluenceLoss.logTexts.join(" and ")}` : "";
-  const trashText = combatTrash.logTexts.length > 0 ? ` and ${combatTrash.logTexts.join(" and ")}` : "";
-  const spyRecallText = combatSpyRecall.logTexts.length > 0 ? ` and ${combatSpyRecall.logTexts.join(" and ")}` : "";
-  const acquireText = combatAcquire.logTexts.length > 0 ? ` and ${combatAcquire.logTexts.join(" and ")}` : "";
-  const strengthText = immediateCombatSwords === 0 && requiredSpyRecallStrength > 0
-    ? `preparing to add ${requiredSpyRecallStrength} strength`
-    : combatSwords
-      ? `adding ${combatSwords} strength`
-      : "resolving its effect";
+  const effectTexts = [
+    ...(immediateCombatSwords === 0 && requiredSpyRecallStrength > 0
+      ? [`preparing to add ${requiredSpyRecallStrength} strength`]
+      : combatSwords
+        ? [`adding ${combatSwords} strength`]
+        : []),
+    ...combatRetreat.logTexts,
+    ...combatInfluenceLoss.logTexts,
+    ...combatContract.logTexts,
+    ...combatTrash.logTexts,
+    ...combatSpyRecall.logTexts,
+    ...combatAcquire.logTexts,
+  ];
+  const firstEffectText = effectTexts[0] ?? "resolving its effect";
+  const separator = firstEffectText.startsWith(`${target.leader} `) ? "; " : ", ";
   return advanceAfterCombatIntriguePlay({
     ...nextState,
     log: [
-      `${actor.leader} plays ${intrigue.name} for ${target.leader}, ${strengthText}${influenceLossText}${trashText}${spyRecallText}${acquireText}.`,
+      `${actor.leader} plays ${intrigue.name} for ${target.leader}${separator}${effectTexts.join(" and ")}.`,
       ...state.log,
     ],
   });

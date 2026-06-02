@@ -372,10 +372,10 @@ export function resolveChoamContractFallback(
   pending: ContractPendingAction,
   finishPendingResolution: FinishPendingResolution,
 ): GameState {
-  if (pending.publicOnly) return state;
+  if (pending.publicOnly && !pending.allowFallback) return state;
   if (state.contractOffer.length > 0) return state;
   const owner = state.players.find((player) => player.id === pending.ownerId);
-  if (!owner || owner.reservedContracts.length > 0) return state;
+  if (!owner || (!pending.publicOnly && owner.reservedContracts.length > 0)) return state;
   const players = state.players.map((player) =>
     player.id === owner.id
       ? { ...player, resources: { ...player.resources, solari: player.resources.solari + 2 } }

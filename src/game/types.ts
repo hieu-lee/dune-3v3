@@ -120,6 +120,13 @@ export type GameEffectSpec =
       optional?: boolean;
     }
   | {
+      kind: "retreat-troops";
+      selector: PlayerSelector;
+      min: number;
+      max: number;
+      source?: string;
+    }
+  | {
       kind: "trash-card";
       selector: PlayerSelector;
       optional?: boolean;
@@ -646,6 +653,7 @@ export type PendingAction =
       source: string;
       spaceId?: string;
       publicOnly?: boolean;
+      allowFallback?: boolean;
       optional?: true;
     }
   | ({

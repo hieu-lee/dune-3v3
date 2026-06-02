@@ -35,9 +35,11 @@ export function combatIntrigueStrength(
   actor: Player,
   intrigue: IntrigueCard,
   target?: Player,
+  choiceId?: string,
 ) {
   const resolved = resolveGameEffects(intrigue.effects, {
     trigger: "combat-intrigue",
+    choiceId,
     source: actor,
     target,
     state,
@@ -45,6 +47,7 @@ export function combatIntrigueStrength(
   if (resolved.swords > 0) return resolved.swords;
   const mandatoryRecallStrength = resolveCombatSpyRecallForStrengths(intrigue.effects, {
     trigger: "combat-intrigue",
+    choiceId,
     source: actor,
     target,
     state,

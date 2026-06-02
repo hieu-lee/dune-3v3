@@ -74,6 +74,14 @@ export type CombatInfluenceLossForStrength = {
   source?: string;
 };
 
+export type CombatRetreatTroops = {
+  selector: PlayerSelector;
+  count: number;
+  min: number;
+  max: number;
+  source?: string;
+};
+
 export type EffectResolverState = Partial<
   Pick<GameState, "alliances" | "players" | "roundMakerSpaceVisits" | "sharedSpyPosts" | "spyPosts" | "turnSpiceGains" | "turnUnitDeployments">
 >;
@@ -81,6 +89,7 @@ export type EffectResolverState = Partial<
 export type GameEffectContext = {
   trigger: GameEffectTrigger;
   choiceId?: string;
+  selectedTroopCount?: number;
   source: Player;
   target?: Player;
   space?: Pick<BoardSpace, "id" | "icon" | "maker">;
@@ -786,6 +795,9 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
   if (effect.kind === "retreat-troops-for-strength") {
     return result;
   }
+  if (effect.kind === "retreat-troops") {
+    return result;
+  }
   if (effect.kind === "trash-card") {
     return result;
   }
@@ -1460,6 +1472,37 @@ export function resolveCombatInfluenceLossForStrengths(
         optional: true,
         source: effect.source,
       }));
+  });
+}
+
+export function resolveCombatRetreatTroops(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): CombatRetreatTroops[] {
+  specs?.forEach(validateSpec);
+  return (specs ?? []).flatMap((spec) => {
+    if (spec.trigger !== "combat-intrigue") return [];
+    if (!specApplies(spec, context)) return [];
+    return spec.effects
+      .filter((effect) => effect.kind === "retreat-troops")
+      .flatMap((effect) => {
+        const count = context.selectedTroopCount;
+        if (
+          count === undefined ||
+          !Number.isInteger(count) ||
+          count < effect.min ||
+          count > effect.max
+        ) {
+          return [];
+        }
+        return {
+          selector: effect.selector,
+          count,
+          min: effect.min,
+          max: effect.max,
+          source: effect.source,
+        };
+      });
   });
 }
 

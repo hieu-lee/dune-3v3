@@ -87,15 +87,17 @@ export function plotIntrigueEffects(
 export function combatIntrigueEffects(
   effects: GameEffectSpec[],
   conditions?: GameEffectConditionSpec[],
+  options?: CardEffectSpecOptions,
 ): CardEffectSpec {
-  return effectSpec("combat-intrigue", effects, conditions);
+  return effectSpec("combat-intrigue", effects, conditions, options);
 }
 
 export function combatGainStrength(
   amount: EffectAmountSpec,
   conditions?: GameEffectConditionSpec[],
+  options?: CardEffectSpecOptions,
 ): CardEffectSpec {
-  return combatIntrigueEffects([{ kind: "gain-strength", selector: "self", amount }], conditions);
+  return combatIntrigueEffects([{ kind: "gain-strength", selector: "self", amount }], conditions, options);
 }
 
 export function combatAcquireCard(
@@ -178,6 +180,46 @@ export function combatLoseInfluenceForStrength(
       ...(options.alternateOwner ? { alternateOwner: options.alternateOwner } : {}),
     },
   ], conditions);
+}
+
+export function combatRetreatTroops(
+  min: number,
+  max: number,
+  options: {
+    source?: string;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+  specOptions?: CardEffectSpecOptions,
+): CardEffectSpec {
+  return combatIntrigueEffects([
+    {
+      kind: "retreat-troops",
+      selector: "self",
+      min,
+      max,
+      ...(options.source ? { source: options.source } : {}),
+    },
+  ], conditions, specOptions);
+}
+
+export function combatTakeContracts(
+  amount: EffectAmountSpec,
+  options: {
+    sourcePool?: ContractEffectSourcePool;
+    source?: string;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+  specOptions?: CardEffectSpecOptions,
+): CardEffectSpec {
+  return combatIntrigueEffects([
+    {
+      kind: "take-contracts",
+      selector: "self",
+      amount,
+      sourcePool: options.sourcePool ?? "public-offer",
+      ...(options.source ? { source: options.source } : {}),
+    },
+  ], conditions, specOptions);
 }
 
 export function plotGainResource(

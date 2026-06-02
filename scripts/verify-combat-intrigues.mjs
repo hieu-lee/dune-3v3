@@ -303,6 +303,8 @@ try {
     kind: "contract",
     ownerId: "p6",
     source: "Reach Agreement",
+    publicOnly: true,
+    allowFallback: true,
   });
   assert.equal(
     commanderReachAgreementPlayed.players[commanderReachAgreementPlayed.activeSeat].id,

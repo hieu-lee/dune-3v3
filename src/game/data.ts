@@ -47,6 +47,7 @@ import {
   priceIsNoObjectSourceId,
   publicSpectacleSourceId,
   questionableMethodsSourceId,
+  reachAgreementSourceId,
   rebelSupplierSourceId,
   reliableInformantSourceId,
   sardaukarSoldierSourceId,
@@ -88,6 +89,8 @@ import {
   combatGainStrength,
   combatLoseInfluenceForStrength,
   combatRecallSpiesForStrength,
+  combatRetreatTroops,
+  combatTakeContracts,
   combatTrashCard,
   deployedUnitsThisTurn,
   hasCombatRecipient,
@@ -1030,6 +1033,12 @@ function intrigueCardEffects(card: HubCard): CardEffectSpec[] | undefined {
         source: "Questionable Methods",
         alternateOwner: "source-commander-personal",
       }),
+    ];
+  }
+  if (card.id === reachAgreementSourceId) {
+    return [
+      combatRetreatTroops(1, 2, { source: "Reach Agreement" }, undefined, { choiceId: "retreat-troops" }),
+      combatTakeContracts(1, { source: "Reach Agreement" }, undefined, { choiceId: "retreat-troops" }),
     ];
   }
   if (card.id === springTheTrapSourceId) {

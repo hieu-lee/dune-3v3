@@ -866,6 +866,7 @@ export function PendingActionPanel({
       {pendingAction.kind === "contract" && pendingContractOwner && (
         <PendingContractPanel
           contractOffer={game.contractOffer}
+          allowFallback={pendingAction.allowFallback}
           optional={pendingAction.optional}
           publicOnly={pendingAction.publicOnly}
           reservedContracts={reservedContractChoices}

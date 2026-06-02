@@ -11,6 +11,7 @@ import {
 } from "./card-identifiers";
 import { commanderPersonalFaction } from "./commander-rules";
 import {
+  buyAccessPairChoices,
   changeAllegiancesGainChoices,
   imperiumPoliticsFactionChoices,
   validBuyAccessChoice,
@@ -296,6 +297,37 @@ export function playImperiumPoliticsPlotIntrigue(
   );
 }
 
+function buyAccessChoiceId(player: Player, choice: BuyAccessChoice) {
+  if (!validBuyAccessChoice(player, choice)) return undefined;
+  const [selectedFirst, selectedSecond] = choice;
+  const canonicalChoice = buyAccessPairChoices(player).find(([first, second]) =>
+    (first === selectedFirst && second === selectedSecond) ||
+    (first === selectedSecond && second === selectedFirst)
+  );
+  return canonicalChoice ? `${canonicalChoice[0]}+${canonicalChoice[1]}` : undefined;
+}
+
+function buyAccessGainText(player: Player, activatedAlly: Player | undefined, choice: BuyAccessChoice) {
+  const personalFaction = commanderPersonalFaction(player);
+  const effects = choice.map((faction) => {
+    const owner = player.role === "Commander" && faction !== personalFaction ? activatedAlly : player;
+    return { faction, owner };
+  });
+  const selfOnly = effects.every((effect) => effect.owner?.id === player.id);
+  if (selfOnly) {
+    return `gains ${effects
+      .map((effect) => `1 ${factionLabels[effect.faction]} Influence`)
+      .join(" and ")}`;
+  }
+  return effects
+    .map((effect) =>
+      effect.owner?.id === player.id
+        ? `gains 1 ${factionLabels[effect.faction]} Influence`
+        : `${effect.owner?.leader ?? "the activated Ally"} gains 1 ${factionLabels[effect.faction]} Influence`
+    )
+    .join(" and ");
+}
+
 export function playBuyAccessPlotIntrigue(
   state: GameState,
   playerId: string,
@@ -303,60 +335,22 @@ export function playBuyAccessPlotIntrigue(
   choice: BuyAccessChoice,
   influenceOwnerId?: string,
 ): GameState {
-  if (state.phase !== "playing" || state.pendingAction || state.pendingQueue.length > 0) return state;
   const player = state.players[state.activeSeat];
   if (!player || player.id !== playerId) return state;
-  const intrigue = player.intrigues.find((card) => card.id === intrigueId);
-  if (!intrigue || !isBuyAccessIntrigue(intrigue)) return state;
-  if (!validBuyAccessChoice(player, choice)) return state;
-  if (player.resources.solari < 5) return state;
-
+  const choiceId = buyAccessChoiceId(player, choice);
+  if (!choiceId) return state;
   const personalFaction = commanderPersonalFaction(player);
-  const influenceEffects = choice.map((faction) => {
-    const ownerResult = player.role === "Commander" && faction !== personalFaction
-      ? activatedAllyEffectOwner(state, player, influenceOwnerId)
-      : { valid: true, owner: player };
-    return { faction, ownerResult };
-  });
-  if (influenceEffects.some((effect) => !effect.ownerResult.valid || !effect.ownerResult.owner)) return state;
-
-  const players = state.players.map((candidate) => {
-    let next = candidate;
-    if (candidate.id === player.id) {
-      next = {
-        ...next,
-        resources: { ...next.resources, solari: next.resources.solari - 5 },
-        intrigues: next.intrigues.filter((card) => card.id !== intrigue.id),
-      };
-    }
-    influenceEffects.forEach((effect) => {
-      const owner = effect.ownerResult.owner;
-      if (owner && candidate.id === owner.id) {
-        next = adjustInfluence(next, effect.faction, 1);
-      }
-    });
-    return next;
-  });
-
-  const selfOnly = influenceEffects.every((effect) => effect.ownerResult.owner?.id === player.id);
-  const effectText = selfOnly
-    ? influenceEffects
-      .map((effect) => `1 ${factionLabels[effect.faction]} Influence`)
-      .join(" and ")
-    : influenceEffects
-      .map((effect) => {
-        const owner = effect.ownerResult.owner;
-        return `${owner?.leader ?? "the activated Ally"} gains 1 ${factionLabels[effect.faction]} Influence`;
-      })
-      .join(" and ");
-  const nextState = {
-    ...state,
-    players,
-    intrigueDiscard: [...state.intrigueDiscard, intrigue],
-    log: [
-      `${player.leader} plays Buy Access, spends 5 Solari, and ${selfOnly ? `gains ${effectText}` : effectText}.`,
-      ...state.log,
-    ],
-  };
-  return resolveLeaderInfluenceThresholdRewards(nextState, state.players);
+  const requiresActivatedAlly = player.role === "Commander" && choice.some((faction) => faction !== personalFaction);
+  return playTypedPlotIntrigue(
+    state,
+    playerId,
+    intrigueId,
+    isBuyAccessIntrigue,
+    (actor, _contractPending, activatedAlly) =>
+      `${actor.leader} plays Buy Access, spends 5 Solari, and ${buyAccessGainText(actor, activatedAlly, choice)}.`,
+    {
+      choiceId,
+      ...(requiresActivatedAlly ? { activatedAllyOwnerId: influenceOwnerId, requireActivatedAlly: true } : {}),
+    },
+  );
 }

@@ -2,6 +2,7 @@ import catalogJson from "./uprising-catalog.generated.json";
 import {
   backedByChoamSourceId,
   beneGesseritOperativeSourceId,
+  buyAccessSourceId,
   calculusOfPowerSourceId,
   callToArmsSourceId,
   cargoRunnerSourceId,
@@ -93,6 +94,7 @@ import {
   plotPayResourcesAndLoseInfluenceForVp,
   plotPayResourcesForVp,
   plotPayResourceForInfluence,
+  plotPayResourceForInfluenceGains,
   plotPlaceSpies,
   plotRecruitTroops,
   plotResourceExchange,
@@ -135,6 +137,43 @@ const influenceLossFactions: FactionId[] = [
   "greatHouses",
   "fringeWorlds",
 ];
+
+const buyAccessAllyFactions: FactionId[] = ["greatHouses", "fringeWorlds", "bene", "spacing"];
+const buyAccessShaddamFactions: FactionId[] = ["emperor", "greatHouses", "fringeWorlds", "bene", "spacing"];
+const buyAccessMuadDibFactions: FactionId[] = ["greatHouses", "fremen", "fringeWorlds", "bene", "spacing"];
+
+function buyAccessChoiceId(first: FactionId, second: FactionId) {
+  return `${first}+${second}`;
+}
+
+function buyAccessPrintedIcon(faction: FactionId) {
+  if (faction === "emperor" || faction === "greatHouses") return "emperor";
+  if (faction === "fremen" || faction === "fringeWorlds") return "fremen";
+  return faction;
+}
+
+function buyAccessPlotSpecsFor(
+  factions: FactionId[],
+  ownerForFaction: (faction: FactionId) => "self" | "activated-ally",
+  conditions: GameEffectConditionSpec[],
+): CardEffectSpec[] {
+  return factions.flatMap((first, firstIndex) =>
+    factions.slice(firstIndex + 1)
+      .filter((second) => buyAccessPrintedIcon(first) !== buyAccessPrintedIcon(second))
+      .map((second) =>
+        plotPayResourceForInfluenceGains(
+          buyAccessChoiceId(first, second),
+          "solari",
+          5,
+          [
+            { selector: ownerForFaction(first), faction: first, amount: 1 },
+            { selector: ownerForFaction(second), faction: second, amount: 1 },
+          ],
+          conditions,
+        )
+      )
+  );
+}
 
 export {
   battleIconLabels,
@@ -944,6 +983,21 @@ function intrigueCardEffects(card: HubCard): CardEffectSpec[] | undefined {
     return [
       plotResourceExchange("spice-to-solari", "spice", 2, "solari", 5),
       plotResourceExchange("solari-to-spice", "solari", 5, "spice", 5),
+    ];
+  }
+  if (card.id === buyAccessSourceId) {
+    return [
+      ...buyAccessPlotSpecsFor(buyAccessAllyFactions, () => "self", [hasRole("Ally")]),
+      ...buyAccessPlotSpecsFor(
+        buyAccessShaddamFactions,
+        (faction) => faction === "emperor" ? "self" : "activated-ally",
+        [hasRole("Commander"), hasTeam("shaddam")],
+      ),
+      ...buyAccessPlotSpecsFor(
+        buyAccessMuadDibFactions,
+        (faction) => faction === "fremen" ? "self" : "activated-ally",
+        [hasRole("Commander"), hasTeam("muaddib")],
+      ),
     ];
   }
   if (card.id === imperiumPoliticsSourceId) {

@@ -105,6 +105,7 @@ try {
   const p2 = playerById(game, "p2");
   const p3 = playerById(game, "p3");
   const p4 = playerById(game, "p4");
+  const p5 = playerById(game, "p5");
   const p6 = playerById(game, "p6");
   const revealSpecCards = [
     ...data.allyStarterCards,
@@ -161,6 +162,7 @@ try {
   const prepareTheWay = data.reserveMarket.find((card) => card.sourceId === 537);
   const spiceMustFlow = data.reserveMarket.find((card) => card.sourceId === 538);
   const backedByChoam = data.intrigueCards.find((card) => card.name === "Backed by CHOAM");
+  const buyAccess = data.intrigueCards.find((card) => card.name === "Buy Access");
   const callToArms = data.intrigueCards.find((card) => card.name === "Call to Arms");
   const councilorsAmbition = data.intrigueCards.find((card) => card.name === "Councilor's Ambition");
   const contingencyPlan = data.intrigueCards.find((card) => card.name === "Contingency Plan");
@@ -243,7 +245,7 @@ try {
     wheelsWithinWheels,
   );
   assert.ok(commandRespect && prepareTheWay && spiceMustFlow && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
-  assert.ok(backedByChoam && callToArms && councilorsAmbition && contingencyPlan && cunning && departForArrakis && distraction && imperiumPolitics && intelligenceReport && leverage && manipulate && marketOpportunity && mercenaries && opportunism && shaddamsFavor && strategicStockpiling);
+  assert.ok(backedByChoam && buyAccess && callToArms && councilorsAmbition && contingencyPlan && cunning && departForArrakis && distraction && imperiumPolitics && intelligenceReport && leverage && manipulate && marketOpportunity && mercenaries && opportunism && shaddamsFavor && strategicStockpiling);
   assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && dutifulService && deliverSupplies && sietchTabr && spiceRefinery);
   assert.equal(revealSpecCards.length, 79, "Unexpected number of cards with declarative Reveal specs");
   assert.equal(
@@ -782,6 +784,138 @@ try {
   assert.equal(opportunismBeneBeneResolved.spentResources.solari, 2, "Opportunism same-Faction choice should spend 2 Solari");
   assert.equal(opportunismBeneBeneResolved.influenceLosses.bene, 2, "Opportunism same-Faction choice should aggregate two Influence losses");
   assert.equal(opportunismBeneBeneResolved.vp, 1, "Opportunism same-Faction choice should gain 1 VP");
+  assert.ok(
+    buyAccess.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.choiceId === "greatHouses+bene" &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Ally") &&
+      spec.effects.some((effect) =>
+        effect.kind === "spend-resource" &&
+        effect.selector === "self" &&
+        effect.resource === "solari" &&
+        effect.amount === 5
+      ) &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-influence" &&
+        effect.selector === "self" &&
+        effect.faction === "greatHouses" &&
+        effect.amount === 1
+      ) &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-influence" &&
+        effect.selector === "self" &&
+        effect.faction === "bene" &&
+        effect.amount === 1
+      )
+    ),
+    "Buy Access should carry a typed Ally Great Houses plus Bene Gesserit Plot choice spec",
+  );
+  assert.ok(
+    buyAccess.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.choiceId === "emperor+bene" &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Commander") &&
+      spec.conditions?.some((condition) => condition.kind === "has-team" && condition.team === "shaddam") &&
+      spec.effects.some((effect) =>
+        effect.kind === "spend-resource" &&
+        effect.selector === "self" &&
+        effect.resource === "solari" &&
+        effect.amount === 5
+      ) &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-influence" &&
+        effect.selector === "self" &&
+        effect.faction === "emperor" &&
+        effect.amount === 1
+      ) &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-influence" &&
+        effect.selector === "activated-ally" &&
+        effect.faction === "bene" &&
+        effect.amount === 1
+      )
+    ),
+    "Buy Access should carry a typed Shaddam personal Emperor plus routed Bene Gesserit Plot choice spec",
+  );
+  assert.ok(
+    buyAccess.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.choiceId === "greatHouses+fremen" &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Commander") &&
+      spec.conditions?.some((condition) => condition.kind === "has-team" && condition.team === "muaddib") &&
+      spec.effects.some((effect) =>
+        effect.kind === "spend-resource" &&
+        effect.selector === "self" &&
+        effect.resource === "solari" &&
+        effect.amount === 5
+      ) &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-influence" &&
+        effect.selector === "activated-ally" &&
+        effect.faction === "greatHouses" &&
+        effect.amount === 1
+      ) &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-influence" &&
+        effect.selector === "self" &&
+        effect.faction === "fremen" &&
+        effect.amount === 1
+      )
+    ),
+    "Buy Access should carry a typed Muad'Dib routed Great Houses plus personal Fremen Plot choice spec",
+  );
+  assert.equal(
+    buyAccess.effects?.some((spec) => spec.trigger === "plot-intrigue" && spec.choiceId === "emperor+greatHouses"),
+    false,
+    "Buy Access typed specs should not allow both mappings of the printed Emperor icon",
+  );
+  assert.equal(
+    buyAccess.effects?.some((spec) => spec.trigger === "plot-intrigue" && spec.choiceId === "fremen+fringeWorlds"),
+    false,
+    "Buy Access typed specs should not allow both mappings of the printed Fremen icon",
+  );
+  const buyAccessAllyResolved = effectResolver.resolveGameEffects(buyAccess.effects, {
+    trigger: "plot-intrigue",
+    choiceId: "greatHouses+bene",
+    source: p2,
+    state: game,
+  });
+  assert.equal(buyAccessAllyResolved.spentResources.solari, 5, "Ally Buy Access should spend 5 Solari");
+  assert.equal(buyAccessAllyResolved.influenceGains.greatHouses, 1, "Ally Buy Access should gain Great Houses Influence");
+  assert.equal(buyAccessAllyResolved.influenceGains.bene, 1, "Ally Buy Access should gain Bene Gesserit Influence");
+  assert.deepEqual(
+    buyAccessAllyResolved.activatedAlly.influenceGains,
+    {},
+    "Ally Buy Access should not route Influence to an activated Ally",
+  );
+  const buyAccessShaddamResolved = effectResolver.resolveGameEffects(buyAccess.effects, {
+    trigger: "plot-intrigue",
+    choiceId: "emperor+bene",
+    source: p4,
+    target: p6,
+    state: game,
+  });
+  assert.equal(buyAccessShaddamResolved.spentResources.solari, 5, "Shaddam Buy Access should spend 5 Solari");
+  assert.equal(buyAccessShaddamResolved.influenceGains.emperor, 1, "Shaddam Buy Access should gain personal Emperor Influence");
+  assert.equal(
+    buyAccessShaddamResolved.activatedAlly.influenceGains.bene,
+    1,
+    "Shaddam Buy Access should route game-board Influence to the activated Ally",
+  );
+  const buyAccessMuadDibResolved = effectResolver.resolveGameEffects(buyAccess.effects, {
+    trigger: "plot-intrigue",
+    choiceId: "greatHouses+fremen",
+    source: p1,
+    target: p5,
+    state: game,
+  });
+  assert.equal(buyAccessMuadDibResolved.spentResources.solari, 5, "Muad'Dib Buy Access should spend 5 Solari");
+  assert.equal(buyAccessMuadDibResolved.influenceGains.fremen, 1, "Muad'Dib Buy Access should gain personal Fremen Influence");
+  assert.equal(
+    buyAccessMuadDibResolved.activatedAlly.influenceGains.greatHouses,
+    1,
+    "Muad'Dib Buy Access should route game-board Influence to the activated Ally",
+  );
   assert.ok(
     imperiumPolitics.effects?.some((spec) =>
       spec.trigger === "plot-intrigue" &&

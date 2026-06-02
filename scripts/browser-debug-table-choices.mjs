@@ -154,6 +154,101 @@ export async function runTableChoicesSmoke({
     "Calculus should trash the selected Emperor card",
   );
 
+  await setDebugGameAndWait(page, states.buyAccessAlly);
+  await waitForActiveIntrigue(page, "Buy Access");
+  const allyBuyAccessCard = page.locator(".intrigue-card").filter({ hasText: "Buy Access" });
+  const allyBuyAccessButton = allyBuyAccessCard.getByRole("button", { name: /5 Solari -> GH \+ BG/ });
+  assert.equal(await allyBuyAccessButton.count(), 1, "Expected one Ally Buy Access Great Houses plus Bene Gesserit button");
+  assert.equal(await allyBuyAccessButton.isEnabled(), true, "Ally Buy Access should be playable with 5 Solari");
+  await screenshot(page, captures, "buy-access-ally-ready.png");
+
+  const allyBuyAccessBefore = await currentGame(page);
+  const allyBuyAccessOwnerBefore = allyBuyAccessBefore.players.find((player) => player.id === "p2");
+  assert.ok(allyBuyAccessOwnerBefore, "Expected Feyd before Ally Buy Access");
+  await allyBuyAccessButton.click();
+  await page.waitForFunction(() => {
+    const game = window.__DUNE_DEBUG__?.getGame();
+    const player = game?.players.find((candidate) => candidate.id === "p2");
+    return Boolean(
+      player &&
+        !game.pendingAction &&
+        game.pendingQueue.length === 0 &&
+        player.resources.solari === 0 &&
+        player.influence.greatHouses === 2 &&
+        player.influence.bene === 2 &&
+        !player.intrigues.some((card) => card.name === "Buy Access") &&
+        game?.intrigueDiscard.at(-1)?.name === "Buy Access",
+    );
+  });
+  const allyBuyAccessAfter = await currentGame(page);
+  const allyBuyAccessOwnerAfter = allyBuyAccessAfter.players.find((player) => player.id === "p2");
+  assert.ok(allyBuyAccessOwnerAfter, "Expected Feyd after Ally Buy Access");
+  assert.equal(
+    allyBuyAccessOwnerAfter.vp,
+    allyBuyAccessOwnerBefore.vp + 2,
+    "Ally Buy Access should award both Influence threshold VPs",
+  );
+  assert.match(
+    allyBuyAccessAfter.log[0],
+    /Buy Access, spends 5 Solari, and gains 1 Great Houses Influence and 1 Bene Gesserit Influence/,
+  );
+  await screenshot(page, captures, "buy-access-ally-after.png");
+
+  await setDebugGameAndWait(page, states.buyAccessCommander);
+  await waitForActiveIntrigue(page, "Buy Access");
+  const commanderBuyAccessCard = page.locator(".intrigue-card").filter({ hasText: "Buy Access" });
+  const commanderBuyAccessButton = commanderBuyAccessCard.getByRole("button", {
+    name: new RegExp(`5 Solari -> Self: EMP / ${escapeRegExp(states.buyAccessCommanderTargetName)}: BG`),
+  });
+  assert.equal(await commanderBuyAccessButton.count(), 1, "Expected one Commander Buy Access personal plus routed button");
+  assert.equal(
+    await commanderBuyAccessButton.isEnabled(),
+    true,
+    "Commander Buy Access should be playable with 5 Solari and an activated Ally",
+  );
+  await screenshot(page, captures, "buy-access-commander-ready.png");
+
+  const commanderBuyAccessBefore = await currentGame(page);
+  const commanderBuyAccessSourceBefore = commanderBuyAccessBefore.players.find((player) => player.id === "p4");
+  const commanderBuyAccessOwnerBefore = commanderBuyAccessBefore.players.find((player) => player.id === "p6");
+  assert.ok(commanderBuyAccessSourceBefore, "Expected Shaddam before Commander Buy Access");
+  assert.ok(commanderBuyAccessOwnerBefore, "Expected Princess Irulan before Commander Buy Access");
+  await commanderBuyAccessButton.click();
+  await page.waitForFunction(() => {
+    const game = window.__DUNE_DEBUG__?.getGame();
+    const commander = game?.players.find((candidate) => candidate.id === "p4");
+    const ally = game?.players.find((candidate) => candidate.id === "p6");
+    return Boolean(
+      commander &&
+        ally &&
+        !game.pendingAction &&
+        game.pendingQueue.length === 0 &&
+        commander.resources.solari === 0 &&
+        commander.influence.emperor === 2 &&
+        commander.influence.bene === 0 &&
+        ally.influence.bene === 2 &&
+        !commander.intrigues.some((card) => card.name === "Buy Access") &&
+        game?.intrigueDiscard.at(-1)?.name === "Buy Access",
+    );
+  });
+  const commanderBuyAccessAfter = await currentGame(page);
+  const commanderBuyAccessSourceAfter = commanderBuyAccessAfter.players.find((player) => player.id === "p4");
+  const commanderBuyAccessOwnerAfter = commanderBuyAccessAfter.players.find((player) => player.id === "p6");
+  assert.ok(commanderBuyAccessSourceAfter, "Expected Shaddam after Commander Buy Access");
+  assert.ok(commanderBuyAccessOwnerAfter, "Expected Princess Irulan after Commander Buy Access");
+  assert.equal(
+    commanderBuyAccessSourceAfter.vp,
+    commanderBuyAccessSourceBefore.vp + 1,
+    "Commander Buy Access should award the personal Emperor threshold VP to Shaddam",
+  );
+  assert.equal(
+    commanderBuyAccessOwnerAfter.vp,
+    commanderBuyAccessOwnerBefore.vp + 1,
+    "Commander Buy Access should award the routed Bene Gesserit threshold VP to the activated Ally",
+  );
+  assert.match(commanderBuyAccessAfter.log[0], /gains 1 Emperor Influence and Princess Irulan gains 1 Bene Gesserit Influence/);
+  await screenshot(page, captures, "buy-access-commander-after.png");
+
   await setDebugGameAndWait(page, states.imperiumPoliticsAlly);
   await waitForActiveIntrigue(page, "Imperium Politics");
   const allyPoliticsCard = page.locator(".intrigue-card").filter({ hasText: "Imperium Politics" });
@@ -402,6 +497,8 @@ async function createTableChoiceStates(server, initialPlayableGame) {
   assert.ok(imperialTent, "Expected Imperial Tent for declarative Throne Row browser debug state");
   const manipulate = data.intrigueCards.find((card) => card.name === "Manipulate");
   assert.ok(manipulate, "Expected Manipulate for Plot row-manipulation browser debug state");
+  const buyAccess = data.intrigueCards.find((card) => card.name === "Buy Access");
+  assert.ok(buyAccess, "Expected Buy Access for Plot Influence browser debug state");
   const imperiumPolitics = data.intrigueCards.find((card) => card.name === "Imperium Politics");
   assert.ok(imperiumPolitics, "Expected Imperium Politics for Plot Influence browser debug state");
   const manipulateRowCard = data.imperiumDeck.find((card) => (card.cost ?? 0) > 0);
@@ -571,6 +668,50 @@ async function createTableChoiceStates(server, initialPlayableGame) {
     },
     calculusTrashTargetId: calculusTrashTarget.id,
     calculusTrashTargetName: calculusTrashTarget.name,
+    buyAccessAlly: {
+      ...base,
+      activeSeat: feydSeat,
+      intrigueDiscard: [],
+      players: base.players.map((player) =>
+        player.id === "p2"
+          ? {
+              ...player,
+              hand: [],
+              influence: { ...player.influence, greatHouses: 1, bene: 1, spacing: 1 },
+              intrigues: [cloneCard(buyAccess)],
+              resources: { ...player.resources, solari: 5 },
+              revealed: false,
+            }
+          : { ...player, intrigues: [] }
+      ),
+    },
+    buyAccessCommander: {
+      ...base,
+      activeSeat: shaddamSeat,
+      intrigueDiscard: [],
+      players: base.players.map((player) => {
+        if (player.id === "p4") {
+          return {
+            ...player,
+            hand: [],
+            influence: { ...player.influence, emperor: 1, bene: 0 },
+            intrigues: [cloneCard(buyAccess)],
+            resources: { ...player.resources, solari: 5 },
+            revealActivatedAllyId: "p6",
+            revealed: true,
+          };
+        }
+        if (player.id === "p6") {
+          return {
+            ...player,
+            influence: { ...player.influence, bene: 1 },
+            intrigues: [],
+          };
+        }
+        return { ...player, intrigues: [] };
+      }),
+    },
+    buyAccessCommanderTargetName: "Princess Irulan",
     imperiumPoliticsAlly: {
       ...base,
       activeSeat: feydSeat,

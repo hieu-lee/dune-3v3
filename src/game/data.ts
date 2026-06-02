@@ -7,6 +7,7 @@ import {
   chaniCleverTacticianSourceId,
   covertOperationSourceId,
   dangerousRhetoricSourceId,
+  desertPowerSourceId,
   doubleAgentSourceId,
   ecologicalTestingStationSourceId,
   fedaykinStilltentSourceId,
@@ -86,6 +87,7 @@ import type {
   IntrigueCard,
   LeaderCard,
   CardEffectSpec,
+  GameEffectConditionSpec,
   ResourceId,
 } from "./types";
 export {
@@ -490,6 +492,7 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
 }
 
 type SimpleAgentEffectConfig = {
+  conditions?: GameEffectConditionSpec[];
   drawCards?: number;
   drawIntrigues?: number;
   gainInfluence?: number;
@@ -499,6 +502,7 @@ type SimpleAgentEffectConfig = {
 };
 
 const simpleAgentEffectConfigs: Record<number, SimpleAgentEffectConfig> = {
+  [desertPowerSourceId]: { conditions: [visitedMakerSpace()], gain: { spice: 2 } },
   [imperialSpymasterSourceId]: { drawIntrigues: 1 },
   [leadershipSourceId]: { drawCards: 1 },
   [publicSpectacleSourceId]: { gainInfluence: 1, placeSpies: 1 },
@@ -510,10 +514,13 @@ const simpleAgentEffectConfigs: Record<number, SimpleAgentEffectConfig> = {
   [undercoverAssetSourceId]: { placeSpies: 1 },
 };
 
-function agentRecruitTroopsForActivatedOwner(amount: number): CardEffectSpec[] {
+function agentRecruitTroopsForActivatedOwner(
+  amount: number,
+  conditions: GameEffectConditionSpec[] = [],
+): CardEffectSpec[] {
   return [
-    agentRecruitTroops("self", amount, [hasRole("Ally")]),
-    agentRecruitTroops("activated-ally", amount, [hasRole("Commander")]),
+    agentRecruitTroops("self", amount, [...conditions, hasRole("Ally")]),
+    agentRecruitTroops("activated-ally", amount, [...conditions, hasRole("Commander")]),
   ];
 }
 
@@ -526,24 +533,25 @@ function imperiumSimpleAgentEffects(card: HubCard): CardEffectSpec[] | undefined
       attributeNumber(card, "Swords"),
     ) ?? []),
   ];
+  const conditions = config.conditions ?? [];
   if (config.drawIntrigues) {
-    effects.push(agentDrawIntrigues(config.drawIntrigues));
+    effects.push(agentDrawIntrigues(config.drawIntrigues, conditions));
   }
   if (config.drawCards) {
-    effects.push(agentDrawCards(config.drawCards));
+    effects.push(agentDrawCards(config.drawCards, conditions));
   }
   if (config.gainInfluence) {
-    effects.push(agentGainInfluenceChoice(config.gainInfluence));
+    effects.push(agentGainInfluenceChoice(config.gainInfluence, {}, conditions));
   }
   if (config.placeSpies) {
-    effects.push(agentPlaceSpies("self", config.placeSpies, { recallForSupply: true, mustPlace: true }));
+    effects.push(agentPlaceSpies("self", config.placeSpies, { recallForSupply: true, mustPlace: true }, conditions));
   }
   for (const resource of ["solari", "spice", "water"] as const) {
     const amount = config.gain?.[resource] ?? 0;
-    if (amount > 0) effects.push(agentGainResource(resource, amount));
+    if (amount > 0) effects.push(agentGainResource(resource, amount, conditions));
   }
   if (config.recruitTroops) {
-    effects.push(...agentRecruitTroopsForActivatedOwner(config.recruitTroops));
+    effects.push(...agentRecruitTroopsForActivatedOwner(config.recruitTroops, conditions));
   }
   return effects;
 }
@@ -593,6 +601,9 @@ function imperiumPlayText(card: HubCard) {
   }
   if (card.id === dangerousRhetoricSourceId) {
     return "Gain 1 Influence and trash this card.";
+  }
+  if (card.id === desertPowerSourceId) {
+    return "If you sent an Agent to a Maker board space this turn, gain 2 spice.";
   }
   if (card.id === priceIsNoObjectSourceId) {
     return "You may acquire a card to your hand using Solari instead of persuasion.";

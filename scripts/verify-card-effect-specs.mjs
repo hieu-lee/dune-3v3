@@ -110,6 +110,7 @@ try {
   const beneGesseritOperative = data.imperiumDeck.find((card) => card.name === "Bene Gesserit Operative");
   const covertOperation = data.imperiumDeck.find((card) => card.name === "Covert Operation");
   const dangerousRhetoric = data.imperiumDeck.find((card) => card.name === "Dangerous Rhetoric");
+  const desertPower = data.imperiumDeck.find((card) => card.name === "Desert Power");
   const doubleAgent = data.imperiumDeck.find((card) => card.name === "Double Agent");
   const imperialSpymaster = data.imperiumDeck.find((card) => card.name === "Imperial Spymaster");
   const fedaykinStilltent = data.imperiumDeck.find((card) => card.name === "Fedaykin Stilltent");
@@ -177,6 +178,7 @@ try {
     beneGesseritOperative &&
     covertOperation &&
     doubleAgent &&
+    desertPower &&
     imperialSpymaster &&
     fedaykinStilltent &&
     hiddenMissive &&
@@ -331,6 +333,7 @@ try {
       "Chani, Clever Tactician",
       "Covert Operation",
       "Dangerous Rhetoric",
+      "Desert Power",
       "Double Agent",
       "Ecological Testing Station",
       "Fedaykin Stilltent",
@@ -382,6 +385,7 @@ try {
     wheelsWithinWheels,
     beneGesseritOperative,
     chani,
+    desertPower,
     imperialSpymaster,
     rebelSupplier,
     sardaukarSoldier,
@@ -446,6 +450,19 @@ try {
       (effect) => effect.kind === "gain-resource" && effect.selector === "self" && effect.resource === "spice" && effect.amount === 1,
     ),
     "Rebel Supplier should carry a declarative Agent spice spec",
+  );
+  assert.ok(
+    desertPower.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.conditions?.some((condition) => condition.kind === "visited-maker-space") &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-resource" &&
+        effect.selector === "self" &&
+        effect.resource === "spice" &&
+        effect.amount === 2
+      )
+    ),
+    "Desert Power should carry a Maker-space-gated Agent spice spec",
   );
   assert.ok(
     hasAgentEffect(
@@ -3961,6 +3978,30 @@ try {
   assert.equal(stilgarCommanderEffect.source.garrison, 0, "Commander Stilgar should not recruit troops to the Commander");
   assert.equal(stilgarCommanderEffect.target.garrison, 2, "Commander Stilgar should recruit troops to the activated Ally");
   assert.equal(stilgarCommanderEffect.recruitedTroops, 2, "Commander Stilgar recruited troops should count for deployment limits");
+
+  const desertPowerMakerEffect = state.applyCardAgentEffect(
+    desertPower,
+    { ...p2, resources: { solari: 0, spice: 0, water: 0 } },
+    p2,
+    game,
+    haggaBasin,
+  );
+  assert.equal(desertPowerMakerEffect.source.resources.spice, 2, "Desert Power should gain 2 Agent spice on Maker spaces");
+  assert.equal(desertPowerMakerEffect.sourceSpiceGained, 2, "Desert Power Agent spice should be trackable");
+  assert.match(desertPowerMakerEffect.log ?? "", /Desert Power: gains 2 spice/);
+  const desertPowerNonMakerEffect = state.applyCardAgentEffect(
+    desertPower,
+    { ...p2, resources: { solari: 0, spice: 0, water: 0 } },
+    p2,
+    game,
+    arrakeen,
+  );
+  assert.equal(
+    desertPowerNonMakerEffect.source.resources.spice,
+    0,
+    "Desert Power should not gain Agent spice outside Maker spaces",
+  );
+  assert.equal(desertPowerNonMakerEffect.log, undefined, "Desert Power should not log outside Maker spaces");
 
   const ecologicalSoloReveal = turnActions.revealTurnPlan(
     { ...p2, hand: [ecologicalTestingStation], playArea: [], highCouncilSeat: false },

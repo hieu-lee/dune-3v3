@@ -26,7 +26,6 @@ import {
   resolveDiscardCardForInfluenceAndDrawChoice,
   resolveBoardInfluenceChoice,
   resolveJessicaOtherMemoriesChoice,
-  resolveJessicaSpiceAgonyChoice,
   resolveLadyAmberDesertScoutsChoice,
   resolveLoseInfluenceForIntriguesChoice,
   resolveMakerChoice,
@@ -81,7 +80,6 @@ import type {
 } from "./game/types";
 import type {
   JessicaOtherMemoriesChoice,
-  JessicaSpiceAgonyChoice,
   LadyAmberDesertScoutsChoice,
   RepeatBoardSpaceChoice,
   StabanUnseenNetworkChoice,
@@ -189,8 +187,6 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     runPending("staban-unseen-network", (current, pending) => maybeStartCombatPhase(resolveStabanUnseenNetworkChoice(current, pending, choice)));
   const chooseLadyAmberDesertScouts = (choice: LadyAmberDesertScoutsChoice) =>
     runPending("amber-desert-scouts", (current, pending) => maybeStartCombatPhase(resolveLadyAmberDesertScoutsChoice(current, pending, choice)));
-  const chooseJessicaSpiceAgony = (choice: JessicaSpiceAgonyChoice) =>
-    runPending("jessica-spice-agony", (current, pending) => maybeStartCombatPhase(resolveJessicaSpiceAgonyChoice(current, pending, choice)));
   const chooseRepeatBoardSpace = (choice: RepeatBoardSpaceChoice) =>
     runPending("repeat-board-space", (current, pending) => maybeStartCombatPhase(resolveRepeatBoardSpaceChoice(current, pending, choice)));
   const chooseJessicaOtherMemories = (choice: JessicaOtherMemoriesChoice) =>
@@ -315,7 +311,6 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     chooseDiscardHandCard,
     chooseDiscardCardForInfluenceAndDraw,
     chooseJessicaOtherMemories,
-    chooseJessicaSpiceAgony,
     chooseLadyAmberDesertScouts,
     chooseLoseInfluenceForIntrigues,
     chooseMakerReward,

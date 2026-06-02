@@ -392,31 +392,62 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
         throw new Error(`Unsupported effect resource "${option.resource}"`);
       }
       validatePositiveAmount("paid-reward-choice cost", option.cost);
-      if (option.reward.selector !== "self" && option.reward.selector !== "activated-ally") {
-        throw new Error(`Unsupported paid-reward-choice selector "${option.reward.selector}"`);
-      }
-      if (option.reward.kind === "recruit-troops") {
-        validatePositiveAmount("paid-reward-choice troops", option.reward.amount);
-        if (option.reward.destination !== "garrison") {
-          invalidSpecField("paid-reward-choice troop destination", option.reward.destination);
+      const validateAtomicReward = (reward: typeof option.reward) => {
+        if (reward.kind === "bundle") {
+          invalidSpecField("paid-reward-choice nested bundle", reward.kind);
         }
-        return;
-      }
-      if (option.reward.kind === "gain-influence") {
-        if (!supportedFactions.has(option.reward.faction)) {
-          throw new Error(`Unsupported effect faction "${option.reward.faction}"`);
+        if (reward.selector !== "self" && reward.selector !== "activated-ally") {
+          throw new Error(`Unsupported paid-reward-choice selector "${reward.selector}"`);
         }
-        validatePositiveAmount("paid-reward-choice influence", option.reward.amount);
-        return;
-      }
-      if (option.reward.kind === "gain-resource") {
-        if (!supportedResources.has(option.reward.resource)) {
-          throw new Error(`Unsupported effect resource "${option.reward.resource}"`);
+        if (reward.kind === "recruit-troops") {
+          validatePositiveAmount("paid-reward-choice troops", reward.amount);
+          if (reward.destination !== "garrison") {
+            invalidSpecField("paid-reward-choice troop destination", reward.destination);
+          }
+          return;
         }
-        validatePositiveAmount("paid-reward-choice resource", option.reward.amount);
-        return;
-      }
-      unsupportedKind("paid-reward-choice reward", option.reward);
+        if (reward.kind === "gain-influence") {
+          if (!supportedFactions.has(reward.faction)) {
+            throw new Error(`Unsupported effect faction "${reward.faction}"`);
+          }
+          validatePositiveAmount("paid-reward-choice influence", reward.amount);
+          return;
+        }
+        if (reward.kind === "gain-resource") {
+          if (!supportedResources.has(reward.resource)) {
+            throw new Error(`Unsupported effect resource "${reward.resource}"`);
+          }
+          validatePositiveAmount("paid-reward-choice resource", reward.amount);
+          return;
+        }
+        if (reward.kind === "draw-intrigues") {
+          validatePositiveAmount("paid-reward-choice intrigues", reward.amount);
+          return;
+        }
+        if (reward.kind === "gain-leader-counter") {
+          if (reward.counter !== "jessicaMemories") {
+            invalidSpecField("paid-reward-choice leader counter", reward.counter);
+          }
+          validatePositiveAmount("paid-reward-choice leader counter", reward.amount);
+          validatePositiveAmount("paid-reward-choice leader counter troopSupplyCost", reward.troopSupplyCost);
+          if (reward.troopSupplyCost !== reward.amount) {
+            invalidSpecField("paid-reward-choice leader counter troopSupplyCost", reward.troopSupplyCost);
+          }
+          return;
+        }
+        unsupportedKind("paid-reward-choice reward", reward);
+      };
+      const validateReward = (reward: typeof option.reward) => {
+        if (reward.kind === "bundle") {
+          if (!Array.isArray(reward.rewards) || reward.rewards.length === 0) {
+            invalidSpecField("paid-reward-choice bundle rewards", reward.rewards);
+          }
+          reward.rewards.forEach((nestedReward) => validateAtomicReward(nestedReward));
+          return;
+        }
+        validateAtomicReward(reward);
+      };
+      validateReward(option.reward);
     });
     return;
   }

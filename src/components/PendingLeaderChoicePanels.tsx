@@ -74,43 +74,6 @@ export function PendingLadyAmberDesertScoutsPanel({
   );
 }
 
-type PendingJessicaSpiceAgonyPanelProps = {
-  canPay: boolean;
-  memoryLabel: string;
-  owner?: Player;
-  troopSupplyLabel: string;
-  onChoose: (choice: "pay" | "skip") => void;
-};
-
-export function PendingJessicaSpiceAgonyPanel({
-  canPay,
-  memoryLabel,
-  owner,
-  troopSupplyLabel,
-  onChoose,
-}: PendingJessicaSpiceAgonyPanelProps) {
-  return (
-    <div className="pending-controls">
-      {owner ? (
-        <>
-          <button
-            type="button"
-            onClick={() => onChoose("pay")}
-            disabled={!canPay}
-          >
-            <Sparkles size={15} />
-            Spend 1 spice: Intrigue + memory
-          </button>
-          <span>{memoryLabel} / {troopSupplyLabel}</span>
-        </>
-      ) : (
-        <span>Spice Agony can no longer resolve with the current table state.</span>
-      )}
-      <button type="button" onClick={() => onChoose("skip")}>Skip</button>
-    </div>
-  );
-}
-
 type PendingRepeatBoardSpacePanelProps = {
   owner?: Player;
   pending: Extract<PendingAction, { kind: "repeat-board-space" }>;

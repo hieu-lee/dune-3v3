@@ -6,13 +6,8 @@ import {
   pendingActionForReverendMotherJessicaRepeat,
 } from "./card-pending-rules";
 import {
-  isGenericSignetRingCard,
-} from "./card-identifiers";
-import {
   drawCards,
-  playerTroopSupply,
 } from "./deck-utils";
-import { drawIntrigueCards } from "./intrigue-deck";
 import {
   ladyAmberMetulliLeaderName,
   ladyJessicaLeaderName,
@@ -32,11 +27,9 @@ import type {
 } from "./types";
 
 export type LadyAmberDesertScoutsChoice = "retreat" | "skip";
-export type JessicaSpiceAgonyChoice = "pay" | "skip";
 export type JessicaOtherMemoriesChoice = "flip" | "skip";
 
 type LadyAmberDesertScoutsPendingAction = Extract<PendingAction, { kind: "amber-desert-scouts" }>;
-type JessicaSpiceAgonyPendingAction = Extract<PendingAction, { kind: "jessica-spice-agony" }>;
 type JessicaOtherMemoriesPendingAction = Extract<PendingAction, { kind: "jessica-other-memories" }>;
 
 export function resolveLadyAmberDesertScoutsChoice(
@@ -71,47 +64,6 @@ export function resolveLadyAmberDesertScoutsChoice(
     ...advancePendingAction(state),
     log: [`${owner.leader} resolves ${pending.source}: retreats 1 troop.`, ...state.log],
   };
-}
-
-export function resolveJessicaSpiceAgonyChoice(
-  state: GameState,
-  pending: JessicaSpiceAgonyPendingAction,
-  choice: JessicaSpiceAgonyChoice,
-): GameState {
-  const owner = state.players.find((player) => player.id === pending.ownerId);
-  if (
-    !owner ||
-    owner.leader !== ladyJessicaLeaderName ||
-    owner.role !== "Ally" ||
-    !owner.playArea.some((card) => card.id === pending.cardId && isGenericSignetRingCard(card))
-  ) {
-    return state;
-  }
-
-  if (choice === "skip") {
-    return {
-      ...state,
-      ...advancePendingAction(state),
-      log: [`${owner.leader} declines ${pending.source}.`, ...state.log],
-    };
-  }
-
-  if (owner.resources.spice < 1 || playerTroopSupply(owner) <= 0) return state;
-  const paidState: GameState = {
-    ...state,
-    players: state.players.map((player) =>
-      player.id === owner.id
-        ? {
-            ...player,
-            resources: { ...player.resources, spice: player.resources.spice - 1 },
-            jessicaMemories: player.jessicaMemories + 1,
-          }
-        : player,
-    ),
-    ...advancePendingAction(state),
-    log: [`${owner.leader} spends 1 spice for ${pending.source} and moves a supply troop as 1 memory.`, ...state.log],
-  };
-  return drawIntrigueCards(paidState, owner.id, 1, pending.source);
 }
 
 export function resolveJessicaOtherMemoriesChoice(

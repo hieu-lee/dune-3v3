@@ -27,6 +27,7 @@ import type {
   InfluenceEffectFaction,
   InfluenceEffectRecipient,
   PaidRewardChoiceEffectOption,
+  PaidRewardChoiceEffectAtomicReward,
   PendingActionChoiceEffectOption,
   Player,
   PlayerSelector,
@@ -188,43 +189,52 @@ export type AgentOpponentsDiscardCards = {
   source?: string;
 };
 
+type AgentPaidRewardChoiceAtomicReward =
+  | {
+      kind: "recruit-troops";
+      selector: "self" | "activated-ally";
+      amount: number;
+      destination: "garrison";
+    }
+  | {
+      kind: "gain-influence";
+      selector: "self" | "activated-ally";
+      faction: FactionId;
+      amount: number;
+    }
+  | {
+      kind: "gain-resource";
+      selector: "self" | "activated-ally";
+      resource: ResourceId;
+      amount: number;
+    }
+  | {
+      kind: "draw-intrigues";
+      selector: "self" | "activated-ally";
+      amount: number;
+    }
+  | {
+      kind: "gain-leader-counter";
+      selector: "self" | "activated-ally";
+      counter: "jessicaMemories";
+      amount: number;
+      troopSupplyCost: number;
+    };
+
+type AgentPaidRewardChoiceReward =
+  | AgentPaidRewardChoiceAtomicReward
+  | { kind: "bundle"; rewards: AgentPaidRewardChoiceAtomicReward[] };
+
+type AgentPaidRewardChoiceOption = {
+  id: string;
+  resource: ResourceId;
+  cost: number;
+  reward: AgentPaidRewardChoiceReward;
+};
+
 export type AgentPaidRewardChoice = {
   selector: "self";
-  options: Array<
-    | {
-        id: string;
-        resource: ResourceId;
-        cost: number;
-        reward: {
-          kind: "recruit-troops";
-          selector: "self" | "activated-ally";
-          amount: number;
-          destination: "garrison";
-        };
-      }
-    | {
-        id: string;
-        resource: ResourceId;
-        cost: number;
-        reward: {
-          kind: "gain-influence";
-          selector: "self" | "activated-ally";
-          faction: FactionId;
-          amount: number;
-        };
-      }
-    | {
-        id: string;
-        resource: ResourceId;
-        cost: number;
-        reward: {
-          kind: "gain-resource";
-          selector: "self" | "activated-ally";
-          resource: ResourceId;
-          amount: number;
-        };
-      }
-  >;
+  options: AgentPaidRewardChoiceOption[];
   requiredRecipient?: "activated-ally";
   requirePayableOption?: true;
   source?: string;
@@ -1366,42 +1376,84 @@ function resolvePaidRewardChoiceOption(
   option: PaidRewardChoiceEffectOption,
   context: GameEffectContext,
 ): AgentPaidRewardChoice["options"][number] {
+  const resolveReward = (reward: PaidRewardChoiceEffectAtomicReward): AgentPaidRewardChoiceAtomicReward => {
+    switch (reward.kind) {
+      case "recruit-troops":
+        return {
+          kind: "recruit-troops",
+          selector: reward.selector,
+          amount: amountFor(reward.amount, context.source),
+          destination: reward.destination,
+        };
+      case "gain-influence":
+        return {
+          kind: "gain-influence",
+          selector: reward.selector,
+          faction: reward.faction,
+          amount: amountFor(reward.amount, context.source),
+        };
+      case "gain-resource":
+        return {
+          kind: "gain-resource",
+          selector: reward.selector,
+          resource: reward.resource,
+          amount: amountFor(reward.amount, context.source),
+        };
+      case "draw-intrigues":
+        return {
+          kind: "draw-intrigues",
+          selector: reward.selector,
+          amount: amountFor(reward.amount, context.source),
+        };
+      case "gain-leader-counter":
+        return {
+          kind: "gain-leader-counter",
+          selector: reward.selector,
+          counter: reward.counter,
+          amount: amountFor(reward.amount, context.source),
+          troopSupplyCost: amountFor(reward.troopSupplyCost, context.source),
+        };
+      default: {
+        const unsupported = reward as { kind?: unknown };
+        throw new Error(`Unsupported paid-reward-choice reward "${String(unsupported.kind)}"`);
+      }
+    }
+  };
+  const resolvedBase = {
+    id: option.id,
+    resource: option.resource,
+    cost: amountFor(option.cost, context.source),
+  };
+  if (option.reward.kind === "bundle") {
+    return {
+      ...resolvedBase,
+      reward: {
+        kind: "bundle",
+        rewards: option.reward.rewards.map(resolveReward),
+      },
+    };
+  }
   switch (option.reward.kind) {
     case "recruit-troops":
       return {
-        id: option.id,
-        resource: option.resource,
-        cost: amountFor(option.cost, context.source),
-        reward: {
-          kind: "recruit-troops",
-          selector: option.reward.selector,
-          amount: amountFor(option.reward.amount, context.source),
-          destination: option.reward.destination,
-        },
+        ...resolvedBase,
+        reward: resolveReward(option.reward),
       };
     case "gain-influence":
       return {
-        id: option.id,
-        resource: option.resource,
-        cost: amountFor(option.cost, context.source),
-        reward: {
-          kind: "gain-influence",
-          selector: option.reward.selector,
-          faction: option.reward.faction,
-          amount: amountFor(option.reward.amount, context.source),
-        },
+        ...resolvedBase,
+        reward: resolveReward(option.reward),
       };
     case "gain-resource":
       return {
-        id: option.id,
-        resource: option.resource,
-        cost: amountFor(option.cost, context.source),
-        reward: {
-          kind: "gain-resource",
-          selector: option.reward.selector,
-          resource: option.reward.resource,
-          amount: amountFor(option.reward.amount, context.source),
-        },
+        ...resolvedBase,
+        reward: resolveReward(option.reward),
+      };
+    case "draw-intrigues":
+    case "gain-leader-counter":
+      return {
+        ...resolvedBase,
+        reward: resolveReward(option.reward),
       };
     default: {
       const reward = option.reward as { kind?: unknown };

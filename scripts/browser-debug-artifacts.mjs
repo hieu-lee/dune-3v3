@@ -94,6 +94,7 @@ const generatedScreenshotNames = [
   "pending-staban-unseen-network.png",
   "pending-amber-desert-scouts.png",
   "pending-jessica-spice-agony.png",
+  "pending-jessica-spice-agony-no-supply.png",
   "pending-jessica-water-of-life.png",
   "pending-jessica-reverend-mother.png",
   "pending-jessica-other-memories.png",

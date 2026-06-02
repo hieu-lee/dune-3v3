@@ -1,4 +1,4 @@
-import { memoryCountLabel, troopSupplyLabel } from "../app-helpers";
+import { memoryCountLabel } from "../app-helpers";
 import { criticalLocationNames } from "../game/critical-locations";
 import { boardSpaces, factionLabels, iconLabels, teams } from "../game/data";
 import {
@@ -21,7 +21,6 @@ import {
 } from "../game/state";
 import type {
   JessicaOtherMemoriesChoice,
-  JessicaSpiceAgonyChoice,
   LadyAmberDesertScoutsChoice,
   RepeatBoardSpaceChoice,
   StabanUnseenNetworkChoice,
@@ -41,7 +40,6 @@ import { PendingInfluenceLossPanel } from "./PendingInfluenceLossPanel";
 import { PendingActionChoicePanel } from "./PendingActionChoicePanel";
 import {
   PendingJessicaOtherMemoriesPanel,
-  PendingJessicaSpiceAgonyPanel,
   PendingLadyAmberDesertScoutsPanel,
   PendingPayResourceForContractsPanel,
   PendingPayResourceForDrawCardsPanel,
@@ -86,7 +84,6 @@ type PendingActionPanelProps = {
   chooseLoseInfluenceForIntrigues: (faction: FactionId) => void;
   choosePendingActionChoice: (optionId: string) => void;
   chooseJessicaOtherMemories: (choice: JessicaOtherMemoriesChoice) => void;
-  chooseJessicaSpiceAgony: (choice: JessicaSpiceAgonyChoice) => void;
   chooseLadyAmberDesertScouts: (choice: LadyAmberDesertScoutsChoice) => void;
   chooseMakerReward: (choice: "spice" | "sandworms") => void;
   choosePayResourceForContracts: (optionIndex: number) => void;
@@ -158,7 +155,6 @@ export function PendingActionPanel({
   chooseLoseInfluenceForIntrigues,
   choosePendingActionChoice,
   chooseJessicaOtherMemories,
-  chooseJessicaSpiceAgony,
   chooseLadyAmberDesertScouts,
   chooseMakerReward,
   choosePayResourceForContracts,
@@ -372,16 +368,6 @@ export function PendingActionPanel({
     pendingAction.kind === "staban-unseen-network" ? boardSpaces.find((space) => space.id === pendingAction.spaceId) : undefined;
   const pendingLadyAmberDesertScoutsOwner =
     pendingAction.kind === "amber-desert-scouts" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
-  const pendingJessicaSpiceAgonyOwner =
-    pendingAction.kind === "jessica-spice-agony" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
-  const pendingJessicaSpiceAgonyTroopSupply = pendingJessicaSpiceAgonyOwner
-    ? playerTroopSupply(pendingJessicaSpiceAgonyOwner)
-    : 0;
-  const pendingJessicaSpiceAgonyCanPay = Boolean(
-    pendingJessicaSpiceAgonyOwner &&
-      pendingJessicaSpiceAgonyOwner.resources.spice >= 1 &&
-      pendingJessicaSpiceAgonyTroopSupply > 0,
-  );
   const pendingRepeatBoardSpaceOwner =
     pendingAction.kind === "repeat-board-space" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingRepeatBoardSpaceSpace =
@@ -489,7 +475,6 @@ export function PendingActionPanel({
           {pendingAction.kind === "pending-action-choice" && `${pendingActionChoiceOwner?.leader ?? "Player"} ${pendingAction.source}`}
           {pendingAction.kind === "staban-unseen-network" && `${pendingStabanUnseenNetworkOwner?.leader ?? "Staban Tuek"} Unseen Network`}
           {pendingAction.kind === "amber-desert-scouts" && `${pendingLadyAmberDesertScoutsOwner?.leader ?? "Lady Amber"} Desert Scouts`}
-          {pendingAction.kind === "jessica-spice-agony" && `${pendingJessicaSpiceAgonyOwner?.leader ?? "Lady Jessica"} Spice Agony`}
           {pendingAction.kind === "repeat-board-space" && `${pendingRepeatBoardSpaceOwner?.leader ?? "Player"} ${pendingAction.source}`}
           {pendingAction.kind === "jessica-other-memories" && `${pendingJessicaOtherMemoriesOwner?.leader ?? "Lady Jessica"} Other Memories`}
           {pendingAction.kind === "conflict-influence" && `${pendingConflictInfluenceOwner?.leader ?? "Player"} Conflict Influence`}
@@ -657,16 +642,6 @@ export function PendingActionPanel({
         <PendingLadyAmberDesertScoutsPanel
           owner={pendingLadyAmberDesertScoutsOwner}
           onChoose={chooseLadyAmberDesertScouts}
-        />
-      )}
-
-      {pendingAction.kind === "jessica-spice-agony" && (
-        <PendingJessicaSpiceAgonyPanel
-          canPay={pendingJessicaSpiceAgonyCanPay}
-          memoryLabel={memoryCountLabel(pendingJessicaSpiceAgonyOwner?.jessicaMemories ?? 0)}
-          owner={pendingJessicaSpiceAgonyOwner}
-          troopSupplyLabel={troopSupplyLabel(pendingJessicaSpiceAgonyTroopSupply)}
-          onChoose={chooseJessicaSpiceAgony}
         />
       )}
 

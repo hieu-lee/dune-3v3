@@ -1,6 +1,7 @@
 import { CircleDollarSign } from "lucide-react";
 import { factionLabels } from "../game/data";
-import type { PendingAction, Player } from "../game/types";
+import { playerTroopSupply } from "../game/deck-utils";
+import type { PaidRewardChoicePendingAtomicReward, PaidRewardChoicePendingReward, PendingAction, Player } from "../game/types";
 
 type PaidRewardChoicePendingAction = Extract<PendingAction, { kind: "paid-reward-choice" }>;
 
@@ -22,6 +23,87 @@ function resourceAmount(owner: Player | undefined, resource: PaidRewardChoicePen
   return owner?.resources[resource] ?? 0;
 }
 
+function atomicRewardLabel(
+  reward: PaidRewardChoicePendingAtomicReward,
+  owner: Player,
+  recipient: Player | undefined,
+) {
+  const recipientLabel = recipient?.leader ?? "Player";
+  if (reward.kind === "recruit-troops") {
+    return `${recipientLabel} recruits ${reward.amount} troop${reward.amount === 1 ? "" : "s"}`;
+  }
+  if (reward.kind === "gain-influence") {
+    return `${recipientLabel} +${reward.amount} ${factionLabels[reward.faction]}`;
+  }
+  if (reward.kind === "gain-resource") {
+    const label = `+${reward.amount} ${resourceLabels[reward.resource]}`;
+    return recipient?.id === owner.id ? label : `${recipientLabel} ${label}`;
+  }
+  if (reward.kind === "draw-intrigues") {
+    return reward.amount === 1 ? "Intrigue" : `${reward.amount} Intrigues`;
+  }
+  if (reward.kind === "gain-leader-counter" && reward.counter === "jessicaMemories") {
+    return reward.amount === 1 ? "memory" : `${reward.amount} memories`;
+  }
+  return undefined;
+}
+
+function rewardLabel(
+  reward: PaidRewardChoicePendingReward,
+  owner: Player,
+  players: Player[],
+) {
+  const rewards = reward.kind === "bundle" ? reward.rewards : [reward];
+  const labels = rewards.map((atomicReward) => atomicRewardLabel(
+    atomicReward,
+    owner,
+    players.find((player) => player.id === atomicReward.recipientId),
+  ));
+  return labels.every((label): label is string => Boolean(label)) ? labels.join(" + ") : undefined;
+}
+
+function atomicRewards(reward: PaidRewardChoicePendingReward) {
+  return reward.kind === "bundle" ? reward.rewards : [reward];
+}
+
+function rewardCanResolve(
+  reward: PaidRewardChoicePendingReward,
+  owner: Player,
+  players: Player[],
+) {
+  const leaderCounterTroopCosts = new Map<string, number>();
+  for (const atomicReward of atomicRewards(reward)) {
+    const recipient = players.find((player) => player.id === atomicReward.recipientId);
+    if (
+      !recipient ||
+      recipient.team !== owner.team ||
+      (recipient.id !== owner.id && recipient.role !== "Ally")
+    ) {
+      return false;
+    }
+    if (atomicReward.kind !== "gain-leader-counter") continue;
+    if (
+      atomicReward.counter !== "jessicaMemories" ||
+      atomicReward.troopSupplyCost <= 0 ||
+      atomicReward.troopSupplyCost !== atomicReward.amount
+    ) {
+      return false;
+    }
+    leaderCounterTroopCosts.set(
+      atomicReward.recipientId,
+      (leaderCounterTroopCosts.get(atomicReward.recipientId) ?? 0) + atomicReward.troopSupplyCost,
+    );
+  }
+  return [...leaderCounterTroopCosts.entries()].every(([recipientId, troopSupplyCost]) => {
+    const recipient = players.find((player) => player.id === recipientId);
+    return Boolean(
+      recipient &&
+        recipient.role === "Ally" &&
+        playerTroopSupply(recipient) >= troopSupplyCost,
+    );
+  });
+}
+
 export function PendingPaidRewardChoicePanel({
   owner,
   pending,
@@ -33,20 +115,11 @@ export function PendingPaidRewardChoicePanel({
     <div className="pending-controls influence-buttons">
       {owner && pending.options.length > 0 ? (
         pending.options.map((option) => {
-          const recipient = players.find((player) => player.id === option.reward.recipientId);
-          const recipientLabel = recipient?.leader ?? "Player";
           const costLabel = option.resource === "solari" ? String(option.cost) : `${option.cost} ${resourceLabels[option.resource]}`;
-          const canChoose = Boolean(recipient) && resourceAmount(owner, option.resource) >= option.cost;
-          const label = (() => {
-            if (option.reward.kind === "recruit-troops") {
-              return `${recipientLabel} recruits ${option.reward.amount} troop${option.reward.amount === 1 ? "" : "s"}`;
-            }
-            if (option.reward.kind === "gain-influence") {
-              return `${recipientLabel} +${option.reward.amount} ${factionLabels[option.reward.faction]}`;
-            }
-            const reward = `+${option.reward.amount} ${resourceLabels[option.reward.resource]}`;
-            return recipient?.id === owner.id ? reward : `${recipientLabel} ${reward}`;
-          })();
+          const label = rewardLabel(option.reward, owner, players);
+          const canChoose = Boolean(label) &&
+            resourceAmount(owner, option.resource) >= option.cost &&
+            rewardCanResolve(option.reward, owner, players);
           return (
             <button
               type="button"

@@ -31,20 +31,44 @@ export function verifyLeaderJessicaSignets({ appTurnActions, cards, data, game, 
     jessicaSpiceAgonyOwner,
     secrets,
   );
+  const expectedSpiceAgonyPending = {
+    kind: "paid-reward-choice",
+    ownerId: ladyJessica.id,
+    cardId: allySignet.id,
+    source: "Spice Agony",
+    requirePayableOption: true,
+    options: [{
+      id: "spice-agony",
+      resource: "spice",
+      cost: 1,
+      reward: {
+        kind: "bundle",
+        rewards: [
+          {
+            kind: "draw-intrigues",
+            recipientId: ladyJessica.id,
+            amount: 1,
+          },
+          {
+            kind: "gain-leader-counter",
+            recipientId: ladyJessica.id,
+            counter: "jessicaMemories",
+            amount: 1,
+            troopSupplyCost: 1,
+          },
+        ],
+      },
+    }],
+  };
   assert.deepEqual(
     jessicaSpiceAgonyPending,
-    {
-      kind: "jessica-spice-agony",
-      ownerId: ladyJessica.id,
-      cardId: allySignet.id,
-      source: "Spice Agony",
-    },
+    expectedSpiceAgonyPending,
     "Lady Jessica's Signet Ring should queue Spice Agony when she can pay 1 spice",
   );
-  const jessicaSpiceAgonyResolved = state.resolveJessicaSpiceAgonyChoice(
+  const jessicaSpiceAgonyResolved = state.resolvePaidRewardChoice(
     { ...jessicaSpiceAgonyGame, pendingAction: jessicaSpiceAgonyPending, pendingQueue: [] },
     jessicaSpiceAgonyPending,
-    "pay",
+    "spice-agony",
   );
   assert.equal(playerById(jessicaSpiceAgonyResolved, ladyJessica.id).resources.spice, 0, "Spice Agony should spend 1 spice");
   assert.equal(playerById(jessicaSpiceAgonyResolved, ladyJessica.id).jessicaMemories, 1, "Spice Agony should add 1 memory");
@@ -77,7 +101,7 @@ export function verifyLeaderJessicaSignets({ appTurnActions, cards, data, game, 
     undefined,
     "Spice Agony should require a troop in Jessica's supply for the memory",
   );
-  const noSupplySpiceAgony = state.resolveJessicaSpiceAgonyChoice(
+  const noSupplySpiceAgony = state.resolvePaidRewardChoice(
     {
       ...jessicaSpiceAgonyGame,
       players: jessicaSpiceAgonyGame.players.map((player) =>
@@ -87,7 +111,7 @@ export function verifyLeaderJessicaSignets({ appTurnActions, cards, data, game, 
       pendingQueue: [],
     },
     jessicaSpiceAgonyPending,
-    "pay",
+    "spice-agony",
   );
   assert.equal(playerById(noSupplySpiceAgony, ladyJessica.id).jessicaMemories, 0, "Spice Agony should not create memories without troop supply");
   assert.equal(playerById(noSupplySpiceAgony, ladyJessica.id).intrigues.length, 0, "Spice Agony should not draw Intrigues without troop supply");
@@ -114,12 +138,7 @@ export function verifyLeaderJessicaSignets({ appTurnActions, cards, data, game, 
   );
   assert.deepEqual(
     deferredMakerSpicePending,
-    {
-      kind: "jessica-spice-agony",
-      ownerId: ladyJessica.id,
-      cardId: allySignet.id,
-      source: "Spice Agony",
-    },
+    expectedSpiceAgonyPending,
     "Spice Agony should queue when a pending Maker choice can supply the 1 spice payment",
   );
   const deferredMakerPending = state.pendingActionForMakerChoice(
@@ -151,16 +170,16 @@ export function verifyLeaderJessicaSignets({ appTurnActions, cards, data, game, 
   );
   assert.deepEqual(afterDeferredMakerWorms.pendingAction, deferredMakerSpicePending, "Choosing Maker worms should still advance to the queued optional Spice Agony");
   assert.equal(
-    state.resolveJessicaSpiceAgonyChoice(afterDeferredMakerWorms, deferredMakerSpicePending, "pay"),
+    state.resolvePaidRewardChoice(afterDeferredMakerWorms, deferredMakerSpicePending, "spice-agony"),
     afterDeferredMakerWorms,
     "Deferred Spice Agony should not resolve if the Maker choice did not provide spice",
   );
-  const skippedDeferredSpiceAgony = state.resolveJessicaSpiceAgonyChoice(afterDeferredMakerWorms, deferredMakerSpicePending, "skip");
+  const skippedDeferredSpiceAgony = state.skipPaidRewardChoice(afterDeferredMakerWorms, deferredMakerSpicePending);
   assert.equal(skippedDeferredSpiceAgony.pendingAction, undefined, "Deferred Spice Agony should remain skippable after choosing Maker worms");
-  const afterDeferredSpiceAgony = state.resolveJessicaSpiceAgonyChoice(
+  const afterDeferredSpiceAgony = state.resolvePaidRewardChoice(
     afterDeferredMakerSpice,
     deferredMakerSpicePending,
-    "pay",
+    "spice-agony",
   );
   assert.equal(playerById(afterDeferredSpiceAgony, ladyJessica.id).resources.spice, 1, "Deferred Spice Agony should spend 1 of the Maker spice");
   assert.equal(playerById(afterDeferredSpiceAgony, ladyJessica.id).jessicaMemories, 1, "Deferred Spice Agony should still create a memory");
@@ -201,10 +220,9 @@ export function verifyLeaderJessicaSignets({ appTurnActions, cards, data, game, 
     undefined,
     "Spice Agony should not trigger from Shaddam's Commander Signet Ring",
   );
-  const skippedSpiceAgony = state.resolveJessicaSpiceAgonyChoice(
+  const skippedSpiceAgony = state.skipPaidRewardChoice(
     { ...jessicaSpiceAgonyGame, pendingAction: jessicaSpiceAgonyPending, pendingQueue: [] },
     jessicaSpiceAgonyPending,
-    "skip",
   );
   assert.equal(playerById(skippedSpiceAgony, ladyJessica.id).resources.spice, 1, "Skipping Spice Agony should not spend spice");
   assert.equal(playerById(skippedSpiceAgony, ladyJessica.id).jessicaMemories, 0, "Skipping Spice Agony should not add a memory");

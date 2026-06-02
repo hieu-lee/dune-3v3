@@ -48,74 +48,87 @@ export type TroopEffectDestination = "garrison";
 export type SandwormEffectRecipient = "activated-ally" | "combat-recipient";
 export type SandwormEffectDestination = "conflict";
 export type PaidRewardChoiceSelector = "self" | "activated-ally";
-export type PaidRewardChoiceEffectOption =
+export type LeaderCounterId = "jessicaMemories";
+export type PaidRewardChoiceEffectAtomicReward =
   | {
-      id: string;
-      resource: ResourceId;
-      cost: EffectAmountSpec;
-      reward: {
-        kind: "recruit-troops";
-        selector: PaidRewardChoiceSelector;
-        amount: EffectAmountSpec;
-        destination: TroopEffectDestination;
-      };
+      kind: "recruit-troops";
+      selector: PaidRewardChoiceSelector;
+      amount: EffectAmountSpec;
+      destination: TroopEffectDestination;
     }
   | {
-      id: string;
-      resource: ResourceId;
-      cost: EffectAmountSpec;
-      reward: {
-        kind: "gain-influence";
-        selector: PaidRewardChoiceSelector;
-        faction: FactionId;
-        amount: EffectAmountSpec;
-      };
+      kind: "gain-influence";
+      selector: PaidRewardChoiceSelector;
+      faction: FactionId;
+      amount: EffectAmountSpec;
     }
   | {
-      id: string;
+      kind: "gain-resource";
+      selector: PaidRewardChoiceSelector;
       resource: ResourceId;
-      cost: EffectAmountSpec;
-      reward: {
-        kind: "gain-resource";
-        selector: PaidRewardChoiceSelector;
-        resource: ResourceId;
-        amount: EffectAmountSpec;
-      };
+      amount: EffectAmountSpec;
+    }
+  | {
+      kind: "draw-intrigues";
+      selector: PaidRewardChoiceSelector;
+      amount: EffectAmountSpec;
+    }
+  | {
+      kind: "gain-leader-counter";
+      selector: PaidRewardChoiceSelector;
+      counter: LeaderCounterId;
+      amount: EffectAmountSpec;
+      troopSupplyCost: EffectAmountSpec;
     };
-export type PaidRewardChoicePendingOption =
+export type PaidRewardChoiceEffectReward =
+  | PaidRewardChoiceEffectAtomicReward
+  | { kind: "bundle"; rewards: PaidRewardChoiceEffectAtomicReward[] };
+export type PaidRewardChoiceEffectOption = {
+  id: string;
+  resource: ResourceId;
+  cost: EffectAmountSpec;
+  reward: PaidRewardChoiceEffectReward;
+};
+export type PaidRewardChoicePendingAtomicReward =
   | {
-      id: string;
-      resource: ResourceId;
-      cost: number;
-      reward: {
-        kind: "recruit-troops";
-        recipientId: string;
-        amount: number;
-        destination: TroopEffectDestination;
-      };
+      kind: "recruit-troops";
+      recipientId: string;
+      amount: number;
+      destination: TroopEffectDestination;
     }
   | {
-      id: string;
-      resource: ResourceId;
-      cost: number;
-      reward: {
-        kind: "gain-influence";
-        recipientId: string;
-        faction: FactionId;
-        amount: number;
-      };
+      kind: "gain-influence";
+      recipientId: string;
+      faction: FactionId;
+      amount: number;
     }
   | {
-      id: string;
+      kind: "gain-resource";
+      recipientId: string;
       resource: ResourceId;
-      cost: number;
-      reward: {
-        kind: "gain-resource";
-        recipientId: string;
-        resource: ResourceId;
-        amount: number;
-      };
+      amount: number;
+    }
+  | {
+      kind: "draw-intrigues";
+      recipientId: string;
+      amount: number;
+    }
+  | {
+      kind: "gain-leader-counter";
+      recipientId: string;
+      counter: LeaderCounterId;
+      amount: number;
+      troopSupplyCost: number;
     };
+export type PaidRewardChoicePendingReward =
+  | PaidRewardChoicePendingAtomicReward
+  | { kind: "bundle"; rewards: PaidRewardChoicePendingAtomicReward[] };
+export type PaidRewardChoicePendingOption = {
+  id: string;
+  resource: ResourceId;
+  cost: number;
+  reward: PaidRewardChoicePendingReward;
+};
 export type PendingActionChoiceEffect =
   | {
       kind: "acquire-card";
@@ -964,12 +977,6 @@ export type PendingAction =
   | {
       kind: "amber-desert-scouts";
       ownerId: string;
-      source: string;
-    }
-  | {
-      kind: "jessica-spice-agony";
-      ownerId: string;
-      cardId: string;
       source: string;
     }
   | {

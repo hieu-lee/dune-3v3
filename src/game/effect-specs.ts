@@ -12,7 +12,9 @@ import type {
   InfluenceLossForStrengthAlternateOwner,
   InfluenceEffectFaction,
   InfluenceEffectRecipient,
+  PaidRewardChoiceEffectAtomicReward,
   PaidRewardChoiceEffectOption,
+  PaidRewardChoiceEffectReward,
   PendingActionChoiceEffectOption,
   PlayerSelector,
   ResourceId,
@@ -1421,41 +1423,46 @@ function clonePendingActionChoiceOptions(options: PendingActionChoiceEffectOptio
 }
 
 function clonePaidRewardChoiceOptions(options: PaidRewardChoiceEffectOption[]): PaidRewardChoiceEffectOption[] {
-  return options.map((option) => {
-    switch (option.reward.kind) {
-      case "recruit-troops":
-        return {
-          ...option,
-          cost: cloneAmount(option.cost),
-          reward: {
-            ...option.reward,
-            amount: cloneAmount(option.reward.amount),
-          },
-        };
-      case "gain-influence":
-        return {
-          ...option,
-          cost: cloneAmount(option.cost),
-          reward: {
-            ...option.reward,
-            amount: cloneAmount(option.reward.amount),
-          },
-        };
-      case "gain-resource":
-        return {
-          ...option,
-          cost: cloneAmount(option.cost),
-          reward: {
-            ...option.reward,
-            amount: cloneAmount(option.reward.amount),
-          },
-        };
-      default: {
-        const reward = option.reward as { kind?: unknown };
-        throw new Error(`Unsupported paid-reward-choice reward "${String(reward.kind)}"`);
-      }
+  return options.map((option) => ({
+    ...option,
+    cost: cloneAmount(option.cost),
+    reward: clonePaidRewardChoiceReward(option.reward),
+  }));
+}
+
+function clonePaidRewardChoiceReward(reward: PaidRewardChoiceEffectReward): PaidRewardChoiceEffectReward {
+  if (reward.kind === "bundle") {
+    return {
+      kind: "bundle",
+      rewards: reward.rewards.map(clonePaidRewardChoiceAtomicReward),
+    };
+  }
+  return clonePaidRewardChoiceAtomicReward(reward);
+}
+
+function clonePaidRewardChoiceAtomicReward(
+  reward: PaidRewardChoiceEffectAtomicReward,
+): PaidRewardChoiceEffectAtomicReward {
+  switch (reward.kind) {
+    case "recruit-troops":
+    case "gain-influence":
+    case "gain-resource":
+    case "draw-intrigues":
+      return {
+        ...reward,
+        amount: cloneAmount(reward.amount),
+      };
+    case "gain-leader-counter":
+      return {
+        ...reward,
+        amount: cloneAmount(reward.amount),
+        troopSupplyCost: cloneAmount(reward.troopSupplyCost),
+      };
+    default: {
+      const unsupported = reward as { kind?: unknown };
+      throw new Error(`Unsupported paid-reward-choice reward "${String(unsupported.kind)}"`);
     }
-  });
+  }
 }
 
 function cloneAmount(amount: EffectAmountSpec): EffectAmountSpec {

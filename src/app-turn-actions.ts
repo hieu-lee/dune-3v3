@@ -219,7 +219,7 @@ export function placeAgentAction(
     jessicaRepeatDeferredWater,
   );
   const prioritizedCardPending =
-    firstCardPending?.kind === "jessica-spice-agony" || paidRewardWater > 0
+    (firstCardPending?.kind === "paid-reward-choice" && firstCardPending.source === "Spice Agony") || paidRewardWater > 0
       ? firstCardPending
       : undefined;
   const pendingActions = prioritizedCardPending || jessicaOtherMemoriesPending || jessicaReverendMotherPending

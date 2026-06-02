@@ -32,6 +32,7 @@ import {
 import {
   gurneyHalleckLeaderName,
   ladyAmberMetulliLeaderName,
+  ladyJessicaLeaderName,
   ladyMargotFenringLeaderName,
   princessIrulanLeaderName,
   reverendMotherJessicaLeaderName,
@@ -235,6 +236,28 @@ const allyStarterSpecs: StarterCardSpec[] = [
         1,
         { source: "Unseen Network", recallForSupply: true, postPlacementAction: "staban-unseen-network" },
         [hasLeader(stabanTuekLeaderName), hasRole("Ally")],
+      ),
+      agentPaidRewardChoice(
+        [{
+          id: "spice-agony",
+          resource: "spice",
+          cost: 1,
+          reward: {
+            kind: "bundle",
+            rewards: [
+              { kind: "draw-intrigues", selector: "self", amount: 1 },
+              {
+                kind: "gain-leader-counter",
+                selector: "self",
+                counter: "jessicaMemories",
+                amount: 1,
+                troopSupplyCost: 1,
+              },
+            ],
+          },
+        }],
+        { requirePayableOption: true, source: "Spice Agony" },
+        [hasLeader(ladyJessicaLeaderName), hasRole("Ally")],
       ),
       agentPaidRewardChoice(
         [{

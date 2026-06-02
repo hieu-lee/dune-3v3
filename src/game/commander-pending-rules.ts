@@ -8,7 +8,12 @@ import {
 } from "./conflict-rules";
 import {
   drawCards,
+  playerTroopSupply,
 } from "./deck-utils";
+import { drawIntrigueCards } from "./intrigue-deck";
+import {
+  ladyJessicaLeaderName,
+} from "./leader-constants";
 import {
   adjustInfluence,
   resolveLeaderInfluenceThresholdRewards,
@@ -23,6 +28,8 @@ import {
 import type {
   GameState,
   PendingAction,
+  PaidRewardChoicePendingAtomicReward,
+  PaidRewardChoicePendingReward,
   PaidRewardChoicePendingOption,
   Player,
   ResourceId,
@@ -65,15 +72,62 @@ function paidRewardChoiceOptionIsValid(option: PaidRewardChoicePendingOption) {
   if (typeof option.id !== "string" || option.id.trim().length === 0) return false;
   if (!resourceLabels[option.resource]) return false;
   if (!paymentPendingAmountIsValid(option.cost)) return false;
-  switch (option.reward.kind) {
+  const atomicRewardIsValid = (reward: PaidRewardChoicePendingAtomicReward): boolean => {
+    switch (reward.kind) {
+      case "recruit-troops":
+        return paymentPendingAmountIsValid(reward.amount) && reward.destination === "garrison";
+      case "gain-influence":
+        return Boolean(factionLabels[reward.faction]) && paymentPendingAmountIsValid(reward.amount);
+      case "gain-resource":
+        return Boolean(resourceLabels[reward.resource]) && paymentPendingAmountIsValid(reward.amount);
+      case "draw-intrigues":
+        return paymentPendingAmountIsValid(reward.amount);
+      case "gain-leader-counter":
+        return reward.counter === "jessicaMemories" &&
+          paymentPendingAmountIsValid(reward.amount) &&
+          paymentPendingAmountIsValid(reward.troopSupplyCost) &&
+          reward.troopSupplyCost === reward.amount;
+      default:
+        return false;
+    }
+  };
+  const rewardIsValid = (reward: PaidRewardChoicePendingReward): boolean => {
+    if (reward.kind === "bundle") {
+      const rewards = (reward as { rewards?: unknown }).rewards;
+      return Array.isArray(rewards) &&
+        rewards.length > 0 &&
+        rewards.every((candidate) =>
+          typeof candidate === "object" &&
+          candidate !== null &&
+          (candidate as { kind?: unknown }).kind !== "bundle" &&
+          atomicRewardIsValid(candidate as PaidRewardChoicePendingAtomicReward)
+        );
+    }
+    return atomicRewardIsValid(reward);
+  };
+  return rewardIsValid(option.reward);
+}
+
+function paidRewardChoiceAtomicRewards(reward: PaidRewardChoicePendingReward): PaidRewardChoicePendingAtomicReward[] {
+  return reward.kind === "bundle" ? reward.rewards : [reward];
+}
+
+function paidRewardChoiceRewardText(reward: PaidRewardChoicePendingAtomicReward, recipient: Player) {
+  switch (reward.kind) {
     case "recruit-troops":
-      return paymentPendingAmountIsValid(option.reward.amount) && option.reward.destination === "garrison";
+      return `${recipient.leader} recruits ${reward.amount} troop${reward.amount === 1 ? "" : "s"}`;
     case "gain-influence":
-      return Boolean(factionLabels[option.reward.faction]) && paymentPendingAmountIsValid(option.reward.amount);
+      return `${recipient.leader} gains ${reward.amount} ${factionLabels[reward.faction]} Influence`;
     case "gain-resource":
-      return Boolean(resourceLabels[option.reward.resource]) && paymentPendingAmountIsValid(option.reward.amount);
+      return `${recipient.leader} gains ${reward.amount} ${resourceLabels[reward.resource]}`;
+    case "draw-intrigues":
+      return `${recipient.leader} draws ${reward.amount} Intrigue${reward.amount === 1 ? "" : "s"}`;
+    case "gain-leader-counter":
+      return reward.counter === "jessicaMemories"
+        ? `${recipient.leader} gains ${reward.amount} memor${reward.amount === 1 ? "y" : "ies"}`
+        : undefined;
     default:
-      return false;
+      return undefined;
   }
 }
 
@@ -109,8 +163,28 @@ export function resolvePaidRewardChoice(
     return state;
   }
 
-  const recipient = state.players.find((player) => player.id === option.reward.recipientId);
-  if (!recipient || !paidRewardChoiceRecipientIsValid(owner, recipient)) return state;
+  const rewards = paidRewardChoiceAtomicRewards(option.reward);
+  const recipients = rewards.map((reward) => state.players.find((player) => player.id === reward.recipientId));
+  if (rewards.length === 0 || recipients.some((recipient) => !paidRewardChoiceRecipientIsValid(owner, recipient))) return state;
+  const leaderCounterTroopCostsByRecipient = new Map<string, number>();
+  rewards.forEach((reward) => {
+    if (reward.kind !== "gain-leader-counter") return;
+    leaderCounterTroopCostsByRecipient.set(
+      reward.recipientId,
+      (leaderCounterTroopCostsByRecipient.get(reward.recipientId) ?? 0) + reward.troopSupplyCost,
+    );
+  });
+  for (const [recipientId, troopSupplyCost] of leaderCounterTroopCostsByRecipient.entries()) {
+    const counterRecipient = state.players.find((player) => player.id === recipientId);
+    if (
+      !counterRecipient ||
+      counterRecipient.role !== "Ally" ||
+      counterRecipient.leader !== ladyJessicaLeaderName ||
+      playerTroopSupply(counterRecipient) < troopSupplyCost
+    ) {
+      return state;
+    }
+  }
   const resourceLabel = resourceLabels[option.resource];
   const players = state.players.map((player) => {
     let next = player;
@@ -120,44 +194,45 @@ export function resolvePaidRewardChoice(
         resources: { ...next.resources, [option.resource]: availableResource - option.cost },
       };
     }
-    if (player.id === recipient.id) {
-      switch (option.reward.kind) {
+    rewards.forEach((reward) => {
+      if (player.id !== reward.recipientId) return;
+      switch (reward.kind) {
         case "recruit-troops":
-          next = { ...next, garrison: next.garrison + option.reward.amount };
+          next = { ...next, garrison: next.garrison + reward.amount };
           break;
         case "gain-influence":
-          next = adjustInfluence(next, option.reward.faction, option.reward.amount);
+          next = adjustInfluence(next, reward.faction, reward.amount);
           break;
         case "gain-resource":
           next = {
             ...next,
             resources: {
               ...next.resources,
-              [option.reward.resource]: next.resources[option.reward.resource] + option.reward.amount,
+              [reward.resource]: next.resources[reward.resource] + reward.amount,
             },
           };
           break;
+        case "gain-leader-counter":
+          next = reward.counter === "jessicaMemories"
+            ? { ...next, jessicaMemories: next.jessicaMemories + reward.amount }
+            : next;
+          break;
         default:
-          return next;
+          break;
       }
-    }
+    });
     return next;
   });
 
-  const rewardText = (() => {
-    switch (option.reward.kind) {
-      case "recruit-troops":
-        return `${recipient.leader} recruits ${option.reward.amount} troop${option.reward.amount === 1 ? "" : "s"}`;
-      case "gain-influence":
-        return `${recipient.leader} gains ${option.reward.amount} ${factionLabels[option.reward.faction]} Influence`;
-      case "gain-resource":
-        return `${recipient.leader} gains ${option.reward.amount} ${resourceLabels[option.reward.resource]}`;
-      default:
-        return undefined;
-    }
-  })();
-  if (!rewardText) return state;
-  const nextState = {
+  const rewardText = rewards
+    .map((reward, index) => {
+      const recipient = recipients[index];
+      return recipient ? paidRewardChoiceRewardText(reward, recipient) : undefined;
+    })
+    .filter((text): text is string => Boolean(text))
+    .join(" and ");
+  if (!rewardText || rewardText.length === 0) return state;
+  let nextState: GameState = {
     ...state,
     players,
     ...advancePendingAction(state),
@@ -166,18 +241,18 @@ export function resolvePaidRewardChoice(
       ...state.log,
     ],
   };
-  switch (option.reward.kind) {
-    case "recruit-troops":
-      return nextState;
-    case "gain-influence":
-      return resolveLeaderInfluenceThresholdRewards(nextState, state.players);
-    case "gain-resource":
-      return option.reward.resource === "spice"
-        ? recordTurnSpiceGain(nextState, recipient.id, option.reward.amount)
-        : nextState;
-    default:
-      return state;
+  if (rewards.some((reward) => reward.kind === "gain-influence")) {
+    nextState = resolveLeaderInfluenceThresholdRewards(nextState, state.players);
   }
+  rewards.forEach((reward) => {
+    if (reward.kind === "draw-intrigues") {
+      nextState = drawIntrigueCards(nextState, reward.recipientId, reward.amount, pending.source);
+    }
+    if (reward.kind === "gain-resource" && reward.resource === "spice") {
+      nextState = recordTurnSpiceGain(nextState, reward.recipientId, reward.amount);
+    }
+  });
+  return nextState;
 }
 
 export function skipPaidRewardChoice(state: GameState, pending: PaidRewardChoicePendingAction): GameState {

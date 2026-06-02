@@ -3821,6 +3821,69 @@ try {
     "Water of Life paid reward spec should resolve its spice-for-water branch",
   );
   assert.ok(
+    allySignet.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.conditions?.some((condition) => condition.kind === "has-leader" && condition.leader === "Lady Jessica") &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Ally") &&
+      spec.effects.some((effect) =>
+        effect.kind === "paid-reward-choice" &&
+        effect.selector === "self" &&
+        effect.source === "Spice Agony" &&
+        effect.requirePayableOption === true &&
+        effect.options.length === 1 &&
+        effect.options[0].id === "spice-agony" &&
+        effect.options[0].resource === "spice" &&
+        effect.options[0].cost === 1 &&
+        effect.options[0].reward.kind === "bundle" &&
+        effect.options[0].reward.rewards.some((reward) =>
+          reward.kind === "draw-intrigues" &&
+          reward.selector === "self" &&
+          reward.amount === 1
+        ) &&
+        effect.options[0].reward.rewards.some((reward) =>
+          reward.kind === "gain-leader-counter" &&
+          reward.selector === "self" &&
+          reward.counter === "jessicaMemories" &&
+          reward.amount === 1 &&
+          reward.troopSupplyCost === 1
+        )
+      )
+    ),
+    "Generic Ally Signet Ring should carry a typed Lady Jessica Spice Agony payment spec",
+  );
+  assert.deepEqual(
+    effectResolver.resolveAgentPaidRewardChoices(allySignet.effects, {
+      trigger: "agent-play",
+      source: { ...p5, leader: "Lady Jessica", role: "Ally" },
+      target: p5,
+      state: game,
+    }),
+    [{
+      selector: "self",
+      source: "Spice Agony",
+      requirePayableOption: true,
+      options: [{
+        id: "spice-agony",
+        resource: "spice",
+        cost: 1,
+        reward: {
+          kind: "bundle",
+          rewards: [
+            { kind: "draw-intrigues", selector: "self", amount: 1 },
+            {
+              kind: "gain-leader-counter",
+              selector: "self",
+              counter: "jessicaMemories",
+              amount: 1,
+              troopSupplyCost: 1,
+            },
+          ],
+        },
+      }],
+    }],
+    "Spice Agony paid reward spec should resolve its spice-for-Intrigue-and-memory branch",
+  );
+  assert.ok(
     makerKeeper.effects?.some((spec) =>
       spec.trigger === "agent-play" &&
       spec.conditions?.some((condition) =>
@@ -6942,6 +7005,138 @@ try {
   assert.throws(
     () => state.applyCardAgentEffect(
       paidRewardChoiceCard(
+        "effect-spec-invalid-paid-reward-choice-empty-bundle-card",
+        paidRewardChoiceEffect({
+          options: [{
+            id: "bundle",
+            resource: "spice",
+            cost: 1,
+            reward: { kind: "bundle", rewards: [] },
+          }],
+        }),
+      ),
+      p4,
+      p6,
+    ),
+    /Invalid paid-reward-choice bundle rewards ""/,
+    "Paid reward choice bundled branches should require at least one nested reward",
+  );
+  assert.throws(
+    () => state.applyCardAgentEffect(
+      paidRewardChoiceCard(
+        "effect-spec-invalid-paid-reward-choice-nested-bundle-card",
+        paidRewardChoiceEffect({
+          options: [{
+            id: "bundle",
+            resource: "spice",
+            cost: 1,
+            reward: {
+              kind: "bundle",
+              rewards: [{
+                kind: "bundle",
+                rewards: [{ kind: "draw-intrigues", selector: "self", amount: 1 }],
+              }],
+            },
+          }],
+        }),
+      ),
+      p4,
+      p6,
+    ),
+    /Invalid paid-reward-choice nested bundle "bundle"/,
+    "Paid reward choice bundled branches should reject nested bundles",
+  );
+  assert.throws(
+    () => state.applyCardAgentEffect(
+      paidRewardChoiceCard(
+        "effect-spec-invalid-paid-reward-choice-intrigue-amount-card",
+        paidRewardChoiceEffect({
+          options: [{
+            id: "intrigue",
+            resource: "spice",
+            cost: 1,
+            reward: { kind: "draw-intrigues", selector: "self", amount: 0 },
+          }],
+        }),
+      ),
+      p4,
+      p6,
+    ),
+    /Invalid paid-reward-choice intrigues "0"/,
+    "Paid reward choice Intrigue branches should require positive reward amounts",
+  );
+  assert.throws(
+    () => state.applyCardAgentEffect(
+      paidRewardChoiceCard(
+        "effect-spec-invalid-paid-reward-choice-leader-counter-card",
+        paidRewardChoiceEffect({
+          options: [{
+            id: "memory",
+            resource: "spice",
+            cost: 1,
+            reward: { kind: "gain-leader-counter", selector: "self", counter: "otherMemories", amount: 1 },
+          }],
+        }),
+      ),
+      p4,
+      p6,
+    ),
+    /Invalid paid-reward-choice leader counter "otherMemories"/,
+    "Paid reward choice leader-counter branches should reject unsupported counters",
+  );
+  assert.throws(
+    () => state.applyCardAgentEffect(
+      paidRewardChoiceCard(
+        "effect-spec-invalid-paid-reward-choice-leader-counter-cost-card",
+        paidRewardChoiceEffect({
+          options: [{
+            id: "memory",
+            resource: "spice",
+            cost: 1,
+            reward: {
+              kind: "gain-leader-counter",
+              selector: "self",
+              counter: "jessicaMemories",
+              amount: 1,
+              troopSupplyCost: 0,
+            },
+          }],
+        }),
+      ),
+      p4,
+      p6,
+    ),
+    /Invalid paid-reward-choice leader counter troopSupplyCost "0"/,
+    "Paid reward choice leader-counter branches should require positive troop-supply costs",
+  );
+  assert.throws(
+    () => state.applyCardAgentEffect(
+      paidRewardChoiceCard(
+        "effect-spec-invalid-paid-reward-choice-leader-counter-cost-mismatch-card",
+        paidRewardChoiceEffect({
+          options: [{
+            id: "memory",
+            resource: "spice",
+            cost: 1,
+            reward: {
+              kind: "gain-leader-counter",
+              selector: "self",
+              counter: "jessicaMemories",
+              amount: 2,
+              troopSupplyCost: 1,
+            },
+          }],
+        }),
+      ),
+      p4,
+      p6,
+    ),
+    /Invalid paid-reward-choice leader counter troopSupplyCost "1"/,
+    "Paid reward choice leader-counter branches should require troop costs to match memory counts",
+  );
+  assert.throws(
+    () => state.applyCardAgentEffect(
+      paidRewardChoiceCard(
         "effect-spec-invalid-paid-reward-choice-reward-kind-card",
         paidRewardChoiceEffect({
           options: [{
@@ -8783,6 +8978,211 @@ try {
   assert.equal(playerById(paidSpiceRewardResolved, paidSpiceRewardSource.id).resources.water, 0, "Paid spice reward should spend the payment resource");
   assert.equal(playerById(paidSpiceRewardResolved, paidSpiceRewardSource.id).resources.spice, 2, "Paid spice reward should gain spice");
   assert.equal(paidSpiceRewardResolved.turnSpiceGains[paidSpiceRewardSource.id], 2, "Paid spice rewards should count as turn spice gains");
+
+  const bundledPaidRewardCard = {
+    ...convincingArgument,
+    id: "effect-spec-bundled-paid-reward-card",
+    name: "Effect Spec Bundled Paid Reward",
+    effects: [agentSpec([{
+      kind: "paid-reward-choice",
+      selector: "self",
+      source: "Bundled Paid Reward",
+      requirePayableOption: true,
+      options: [{
+        id: "bundle",
+        resource: "spice",
+        cost: 1,
+        reward: {
+          kind: "bundle",
+          rewards: [
+            { kind: "draw-intrigues", selector: "self", amount: 1 },
+            {
+              kind: "gain-leader-counter",
+              selector: "self",
+              counter: "jessicaMemories",
+              amount: 1,
+              troopSupplyCost: 1,
+            },
+          ],
+        },
+      }],
+    }])],
+  };
+  const bundledPaidRewardSource = {
+    ...p5,
+    leader: "Lady Jessica",
+    role: "Ally",
+    playArea: [bundledPaidRewardCard],
+    resources: { ...p5.resources, spice: 1 },
+    intrigues: [],
+    jessicaMemories: 0,
+  };
+  const bundledPaidRewardFixture = {
+    ...game,
+    pendingAction: undefined,
+    pendingQueue: [],
+    players: game.players.map((player) => player.id === bundledPaidRewardSource.id ? bundledPaidRewardSource : player),
+  };
+  const [bundledPaidRewardPending] = state.pendingActionsForCard(
+    bundledPaidRewardCard,
+    bundledPaidRewardSource,
+    bundledPaidRewardFixture,
+    bundledPaidRewardSource,
+  );
+  assert.deepEqual(
+    bundledPaidRewardPending,
+    {
+      kind: "paid-reward-choice",
+      ownerId: bundledPaidRewardSource.id,
+      cardId: bundledPaidRewardCard.id,
+      source: "Bundled Paid Reward",
+      requirePayableOption: true,
+      options: [{
+        id: "bundle",
+        resource: "spice",
+        cost: 1,
+        reward: {
+          kind: "bundle",
+          rewards: [
+            { kind: "draw-intrigues", recipientId: bundledPaidRewardSource.id, amount: 1 },
+            {
+              kind: "gain-leader-counter",
+              recipientId: bundledPaidRewardSource.id,
+              counter: "jessicaMemories",
+              amount: 1,
+              troopSupplyCost: 1,
+            },
+          ],
+        },
+      }],
+    },
+    "Generic paid reward choices should queue bundled Intrigue and leader-counter rewards",
+  );
+  const bundledPaidRewardSupplyBefore = state.playerTroopSupply(bundledPaidRewardSource);
+  const bundledPaidRewardResolved = state.resolvePaidRewardChoice(
+    { ...bundledPaidRewardFixture, pendingAction: bundledPaidRewardPending },
+    bundledPaidRewardPending,
+    "bundle",
+  );
+  const bundledPaidRewardPlayer = playerById(bundledPaidRewardResolved, bundledPaidRewardSource.id);
+  assert.equal(bundledPaidRewardPlayer.resources.spice, 0, "Bundled paid reward should spend the payment resource");
+  assert.equal(bundledPaidRewardPlayer.jessicaMemories, 1, "Bundled paid reward should add a Jessica memory");
+  assert.equal(
+    state.playerTroopSupply(bundledPaidRewardPlayer),
+    bundledPaidRewardSupplyBefore - 1,
+    "Bundled paid reward leader-counter costs should consume troop supply",
+  );
+  assert.equal(bundledPaidRewardPlayer.intrigues.length, 1, "Bundled paid reward should draw Intrigues");
+  const malformedLeaderCounterPending = {
+    ...bundledPaidRewardPending,
+    options: [{
+      ...bundledPaidRewardPending.options[0],
+      reward: {
+        kind: "bundle",
+        rewards: [
+          { kind: "draw-intrigues", recipientId: bundledPaidRewardSource.id, amount: 1 },
+          {
+            kind: "gain-leader-counter",
+            recipientId: bundledPaidRewardSource.id,
+            counter: "jessicaMemories",
+            amount: 2,
+            troopSupplyCost: 1,
+          },
+        ],
+      },
+    }],
+  };
+  const malformedLeaderCounterState = {
+    ...bundledPaidRewardFixture,
+    pendingAction: malformedLeaderCounterPending,
+  };
+  assert.equal(
+    state.resolvePaidRewardChoice(malformedLeaderCounterState, malformedLeaderCounterPending, "bundle"),
+    malformedLeaderCounterState,
+    "Paid reward resolver should reject malformed leader-counter rewards with mismatched troop costs",
+  );
+  const nestedBundlePending = {
+    ...bundledPaidRewardPending,
+    options: [{
+      ...bundledPaidRewardPending.options[0],
+      reward: {
+        kind: "bundle",
+        rewards: [
+          {
+            kind: "bundle",
+            recipientId: bundledPaidRewardSource.id,
+            rewards: [{ kind: "draw-intrigues", recipientId: bundledPaidRewardSource.id, amount: 1 }],
+          },
+          { kind: "draw-intrigues", recipientId: bundledPaidRewardSource.id, amount: 1 },
+        ],
+      },
+    }],
+  };
+  const nestedBundleState = {
+    ...bundledPaidRewardFixture,
+    pendingAction: nestedBundlePending,
+  };
+  assert.equal(
+    state.resolvePaidRewardChoice(nestedBundleState, nestedBundlePending, "bundle"),
+    nestedBundleState,
+    "Paid reward resolver should reject malformed nested bundle pendings instead of resolving partially",
+  );
+  const doubleMemoryPaidRewardCard = {
+    ...convincingArgument,
+    id: "effect-spec-double-memory-paid-reward-card",
+    name: "Effect Spec Double Memory Paid Reward",
+    effects: [agentSpec([{
+      kind: "paid-reward-choice",
+      selector: "self",
+      source: "Double Memory Paid Reward",
+      requirePayableOption: true,
+      options: [{
+        id: "double-memory",
+        resource: "spice",
+        cost: 1,
+        reward: {
+          kind: "bundle",
+          rewards: [
+            {
+              kind: "gain-leader-counter",
+              selector: "self",
+              counter: "jessicaMemories",
+              amount: 1,
+              troopSupplyCost: 1,
+            },
+            {
+              kind: "gain-leader-counter",
+              selector: "self",
+              counter: "jessicaMemories",
+              amount: 1,
+              troopSupplyCost: 1,
+            },
+          ],
+        },
+      }],
+    }])],
+  };
+  const oneSupplyJessica = {
+    ...p5,
+    leader: "Lady Jessica",
+    role: "Ally",
+    garrison: 11,
+    deployedTroops: 0,
+    jessicaMemories: 0,
+    playArea: [doubleMemoryPaidRewardCard],
+    resources: { ...p5.resources, spice: 1 },
+  };
+  const oneSupplyJessicaFixture = {
+    ...game,
+    pendingAction: undefined,
+    pendingQueue: [],
+    players: game.players.map((player) => player.id === oneSupplyJessica.id ? oneSupplyJessica : player),
+  };
+  assert.deepEqual(
+    state.pendingActionsForCard(doubleMemoryPaidRewardCard, oneSupplyJessica, oneSupplyJessicaFixture, oneSupplyJessica),
+    [],
+    "Paid reward pending creation should aggregate bundled leader-counter troop costs by recipient",
+  );
 
   const rebelSupplierEffect = state.applyCardAgentEffect(
     rebelSupplier,

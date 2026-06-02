@@ -68,6 +68,14 @@ export async function runLeaderCharacterChoicesSmoke({
   assert.equal(ownerAfter.jessicaMemories, ownerBefore.jessicaMemories + 1, "Spice Agony should add one memory");
   assert.equal(ownerAfter.intrigues.length, ownerBefore.intrigues.length + 1, "Spice Agony should draw one Intrigue");
 
+  await setDebugGameAndWait(page, states.jessicaSpiceAgonyNoSupply);
+  pendingText = await page.locator(".pending-panel").innerText();
+  assert.match(pendingText, /Spice Agony/i);
+  assert.match(pendingText, /Spend 1 spice: Intrigue \+ memory/i);
+  const noSupplySpiceAgonyButton = page.locator(".pending-panel").getByRole("button", { name: /Spend 1 spice: Intrigue \+ memory/ });
+  assert.equal(await noSupplySpiceAgonyButton.isDisabled(), true, "Spice Agony pay button should disable when the memory has no troop supply");
+  await screenshot(page, captures, "pending-jessica-spice-agony-no-supply.png");
+
   await setDebugGameAndWait(page, states.jessicaWaterOfLife);
   pendingText = await page.locator(".pending-panel").innerText();
   assert.match(pendingText, /Water of Life/i);
@@ -527,6 +535,35 @@ async function createLeaderCharacterChoiceStates(server, initialPlayableGame) {
     demandResultsState.players.find((player) => player.id === "p2"),
   );
   assert.ok(demandResultsPending, "Expected a derived Demand Results contract payment pending action");
+  const jessicaSpiceAgonyPending = (cardId) => ({
+    kind: "paid-reward-choice",
+    ownerId: "p5",
+    cardId,
+    source: "Spice Agony",
+    requirePayableOption: true,
+    options: [{
+      id: "spice-agony",
+      resource: "spice",
+      cost: 1,
+      reward: {
+        kind: "bundle",
+        rewards: [
+          {
+            kind: "draw-intrigues",
+            recipientId: "p5",
+            amount: 1,
+          },
+          {
+            kind: "gain-leader-counter",
+            recipientId: "p5",
+            counter: "jessicaMemories",
+            amount: 1,
+            troopSupplyCost: 1,
+          },
+        ],
+      },
+    }],
+  });
 
   return {
     stabanUnseenNetwork: {
@@ -575,12 +612,24 @@ async function createLeaderCharacterChoiceStates(server, initialPlayableGame) {
             }, leaderNames.ladyJessica)
           : player,
       ),
-      pendingAction: {
-        kind: "jessica-spice-agony",
-        ownerId: "p5",
-        cardId: "debug-jessica-spice-agony-signet",
-        source: "Spice Agony",
-      },
+      pendingAction: jessicaSpiceAgonyPending("debug-jessica-spice-agony-signet"),
+    },
+    jessicaSpiceAgonyNoSupply: {
+      ...base,
+      activeSeat: p5Seat,
+      players: base.players.map((player) =>
+        player.id === "p5"
+          ? withLeader(data, {
+              ...player,
+              resources: { ...player.resources, spice: 2 },
+              garrison: 12,
+              deployedTroops: 0,
+              jessicaMemories: 0,
+              playArea: [{ ...genericSignet, id: "debug-jessica-spice-agony-no-supply-signet" }, ...player.playArea],
+            }, leaderNames.ladyJessica)
+          : player,
+      ),
+      pendingAction: jessicaSpiceAgonyPending("debug-jessica-spice-agony-no-supply-signet"),
     },
     jessicaWaterOfLife: {
       ...base,

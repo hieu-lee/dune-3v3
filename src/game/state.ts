@@ -256,13 +256,11 @@ export {
 
 export {
   resolveJessicaOtherMemoriesChoice,
-  resolveJessicaSpiceAgonyChoice,
   resolveLadyAmberDesertScoutsChoice,
 } from "./leader-pending-rules";
 
 export type {
   JessicaOtherMemoriesChoice,
-  JessicaSpiceAgonyChoice,
   LadyAmberDesertScoutsChoice,
 } from "./leader-pending-rules";
 

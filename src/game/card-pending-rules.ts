@@ -1,7 +1,6 @@
 import { resolveInfluence } from "./agent-effects";
 import {
   canMoveCardToThroneRow,
-  isGenericSignetRingCard,
 } from "./card-identifiers";
 import {
   canSummonSandworms,
@@ -66,6 +65,8 @@ import type {
   GameState,
   IconId,
   PaidRewardChoicePendingOption,
+  PaidRewardChoicePendingAtomicReward,
+  PaidRewardChoicePendingReward,
   PendingAction,
   PendingActionChoiceNestedPending,
   PendingActionChoicePendingOption,
@@ -303,56 +304,94 @@ function pendingActionForAgentPaidRewardChoice(
   if (effect.requiredRecipient && !paidRewardChoiceRecipientFor(source, target, effect.requiredRecipient)) {
     return undefined;
   }
+  const pendingRewardFor = (reward: typeof effect.options[number]["reward"]): PaidRewardChoicePendingReward | undefined => {
+    if (reward.kind === "bundle") {
+      const rewards = reward.rewards.map(pendingRewardFor);
+      if (rewards.some((candidate) => !candidate || candidate.kind === "bundle")) return undefined;
+      const atomicRewards = rewards as PaidRewardChoicePendingAtomicReward[];
+      const leaderCounterTroopCostsByRecipient = new Map<string, number>();
+      atomicRewards.forEach((atomicReward) => {
+        if (atomicReward.kind !== "gain-leader-counter") return;
+        leaderCounterTroopCostsByRecipient.set(
+          atomicReward.recipientId,
+          (leaderCounterTroopCostsByRecipient.get(atomicReward.recipientId) ?? 0) + atomicReward.troopSupplyCost,
+        );
+      });
+      for (const [recipientId, troopSupplyCost] of leaderCounterTroopCostsByRecipient.entries()) {
+        const recipient = [source, target].find((candidate) => candidate?.id === recipientId);
+        if (!recipient || playerTroopSupply(recipient) < troopSupplyCost) return undefined;
+      }
+      return { kind: "bundle", rewards: atomicRewards };
+    }
+    const recipient = paidRewardChoiceRecipientFor(source, target, reward.selector);
+    if (!recipient) return undefined;
+    if (reward.kind === "gain-leader-counter") {
+      if (
+        reward.amount <= 0 ||
+        reward.counter !== "jessicaMemories" ||
+        reward.troopSupplyCost <= 0 ||
+        reward.troopSupplyCost !== reward.amount ||
+        playerTroopSupply(recipient) < reward.troopSupplyCost
+      ) {
+        return undefined;
+      }
+      return {
+        kind: "gain-leader-counter",
+        recipientId: recipient.id,
+        counter: reward.counter,
+        amount: reward.amount,
+        troopSupplyCost: reward.troopSupplyCost,
+      };
+    }
+    if (reward.kind === "draw-intrigues") {
+      if (reward.amount <= 0) return undefined;
+      return {
+        kind: "draw-intrigues",
+        recipientId: recipient.id,
+        amount: reward.amount,
+      };
+    }
+    if (reward.kind === "recruit-troops") {
+      if (reward.amount <= 0 || reward.destination !== "garrison") return undefined;
+      return {
+        kind: "recruit-troops",
+        recipientId: recipient.id,
+        amount: reward.amount,
+        destination: reward.destination,
+      };
+    }
+    if (reward.kind === "gain-influence") {
+      if (reward.amount <= 0) return undefined;
+      return {
+        kind: "gain-influence",
+        recipientId: recipient.id,
+        faction: reward.faction,
+        amount: reward.amount,
+      };
+    }
+    if (reward.kind === "gain-resource") {
+      if (reward.amount <= 0) return undefined;
+      return {
+        kind: "gain-resource",
+        recipientId: recipient.id,
+        resource: reward.resource,
+        amount: reward.amount,
+      };
+    }
+    const unsupported = reward as { kind?: unknown };
+    throw new Error(`Unsupported paid-reward-choice reward "${String(unsupported.kind)}"`);
+  };
   const options = effect.options.flatMap((option): PaidRewardChoicePendingOption[] => {
-    const recipient = paidRewardChoiceRecipientFor(source, target, option.reward.selector);
-    if (!recipient || option.cost <= 0) return [];
+    if (option.cost <= 0) return [];
     const deferredResource = potentialDeferredPaidRewardResource(state, source, target, space, option.resource);
     if (effect.requirePayableOption && source.resources[option.resource] + deferredResource < option.cost) return [];
-    switch (option.reward.kind) {
-      case "recruit-troops":
-        if (option.reward.amount <= 0 || option.reward.destination !== "garrison") return [];
-        return [{
-          id: option.id,
-          resource: option.resource,
-          cost: option.cost,
-          reward: {
-            kind: "recruit-troops",
-            recipientId: recipient.id,
-            amount: option.reward.amount,
-            destination: option.reward.destination,
-          },
-        }];
-      case "gain-influence":
-        if (option.reward.amount <= 0) return [];
-        return [{
-          id: option.id,
-          resource: option.resource,
-          cost: option.cost,
-          reward: {
-            kind: "gain-influence",
-            recipientId: recipient.id,
-            faction: option.reward.faction,
-            amount: option.reward.amount,
-          },
-        }];
-      case "gain-resource":
-        if (option.reward.amount <= 0) return [];
-        return [{
-          id: option.id,
-          resource: option.resource,
-          cost: option.cost,
-          reward: {
-            kind: "gain-resource",
-            recipientId: recipient.id,
-            resource: option.reward.resource,
-            amount: option.reward.amount,
-          },
-        }];
-      default: {
-        const reward = option.reward as { kind?: unknown };
-        throw new Error(`Unsupported paid-reward-choice reward "${String(reward.kind)}"`);
-      }
-    }
+    const reward = pendingRewardFor(option.reward);
+    return reward ? [{
+      id: option.id,
+      resource: option.resource,
+      cost: option.cost,
+      reward,
+    }] : [];
   });
   return options.length > 0
     ? {
@@ -903,21 +942,6 @@ export function pendingActionsForCard(
   const agentTrashSourceForTradePending = pendingActionForAgentTrashSourceForTrade(card, source, state, target);
   if (agentTrashSourceForTradePending) typedPendings.push(agentTrashSourceForTradePending);
   if (typedPendings.length > 0) return typedPendings;
-  if (
-    isGenericSignetRingCard(card) &&
-    source.leader === ladyJessicaLeaderName &&
-    source.role === "Ally" &&
-    source.resources.spice + (state && space ? potentialDeferredMakerChoiceSpice(state, source, target, space) : 0) >= 1 &&
-    playerTroopSupply(source) > 0 &&
-    source.playArea.some((candidate) => candidate.id === card.id && isGenericSignetRingCard(candidate))
-  ) {
-    return [{
-      kind: "jessica-spice-agony",
-      ownerId: source.id,
-      cardId: card.id,
-      source: "Spice Agony",
-    }];
-  }
   return [];
 }
 

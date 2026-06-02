@@ -110,8 +110,10 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
   const chooseThroneRowCard = (cardId: string) =>
     runPending("throne-row", (current, pending) => maybeStartCombatPhase(moveImperiumCardToThroneRow(current, pending, cardId)));
   const clearPendingAction = () => setGame((current) => maybeStartCombatPhase(finishPendingAction(current)));
-  const trashCard = (zone: TrashCardZone, cardId: string) =>
-    runPending("trash-card", (current, pending) => maybeStartCombatPhase(trashPlayerCard(current, pending, zone, cardId)));
+  const trashCard = (zone: TrashCardZone, cardId: string, choiceIndex?: number) =>
+    runPending("trash-card", (current, pending) =>
+      maybeStartCombatPhase(trashPlayerCard(current, pending, zone, cardId, choiceIndex))
+    );
   const skipTrash = () =>
     runPending("trash-card", (current, pending) => maybeStartCombatPhase(skipTrashCard(current, pending)));
   const recallSpy = (spaceId: string) =>

@@ -394,7 +394,7 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     return;
   }
   if (effect.kind === "trash-card") {
-    if (trigger !== "reveal" && trigger !== "plot-intrigue" && trigger !== "combat-intrigue") {
+    if (trigger !== "reveal" && trigger !== "plot-intrigue" && trigger !== "combat-intrigue" && trigger !== "agent-play") {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
     }
     if (effect.selector !== "self") {
@@ -403,6 +403,36 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     validateOptionalBoolean("trash-card optional", (effect as { optional?: unknown }).optional);
     if (effect.zones?.some((zone) => !supportedTrashZones.has(zone))) {
       throw new Error(`Unsupported trash-card zone "${effect.zones.find((zone) => !supportedTrashZones.has(zone))}"`);
+    }
+    if (effect.sourceOnly !== undefined && effect.sourceOnly !== true) {
+      invalidSpecField("trash-card sourceOnly", effect.sourceOnly);
+    }
+    if (trigger === "agent-play") {
+      if (effect.sourceOnly !== true) {
+        throw new Error(`Unsupported effect "${effect.kind}" for ${trigger} without sourceOnly`);
+      }
+      if (effect.excludeSource) {
+        invalidSpecField("trash-card excludeSource", effect.excludeSource);
+      }
+      if (!effect.zones || effect.zones.length !== 1 || effect.zones[0] !== "playArea") {
+        invalidSpecField("agent source trash-card zones", effect.zones);
+      }
+      if (effect.requiredTrait !== undefined) {
+        throw new Error(`Unsupported trash-card requiredTrait for ${trigger}`);
+      }
+      if (effect.strengthReward !== undefined) {
+        throw new Error(`Unsupported trash-card strengthReward for ${trigger}`);
+      }
+      if (effect.spiceRewardCostThreshold !== undefined) {
+        throw new Error(`Unsupported trash-card spiceRewardCostThreshold for ${trigger}`);
+      }
+      if (effect.spiceReward !== undefined) {
+        throw new Error(`Unsupported trash-card spiceReward for ${trigger}`);
+      }
+      return;
+    }
+    if (effect.sourceOnly !== undefined) {
+      throw new Error(`Unsupported trash-card sourceOnly for ${trigger}`);
     }
     if (trigger === "combat-intrigue" && effect.optional !== true) {
       invalidSpecField("combat trash-card optional", effect.optional);

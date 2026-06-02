@@ -276,6 +276,7 @@ export type GameEffectSpec =
       optional?: boolean;
       zones?: TrashCardZone[];
       excludeSource?: boolean;
+      sourceOnly?: boolean;
       requiredTrait?: string;
       strengthReward?: EffectAmountSpec;
       spiceRewardCostThreshold?: EffectAmountSpec;

@@ -58,6 +58,7 @@ export const capturedMentatSourceId = 61;
 export const beneGesseritOperativeSourceId = 30;
 export const covertOperationSourceId = 35;
 export const dangerousRhetoricSourceId = 44;
+export const desertSurvivalSourceId = 27;
 export const desertPowerSourceId = 71;
 export const doubleAgentSourceId = 37;
 export const fedaykinStilltentSourceId = 23;

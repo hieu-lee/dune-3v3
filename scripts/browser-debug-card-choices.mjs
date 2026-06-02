@@ -116,6 +116,7 @@ export async function runCardChoicesSmoke({
   await waitForNoPending(page);
   after = await currentGame(page);
   ownerAfter = after.players.find((player) => player.id === "p2");
+  assert.ok(ownerAfter, "Expected Feyd after Price is No Object acquire");
   assert.equal(
     ownerAfter.resources.solari,
     ownerBefore.resources.solari - priceAcquireCost,
@@ -142,6 +143,29 @@ export async function runCardChoicesSmoke({
     ownerAfter.playArea.some((card) => card.id === states.dangerousRhetoric.pendingAction.cardId),
     false,
     "Dangerous Rhetoric should trash itself after the Influence choice",
+  );
+
+  await setDebugGameAndWait(page, states.desertSurvival);
+  pendingText = await page.locator(".pending-panel").innerText();
+  assert.match(pendingText, /Desert Survival/i);
+  assert.match(pendingText, /Skip/i);
+  assert.doesNotMatch(pendingText, /Desert Survival Debug Other/i);
+  await screenshot(page, captures, "pending-desert-survival-trash.png");
+
+  before = await currentGame(page);
+  await page.locator(".pending-panel").getByRole("button", { name: /Desert Survival \(in play\)/ }).click();
+  await waitForNoPending(page);
+  after = await currentGame(page);
+  ownerAfter = after.players.find((player) => player.id === "p2");
+  assert.equal(
+    ownerAfter.playArea.some((card) => card.id === before.pendingAction.requiredCardId),
+    false,
+    "Desert Survival should trash the source card from play",
+  );
+  assert.equal(
+    ownerAfter.playArea.some((card) => card.id === states.desertSurvival.desertSurvivalOtherPlayCardId),
+    true,
+    "Desert Survival should leave other in-play cards alone",
   );
 
   await setDebugGameAndWait(page, states.acquireSpyNetwork);
@@ -408,6 +432,8 @@ async function createCardChoiceStates(server, initialPlayableGame) {
   assert.ok(beneGesseritOperative, "Expected Bene Gesserit Operative Imperium card");
   const dangerousRhetoric = data.imperiumDeck.find((card) => card.sourceId === 44);
   assert.ok(dangerousRhetoric, "Expected Dangerous Rhetoric Imperium card");
+  const desertSurvival = data.imperiumDeck.find((card) => card.sourceId === 27);
+  assert.ok(desertSurvival, "Expected Desert Survival Imperium card");
   const priceIsNoObject = data.imperiumDeck.find((card) => card.sourceId === 73);
   assert.ok(priceIsNoObject, "Expected Price is No Object Imperium card");
   const doubleAgent = data.imperiumDeck.find((card) => card.sourceId === 37);
@@ -430,6 +456,8 @@ async function createCardChoiceStates(server, initialPlayableGame) {
   assert.ok(deliverSupplies, "Expected Deliver Supplies board space");
   const spiceRefinery = data.boardSpaces.find((space) => space.id === "spice-refinery");
   assert.ok(spiceRefinery, "Expected Spice Refinery board space");
+  const imperialBasin = data.boardSpaces.find((space) => space.id === "imperial-basin");
+  assert.ok(imperialBasin, "Expected Imperial Basin board space");
   const capturedMentat = data.imperiumDeck.find((card) => card.sourceId === 61);
   assert.ok(capturedMentat, "Expected Captured Mentat Imperium card");
   const capturedMentatDiscard = { ...data.allyStarterCards[0], id: "browser-captured-mentat-discard-card" };
@@ -463,6 +491,11 @@ async function createCardChoiceStates(server, initialPlayableGame) {
     ...data.allyStarterCards[0],
     id: "browser-covert-operation-discard-card",
     name: "Covert Operation Debug Discard",
+  };
+  const desertSurvivalOtherPlayCard = {
+    ...data.allyStarterCards[0],
+    id: "browser-desert-survival-other-play-card",
+    name: "Desert Survival Debug Other",
   };
   const priceIsNoObjectAcquireCard = {
     ...beneGesseritOperative,
@@ -681,6 +714,47 @@ async function createCardChoiceStates(server, initialPlayableGame) {
     "board-influence-choice",
     "Expected Dangerous Rhetoric Influence choice pending action",
   );
+  const desertSurvivalState = turnActions.placeAgentAction(
+    {
+      ...base,
+      spaces: {},
+      players: base.players.map((player) =>
+        player.id === ownerId
+          ? {
+              ...player,
+              agentsReady: 1,
+              garrison: 0,
+              hand: [desertSurvival],
+              playArea: [desertSurvivalOtherPlayCard],
+              resources: { solari: 0, spice: 0, water: 0 },
+            }
+          : player,
+      ),
+    },
+    {
+      commanderTargets: {},
+      selectedCard: desertSurvival,
+      selectedSpace: imperialBasin,
+    },
+  );
+  assert.equal(
+    desertSurvivalState.pendingAction?.kind,
+    "trash-card",
+    "Expected Desert Survival source-trash pending action",
+  );
+  assert.equal(desertSurvivalState.pendingAction.requiredCardId, desertSurvival.id);
+  assert.equal(desertSurvivalState.pendingAction.requiredAgentPlacementSpaceId, imperialBasin.id);
+  assert.equal(desertSurvivalState.pendingAction.requiredAgentPlacementTargetOwnerId, ownerId);
+  const desertSurvivalOwner = desertSurvivalState.players.find((player) => player.id === ownerId);
+  assert.ok(desertSurvivalOwner, "Expected Desert Survival owner in browser debug state");
+  assert.deepEqual(
+    state.trashableCardsForPending(
+      desertSurvivalOwner,
+      desertSurvivalState.pendingAction,
+    ).map(({ card }) => card.id),
+    [desertSurvival.id],
+    "Desert Survival browser state should only offer its source card",
+  );
   const covertOperationOwner = base.players.find((player) => player.id === ownerId);
   assert.ok(covertOperationOwner, "Expected Covert Operation owner");
   const covertOperationSource = {
@@ -849,6 +923,10 @@ async function createCardChoiceStates(server, initialPlayableGame) {
       priceIsNoObjectAcquireCardName: priceIsNoObjectAcquireCard.name,
     },
     dangerousRhetoric: dangerousRhetoricState,
+    desertSurvival: {
+      ...desertSurvivalState,
+      desertSurvivalOtherPlayCardId: desertSurvivalOtherPlayCard.id,
+    },
     acquireSpyNetwork: {
       ...acquireSpyNetworkState,
       spySpaceId: spySpace.id,

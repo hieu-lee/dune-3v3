@@ -113,6 +113,7 @@ export function resolveTrashCardEffects(
         optional: effect.optional ?? true,
         zones: effect.zones ? [...effect.zones] : undefined,
         excludeSource: effect.excludeSource ?? false,
+        sourceOnly: effect.sourceOnly ?? false,
         requiredTrait: effect.requiredTrait,
         strengthReward: effect.strengthReward === undefined ? undefined : amountFor(effect.strengthReward, context.source),
         spiceRewardCostThreshold: effect.spiceRewardCostThreshold === undefined

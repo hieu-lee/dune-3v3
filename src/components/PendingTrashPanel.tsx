@@ -11,7 +11,7 @@ type PendingTrashPanelProps = {
   owner: Player;
   pending: TrashCardPendingAction;
   onSkip: () => void;
-  onTrash: (zone: TrashCardZone, cardId: string) => void;
+  onTrash: (zone: TrashCardZone, cardId: string, choiceIndex: number) => void;
 };
 
 export function PendingTrashPanel({
@@ -26,11 +26,11 @@ export function PendingTrashPanel({
       <div className="trade-intrigue-column">
         <strong>{owner.leader}</strong>
         {choices.length === 0 && <span>No trashable cards</span>}
-        {choices.map(({ zone, card }) => (
+        {choices.map(({ zone, card }, index) => (
           <button
             type="button"
-            key={`${zone}-${card.id}`}
-            onClick={() => onTrash(zone, card.id)}
+            key={`${zone}-${card.id}-${index}`}
+            onClick={() => onTrash(zone, card.id, index)}
             title={`Trash ${card.name}`}
           >
             {card.thumbnailPath && <img src={card.thumbnailPath} alt="" />}

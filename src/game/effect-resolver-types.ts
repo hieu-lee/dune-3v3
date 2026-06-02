@@ -101,6 +101,7 @@ export type TrashCardEffect = {
   optional: boolean;
   zones?: TrashCardZone[];
   excludeSource: boolean;
+  sourceOnly: boolean;
   requiredTrait?: string;
   strengthReward?: number;
   spiceRewardCostThreshold?: number;

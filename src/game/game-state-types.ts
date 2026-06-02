@@ -134,6 +134,9 @@ export type PendingAction =
       optional: boolean;
       zones?: TrashCardZone[];
       excludeCardId?: string;
+      requiredCardId?: string;
+      requiredAgentPlacementSpaceId?: string;
+      requiredAgentPlacementTargetOwnerId?: string;
       requiredTrait?: string;
       spiceRewardCostThreshold?: number;
       spiceReward?: number;

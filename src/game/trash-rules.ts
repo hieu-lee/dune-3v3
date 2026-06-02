@@ -28,8 +28,25 @@ export function trashableCardsForPending(player: Player, pending: TrashCardPendi
   return trashableCards(player).filter(({ card, zone }) =>
     zones.includes(zone) &&
     card.id !== pending.excludeCardId &&
+    (!pending.requiredCardId || card.id === pending.requiredCardId) &&
+    (!pending.requiredAgentPlacementSpaceId || card.agentPlacementSpaceId === pending.requiredAgentPlacementSpaceId) &&
+    (
+      !pending.requiredAgentPlacementTargetOwnerId ||
+      card.agentPlacementTargetOwnerId === pending.requiredAgentPlacementTargetOwnerId
+    ) &&
     (!pending.requiredTrait || card.traits?.includes(pending.requiredTrait))
   );
+}
+
+function removeCardInstance(cards: Card[], card: Card) {
+  let removed = false;
+  return cards.filter((candidate) => {
+    if (!removed && candidate === card) {
+      removed = true;
+      return false;
+    }
+    return true;
+  });
 }
 
 export function advancePastUnresolvableMandatoryTrash(state: GameState): GameState {
@@ -52,18 +69,26 @@ export function trashPlayerCard(
   pending: TrashCardPendingAction,
   zone: TrashCardZone,
   cardId: string,
+  choiceIndex?: number,
 ): GameState {
   const owner = state.players.find((player) => player.id === pending.ownerId);
   if (!owner) return advancePastUnresolvableMandatoryTrash({ ...state, ...advancePendingAction(state) });
-  if (!trashableCardsForPending(owner, pending).some((choice) => choice.zone === zone && choice.card.id === cardId)) {
-    if (!pending.optional && trashableCardsForPending(owner, pending).length === 0) {
+  const choices = trashableCardsForPending(owner, pending);
+  const indexedChoice = choiceIndex === undefined ? undefined : choices[choiceIndex];
+  const choice =
+    indexedChoice?.zone === zone && indexedChoice.card.id === cardId
+      ? indexedChoice
+      : choiceIndex === undefined
+        ? choices.find((candidate) => candidate.zone === zone && candidate.card.id === cardId)
+        : undefined;
+  if (!choice) {
+    if (!pending.optional && choices.length === 0) {
       return advancePastUnresolvableMandatoryTrash(state);
     }
     return state;
   }
   const cards = cardsForTrashZone(owner, zone);
-  const card = cards.find((candidate) => candidate.id === cardId);
-  if (!card) return state;
+  const card = choice.card;
   const combatRecipient = pending.combatRecipientId
     ? state.players.find((player) => player.id === pending.combatRecipientId)
     : undefined;
@@ -79,7 +104,7 @@ export function trashPlayerCard(
     let nextPlayer = player;
     if (player.id === owner.id) {
       nextPlayer = {
-        ...updateTrashZone(player, zone, cards.filter((candidate) => candidate.id !== card.id)),
+        ...updateTrashZone(player, zone, removeCardInstance(cards, card)),
         resources: {
           ...player.resources,
           spice: player.resources.spice + spiceReward,

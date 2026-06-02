@@ -210,8 +210,9 @@ export function trashPlayerCard(
   pending: TrashCardPendingAction,
   zone: TrashCardZone,
   cardId: string,
+  choiceIndex?: number,
 ): GameState {
-  return continueAfterResolvedConflictReward(resolveTrashPlayerCard(state, pending, zone, cardId));
+  return continueAfterResolvedConflictReward(resolveTrashPlayerCard(state, pending, zone, cardId, choiceIndex));
 }
 
 export function skipTrashCard(state: GameState, pending: TrashCardPendingAction): GameState {

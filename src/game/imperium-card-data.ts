@@ -7,6 +7,7 @@ import {
   covertOperationSourceId,
   dangerousRhetoricSourceId,
   desertPowerSourceId,
+  desertSurvivalSourceId,
   doubleAgentSourceId,
   ecologicalTestingStationSourceId,
   fedaykinStilltentSourceId,
@@ -61,6 +62,7 @@ import {
   agentPayResourceForSandworms,
   agentPlaceSpies,
   agentRecruitTroops,
+  agentTrashSource,
   discardGainResource,
   hasCardTraitInPlay,
   hasCompletedContracts,
@@ -210,6 +212,13 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
   if (card.id === dangerousRhetoricSourceId) {
     return [
       agentGainInfluenceChoice(1, { trashSource: true }),
+      revealGainPersuasion(1),
+      revealGainStrength(1),
+    ];
+  }
+  if (card.id === desertSurvivalSourceId) {
+    return [
+      agentTrashSource(),
       revealGainPersuasion(1),
       revealGainStrength(1),
     ];
@@ -524,6 +533,9 @@ function imperiumPlayText(card: HubCard) {
   }
   if (card.id === dangerousRhetoricSourceId) {
     return "Gain 1 Influence and trash this card.";
+  }
+  if (card.id === desertSurvivalSourceId) {
+    return "You may trash this card.";
   }
   if (card.id === desertPowerSourceId) {
     return "If you sent an Agent to a Maker board space this turn, gain 2 spice.";

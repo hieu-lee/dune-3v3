@@ -321,6 +321,23 @@ export function agentTrashSourceForTrade(
   ], conditions);
 }
 
+export function agentTrashSource(
+  options: {
+    optional?: boolean;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return agentPlayEffects([
+    {
+      kind: "trash-card",
+      selector: "self",
+      optional: options.optional ?? true,
+      zones: ["playArea"],
+      sourceOnly: true,
+    },
+  ], conditions);
+}
+
 export function agentMoveCardToThroneRow(
   options: {
     source?: string;

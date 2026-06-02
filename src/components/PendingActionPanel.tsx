@@ -135,7 +135,7 @@ type PendingActionPanelProps = {
   skipTrashSourceForTradeChoice: () => void;
   takeContract: (contractId: string) => void;
   transferTrade: (fromId: string, toId: string, intrigueId?: string) => void;
-  trashCard: (zone: TrashCardZone, cardId: string) => void;
+  trashCard: (zone: TrashCardZone, cardId: string, choiceIndex?: number) => void;
   updateTrade: (resource: TradeGoodId, partnerId?: string) => void;
 };
 

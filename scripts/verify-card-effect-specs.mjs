@@ -162,6 +162,7 @@ try {
   const covertOperation = data.imperiumDeck.find((card) => card.name === "Covert Operation");
   const dangerousRhetoric = data.imperiumDeck.find((card) => card.name === "Dangerous Rhetoric");
   const desertPower = data.imperiumDeck.find((card) => card.name === "Desert Power");
+  const desertSurvival = data.imperiumDeck.find((card) => card.name === "Desert Survival");
   const doubleAgent = data.imperiumDeck.find((card) => card.name === "Double Agent");
   const imperialSpymaster = data.imperiumDeck.find((card) => card.name === "Imperial Spymaster");
   const fedaykinStilltent = data.imperiumDeck.find((card) => card.name === "Fedaykin Stilltent");
@@ -265,6 +266,7 @@ try {
     covertOperation &&
     doubleAgent &&
     desertPower &&
+    desertSurvival &&
     imperialSpymaster &&
     fedaykinStilltent &&
     hiddenMissive &&
@@ -3319,6 +3321,7 @@ try {
       "Covert Operation",
       "Dangerous Rhetoric",
       "Desert Power",
+      "Desert Survival",
       "Double Agent",
       "Ecological Testing Station",
       "Fedaykin Stilltent",
@@ -3376,6 +3379,7 @@ try {
     beneGesseritOperative,
     chani,
     desertPower,
+    desertSurvival,
     imperialSpymaster,
     rebelSupplier,
     sardaukarSoldier,
@@ -4195,6 +4199,36 @@ try {
     "Gain 1 Influence and trash this card.",
     "Dangerous Rhetoric play text should expose its automated Influence choice",
   );
+  assert.ok(
+    desertSurvival.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.effects.some((effect) =>
+        effect.kind === "trash-card" &&
+        effect.selector === "self" &&
+        effect.optional === true &&
+        effect.sourceOnly === true &&
+        effect.zones?.length === 1 &&
+        effect.zones[0] === "playArea"
+      )
+    ),
+    "Desert Survival should carry a typed optional Agent source-trash spec",
+  );
+  assert.ok(
+    desertSurvival.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.effects.some((effect) => effect.kind === "gain-persuasion" && effect.amount === 1)
+    ),
+    "Desert Survival should carry its printed persuasion in Reveal specs",
+  );
+  assert.ok(
+    desertSurvival.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.effects.some((effect) => effect.kind === "gain-strength" && effect.amount === 1)
+    ),
+    "Desert Survival should carry its printed strength in Reveal specs",
+  );
+  assert.equal(desertSurvival.play, "You may trash this card.", "Desert Survival play text should expose source trash");
+  assert.equal(desertSurvival.reveal, "+1 persuasion and +1 strength.", "Desert Survival reveal text should stay fixed");
   assert.equal(
     covertOperation.play,
     "Each opponent discards a card.",
@@ -6144,8 +6178,8 @@ try {
   };
   assert.throws(
     () => state.applyCardAgentEffect(agentTrashCard, p2, p2),
-    /Unsupported effect "trash-card" for agent-play/,
-    "Trash-card specs should fail for Agent play until an Agent pending-action resolver supports them",
+    /Unsupported effect "trash-card" for agent-play without sourceOnly/,
+    "Agent trash-card specs should require sourceOnly until broader Agent trash pending actions are supported",
   );
   const invalidTrashOptionalCard = {
     ...convincingArgument,
@@ -10849,6 +10883,169 @@ try {
   assert.ok(
     cleanupOwner.discard.some((card) => card.id === cleanupSpacingGuildFavor.id),
     "Round cleanup should move Spacing Guild's Favor to discard without triggering it",
+  );
+  const desertSurvivalOtherPlayCard = { ...dagger, id: "desert-survival-other-play-card" };
+  const desertSurvivalFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 1,
+    garrison: 0,
+    hand: [desertSurvival],
+    playArea: [desertSurvivalOtherPlayCard],
+    resources: { solari: 0, spice: 0, water: 0 },
+  }));
+  assert.equal(
+    state.pendingActionForCard(desertSurvival, playerById(desertSurvivalFixture, p2.id), desertSurvivalFixture),
+    undefined,
+    "Desert Survival should only queue its source-trash choice from play",
+  );
+  const desertSurvivalPlaced = turnActions.placeAgentAction(desertSurvivalFixture, {
+    commanderTargets: {},
+    selectedCard: desertSurvival,
+    selectedSpace: imperialBasin,
+  });
+  assert.equal(
+    desertSurvivalPlaced.pendingAction?.kind,
+    "trash-card",
+    "Desert Survival should queue a typed optional trash-card pending action",
+  );
+  assert.equal(desertSurvivalPlaced.pendingAction.source, "Desert Survival");
+  assert.equal(desertSurvivalPlaced.pendingAction.optional, true);
+  assert.deepEqual(desertSurvivalPlaced.pendingAction.zones, ["playArea"]);
+  assert.equal(desertSurvivalPlaced.pendingAction.requiredCardId, desertSurvival.id);
+  assert.equal(desertSurvivalPlaced.pendingAction.requiredAgentPlacementSpaceId, imperialBasin.id);
+  assert.equal(desertSurvivalPlaced.pendingAction.requiredAgentPlacementTargetOwnerId, p2.id);
+  assert.deepEqual(
+    state.trashableCardsForPending(playerById(desertSurvivalPlaced, p2.id), desertSurvivalPlaced.pendingAction)
+      .map(({ zone, card }) => ({ zone, id: card.id })),
+    [{ zone: "playArea", id: desertSurvival.id }],
+    "Desert Survival source-trash choices should exclude other cards in play",
+  );
+  const desertSurvivalOtherTrashAttempt = state.trashPlayerCard(
+    desertSurvivalPlaced,
+    desertSurvivalPlaced.pendingAction,
+    "playArea",
+    desertSurvivalOtherPlayCard.id,
+  );
+  assert.equal(
+    playerById(desertSurvivalOtherTrashAttempt, p2.id).playArea.some((card) => card.id === desertSurvivalOtherPlayCard.id),
+    true,
+    "Desert Survival source-trash pending should reject non-source cards in play",
+  );
+  assert.equal(
+    desertSurvivalOtherTrashAttempt.pendingAction?.kind,
+    "trash-card",
+    "Rejected Desert Survival trash attempts should leave the pending action unresolved",
+  );
+  const desertSurvivalTrashed = state.trashPlayerCard(
+    desertSurvivalPlaced,
+    desertSurvivalPlaced.pendingAction,
+    "playArea",
+    desertSurvival.id,
+  );
+  assert.equal(
+    playerById(desertSurvivalTrashed, p2.id).playArea.some((card) => card.id === desertSurvival.id),
+    false,
+    "Resolving Desert Survival trash should remove the source card from play",
+  );
+  assert.equal(
+    playerById(desertSurvivalTrashed, p2.id).playArea.some((card) => card.id === desertSurvivalOtherPlayCard.id),
+    true,
+    "Resolving Desert Survival trash should leave other cards in play",
+  );
+  assert.equal(desertSurvivalTrashed.pendingAction, undefined);
+  assert.match(desertSurvivalTrashed.log[0], /trashes Desert Survival from Desert Survival/);
+  const desertSurvivalSkipped = state.skipTrashCard(desertSurvivalPlaced, desertSurvivalPlaced.pendingAction);
+  assert.equal(
+    playerById(desertSurvivalSkipped, p2.id).playArea.some((card) => card.id === desertSurvival.id),
+    true,
+    "Skipping Desert Survival trash should leave the source card in play",
+  );
+  assert.equal(desertSurvivalSkipped.pendingAction, undefined);
+  assert.match(desertSurvivalSkipped.log[0], /declines to trash a card from Desert Survival/);
+  const duplicateDesertSurvivalInPlay = {
+    ...desertSurvival,
+    name: "Desert Survival Duplicate",
+    agentPlacementSpaceId: "shipping",
+    agentPlacementTargetOwnerId: p2.id,
+  };
+  const duplicateDesertSurvivalFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 1,
+    garrison: 0,
+    hand: [desertSurvival],
+    playArea: [duplicateDesertSurvivalInPlay],
+    resources: { solari: 0, spice: 0, water: 0 },
+  }));
+  const duplicateDesertSurvivalPlaced = turnActions.placeAgentAction(duplicateDesertSurvivalFixture, {
+    commanderTargets: {},
+    selectedCard: desertSurvival,
+    selectedSpace: imperialBasin,
+  });
+  assert.equal(duplicateDesertSurvivalPlaced.pendingAction?.kind, "trash-card");
+  assert.equal(duplicateDesertSurvivalPlaced.pendingAction.requiredCardId, desertSurvival.id);
+  assert.equal(duplicateDesertSurvivalPlaced.pendingAction.requiredAgentPlacementSpaceId, imperialBasin.id);
+  assert.deepEqual(
+    state.trashableCardsForPending(
+      playerById(duplicateDesertSurvivalPlaced, p2.id),
+      duplicateDesertSurvivalPlaced.pendingAction,
+    ).map(({ card }) => card.agentPlacementSpaceId),
+    [imperialBasin.id],
+    "Desert Survival source trash should distinguish duplicate IDs by placement metadata",
+  );
+  const duplicateDesertSurvivalTrashed = state.trashPlayerCard(
+    duplicateDesertSurvivalPlaced,
+    duplicateDesertSurvivalPlaced.pendingAction,
+    "playArea",
+    desertSurvival.id,
+  );
+  const remainingDuplicateDesertSurvivals = playerById(duplicateDesertSurvivalTrashed, p2.id).playArea.filter(
+    (card) => card.id === desertSurvival.id,
+  );
+  assert.equal(
+    remainingDuplicateDesertSurvivals.length,
+    1,
+    "Source trash should remove only one matching source-card instance",
+  );
+  assert.equal(
+    remainingDuplicateDesertSurvivals[0]?.agentPlacementSpaceId,
+    "shipping",
+    "Source trash should leave a same-id non-source card in play",
+  );
+  const genericDuplicateTrashCardA = {
+    ...dagger,
+    id: "generic-duplicate-trash-card",
+    name: "Generic Duplicate Trash A",
+  };
+  const genericDuplicateTrashCardB = {
+    ...dagger,
+    id: "generic-duplicate-trash-card",
+    name: "Generic Duplicate Trash B",
+  };
+  const genericDuplicateTrashPending = {
+    kind: "trash-card",
+    ownerId: p2.id,
+    source: "Generic Duplicate Trash",
+    optional: true,
+    zones: ["playArea"],
+  };
+  const genericDuplicateTrashState = withActivePlayer(game, p2.id, () => ({
+    playArea: [genericDuplicateTrashCardA, genericDuplicateTrashCardB],
+  }));
+  assert.deepEqual(
+    state.trashableCardsForPending(playerById(genericDuplicateTrashState, p2.id), genericDuplicateTrashPending)
+      .map(({ card }) => card.name),
+    ["Generic Duplicate Trash A", "Generic Duplicate Trash B"],
+    "Generic duplicate trash choices should preserve both visible choices",
+  );
+  const genericDuplicateTrashResolved = state.trashPlayerCard(
+    genericDuplicateTrashState,
+    genericDuplicateTrashPending,
+    "playArea",
+    genericDuplicateTrashCardB.id,
+    1,
+  );
+  assert.deepEqual(
+    playerById(genericDuplicateTrashResolved, p2.id).playArea.map((card) => card.name),
+    ["Generic Duplicate Trash A"],
+    "Choice-indexed trash should remove the clicked duplicate-id card instance",
   );
   const dangerousRhetoricFixture = withActivePlayer(game, p2.id, () => ({
     agentsReady: 1,

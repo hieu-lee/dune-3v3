@@ -22,6 +22,7 @@ import {
   resolveAgentPayResourceForSandworms,
   resolveAgentPayTeamResourceForVps,
   resolveAgentTrashSourceForTrades,
+  resolveTrashCardEffects,
   resolveCardEffects,
   resolveAgentAcquireCards,
 } from "./effect-resolver";
@@ -35,6 +36,9 @@ import {
 import {
   pendingActionChoiceOptionIsResolvable,
 } from "./pending-action-choice-rules";
+import {
+  trashableCardsForPending,
+} from "./trash-rules";
 import {
   mergedSpyPlacement,
   spyPendingForPlacement,
@@ -875,6 +879,51 @@ function pendingActionForAgentTrashSourceForTrade(
     .find((pending): pending is PendingAction => Boolean(pending));
 }
 
+function pendingActionForAgentTrashSourceCard(
+  card: Card,
+  source: Player,
+  state?: GameState,
+  target?: Player,
+  space?: BoardSpace,
+): PendingAction | undefined {
+  const sourceCardsInPlay = source.playArea.filter((candidate) =>
+    candidate.id === card.id &&
+    (!space || candidate.agentPlacementSpaceId === space.id) &&
+    (!target || candidate.agentPlacementTargetOwnerId === target.id)
+  );
+  if (!card.effects || sourceCardsInPlay.length !== 1) return undefined;
+  const [sourceCardInPlay] = sourceCardsInPlay;
+  const players = state ? playersWithPendingCardEffect(state, source, target) : undefined;
+  const effectState = state && players ? { ...state, players } : undefined;
+  const effects = resolveTrashCardEffects(card.effects, {
+    trigger: "agent-play",
+    source,
+    target,
+    space,
+    state: effectState,
+  });
+  return effects
+    .map((effect): PendingAction | undefined => {
+      if (effect.selector !== "self" || !effect.sourceOnly) return undefined;
+      const pending: Extract<PendingAction, { kind: "trash-card" }> = {
+        kind: "trash-card",
+        ownerId: source.id,
+        source: card.name,
+        optional: effect.optional,
+        zones: ["playArea"],
+        requiredCardId: card.id,
+        ...(sourceCardInPlay.agentPlacementSpaceId
+          ? { requiredAgentPlacementSpaceId: sourceCardInPlay.agentPlacementSpaceId }
+          : {}),
+        ...(sourceCardInPlay.agentPlacementTargetOwnerId
+          ? { requiredAgentPlacementTargetOwnerId: sourceCardInPlay.agentPlacementTargetOwnerId }
+          : {}),
+      };
+      return trashableCardsForPending(source, pending).length > 0 ? pending : undefined;
+    })
+    .find((pending): pending is PendingAction => Boolean(pending));
+}
+
 export function pendingActionsForCard(
   card: Card,
   source: Player,
@@ -915,6 +964,8 @@ export function pendingActionsForCard(
   if (agentCommanderResourceSplitPending) typedPendings.push(agentCommanderResourceSplitPending);
   const agentTrashSourceForTradePending = pendingActionForAgentTrashSourceForTrade(card, source, state, target);
   if (agentTrashSourceForTradePending) typedPendings.push(agentTrashSourceForTradePending);
+  const agentTrashSourceCardPending = pendingActionForAgentTrashSourceCard(card, source, state, target, space);
+  if (agentTrashSourceCardPending) typedPendings.push(agentTrashSourceCardPending);
   if (typedPendings.length > 0) return typedPendings;
   return [];
 }

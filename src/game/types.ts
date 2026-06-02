@@ -90,6 +90,7 @@ export type GameEffectSpec =
   | { kind: "draw-cards"; selector: PlayerSelector; amount: EffectAmountSpec; source?: string }
   | { kind: "draw-intrigues"; selector: PlayerSelector; amount: EffectAmountSpec }
   | { kind: "activate-acquire-recruit-bonus"; selector: PlayerSelector; amount: EffectAmountSpec }
+  | { kind: "remove-shield-wall"; selector: "self"; source?: string }
   | {
       kind: "discard-card";
       selector: PlayerSelector;
@@ -115,6 +116,7 @@ export type GameEffectSpec =
       source?: string;
     }
   | { kind: "recruit-troops"; selector: PlayerSelector; amount: EffectAmountSpec; source?: string }
+  | { kind: "deploy-troops"; selector: "self" | "activated-ally"; max: number; source?: string }
   | {
       kind: "retreat-troops-for-strength";
       selector: PlayerSelector;

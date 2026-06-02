@@ -5,9 +5,11 @@ import {
   resolveDiscardCardEffects,
   resolveGameEffects,
   resolveManipulateRowCards,
+  resolvePlotDeployTroops,
   resolveTakeContracts,
   resolveTrashCardEffects,
 } from "./effect-resolver";
+import { conflictDeploymentBlockedFor } from "./conflict-rules";
 import { drawIntrigueCards } from "./intrigue-deck";
 import {
   adjustInfluenceAndResolveThresholdRewards,
@@ -44,12 +46,16 @@ type TypedPlotIntrigueOutcome = {
   acquireDestination?: AcquireCardDestination;
   acquirePending?: AcquireCardPendingAction;
   cardsDrawn: number;
+  deployableTroops?: number;
+  deployOwner?: Player;
+  deployPending?: DeployPendingAction;
   discardedCard?: Card;
   manipulatedCard?: Card;
   recalledSpySpace?: BoardSpace;
 };
 
 type AcquireCardPendingAction = Extract<PendingAction, { kind: "acquire-card" }>;
+type DeployPendingAction = Extract<PendingAction, { kind: "deploy" }>;
 type TrashCardPendingAction = Extract<PendingAction, { kind: "trash-card" }>;
 
 function hasResourceGains(gain: Partial<Resources>) {
@@ -146,6 +152,17 @@ function trashCardPendingFor(
     ...(effect.excludeSource ? { excludeCardId: intrigue.id } : {}),
     ...(effect.requiredTrait ? { requiredTrait: effect.requiredTrait } : {}),
   };
+}
+
+function deployTroopsOwnerFor(
+  player: Player,
+  activatedAlly: Player | undefined,
+  effect: ReturnType<typeof resolvePlotDeployTroops>[number] | undefined,
+): Player | undefined {
+  if (!effect) return undefined;
+  if (effect.selector === "self") return player;
+  if (effect.selector === "activated-ally") return activatedAlly;
+  throw new Error(`Unsupported Plot Intrigue deploy-troops selector "${effect.selector}"`);
 }
 
 function selectedDiscardCardFor(
@@ -275,20 +292,27 @@ export function playTypedPlotIntrigue(
   const discardEffects = resolveDiscardCardEffects(intrigue.effects, context);
   const trashEffects = resolveTrashCardEffects(intrigue.effects, context);
   const rowManipulationEffects = resolveManipulateRowCards(intrigue.effects, context);
+  const deployEffects = resolvePlotDeployTroops(intrigue.effects, context);
   if (acquireEffects.length > 1) throw new Error("Unsupported multiple Plot Intrigue acquire-card effects");
   if (contractEffects.length > 1) throw new Error("Unsupported multiple Plot Intrigue take-contracts effects");
   if (discardEffects.length > 1) throw new Error("Unsupported multiple Plot Intrigue discard-card effects");
   if (trashEffects.length > 1) throw new Error("Unsupported multiple Plot Intrigue trash-card effects");
   if (rowManipulationEffects.length > 1) throw new Error("Unsupported multiple Plot Intrigue row manipulation effects");
+  if (deployEffects.length > 1) throw new Error("Unsupported multiple Plot Intrigue deploy-troops effects");
   const [acquireEffect] = acquireEffects;
   const [contractEffect] = contractEffects;
   const [discardEffect] = discardEffects;
   const [trashEffect] = trashEffects;
   const [rowManipulationEffect] = rowManipulationEffects;
+  const [deployEffect] = deployEffects;
   const discardedCard = selectedDiscardCardFor(player, discardEffect, options.discardCardId);
   if (discardEffect && !discardedCard) return state;
   const spyRecall = selectedSpyRecallFor(state, player, resolved.spyRecalls);
   if (resolved.spyRecalls.length > 0 && !spyRecall) return state;
+  const deployOwner = deployTroopsOwnerFor(player, activatedAlly, deployEffect);
+  if (deployEffect && (!state.conflict || !deployOwner || conflictDeploymentBlockedFor(state, player.id, deployOwner.id))) {
+    return state;
+  }
   const acquirePending = acquireCardPendingFor(state, player, intrigue, acquireEffect);
   const contractPending = publicContractPendingFor(state, player, intrigue, contractEffect);
   const spyPending = pendingActionForSpyPlacements(intrigue.name, player, resolved.spyPlacements, state);
@@ -326,6 +350,7 @@ export function playTypedPlotIntrigue(
     !discardEffect &&
     !spyPending &&
     !trashEffect &&
+    !deployEffect &&
     !rowManipulation
   ) {
     return state;
@@ -372,6 +397,23 @@ export function playTypedPlotIntrigue(
       garrison: candidate.garrison + resolved.activatedAlly.recruitedTroops,
     };
   });
+  const deployOwnerAfterEffects = deployOwner
+    ? players.find((candidate) => candidate.id === deployOwner.id) ?? deployOwner
+    : undefined;
+  const deployableTroops = deployEffect && deployOwnerAfterEffects
+    ? Math.min(deployOwnerAfterEffects.garrison, deployEffect.max)
+    : undefined;
+  const deployPending = deployEffect && deployOwnerAfterEffects && deployableTroops && deployableTroops > 0
+    ? {
+        kind: "deploy" as const,
+        ownerId: deployOwnerAfterEffects.id,
+        remaining: deployableTroops,
+        source: deployEffect.source ?? intrigue.name,
+      }
+    : undefined;
+  outcome.deployOwner = deployOwnerAfterEffects;
+  outcome.deployableTroops = deployableTroops;
+  outcome.deployPending = deployPending;
   const trashPending = trashCardPendingFor(sourceAfterEffects ?? player, intrigue, trashEffect);
   const canResolveTrash = trashPending && trashableCardsForPending(sourceAfterEffects ?? player, trashPending).length > 0;
   if (trashPending && !canResolveTrash && !trashPending.optional) return state;
@@ -379,6 +421,7 @@ export function playTypedPlotIntrigue(
     contractPending,
     acquirePending,
     spyPending,
+    deployPending,
     canResolveTrash ? trashPending : undefined,
   ].filter((action): action is PendingAction => Boolean(action));
   const immediateState = {

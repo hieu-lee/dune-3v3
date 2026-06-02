@@ -42,6 +42,8 @@ type CardEffectSpecOptions = {
   choiceId?: string;
 };
 
+type PlotDeployTroopSelector = Extract<PlayerSelector, "self" | "activated-ally">;
+
 function effectSpec(
   trigger: CardEffectSpec["trigger"],
   effects: GameEffectSpec[],
@@ -502,6 +504,41 @@ export function plotRecruitTroops(
   options?: CardEffectSpecOptions,
 ): CardEffectSpec {
   return plotIntrigueEffects([{ kind: "recruit-troops", selector, amount }], conditions, options);
+}
+
+export function plotDeployTroops(
+  selector: PlotDeployTroopSelector,
+  max: number,
+  options: {
+    source?: string;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+  specOptions?: CardEffectSpecOptions,
+): CardEffectSpec {
+  return plotIntrigueEffects([
+    {
+      kind: "deploy-troops",
+      selector,
+      max,
+      ...(options.source ? { source: options.source } : {}),
+    },
+  ], conditions, specOptions);
+}
+
+export function plotRemoveShieldWall(
+  options: {
+    source?: string;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+  specOptions?: CardEffectSpecOptions,
+): CardEffectSpec {
+  return plotIntrigueEffects([
+    {
+      kind: "remove-shield-wall",
+      selector: "self",
+      ...(options.source ? { source: options.source } : {}),
+    },
+  ], conditions, specOptions);
 }
 
 export function plotTakeContracts(

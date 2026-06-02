@@ -181,6 +181,7 @@ try {
   const contingencyPlan = data.intrigueCards.find((card) => card.name === "Contingency Plan");
   const cunning = data.intrigueCards.find((card) => card.name === "Cunning");
   const departForArrakis = data.intrigueCards.find((card) => card.name === "Depart For Arrakis");
+  const detonation = data.intrigueCards.find((card) => card.name === "Detonation");
   const devour = data.intrigueCards.find((card) => card.name === "Devour");
   const distraction = data.intrigueCards.find((card) => card.name === "Distraction");
   const findWeakness = data.intrigueCards.find((card) => card.name === "Find Weakness");
@@ -271,7 +272,7 @@ try {
     wheelsWithinWheels,
   );
   assert.ok(commandRespect && prepareTheWay && spiceMustFlow && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
-  assert.ok(backedByChoam && buyAccess && callToArms && changeAllegiances && councilorsAmbition && contingencyPlan && cunning && departForArrakis && devour && distraction && findWeakness && goToGround && impress && imperiumPolitics && inspireAwe && intelligenceReport && leverage && manipulate && marketOpportunity && mercenaries && opportunism && questionableMethods && reachAgreement && shaddamsFavor && spiceIsPower && specialMission && springTheTrap && tacticalOption && sietchRitual && strategicStockpiling && weirdingCombat);
+  assert.ok(backedByChoam && buyAccess && callToArms && changeAllegiances && councilorsAmbition && contingencyPlan && cunning && departForArrakis && detonation && devour && distraction && findWeakness && goToGround && impress && imperiumPolitics && inspireAwe && intelligenceReport && leverage && manipulate && marketOpportunity && mercenaries && opportunism && questionableMethods && reachAgreement && shaddamsFavor && spiceIsPower && specialMission && springTheTrap && tacticalOption && sietchRitual && strategicStockpiling && weirdingCombat);
   assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && dutifulService && deliverSupplies && sietchTabr && spiceRefinery);
   assert.equal(revealSpecCards.length, 79, "Unexpected number of cards with declarative Reveal specs");
   assert.equal(
@@ -2473,6 +2474,105 @@ try {
     "Call to Arms Plot spec should not recruit immediately",
   );
   assert.ok(
+    detonation.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.choiceId === "shield-wall" &&
+      spec.effects.some((effect) =>
+        effect.kind === "remove-shield-wall" &&
+        effect.selector === "self" &&
+        effect.source === "Detonation"
+      )
+    ),
+    "Detonation should carry a typed Shield Wall removal branch spec",
+  );
+  assert.ok(
+    detonation.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.choiceId === "deploy" &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Ally") &&
+      spec.effects.some((effect) =>
+        effect.kind === "deploy-troops" &&
+        effect.selector === "self" &&
+        effect.max === 4 &&
+        effect.source === "Detonation"
+      )
+    ),
+    "Detonation should carry a typed Ally troop deployment branch spec",
+  );
+  assert.ok(
+    detonation.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.choiceId === "deploy" &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Commander") &&
+      spec.effects.some((effect) =>
+        effect.kind === "deploy-troops" &&
+        effect.selector === "activated-ally" &&
+        effect.max === 4 &&
+        effect.source === "Detonation"
+      )
+    ),
+    "Detonation should carry a typed Commander activated-Ally troop deployment branch spec",
+  );
+  assert.equal(
+    effectResolver.resolveGameEffects(detonation.effects, {
+      trigger: "plot-intrigue",
+      choiceId: "shield-wall",
+      source: p2,
+      state: game,
+    }).removeShieldWall,
+    true,
+    "Detonation Shield Wall branch should resolve through generic Plot effects",
+  );
+  assert.equal(
+    effectResolver.resolveGameEffects(detonation.effects, {
+      trigger: "plot-intrigue",
+      source: p2,
+      state: game,
+    }).removeShieldWall,
+    false,
+    "Detonation Shield Wall branch should remain choice-gated",
+  );
+  assert.deepEqual(
+    effectResolver.resolvePlotDeployTroops(detonation.effects, {
+      trigger: "plot-intrigue",
+      choiceId: "deploy",
+      source: p2,
+      state: game,
+    }),
+    [{ selector: "self", max: 4, source: "Detonation" }],
+    "Detonation Ally deploy branch should resolve a self troop deployment effect",
+  );
+  assert.deepEqual(
+    effectResolver.resolvePlotDeployTroops(detonation.effects, {
+      trigger: "plot-intrigue",
+      choiceId: "deploy",
+      source: p4,
+      target: p6,
+      state: game,
+    }),
+    [{ selector: "activated-ally", max: 4, source: "Detonation" }],
+    "Detonation Commander deploy branch should resolve an activated-Ally troop deployment effect",
+  );
+  assert.deepEqual(
+    effectResolver.resolvePlotDeployTroops(detonation.effects, {
+      trigger: "plot-intrigue",
+      choiceId: "deploy",
+      source: p4,
+      state: game,
+    }),
+    [],
+    "Detonation Commander deploy branch should require an activated Ally target",
+  );
+  assert.deepEqual(
+    effectResolver.resolvePlotDeployTroops(detonation.effects, {
+      trigger: "plot-intrigue",
+      source: p2,
+      state: game,
+    }),
+    [],
+    "Detonation deploy branch should remain choice-gated",
+  );
+  assert.ok(
     departForArrakis.effects?.some((spec) =>
       spec.trigger === "plot-intrigue" &&
       spec.choiceId === "draw" &&
@@ -4400,6 +4500,70 @@ try {
     ),
     /Invalid activate-acquire-recruit-bonus amount "2"/,
     "Acquire-recruit bonus activation currently supports exactly one troop per acquisition",
+  );
+  assert.throws(
+    () => effectResolver.resolveGameEffects(
+      [agentSpec([{ kind: "remove-shield-wall", selector: "self", source: "Test" }])],
+      { trigger: "agent-play", source: p2, state: game },
+    ),
+    /Unsupported effect "remove-shield-wall" for agent-play/,
+    "Shield Wall removal specs should stay on Plot Intrigues",
+  );
+  assert.throws(
+    () => effectResolver.resolveGameEffects(
+      [plotSpec([{ kind: "remove-shield-wall", selector: "activated-ally", source: "Test" }])],
+      { trigger: "plot-intrigue", source: p2, state: game },
+    ),
+    /Unsupported effect selector "activated-ally" for plot-intrigue/,
+    "Shield Wall removal specs should target only the source player",
+  );
+  assert.throws(
+    () => effectResolver.resolveGameEffects(
+      [plotSpec([{ kind: "remove-shield-wall", selector: "self", source: "" }])],
+      { trigger: "plot-intrigue", source: p2, state: game },
+    ),
+    /Invalid remove-shield-wall source ""/,
+    "Shield Wall removal specs should reject empty source labels",
+  );
+  assert.throws(
+    () => effectResolver.resolvePlotDeployTroops(
+      [agentSpec([{ kind: "deploy-troops", selector: "self", max: 1, source: "Test" }])],
+      { trigger: "agent-play", source: p2, state: game },
+    ),
+    /Unsupported effect "deploy-troops" for agent-play/,
+    "Deploy-troops specs should stay on Plot Intrigues",
+  );
+  assert.throws(
+    () => effectResolver.resolvePlotDeployTroops(
+      [plotSpec([{ kind: "deploy-troops", selector: "opponent", max: 1, source: "Test" }])],
+      { trigger: "plot-intrigue", source: p2, state: game },
+    ),
+    /Unsupported effect selector "opponent" for deploy-troops/,
+    "Deploy-troops specs should reject unsupported selectors",
+  );
+  assert.throws(
+    () => effectResolver.resolvePlotDeployTroops(
+      [plotSpec([{ kind: "deploy-troops", selector: "self", max: 0, source: "Test" }])],
+      { trigger: "plot-intrigue", source: p2, state: game },
+    ),
+    /Invalid deploy-troops max "0"/,
+    "Deploy-troops specs should require a positive max",
+  );
+  assert.throws(
+    () => effectResolver.resolvePlotDeployTroops(
+      [plotSpec([{ kind: "deploy-troops", selector: "self", max: { kind: "completed-contracts" }, source: "Test" }])],
+      { trigger: "plot-intrigue", source: p2, state: game },
+    ),
+    /Invalid deploy-troops max "\[object Object\]"/,
+    "Deploy-troops specs should reject dynamic max amounts",
+  );
+  assert.throws(
+    () => effectResolver.resolvePlotDeployTroops(
+      [plotSpec([{ kind: "deploy-troops", selector: "self", max: 1, source: "" }])],
+      { trigger: "plot-intrigue", source: p2, state: game },
+    ),
+    /Invalid deploy-troops source ""/,
+    "Deploy-troops specs should reject empty source labels",
   );
   const invalidAcquirePersuasionCard = {
     ...convincingArgument,

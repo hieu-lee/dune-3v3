@@ -203,6 +203,12 @@ export type DiscardCardEffect = {
   source?: string;
 };
 
+export type PlotDeployTroops = {
+  selector: "self" | "activated-ally";
+  max: number;
+  source?: string;
+};
+
 export type AgentGainInfluenceChoice = {
   selector: PlayerSelector;
   amount: number;
@@ -789,6 +795,9 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
     const amount = amountFor(effect.amount, context.source);
     return { ...result, acquireRecruitBonus: result.acquireRecruitBonus + amount };
   }
+  if (effect.kind === "remove-shield-wall") {
+    return { ...result, removeShieldWall: true };
+  }
   if (effect.kind === "gain-influence-choice") {
     return result;
   }
@@ -798,6 +807,9 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
   if (effect.kind === "recruit-troops") {
     const amount = amountFor(effect.amount, context.source);
     return addSelectedRecruitedTroops(result, effect.selector, amount, effect.source);
+  }
+  if (effect.kind === "deploy-troops") {
+    return result;
   }
   if (effect.kind === "retreat-troops-for-strength") {
     return result;
@@ -1477,6 +1489,24 @@ export function resolveCombatInfluenceLossForStrengths(
         owner: effect.owner,
         alternateOwner: effect.alternateOwner,
         optional: true,
+        source: effect.source,
+      }));
+  });
+}
+
+export function resolvePlotDeployTroops(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): PlotDeployTroops[] {
+  specs?.forEach(validateSpec);
+  return (specs ?? []).flatMap((spec) => {
+    if (spec.trigger !== "plot-intrigue") return [];
+    if (!specApplies(spec, context)) return [];
+    return spec.effects
+      .filter((effect) => effect.kind === "deploy-troops")
+      .map((effect) => ({
+        selector: effect.selector,
+        max: effect.max,
         source: effect.source,
       }));
   });

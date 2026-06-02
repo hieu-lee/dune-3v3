@@ -211,7 +211,12 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     trigger !== "agent-play" &&
     !(
       trigger === "plot-intrigue" &&
-      (effect.kind === "recruit-troops" || effect.kind === "gain-influence" || effect.kind === "lose-influence")
+      (
+        effect.kind === "recruit-troops" ||
+        effect.kind === "deploy-troops" ||
+        effect.kind === "gain-influence" ||
+        effect.kind === "lose-influence"
+      )
     )
   ) {
     throw new Error(`Unsupported effect selector "${effect.selector}" for ${trigger}`);
@@ -332,6 +337,13 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     }
     return;
   }
+  if (effect.kind === "remove-shield-wall") {
+    if (trigger !== "plot-intrigue") {
+      throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
+    }
+    validateSourceLabel("remove-shield-wall source", effect.source);
+    return;
+  }
   if (effect.kind === "gain-influence-choice") {
     if (trigger !== "agent-play") {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
@@ -376,6 +388,17 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
   if (effect.kind === "recruit-troops") {
     validateSourceLabel("recruit-troops source", effect.source);
     validateAmount(effect.amount);
+    return;
+  }
+  if (effect.kind === "deploy-troops") {
+    if (trigger !== "plot-intrigue") {
+      throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
+    }
+    if (effect.selector !== "self" && effect.selector !== "activated-ally") {
+      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
+    validatePositiveFixedAmount("deploy-troops max", effect.max);
+    validateSourceLabel("deploy-troops source", effect.source);
     return;
   }
   if (effect.kind === "retreat-troops-for-strength") {

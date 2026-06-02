@@ -24,7 +24,6 @@ import {
 } from "./turn-trackers";
 import type {
   GameState,
-  PendingAction,
 } from "./types";
 
 export type SpecialMissionChoice =
@@ -82,60 +81,43 @@ export function playDetonationIntrigue(
   choice: "shield-wall" | "deploy",
   deployOwnerId?: string,
 ): GameState {
-  if (state.phase !== "playing" || state.pendingAction || state.pendingQueue.length > 0) return state;
-  const player = state.players[state.activeSeat];
-  if (!player || player.id !== playerId) return state;
-  const intrigue = player.intrigues.find((card) => card.id === intrigueId);
-  if (!intrigue || !isDetonationIntrigue(intrigue)) return state;
-  if (choice === "shield-wall" && !state.shieldWall) return state;
-  const deployOwnerResult = choice === "deploy"
-    ? activatedAllyEffectOwner(state, player, deployOwnerId)
-    : { valid: true, owner: undefined };
-  if (choice === "deploy" && (!state.conflict || !deployOwnerResult.valid || !deployOwnerResult.owner)) return state;
-  if (
-    choice === "deploy" &&
-    deployOwnerResult.owner &&
-    conflictDeploymentBlockedFor(state, player.id, deployOwnerResult.owner.id)
-  ) {
-    return state;
-  }
-
-  const players = state.players.map((candidate) =>
-    candidate.id === player.id
-      ? { ...candidate, intrigues: candidate.intrigues.filter((card) => card.id !== intrigue.id) }
-      : candidate,
-  );
-  const baseState = {
-    ...state,
-    players,
-    intrigueDiscard: [...state.intrigueDiscard, intrigue],
-  };
-
   if (choice === "shield-wall") {
-    return {
-      ...baseState,
-      shieldWall: false,
-      log: [`${player.leader} plays Detonation and removes the Shield Wall.`, ...state.log],
-    };
+    if (!state.shieldWall) return state;
+    return playTypedPlotIntrigue(
+      state,
+      playerId,
+      intrigueId,
+      isDetonationIntrigue,
+      (actor) => `${actor.leader} plays Detonation and removes the Shield Wall.`,
+      { choiceId: "shield-wall" },
+    );
   }
 
-  const deployOwner = deployOwnerResult.owner;
-  if (!deployOwner) return state;
-  const deployable = Math.min(deployOwner.garrison, 4);
-  const deployLabel = deployOwner && deployOwner.id !== player.id ? ` for ${deployOwner.leader}` : "";
-  const deployPending: PendingAction | undefined = deployable > 0
-    ? { kind: "deploy", ownerId: deployOwner.id, remaining: deployable, source: "Detonation" }
-    : undefined;
-  return {
-    ...baseState,
-    pendingAction: deployPending,
-    log: [
-      deployable > 0
-        ? `${player.leader} plays Detonation${deployLabel} and may deploy up to ${deployable} troops.`
-        : `${player.leader} plays Detonation${deployLabel} and deploys no troops.`,
-      ...state.log,
-    ],
-  };
+  if (choice === "deploy") {
+    const actor = state.players[state.activeSeat];
+    return playTypedPlotIntrigue(
+      state,
+      playerId,
+      intrigueId,
+      isDetonationIntrigue,
+      (player, _contractPending, _activatedAlly, _resolved, outcome) => {
+        const deployOwner = outcome.deployOwner;
+        const deployLabel = deployOwner && deployOwner.id !== player.id ? ` for ${deployOwner.leader}` : "";
+        const deployable = outcome.deployableTroops ?? 0;
+        return deployable > 0
+          ? `${player.leader} plays Detonation${deployLabel} and may deploy up to ${deployable} troops.`
+          : `${player.leader} plays Detonation${deployLabel} and deploys no troops.`;
+      },
+      {
+        choiceId: "deploy",
+        ...(actor?.role === "Commander"
+          ? { requireActivatedAlly: true, activatedAllyOwnerId: deployOwnerId }
+          : {}),
+      },
+    );
+  }
+
+  return state;
 }
 
 export function playUnexpectedAlliesIntrigue(

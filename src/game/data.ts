@@ -15,6 +15,7 @@ import {
   cunningSourceId,
   dangerousRhetoricSourceId,
   desertPowerSourceId,
+  detonationSourceId,
   devourSourceId,
   distractionSourceId,
   doubleAgentSourceId,
@@ -115,6 +116,7 @@ import {
   plotAcquireCard,
   plotActivateAcquireRecruitBonus,
   plotDiscardCardForInfluence,
+  plotDeployTroops,
   plotDrawCards,
   plotDrawIntrigues,
   plotGainResource,
@@ -127,6 +129,7 @@ import {
   plotPlaceSpies,
   plotRecallSpy,
   plotRecruitTroops,
+  plotRemoveShieldWall,
   plotResourceExchange,
   plotShiftInfluence,
   plotShiftInfluenceAndPayResourceForInfluenceGains,
@@ -1011,6 +1014,13 @@ function intrigueCardEffects(card: HubCard): CardEffectSpec[] | undefined {
   }
   if (card.id === callToArmsSourceId) {
     return [plotActivateAcquireRecruitBonus(1)];
+  }
+  if (card.id === detonationSourceId) {
+    return [
+      plotRemoveShieldWall({ source: "Detonation" }, undefined, { choiceId: "shield-wall" }),
+      plotDeployTroops("self", 4, { source: "Detonation" }, [hasRole("Ally")], { choiceId: "deploy" }),
+      plotDeployTroops("activated-ally", 4, { source: "Detonation" }, [hasRole("Commander")], { choiceId: "deploy" }),
+    ];
   }
   if (card.id === councilorsAmbitionSourceId) {
     return [plotGainResource("water", 2, [hasHighCouncilSeat()])];

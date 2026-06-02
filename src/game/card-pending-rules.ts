@@ -1050,6 +1050,39 @@ function pendingActionForAgentTrashSourceCard(
     .find((pending): pending is PendingAction => Boolean(pending));
 }
 
+function pendingActionForAgentTrashCard(
+  card: Card,
+  source: Player,
+  state?: GameState,
+  target?: Player,
+  space?: BoardSpace,
+): PendingAction | undefined {
+  if (!card.effects || !source.playArea.some((candidate) => candidate.id === card.id)) return undefined;
+  const players = state ? playersWithPendingCardEffect(state, source, target) : undefined;
+  const effectState = state && players ? { ...state, players } : undefined;
+  const effects = resolveTrashCardEffects(card.effects, {
+    trigger: "agent-play",
+    source,
+    target,
+    space,
+    state: effectState,
+  });
+  return effects
+    .map((effect): PendingAction | undefined => {
+      if (effect.selector !== "self" || effect.sourceOnly) return undefined;
+      const pending: Extract<PendingAction, { kind: "trash-card" }> = {
+        kind: "trash-card",
+        ownerId: source.id,
+        source: card.name,
+        optional: effect.optional,
+        ...(effect.zones ? { zones: effect.zones } : {}),
+        ...(effect.requiredTrait ? { requiredTrait: effect.requiredTrait } : {}),
+      };
+      return trashableCardsForPending(source, pending).length > 0 || !pending.optional ? pending : undefined;
+    })
+    .find((pending): pending is PendingAction => Boolean(pending));
+}
+
 export function pendingActionsForCard(
   card: Card,
   source: Player,
@@ -1095,6 +1128,8 @@ export function pendingActionsForCard(
   if (agentCommanderResourceSplitPending) typedPendings.push(agentCommanderResourceSplitPending);
   const agentTrashSourceForTradePending = pendingActionForAgentTrashSourceForTrade(card, source, state, target);
   if (agentTrashSourceForTradePending) typedPendings.push(agentTrashSourceForTradePending);
+  const agentTrashCardPending = pendingActionForAgentTrashCard(card, source, state, target, space);
+  if (agentTrashCardPending) typedPendings.push(agentTrashCardPending);
   const agentTrashSourceCardPending = pendingActionForAgentTrashSourceCard(card, source, state, target, space);
   if (agentTrashSourceCardPending) typedPendings.push(agentTrashSourceCardPending);
   if (typedPendings.length > 0) return typedPendings;

@@ -107,6 +107,13 @@ try {
     ),
     "Calculus of Power should use declarative Reveal persuasion and trash-card strength effects",
   );
+  assert.ok(
+    calculus.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.effects.some((effect) => effect.kind === "trash-card" && effect.optional === true)
+    ),
+    "Calculus of Power should carry a typed Agent selected-card trash effect",
+  );
   assert.match(calculus.reveal, /another Emperor card/, "Calculus of Power should describe its structured Reveal trash text");
   const capturedMentat = data.imperiumDeck.find((card) => card.name === "Captured Mentat");
   assert.ok(capturedMentat, "Imperium deck should include Captured Mentat");
@@ -506,7 +513,7 @@ try {
     ),
     "Shishakli should model its Fremen Bond Reveal Influence as a typed effect",
   );
-  for (const name of ["Bene Gesserit Operative", "Branching Path", "Cargo Runner", "Chani, Clever Tactician", "Guild Spy", "In High Places", "Junction Headquarters", "Maker Keeper", "Maula Pistol", "Northern Watermaster", "Overthrow", "Paracompass", "Price is No Object", "Shishakli", "Steersman"]) {
+  for (const name of ["Bene Gesserit Operative", "Branching Path", "Calculus of Power", "Cargo Runner", "Chani, Clever Tactician", "Guild Spy", "In High Places", "Junction Headquarters", "Maker Keeper", "Maula Pistol", "Northern Watermaster", "Overthrow", "Paracompass", "Price is No Object", "Shishakli", "Steersman"]) {
     const card = data.imperiumDeck.find((candidate) => candidate.name === name);
     assert.ok(card?.effects?.some((spec) => spec.trigger === "agent-play"), `${name} should use a structured Agent effect`);
   }
@@ -1315,6 +1322,48 @@ try {
     false,
     "Prepare The Way should not log a draw when the threshold is unmet",
   );
+
+  const calculusAgentTrashTarget = { ...calculusTrashTarget, id: "calculus-agent-trash-target" };
+  const calculusAgentSpace = {
+    id: "calculus-agent-test-space",
+    name: "Calculus Agent Test Space",
+    zone: "City",
+    icon: "city",
+    detail: "Verifier-only city space without board pending rewards.",
+  };
+  const calculusAgentFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 1,
+    discard: [],
+    garrison: 0,
+    hand: [calculus, calculusAgentTrashTarget],
+    playArea: [],
+    resources: { solari: 0, spice: 0, water: 0 },
+  }));
+  const calculusAgentPlaced = turnActions.placeAgentAction(calculusAgentFixture, {
+    commanderTargets: {},
+    selectedCard: calculus,
+    selectedSpace: calculusAgentSpace,
+  });
+  assert.equal(calculusAgentPlaced.pendingAction?.kind, "trash-card", "Calculus of Power should queue Agent trash");
+  assert.equal(calculusAgentPlaced.pendingAction.source, "Calculus of Power");
+  assert.deepEqual(
+    state.trashableCardsForPending(playerById(calculusAgentPlaced, p2.id), calculusAgentPlaced.pendingAction)
+      .map(({ zone, card }) => ({ zone, id: card.id })),
+    [
+      { zone: "hand", id: calculusAgentTrashTarget.id },
+      { zone: "playArea", id: calculus.id },
+    ],
+    "Calculus Agent trash should allow a card from hand or in play",
+  );
+  const calculusAgentResolved = state.trashPlayerCard(
+    calculusAgentPlaced,
+    calculusAgentPlaced.pendingAction,
+    "hand",
+    calculusAgentTrashTarget.id,
+  );
+  assert.equal(playerById(calculusAgentResolved, p2.id).hand.length, 0, "Calculus Agent trash should remove the selected hand card");
+  assert.ok(playerById(calculusAgentResolved, p2.id).playArea.some((card) => card.id === calculus.id));
+  assert.equal(calculusAgentResolved.pendingAction, undefined);
 
   const steersmanDrawTarget = { ...calculusTrashTarget, id: "steersman-draw-target" };
   const steersmanFixture = withActivePlayer(game, p2.id, () => ({

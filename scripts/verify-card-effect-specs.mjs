@@ -3532,6 +3532,7 @@ try {
     [
       "Bene Gesserit Operative",
       "Branching Path",
+      "Calculus of Power",
       "Captured Mentat",
       "Cargo Runner",
       "Chani, Clever Tactician",
@@ -4376,6 +4377,14 @@ try {
       )
     ),
     "Calculus of Power should carry a declarative Reveal trash-card strength spec",
+  );
+  assert.ok(
+    hasAgentEffect(calculus, (effect) =>
+      effect.kind === "trash-card" &&
+      effect.optional === true &&
+      effect.sourceOnly !== true
+    ),
+    "Calculus of Power should use a typed Agent selected-card trash effect",
   );
   assert.ok(
     capturedMentat.effects?.some((spec) =>
@@ -6622,10 +6631,44 @@ try {
     name: "Effect Spec Agent Trash Card",
     effects: [agentSpec([{ kind: "trash-card", selector: "self", optional: true }])],
   };
+  assert.equal(
+    effectResolver.resolveTrashCardEffects(agentTrashCard.effects, {
+      trigger: "agent-play",
+      source: p2,
+      state: game,
+    })[0]?.sourceOnly,
+    false,
+    "Agent selected trash-card specs should resolve without sourceOnly",
+  );
+  const invalidAgentTrashStrengthRewardCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-agent-trash-strength-reward-card",
+    name: "Effect Spec Invalid Agent Trash Strength Reward",
+    effects: [agentSpec([{ kind: "trash-card", selector: "self", optional: true, strengthReward: 1 }])],
+  };
   assert.throws(
-    () => state.applyCardAgentEffect(agentTrashCard, p2, p2),
-    /Unsupported effect "trash-card" for agent-play without sourceOnly/,
-    "Agent trash-card specs should require sourceOnly until broader Agent trash pending actions are supported",
+    () => effectResolver.resolveTrashCardEffects(invalidAgentTrashStrengthRewardCard.effects, {
+      trigger: "agent-play",
+      source: p2,
+      state: game,
+    }),
+    /Unsupported trash-card strengthReward for agent-play/,
+    "Agent selected trash-card specs should reject strength rewards",
+  );
+  const invalidAgentSelectedTrashExcludeSourceCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-agent-selected-trash-exclude-source-card",
+    name: "Effect Spec Invalid Agent Selected Trash Exclude Source",
+    effects: [agentSpec([{ kind: "trash-card", selector: "self", optional: true, excludeSource: true }])],
+  };
+  assert.throws(
+    () => effectResolver.resolveTrashCardEffects(invalidAgentSelectedTrashExcludeSourceCard.effects, {
+      trigger: "agent-play",
+      source: p2,
+      state: game,
+    }),
+    /Invalid trash-card excludeSource "true"/,
+    "Agent selected trash-card specs should reject source exclusion until it can exclude by source instance",
   );
   const invalidAgentTrashDrawRewardCard = {
     ...convincingArgument,
@@ -6648,6 +6691,21 @@ try {
     }),
     /Invalid effect amount "-1"/,
     "Agent source trash-card draw rewards should require non-negative integer amounts",
+  );
+  const invalidAgentSelectedTrashDrawRewardCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-agent-selected-trash-draw-reward-card",
+    name: "Effect Spec Invalid Agent Selected Trash Draw Reward",
+    effects: [agentSpec([{ kind: "trash-card", selector: "self", optional: true, drawCardsReward: 1 }])],
+  };
+  assert.throws(
+    () => effectResolver.resolveTrashCardEffects(invalidAgentSelectedTrashDrawRewardCard.effects, {
+      trigger: "agent-play",
+      source: p2,
+      state: game,
+    }),
+    /Unsupported trash-card drawCardsReward for agent-play without sourceOnly/,
+    "Agent selected trash-card specs should reject draw rewards until reward-bearing selected trash is supported",
   );
   const invalidTrashOptionalCard = {
     ...convincingArgument,
@@ -12441,6 +12499,80 @@ try {
     cleanupOwner.discard.some((card) => card.id === cleanupSpacingGuildFavor.id),
     "Round cleanup should move Spacing Guild's Favor to discard without triggering it",
   );
+  const calculusAgentHandTrash = {
+    ...dagger,
+    id: "calculus-agent-hand-trash-card",
+    name: "Calculus Agent Hand Trash",
+  };
+  const calculusAgentPlayTrash = {
+    ...convincingArgument,
+    id: "calculus-agent-play-trash-card",
+    name: "Calculus Agent Play Trash",
+  };
+  const calculusAgentDiscardTrash = {
+    ...convincingArgument,
+    id: "calculus-agent-discard-trash-card",
+    name: "Calculus Agent Discard Trash",
+  };
+  const calculusAgentSpace = {
+    id: "calculus-agent-test-space",
+    name: "Calculus Agent Test Space",
+    zone: "City",
+    icon: "city",
+    detail: "Verifier-only city space without board pending rewards.",
+  };
+  const calculusAgentPlaced = turnActions.placeAgentAction(
+    withActivePlayer(game, p2.id, () => ({
+      agentsReady: 1,
+      discard: [calculusAgentDiscardTrash],
+      hand: [calculus, calculusAgentHandTrash],
+      playArea: [calculusAgentPlayTrash],
+      resources: { solari: 0, spice: 0, water: 0 },
+    })),
+    {
+      commanderTargets: {},
+      selectedCard: calculus,
+      selectedSpace: calculusAgentSpace,
+    },
+  );
+  assert.equal(
+    calculusAgentPlaced.pendingAction?.kind,
+    "trash-card",
+    "Calculus of Power should queue a typed Agent selected-card trash pending action",
+  );
+  assert.equal(calculusAgentPlaced.pendingAction.source, "Calculus of Power");
+  assert.equal(calculusAgentPlaced.pendingAction.optional, true);
+  assert.equal(calculusAgentPlaced.pendingAction.zones, undefined, "Calculus Agent trash should use all standard trash zones");
+  assert.deepEqual(
+    state.trashableCardsForPending(playerById(calculusAgentPlaced, p2.id), calculusAgentPlaced.pendingAction)
+      .map(({ zone, card }) => `${zone}:${card.id}`),
+    [
+      `hand:${calculusAgentHandTrash.id}`,
+      `discard:${calculusAgentDiscardTrash.id}`,
+      `playArea:${calculusAgentPlayTrash.id}`,
+      `playArea:${calculus.id}`,
+    ],
+    "Calculus Agent trash should offer hand, discard, in-play, and source-card choices",
+  );
+  const calculusAgentTrashed = state.trashPlayerCard(
+    calculusAgentPlaced,
+    calculusAgentPlaced.pendingAction,
+    "hand",
+    calculusAgentHandTrash.id,
+  );
+  const calculusAgentOwner = playerById(calculusAgentTrashed, p2.id);
+  assert.equal(
+    calculusAgentOwner.hand.some((card) => card.id === calculusAgentHandTrash.id),
+    false,
+    "Resolving Calculus Agent trash should remove the selected hand card",
+  );
+  assert.equal(
+    calculusAgentOwner.playArea.some((card) => card.id === calculus.id),
+    true,
+    "Resolving Calculus Agent trash should leave Calculus in play when another card was trashed",
+  );
+  assert.equal(calculusAgentTrashed.pendingAction, undefined);
+  assert.match(calculusAgentTrashed.log[0], /trashes Calculus Agent Hand Trash from Calculus of Power/);
   const desertSurvivalOtherPlayCard = { ...dagger, id: "desert-survival-other-play-card" };
   const desertSurvivalFixture = withActivePlayer(game, p2.id, () => ({
     agentsReady: 1,

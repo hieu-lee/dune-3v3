@@ -24,6 +24,7 @@ import type {
   TeamResourcePaymentRecipient,
   TradeEffectPartner,
   TradeGoodId,
+  TrashCardZone,
 } from "./types";
 
 type AgentAcquireCardOptions = (
@@ -366,6 +367,25 @@ export function agentTrashSource(
       zones: ["playArea"],
       sourceOnly: true,
       ...(options.drawCardsReward !== undefined ? { drawCardsReward: options.drawCardsReward } : {}),
+    },
+  ], conditions);
+}
+
+export function agentTrashCards(
+  options: {
+    optional?: boolean;
+    zones?: TrashCardZone[];
+    requiredTrait?: string;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return agentPlayEffects([
+    {
+      kind: "trash-card",
+      selector: "self",
+      optional: options.optional ?? true,
+      ...(options.zones ? { zones: options.zones } : {}),
+      ...(options.requiredTrait ? { requiredTrait: options.requiredTrait } : {}),
     },
   ], conditions);
 }

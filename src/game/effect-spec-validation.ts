@@ -443,17 +443,22 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
       invalidSpecField("trash-card sourceOnly", effect.sourceOnly);
     }
     if (trigger === "agent-play") {
-      if (effect.sourceOnly !== true) {
-        throw new Error(`Unsupported effect "${effect.kind}" for ${trigger} without sourceOnly`);
-      }
-      if (effect.excludeSource) {
+      const sourceOnly = effect.sourceOnly === true;
+      if (effect.excludeSource !== undefined) {
         invalidSpecField("trash-card excludeSource", effect.excludeSource);
       }
-      if (!effect.zones || effect.zones.length !== 1 || effect.zones[0] !== "playArea") {
-        invalidSpecField("agent source trash-card zones", effect.zones);
+      if (sourceOnly) {
+        if (!effect.zones || effect.zones.length !== 1 || effect.zones[0] !== "playArea") {
+          invalidSpecField("agent source trash-card zones", effect.zones);
+        }
       }
       if (effect.requiredTrait !== undefined) {
-        throw new Error(`Unsupported trash-card requiredTrait for ${trigger}`);
+        if (sourceOnly) {
+          throw new Error(`Unsupported trash-card requiredTrait for ${trigger} sourceOnly`);
+        }
+        if (typeof effect.requiredTrait !== "string" || effect.requiredTrait.trim().length === 0) {
+          invalidSpecField("trash-card requiredTrait", effect.requiredTrait);
+        }
       }
       if (effect.strengthReward !== undefined) {
         throw new Error(`Unsupported trash-card strengthReward for ${trigger}`);
@@ -464,7 +469,12 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
       if (effect.spiceReward !== undefined) {
         throw new Error(`Unsupported trash-card spiceReward for ${trigger}`);
       }
-      if (effect.drawCardsReward !== undefined) validateAmount(effect.drawCardsReward);
+      if (effect.drawCardsReward !== undefined) {
+        if (!sourceOnly) {
+          throw new Error(`Unsupported trash-card drawCardsReward for ${trigger} without sourceOnly`);
+        }
+        validateAmount(effect.drawCardsReward);
+      }
       return;
     }
     if (effect.sourceOnly !== undefined) {

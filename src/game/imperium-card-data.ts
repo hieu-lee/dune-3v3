@@ -69,6 +69,7 @@ import {
   agentPlaceSpies,
   agentRecallAgent,
   agentRecruitTroops,
+  agentTrashCards,
   agentTrashIntrigueForReward,
   agentTrashSource,
   agentTrashSourceForDrawCards,
@@ -243,6 +244,7 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
   }
   if (card.id === calculusOfPowerSourceId) {
     return [
+      agentTrashCards(),
       revealGainPersuasion(2),
       revealTrashCardForStrength(3, {
         zones: ["playArea"],

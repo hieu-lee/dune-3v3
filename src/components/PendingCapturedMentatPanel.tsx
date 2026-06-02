@@ -172,6 +172,59 @@ export function PendingDiscardDrawPanel({
   );
 }
 
+type PendingDiscardHandCardPanelProps = {
+  discardChoices: Card[];
+  owner?: Player;
+  remaining: number;
+  source: string;
+  onResolve: (discardCardId: string) => void;
+};
+
+export function PendingDiscardHandCardPanel({
+  discardChoices,
+  owner,
+  remaining,
+  source,
+  onResolve,
+}: PendingDiscardHandCardPanelProps) {
+  const [selectedCardId, setSelectedCardId] = useState<string>();
+  const selectedCard = discardChoices.find((card) => card.id === selectedCardId);
+  const remainingText = remaining === 1 ? "Discard 1 card" : `Discard ${remaining} cards`;
+
+  return (
+    <div className="pending-controls trade-intrigue-grid">
+      <div className="trade-intrigue-column">
+        <strong>{owner?.leader ?? "Player"}</strong>
+        <span>{source}: {remainingText}</span>
+        {discardChoices.length === 0 && <span>No discardable cards</span>}
+        {discardChoices.map((card) => (
+          <button
+            className={selectedCardId === card.id ? "selected" : undefined}
+            type="button"
+            aria-pressed={selectedCardId === card.id}
+            key={card.id}
+            onClick={() => setSelectedCardId(card.id)}
+            title={`Discard ${card.name}`}
+          >
+            {card.thumbnailPath && <img src={card.thumbnailPath} alt="" />}
+            <span>{card.name}</span>
+          </button>
+        ))}
+      </div>
+
+      <button
+        type="button"
+        disabled={!selectedCard}
+        onClick={() => {
+          if (selectedCard) onResolve(selectedCard.id);
+        }}
+      >
+        Discard {selectedCard?.name ?? "card"}
+      </button>
+    </div>
+  );
+}
+
 type PendingInfluenceIntriguePanelProps = {
   influenceChoices: FactionId[];
   amount: number;

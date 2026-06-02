@@ -21,6 +21,10 @@ import {
   skipDiscardCardForInfluenceAndDraw as resolveSkipDiscardCardForInfluenceAndDraw,
 } from "./discard-influence-draw-rules";
 import {
+  discardHandCardChoices,
+  resolveDiscardHandCard as resolveDiscardHandCardForPending,
+} from "./discard-hand-rules";
+import {
   resolveLoseInfluenceForIntrigues as resolveLoseInfluenceForIntriguesForPending,
   skipLoseInfluenceForIntrigues as resolveSkipLoseInfluenceForIntrigues,
 } from "./influence-intrigue-rules";
@@ -179,6 +183,10 @@ export {
 } from "./discard-draw-rules";
 
 export {
+  discardHandCardChoices,
+} from "./discard-hand-rules";
+
+export {
   discardCardForInfluenceAndDrawChoices,
   discardCardForInfluenceAndDrawDiscardChoices,
 } from "./discard-influence-draw-rules";
@@ -224,6 +232,7 @@ export {
   pendingActionForCard,
   pendingActionForJessicaOtherMemories,
   pendingActionForReverendMotherJessicaRepeat,
+  pendingActionsForCard,
   pendingActionsForRevealPayResourceForStrength,
   pendingActionsForRevealPayResourceForTroops,
   pendingActionsForReveal,
@@ -512,6 +521,7 @@ function continueAfterResolvedConflictReward(state: GameState): GameState {
 export function finishPendingAction(state: GameState): GameState {
   if (state.pendingAction?.kind === "spy" && state.pendingAction.mustPlaceSpy) return state;
   if (state.pendingAction?.kind === "acquire-card" && !state.pendingAction.optional) return state;
+  if (state.pendingAction?.kind === "discard-hand-card") return state;
   const resolvedState = state.pendingAction?.kind === "deploy"
     ? resolvePostDeployIntrigueDraw(state, state.pendingAction.postDeployIntrigueDraw)
     : state;
@@ -534,6 +544,7 @@ type CommanderResourceSplitPendingAction = Extract<PendingAction, { kind: "comma
 type TrashCardPendingAction = Extract<PendingAction, { kind: "trash-card" }>;
 type DiscardCardForInfluenceAndDrawPendingAction = Extract<PendingAction, { kind: "discard-card-for-influence-and-draw" }>;
 type DiscardCardForDrawPendingAction = Extract<PendingAction, { kind: "discard-card-for-draw" }>;
+type DiscardHandCardPendingAction = Extract<PendingAction, { kind: "discard-hand-card" }>;
 type LoseInfluenceForIntriguesPendingAction = Extract<PendingAction, { kind: "lose-influence-for-intrigues" }>;
 type BoardInfluenceChoicePendingAction = Extract<PendingAction, { kind: "board-influence-choice" }>;
 type OptionalSpacePaymentPendingAction = Extract<PendingAction, { kind: "optional-space-payment" }>;
@@ -689,6 +700,16 @@ export function skipDiscardCardForDraw(
   pending: DiscardCardForDrawPendingAction,
 ): GameState {
   return continueAfterResolvedConflictReward(resolveSkipDiscardCardForDraw(state, pending));
+}
+
+export function resolveDiscardHandCardChoice(
+  state: GameState,
+  pending: DiscardHandCardPendingAction,
+  discardCardId: string,
+): GameState {
+  return continueAfterResolvedConflictReward(
+    resolveDiscardHandCardForPending(state, pending, discardCardId),
+  );
 }
 
 export function resolveLoseInfluenceForIntriguesChoice(

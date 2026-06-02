@@ -7,6 +7,7 @@ import {
   canMoveCardToThroneRow,
   canPayConflictVpConversion,
   conflictVpConversionSpyChoices,
+  discardHandCardChoices,
   discardCardForDrawChoices,
   discardCardForInfluenceAndDrawChoices,
   discardCardForInfluenceAndDrawDiscardChoices,
@@ -33,7 +34,12 @@ import type {
 import type { FactionId, GameState, PendingAction, Player, TradeGoodId, TrashCardZone } from "../game/types";
 import { PendingBoardInfluenceChoicePanel, PendingOptionalSpacePaymentPanel } from "./PendingBoardChoicePanels";
 import { PendingAcquireCardPanel, PendingContractPanel } from "./PendingCardChoicePanels";
-import { PendingDiscardDrawPanel, PendingDiscardInfluenceDrawPanel, PendingInfluenceIntriguePanel } from "./PendingCapturedMentatPanel";
+import {
+  PendingDiscardDrawPanel,
+  PendingDiscardHandCardPanel,
+  PendingDiscardInfluenceDrawPanel,
+  PendingInfluenceIntriguePanel,
+} from "./PendingCapturedMentatPanel";
 import { PendingConflictInfluencePanel } from "./PendingConflictInfluencePanel";
 import { PendingConflictVpPanel } from "./PendingConflictVpPanel";
 import { PendingInfluenceLossPanel } from "./PendingInfluenceLossPanel";
@@ -81,6 +87,7 @@ type PendingActionPanelProps = {
   chooseBoardInfluence: (ownerId: string, faction: FactionId) => void;
   chooseConflictTieWinner: (winnerId?: string) => void;
   chooseDiscardCardForDraw: (discardCardId: string) => void;
+  chooseDiscardHandCard: (discardCardId: string) => void;
   chooseDiscardCardForInfluenceAndDraw: (discardCardId: string, faction: FactionId) => void;
   chooseLoseInfluenceForIntrigues: (faction: FactionId) => void;
   chooseIrulanSignet: (choice: IrulanSignetRingChoice) => void;
@@ -151,6 +158,7 @@ export function PendingActionPanel({
   chooseBoardInfluence,
   chooseConflictTieWinner,
   chooseDiscardCardForDraw,
+  chooseDiscardHandCard,
   chooseDiscardCardForInfluenceAndDraw,
   chooseLoseInfluenceForIntrigues,
   chooseIrulanSignet,
@@ -236,6 +244,12 @@ export function PendingActionPanel({
   const pendingDiscardDrawChoices =
     pendingAction.kind === "discard-card-for-draw" && pendingDiscardDrawOwner
       ? discardCardForDrawChoices(pendingDiscardDrawOwner, pendingAction)
+      : [];
+  const pendingDiscardHandCardOwner =
+    pendingAction.kind === "discard-hand-card" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
+  const pendingDiscardHandCardChoices =
+    pendingAction.kind === "discard-hand-card" && pendingDiscardHandCardOwner
+      ? discardHandCardChoices(pendingDiscardHandCardOwner, pendingAction)
       : [];
   const pendingInfluenceIntrigueOwner =
     pendingAction.kind === "lose-influence-for-intrigues" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
@@ -480,6 +494,7 @@ export function PendingActionPanel({
           {pendingAction.kind === "acquire-card" && `${pendingAcquireOwner?.leader ?? "Player"} acquisition`}
           {pendingAction.kind === "discard-card-for-influence-and-draw" && `${pendingDiscardInfluenceDrawOwner?.leader ?? "Player"} ${pendingAction.source}`}
           {pendingAction.kind === "discard-card-for-draw" && `${pendingDiscardDrawOwner?.leader ?? "Player"} ${pendingAction.source}`}
+          {pendingAction.kind === "discard-hand-card" && `${pendingDiscardHandCardOwner?.leader ?? "Player"} ${pendingAction.source}`}
           {pendingAction.kind === "lose-influence-for-intrigues" && `${pendingInfluenceIntrigueOwner?.leader ?? "Player"} ${pendingAction.source} reveal`}
           {pendingAction.kind === "maker-choice" && `${pendingMakerLabel ?? "Player"} Maker space`}
           {pendingAction.kind === "sietch-tabr" && `${pendingSietchLabel ?? "Player"} Sietch Tabr`}
@@ -890,6 +905,16 @@ export function PendingActionPanel({
           source={pendingAction.source}
           onResolve={chooseDiscardCardForDraw}
           onSkip={skipDiscardCardForDrawChoice}
+        />
+      )}
+
+      {pendingAction.kind === "discard-hand-card" && (
+        <PendingDiscardHandCardPanel
+          discardChoices={pendingDiscardHandCardChoices}
+          owner={pendingDiscardHandCardOwner}
+          remaining={pendingAction.remaining}
+          source={pendingAction.source}
+          onResolve={chooseDiscardHandCard}
         />
       )}
 

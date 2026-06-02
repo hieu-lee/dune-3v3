@@ -11,7 +11,6 @@ import {
   defaultActivatedAllyId,
   drawIntrigueCards,
   effectiveCost,
-  pendingActionForCard,
   pendingActionForJessicaOtherMemories,
   pendingActionForBoardInfluenceChoice,
   pendingActionForBoardTrash,
@@ -21,6 +20,7 @@ import {
   pendingActionForSietchTabr,
   pendingActionForSpace,
   pendingActionsFor,
+  pendingActionsForCard,
   pendingActionsForReveal,
   playerHasConflictUnits,
   queuePendingActions,
@@ -174,13 +174,14 @@ export function placeAgentAction(
     baseSpacePending,
     postDeployIntrigueDraw,
   );
-  const cardPending = pendingActionForCard(
+  const cardPendings = pendingActionsForCard(
     selectedCard,
     source,
     postEffectState,
     deploymentOwner,
     selectedSpace,
   );
+  const [firstCardPending, ...remainingCardPendings] = cardPendings;
   const optionalSpacePaymentPending = pendingActionForOptionalSpacePayment(selectedSpace, source);
   const boardInfluencePending = pendingActionForBoardInfluenceChoice(selectedSpace, source, effectedTarget);
   const boardTrashPending = pendingActionForBoardTrash(selectedSpace, source);
@@ -189,7 +190,7 @@ export function placeAgentAction(
     boardInfluencePending,
   ].filter((action): action is PendingAction => Boolean(action));
   const jessicaOtherMemoriesPending = pendingActionForJessicaOtherMemories(source, selectedSpace);
-  const jessicaRepeatDeferredWater = cardPending?.kind === "jessica-water-of-life" ? 1 : 0;
+  const jessicaRepeatDeferredWater = firstCardPending?.kind === "jessica-water-of-life" ? 1 : 0;
   const jessicaReverendMotherPending = pendingActionForReverendMotherJessicaRepeat(
     current,
     source,
@@ -197,19 +198,21 @@ export function placeAgentAction(
     jessicaRepeatDeferredWater,
   );
   const prioritizedCardPending =
-    cardPending?.kind === "jessica-spice-agony" || cardPending?.kind === "jessica-water-of-life"
-      ? cardPending
+    firstCardPending?.kind === "jessica-spice-agony" || firstCardPending?.kind === "jessica-water-of-life"
+      ? firstCardPending
       : undefined;
   const pendingActions = prioritizedCardPending || jessicaOtherMemoriesPending || jessicaReverendMotherPending
     ? [
         ...[prioritizedCardPending, jessicaOtherMemoriesPending, jessicaReverendMotherPending].filter((action): action is PendingAction => Boolean(action)),
         ...boardChoicePendings,
-        ...pendingActionsFor(spacePending, prioritizedCardPending ? undefined : cardPending, source.spies),
+        ...pendingActionsFor(spacePending, prioritizedCardPending ? undefined : firstCardPending, source.spies),
+        ...remainingCardPendings,
         ...[boardTrashPending].filter((action): action is PendingAction => Boolean(action)),
       ]
     : [
         ...boardChoicePendings,
-        ...pendingActionsFor(spacePending, cardPending, source.spies),
+        ...pendingActionsFor(spacePending, firstCardPending, source.spies),
+        ...remainingCardPendings,
         ...[boardTrashPending].filter((action): action is PendingAction => Boolean(action)),
       ];
   if (sietchTabrPending) {

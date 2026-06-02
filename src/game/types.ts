@@ -157,6 +157,12 @@ export type GameEffectSpec =
       };
     }
   | {
+      kind: "opponents-discard-cards";
+      selector: PlayerSelector;
+      amount: EffectAmountSpec;
+      source?: string;
+    }
+  | {
       kind: "pay-resource-for-influence";
       selector: PlayerSelector;
       resource: ResourceId;
@@ -594,6 +600,12 @@ export type PendingAction =
       source: string;
       amount: number;
       optional: boolean;
+    }
+  | {
+      kind: "discard-hand-card";
+      ownerId: string;
+      source: string;
+      remaining: number;
     }
   | {
       kind: "pay-resource-for-influence";

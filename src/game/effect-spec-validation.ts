@@ -323,6 +323,17 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     }
     return;
   }
+  if (effect.kind === "opponents-discard-cards") {
+    if (trigger !== "agent-play") {
+      throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
+    }
+    if (effect.selector !== "self") {
+      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
+    validateAmount(effect.amount);
+    validateSourceLabel("opponents-discard-cards source", effect.source);
+    return;
+  }
   if (effect.kind === "pay-resource-for-influence") {
     if (trigger !== "agent-play") {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);

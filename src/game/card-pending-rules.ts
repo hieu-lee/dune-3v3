@@ -15,6 +15,7 @@ import {
   resolveAgentDiscardCardForDraws,
   resolveAgentDiscardCardForInfluenceAndDraws,
   resolveAgentMoveCardToThroneRows,
+  resolveAgentOpponentsDiscardCards,
   resolveAgentPayResourceForContracts,
   resolveAgentPayResourceForDrawCards,
   resolveAgentPayResourceForInfluences,
@@ -255,6 +256,48 @@ function pendingActionForAgentDiscardCardForDraw(
       return pending;
     })
     .find((pending): pending is PendingAction => Boolean(pending));
+}
+
+function pendingActionsForAgentOpponentsDiscardCards(
+  card: Card,
+  source: Player,
+  state?: GameState,
+  target?: Player,
+): PendingAction[] {
+  if (!card.effects || !source.playArea.some((candidate) => candidate.id === card.id)) return [];
+  if (!state) return [];
+  const players = playersWithPendingCardEffect(state, source, target);
+  const effectState = { ...state, players };
+  const effects = resolveAgentOpponentsDiscardCards(card.effects, {
+    trigger: "agent-play",
+    source,
+    target,
+    state: effectState,
+  });
+  const discardCountsByOwner = new Map<string, number>();
+  const sourceLabelsByOwner = new Map<string, string[]>();
+  for (const effect of effects) {
+    if (effect.selector !== "self" || effect.amount <= 0) continue;
+    for (const player of effectState.players) {
+      if (player.team === source.team || player.hand.length === 0) continue;
+      discardCountsByOwner.set(player.id, (discardCountsByOwner.get(player.id) ?? 0) + effect.amount);
+      const sourceLabels = sourceLabelsByOwner.get(player.id) ?? [];
+      const sourceLabel = effect.source ?? card.name;
+      if (!sourceLabels.includes(sourceLabel)) sourceLabels.push(sourceLabel);
+      sourceLabelsByOwner.set(player.id, sourceLabels);
+    }
+  }
+  return effectState.players.flatMap((player): PendingAction[] => {
+    const discardCount = discardCountsByOwner.get(player.id) ?? 0;
+    if (discardCount <= 0 || player.hand.length === 0) return [];
+    const sourceLabels = sourceLabelsByOwner.get(player.id) ?? [card.name];
+    return [{
+      kind: "discard-hand-card",
+      ownerId: player.id,
+      source: sourceLabels.join(" / "),
+      remaining: Math.min(discardCount, player.hand.length),
+    }];
+  });
 }
 
 function pendingActionForAgentPayResourceForInfluence(
@@ -578,35 +621,39 @@ function pendingActionForAgentTrashSourceForTrade(
     .find((pending): pending is PendingAction => Boolean(pending));
 }
 
-export function pendingActionForCard(
+export function pendingActionsForCard(
   card: Card,
   source: Player,
   state?: GameState,
   target?: Player,
   space?: BoardSpace,
-): PendingAction | undefined {
+): PendingAction[] {
+  const typedPendings: PendingAction[] = [];
   const agentSpyPlacementPending = pendingActionForAgentSpyPlacement(card, source, state, target, space);
-  if (agentSpyPlacementPending) return agentSpyPlacementPending;
+  if (agentSpyPlacementPending) typedPendings.push(agentSpyPlacementPending);
   const agentDiscardInfluenceDrawPending = pendingActionForAgentDiscardCardForInfluenceAndDraw(card, source, state, target);
-  if (agentDiscardInfluenceDrawPending) return agentDiscardInfluenceDrawPending;
+  if (agentDiscardInfluenceDrawPending) typedPendings.push(agentDiscardInfluenceDrawPending);
   const agentDiscardDrawPending = pendingActionForAgentDiscardCardForDraw(card, source, state, target);
-  if (agentDiscardDrawPending) return agentDiscardDrawPending;
+  if (agentDiscardDrawPending) typedPendings.push(agentDiscardDrawPending);
+  const agentOpponentDiscardPendings = pendingActionsForAgentOpponentsDiscardCards(card, source, state, target);
+  typedPendings.push(...agentOpponentDiscardPendings);
   const agentPayResourceInfluencePending = pendingActionForAgentPayResourceForInfluence(card, source, state, target, space);
-  if (agentPayResourceInfluencePending) return agentPayResourceInfluencePending;
+  if (agentPayResourceInfluencePending) typedPendings.push(agentPayResourceInfluencePending);
   const agentPayResourceSandwormsPending = pendingActionForAgentPayResourceForSandworms(card, source, state, target, space);
-  if (agentPayResourceSandwormsPending) return agentPayResourceSandwormsPending;
+  if (agentPayResourceSandwormsPending) typedPendings.push(agentPayResourceSandwormsPending);
   const agentPayResourceContractsPending = pendingActionForAgentPayResourceForContracts(card, source, state, target);
-  if (agentPayResourceContractsPending) return agentPayResourceContractsPending;
+  if (agentPayResourceContractsPending) typedPendings.push(agentPayResourceContractsPending);
   const agentPayResourceDrawCardsPending = pendingActionForAgentPayResourceForDrawCards(card, source, state, target, space);
-  if (agentPayResourceDrawCardsPending) return agentPayResourceDrawCardsPending;
+  if (agentPayResourceDrawCardsPending) typedPendings.push(agentPayResourceDrawCardsPending);
   const agentPayTeamResourceVpPending = pendingActionForAgentPayTeamResourceForVp(card, source, state, target, space);
-  if (agentPayTeamResourceVpPending) return agentPayTeamResourceVpPending;
+  if (agentPayTeamResourceVpPending) typedPendings.push(agentPayTeamResourceVpPending);
   const agentThroneRowPending = pendingActionForAgentThroneRowMove(card, source, state, target);
-  if (agentThroneRowPending) return agentThroneRowPending;
+  if (agentThroneRowPending) typedPendings.push(agentThroneRowPending);
   const agentCommanderResourceSplitPending = pendingActionForAgentCommanderResourceSplit(card, source, state, target);
-  if (agentCommanderResourceSplitPending) return agentCommanderResourceSplitPending;
+  if (agentCommanderResourceSplitPending) typedPendings.push(agentCommanderResourceSplitPending);
   const agentTrashSourceForTradePending = pendingActionForAgentTrashSourceForTrade(card, source, state, target);
-  if (agentTrashSourceForTradePending) return agentTrashSourceForTradePending;
+  if (agentTrashSourceForTradePending) typedPendings.push(agentTrashSourceForTradePending);
+  if (typedPendings.length > 0) return typedPendings;
   if (
     isShaddamSignetRingCard(card) &&
     source.team === "shaddam" &&
@@ -615,13 +662,13 @@ export function pendingActionForCard(
     target.role === "Ally" &&
     source.playArea.some((candidate) => candidate.id === card.id && isShaddamSignetRingCard(candidate))
   ) {
-    return {
+    return [{
       kind: "shaddam-signet-ring",
       commanderId: source.id,
       allyId: target.id,
       cardId: card.id,
       source: "Emperor of the Known Universe",
-    };
+    }];
   }
   if (
     isGenericSignetRingCard(card) &&
@@ -637,7 +684,7 @@ export function pendingActionForCard(
     };
     const canAcquire = state ? irulanSignetAcquireCards(state, pending).length > 0 : false;
     const canTrash = state ? irulanSignetTrashableCards(state, pending).length > 0 : source.hand.length > 0;
-    return canAcquire || canTrash ? pending : undefined;
+    return canAcquire || canTrash ? [pending] : [];
   }
   if (
     isGenericSignetRingCard(card) &&
@@ -647,12 +694,12 @@ export function pendingActionForCard(
     playerTroopSupply(source) > 0 &&
     source.playArea.some((candidate) => candidate.id === card.id && isGenericSignetRingCard(candidate))
   ) {
-    return {
+    return [{
       kind: "jessica-spice-agony",
       ownerId: source.id,
       cardId: card.id,
       source: "Spice Agony",
-    };
+    }];
   }
   if (
     isGenericSignetRingCard(card) &&
@@ -661,14 +708,24 @@ export function pendingActionForCard(
     source.resources.spice + (state && space ? potentialDeferredMakerChoiceSpice(state, source, target, space) : 0) >= 1 &&
     source.playArea.some((candidate) => candidate.id === card.id && isGenericSignetRingCard(candidate))
   ) {
-    return {
+    return [{
       kind: "jessica-water-of-life",
       ownerId: source.id,
       cardId: card.id,
       source: "Water of Life",
-    };
+    }];
   }
-  return undefined;
+  return [];
+}
+
+export function pendingActionForCard(
+  card: Card,
+  source: Player,
+  state?: GameState,
+  target?: Player,
+  space?: BoardSpace,
+): PendingAction | undefined {
+  return pendingActionsForCard(card, source, state, target, space)[0];
 }
 
 export function pendingActionForJessicaOtherMemories(

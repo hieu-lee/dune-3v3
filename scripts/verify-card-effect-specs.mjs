@@ -205,6 +205,7 @@ try {
       "Captured Mentat",
       "Cargo Runner",
       "Chani, Clever Tactician",
+      "Covert Operation",
       "Double Agent",
       "Ecological Testing Station",
       "Fedaykin Stilltent",
@@ -613,6 +614,22 @@ try {
       )
     ),
     "Covert Operation should carry a reveal Solari spec",
+  );
+  assert.ok(
+    covertOperation.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.effects.some((effect) =>
+        effect.kind === "opponents-discard-cards" &&
+        effect.selector === "self" &&
+        effect.amount === 1
+      )
+    ),
+    "Covert Operation should carry a declarative Agent opponents-discard spec",
+  );
+  assert.equal(
+    hasAgentEffect(covertOperation, (effect) => effect.kind === "place-spies"),
+    false,
+    "Covert Operation should not treat its image-verified Reveal Solari icons as Agent spy placement",
   );
   assert.ok(
     beneGesseritOperative.effects?.some((spec) =>
@@ -1123,6 +1140,160 @@ try {
   assert.equal(covertOperationReveal.swords, 0, "Covert Operation should not reveal for strength");
   assert.deepEqual(covertOperationReveal.revealGain, { solari: 2 }, "Covert Operation should reveal for 2 Solari");
   assert.deepEqual(covertOperationReveal.printedRevealCards, [], "Covert Operation typed Reveal should not need manual fallback");
+  const covertSource = { ...p2, hand: [], playArea: [covertOperation] };
+  const covertOpponents = game.players.filter((player) => player.team !== covertSource.team);
+  const covertSameTeamAlly = game.players.find((player) => player.team === covertSource.team && player.id !== covertSource.id);
+  assert.ok(covertOpponents.length >= 2 && covertSameTeamAlly, "Covert Operation fixture should have opposing players and a teammate");
+  const covertDiscardA = { ...dagger, id: "covert-operation-discard-a" };
+  const covertDiscardA2 = { ...convincingArgument, id: "covert-operation-discard-a-2" };
+  const covertDiscardB = { ...convincingArgument, id: "covert-operation-discard-b" };
+  const covertSameTeamHandCard = { ...dagger, id: "covert-operation-same-team-hand" };
+  const covertFixture = {
+    ...game,
+    pendingAction: undefined,
+    pendingQueue: [],
+    players: game.players.map((player) => {
+      if (player.id === covertSource.id) return covertSource;
+      if (player.id === covertOpponents[0].id) return { ...player, hand: [covertDiscardA], discard: [] };
+      if (player.id === covertOpponents[1].id) return { ...player, hand: [covertDiscardB], discard: [] };
+      if (player.id === covertSameTeamAlly.id) return { ...player, hand: [covertSameTeamHandCard], discard: [] };
+      return { ...player, hand: [], discard: [] };
+    }),
+  };
+  const covertPendings = state.pendingActionsForCard(covertOperation, covertSource, covertFixture);
+  assert.deepEqual(
+    covertPendings.map((pending) => pending.kind),
+    ["discard-hand-card", "discard-hand-card"],
+    "Covert Operation should queue one hand-discard prompt for each opponent with a card",
+  );
+  assert.deepEqual(
+    covertPendings.map((pending) => pending.ownerId),
+    [covertOpponents[0].id, covertOpponents[1].id],
+    "Covert Operation discard prompts should target opposing-team players in table order",
+  );
+  assert.equal(covertPendings[0].remaining, 1, "Covert Operation should make each targeted opponent discard one card");
+  const covertQueued = {
+    ...covertFixture,
+    pendingAction: covertPendings[0],
+    pendingQueue: covertPendings.slice(1),
+  };
+  const covertFinishAttempt = state.finishPendingAction(covertQueued);
+  assert.equal(
+    covertFinishAttempt.pendingAction,
+    covertQueued.pendingAction,
+    "Mandatory Covert Operation hand discard should not be skippable through finishPendingAction",
+  );
+  const covertFirstResolved = state.resolveDiscardHandCardChoice(
+    covertQueued,
+    covertQueued.pendingAction,
+    covertDiscardA.id,
+  );
+  assert.equal(
+    playerById(covertFirstResolved, covertOpponents[0].id).discard.at(-1).id,
+    covertDiscardA.id,
+    "Covert Operation should discard the selected opponent card",
+  );
+  assert.equal(
+    covertFirstResolved.pendingAction?.ownerId,
+    covertOpponents[1].id,
+    "Covert Operation should advance to the next opponent discard prompt",
+  );
+  assert.deepEqual(
+    playerById(covertFirstResolved, covertSameTeamAlly.id).hand.map((card) => card.id),
+    [covertSameTeamHandCard.id],
+    "Covert Operation should not make same-team players discard",
+  );
+  const covertSecondResolved = state.resolveDiscardHandCardChoice(
+    covertFirstResolved,
+    covertFirstResolved.pendingAction,
+    covertDiscardB.id,
+  );
+  assert.equal(covertSecondResolved.pendingAction, undefined, "Covert Operation should clear pending after all opponents discard");
+  assert.equal(
+    playerById(covertSecondResolved, covertOpponents[1].id).discard.at(-1).id,
+    covertDiscardB.id,
+    "Covert Operation should resolve the queued second opponent discard",
+  );
+  assert.match(covertSecondResolved.log[0], /Covert Operation: discards Convincing Argument/);
+  const covertNoOpponentsWithCardsFixture = {
+    ...covertFixture,
+    players: covertFixture.players.map((player) =>
+      player.team !== covertSource.team ? { ...player, hand: [], discard: [] } : player
+    ),
+  };
+  assert.deepEqual(
+    state.pendingActionsForCard(covertOperation, covertSource, covertNoOpponentsWithCardsFixture),
+    [],
+    "Covert Operation should not queue discard prompts when no opponent has hand cards",
+  );
+  const stackedOpponentDiscardCard = {
+    ...covertOperation,
+    id: "effect-spec-stacked-opponent-discard-card",
+    name: "Effect Spec Stacked Opponent Discard",
+    effects: [agentSpec([
+      { kind: "opponents-discard-cards", selector: "self", amount: 1 },
+      { kind: "opponents-discard-cards", selector: "self", amount: 1 },
+    ])],
+  };
+  const stackedOpponentDiscardSource = {
+    ...covertSource,
+    playArea: [stackedOpponentDiscardCard],
+  };
+  const stackedOpponentDiscardFixture = {
+    ...covertFixture,
+    players: covertFixture.players.map((player) =>
+      player.id === stackedOpponentDiscardSource.id
+        ? stackedOpponentDiscardSource
+        : player.id === covertOpponents[0].id
+          ? { ...player, hand: [covertDiscardA, covertDiscardA2], discard: [] }
+          : player
+    ),
+  };
+  const stackedOpponentDiscardPendings = state.pendingActionsForCard(
+    stackedOpponentDiscardCard,
+    stackedOpponentDiscardSource,
+    stackedOpponentDiscardFixture,
+  );
+  assert.deepEqual(
+    stackedOpponentDiscardPendings.map((pending) => pending.ownerId),
+    [covertOpponents[0].id, covertOpponents[1].id],
+    "Stacked opponent-discard specs should aggregate into one capped pending action per opponent",
+  );
+  assert.deepEqual(
+    stackedOpponentDiscardPendings.map((pending) => pending.remaining),
+    [2, 1],
+    "Stacked opponent-discard specs should sum effects and cap each pending action by that opponent's hand size",
+  );
+  const spyAndOpponentDiscardCard = {
+    ...covertOperation,
+    id: "effect-spec-spy-and-opponent-discard-card",
+    name: "Effect Spec Spy And Opponent Discard",
+    effects: [agentSpec([
+      { kind: "place-spies", selector: "self", amount: 1 },
+      { kind: "opponents-discard-cards", selector: "self", amount: 1 },
+    ])],
+  };
+  const spyAndDiscardSource = {
+    ...covertSource,
+    playArea: [spyAndOpponentDiscardCard],
+    spies: 1,
+  };
+  const spyAndDiscardFixture = {
+    ...covertFixture,
+    spyPosts: {},
+    sharedSpyPosts: {},
+    players: covertFixture.players.map((player) => player.id === spyAndDiscardSource.id ? spyAndDiscardSource : player),
+  };
+  const spyAndDiscardPendings = state.pendingActionsForCard(
+    spyAndOpponentDiscardCard,
+    spyAndDiscardSource,
+    spyAndDiscardFixture,
+  );
+  assert.deepEqual(
+    spyAndDiscardPendings.map((pending) => pending.kind),
+    ["spy", "discard-hand-card", "discard-hand-card"],
+    "Typed card pending primitives should compose spy placement before opponent discard prompts",
+  );
   const fremenSupportCard = {
     ...convincingArgument,
     id: "effect-spec-fremen-bond-support",
@@ -2649,6 +2820,67 @@ try {
     () => state.applyCardAgentEffect(invalidDiscardDrawBonusAmountCard, p2, p2),
     /Invalid effect amount "-1"/,
     "Discard-for-draw specs should reject negative bonus draw amounts",
+  );
+  const revealOpponentDiscardCard = {
+    ...convincingArgument,
+    id: "effect-spec-reveal-opponent-discard-card",
+    name: "Effect Spec Reveal Opponent Discard",
+    effects: [revealSpec([{
+      kind: "opponents-discard-cards",
+      selector: "self",
+      amount: 1,
+    }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [revealOpponentDiscardCard], highCouncilSeat: false }),
+    /Unsupported effect "opponents-discard-cards" for reveal/,
+    "Opponent-discard specs should stay in Agent play until other trigger resolvers support them",
+  );
+  const invalidOpponentDiscardSelectorCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-opponent-discard-selector-card",
+    name: "Effect Spec Invalid Opponent Discard Selector",
+    effects: [agentSpec([{
+      kind: "opponents-discard-cards",
+      selector: "activated-ally",
+      amount: 1,
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidOpponentDiscardSelectorCard, p4, p2),
+    /Unsupported effect selector "activated-ally" for opponents-discard-cards/,
+    "Opponent-discard specs should reject activated Ally selectors",
+  );
+  const invalidOpponentDiscardAmountCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-opponent-discard-amount-card",
+    name: "Effect Spec Invalid Opponent Discard Amount",
+    effects: [agentSpec([{
+      kind: "opponents-discard-cards",
+      selector: "self",
+      amount: -1,
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidOpponentDiscardAmountCard, p2, p2),
+    /Invalid effect amount "-1"/,
+    "Opponent-discard specs should require non-negative discard amounts",
+  );
+  const invalidOpponentDiscardSourceCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-opponent-discard-source-card",
+    name: "Effect Spec Invalid Opponent Discard Source",
+    effects: [agentSpec([{
+      kind: "opponents-discard-cards",
+      selector: "self",
+      amount: 1,
+      source: "",
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidOpponentDiscardSourceCard, p2, p2),
+    /Invalid opponents-discard-cards source ""/,
+    "Opponent-discard specs should reject empty source labels",
   );
   const revealDeploymentBlockCard = {
     ...convincingArgument,

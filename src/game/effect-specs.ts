@@ -247,6 +247,23 @@ export function agentDiscardCardForDraw(
   ], conditions);
 }
 
+export function agentOpponentsDiscardCards(
+  amount: EffectAmountSpec,
+  options: {
+    source?: string;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return agentPlayEffects([
+    {
+      kind: "opponents-discard-cards",
+      selector: "self",
+      amount,
+      ...(options.source ? { source: options.source } : {}),
+    },
+  ], conditions);
+}
+
 export function agentPayResourceForInfluence(
   resource: ResourceId,
   cost: EffectAmountSpec,

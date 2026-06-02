@@ -19,7 +19,8 @@ These cards currently use typed Agent effect specs:
 - Reserve cards: Prepare The Way.
 - Muad'Dib Commander cards: Command Respect, Demand Attention, Desert Call, Signet Ring, Threaten Spice Production, Usul.
 - Emperor Commander cards: Critical Shipments, Demand Results, Devastating Assault, Imperial Tent, Signet Ring.
-- Imperium cards: Bene Gesserit Operative, Captured Mentat, Cargo Runner, Chani, Clever Tactician, Double Agent, Ecological Testing Station, Fedaykin Stilltent, Guild Envoy, Hidden Missive, Maker Keeper, Maula Pistol, Northern Watermaster, Paracompass, Reliable Informant, Space-time Folding, Wheels Within Wheels.
+- Imperium cards: Bene Gesserit Operative, Captured Mentat, Cargo Runner, Chani, Clever Tactician, Covert Operation, Double Agent, Ecological Testing Station, Fedaykin Stilltent, Guild Envoy, Hidden Missive, Maker Keeper, Maula Pistol, Northern Watermaster, Paracompass, Reliable Informant, Space-time Folding, Wheels Within Wheels.
+- Covert Operation uses the typed Agent `opponents-discard-cards` primitive, which queues mandatory hand-discard prompts for opposing-team players with cards in hand.
 - Ecological Testing Station uses the typed Agent `pay-resource-for-draw-cards` pending primitive for its "pay 2 water to draw 2 cards" choice.
 
 ## Bespoke Automated Cards
@@ -39,7 +40,7 @@ These cards are automated but still rely on explicit card or leader branches whi
 
 - `reveal-adjust` remains available for cards with `conditionalPersuasion` or `conditionalSwords`; no current Reserve or Imperium reveal card needs it.
 - Zero-reveal Reserve/Imperium cards without Reveal specs: The Spice Must Flow, Corrinth City, Delivery Agreement, Priority Contracts.
-- Imported Imperium Agent text that is only summarized in `play` remains manual until migrated into Agent effect specs; cards with costs, discard/trash choices, Influence gains, contract acquisition, spy placement, acquire bonuses, Recall Agent, or sandworm effects still need specific primitives before automatic generation.
+- Imported Imperium Agent text that is only summarized in `play` remains manual until migrated into Agent effect specs; cards with costs, discard/trash choices, Influence gains, contract acquisition, spy placement, acquire bonuses, Recall Agent, sandworm effects, or opponent effects beyond typed hand discard still need specific primitives before automatic generation.
 
 ## Missing Primitives
 
@@ -48,10 +49,10 @@ The largest current gaps are Agent and choice primitives:
 - Costs: Agent pay resources beyond typed draw-card/Influence/sandworm/contract/team-VP payments and Reveal strength/Reveal troop payments, discard card outside typed discard-for-draw/Influence-draw effects, non-trade trash card, lose Influence, recall spy.
 - Conditions: combat participation beyond current conflict-unit count checks.
 - Selectors: activated Ally outside routed troop recruitment, teammate, faction, board space, market card, reserve card, contract, hand/discard/play-area card.
-- Effects: deploy troops to conflict, variable retreat troops, gain/lose Influence, recall spy, acquire card, take/complete contract, trash/discard card, make opponents discard cards, gain VP, remove Shield Wall, remaining non-payment sandworm effects.
+- Effects: deploy troops to conflict, variable retreat troops, gain/lose Influence, recall spy, acquire card, take/complete contract, trash/discard card beyond typed self/opponent hand-discard shapes, gain VP, remove Shield Wall, remaining non-payment sandworm effects.
 - Choices: optional effect, pay-or-skip, choose one, choose N, non-resource split Commander/Ally rewards.
 
 ## Verification
 
-- `pnpm run verify:card-effect-specs` verifies generated fixed Reserve/Imperium reveal specs, Agent card draw/source-label/resource/recruit/spy-placement/post-placement/Intrigue draw/discard-for-draw/discard-for-Influence/resource-for-draw/resource-for-Influence/resource-for-sandworms/resource-for-contracts/team-resource-for-VP/trash-source-for-trade/deployment-block/Throne Row movement/Commander resource-split specs, condition-gated Imperium Agent resource/draw/recruit/spy migrations, current-Agent Maker-space and spy-post context, Reveal Fremen Bond trait checks, Reveal troop-retreat strength specs, Reveal trash-card strength specs, Reveal Influence-for-Intrigue specs, Reveal resource-for-strength and resource-for-troops payment specs, Reveal spy placement pending specs, legacy fallback, no double-counting, conditional Maker/space-icon/contract/spy/influence/conflict-unit/leader/alliance behavior, shared spy posts, and manual reveal fallback.
+- `pnpm run verify:card-effect-specs` verifies generated fixed Reserve/Imperium reveal specs, Agent card draw/source-label/resource/recruit/spy-placement/post-placement/Intrigue draw/discard-for-draw/discard-for-Influence/opponents-discard/resource-for-draw/resource-for-Influence/resource-for-sandworms/resource-for-contracts/team-resource-for-VP/trash-source-for-trade/deployment-block/Throne Row movement/Commander resource-split specs, condition-gated Imperium Agent resource/draw/recruit/spy migrations, current-Agent Maker-space and spy-post context, Reveal Fremen Bond trait checks, Reveal troop-retreat strength specs, Reveal trash-card strength specs, Reveal Influence-for-Intrigue specs, Reveal resource-for-strength and resource-for-troops payment specs, Reveal spy placement pending specs, legacy fallback, no double-counting, conditional Maker/space-icon/contract/spy/influence/conflict-unit/leader/alliance behavior, shared spy posts, and manual reveal fallback.
 - `pnpm run verify` includes the effect-spec verifier through `package.json`.

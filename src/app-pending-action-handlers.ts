@@ -22,6 +22,7 @@ import {
   resolveCommanderResourceSplitChoice,
   resolveConflictTie,
   resolveDiscardCardForDrawChoice,
+  resolveDiscardHandCardChoice,
   resolveDiscardCardForInfluenceAndDrawChoice,
   resolveIrulanSignetRingChoice,
   resolveBoardInfluenceChoice,
@@ -273,6 +274,10 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     runPending("discard-card-for-draw", (current, pending) =>
       maybeStartCombatPhase(skipDiscardCardForDraw(current, pending))
     );
+  const chooseDiscardHandCard = (discardCardId: string) =>
+    runPending("discard-hand-card", (current, pending) =>
+      maybeStartCombatPhase(resolveDiscardHandCardChoice(current, pending, discardCardId))
+    );
   const chooseLoseInfluenceForIntrigues = (faction: FactionId) =>
     runPending("lose-influence-for-intrigues", (current, pending) =>
       maybeStartCombatPhase(resolveLoseInfluenceForIntriguesChoice(current, pending, faction))
@@ -307,6 +312,7 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     chooseBoardInfluence,
     chooseConflictTieWinner,
     chooseDiscardCardForDraw,
+    chooseDiscardHandCard,
     chooseDiscardCardForInfluenceAndDraw,
     chooseIrulanSignet,
     chooseJessicaOtherMemories,

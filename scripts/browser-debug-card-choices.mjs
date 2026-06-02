@@ -203,6 +203,26 @@ export async function runCardChoicesSmoke({
     "Guild Envoy should draw two cards after discarding a Spacing Guild card",
   );
 
+  await setDebugGameAndWait(page, states.covertOperation);
+  pendingText = await page.locator(".pending-panel").innerText();
+  const covertOperationDiscardName = states.covertOperation.covertOperationDiscardName;
+  const covertOperationDiscardId = states.covertOperation.covertOperationDiscardId;
+  const covertOperationOpponentId = states.covertOperation.covertOperationOpponentId;
+  assert.match(pendingText, /Covert Operation/i);
+  assert.match(pendingText, new RegExp(escapeRegExp(covertOperationDiscardName)));
+  await screenshot(page, captures, "pending-covert-operation-opponent-discard.png");
+
+  await page.locator(".pending-panel").getByRole("button", { name: covertOperationDiscardName }).click();
+  await page.locator(".pending-panel").getByRole("button", { name: `Discard ${covertOperationDiscardName}` }).click();
+  await waitForNoPending(page);
+  after = await currentGame(page);
+  const covertOperationOpponentAfter = after.players.find((player) => player.id === covertOperationOpponentId);
+  assert.equal(
+    covertOperationOpponentAfter.discard.at(-1).id,
+    covertOperationDiscardId,
+    "Covert Operation should discard the selected opponent card",
+  );
+
   await setDebugGameAndWait(page, states.ecologicalTestingStation);
   pendingText = await page.locator(".pending-panel").innerText();
   const ecologicalTestingStationDrawOneId = states.ecologicalTestingStation.ecologicalTestingStationDrawOneId;
@@ -268,6 +288,8 @@ async function createCardChoiceStates(server, initialPlayableGame) {
   assert.ok(guildEnvoy, "Expected Guild Envoy Imperium card");
   const ecologicalTestingStation = data.imperiumDeck.find((card) => card.sourceId === 46);
   assert.ok(ecologicalTestingStation, "Expected Ecological Testing Station Imperium card");
+  const covertOperation = data.imperiumDeck.find((card) => card.sourceId === 35);
+  assert.ok(covertOperation, "Expected Covert Operation Imperium card");
   const spySpace = data.boardSpaces.find((space) => space.id === "high-council");
   assert.ok(spySpace, "Expected High Council spy placement space");
   const spyPlaceAfterRecallSpace = data.boardSpaces.find((space) => space.id === "secrets");
@@ -304,6 +326,11 @@ async function createCardChoiceStates(server, initialPlayableGame) {
   const ecologicalTestingStationDrawTwo = {
     ...data.allyStarterCards[1],
     id: "browser-ecological-testing-station-draw-two-card",
+  };
+  const covertOperationDiscard = {
+    ...data.allyStarterCards[0],
+    id: "browser-covert-operation-discard-card",
+    name: "Covert Operation Debug Discard",
   };
 
   const base = {
@@ -449,6 +476,38 @@ async function createCardChoiceStates(server, initialPlayableGame) {
     "pay-resource-for-draw-cards",
     "Expected Ecological Testing Station resource-for-draw pending action",
   );
+  const covertOperationOwner = base.players.find((player) => player.id === ownerId);
+  assert.ok(covertOperationOwner, "Expected Covert Operation owner");
+  const covertOperationSource = {
+    ...covertOperationOwner,
+    agentsReady: 0,
+    hand: [],
+    playArea: [covertOperation],
+  };
+  const covertOperationOpponent = base.players.find((player) => player.team !== covertOperationSource.team);
+  assert.ok(covertOperationOpponent, "Expected an opposing player for Covert Operation");
+  const covertOperationBase = {
+    ...base,
+    players: base.players.map((player) => {
+      if (player.id === ownerId) return covertOperationSource;
+      if (player.id === covertOperationOpponent.id) {
+        return { ...player, discard: [], hand: [covertOperationDiscard] };
+      }
+      return player.team !== covertOperationSource.team ? { ...player, hand: [] } : player;
+    }),
+  };
+  const covertOperationPendings = state.pendingActionsForCard(
+    covertOperation,
+    covertOperationSource,
+    covertOperationBase,
+  );
+  assert.equal(covertOperationPendings.length, 1, "Expected one Covert Operation opponent discard pending action");
+  assert.equal(covertOperationPendings[0].kind, "discard-hand-card", "Expected Covert Operation hand-discard pending action");
+  const covertOperationState = {
+    ...covertOperationBase,
+    pendingAction: covertOperationPendings[0],
+    pendingQueue: covertOperationPendings.slice(1),
+  };
 
   return {
     contractPublic: {
@@ -555,6 +614,12 @@ async function createCardChoiceStates(server, initialPlayableGame) {
       ...ecologicalTestingStationState,
       ecologicalTestingStationDrawOneId: ecologicalTestingStationDrawOne.id,
       ecologicalTestingStationDrawTwoId: ecologicalTestingStationDrawTwo.id,
+    },
+    covertOperation: {
+      ...covertOperationState,
+      covertOperationDiscardId: covertOperationDiscard.id,
+      covertOperationDiscardName: covertOperationDiscard.name,
+      covertOperationOpponentId: covertOperationOpponent.id,
     },
     capturedMentatReveal: {
       ...base,

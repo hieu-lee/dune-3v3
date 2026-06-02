@@ -29,6 +29,7 @@ import {
   agentDrawCards,
   agentDrawIntrigues,
   agentGainResource,
+  agentOpponentsDiscardCards,
   agentPayResourceForDrawCards,
   agentPlaceSpies,
   agentRecruitTroops,
@@ -283,7 +284,10 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
     ];
   }
   if (card.id === covertOperationSourceId) {
-    return [revealGainResource("solari", 2)];
+    return [
+      agentOpponentsDiscardCards(1),
+      revealGainResource("solari", 2),
+    ];
   }
   if (card.id === beneGesseritOperativeSourceId) {
     return [

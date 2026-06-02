@@ -125,6 +125,19 @@ export function plotSpendResource(
   return plotIntrigueEffects([{ kind: "spend-resource", selector: "self", resource, amount }], conditions, options);
 }
 
+export function plotTrashCard(
+  options: {
+    optional?: boolean;
+    zones?: TrashCardZone[];
+    excludeSource?: boolean;
+    requiredTrait?: string;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+  specOptions?: CardEffectSpecOptions,
+): CardEffectSpec {
+  return plotIntrigueEffects([{ kind: "trash-card", selector: "self", ...options }], conditions, specOptions);
+}
+
 export function plotResourceExchange(
   choiceId: string,
   spendResource: ResourceId,

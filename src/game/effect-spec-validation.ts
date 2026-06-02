@@ -317,12 +317,13 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     return;
   }
   if (effect.kind === "trash-card") {
-    if (trigger !== "reveal") {
+    if (trigger !== "reveal" && trigger !== "plot-intrigue") {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
     }
     if (effect.selector !== "self") {
       throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
     }
+    validateOptionalBoolean("trash-card optional", (effect as { optional?: unknown }).optional);
     if (effect.zones?.some((zone) => !supportedTrashZones.has(zone))) {
       throw new Error(`Unsupported trash-card zone "${effect.zones.find((zone) => !supportedTrashZones.has(zone))}"`);
     }
@@ -331,6 +332,17 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
       (typeof effect.requiredTrait !== "string" || effect.requiredTrait.trim().length === 0)
     ) {
       invalidSpecField("trash-card requiredTrait", effect.requiredTrait);
+    }
+    if (trigger === "plot-intrigue") {
+      if (effect.strengthReward !== undefined) {
+        throw new Error(`Unsupported trash-card strengthReward for ${trigger}`);
+      }
+      if (effect.spiceRewardCostThreshold !== undefined) {
+        throw new Error(`Unsupported trash-card spiceRewardCostThreshold for ${trigger}`);
+      }
+      if (effect.spiceReward !== undefined) {
+        throw new Error(`Unsupported trash-card spiceReward for ${trigger}`);
+      }
     }
     if (effect.strengthReward !== undefined) validateAmount(effect.strengthReward);
     if (effect.spiceRewardCostThreshold !== undefined) validateAmount(effect.spiceRewardCostThreshold);

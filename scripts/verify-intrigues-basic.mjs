@@ -686,6 +686,27 @@ export function verifyCunningPlotIntrigue({ cards, game, state }) {
     poorCunning,
     "Cunning paid branch should require 1 spice",
   );
+  const noTrashCunning = {
+    ...cunningFixture,
+    players: cunningFixture.players.map((candidate) =>
+      candidate.id === "p2"
+        ? {
+            ...candidate,
+            resources: { ...candidate.resources, spice: 1 },
+            hand: [],
+            deck: [],
+            discard: [],
+            playArea: [],
+            intrigues: [cunning],
+          }
+        : candidate,
+    ),
+  };
+  assert.equal(
+    state.playCunningPlotIntrigue(noTrashCunning, "p2", cunning.id, "paid-trash"),
+    noTrashCunning,
+    "Cunning paid branch should leave state unchanged when no card is trashable after drawing",
+  );
   const pendingCunning = {
     ...cunningFixture,
     pendingAction: { kind: "spy", ownerId: "p2", remaining: 1, source: "Test" },

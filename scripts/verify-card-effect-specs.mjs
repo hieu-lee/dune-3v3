@@ -163,6 +163,7 @@ try {
   const callToArms = data.intrigueCards.find((card) => card.name === "Call to Arms");
   const councilorsAmbition = data.intrigueCards.find((card) => card.name === "Councilor's Ambition");
   const contingencyPlan = data.intrigueCards.find((card) => card.name === "Contingency Plan");
+  const cunning = data.intrigueCards.find((card) => card.name === "Cunning");
   const departForArrakis = data.intrigueCards.find((card) => card.name === "Depart For Arrakis");
   const distraction = data.intrigueCards.find((card) => card.name === "Distraction");
   const intelligenceReport = data.intrigueCards.find((card) => card.name === "Intelligence Report");
@@ -238,7 +239,7 @@ try {
     wheelsWithinWheels,
   );
   assert.ok(commandRespect && prepareTheWay && spiceMustFlow && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
-  assert.ok(backedByChoam && callToArms && councilorsAmbition && contingencyPlan && departForArrakis && distraction && intelligenceReport && leverage && marketOpportunity && mercenaries && shaddamsFavor && strategicStockpiling);
+  assert.ok(backedByChoam && callToArms && councilorsAmbition && contingencyPlan && cunning && departForArrakis && distraction && intelligenceReport && leverage && marketOpportunity && mercenaries && shaddamsFavor && strategicStockpiling);
   assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && dutifulService && deliverSupplies && sietchTabr && spiceRefinery);
   assert.equal(revealSpecCards.length, 79, "Unexpected number of cards with declarative Reveal specs");
   assert.equal(
@@ -333,6 +334,111 @@ try {
     2,
     "Contingency Plan Plot spec should resolve its Solari gain",
   );
+  assert.ok(
+    cunning.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.choiceId === "draw" &&
+      spec.effects.some((effect) =>
+        effect.kind === "draw-cards" &&
+        effect.selector === "self" &&
+        effect.amount === 1
+      )
+    ),
+    "Cunning should carry a typed free Plot draw choice spec",
+  );
+  assert.ok(
+    cunning.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.choiceId === "paid-trash" &&
+      spec.effects.some((effect) =>
+        effect.kind === "spend-resource" &&
+        effect.selector === "self" &&
+        effect.resource === "spice" &&
+        effect.amount === 1
+      )
+    ),
+    "Cunning should carry a typed paid Plot spice spend choice spec",
+  );
+  assert.ok(
+    cunning.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.choiceId === "paid-trash" &&
+      spec.effects.some((effect) =>
+        effect.kind === "draw-cards" &&
+        effect.selector === "self" &&
+        effect.amount === 1
+      )
+    ),
+    "Cunning should carry a typed paid Plot draw choice spec",
+  );
+  assert.ok(
+    cunning.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.choiceId === "paid-trash" &&
+      spec.effects.some((effect) =>
+        effect.kind === "trash-card" &&
+        effect.selector === "self" &&
+        effect.optional === false
+      )
+    ),
+    "Cunning should carry a typed mandatory Plot trash-card choice spec",
+  );
+  const cunningNoChoiceResolved = effectResolver.resolveGameEffects(cunning.effects, {
+    trigger: "plot-intrigue",
+    source: p2,
+    state: game,
+  });
+  assert.equal(cunningNoChoiceResolved.cardsToDraw, 0, "Cunning Plot specs should not draw without a selected choice");
+  assert.deepEqual(
+    cunningNoChoiceResolved.spentResources,
+    {},
+    "Cunning Plot specs should not spend spice without a selected choice",
+  );
+  assert.deepEqual(
+    effectResolver.resolveTrashCardEffects(cunning.effects, {
+      trigger: "plot-intrigue",
+      source: p2,
+      state: game,
+    }),
+    [],
+    "Cunning Plot specs should not create a trash effect without a selected choice",
+  );
+  const cunningDrawResolved = effectResolver.resolveGameEffects(cunning.effects, {
+    trigger: "plot-intrigue",
+    choiceId: "draw",
+    source: p2,
+    state: game,
+  });
+  assert.equal(cunningDrawResolved.cardsToDraw, 1, "Cunning free Plot choice should draw 1 card");
+  assert.deepEqual(cunningDrawResolved.spentResources, {}, "Cunning free Plot choice should not spend spice");
+  assert.deepEqual(
+    effectResolver.resolveTrashCardEffects(cunning.effects, {
+      trigger: "plot-intrigue",
+      choiceId: "draw",
+      source: p2,
+      state: game,
+    }),
+    [],
+    "Cunning free Plot choice should not create a trash effect",
+  );
+  const cunningPaidResolved = effectResolver.resolveGameEffects(cunning.effects, {
+    trigger: "plot-intrigue",
+    choiceId: "paid-trash",
+    source: p2,
+    state: game,
+  });
+  assert.equal(cunningPaidResolved.spentResources.spice, 1, "Cunning paid Plot choice should spend 1 spice");
+  assert.equal(cunningPaidResolved.cardsToDraw, 1, "Cunning paid Plot choice should draw 1 card");
+  const cunningTrashEffects = effectResolver.resolveTrashCardEffects(cunning.effects, {
+    trigger: "plot-intrigue",
+    choiceId: "paid-trash",
+    source: p2,
+    state: game,
+  });
+  assert.equal(cunningTrashEffects.length, 1, "Cunning paid Plot choice should resolve one trash effect");
+  assert.equal(cunningTrashEffects[0]?.selector, "self", "Cunning trash effect should target the source player");
+  assert.equal(cunningTrashEffects[0]?.optional, false, "Cunning trash effect should be mandatory");
+  assert.equal(cunningTrashEffects[0]?.excludeSource, false, "Cunning trash effect should not exclude a source card");
   assert.ok(
     distraction.effects?.some((spec) =>
       spec.trigger === "plot-intrigue" &&
@@ -3051,7 +3157,37 @@ try {
   assert.throws(
     () => state.applyCardAgentEffect(agentTrashCard, p2, p2),
     /Unsupported effect "trash-card" for agent-play/,
-    "Trash-card specs should fail outside Reveal until an Agent pending-action resolver supports them",
+    "Trash-card specs should fail for Agent play until an Agent pending-action resolver supports them",
+  );
+  const invalidTrashOptionalCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-trash-optional-card",
+    name: "Effect Spec Invalid Trash Optional",
+    effects: [plotSpec([{ kind: "trash-card", selector: "self", optional: "yes" }])],
+  };
+  assert.throws(
+    () => effectResolver.resolveTrashCardEffects(invalidTrashOptionalCard.effects, {
+      trigger: "plot-intrigue",
+      source: p2,
+      state: game,
+    }),
+    /Invalid trash-card optional "yes"/,
+    "Plot trash-card specs should require optional to be boolean when present",
+  );
+  const invalidPlotTrashStrengthCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-plot-trash-strength-card",
+    name: "Effect Spec Invalid Plot Trash Strength",
+    effects: [plotSpec([{ kind: "trash-card", selector: "self", strengthReward: 1, optional: true }])],
+  };
+  assert.throws(
+    () => effectResolver.resolveTrashCardEffects(invalidPlotTrashStrengthCard.effects, {
+      trigger: "plot-intrigue",
+      source: p2,
+      state: game,
+    }),
+    /Unsupported trash-card strengthReward for plot-intrigue/,
+    "Plot trash-card specs should reject reveal/combat reward metadata until that pending path supports it",
   );
   const invalidTrashZoneCard = {
     ...convincingArgument,

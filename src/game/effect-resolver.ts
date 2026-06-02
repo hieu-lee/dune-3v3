@@ -75,7 +75,7 @@ export type RevealRetreatTroopsForStrength = {
   optional: boolean;
 };
 
-export type RevealTrashCardEffect = {
+export type TrashCardEffect = {
   selector: PlayerSelector;
   optional: boolean;
   zones?: TrashCardZone[];
@@ -85,6 +85,8 @@ export type RevealTrashCardEffect = {
   spiceRewardCostThreshold?: number;
   spiceReward?: number;
 };
+
+export type RevealTrashCardEffect = TrashCardEffect;
 
 export type RevealLoseInfluenceForIntrigues = {
   selector: PlayerSelector;
@@ -902,13 +904,13 @@ export function resolveRevealRetreatTroopsForStrength(
   });
 }
 
-export function resolveRevealTrashCardEffects(
+export function resolveTrashCardEffects(
   specs: CardEffectSpec[] | undefined,
   context: GameEffectContext,
-): RevealTrashCardEffect[] {
+): TrashCardEffect[] {
   specs?.forEach(validateSpec);
   return (specs ?? []).flatMap((spec) => {
-    if (spec.trigger !== "reveal") return [];
+    if (spec.trigger !== context.trigger) return [];
     if (!specApplies(spec, context)) return [];
     return spec.effects
       .filter((effect) => effect.kind === "trash-card")
@@ -925,6 +927,13 @@ export function resolveRevealTrashCardEffects(
         spiceReward: effect.spiceReward === undefined ? undefined : amountFor(effect.spiceReward, context.source),
       }));
   });
+}
+
+export function resolveRevealTrashCardEffects(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): RevealTrashCardEffect[] {
+  return resolveTrashCardEffects(specs, { ...context, trigger: "reveal" });
 }
 
 export function resolveRevealLoseInfluenceForIntrigues(

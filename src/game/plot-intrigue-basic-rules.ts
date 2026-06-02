@@ -8,14 +8,10 @@ import {
   isManipulateIntrigue,
 } from "./card-identifiers";
 import {
-  drawCards,
-} from "./deck-utils";
-import {
   acquirableCardsForPending,
   activatedAllyEffectOwner,
 } from "./market-rules";
 import { playTypedPlotIntrigue } from "./plot-intrigue-effect-rules";
-import { trashableCards } from "./trash-rules";
 import type {
   GameState,
   PendingAction,
@@ -187,45 +183,19 @@ export function playCunningPlotIntrigue(
   intrigueId: string,
   choice: CunningPlotChoice,
 ): GameState {
-  if (state.phase !== "playing" || state.pendingAction || state.pendingQueue.length > 0) return state;
-  const player = state.players[state.activeSeat];
-  if (!player || player.id !== playerId) return state;
-  const intrigue = player.intrigues.find((card) => card.id === intrigueId);
-  if (!intrigue || !isCunningIntrigue(intrigue)) return state;
   if (choice !== "draw" && choice !== "paid-trash") return state;
-  if (choice === "paid-trash" && player.resources.spice < 1) return state;
 
-  let cardsDrawn = 0;
-  let canTrashAfterDraw = false;
-  const players = state.players.map((candidate) => {
-    if (candidate.id !== player.id) return candidate;
-    const withoutIntrigue = {
-      ...candidate,
-      resources: {
-        ...candidate.resources,
-        spice: candidate.resources.spice - (choice === "paid-trash" ? 1 : 0),
-      },
-      intrigues: candidate.intrigues.filter((card) => card.id !== intrigue.id),
-    };
-    const drawn = drawCards(withoutIntrigue, withoutIntrigue.hand.length + 1);
-    cardsDrawn = drawn.hand.length - withoutIntrigue.hand.length;
-    canTrashAfterDraw = trashableCards(drawn).length > 0;
-    return drawn;
-  });
-  if (choice === "paid-trash" && !canTrashAfterDraw) return state;
-
-  const trashPending: PendingAction | undefined = choice === "paid-trash"
-    ? { kind: "trash-card", ownerId: player.id, source: "Cunning", optional: false }
-    : undefined;
-  const cardText = cardsDrawn === 1 ? "1 card" : `${cardsDrawn} cards`;
-  const log = choice === "paid-trash"
-    ? `${player.leader} plays Cunning, spends 1 spice, draws ${cardText}, and must trash 1 card.`
-    : `${player.leader} plays Cunning and draws ${cardText}.`;
-  return {
-    ...state,
-    players,
-    intrigueDiscard: [...state.intrigueDiscard, intrigue],
-    pendingAction: trashPending,
-    log: [log, ...state.log],
-  };
+  return playTypedPlotIntrigue(
+    state,
+    playerId,
+    intrigueId,
+    isCunningIntrigue,
+    (player, _contractPending, _activatedAlly, resolved, outcome) => {
+      const cardText = outcome.cardsDrawn === 1 ? "1 card" : `${outcome.cardsDrawn} cards`;
+      return (resolved.spentResources.spice ?? 0) > 0
+        ? `${player.leader} plays Cunning, spends 1 spice, draws ${cardText}, and must trash 1 card.`
+        : `${player.leader} plays Cunning and draws ${cardText}.`;
+    },
+    { choiceId: choice },
+  );
 }

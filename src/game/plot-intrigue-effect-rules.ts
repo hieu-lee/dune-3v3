@@ -1,9 +1,10 @@
 import { drawCards } from "./deck-utils";
-import { resolveGameEffects, resolveTakeContracts } from "./effect-resolver";
+import { resolveGameEffects, resolveTakeContracts, resolveTrashCardEffects } from "./effect-resolver";
 import { drawIntrigueCards } from "./intrigue-deck";
 import { adjustInfluence } from "./leader-rewards";
 import { activatedAllyEffectOwner } from "./market-rules";
 import { pendingActionForSpyPlacements } from "./spy-effect-pending-rules";
+import { trashableCardsForPending } from "./trash-rules";
 import type {
   FactionId,
   GameState,
@@ -24,6 +25,8 @@ type PlayTypedPlotIntrigueOptions = {
 type TypedPlotIntrigueOutcome = {
   cardsDrawn: number;
 };
+
+type TrashCardPendingAction = Extract<PendingAction, { kind: "trash-card" }>;
 
 function hasResourceGains(gain: Partial<Resources>) {
   return resourceIds.some((resource) => (gain[resource] ?? 0) > 0);
@@ -80,6 +83,23 @@ function publicContractPendingFor(
   };
 }
 
+function trashCardPendingFor(
+  player: Player,
+  intrigue: IntrigueCard,
+  effect: ReturnType<typeof resolveTrashCardEffects>[number] | undefined,
+): TrashCardPendingAction | undefined {
+  if (!effect || effect.selector !== "self") return undefined;
+  return {
+    kind: "trash-card",
+    ownerId: player.id,
+    source: intrigue.name,
+    optional: effect.optional,
+    ...(effect.zones ? { zones: effect.zones } : {}),
+    ...(effect.excludeSource ? { excludeCardId: intrigue.id } : {}),
+    ...(effect.requiredTrait ? { requiredTrait: effect.requiredTrait } : {}),
+  };
+}
+
 export function playTypedPlotIntrigue(
   state: GameState,
   playerId: string,
@@ -114,8 +134,11 @@ export function playTypedPlotIntrigue(
   };
   const resolved = resolveGameEffects(intrigue.effects, context);
   const contractEffects = resolveTakeContracts(intrigue.effects, context);
+  const trashEffects = resolveTrashCardEffects(intrigue.effects, context);
   if (contractEffects.length > 1) throw new Error("Unsupported multiple Plot Intrigue take-contracts effects");
+  if (trashEffects.length > 1) throw new Error("Unsupported multiple Plot Intrigue trash-card effects");
   const [contractEffect] = contractEffects;
+  const [trashEffect] = trashEffects;
   const contractPending = publicContractPendingFor(state, player, intrigue, contractEffect);
   const spyPending = pendingActionForSpyPlacements(intrigue.name, player, resolved.spyPlacements, state);
   if (resolved.activatedAlly.spyPlacements.length > 0) {
@@ -143,13 +166,14 @@ export function playTypedPlotIntrigue(
     !hasIntrigueDraw &&
     !hasAcquireRecruitBonus &&
     !contractPending &&
-    !spyPending
+    !spyPending &&
+    !trashEffect
   ) {
     return state;
   }
-  const pendingActions = [contractPending, spyPending].filter((action): action is PendingAction => Boolean(action));
 
   const outcome: TypedPlotIntrigueOutcome = { cardsDrawn: 0 };
+  let sourceAfterEffects: Player | undefined;
   const players = state.players.map((candidate) => {
     if (candidate.id === player.id) {
       let next = {
@@ -170,6 +194,7 @@ export function playTypedPlotIntrigue(
         next = drawCards(next, handSize + resolved.cardsToDraw);
         outcome.cardsDrawn = next.hand.length - handSize;
       }
+      sourceAfterEffects = next;
       return next;
     }
     return activatedAlly && candidate.id === activatedAlly.id
@@ -179,6 +204,14 @@ export function playTypedPlotIntrigue(
         }
       : candidate;
   });
+  const trashPending = trashCardPendingFor(sourceAfterEffects ?? player, intrigue, trashEffect);
+  const canResolveTrash = trashPending && trashableCardsForPending(sourceAfterEffects ?? player, trashPending).length > 0;
+  if (trashPending && !canResolveTrash && !trashPending.optional) return state;
+  const pendingActions = [
+    contractPending,
+    spyPending,
+    canResolveTrash ? trashPending : undefined,
+  ].filter((action): action is PendingAction => Boolean(action));
   const immediateState = {
     ...state,
     players,

@@ -10,6 +10,7 @@ import {
   contingencyPlanSourceId,
   councilorsAmbitionSourceId,
   covertOperationSourceId,
+  cunningSourceId,
   dangerousRhetoricSourceId,
   desertPowerSourceId,
   distractionSourceId,
@@ -90,6 +91,7 @@ import {
   plotResourceExchange,
   plotSpendResource,
   plotTakeContracts,
+  plotTrashCard,
   revealGainPersuasion,
   revealPlaceSpies,
   revealGainResource,
@@ -866,6 +868,14 @@ function intrigueCardEffects(card: HubCard): CardEffectSpec[] | undefined {
   }
   if (card.id === contingencyPlanSourceId) {
     return [plotGainResource("solari", 2)];
+  }
+  if (card.id === cunningSourceId) {
+    return [
+      plotDrawCards(1, undefined, { choiceId: "draw" }),
+      plotSpendResource("spice", 1, undefined, { choiceId: "paid-trash" }),
+      plotDrawCards(1, undefined, { choiceId: "paid-trash" }),
+      plotTrashCard({ optional: false }, undefined, { choiceId: "paid-trash" }),
+    ];
   }
   if (card.id === distractionSourceId) {
     return [

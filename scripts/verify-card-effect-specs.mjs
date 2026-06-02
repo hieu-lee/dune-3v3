@@ -28,6 +28,10 @@ function hasRevealSpec(card) {
   return card.effects?.some((spec) => spec.trigger === "reveal") ?? false;
 }
 
+function hasAcquireSpec(card) {
+  return card.effects?.some((spec) => spec.trigger === "acquire") ?? false;
+}
+
 function hasAgentPlaySpec(card) {
   return card.effects?.some((spec) => spec.trigger === "agent-play") ?? false;
 }
@@ -120,6 +124,7 @@ try {
   const guildEnvoy = data.imperiumDeck.find((card) => card.name === "Guild Envoy");
   const wheelsWithinWheels = data.imperiumDeck.find((card) => card.name === "Wheels Within Wheels");
   const prepareTheWay = data.reserveMarket.find((card) => card.sourceId === 537);
+  const spiceMustFlow = data.reserveMarket.find((card) => card.sourceId === 538);
   const commandRespect = data.muadDibCommanderCards.find((card) => card.name === "Command Respect");
   const limitedLandsraadAccess = data.muadDibCommanderCards.find((card) => card.name === "Limited Landsraad Access");
   const demandAttention = data.muadDibCommanderCards.find((card) => card.name === "Demand Attention");
@@ -169,7 +174,7 @@ try {
     guildEnvoy &&
     wheelsWithinWheels,
   );
-  assert.ok(commandRespect && prepareTheWay && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
+  assert.ok(commandRespect && prepareTheWay && spiceMustFlow && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
   assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && dutifulService && deliverSupplies && sietchTabr && spiceRefinery);
   assert.equal(revealSpecCards.length, 79, "Unexpected number of cards with declarative Reveal specs");
   assert.equal(
@@ -197,6 +202,30 @@ try {
       "The Spice Must Flow",
     ],
     "Only zero-reveal reserve/Imperium cards should lack declarative Reveal specs",
+  );
+  assert.deepEqual(
+    marketAndImperiumCards.filter(hasAcquireSpec).map((card) => card.name).sort(),
+    ["The Spice Must Flow"],
+    "Only The Spice Must Flow should currently carry a declarative Acquire spec",
+  );
+  assert.ok(
+    spiceMustFlow.effects?.some((spec) =>
+      spec.trigger === "acquire" &&
+      spec.effects.some((effect) => effect.kind === "gain-vp" && effect.selector === "self" && effect.amount === 1)
+    ),
+    "The Spice Must Flow should use a typed acquire VP effect",
+  );
+  assert.ok(
+    spiceMustFlow.effects?.some((spec) =>
+      spec.trigger === "acquire" &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-resource" &&
+        effect.selector === "self" &&
+        effect.resource === "spice" &&
+        effect.amount === 1
+      )
+    ),
+    "The Spice Must Flow should use a typed acquire spice effect",
   );
   assert.deepEqual(
     marketAndImperiumCards.filter(hasAgentPlaySpec).map((card) => card.name).sort(),
@@ -1378,6 +1407,37 @@ try {
     () => turnActions.revealTurnPlan({ ...p2, hand: [negativeAmountCard], highCouncilSeat: false }),
     /Invalid effect amount "-1"/,
     "Gain effect amounts should be non-negative integers",
+  );
+  const invalidRevealVpCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-reveal-vp-card",
+    name: "Effect Spec Invalid Reveal VP",
+    effects: [revealSpec([{ kind: "gain-vp", selector: "self", amount: 1 }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [invalidRevealVpCard], highCouncilSeat: false }),
+    /Unsupported effect "gain-vp" for reveal/,
+    "Acquire VP effects should not silently run during Reveal",
+  );
+  const invalidAcquirePersuasionCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-acquire-persuasion-card",
+    name: "Effect Spec Invalid Acquire Persuasion",
+    cost: 0,
+    effects: [{ trigger: "acquire", effects: [{ kind: "gain-persuasion", selector: "self", amount: 1 }] }],
+  };
+  const invalidAcquireFixtureBase = withActivePlayer(game, p2.id, () => ({
+    revealed: true,
+  }));
+  const invalidAcquireFixture = {
+    ...invalidAcquireFixtureBase,
+    imperiumRow: [invalidAcquirePersuasionCard],
+    marketDeck: [],
+  };
+  assert.throws(
+    () => state.acquireMarketCard(invalidAcquireFixture, p2.id, invalidAcquirePersuasionCard.id),
+    /Unsupported effect "gain-persuasion" for acquire/,
+    "Acquire specs should reject non-acquire reward effect kinds",
   );
   const fractionalAmountCard = {
     ...convincingArgument,

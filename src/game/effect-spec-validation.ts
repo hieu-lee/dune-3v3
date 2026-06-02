@@ -158,11 +158,24 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
   if (effect.selector === "activated-ally" && trigger !== "agent-play") {
     throw new Error(`Unsupported effect selector "${effect.selector}" for ${trigger}`);
   }
+  if (trigger === "acquire" && effect.kind !== "gain-resource" && effect.kind !== "gain-vp") {
+    throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
+  }
   if (effect.kind === "gain-resource") {
     if (!supportedResources.has(effect.resource)) {
       throw new Error(`Unsupported effect resource "${effect.resource}"`);
     }
     validateSourceLabel("gain-resource source", effect.source);
+    validateAmount(effect.amount);
+    return;
+  }
+  if (effect.kind === "gain-vp") {
+    if (trigger !== "acquire") {
+      throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
+    }
+    if (effect.selector !== "self") {
+      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
     validateAmount(effect.amount);
     return;
   }

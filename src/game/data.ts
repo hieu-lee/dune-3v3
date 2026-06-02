@@ -24,6 +24,8 @@ import {
   wheelsWithinWheelsSourceId,
 } from "./card-identifiers";
 import {
+  acquireGainResource,
+  acquireGainVp,
   agentDiscardCardForDraw,
   agentDiscardCardForInfluenceAndDraw,
   agentDrawCards,
@@ -410,6 +412,12 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
       agentGainResource("spice", 1, [hasInfluence("spacing", 2)]),
       revealGainPersuasion(1),
       revealPlaceSpies(1, { mustPlace: true }),
+    ];
+  }
+  if (card.id === spiceMustFlowSourceId) {
+    return [
+      acquireGainVp(1),
+      acquireGainResource("spice", 1),
     ];
   }
   return undefined;

@@ -228,6 +228,7 @@ export type GameEffectResult = PlayerEffectResult & {
   activatedAlly: PlayerEffectResult;
   persuasion: number;
   swords: number;
+  vp: number;
 };
 
 const emptyPlayerEffectResult: PlayerEffectResult = {
@@ -248,6 +249,7 @@ const emptyEffectResult: GameEffectResult = {
   revealGain: {},
   spyPlacements: [],
   swords: 0,
+  vp: 0,
   activatedAlly: emptyPlayerEffectResult,
 };
 
@@ -516,6 +518,13 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
     const amount = amountFor(effect.amount, context.source);
     return { ...result, swords: result.swords + amount };
   }
+  if (effect.kind === "gain-vp") {
+    if (effect.selector !== "self") {
+      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
+    const amount = amountFor(effect.amount, context.source);
+    return { ...result, vp: result.vp + amount };
+  }
   if (effect.kind === "draw-cards") {
     if (effect.selector !== "self") {
       throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
@@ -650,6 +659,7 @@ function mergeEffectResult(result: GameEffectResult, next: GameEffectResult): Ga
     ),
     spyPlacements: [...result.spyPlacements, ...next.spyPlacements],
     swords: result.swords + next.swords,
+    vp: result.vp + next.vp,
     activatedAlly: mergePlayerEffectResult(result.activatedAlly, next.activatedAlly),
   };
 }
@@ -1079,6 +1089,7 @@ function legacyRevealResult(card: Card): GameEffectResult {
     revealGain: card.revealGain ? { ...card.revealGain } : {},
     spyPlacements: [],
     swords: card.swords,
+    vp: 0,
     activatedAlly: emptyPlayerEffectResult,
   };
 }
@@ -1099,4 +1110,31 @@ export function resolveCardRevealEffects(
       : legacyRevealResult(card);
     return mergeEffectResult(result, cardResult);
   }, emptyEffectResult);
+}
+
+function legacyAcquireResult(card: Card): GameEffectResult {
+  return {
+    cardsToDraw: 0,
+    blocksDeploymentsThisTurn: false,
+    intriguesToDraw: 0,
+    recruitedTroops: 0,
+    persuasion: 0,
+    revealGain: {},
+    spyPlacements: [],
+    swords: 0,
+    vp: card.acquired ?? 0,
+    activatedAlly: emptyPlayerEffectResult,
+  };
+}
+
+export function resolveCardAcquireEffects(
+  card: Card,
+  source: Player,
+  state?: EffectResolverState,
+): GameEffectResult {
+  card.effects?.forEach(validateSpec);
+  const acquireSpecs = card.effects?.filter((spec) => spec.trigger === "acquire");
+  return acquireSpecs && acquireSpecs.length > 0
+    ? resolveGameEffects(acquireSpecs, { trigger: "acquire", source, state })
+    : legacyAcquireResult(card);
 }

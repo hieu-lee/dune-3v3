@@ -175,6 +175,8 @@ try {
   assert.match(chani.reveal, /Fremen Bond.*\+2 persuasion.*retreat two troops.*4 strength/i);
   const prepareTheWay = data.reserveMarket.find((card) => card.sourceId === 537);
   assert.ok(prepareTheWay, "Reserve market should include Prepare The Way");
+  const spiceMustFlow = data.reserveMarket.find((card) => card.sourceId === 538);
+  assert.ok(spiceMustFlow, "Reserve market should include The Spice Must Flow");
   assert.equal(state.isPrepareTheWayCard(prepareTheWay), true, "Prepare The Way should be recognized");
   assert.deepEqual(
     data.reserveMarket.map((card) => card.sourceId),
@@ -192,6 +194,21 @@ try {
   assert.deepEqual(prepareTheWay.traits, ["Faction: Bene Gesserit"], "Prepare The Way should keep its Bene Gesserit trait");
   assert.match(prepareTheWay.play, /2 or more Bene Gesserit Influence.*draw 1 card/i);
   assert.match(prepareTheWay.reveal, /\+2 persuasion/i);
+  assert.equal(spiceMustFlow.acquired, 1, "The Spice Must Flow should keep its legacy acquisition VP display");
+  assert.ok(
+    spiceMustFlow.effects?.some((spec) =>
+      spec.trigger === "acquire" &&
+      spec.effects.some((effect) => effect.kind === "gain-vp" && effect.amount === 1)
+    ),
+    "The Spice Must Flow should model its VP as a typed acquire effect",
+  );
+  assert.ok(
+    spiceMustFlow.effects?.some((spec) =>
+      spec.trigger === "acquire" &&
+      spec.effects.some((effect) => effect.kind === "gain-resource" && effect.resource === "spice" && effect.amount === 1)
+    ),
+    "The Spice Must Flow should model its acquire spice as a typed acquire effect",
+  );
   for (const name of ["Bene Gesserit Operative", "Cargo Runner", "Chani, Clever Tactician", "Maker Keeper", "Maula Pistol", "Northern Watermaster", "Paracompass"]) {
     const card = data.imperiumDeck.find((candidate) => candidate.name === name);
     assert.ok(card?.effects?.some((spec) => spec.trigger === "agent-play"), `${name} should use a structured Agent effect`);
@@ -420,6 +437,54 @@ try {
     prepareBought.reserveMarket.map((card) => card.sourceId),
     [537, 538],
     "Buying Prepare The Way should leave the reserve stack available",
+  );
+
+  const spiceBuyFixture = withActivePlayer(game, p2.id, (player) => ({
+    revealed: true,
+    persuasion: 9,
+    resources: { ...player.resources, spice: 0 },
+    vp: 0,
+  }));
+  const spiceBought = state.acquireMarketCard(spiceBuyFixture, p2.id, spiceMustFlow.id);
+  const spiceBuyer = playerById(spiceBought, p2.id);
+  assert.equal(spiceBuyer.persuasion, 0, "The Spice Must Flow should spend 9 persuasion");
+  assert.equal(spiceBuyer.vp, 1, "The Spice Must Flow should award exactly one VP through acquire specs");
+  assert.equal(spiceBuyer.resources.spice, 1, "The Spice Must Flow should award its acquire spice bonus");
+  assert.equal(spiceBought.turnSpiceGains[p2.id], 1, "The Spice Must Flow acquire spice should count as turn spice gain");
+  assert.equal(spiceBuyer.discard.at(-1).sourceId, 538, "The Spice Must Flow should go to discard when bought");
+  assert.notEqual(
+    spiceBuyer.discard.at(-1).id,
+    spiceMustFlow.id,
+    "The Spice Must Flow reserve acquisitions should create a physical card copy",
+  );
+  assert.match(spiceBought.log[0], /acquires The Spice Must Flow for 1 VP and gains 1 spice/);
+
+  const spiceAcquirePending = {
+    kind: "acquire-card",
+    ownerId: p2.id,
+    source: "Verifier Acquire",
+    maxCost: 9,
+    destination: "hand",
+  };
+  const spicePendingFixtureBase = withActivePlayer(game, p2.id, (player) => ({
+    resources: { ...player.resources, spice: 0 },
+    vp: 0,
+  }));
+  const spicePendingFixture = {
+    ...spicePendingFixtureBase,
+    pendingAction: spiceAcquirePending,
+    pendingQueue: [],
+  };
+  const spicePendingAcquired = state.acquireCardForPending(spicePendingFixture, spiceAcquirePending, spiceMustFlow.id);
+  const spicePendingOwner = playerById(spicePendingAcquired, p2.id);
+  assert.equal(spicePendingOwner.vp, 1, "Acquire-card pending actions should award The Spice Must Flow VP");
+  assert.equal(spicePendingOwner.resources.spice, 1, "Acquire-card pending actions should award The Spice Must Flow spice");
+  assert.equal(spicePendingAcquired.turnSpiceGains[p2.id], 1, "Acquire-card pending spice should count as turn spice gain");
+  assert.equal(spicePendingOwner.hand.at(-1).sourceId, 538, "Acquire-card pending should honor the requested destination");
+  assert.equal(spicePendingAcquired.pendingAction, undefined, "Acquire-card pending should advance after acquisition");
+  assert.match(
+    spicePendingAcquired.log[0],
+    /acquires The Spice Must Flow to their hand from Verifier Acquire for 1 VP and gains 1 spice/,
   );
 
   const prepareDrawCard = { ...calculusTrashTarget, id: "prepare-way-draw-target" };

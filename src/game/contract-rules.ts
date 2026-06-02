@@ -1,9 +1,13 @@
 import {
   addAcquiredCard,
+  acquireRewardParts,
   callToArmsRecruitOwner,
+  formatAcquireOutcome,
+  recordAcquireSpiceGain,
 } from "./market-rules";
 import {
   resolveAgentPayResourceForContracts,
+  resolveCardAcquireEffects,
 } from "./effect-resolver";
 import { advancePendingAction } from "./pending-actions";
 import type {
@@ -295,10 +299,11 @@ export function resolveAcquireCardForPending(
     : { valid: true, owner: undefined };
   if (!callToArmsRecruit.valid) return state;
   const recruitOwner = callToArmsRecruit.owner;
+  const acquireReward = resolveCardAcquireEffects(card, owner, state);
   const players = state.players.map((player) => {
     let next = player;
     if (player.id === owner.id) {
-      next = addAcquiredCard(player, card, Boolean(reserveCard), pending.destination);
+      next = addAcquiredCard(player, card, Boolean(reserveCard), pending.destination, 0, acquireReward);
     }
     if (recruitOwner && player.id === recruitOwner.id) {
       next = { ...next, garrison: next.garrison + 1 };
@@ -306,23 +311,29 @@ export function resolveAcquireCardForPending(
     return next;
   });
   const destinationText = pending.destination === "hand" ? "hand" : "discard pile";
-  const recruitText = recruitOwner
+  const recruitPart = recruitOwner
     ? recruitOwner.id === owner.id
-      ? " and recruits 1 troop"
-      : ` and ${recruitOwner.leader} recruits 1 troop`
-    : "";
-  return finishPendingResolution({
-    ...state,
-    players,
-    imperiumRow,
-    marketDeck,
-    throneRow,
-    ...advancePendingAction(state),
-    log: [
-      `${owner.leader} acquires ${card.name} to their ${destinationText} from ${pending.source}${recruitText}.`,
-      ...state.log,
-    ],
-  });
+      ? "recruits 1 troop"
+      : `${recruitOwner.leader} recruits 1 troop`
+    : undefined;
+  const outcomeText = formatAcquireOutcome([
+    ...acquireRewardParts(acquireReward),
+    ...(recruitPart ? [recruitPart] : []),
+  ]);
+  return finishPendingResolution(
+    recordAcquireSpiceGain({
+      ...state,
+      players,
+      imperiumRow,
+      marketDeck,
+      throneRow,
+      ...advancePendingAction(state),
+      log: [
+        `${owner.leader} acquires ${card.name} to their ${destinationText} from ${pending.source}${outcomeText}.`,
+        ...state.log,
+      ],
+    }, owner.id, acquireReward),
+  );
 }
 
 export function resolveChoamContractFallback(

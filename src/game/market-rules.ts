@@ -1,8 +1,10 @@
 import { canMoveCardToThroneRow } from "./card-identifiers";
+import { resolveCardAcquireEffects, type GameEffectResult } from "./effect-resolver";
 import { advancePendingAction } from "./pending-actions";
 import { defaultActivatedAllyId } from "./placement-rules";
+import { recordTurnSpiceGain } from "./turn-trackers";
 import { trashableCardsForPending } from "./trash-rules";
-import type { Card, GameState, PendingAction, Player } from "./types";
+import type { Card, GameState, PendingAction, Player, ResourceId, Resources } from "./types";
 
 type AcquireCardPendingAction = Extract<PendingAction, { kind: "acquire-card" }>;
 type IrulanSignetRingPendingAction = Extract<PendingAction, { kind: "irulan-signet-ring" }>;
@@ -12,6 +14,48 @@ type TrashCardPendingAction = Extract<PendingAction, { kind: "trash-card" }>;
 const irulanSignetAcquireCost = 1;
 const irulanSignetTrashRewardCost = 1;
 const irulanSignetTrashRewardSpice = 2;
+
+function resourceLabel(resource: ResourceId) {
+  return resource === "solari" ? "Solari" : resource;
+}
+
+function addResources(resources: Resources, gain: Partial<Resources>): Resources {
+  return {
+    ...resources,
+    solari: resources.solari + (gain.solari ?? 0),
+    spice: resources.spice + (gain.spice ?? 0),
+    water: resources.water + (gain.water ?? 0),
+  };
+}
+
+function formatResourceEntries(resources: Partial<Resources>) {
+  return Object.entries(resources)
+    .filter(([, amount]) => (amount ?? 0) > 0)
+    .map(([resource, amount]) => `${amount} ${resourceLabel(resource as ResourceId)}`)
+    .join(", ");
+}
+
+export function acquireRewardParts(reward: GameEffectResult) {
+  const parts: string[] = [];
+  if (reward.vp > 0) parts.push(`for ${reward.vp} VP`);
+  const resourceText = formatResourceEntries(reward.revealGain);
+  if (resourceText) parts.push(`gains ${resourceText}`);
+  return parts;
+}
+
+export function formatAcquireOutcome(parts: string[]) {
+  if (parts.length === 0) return "";
+  const startsWithVp = parts[0].startsWith("for ");
+  const formattedParts = parts.length === 1
+    ? parts[0]
+    : `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}`;
+  return startsWithVp ? ` ${formattedParts}` : ` and ${formattedParts}`;
+}
+
+export function recordAcquireSpiceGain(state: GameState, playerId: string, reward: GameEffectResult) {
+  const spiceGain = reward.revealGain.spice ?? 0;
+  return spiceGain > 0 ? recordTurnSpiceGain(state, playerId, spiceGain) : state;
+}
 
 export function manipulateAcquisitionCost(card: Card) {
   return Math.max(0, (card.cost ?? 0) - 1);
@@ -46,6 +90,7 @@ export function addAcquiredCard(
   fromReserve: boolean,
   destination: AcquireCardPendingAction["destination"],
   persuasionCost = 0,
+  acquireReward: GameEffectResult = resolveCardAcquireEffects(card, player),
 ): Player {
   const purchaseSequence = player.purchaseSequence + 1;
   const acquiredCard = fromReserve
@@ -54,7 +99,8 @@ export function addAcquiredCard(
   const destinationCards = destination === "hand" ? player.hand : player.discard;
   return {
     ...player,
-    vp: player.vp + (card.acquired ?? 0),
+    resources: addResources(player.resources, acquireReward.revealGain),
+    vp: player.vp + acquireReward.vp,
     persuasion: player.persuasion - persuasionCost,
     purchaseSequence,
     ...(destination === "hand"
@@ -119,6 +165,7 @@ export function acquireMarketCard(
   const callToArmsRecruit = callToArmsRecruitOwner(state, buyer, callToArmsRecruitOwnerId);
   if (!callToArmsRecruit.valid) return state;
   const recruitOwner = callToArmsRecruit.owner;
+  const acquireReward = resolveCardAcquireEffects(card, buyer, state);
   const players = state.players.map((player) => {
     let next = player;
     if (player.id === buyer.id) {
@@ -128,28 +175,32 @@ export function acquireMarketCard(
           manipulatedCards: next.manipulatedCards.filter((candidate) => candidate.id !== manipulatedCard.id),
         };
       }
-      next = addAcquiredCard(next, card, fromReserve, "discard", persuasionCost);
+      next = addAcquiredCard(next, card, fromReserve, "discard", persuasionCost, acquireReward);
     }
     if (recruitOwner && player.id === recruitOwner.id) next = { ...next, garrison: next.garrison + 1 };
     return next;
   });
-  const recruitText = recruitOwner
+  const recruitPart = recruitOwner
     ? recruitOwner.id === buyer.id
-      ? " and recruits 1 troop"
-      : ` and ${recruitOwner.leader} recruits 1 troop`
-    : "";
+      ? "recruits 1 troop"
+      : `${recruitOwner.leader} recruits 1 troop`
+    : undefined;
+  const outcomeText = formatAcquireOutcome([
+    ...acquireRewardParts(acquireReward),
+    ...(recruitPart ? [recruitPart] : []),
+  ]);
 
-  return {
+  return recordAcquireSpiceGain({
     ...state,
     players,
     imperiumRow,
     marketDeck,
     throneRow,
     log: [
-      `${buyer.leader} acquires ${card.name}${card.acquired ? ` for ${card.acquired} VP` : ""}${recruitText}.`,
+      `${buyer.leader} acquires ${card.name}${outcomeText}.`,
       ...state.log,
     ],
-  };
+  }, buyer.id, acquireReward);
 }
 
 export function moveImperiumCardToThroneRow(

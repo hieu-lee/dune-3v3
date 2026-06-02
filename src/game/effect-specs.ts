@@ -41,6 +41,26 @@ export function revealEffects(effects: GameEffectSpec[], conditions?: GameEffect
   };
 }
 
+export function acquireEffects(effects: GameEffectSpec[], conditions?: GameEffectConditionSpec[]): CardEffectSpec {
+  return {
+    trigger: "acquire",
+    ...(conditions && conditions.length > 0 ? { conditions } : {}),
+    effects,
+  };
+}
+
+export function acquireGainResource(
+  resource: ResourceId,
+  amount: EffectAmountSpec,
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return acquireEffects([{ kind: "gain-resource", selector: "self", resource, amount }], conditions);
+}
+
+export function acquireGainVp(amount: EffectAmountSpec, conditions?: GameEffectConditionSpec[]): CardEffectSpec {
+  return acquireEffects([{ kind: "gain-vp", selector: "self", amount }], conditions);
+}
+
 export function revealGainResource(
   resource: ResourceId,
   amount: number,

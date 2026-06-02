@@ -43,10 +43,13 @@ export function verifyCallToArmsPlotIntrigue({ cards, data, game, state }) {
   const firstArmedAcquire = state.acquireMarketCard(callToArmsRevealed, "p2", spiceMustFlow.id);
   assert.equal(playerById(firstArmedAcquire, "p2").garrison, 3, "Call to Arms should recruit on the first acquisition");
   assert.equal(playerById(firstArmedAcquire, "p2").persuasion, 9);
-  assert.match(firstArmedAcquire.log[0], /acquires The Spice Must Flow for 1 VP and recruits 1 troop/);
+  assert.equal(playerById(firstArmedAcquire, "p2").vp, playerById(callToArmsRevealed, "p2").vp + 1);
+  assert.equal(playerById(firstArmedAcquire, "p2").resources.spice, playerById(callToArmsRevealed, "p2").resources.spice + 1);
+  assert.match(firstArmedAcquire.log[0], /acquires The Spice Must Flow for 1 VP, gains 1 spice and recruits 1 troop/);
   const secondArmedAcquire = state.acquireMarketCard(firstArmedAcquire, "p2", spiceMustFlow.id);
   assert.equal(playerById(secondArmedAcquire, "p2").garrison, 4, "Call to Arms should recruit on each acquisition");
   assert.equal(playerById(secondArmedAcquire, "p2").persuasion, 0);
+  assert.equal(playerById(secondArmedAcquire, "p2").resources.spice, playerById(callToArmsRevealed, "p2").resources.spice + 2);
   const rowCallToArmsCard =
     data.imperiumDeck.find((card) => card.name === "Smuggler's Harvester") ??
     data.imperiumDeck.find((card) => (card.cost ?? 0) > 0 && (card.cost ?? 0) <= 3);
@@ -67,6 +70,7 @@ export function verifyCallToArmsPlotIntrigue({ cards, data, game, state }) {
   assert.equal(playerById(rowCallToArmsBought, "p2").garrison, 3, "Call to Arms should recruit on Imperium Row buys");
   assert.equal(rowCallToArmsBought.imperiumRow[0].id, rowReplacementCard.id, "Imperium Row buys should still refill the row");
   assert.equal(playerById(rowCallToArmsBought, "p2").discard.at(-1).id, rowCallToArmsCard.id);
+  assert.match(rowCallToArmsBought.log[0], /acquires .* and recruits 1 troop/);
   const callToArmsCleared = state.finishRevealTurn(firstArmedAcquire, "p2");
   assert.equal(playerById(callToArmsCleared, "p2").callToArmsActive, false, "Reveal cleanup should clear Call to Arms");
   const afterCallToArmsCleared = state.acquireMarketCard(

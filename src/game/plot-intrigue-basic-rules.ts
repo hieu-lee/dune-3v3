@@ -23,28 +23,78 @@ import { resolveGameEffects, resolveTakeContracts } from "./effect-resolver";
 import { trashableCards } from "./trash-rules";
 import type {
   GameState,
+  IntrigueCard,
   PendingAction,
+  Player,
+  Resources,
 } from "./types";
 
 type AcquireCardPendingAction = Extract<PendingAction, { kind: "acquire-card" }>;
 type CunningPlotChoice = "draw" | "paid-trash";
+const resourceIds = ["solari", "spice", "water"] as const;
 
-export function playContingencyPlanPlotIntrigue(
+function hasResourceGains(gain: Partial<Resources>) {
+  return resourceIds.some((resource) => (gain[resource] ?? 0) > 0);
+}
+
+function addResourceGains(resources: Resources, gain: Partial<Resources>): Resources {
+  return resourceIds.reduce(
+    (next, resource) => ({
+      ...next,
+      [resource]: next[resource] + (gain[resource] ?? 0),
+    }),
+    { ...resources },
+  );
+}
+
+function publicContractPendingFor(
+  state: GameState,
+  player: Player,
+  intrigue: IntrigueCard,
+  effect: ReturnType<typeof resolveTakeContracts>[number] | undefined,
+): PendingAction | undefined {
+  if (!effect || effect.selector !== "self" || effect.amount <= 0 || effect.sourcePool !== "public-offer") return undefined;
+  if (effect.amount !== 1) throw new Error(`Unsupported Plot Intrigue contract amount ${effect.amount}`);
+  if (state.contractOffer.length === 0) return undefined;
+  return {
+    kind: "contract",
+    ownerId: player.id,
+    source: effect.source ?? intrigue.name,
+    publicOnly: true,
+    ...(effect.optional ? { optional: true } : {}),
+  };
+}
+
+function playTypedPlotIntrigue(
   state: GameState,
   playerId: string,
   intrigueId: string,
+  isExpectedIntrigue: (intrigue: IntrigueCard) => boolean,
+  logFor: (player: Player, contractPending: PendingAction | undefined) => string,
 ): GameState {
   if (state.phase !== "playing" || state.pendingAction || state.pendingQueue.length > 0) return state;
   const player = state.players[state.activeSeat];
   if (!player || player.id !== playerId) return state;
   const intrigue = player.intrigues.find((card) => card.id === intrigueId);
-  if (!intrigue || !isContingencyPlanIntrigue(intrigue)) return state;
+  if (!intrigue || !isExpectedIntrigue(intrigue)) return state;
+
+  const context = {
+    trigger: "plot-intrigue" as const,
+    source: player,
+    state,
+  };
+  const resolved = resolveGameEffects(intrigue.effects, context);
+  const contractEffects = resolveTakeContracts(intrigue.effects, context);
+  if (contractEffects.length > 1) throw new Error("Unsupported multiple Plot Intrigue take-contracts effects");
+  const [contractEffect] = contractEffects;
+  const contractPending = publicContractPendingFor(state, player, intrigue, contractEffect);
+  if (!hasResourceGains(resolved.revealGain) && !contractPending) return state;
 
   const players = state.players.map((candidate) =>
     candidate.id === player.id
       ? {
           ...candidate,
-          resources: { ...candidate.resources, solari: candidate.resources.solari + 2 },
+          resources: addResourceGains(candidate.resources, resolved.revealGain),
           intrigues: candidate.intrigues.filter((card) => card.id !== intrigue.id),
         }
       : candidate,
@@ -52,9 +102,24 @@ export function playContingencyPlanPlotIntrigue(
   return {
     ...state,
     players,
+    pendingAction: contractPending,
     intrigueDiscard: [...state.intrigueDiscard, intrigue],
-    log: [`${player.leader} plays Contingency Plan as a Plot Intrigue for 2 Solari.`, ...state.log],
+    log: [logFor(player, contractPending), ...state.log],
   };
+}
+
+export function playContingencyPlanPlotIntrigue(
+  state: GameState,
+  playerId: string,
+  intrigueId: string,
+): GameState {
+  return playTypedPlotIntrigue(
+    state,
+    playerId,
+    intrigueId,
+    isContingencyPlanIntrigue,
+    (player) => `${player.leader} plays Contingency Plan as a Plot Intrigue for 2 Solari.`,
+  );
 }
 
 export function playManipulatePlotIntrigue(
@@ -105,57 +170,16 @@ export function playLeveragePlotIntrigue(
   playerId: string,
   intrigueId: string,
 ): GameState {
-  if (state.phase !== "playing" || state.pendingAction || state.pendingQueue.length > 0) return state;
-  const player = state.players[state.activeSeat];
-  if (!player || player.id !== playerId) return state;
-  const intrigue = player.intrigues.find((card) => card.id === intrigueId);
-  if (!intrigue || !isLeverageIntrigue(intrigue)) return state;
-  const context = {
-    trigger: "plot-intrigue" as const,
-    source: player,
+  return playTypedPlotIntrigue(
     state,
-  };
-  const resolved = resolveGameEffects(intrigue.effects, context);
-  const [contractEffect] = resolveTakeContracts(intrigue.effects, context);
-  if ((resolved.revealGain.solari ?? 0) <= 0) return state;
-
-  const players = state.players.map((candidate) =>
-    candidate.id === player.id
-      ? {
-          ...candidate,
-          resources: {
-            ...candidate.resources,
-            solari: candidate.resources.solari + (resolved.revealGain.solari ?? 0),
-          },
-          intrigues: candidate.intrigues.filter((card) => card.id !== intrigue.id),
-        }
-      : candidate,
+    playerId,
+    intrigueId,
+    isLeverageIntrigue,
+    (player, contractPending) => {
+      const contractText = contractPending ? " and may take a face-up CHOAM contract" : "";
+      return `${player.leader} plays Leverage, gains 1 Solari${contractText}.`;
+    },
   );
-  const contractPending: PendingAction | undefined = contractEffect &&
-    contractEffect.selector === "self" &&
-    contractEffect.amount > 0 &&
-    contractEffect.sourcePool === "public-offer" &&
-    state.contractOffer.length > 0
-    ? {
-        kind: "contract",
-        ownerId: player.id,
-        source: contractEffect.source ?? intrigue.name,
-        publicOnly: true,
-        ...(contractEffect.optional ? { optional: true } : {}),
-      }
-    : undefined;
-  const contractText = contractPending ? " and may take a face-up CHOAM contract" : "";
-
-  return {
-    ...state,
-    players,
-    pendingAction: contractPending,
-    intrigueDiscard: [...state.intrigueDiscard, intrigue],
-    log: [
-      `${player.leader} plays Leverage, gains 1 Solari${contractText}.`,
-      ...state.log,
-    ],
-  };
 }
 
 export function playDistractionPlotIntrigue(

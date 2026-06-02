@@ -5,6 +5,7 @@ import {
   cargoRunnerSourceId,
   capturedMentatSourceId,
   chaniCleverTacticianSourceId,
+  contingencyPlanSourceId,
   covertOperationSourceId,
   dangerousRhetoricSourceId,
   desertPowerSourceId,
@@ -821,6 +822,9 @@ export const conflictCards: ConflictCard[] = catalog.cards
   .map(toConflictCard);
 
 function intrigueCardEffects(card: HubCard): CardEffectSpec[] | undefined {
+  if (card.id === contingencyPlanSourceId) {
+    return [plotGainResource("solari", 2)];
+  }
   if (card.id === leverageSourceId) {
     return [
       plotGainResource("solari", 1, [gainedSpiceThisTurn()]),

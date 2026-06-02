@@ -157,6 +157,7 @@ try {
   const wheelsWithinWheels = data.imperiumDeck.find((card) => card.name === "Wheels Within Wheels");
   const prepareTheWay = data.reserveMarket.find((card) => card.sourceId === 537);
   const spiceMustFlow = data.reserveMarket.find((card) => card.sourceId === 538);
+  const contingencyPlan = data.intrigueCards.find((card) => card.name === "Contingency Plan");
   const leverage = data.intrigueCards.find((card) => card.name === "Leverage");
   const commandRespect = data.muadDibCommanderCards.find((card) => card.name === "Command Respect");
   const limitedLandsraadAccess = data.muadDibCommanderCards.find((card) => card.name === "Limited Landsraad Access");
@@ -225,7 +226,7 @@ try {
     wheelsWithinWheels,
   );
   assert.ok(commandRespect && prepareTheWay && spiceMustFlow && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
-  assert.ok(leverage);
+  assert.ok(contingencyPlan && leverage);
   assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && dutifulService && deliverSupplies && sietchTabr && spiceRefinery);
   assert.equal(revealSpecCards.length, 79, "Unexpected number of cards with declarative Reveal specs");
   assert.equal(
@@ -267,6 +268,25 @@ try {
       "The Spice Must Flow",
     ],
     "Only implemented acquisition reward cards should currently carry declarative Acquire specs",
+  );
+  assert.ok(
+    hasPlotEffect(contingencyPlan, (effect) =>
+      effect.kind === "gain-resource" &&
+      effect.selector === "self" &&
+      effect.resource === "solari" &&
+      effect.amount === 2
+    ),
+    "Contingency Plan should carry a typed Plot Intrigue Solari gain spec",
+  );
+  const contingencyPlanPlotResolved = effectResolver.resolveGameEffects(contingencyPlan.effects, {
+    trigger: "plot-intrigue",
+    source: p2,
+    state: game,
+  });
+  assert.equal(
+    contingencyPlanPlotResolved.revealGain.solari,
+    2,
+    "Contingency Plan Plot spec should resolve its Solari gain",
   );
   assert.ok(
     hasPlotEffect(leverage, (effect) =>

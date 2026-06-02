@@ -238,6 +238,38 @@ export function verifyBasicPlotIntrigues({ cards, data, game, state }) {
     noSpiceLeverage,
     "Leverage should require gaining spice this turn",
   );
+  const multiContractLeverage = {
+    ...leverage,
+    id: "intrigue-leverage-multi-contract-test",
+    effects: [
+      ...(leverage.effects ?? []),
+      {
+        trigger: "plot-intrigue",
+        conditions: [{ kind: "gained-spice-this-turn" }],
+        effects: [{
+          kind: "take-contracts",
+          selector: "self",
+          amount: 1,
+          sourcePool: "public-offer",
+          optional: true,
+          source: "Leverage",
+        }],
+      },
+    ],
+  };
+  const multiContractLeverageFixture = {
+    ...leverageFixture,
+    players: leverageFixture.players.map((candidate) =>
+      candidate.id === "p2"
+        ? { ...candidate, intrigues: [multiContractLeverage] }
+        : candidate,
+    ),
+  };
+  assert.throws(
+    () => state.playLeveragePlotIntrigue(multiContractLeverageFixture, "p2", multiContractLeverage.id),
+    /Unsupported multiple Plot Intrigue take-contracts effects/,
+    "Typed Plot Intrigues should reject unsupported multiple contract effects instead of ignoring extras",
+  );
   const leverageSpiceTracked = state.playPlotBattleIconIntrigue(
     {
       ...game,

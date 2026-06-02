@@ -50,6 +50,13 @@ export function acquireEffects(
   return effectSpec("acquire", effects, conditions);
 }
 
+export function discardEffects(
+  effects: GameEffectSpec[],
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return effectSpec("discard", effects, conditions);
+}
+
 export function plotIntrigueEffects(
   effects: GameEffectSpec[],
   conditions?: GameEffectConditionSpec[],

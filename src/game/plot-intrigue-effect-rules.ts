@@ -1,4 +1,5 @@
 import { drawCards } from "./deck-utils";
+import { applyDiscardedFromHandTriggers } from "./discard-trigger-rules";
 import {
   type InfluenceAdjustmentEffect,
   resolveAcquireCards,
@@ -475,7 +476,7 @@ export function playTypedPlotIntrigue(
     deployPending,
     canResolveTrash ? trashPending : undefined,
   ].filter((action): action is PendingAction => Boolean(action));
-  const immediateState = {
+  const immediateStateBeforeDiscardTriggers = {
     ...state,
     players,
     imperiumRow: rowManipulation?.imperiumRow ?? state.imperiumRow,
@@ -486,6 +487,9 @@ export function playTypedPlotIntrigue(
     pendingAction: pendingActions[0],
     pendingQueue: pendingActions.slice(1),
   };
+  const immediateState = discardedCard
+    ? applyDiscardedFromHandTriggers(immediateStateBeforeDiscardTriggers, player.id, discardedCard)
+    : immediateStateBeforeDiscardTriggers;
   const drawnState = hasIntrigueDraw
     ? drawIntrigueCards(immediateState, player.id, resolved.intriguesToDraw, intrigue.name)
     : immediateState;

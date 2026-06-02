@@ -3,10 +3,12 @@ export {
   agentPlacementEffects,
   agentPlayEffects,
   combatIntrigueEffects,
+  discardEffects,
   plotIntrigueEffects,
   revealEffects,
 } from "./effect-spec-base";
 export * from "./combat-effect-spec-builders";
+export * from "./discard-effect-spec-builders";
 export * from "./plot-effect-spec-builders";
 export * from "./acquire-effect-spec-builders";
 export * from "./reveal-effect-spec-builders";

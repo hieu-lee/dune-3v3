@@ -1,4 +1,5 @@
 import { advancePendingAction } from "./pending-actions";
+import { applyDiscardedFromHandTriggers } from "./discard-trigger-rules";
 import type { Card, GameState, PendingAction, Player } from "./types";
 
 type DiscardHandCardPendingAction = Extract<PendingAction, { kind: "discard-hand-card" }>;
@@ -30,7 +31,7 @@ export function resolveDiscardHandCard(
   };
   const canDiscardMore = remaining > 0 && ownerAfterDiscard.hand.length > 0;
 
-  return {
+  const nextState = {
     ...state,
     players: state.players.map((player) => player.id === owner.id ? ownerAfterDiscard : player),
     ...(canDiscardMore
@@ -41,4 +42,5 @@ export function resolveDiscardHandCard(
       ...state.log,
     ],
   };
+  return applyDiscardedFromHandTriggers(nextState, owner.id, discardedCard, { logAfterCurrentAction: true });
 }

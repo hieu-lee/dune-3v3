@@ -30,6 +30,7 @@ export type GameEffectTrigger =
   | "agent-placement"
   | "reveal"
   | "acquire"
+  | "discard"
   | "plot-intrigue"
   | "combat-intrigue"
   | "conflict-reward"

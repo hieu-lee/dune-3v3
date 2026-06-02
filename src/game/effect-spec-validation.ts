@@ -38,6 +38,7 @@ const supportedTriggers = new Set<GameEffectTrigger>([
   "agent-placement",
   "reveal",
   "acquire",
+  "discard",
   "plot-intrigue",
   "combat-intrigue",
   "conflict-reward",
@@ -165,11 +166,15 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
   if (trigger === "agent-placement" && effect.kind !== "leader-transition-choice") {
     throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
   }
+  if (trigger === "discard" && effect.kind !== "gain-resource") {
+    throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
+  }
   if (effect.kind === "gain-resource") {
     if (
       trigger !== "agent-play" &&
       trigger !== "reveal" &&
       trigger !== "acquire" &&
+      trigger !== "discard" &&
       trigger !== "plot-intrigue" &&
       trigger !== "combat-intrigue"
     ) {

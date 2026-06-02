@@ -1,4 +1,5 @@
 import { drawCards } from "./deck-utils";
+import { applyDiscardedFromHandTriggers } from "./discard-trigger-rules";
 import { advancePendingAction } from "./pending-actions";
 import type { Card, GameState, PendingAction, Player } from "./types";
 
@@ -48,7 +49,7 @@ export function resolveDiscardCardForDraw(
     : ownerAfterDiscard;
   const drawnCards = ownerAfterDraw.hand.length - ownerAfterDiscard.hand.length;
 
-  return {
+  const nextState = {
     ...state,
     players: state.players.map((player) => player.id === owner.id ? ownerAfterDraw : player),
     ...advancePendingAction(state),
@@ -57,6 +58,7 @@ export function resolveDiscardCardForDraw(
       ...state.log,
     ],
   };
+  return applyDiscardedFromHandTriggers(nextState, owner.id, discardedCard, { logAfterCurrentAction: true });
 }
 
 export function skipDiscardCardForDraw(

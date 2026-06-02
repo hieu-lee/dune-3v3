@@ -31,6 +31,7 @@ import {
   smugglersHavenSourceId,
   smugglersHarvesterSourceId,
   southernEldersSourceId,
+  spacingGuildFavorSourceId,
   spaceTimeFoldingSourceId,
   spiceMustFlowSourceId,
   spyNetworkSourceId,
@@ -60,6 +61,7 @@ import {
   agentPayResourceForSandworms,
   agentPlaceSpies,
   agentRecruitTroops,
+  discardGainResource,
   hasCardTraitInPlay,
   hasCompletedContracts,
   hasConflictUnits,
@@ -385,6 +387,7 @@ type SimpleAgentEffectConfig = {
   drawIntrigues?: number;
   gainInfluence?: number;
   gain?: Partial<Record<ResourceId, number>>;
+  discardGain?: Partial<Record<ResourceId, number>>;
   placeSpies?: number;
   recruitTroops?: number;
   revealPaySandworms?: {
@@ -407,6 +410,7 @@ const simpleAgentEffectConfigs: Record<number, SimpleAgentEffectConfig> = {
   [rebelSupplierSourceId]: { gain: { spice: 1 }, recruitTroops: 2 },
   [sardaukarSoldierSourceId]: { drawIntrigues: 1 },
   [southernEldersSourceId]: { gain: { water: 1 }, recruitTroops: 2 },
+  [spacingGuildFavorSourceId]: { drawCards: 1, discardGain: { spice: 2 } },
   [stilgarDevotedSourceId]: { recruitTroops: 2 },
   [theacherousManeuverSourceId]: { drawIntrigues: 1, gainInfluence: 1 },
   [undercoverAssetSourceId]: { placeSpies: 1 },
@@ -439,6 +443,10 @@ function imperiumSimpleAgentEffects(card: HubCard): CardEffectSpec[] | undefined
       config.revealPaySandworms.sandworms,
       { persuasionCost: config.revealPaySandworms.persuasionCost },
     ));
+  }
+  for (const resource of ["solari", "spice", "water"] as const) {
+    const amount = config.discardGain?.[resource] ?? 0;
+    if (amount > 0) effects.push(discardGainResource(resource, amount));
   }
   if (config.drawIntrigues) {
     effects.push(agentDrawIntrigues(config.drawIntrigues, conditions));
@@ -507,6 +515,9 @@ function imperiumPlayText(card: HubCard) {
   }
   if (card.id === guildEnvoySourceId) {
     return "Discard 1 card. If you discarded a Spacing Guild card, draw 2 cards.";
+  }
+  if (card.id === spacingGuildFavorSourceId) {
+    return "Draw 1 card. When discarded from hand, gain 2 spice.";
   }
   if (card.id === covertOperationSourceId) {
     return "Each opponent discards a card.";

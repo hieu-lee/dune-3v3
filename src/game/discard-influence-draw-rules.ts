@@ -1,5 +1,6 @@
 import { factionLabels } from "./data";
 import { drawCards } from "./deck-utils";
+import { applyDiscardedFromHandTriggers } from "./discard-trigger-rules";
 import { changeAllegiancesGainChoices } from "./influence-choices";
 import {
   influenceEffectOwnerForChoice,
@@ -81,7 +82,10 @@ export function resolveDiscardCardForInfluenceAndDraw(
       ...state.log,
     ],
   };
-  return resolveLeaderInfluenceThresholdRewards(nextState, state.players);
+  return resolveLeaderInfluenceThresholdRewards(
+    applyDiscardedFromHandTriggers(nextState, owner.id, discardedCard, { logAfterCurrentAction: true }),
+    state.players,
+  );
 }
 
 export function skipDiscardCardForInfluenceAndDraw(

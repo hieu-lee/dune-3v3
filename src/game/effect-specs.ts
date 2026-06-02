@@ -188,6 +188,20 @@ export function plotPayResourcesForVp(
   ], conditions, { choiceId });
 }
 
+export function plotPayResourcesAndLoseInfluenceForVp(
+  choiceId: string,
+  costs: Array<{ resource: ResourceId; amount: EffectAmountSpec }>,
+  losses: Array<{ faction: FactionId; amount: EffectAmountSpec }>,
+  vp: EffectAmountSpec,
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return plotIntrigueEffects([
+    ...costs.map(({ resource, amount }) => ({ kind: "spend-resource" as const, selector: "self" as const, resource, amount })),
+    ...losses.map(({ faction, amount }) => ({ kind: "lose-influence" as const, selector: "self" as const, faction, amount })),
+    { kind: "gain-vp", selector: "self", amount: vp },
+  ], conditions, { choiceId });
+}
+
 export function plotRecruitTroops(
   selector: PlayerSelector,
   amount: EffectAmountSpec,

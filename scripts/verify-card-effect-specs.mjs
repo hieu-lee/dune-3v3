@@ -171,6 +171,7 @@ try {
   const manipulate = data.intrigueCards.find((card) => card.name === "Manipulate");
   const marketOpportunity = data.intrigueCards.find((card) => card.name === "Market Opportunity");
   const mercenaries = data.intrigueCards.find((card) => card.name === "Mercenaries");
+  const opportunism = data.intrigueCards.find((card) => card.name === "Opportunism");
   const shaddamsFavor = data.intrigueCards.find((card) => card.name === "Shaddam's Favor");
   const strategicStockpiling = data.intrigueCards.find((card) => card.name === "Strategic Stockpiling");
   const commandRespect = data.muadDibCommanderCards.find((card) => card.name === "Command Respect");
@@ -240,7 +241,7 @@ try {
     wheelsWithinWheels,
   );
   assert.ok(commandRespect && prepareTheWay && spiceMustFlow && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
-  assert.ok(backedByChoam && callToArms && councilorsAmbition && contingencyPlan && cunning && departForArrakis && distraction && intelligenceReport && leverage && manipulate && marketOpportunity && mercenaries && shaddamsFavor && strategicStockpiling);
+  assert.ok(backedByChoam && callToArms && councilorsAmbition && contingencyPlan && cunning && departForArrakis && distraction && intelligenceReport && leverage && manipulate && marketOpportunity && mercenaries && opportunism && shaddamsFavor && strategicStockpiling);
   assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && dutifulService && deliverSupplies && sietchTabr && spiceRefinery);
   assert.equal(revealSpecCards.length, 79, "Unexpected number of cards with declarative Reveal specs");
   assert.equal(
@@ -684,6 +685,101 @@ try {
     2,
     "Mercenaries Plot spec should route Commander troop recruitment to the activated Ally",
   );
+  const opportunismFactions = ["emperor", "spacing", "bene", "fremen", "greatHouses", "fringeWorlds"];
+  const opportunismChoiceIds = opportunismFactions.flatMap((first, firstIndex) =>
+    opportunismFactions.slice(firstIndex).map((second) => `${first}+${second}`)
+  );
+  assert.deepEqual(
+    opportunism.effects
+      ?.filter((spec) => spec.trigger === "plot-intrigue")
+      .map((spec) => spec.choiceId)
+      .sort(),
+    opportunismChoiceIds.sort(),
+    "Opportunism should carry typed Plot choice specs for every payable influence-loss pair shape",
+  );
+  assert.ok(
+    opportunism.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.choiceId === "spacing+bene" &&
+      spec.effects.some((effect) =>
+        effect.kind === "spend-resource" &&
+        effect.selector === "self" &&
+        effect.resource === "solari" &&
+        effect.amount === 2
+      ) &&
+      spec.effects.some((effect) =>
+        effect.kind === "lose-influence" &&
+        effect.selector === "self" &&
+        effect.faction === "spacing" &&
+        effect.amount === 1
+      ) &&
+      spec.effects.some((effect) =>
+        effect.kind === "lose-influence" &&
+        effect.selector === "self" &&
+        effect.faction === "bene" &&
+        effect.amount === 1
+      ) &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-vp" &&
+        effect.selector === "self" &&
+        effect.amount === 1
+      )
+    ),
+    "Opportunism should carry a typed mixed Influence-loss Solari-for-VP Plot choice spec",
+  );
+  assert.ok(
+    opportunism.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.choiceId === "bene+bene" &&
+      spec.effects.some((effect) =>
+        effect.kind === "lose-influence" &&
+        effect.selector === "self" &&
+        effect.faction === "bene" &&
+        effect.amount === 2
+      ) &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-vp" &&
+        effect.selector === "self" &&
+        effect.amount === 1
+      )
+    ),
+    "Opportunism should carry a typed same-Faction Influence-loss Plot choice spec",
+  );
+  const opportunismNoChoiceResolved = effectResolver.resolveGameEffects(opportunism.effects, {
+    trigger: "plot-intrigue",
+    source: p2,
+    state: game,
+  });
+  assert.deepEqual(
+    opportunismNoChoiceResolved.spentResources,
+    {},
+    "Opportunism Plot choice specs should not spend Solari without a selected choice",
+  );
+  assert.deepEqual(
+    opportunismNoChoiceResolved.influenceLosses,
+    {},
+    "Opportunism Plot choice specs should not lose Influence without a selected choice",
+  );
+  assert.equal(opportunismNoChoiceResolved.vp, 0, "Opportunism Plot choice specs should not score VP without a selected choice");
+  const opportunismSpacingBeneResolved = effectResolver.resolveGameEffects(opportunism.effects, {
+    trigger: "plot-intrigue",
+    choiceId: "spacing+bene",
+    source: p2,
+    state: game,
+  });
+  assert.equal(opportunismSpacingBeneResolved.spentResources.solari, 2, "Opportunism mixed choice should spend 2 Solari");
+  assert.equal(opportunismSpacingBeneResolved.influenceLosses.spacing, 1, "Opportunism mixed choice should lose 1 Spacing Guild Influence");
+  assert.equal(opportunismSpacingBeneResolved.influenceLosses.bene, 1, "Opportunism mixed choice should lose 1 Bene Gesserit Influence");
+  assert.equal(opportunismSpacingBeneResolved.vp, 1, "Opportunism mixed choice should gain 1 VP");
+  const opportunismBeneBeneResolved = effectResolver.resolveGameEffects(opportunism.effects, {
+    trigger: "plot-intrigue",
+    choiceId: "bene+bene",
+    source: p2,
+    state: game,
+  });
+  assert.equal(opportunismBeneBeneResolved.spentResources.solari, 2, "Opportunism same-Faction choice should spend 2 Solari");
+  assert.equal(opportunismBeneBeneResolved.influenceLosses.bene, 2, "Opportunism same-Faction choice should aggregate two Influence losses");
+  assert.equal(opportunismBeneBeneResolved.vp, 1, "Opportunism same-Faction choice should gain 1 VP");
   assert.ok(
     backedByChoam.effects?.some((spec) =>
       spec.trigger === "plot-intrigue" &&

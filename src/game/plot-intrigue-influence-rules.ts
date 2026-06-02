@@ -1,4 +1,5 @@
 import {
+  factionIds,
   factionLabels,
 } from "./data";
 import {
@@ -13,7 +14,6 @@ import {
   changeAllegiancesGainChoices,
   imperiumPoliticsFactionChoices,
   validBuyAccessChoice,
-  validInfluenceLossPair,
   validSietchRitualChoice,
 } from "./influence-choices";
 import {
@@ -32,6 +32,7 @@ import {
   resolveLeaderInfluenceThresholdRewards,
 } from "./leader-rewards";
 import { activatedAllyEffectOwner } from "./market-rules";
+import { playTypedPlotIntrigue } from "./plot-intrigue-effect-rules";
 import type {
   FactionId,
   GameState,
@@ -234,42 +235,36 @@ function influenceLossPairLog(choice: InfluenceLossPair) {
   return `1 ${factionLabels[first]} Influence and 1 ${factionLabels[second]} Influence`;
 }
 
+function isInfluenceLossFaction(faction: unknown): faction is FactionId {
+  return typeof faction === "string" && factionIds.includes(faction as FactionId);
+}
+
+function opportunismChoiceId(choice: InfluenceLossPair) {
+  if (!Array.isArray(choice) || choice.length !== 2) return undefined;
+  const [first, second] = choice;
+  if (!isInfluenceLossFaction(first) || !isInfluenceLossFaction(second)) return undefined;
+  return factionIds.indexOf(first) <= factionIds.indexOf(second)
+    ? `${first}+${second}`
+    : `${second}+${first}`;
+}
+
 export function playOpportunismPlotIntrigue(
   state: GameState,
   playerId: string,
   intrigueId: string,
   choice: InfluenceLossPair,
 ): GameState {
-  if (state.phase !== "playing" || state.pendingAction || state.pendingQueue.length > 0) return state;
-  const player = state.players[state.activeSeat];
-  if (!player || player.id !== playerId) return state;
-  const intrigue = player.intrigues.find((card) => card.id === intrigueId);
-  if (!intrigue || !isOpportunismIntrigue(intrigue)) return state;
-  if (!validInfluenceLossPair(player, choice)) return state;
-  if (player.resources.solari < 2) return state;
-  const [first, second] = choice;
-
-  const players = state.players.map((candidate) => {
-    if (candidate.id !== player.id) return candidate;
-    let next = {
-      ...candidate,
-      resources: { ...candidate.resources, solari: candidate.resources.solari - 2 },
-      intrigues: candidate.intrigues.filter((card) => card.id !== intrigue.id),
-    };
-    next = adjustInfluence(next, first, -1);
-    next = adjustInfluence(next, second, -1);
-    return { ...next, vp: next.vp + 1 };
-  });
-
-  return {
-    ...state,
-    players,
-    intrigueDiscard: [...state.intrigueDiscard, intrigue],
-    log: [
+  const choiceId = opportunismChoiceId(choice);
+  if (!choiceId) return state;
+  return playTypedPlotIntrigue(
+    state,
+    playerId,
+    intrigueId,
+    isOpportunismIntrigue,
+    (player) =>
       `${player.leader} plays Opportunism, spends 2 Solari, loses ${influenceLossPairLog(choice)}, and gains 1 VP.`,
-      ...state.log,
-    ],
-  };
+    { choiceId },
+  );
 }
 
 export function playImperiumPoliticsPlotIntrigue(

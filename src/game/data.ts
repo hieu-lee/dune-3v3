@@ -33,6 +33,7 @@ import {
   maulaPistolSourceId,
   mercenariesSourceId,
   northernWatermasterSourceId,
+  opportunismSourceId,
   overthrowSourceId,
   paracompassSourceId,
   prepareTheWaySourceId,
@@ -87,6 +88,7 @@ import {
   plotGainResource,
   plotLoseInfluenceForResource,
   plotManipulateRowCard,
+  plotPayResourcesAndLoseInfluenceForVp,
   plotPayResourcesForVp,
   plotPlaceSpies,
   plotRecruitTroops,
@@ -917,6 +919,23 @@ function intrigueCardEffects(card: HubCard): CardEffectSpec[] | undefined {
       plotRecruitTroops("self", 2, [hasRole("Ally")]),
       plotRecruitTroops("activated-ally", 2, [hasRole("Commander")]),
     ];
+  }
+  if (card.id === opportunismSourceId) {
+    return influenceLossFactions.flatMap((first, firstIndex) =>
+      influenceLossFactions.slice(firstIndex).map((second) =>
+        plotPayResourcesAndLoseInfluenceForVp(
+          `${first}+${second}`,
+          [{ resource: "solari", amount: 2 }],
+          first === second
+            ? [{ faction: first, amount: 2 }]
+            : [
+                { faction: first, amount: 1 },
+                { faction: second, amount: 1 },
+              ],
+          1,
+        )
+      )
+    );
   }
   if (card.id === marketOpportunitySourceId) {
     return [

@@ -164,6 +164,7 @@ try {
   const backedByChoam = data.intrigueCards.find((card) => card.name === "Backed by CHOAM");
   const buyAccess = data.intrigueCards.find((card) => card.name === "Buy Access");
   const callToArms = data.intrigueCards.find((card) => card.name === "Call to Arms");
+  const changeAllegiances = data.intrigueCards.find((card) => card.name === "Change Allegiances");
   const councilorsAmbition = data.intrigueCards.find((card) => card.name === "Councilor's Ambition");
   const contingencyPlan = data.intrigueCards.find((card) => card.name === "Contingency Plan");
   const cunning = data.intrigueCards.find((card) => card.name === "Cunning");
@@ -247,7 +248,7 @@ try {
     wheelsWithinWheels,
   );
   assert.ok(commandRespect && prepareTheWay && spiceMustFlow && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
-  assert.ok(backedByChoam && buyAccess && callToArms && councilorsAmbition && contingencyPlan && cunning && departForArrakis && distraction && imperiumPolitics && inspireAwe && intelligenceReport && leverage && manipulate && marketOpportunity && mercenaries && opportunism && shaddamsFavor && sietchRitual && strategicStockpiling);
+  assert.ok(backedByChoam && buyAccess && callToArms && changeAllegiances && councilorsAmbition && contingencyPlan && cunning && departForArrakis && distraction && imperiumPolitics && inspireAwe && intelligenceReport && leverage && manipulate && marketOpportunity && mercenaries && opportunism && shaddamsFavor && sietchRitual && strategicStockpiling);
   assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && dutifulService && deliverSupplies && sietchTabr && spiceRefinery);
   assert.equal(revealSpecCards.length, 79, "Unexpected number of cards with declarative Reveal specs");
   assert.equal(
@@ -964,6 +965,282 @@ try {
   assert.equal(opportunismBeneBeneResolved.spentResources.solari, 2, "Opportunism same-Faction choice should spend 2 Solari");
   assert.equal(opportunismBeneBeneResolved.influenceLosses.bene, 2, "Opportunism same-Faction choice should aggregate two Influence losses");
   assert.equal(opportunismBeneBeneResolved.vp, 1, "Opportunism same-Faction choice should gain 1 VP");
+  const changeAllegiancesPlotSpecs = changeAllegiances.effects?.filter((spec) => spec.trigger === "plot-intrigue") ?? [];
+  assert.equal(
+    changeAllegiancesPlotSpecs.length,
+    394,
+    "Change Allegiances should carry typed Plot choice specs for Ally, Shaddam, and Muad'Dib influence options",
+  );
+  assert.ok(
+    changeAllegiances.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.choiceId === "shift:greatHouses->bene" &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Ally") &&
+      spec.effects.some((effect) =>
+        effect.kind === "lose-influence" &&
+        effect.selector === "self" &&
+        effect.faction === "greatHouses" &&
+        effect.amount === 1
+      ) &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-influence" &&
+        effect.selector === "self" &&
+        effect.faction === "bene" &&
+        effect.amount === 1
+      )
+    ),
+    "Change Allegiances should carry a typed Ally Influence shift spec",
+  );
+  assert.ok(
+    changeAllegiances.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.choiceId === "spend:spacing" &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Ally") &&
+      spec.effects.some((effect) =>
+        effect.kind === "spend-resource" &&
+        effect.selector === "self" &&
+        effect.resource === "spice" &&
+        effect.amount === 3
+      ) &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-influence" &&
+        effect.selector === "self" &&
+        effect.faction === "spacing" &&
+        effect.amount === 1
+      )
+    ),
+    "Change Allegiances should carry a typed Ally spice-for-Influence spec",
+  );
+  assert.ok(
+    changeAllegiances.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.choiceId === "both:greatHouses->bene+spend:spacing" &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Ally") &&
+      spec.effects.some((effect) =>
+        effect.kind === "lose-influence" &&
+        effect.selector === "self" &&
+        effect.faction === "greatHouses" &&
+        effect.amount === 1
+      ) &&
+      spec.effects.some((effect) =>
+        effect.kind === "spend-resource" &&
+        effect.selector === "self" &&
+        effect.resource === "spice" &&
+        effect.amount === 3
+      ) &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-influence" &&
+        effect.selector === "self" &&
+        effect.faction === "bene" &&
+        effect.amount === 1
+      ) &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-influence" &&
+        effect.selector === "self" &&
+        effect.faction === "spacing" &&
+        effect.amount === 1
+      )
+    ),
+    "Change Allegiances should carry a typed Ally both-rows spec",
+  );
+  assert.ok(
+    changeAllegiances.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.choiceId === "shift:bene->emperor" &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Commander") &&
+      spec.conditions?.some((condition) => condition.kind === "has-team" && condition.team === "shaddam") &&
+      spec.effects.some((effect) =>
+        effect.kind === "lose-influence" &&
+        effect.selector === "activated-ally" &&
+        effect.faction === "bene" &&
+        effect.amount === 1
+      ) &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-influence" &&
+        effect.selector === "self" &&
+        effect.faction === "emperor" &&
+        effect.amount === 1
+      )
+    ),
+    "Change Allegiances should carry a typed Shaddam routed-loss personal-gain shift spec",
+  );
+  assert.ok(
+    changeAllegiances.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.choiceId === "both:fremen->fringeWorlds+spend:fremen" &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Commander") &&
+      spec.conditions?.some((condition) => condition.kind === "has-team" && condition.team === "muaddib") &&
+      spec.effects.some((effect) =>
+        effect.kind === "lose-influence" &&
+        effect.selector === "self" &&
+        effect.faction === "fremen" &&
+        effect.amount === 1
+      ) &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-influence" &&
+        effect.selector === "activated-ally" &&
+        effect.faction === "fringeWorlds" &&
+        effect.amount === 1
+      ) &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-influence" &&
+        effect.selector === "self" &&
+        effect.faction === "fremen" &&
+        effect.amount === 1
+      )
+    ),
+    "Change Allegiances should carry a typed Muad'Dib personal and routed both-rows spec",
+  );
+  const changeAllegiancesNoChoiceResolved = effectResolver.resolveGameEffects(changeAllegiances.effects, {
+    trigger: "plot-intrigue",
+    source: p2,
+    state: game,
+  });
+  assert.deepEqual(
+    changeAllegiancesNoChoiceResolved.spentResources,
+    {},
+    "Change Allegiances Plot choice specs should not spend spice without a selected choice",
+  );
+  assert.deepEqual(
+    changeAllegiancesNoChoiceResolved.influenceLosses,
+    {},
+    "Change Allegiances Plot choice specs should not lose Influence without a selected choice",
+  );
+  assert.deepEqual(
+    changeAllegiancesNoChoiceResolved.influenceGains,
+    {},
+    "Change Allegiances Plot choice specs should not gain Influence without a selected choice",
+  );
+  const changeAllegiancesAllyShiftResolved = effectResolver.resolveGameEffects(changeAllegiances.effects, {
+    trigger: "plot-intrigue",
+    choiceId: "shift:greatHouses->bene",
+    source: p2,
+    state: game,
+  });
+  assert.deepEqual(
+    changeAllegiancesAllyShiftResolved.influenceAdjustments,
+    [
+      { selector: "self", faction: "greatHouses", amount: -1 },
+      { selector: "self", faction: "bene", amount: 1 },
+    ],
+    "Ally Change Allegiances shift should resolve ordered self Influence adjustments",
+  );
+  assert.equal(
+    changeAllegiancesAllyShiftResolved.influenceLosses.greatHouses,
+    1,
+    "Ally Change Allegiances shift should record the selected Influence loss",
+  );
+  assert.equal(
+    changeAllegiancesAllyShiftResolved.influenceGains.bene,
+    1,
+    "Ally Change Allegiances shift should record the selected Influence gain",
+  );
+  const changeAllegiancesAllyBothResolved = effectResolver.resolveGameEffects(changeAllegiances.effects, {
+    trigger: "plot-intrigue",
+    choiceId: "both:greatHouses->bene+spend:spacing",
+    source: p2,
+    state: game,
+  });
+  assert.equal(changeAllegiancesAllyBothResolved.spentResources.spice, 3, "Change Allegiances both rows should spend 3 spice");
+  assert.deepEqual(
+    changeAllegiancesAllyBothResolved.influenceAdjustments,
+    [
+      { selector: "self", faction: "greatHouses", amount: -1 },
+      { selector: "self", faction: "bene", amount: 1 },
+      { selector: "self", faction: "spacing", amount: 1 },
+    ],
+    "Ally Change Allegiances both rows should resolve loss before both gains",
+  );
+  const changeAllegiancesShaddamShiftResolved = effectResolver.resolveGameEffects(changeAllegiances.effects, {
+    trigger: "plot-intrigue",
+    choiceId: "shift:bene->emperor",
+    source: p4,
+    target: p6,
+    state: game,
+  });
+  assert.deepEqual(
+    changeAllegiancesShaddamShiftResolved.influenceAdjustments,
+    [
+      { selector: "activated-ally", faction: "bene", amount: -1 },
+      { selector: "self", faction: "emperor", amount: 1 },
+    ],
+    "Shaddam Change Allegiances should route main-board losses to the activated Ally and personal gains to self",
+  );
+  assert.equal(
+    changeAllegiancesShaddamShiftResolved.influenceGains.emperor,
+    1,
+    "Shaddam Change Allegiances should record personal Emperor Influence gains",
+  );
+  const changeAllegiancesShaddamRoutedSpendResolved = effectResolver.resolveGameEffects(changeAllegiances.effects, {
+    trigger: "plot-intrigue",
+    choiceId: "spend:greatHouses",
+    source: p4,
+    target: p6,
+    state: game,
+  });
+  assert.equal(
+    changeAllegiancesShaddamRoutedSpendResolved.spentResources.spice,
+    3,
+    "Shaddam Change Allegiances routed spend should spend Commander spice",
+  );
+  assert.deepEqual(
+    changeAllegiancesShaddamRoutedSpendResolved.influenceGains,
+    {},
+    "Shaddam Change Allegiances routed spend should not put game-board Influence on the Commander",
+  );
+  assert.equal(
+    changeAllegiancesShaddamRoutedSpendResolved.activatedAlly.influenceGains.greatHouses,
+    1,
+    "Shaddam Change Allegiances routed spend should put game-board Influence on the activated Ally",
+  );
+  const changeAllegiancesShaddamRoutedSpendNoTarget = effectResolver.resolveGameEffects(changeAllegiances.effects, {
+    trigger: "plot-intrigue",
+    choiceId: "spend:greatHouses",
+    source: p4,
+    state: game,
+  });
+  assert.deepEqual(
+    changeAllegiancesShaddamRoutedSpendNoTarget.spentResources,
+    {},
+    "Commander Change Allegiances routed specs should not resolve without an activated Ally target",
+  );
+  assert.deepEqual(
+    changeAllegiancesShaddamRoutedSpendNoTarget.activatedAlly.influenceGains,
+    {},
+    "Commander Change Allegiances routed specs should not gain activated Ally Influence without a target",
+  );
+  const changeAllegiancesShaddamPersonalSpendResolved = effectResolver.resolveGameEffects(changeAllegiances.effects, {
+    trigger: "plot-intrigue",
+    choiceId: "spend:emperor",
+    source: p4,
+    state: game,
+  });
+  assert.equal(
+    changeAllegiancesShaddamPersonalSpendResolved.influenceGains.emperor,
+    1,
+    "Shaddam Change Allegiances personal Emperor spend should resolve without an activated Ally target",
+  );
+  const changeAllegiancesMuadDibBothResolved = effectResolver.resolveGameEffects(changeAllegiances.effects, {
+    trigger: "plot-intrigue",
+    choiceId: "both:fremen->fringeWorlds+spend:fremen",
+    source: p1,
+    target: p5,
+    state: game,
+  });
+  assert.equal(
+    changeAllegiancesMuadDibBothResolved.spentResources.spice,
+    3,
+    "Muad'Dib Change Allegiances both rows should spend Commander spice",
+  );
+  assert.deepEqual(
+    changeAllegiancesMuadDibBothResolved.influenceAdjustments,
+    [
+      { selector: "self", faction: "fremen", amount: -1 },
+      { selector: "activated-ally", faction: "fringeWorlds", amount: 1 },
+      { selector: "self", faction: "fremen", amount: 1 },
+    ],
+    "Muad'Dib Change Allegiances should keep personal Fremen adjustments on self and route main-board gains",
+  );
   assert.ok(
     buyAccess.effects?.some((spec) =>
       spec.trigger === "plot-intrigue" &&

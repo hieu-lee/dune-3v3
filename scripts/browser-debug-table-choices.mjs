@@ -327,6 +327,110 @@ export async function runTableChoicesSmoke({
   assert.match(commanderSietchAfter.log[0], /Princess Irulan gains 1 Bene Gesserit Influence/);
   await screenshot(page, captures, "sietch-ritual-commander-after.png");
 
+  await setDebugGameAndWait(page, states.changeAllegiancesAlly);
+  await waitForActiveIntrigue(page, "Change Allegiances");
+  const allyChangeCard = page.locator(".intrigue-card").filter({ hasText: "Change Allegiances" });
+  await allyChangeCard.getByLabel("Change Allegiances lose Influence").selectOption("greatHouses");
+  await allyChangeCard.getByLabel("Change Allegiances shift gain Influence").selectOption("bene");
+  await allyChangeCard.getByLabel("Change Allegiances spice gain Influence").selectOption("spacing");
+  const allyChangeBothButton = allyChangeCard.getByRole("button", { name: "Both rows" });
+  assert.equal(await allyChangeBothButton.count(), 1, "Expected one Ally Change Allegiances both-rows button");
+  assert.equal(await allyChangeBothButton.isEnabled(), true, "Ally Change Allegiances both rows should be playable");
+  await screenshot(page, captures, "change-allegiances-ally-ready.png");
+
+  const allyChangeBefore = await currentGame(page);
+  const allyChangeOwnerBefore = allyChangeBefore.players.find((player) => player.id === "p2");
+  assert.ok(allyChangeOwnerBefore, "Expected Feyd before Ally Change Allegiances");
+  await allyChangeBothButton.click();
+  await page.waitForFunction(() => {
+    const game = window.__DUNE_DEBUG__?.getGame();
+    const player = game?.players.find((candidate) => candidate.id === "p2");
+    return Boolean(
+      player &&
+        !game.pendingAction &&
+        game.pendingQueue.length === 0 &&
+        player.resources.spice === 0 &&
+        player.influence.greatHouses === 0 &&
+        player.influence.bene === 2 &&
+        player.influence.spacing === 2 &&
+        !player.intrigues.some((card) => card.name === "Change Allegiances") &&
+        game?.intrigueDiscard.at(-1)?.name === "Change Allegiances",
+    );
+  });
+  const allyChangeAfter = await currentGame(page);
+  const allyChangeOwnerAfter = allyChangeAfter.players.find((player) => player.id === "p2");
+  assert.ok(allyChangeOwnerAfter, "Expected Feyd after Ally Change Allegiances");
+  assert.equal(
+    allyChangeOwnerAfter.vp,
+    allyChangeOwnerBefore.vp + 2,
+    "Ally Change Allegiances both rows should award both Influence threshold VPs",
+  );
+  assert.match(
+    allyChangeAfter.log[0],
+    /Change Allegiances; .* loses 1 Great Houses Influence, .* spends 3 spice, and gains 1 Bene Gesserit Influence and gains 1 Spacing Guild Influence/,
+  );
+  await screenshot(page, captures, "change-allegiances-ally-after.png");
+
+  await setDebugGameAndWait(page, states.changeAllegiancesCommander);
+  await waitForActiveIntrigue(page, "Change Allegiances");
+  const commanderChangeCard = page.locator(".intrigue-card").filter({ hasText: "Change Allegiances" });
+  await commanderChangeCard.getByLabel("Change Allegiances lose Influence").selectOption("bene");
+  await commanderChangeCard.getByLabel("Change Allegiances shift gain Influence").selectOption("emperor");
+  await commanderChangeCard.getByLabel("Change Allegiances spice gain Influence").selectOption("greatHouses");
+  const commanderChangeBothButton = commanderChangeCard.getByRole("button", { name: "Both rows" });
+  assert.equal(await commanderChangeBothButton.count(), 1, "Expected one Commander Change Allegiances both-rows button");
+  assert.equal(
+    await commanderChangeBothButton.isEnabled(),
+    true,
+    "Commander Change Allegiances both rows should be playable with an activated Ally",
+  );
+  await screenshot(page, captures, "change-allegiances-commander-ready.png");
+
+  const commanderChangeBefore = await currentGame(page);
+  const commanderChangeSourceBefore = commanderChangeBefore.players.find((player) => player.id === "p4");
+  const commanderChangeOwnerBefore = commanderChangeBefore.players.find((player) => player.id === "p6");
+  assert.ok(commanderChangeSourceBefore, "Expected Shaddam before Commander Change Allegiances");
+  assert.ok(commanderChangeOwnerBefore, "Expected Princess Irulan before Commander Change Allegiances");
+  await commanderChangeBothButton.click();
+  await page.waitForFunction(() => {
+    const game = window.__DUNE_DEBUG__?.getGame();
+    const commander = game?.players.find((candidate) => candidate.id === "p4");
+    const ally = game?.players.find((candidate) => candidate.id === "p6");
+    return Boolean(
+      commander &&
+        ally &&
+        !game.pendingAction &&
+        game.pendingQueue.length === 0 &&
+        commander.resources.spice === 0 &&
+        commander.influence.emperor === 2 &&
+        commander.influence.greatHouses === 0 &&
+        ally.influence.bene === 0 &&
+        ally.influence.greatHouses === 2 &&
+        !commander.intrigues.some((card) => card.name === "Change Allegiances") &&
+        game?.intrigueDiscard.at(-1)?.name === "Change Allegiances",
+    );
+  });
+  const commanderChangeAfter = await currentGame(page);
+  const commanderChangeSourceAfter = commanderChangeAfter.players.find((player) => player.id === "p4");
+  const commanderChangeOwnerAfter = commanderChangeAfter.players.find((player) => player.id === "p6");
+  assert.ok(commanderChangeSourceAfter, "Expected Shaddam after Commander Change Allegiances");
+  assert.ok(commanderChangeOwnerAfter, "Expected Princess Irulan after Commander Change Allegiances");
+  assert.equal(
+    commanderChangeSourceAfter.vp,
+    commanderChangeSourceBefore.vp + 1,
+    "Commander Change Allegiances should award the personal Emperor threshold VP to Shaddam",
+  );
+  assert.equal(
+    commanderChangeOwnerAfter.vp,
+    commanderChangeOwnerBefore.vp + 1,
+    "Commander Change Allegiances should award the routed Great Houses threshold VP to the activated Ally",
+  );
+  assert.match(
+    commanderChangeAfter.log[0],
+    /Princess Irulan loses 1 Bene Gesserit Influence, .* spends 3 spice, and gains 1 Emperor Influence and Princess Irulan gains 1 Great Houses Influence/,
+  );
+  await screenshot(page, captures, "change-allegiances-commander-after.png");
+
   await setDebugGameAndWait(page, states.buyAccessAlly);
   await waitForActiveIntrigue(page, "Buy Access");
   const allyBuyAccessCard = page.locator(".intrigue-card").filter({ hasText: "Buy Access" });
@@ -674,6 +778,8 @@ async function createTableChoiceStates(server, initialPlayableGame) {
   assert.ok(inspireAwe, "Expected Inspire Awe for Plot acquisition browser debug state");
   const sietchRitual = data.intrigueCards.find((card) => card.name === "Sietch Ritual");
   assert.ok(sietchRitual, "Expected Sietch Ritual for Plot discard-for-Influence browser debug state");
+  const changeAllegiances = data.intrigueCards.find((card) => card.name === "Change Allegiances");
+  assert.ok(changeAllegiances, "Expected Change Allegiances for Plot Influence browser debug state");
   const buyAccess = data.intrigueCards.find((card) => card.name === "Buy Access");
   assert.ok(buyAccess, "Expected Buy Access for Plot Influence browser debug state");
   const imperiumPolitics = data.intrigueCards.find((card) => card.name === "Imperium Politics");
@@ -952,6 +1058,49 @@ async function createTableChoiceStates(server, initialPlayableGame) {
     },
     sietchRitualDiscardCardId: sietchRitualDiscardCard.id,
     sietchRitualDiscardCardName: sietchRitualDiscardCard.name,
+    changeAllegiancesAlly: {
+      ...base,
+      activeSeat: feydSeat,
+      intrigueDiscard: [],
+      players: base.players.map((player) =>
+        player.id === "p2"
+          ? {
+              ...player,
+              hand: [],
+              influence: { ...player.influence, greatHouses: 1, spacing: 1, bene: 1 },
+              intrigues: [cloneCard(changeAllegiances)],
+              resources: { ...player.resources, spice: 3 },
+              revealed: false,
+            }
+          : { ...player, intrigues: [] }
+      ),
+    },
+    changeAllegiancesCommander: {
+      ...base,
+      activeSeat: shaddamSeat,
+      intrigueDiscard: [],
+      players: base.players.map((player) => {
+        if (player.id === "p4") {
+          return {
+            ...player,
+            hand: [],
+            influence: { ...player.influence, emperor: 1, greatHouses: 0 },
+            intrigues: [cloneCard(changeAllegiances)],
+            resources: { ...player.resources, spice: 3 },
+            revealActivatedAllyId: "p6",
+            revealed: true,
+          };
+        }
+        if (player.id === "p6") {
+          return {
+            ...player,
+            influence: { ...player.influence, bene: 1, greatHouses: 1 },
+            intrigues: [],
+          };
+        }
+        return { ...player, intrigues: [] };
+      }),
+    },
     buyAccessAlly: {
       ...base,
       activeSeat: feydSeat,

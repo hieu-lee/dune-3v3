@@ -472,6 +472,7 @@ export function IntrigueHandPanel({
                       <label>
                         <span>Lose</span>
                         <select
+                          aria-label="Change Allegiances lose Influence"
                           className="intrigue-select"
                           value={selectedChangeLoss ?? ""}
                           onChange={(event) =>
@@ -490,6 +491,7 @@ export function IntrigueHandPanel({
                       <label>
                         <span>Gain</span>
                         <select
+                          aria-label="Change Allegiances shift gain Influence"
                           className="intrigue-select"
                           value={selectedChangeShiftGain ?? ""}
                           onChange={(event) =>
@@ -528,6 +530,7 @@ export function IntrigueHandPanel({
                     <label>
                       <span>3 Spice gain</span>
                       <select
+                        aria-label="Change Allegiances spice gain Influence"
                         className="intrigue-select"
                         value={selectedChangeSpiceGain ?? ""}
                         onChange={(event) =>

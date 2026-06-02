@@ -664,9 +664,6 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
     return addSelectedResourceSpend(result, effect.selector, effect.resource, amount);
   }
   if (effect.kind === "lose-influence") {
-    if (effect.selector !== "self") {
-      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
-    }
     const amount = amountFor(effect.amount, context.source);
     return {
       ...result,

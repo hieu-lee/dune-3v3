@@ -19,7 +19,6 @@ import {
 } from "./influence-choices";
 import {
   changeAllegiancesLossChoices,
-  influenceEffectOwnerForChoice,
 } from "./influence-loss-rules";
 import type {
   BuyAccessChoice,
@@ -27,9 +26,6 @@ import type {
   InfluenceLossPair,
   SietchRitualChoice,
 } from "./influence-choices";
-import {
-  adjustInfluenceAndResolveThresholdRewards,
-} from "./leader-rewards";
 import { playTypedPlotIntrigue } from "./plot-intrigue-effect-rules";
 import type {
   FactionId,
@@ -114,6 +110,46 @@ function changeAllegiancesSpiceGainFaction(choice: ChangeAllegiancesChoice) {
   return undefined;
 }
 
+function changeAllegiancesChoiceId(choice: ChangeAllegiancesChoice) {
+  if (!choice || typeof choice !== "object") return undefined;
+  if (
+    choice.kind === "shift" &&
+    isInfluenceLossFaction(choice.loseFaction) &&
+    isInfluenceLossFaction(choice.gainFaction)
+  ) {
+    return `shift:${choice.loseFaction}->${choice.gainFaction}`;
+  }
+  if (choice.kind === "spend-spice" && isInfluenceLossFaction(choice.gainFaction)) {
+    return `spend:${choice.gainFaction}`;
+  }
+  if (
+    choice.kind === "both" &&
+    isInfluenceLossFaction(choice.loseFaction) &&
+    isInfluenceLossFaction(choice.shiftGainFaction) &&
+    isInfluenceLossFaction(choice.spiceGainFaction)
+  ) {
+    return `both:${choice.loseFaction}->${choice.shiftGainFaction}+spend:${choice.spiceGainFaction}`;
+  }
+  return undefined;
+}
+
+function changeAllegiancesSelectedFactions(choice: ChangeAllegiancesChoice) {
+  if (choice.kind === "shift") return [choice.loseFaction, choice.gainFaction];
+  if (choice.kind === "spend-spice") return [choice.gainFaction];
+  return [choice.loseFaction, choice.shiftGainFaction, choice.spiceGainFaction];
+}
+
+function changeAllegiancesEffectOwner(
+  player: Player,
+  faction: FactionId,
+  activatedAlly: Player | undefined,
+) {
+  const personalFaction = commanderPersonalFaction(player);
+  return player.role === "Commander" && faction !== personalFaction
+    ? activatedAlly
+    : player;
+}
+
 export function playChangeAllegiancesPlotIntrigue(
   state: GameState,
   playerId: string,
@@ -121,88 +157,53 @@ export function playChangeAllegiancesPlotIntrigue(
   choice: ChangeAllegiancesChoice,
   influenceOwnerId?: string,
 ): GameState {
-  if (state.phase !== "playing" || state.pendingAction || state.pendingQueue.length > 0) return state;
   const player = state.players[state.activeSeat];
   if (!player || player.id !== playerId) return state;
-  const intrigue = player.intrigues.find((card) => card.id === intrigueId);
-  if (!intrigue || !isChangeAllegiancesIntrigue(intrigue)) return state;
+  const choiceId = changeAllegiancesChoiceId(choice);
+  if (!choiceId) return state;
   if (!changeAllegiancesChoiceValid(state, player, choice, influenceOwnerId)) return state;
   const spendsSpice = choice.kind === "spend-spice" || choice.kind === "both";
   if (spendsSpice && player.resources.spice < 3) return state;
 
   const shiftGainFaction = changeAllegiancesShiftGainFaction(choice);
   const spiceGainFaction = changeAllegiancesSpiceGainFaction(choice);
-  const shiftGainOwnerResult = shiftGainFaction
-    ? influenceEffectOwnerForChoice(state, player, shiftGainFaction, influenceOwnerId)
-    : undefined;
-  if (shiftGainOwnerResult && (!shiftGainOwnerResult.valid || !shiftGainOwnerResult.owner)) return state;
-  const spiceGainOwnerResult = spiceGainFaction
-    ? influenceEffectOwnerForChoice(state, player, spiceGainFaction, influenceOwnerId)
-    : undefined;
-  if (spiceGainOwnerResult && (!spiceGainOwnerResult.valid || !spiceGainOwnerResult.owner)) return state;
-  const lossFaction = choice.kind === "shift" || choice.kind === "both" ? choice.loseFaction : undefined;
-  const lossOwnerResult = lossFaction
-    ? influenceEffectOwnerForChoice(state, player, lossFaction, influenceOwnerId)
-    : undefined;
-  if (lossOwnerResult && (!lossOwnerResult.valid || !lossOwnerResult.owner)) return state;
-  if (lossOwnerResult?.owner && lossFaction && lossOwnerResult.owner.influence[lossFaction] <= 0) return state;
+  const personalFaction = commanderPersonalFaction(player);
+  const requiresActivatedAlly = player.role === "Commander" &&
+    changeAllegiancesSelectedFactions(choice).some((faction) => faction !== personalFaction);
 
-  const lossOwner = lossOwnerResult?.owner;
-  const players = state.players.map((candidate) => {
-    let next = candidate;
-    if (candidate.id === player.id) {
-      next = {
-        ...next,
-        resources: spendsSpice
-          ? { ...next.resources, spice: next.resources.spice - 3 }
-          : next.resources,
-        intrigues: next.intrigues.filter((card) => card.id !== intrigue.id),
-      };
-    }
-    return next;
-  });
-  const gainEffects = [
-    ...(shiftGainFaction && shiftGainOwnerResult?.owner
-      ? [{ owner: shiftGainOwnerResult.owner, faction: shiftGainFaction }]
-      : []),
-    ...(spiceGainFaction && spiceGainOwnerResult?.owner
-      ? [{ owner: spiceGainOwnerResult.owner, faction: spiceGainFaction }]
-      : []),
-  ];
-  const gainText = gainEffects
-    .map(({ owner, faction }) =>
-      owner.id === player.id
-        ? `gains 1 ${factionLabels[faction]} Influence`
-        : `${owner.leader} gains 1 ${factionLabels[faction]} Influence`
-    )
-    .join(" and ");
-  const logEntry = choice.kind === "spend-spice"
-    ? `${player.leader} plays Change Allegiances, spends 3 spice, and ${gainText}.`
-    : choice.kind === "shift"
-      ? `${player.leader} plays Change Allegiances; ${lossOwner?.leader ?? player.leader} loses 1 ${factionLabels[choice.loseFaction]} Influence and ${gainText}.`
-      : `${player.leader} plays Change Allegiances; ${lossOwner?.leader ?? player.leader} loses 1 ${factionLabels[choice.loseFaction]} Influence, ${player.leader} spends 3 spice, and ${gainText}.`;
-
-  const nextState = {
-    ...state,
-    players,
-    intrigueDiscard: [...state.intrigueDiscard, intrigue],
-    log: [logEntry, ...state.log],
-  };
-  const influenceSteps = [
-    ...(lossOwner && lossFaction
-      ? [{ ownerId: lossOwner.id, faction: lossFaction, amount: -1 }]
-      : []),
-    ...(shiftGainFaction && shiftGainOwnerResult?.owner
-      ? [{ ownerId: shiftGainOwnerResult.owner.id, faction: shiftGainFaction, amount: 1 }]
-      : []),
-    ...(spiceGainFaction && spiceGainOwnerResult?.owner
-      ? [{ ownerId: spiceGainOwnerResult.owner.id, faction: spiceGainFaction, amount: 1 }]
-      : []),
-  ];
-  return influenceSteps.reduce(
-    (next, { ownerId, faction, amount }) =>
-      adjustInfluenceAndResolveThresholdRewards(next, ownerId, faction, amount),
-    nextState,
+  return playTypedPlotIntrigue(
+    state,
+    playerId,
+    intrigueId,
+    isChangeAllegiancesIntrigue,
+    (actor, _contractPending, activatedAlly) => {
+      const gainEffects = [
+        ...(shiftGainFaction
+          ? [{ owner: changeAllegiancesEffectOwner(actor, shiftGainFaction, activatedAlly), faction: shiftGainFaction }]
+          : []),
+        ...(spiceGainFaction
+          ? [{ owner: changeAllegiancesEffectOwner(actor, spiceGainFaction, activatedAlly), faction: spiceGainFaction }]
+          : []),
+      ];
+      const gainText = gainEffects
+        .map(({ owner, faction }) =>
+          owner && owner.id !== actor.id
+            ? `${owner.leader} gains 1 ${factionLabels[faction]} Influence`
+            : `gains 1 ${factionLabels[faction]} Influence`
+        )
+        .join(" and ");
+      if (choice.kind === "spend-spice") {
+        return `${actor.leader} plays Change Allegiances, spends 3 spice, and ${gainText}.`;
+      }
+      const lossOwner = changeAllegiancesEffectOwner(actor, choice.loseFaction, activatedAlly);
+      return choice.kind === "shift"
+        ? `${actor.leader} plays Change Allegiances; ${lossOwner?.leader ?? actor.leader} loses 1 ${factionLabels[choice.loseFaction]} Influence and ${gainText}.`
+        : `${actor.leader} plays Change Allegiances; ${lossOwner?.leader ?? actor.leader} loses 1 ${factionLabels[choice.loseFaction]} Influence, ${actor.leader} spends 3 spice, and ${gainText}.`;
+    },
+    {
+      choiceId,
+      ...(requiresActivatedAlly ? { activatedAllyOwnerId: influenceOwnerId, requireActivatedAlly: true } : {}),
+    },
   );
 }
 

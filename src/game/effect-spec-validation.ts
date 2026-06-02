@@ -164,7 +164,10 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
   if (
     effect.selector === "activated-ally" &&
     trigger !== "agent-play" &&
-    !(trigger === "plot-intrigue" && (effect.kind === "recruit-troops" || effect.kind === "gain-influence"))
+    !(
+      trigger === "plot-intrigue" &&
+      (effect.kind === "recruit-troops" || effect.kind === "gain-influence" || effect.kind === "lose-influence")
+    )
   ) {
     throw new Error(`Unsupported effect selector "${effect.selector}" for ${trigger}`);
   }
@@ -205,9 +208,6 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
   if (effect.kind === "lose-influence") {
     if (trigger !== "plot-intrigue") {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
-    }
-    if (effect.selector !== "self") {
-      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
     }
     if (!supportedFactions.has(effect.faction)) {
       throw new Error(`Unsupported effect faction "${effect.faction}"`);

@@ -6,6 +6,7 @@ import {
   calculusOfPowerSourceId,
   callToArmsSourceId,
   cargoRunnerSourceId,
+  changeAllegiancesSourceId,
   capturedMentatSourceId,
   chaniCleverTacticianSourceId,
   contingencyPlanSourceId,
@@ -102,6 +103,8 @@ import {
   plotPlaceSpies,
   plotRecruitTroops,
   plotResourceExchange,
+  plotShiftInfluence,
+  plotShiftInfluenceAndPayResourceForInfluenceGains,
   plotSpendResource,
   plotTakeContracts,
   plotTrashCard,
@@ -145,6 +148,15 @@ const influenceLossFactions: FactionId[] = [
 const buyAccessAllyFactions: FactionId[] = ["greatHouses", "fringeWorlds", "bene", "spacing"];
 const buyAccessShaddamFactions: FactionId[] = ["emperor", "greatHouses", "fringeWorlds", "bene", "spacing"];
 const buyAccessMuadDibFactions: FactionId[] = ["greatHouses", "fremen", "fringeWorlds", "bene", "spacing"];
+const changeAllegiancesAllyFactions: FactionId[] = ["greatHouses", "spacing", "bene", "fringeWorlds"];
+const changeAllegiancesShaddamFactions: FactionId[] = ["emperor", ...changeAllegiancesAllyFactions];
+const changeAllegiancesMuadDibFactions: FactionId[] = [
+  "greatHouses",
+  "spacing",
+  "bene",
+  "fremen",
+  "fringeWorlds",
+];
 
 function buyAccessChoiceId(first: FactionId, second: FactionId) {
   return `${first}+${second}`;
@@ -177,6 +189,68 @@ function buyAccessPlotSpecsFor(
         )
       )
   );
+}
+
+function changeAllegiancesShiftChoiceId(loseFaction: FactionId, gainFaction: FactionId) {
+  return `shift:${loseFaction}->${gainFaction}`;
+}
+
+function changeAllegiancesSpendChoiceId(gainFaction: FactionId) {
+  return `spend:${gainFaction}`;
+}
+
+function changeAllegiancesBothChoiceId(
+  loseFaction: FactionId,
+  shiftGainFaction: FactionId,
+  spiceGainFaction: FactionId,
+) {
+  return `both:${loseFaction}->${shiftGainFaction}+spend:${spiceGainFaction}`;
+}
+
+function changeAllegiancesPlotSpecsFor(
+  factions: FactionId[],
+  ownerForFaction: (faction: FactionId) => "self" | "activated-ally",
+  conditions: GameEffectConditionSpec[],
+): CardEffectSpec[] {
+  const shiftSpecs = factions.flatMap((loseFaction) =>
+    factions.map((gainFaction) =>
+      plotShiftInfluence(
+        changeAllegiancesShiftChoiceId(loseFaction, gainFaction),
+        { selector: ownerForFaction(loseFaction), faction: loseFaction, amount: 1 },
+        { selector: ownerForFaction(gainFaction), faction: gainFaction, amount: 1 },
+        conditions,
+      )
+    )
+  );
+  const spendSpecs = factions.map((gainFaction) =>
+    plotPayResourceForInfluence(
+      changeAllegiancesSpendChoiceId(gainFaction),
+      "spice",
+      3,
+      ownerForFaction(gainFaction),
+      gainFaction,
+      1,
+      conditions,
+    )
+  );
+  const bothSpecs = factions.flatMap((loseFaction) =>
+    factions.flatMap((shiftGainFaction) =>
+      factions.map((spiceGainFaction) =>
+        plotShiftInfluenceAndPayResourceForInfluenceGains(
+          changeAllegiancesBothChoiceId(loseFaction, shiftGainFaction, spiceGainFaction),
+          { selector: ownerForFaction(loseFaction), faction: loseFaction, amount: 1 },
+          "spice",
+          3,
+          [
+            { selector: ownerForFaction(shiftGainFaction), faction: shiftGainFaction, amount: 1 },
+            { selector: ownerForFaction(spiceGainFaction), faction: spiceGainFaction, amount: 1 },
+          ],
+          conditions,
+        )
+      )
+    )
+  );
+  return [...shiftSpecs, ...spendSpecs, ...bothSpecs];
 }
 
 export {
@@ -932,6 +1006,21 @@ function intrigueCardEffects(card: HubCard): CardEffectSpec[] | undefined {
       plotDiscardCardForInfluence("bene", "bene", "activated-ally", [hasRole("Commander")]),
       plotDiscardCardForInfluence("fringeWorlds", "fringeWorlds", "activated-ally", [hasRole("Commander")]),
       plotDiscardCardForInfluence("fremen", "fremen", "self", [hasRole("Commander"), hasTeam("muaddib")]),
+    ];
+  }
+  if (card.id === changeAllegiancesSourceId) {
+    return [
+      ...changeAllegiancesPlotSpecsFor(changeAllegiancesAllyFactions, () => "self", [hasRole("Ally")]),
+      ...changeAllegiancesPlotSpecsFor(
+        changeAllegiancesShaddamFactions,
+        (faction) => faction === "emperor" ? "self" : "activated-ally",
+        [hasRole("Commander"), hasTeam("shaddam")],
+      ),
+      ...changeAllegiancesPlotSpecsFor(
+        changeAllegiancesMuadDibFactions,
+        (faction) => faction === "fremen" ? "self" : "activated-ally",
+        [hasRole("Commander"), hasTeam("muaddib")],
+      ),
     ];
   }
   if (card.id === cunningSourceId) {

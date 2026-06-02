@@ -238,6 +238,33 @@ export function plotPayResourceForInfluenceGains(
   ], conditions, { choiceId });
 }
 
+export function plotShiftInfluence(
+  choiceId: string,
+  loss: { selector: PlayerSelector; faction: FactionId; amount: EffectAmountSpec },
+  gain: { selector: PlayerSelector; faction: FactionId; amount: EffectAmountSpec },
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return plotIntrigueEffects([
+    { kind: "lose-influence", selector: loss.selector, faction: loss.faction, amount: loss.amount },
+    { kind: "gain-influence", selector: gain.selector, faction: gain.faction, amount: gain.amount },
+  ], conditions, { choiceId });
+}
+
+export function plotShiftInfluenceAndPayResourceForInfluenceGains(
+  choiceId: string,
+  loss: { selector: PlayerSelector; faction: FactionId; amount: EffectAmountSpec },
+  resource: ResourceId,
+  resourceAmount: EffectAmountSpec,
+  gains: Array<{ selector: PlayerSelector; faction: FactionId; amount: EffectAmountSpec }>,
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return plotIntrigueEffects([
+    { kind: "lose-influence", selector: loss.selector, faction: loss.faction, amount: loss.amount },
+    { kind: "spend-resource", selector: "self", resource, amount: resourceAmount },
+    ...gains.map(({ selector, faction, amount }) => ({ kind: "gain-influence" as const, selector, faction, amount })),
+  ], conditions, { choiceId });
+}
+
 export function plotPayResourcesForVp(
   choiceId: string,
   costs: Array<{ resource: ResourceId; amount: EffectAmountSpec }>,

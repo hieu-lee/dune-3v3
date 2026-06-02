@@ -87,30 +87,34 @@ export function plotGainResource(
   resource: ResourceId,
   amount: EffectAmountSpec,
   conditions?: GameEffectConditionSpec[],
+  options?: CardEffectSpecOptions,
 ): CardEffectSpec {
-  return plotIntrigueEffects([{ kind: "gain-resource", selector: "self", resource, amount }], conditions);
+  return plotIntrigueEffects([{ kind: "gain-resource", selector: "self", resource, amount }], conditions, options);
 }
 
 export function plotDrawCards(
   amount: EffectAmountSpec,
   conditions?: GameEffectConditionSpec[],
+  options?: CardEffectSpecOptions,
 ): CardEffectSpec {
-  return plotIntrigueEffects([{ kind: "draw-cards", selector: "self", amount }], conditions);
+  return plotIntrigueEffects([{ kind: "draw-cards", selector: "self", amount }], conditions, options);
 }
 
 export function plotDrawIntrigues(
   amount: EffectAmountSpec,
   conditions?: GameEffectConditionSpec[],
+  options?: CardEffectSpecOptions,
 ): CardEffectSpec {
-  return plotIntrigueEffects([{ kind: "draw-intrigues", selector: "self", amount }], conditions);
+  return plotIntrigueEffects([{ kind: "draw-intrigues", selector: "self", amount }], conditions, options);
 }
 
 export function plotSpendResource(
   resource: ResourceId,
   amount: EffectAmountSpec,
   conditions?: GameEffectConditionSpec[],
+  options?: CardEffectSpecOptions,
 ): CardEffectSpec {
-  return plotIntrigueEffects([{ kind: "spend-resource", selector: "self", resource, amount }], conditions);
+  return plotIntrigueEffects([{ kind: "spend-resource", selector: "self", resource, amount }], conditions, options);
 }
 
 export function plotResourceExchange(
@@ -143,8 +147,9 @@ export function plotRecruitTroops(
   selector: PlayerSelector,
   amount: EffectAmountSpec,
   conditions?: GameEffectConditionSpec[],
+  options?: CardEffectSpecOptions,
 ): CardEffectSpec {
-  return plotIntrigueEffects([{ kind: "recruit-troops", selector, amount }], conditions);
+  return plotIntrigueEffects([{ kind: "recruit-troops", selector, amount }], conditions, options);
 }
 
 export function plotTakeContracts(

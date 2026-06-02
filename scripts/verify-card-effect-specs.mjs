@@ -161,6 +161,7 @@ try {
   const spiceMustFlow = data.reserveMarket.find((card) => card.sourceId === 538);
   const councilorsAmbition = data.intrigueCards.find((card) => card.name === "Councilor's Ambition");
   const contingencyPlan = data.intrigueCards.find((card) => card.name === "Contingency Plan");
+  const departForArrakis = data.intrigueCards.find((card) => card.name === "Depart For Arrakis");
   const intelligenceReport = data.intrigueCards.find((card) => card.name === "Intelligence Report");
   const leverage = data.intrigueCards.find((card) => card.name === "Leverage");
   const marketOpportunity = data.intrigueCards.find((card) => card.name === "Market Opportunity");
@@ -234,7 +235,7 @@ try {
     wheelsWithinWheels,
   );
   assert.ok(commandRespect && prepareTheWay && spiceMustFlow && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
-  assert.ok(councilorsAmbition && contingencyPlan && intelligenceReport && leverage && marketOpportunity && mercenaries && shaddamsFavor && strategicStockpiling);
+  assert.ok(councilorsAmbition && contingencyPlan && departForArrakis && intelligenceReport && leverage && marketOpportunity && mercenaries && shaddamsFavor && strategicStockpiling);
   assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && dutifulService && deliverSupplies && sietchTabr && spiceRefinery);
   assert.equal(revealSpecCards.length, 79, "Unexpected number of cards with declarative Reveal specs");
   assert.equal(
@@ -495,6 +496,166 @@ try {
     mercenariesCommanderResolved.activatedAlly.recruitedTroops,
     2,
     "Mercenaries Plot spec should route Commander troop recruitment to the activated Ally",
+  );
+  assert.ok(
+    departForArrakis.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.choiceId === "draw" &&
+      spec.conditions?.some((condition) =>
+        condition.kind === "has-influence" &&
+        condition.faction === "fremen" &&
+        condition.amount === 3
+      ) &&
+      spec.effects.some((effect) =>
+        effect.kind === "draw-cards" &&
+        effect.selector === "self" &&
+        effect.amount === 1
+      )
+    ),
+    "Depart For Arrakis should carry a typed Fremen-gated draw choice spec",
+  );
+  assert.ok(
+    departForArrakis.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.choiceId === "spend-spice" &&
+      spec.effects.some((effect) =>
+        effect.kind === "spend-resource" &&
+        effect.selector === "self" &&
+        effect.resource === "spice" &&
+        effect.amount === 2
+      )
+    ),
+    "Depart For Arrakis should carry a typed spice spend choice spec",
+  );
+  assert.ok(
+    departForArrakis.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.choiceId === "spend-spice" &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Ally") &&
+      spec.effects.some((effect) =>
+        effect.kind === "recruit-troops" &&
+        effect.selector === "self" &&
+        effect.amount === 3
+      )
+    ),
+    "Depart For Arrakis should carry a typed Ally troop recruit choice spec",
+  );
+  assert.ok(
+    departForArrakis.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.choiceId === "spend-spice" &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Commander") &&
+      spec.effects.some((effect) =>
+        effect.kind === "recruit-troops" &&
+        effect.selector === "activated-ally" &&
+        effect.amount === 3
+      )
+    ),
+    "Depart For Arrakis should carry a typed Commander activated-Ally troop recruit choice spec",
+  );
+  assert.ok(
+    departForArrakis.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.choiceId === "spend-spice" &&
+      spec.conditions?.some((condition) =>
+        condition.kind === "has-influence" &&
+        condition.faction === "fremen" &&
+        condition.amount === 3
+      ) &&
+      spec.effects.some((effect) =>
+        effect.kind === "draw-cards" &&
+        effect.selector === "self" &&
+        effect.amount === 1
+      )
+    ),
+    "Depart For Arrakis should carry a typed conditional draw on the spice choice",
+  );
+  const departNoChoiceResolved = effectResolver.resolveGameEffects(departForArrakis.effects, {
+    trigger: "plot-intrigue",
+    source: p2,
+    state: game,
+  });
+  assert.deepEqual(
+    departNoChoiceResolved.spentResources,
+    {},
+    "Depart For Arrakis Plot choice specs should not resolve without a selected choice",
+  );
+  assert.equal(departNoChoiceResolved.cardsToDraw, 0, "Depart For Arrakis should not draw without a selected choice");
+  assert.equal(departNoChoiceResolved.recruitedTroops, 0, "Depart For Arrakis should not recruit without a selected choice");
+  const departFringePlayer = { ...p2, influence: { ...p2.influence, fringeWorlds: 3 } };
+  const departFringeState = {
+    players: game.players.map((player) => player.id === p2.id ? departFringePlayer : player),
+  };
+  const departDrawResolved = effectResolver.resolveGameEffects(departForArrakis.effects, {
+    trigger: "plot-intrigue",
+    choiceId: "draw",
+    source: departFringePlayer,
+    state: departFringeState,
+  });
+  assert.equal(departDrawResolved.cardsToDraw, 1, "Depart For Arrakis draw choice should draw with 3 Fringe Worlds Influence");
+  assert.deepEqual(departDrawResolved.spentResources, {}, "Depart For Arrakis draw choice should not spend spice");
+  assert.equal(departDrawResolved.recruitedTroops, 0, "Depart For Arrakis draw choice should not recruit troops");
+  const departDrawBlockedResolved = effectResolver.resolveGameEffects(departForArrakis.effects, {
+    trigger: "plot-intrigue",
+    choiceId: "draw",
+    source: p2,
+    state: game,
+  });
+  assert.equal(departDrawBlockedResolved.cardsToDraw, 0, "Depart For Arrakis draw choice should require Fremen/Fringe Influence");
+  const departSpiceOnlyResolved = effectResolver.resolveGameEffects(departForArrakis.effects, {
+    trigger: "plot-intrigue",
+    choiceId: "spend-spice",
+    source: p2,
+    state: game,
+  });
+  assert.equal(departSpiceOnlyResolved.spentResources.spice, 2, "Depart For Arrakis spice choice should spend 2 spice");
+  assert.equal(departSpiceOnlyResolved.recruitedTroops, 3, "Depart For Arrakis spice choice should recruit 3 troops for Allies");
+  assert.equal(departSpiceOnlyResolved.cardsToDraw, 0, "Depart For Arrakis spice choice should skip draw below the Fremen/Fringe threshold");
+  const departSpiceDrawResolved = effectResolver.resolveGameEffects(departForArrakis.effects, {
+    trigger: "plot-intrigue",
+    choiceId: "spend-spice",
+    source: departFringePlayer,
+    state: departFringeState,
+  });
+  assert.equal(departSpiceDrawResolved.spentResources.spice, 2, "Depart For Arrakis spice-plus-draw choice should spend 2 spice");
+  assert.equal(departSpiceDrawResolved.recruitedTroops, 3, "Depart For Arrakis spice-plus-draw choice should recruit 3 troops");
+  assert.equal(departSpiceDrawResolved.cardsToDraw, 1, "Depart For Arrakis spice choice should draw when the threshold is met");
+  const departCommanderAlly = { ...p6, influence: { ...p6.influence, fringeWorlds: 3 } };
+  const departCommanderState = {
+    players: game.players.map((player) => player.id === p6.id ? departCommanderAlly : player),
+  };
+  const departCommanderResolved = effectResolver.resolveGameEffects(departForArrakis.effects, {
+    trigger: "plot-intrigue",
+    choiceId: "spend-spice",
+    source: p4,
+    target: departCommanderAlly,
+    state: departCommanderState,
+  });
+  assert.equal(departCommanderResolved.spentResources.spice, 2, "Commander Depart For Arrakis should spend Commander spice");
+  assert.equal(departCommanderResolved.recruitedTroops, 0, "Commander Depart For Arrakis should not recruit for the Commander");
+  assert.equal(
+    departCommanderResolved.activatedAlly.recruitedTroops,
+    3,
+    "Commander Depart For Arrakis should route troop recruitment to the activated Ally",
+  );
+  assert.equal(
+    departCommanderResolved.cardsToDraw,
+    1,
+    "Commander Depart For Arrakis should use same-team Ally Fringe Worlds Influence for the draw threshold",
+  );
+  const departMuadDibPlayer = { ...p1, influence: { ...p1.influence, fremen: 3 } };
+  const departMuadDibResolved = effectResolver.resolveGameEffects(departForArrakis.effects, {
+    trigger: "plot-intrigue",
+    choiceId: "draw",
+    source: departMuadDibPlayer,
+    state: {
+      players: game.players.map((player) => player.id === p1.id ? departMuadDibPlayer : player),
+    },
+  });
+  assert.equal(
+    departMuadDibResolved.cardsToDraw,
+    1,
+    "Muad'Dib Depart For Arrakis should use personal Fremen Influence for the draw threshold",
   );
   assert.ok(
     marketOpportunity.effects?.some((spec) =>

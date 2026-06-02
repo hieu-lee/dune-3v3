@@ -11,6 +11,7 @@ import {
   dangerousRhetoricSourceId,
   desertPowerSourceId,
   doubleAgentSourceId,
+  departForArrakisSourceId,
   ecologicalTestingStationSourceId,
   fedaykinStilltentSourceId,
   guildEnvoySourceId,
@@ -844,6 +845,15 @@ function intrigueCardEffects(card: HubCard): CardEffectSpec[] | undefined {
     return [
       plotGainResource("solari", 1, [gainedSpiceThisTurn()]),
       plotTakeContracts(1, { optional: true, source: "Leverage" }, [gainedSpiceThisTurn()]),
+    ];
+  }
+  if (card.id === departForArrakisSourceId) {
+    return [
+      plotDrawCards(1, [hasInfluence("fremen", 3)], { choiceId: "draw" }),
+      plotSpendResource("spice", 2, undefined, { choiceId: "spend-spice" }),
+      plotRecruitTroops("self", 3, [hasRole("Ally")], { choiceId: "spend-spice" }),
+      plotRecruitTroops("activated-ally", 3, [hasRole("Commander")], { choiceId: "spend-spice" }),
+      plotDrawCards(1, [hasInfluence("fremen", 3)], { choiceId: "spend-spice" }),
     ];
   }
   if (card.id === intelligenceReportSourceId) {

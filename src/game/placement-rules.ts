@@ -8,6 +8,7 @@ import {
   canHaveMakerHooks,
   canSummonSandworms,
 } from "./conflict-rules";
+import { playerTroopSupply } from "./deck-utils";
 import { mainBoardInfluenceChoices, changeAllegiancesGainChoices } from "./influence-choices";
 import { playerHasSpyPost } from "./spy-posts";
 import { defaultTradePartnerId } from "./trade-rules";
@@ -115,16 +116,22 @@ export function pendingActionForSpace(
   players: Player[],
   extraRecruitedTroops = 0,
   deploymentsBlocked = false,
+  boardRecruitedTroops = space.troops ?? 0,
 ): PendingAction | undefined {
   if (space.spy && source.spies > 0) {
     return { kind: "spy", ownerId: source.id, remaining: Math.min(space.spy, source.spies), source: space.name };
   }
 
   if (space.team === "reinforce") {
+    const teamTroopSupply = players
+      .filter((player) => player.team === source.team && player.role === "Ally")
+      .reduce((total, player) => total + playerTroopSupply(player), 0);
+    const remaining = Math.min(space.troops ?? 0, teamTroopSupply);
+    if (remaining <= 0) return undefined;
     return {
       kind: "reinforce",
       team: source.team,
-      remaining: space.troops ?? 0,
+      remaining,
       source: space.name,
       ...(deploymentsBlocked ? { conflictBlocked: true } : {}),
     };
@@ -147,7 +154,10 @@ export function pendingActionForSpace(
   }
 
   if (space.combat && !deploymentsBlocked) {
-    const deployable = Math.min(target.garrison, (space.troops ?? 0) + Math.max(0, extraRecruitedTroops) + 2);
+    const deployable = Math.min(
+      target.garrison,
+      Math.max(0, boardRecruitedTroops) + Math.max(0, extraRecruitedTroops) + 2,
+    );
     if (deployable > 0) {
       return { kind: "deploy", ownerId: target.id, remaining: deployable, source: space.name };
     }

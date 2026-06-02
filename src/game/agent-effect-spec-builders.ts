@@ -146,8 +146,10 @@ export function agentDiscardCardForDraw(
 
 export function agentTrashIntrigueForReward(
   options: {
+    cost?: Partial<Record<ResourceId, EffectAmountSpec>>;
     drawIntrigues?: EffectAmountSpec;
     gain?: Partial<Record<ResourceId, EffectAmountSpec>>;
+    gainVp?: EffectAmountSpec;
     optional?: boolean;
     source?: string;
   },
@@ -157,8 +159,10 @@ export function agentTrashIntrigueForReward(
     {
       kind: "trash-intrigue-for-reward",
       selector: "self",
+      ...(options.cost ? { cost: { ...options.cost } } : {}),
       ...(options.drawIntrigues !== undefined ? { drawIntrigues: options.drawIntrigues } : {}),
       ...(options.gain ? { gain: { ...options.gain } } : {}),
+      ...(options.gainVp !== undefined ? { gainVp: options.gainVp } : {}),
       ...(options.optional !== undefined ? { optional: options.optional } : {}),
       ...(options.source ? { source: options.source } : {}),
     },

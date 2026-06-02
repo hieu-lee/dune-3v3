@@ -186,7 +186,10 @@ export function verifyEconomyPlotIntrigues({ cards, data, game, state }) {
     "Commander Mercenaries should recruit for the activated Ally",
   );
   assert.equal(playerById(commanderMercenaries, "p2").garrison, 1, "Commander Mercenaries should not recruit for another Ally");
-  assert.match(commanderMercenaries.log[0], /Shaddam Corrino IV plays Mercenaries for Princess Irulan/);
+  assert.match(
+    commanderMercenaries.log[0],
+    /Shaddam Corrino IV plays Mercenaries, spends 3 Solari, and recruits 2 troops for Princess Irulan\./,
+  );
   assert.equal(
     state.playMercenariesPlotIntrigue(commanderMercenariesFixture, "p4", mercenaries.id, "p3"),
     commanderMercenariesFixture,
@@ -469,6 +472,27 @@ export function verifyEconomyPlotIntrigues({ cards, data, game, state }) {
   assert.deepEqual(playerById(shaddamsFavorRecruit, "p2").intrigues, []);
   assert.equal(shaddamsFavorRecruit.intrigueDiscard.at(-1).id, shaddamsFavor.id);
   assert.match(shaddamsFavorRecruit.log[0], /plays Shaddam's Favor, recruits 1 troop\./);
+  const shaddamsFavorNoSupplyFixture = {
+    ...shaddamsFavorFixture,
+    players: shaddamsFavorFixture.players.map((candidate) =>
+      candidate.id === "p2"
+        ? {
+            ...candidate,
+            deployedTroops: 0,
+            garrison: 12,
+            influence: { ...candidate.influence, emperor: 0, greatHouses: 0 },
+            intrigues: [shaddamsFavor],
+            jessicaMemories: 0,
+            resources: { ...candidate.resources, solari: 2 },
+          }
+        : candidate
+    ),
+  };
+  assert.equal(
+    state.playShaddamsFavorPlotIntrigue(shaddamsFavorNoSupplyFixture, "p2", shaddamsFavor.id),
+    shaddamsFavorNoSupplyFixture,
+    "Shaddam's Favor should not resolve when no troop can be recruited and no Solari bonus is available",
+  );
 
   const shaddamsFavorGreatHousesFixture = {
     ...shaddamsFavorFixture,
@@ -556,7 +580,10 @@ export function verifyEconomyPlotIntrigues({ cards, data, game, state }) {
   );
   assert.deepEqual(playerById(commanderFavor, "p4").intrigues, []);
   assert.equal(commanderFavor.intrigueDiscard.at(-1).id, shaddamsFavor.id);
-  assert.match(commanderFavor.log[0], /Shaddam Corrino IV plays Shaddam's Favor for Princess Irulan/);
+  assert.match(
+    commanderFavor.log[0],
+    /Shaddam Corrino IV plays Shaddam's Favor, recruits 1 troop for Princess Irulan and gains 3 Solari\./,
+  );
 
   const lockedCommanderFavorFixture = {
     ...commanderFavorFixture,

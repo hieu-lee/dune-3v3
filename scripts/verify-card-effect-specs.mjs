@@ -91,7 +91,11 @@ function hasRevealEffect(card, predicate) {
 function expectedFixedReveal(card) {
   return {
     persuasion: card.persuasion,
-    revealGain: card.revealGain ? { ...card.revealGain } : {},
+    revealGain: card.name === "Junction Headquarters"
+      ? { water: 1 }
+      : card.revealGain
+        ? { ...card.revealGain }
+        : {},
     swords: card.swords,
   };
 }
@@ -153,6 +157,7 @@ try {
   ];
   const convincingArgument = data.allyStarterCards.find((card) => card.name === "Convincing Argument");
   const dagger = data.allyStarterCards.find((card) => card.name === "Dagger");
+  const reconnaissance = data.allyStarterCards.find((card) => card.name === "Reconnaissance");
   const allySignet = data.allyStarterCards.find((card) => card.name === "Signet Ring");
   const smuggler = data.imperiumDeck.find((card) => card.name === "Smuggler's Harvester");
   const interstellarTrade = data.imperiumDeck.find((card) => card.name === "Interstellar Trade");
@@ -190,6 +195,7 @@ try {
   const guildEnvoy = data.imperiumDeck.find((card) => card.name === "Guild Envoy");
   const guildSpy = data.imperiumDeck.find((card) => card.name === "Guild Spy");
   const branchingPath = data.imperiumDeck.find((card) => card.name === "Branching Path");
+  const junctionHeadquarters = data.imperiumDeck.find((card) => card.name === "Junction Headquarters");
   const inHighPlaces = data.imperiumDeck.find((card) => card.name === "In High Places");
   const overthrow = data.imperiumDeck.find((card) => card.name === "Overthrow");
   const priceIsNoObject = data.imperiumDeck.find((card) => card.name === "Price is No Object");
@@ -257,10 +263,12 @@ try {
   const deliverSupplies = data.boardSpaces.find((space) => space.id === "deliver-supplies");
   const shipping = data.boardSpaces.find((space) => space.id === "shipping");
   const sietchTabr = data.boardSpaces.find((space) => space.id === "sietch-tabr");
+  const militarySupport = data.boardSpaces.find((space) => space.id === "military-support");
   const spiceRefinery = data.boardSpaces.find((space) => space.id === "spice-refinery");
   assert.ok(
     convincingArgument &&
     dagger &&
+    reconnaissance &&
     allySignet &&
     smuggler &&
     interstellarTrade &&
@@ -297,6 +305,7 @@ try {
     guildEnvoy &&
     guildSpy &&
     branchingPath &&
+    junctionHeadquarters &&
     inHighPlaces &&
     overthrow &&
     priceIsNoObject &&
@@ -308,7 +317,7 @@ try {
   );
   assert.ok(commandRespect && prepareTheWay && spiceMustFlow && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
   assert.ok(backedByChoam && buyAccess && callToArms && changeAllegiances && councilorsAmbition && contingencyPlan && cunning && departForArrakis && detonation && unexpectedAllies && devour && distraction && findWeakness && goToGround && impress && imperiumPolitics && inspireAwe && intelligenceReport && leverage && manipulate && marketOpportunity && mercenaries && opportunism && questionableMethods && reachAgreement && shaddamsFavor && spiceIsPower && specialMission && springTheTrap && tacticalOption && sietchRitual && strategicStockpiling && weirdingCombat);
-  assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && dutifulService && deliverSupplies && shipping && sietchTabr && spiceRefinery);
+  assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && dutifulService && deliverSupplies && shipping && sietchTabr && militarySupport && spiceRefinery);
   assert.equal(revealSpecCards.length, 79, "Unexpected number of cards with declarative Reveal specs");
   assert.equal(
     marketAndImperiumCards.filter(hasFixedRevealReward).length,
@@ -1618,6 +1627,97 @@ try {
     2,
     "Mercenaries Plot spec should route Commander troop recruitment to the activated Ally",
   );
+  const mercenariesNoSupplyCard = { ...mercenaries, id: "mercenaries-no-supply-fixture" };
+  const mercenariesNoSupplyDraw = { ...backedByChoam, id: "mercenaries-no-supply-draw" };
+  const mercenariesNoSupplyFixture = {
+    ...withActivePlayer(game, p2.id, () => ({
+      deployedTroops: 0,
+      garrison: 12,
+      intrigues: [mercenariesNoSupplyCard],
+      jessicaMemories: 0,
+      resources: { ...p2.resources, solari: 3 },
+    })),
+    intrigueDeck: [mercenariesNoSupplyDraw],
+    intrigueDiscard: [],
+  };
+  const mercenariesNoSupplyPlayed = state.playMercenariesPlotIntrigue(
+    mercenariesNoSupplyFixture,
+    p2.id,
+    mercenariesNoSupplyCard.id,
+  );
+  const mercenariesNoSupplyOwner = playerById(mercenariesNoSupplyPlayed, p2.id);
+  assert.equal(
+    mercenariesNoSupplyOwner.garrison,
+    12,
+    "Mercenaries should not recruit beyond the Ally troop supply",
+  );
+  assert.equal(mercenariesNoSupplyOwner.resources.solari, 0, "Mercenaries should still spend Solari when troop supply is capped");
+  assert.equal(
+    mercenariesNoSupplyOwner.intrigues.some((card) => card.id === mercenariesNoSupplyCard.id),
+    false,
+    "Mercenaries should discard the played Intrigue when troop supply is capped",
+  );
+  assert.equal(
+    mercenariesNoSupplyOwner.intrigues.some((card) => card.id === mercenariesNoSupplyDraw.id),
+    true,
+    "Mercenaries should still draw its Intrigue when troop supply is capped",
+  );
+  assert.match(mercenariesNoSupplyPlayed.log[0] ?? "", /plays Mercenaries, spends 3 Solari\./);
+  assert.equal(
+    mercenariesNoSupplyPlayed.log[0]?.includes("recruits"),
+    false,
+    "Mercenaries should not log unplaced Ally troops",
+  );
+  const mercenariesCommanderNoSupplyCard = { ...mercenaries, id: "mercenaries-commander-no-supply-fixture" };
+  const mercenariesCommanderNoSupplyDraw = { ...backedByChoam, id: "mercenaries-commander-no-supply-draw" };
+  const mercenariesCommanderNoSupplyBase = withActivePlayer(game, p4.id, () => ({
+    garrison: 0,
+    intrigues: [mercenariesCommanderNoSupplyCard],
+    resources: { ...p4.resources, solari: 3 },
+  }));
+  const mercenariesCommanderNoSupplyFixture = {
+    ...mercenariesCommanderNoSupplyBase,
+    intrigueDeck: [mercenariesCommanderNoSupplyDraw],
+    intrigueDiscard: [],
+    players: mercenariesCommanderNoSupplyBase.players.map((player) =>
+      player.id === p6.id
+        ? { ...player, deployedTroops: 0, garrison: 12, jessicaMemories: 0 }
+        : player
+    ),
+  };
+  const mercenariesCommanderNoSupplyPlayed = state.playMercenariesPlotIntrigue(
+    mercenariesCommanderNoSupplyFixture,
+    p4.id,
+    mercenariesCommanderNoSupplyCard.id,
+    p6.id,
+  );
+  assert.equal(
+    playerById(mercenariesCommanderNoSupplyPlayed, p4.id).garrison,
+    0,
+    "Commander Mercenaries should not recruit troops to the Commander",
+  );
+  assert.equal(
+    playerById(mercenariesCommanderNoSupplyPlayed, p6.id).garrison,
+    12,
+    "Commander Mercenaries should not recruit beyond the activated Ally troop supply",
+  );
+  assert.equal(
+    playerById(mercenariesCommanderNoSupplyPlayed, p4.id).resources.solari,
+    0,
+    "Commander Mercenaries should still spend Commander Solari when activated Ally supply is capped",
+  );
+  assert.equal(
+    playerById(mercenariesCommanderNoSupplyPlayed, p4.id).intrigues.some((card) =>
+      card.id === mercenariesCommanderNoSupplyDraw.id
+    ),
+    true,
+    "Commander Mercenaries should still draw its Intrigue when activated Ally supply is capped",
+  );
+  assert.equal(
+    mercenariesCommanderNoSupplyPlayed.log[0]?.includes(`${p6.leader} recruits`),
+    false,
+    "Commander Mercenaries should not log unplaced activated-Ally troops",
+  );
   const opportunismFactions = ["emperor", "spacing", "bene", "fremen", "greatHouses", "fringeWorlds"];
   const opportunismChoiceIds = opportunismFactions.flatMap((first, firstIndex) =>
     opportunismFactions.slice(firstIndex).map((second) => `${first}+${second}`)
@@ -2508,6 +2608,40 @@ try {
     callToArmsPlotResolved.recruitedTroops,
     0,
     "Call to Arms Plot spec should not recruit immediately",
+  );
+  const callToArmsNoSupplyAcquireCard = {
+    ...convincingArgument,
+    id: "call-to-arms-no-supply-acquire-card",
+    name: "Call to Arms No Supply Acquire",
+    cost: 0,
+    effects: undefined,
+  };
+  const callToArmsNoSupplyFixture = {
+    ...withActivePlayer(game, p2.id, () => ({
+      callToArmsActive: true,
+      deployedTroops: 0,
+      garrison: 12,
+      jessicaMemories: 0,
+      persuasion: 0,
+      revealed: true,
+    })),
+    imperiumRow: [callToArmsNoSupplyAcquireCard],
+    marketDeck: [],
+  };
+  const callToArmsNoSupplyAcquired = state.acquireMarketCard(
+    callToArmsNoSupplyFixture,
+    p2.id,
+    callToArmsNoSupplyAcquireCard.id,
+  );
+  assert.equal(
+    playerById(callToArmsNoSupplyAcquired, p2.id).garrison,
+    12,
+    "Call to Arms should not recruit beyond the acquisition recruit owner's troop supply",
+  );
+  assert.equal(
+    callToArmsNoSupplyAcquired.log[0]?.includes("recruits 1 troop"),
+    false,
+    "Call to Arms should not log an unplaced acquisition recruit bonus",
   );
   assert.ok(
     detonation.effects?.some((spec) =>
@@ -3412,6 +3546,7 @@ try {
       "Hidden Missive",
       "Imperial Spymaster",
       "In High Places",
+      "Junction Headquarters",
       "Leadership",
       "Maker Keeper",
       "Maula Pistol",
@@ -4637,6 +4772,49 @@ try {
     "Branching Path play text should expose its Alliance-gated Intrigue trash reward",
   );
   assert.equal(branchingPath.reveal, "+2 persuasion.", "Branching Path should keep its fixed reveal persuasion");
+  assert.deepEqual(
+    junctionHeadquarters.effects?.filter((spec) => spec.trigger === "agent-play"),
+    [
+      agentSpec(
+        [
+          {
+            kind: "trash-intrigue-for-reward",
+            selector: "self",
+            cost: { spice: 2 },
+            gainVp: 1,
+            optional: true,
+          },
+        ],
+        [{ kind: "has-alliance", faction: "spacing" }],
+      ),
+    ],
+    "Junction Headquarters should model its Spacing Guild Alliance Intrigue trash VP reward as a typed Agent effect",
+  );
+  assert.ok(
+    hasRevealEffect(
+      junctionHeadquarters,
+      (effect) => effect.kind === "gain-persuasion" && effect.selector === "self" && effect.amount === 1,
+    ) &&
+      hasRevealEffect(
+        junctionHeadquarters,
+        (effect) => effect.kind === "gain-resource" && effect.selector === "self" && effect.resource === "water" && effect.amount === 1,
+      ) &&
+      hasRevealEffect(
+        junctionHeadquarters,
+        (effect) => effect.kind === "recruit-troops" && effect.selector === "self" && effect.amount === 1,
+      ),
+    "Junction Headquarters should carry typed Reveal persuasion, water, and troop rewards",
+  );
+  assert.equal(
+    junctionHeadquarters.play,
+    "Spacing Guild Alliance: may trash 1 Intrigue and pay 2 spice to gain 1 VP.",
+    "Junction Headquarters play text should expose its costed Intrigue trash VP reward",
+  );
+  assert.equal(
+    junctionHeadquarters.reveal,
+    "+1 persuasion. Gain 1 water and recruit 1 troop.",
+    "Junction Headquarters reveal text should expose all typed reveal rewards",
+  );
   assert.equal(
     spacingGuildFavor.play,
     "Draw 1 card. When discarded from hand, gain 2 spice.",
@@ -6402,7 +6580,7 @@ try {
   };
   assert.deepEqual(
     turnActions.revealTurnPlan({ ...p2, hand: [revealSpyPlacementCard], highCouncilSeat: false }),
-    { persuasion: 0, printedRevealCards: [], revealGain: {}, swords: 0 },
+    { persuasion: 0, printedRevealCards: [], recruitedTroops: 0, revealGain: {}, swords: 0 },
     "Reveal spy placement specs should not alter fixed reveal totals",
   );
   const agentTrashCard = {
@@ -6943,6 +7121,33 @@ try {
     () => turnActions.revealTurnPlan({ ...p2, hand: [requiredPayResourceTroopsCard], highCouncilSeat: false }),
     /Invalid pay-resource-for-troops optional "false"/,
     "Resource-for-troops specs should stay optional so queued payments cannot deadlock if resources change",
+  );
+  const stalePayResourceTroopsPending = {
+    kind: "pay-resource-for-troops",
+    ownerId: p4.id,
+    recipientIds: [p2.id, p6.id],
+    resource: "solari",
+    cost: 1,
+    troops: 1,
+    destination: "garrison",
+    optional: true,
+    source: "Stale Pay Troops",
+  };
+  const stalePayResourceTroopsState = {
+    ...game,
+    pendingAction: stalePayResourceTroopsPending,
+    pendingQueue: [],
+    players: game.players.map((player) => {
+      if (player.id === p4.id) return { ...player, resources: { ...player.resources, solari: 1 } };
+      if (player.id === p2.id) return { ...player, deployedTroops: 0, garrison: 12, jessicaMemories: 0 };
+      if (player.id === p6.id) return { ...player, deployedTroops: 0, garrison: 0, jessicaMemories: 0 };
+      return player;
+    }),
+  };
+  assert.equal(
+    state.resolvePayResourceForTroopsChoice(stalePayResourceTroopsState, stalePayResourceTroopsPending),
+    stalePayResourceTroopsState,
+    "Resource-for-troops resolver should reject stale payments when any recipient lacks troop supply",
   );
   const revealPayResourceDrawCardsCard = {
     ...convincingArgument,
@@ -8206,7 +8411,7 @@ try {
   };
   assert.deepEqual(
     turnActions.revealTurnPlan({ ...p3, hand: [revealPayResourceSandwormsCard], highCouncilSeat: false }, game),
-    { persuasion: 0, printedRevealCards: [], revealGain: {}, swords: 0 },
+    { persuasion: 0, printedRevealCards: [], recruitedTroops: 0, revealGain: {}, swords: 0 },
     "Reveal sandworm payment specs should not add immediate reveal rewards by themselves",
   );
   const unprotectedConflict = data.conflictCards.find((card) => card.name === "Skirmish (Desert Mouse)");
@@ -8834,6 +9039,53 @@ try {
     () => state.applyCardAgentEffect(invalidTrashIntrigueZeroGainAmountCard, p2, p2),
     /Invalid trash-intrigue-for-reward gain spice "0"/,
     "Trash-Intrigue reward specs should reject zero resource gains",
+  );
+  const invalidTrashIntrigueCostResourceCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-trash-intrigue-cost-resource-card",
+    name: "Effect Spec Invalid Trash Intrigue Cost Resource",
+    effects: [agentSpec([{
+      kind: "trash-intrigue-for-reward",
+      selector: "self",
+      cost: { melange: 1 },
+      gainVp: 1,
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidTrashIntrigueCostResourceCard, p2, p2),
+    /Unsupported effect resource "melange"/,
+    "Trash-Intrigue reward specs should reject unsupported resource costs",
+  );
+  const invalidTrashIntrigueCostAmountCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-trash-intrigue-cost-amount-card",
+    name: "Effect Spec Invalid Trash Intrigue Cost Amount",
+    effects: [agentSpec([{
+      kind: "trash-intrigue-for-reward",
+      selector: "self",
+      cost: { spice: 0 },
+      gainVp: 1,
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidTrashIntrigueCostAmountCard, p2, p2),
+    /Invalid trash-intrigue-for-reward cost spice "0"/,
+    "Trash-Intrigue reward specs should reject zero resource costs",
+  );
+  const invalidTrashIntrigueGainVpCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-trash-intrigue-gain-vp-card",
+    name: "Effect Spec Invalid Trash Intrigue Gain VP",
+    effects: [agentSpec([{
+      kind: "trash-intrigue-for-reward",
+      selector: "self",
+      gainVp: 0,
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidTrashIntrigueGainVpCard, p2, p2),
+    /Invalid trash-intrigue-for-reward gainVp "0"/,
+    "Trash-Intrigue reward specs should reject zero VP rewards",
   );
   const invalidTrashIntrigueEmptyRewardCard = {
     ...convincingArgument,
@@ -9584,6 +9836,35 @@ try {
       options: shaddamSignetPaidRewardPendingOptions,
     }],
     "Shaddam Signet Ring should queue a generic paid reward choice pending action",
+  );
+  const shaddamSignetTroopRewardOption = shaddamSignetPaidRewardPendingOptions.find((option) =>
+    option.reward.kind === "recruit-troops"
+  );
+  assert.ok(shaddamSignetTroopRewardOption, "Expected Shaddam Signet Ring to expose a troop paid-reward option");
+  const shaddamSignetNoSupplyPending = {
+    kind: "paid-reward-choice",
+    ownerId: shaddamSignetPaidRewardSource.id,
+    cardId: emperorSignet.id,
+    source: "Emperor of the Known Universe",
+    options: [shaddamSignetTroopRewardOption],
+  };
+  const shaddamSignetNoSupplyState = {
+    ...shaddamSignetPaidRewardFixture,
+    pendingAction: shaddamSignetNoSupplyPending,
+    players: shaddamSignetPaidRewardFixture.players.map((player) =>
+      player.id === shaddamSignetPaidRewardTarget.id
+        ? { ...player, deployedTroops: 0, garrison: 12, jessicaMemories: 0 }
+        : player
+    ),
+  };
+  assert.equal(
+    state.resolvePaidRewardChoice(
+      shaddamSignetNoSupplyState,
+      shaddamSignetNoSupplyPending,
+      shaddamSignetTroopRewardOption.id,
+    ),
+    shaddamSignetNoSupplyState,
+    "Paid reward troop choices should reject stale resolution when the recipient lacks troop supply",
   );
   assert.deepEqual(
     state.pendingActionsForCard(emperorSignet, shaddamSignetPaidRewardSource, shaddamSignetPaidRewardFixture),
@@ -11396,6 +11677,330 @@ try {
     "Branching Path should not queue without a starting or same-space Intrigue to trash",
   );
 
+  const junctionTrashIntrigue = { ...backedByChoam, id: "junction-trash-intrigue-card" };
+  const junctionFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 1,
+    garrison: 0,
+    hand: [junctionHeadquarters],
+    intrigues: [junctionTrashIntrigue],
+    playArea: [],
+    resources: { solari: 0, spice: 1, water: 0 },
+    vp: 0,
+  }));
+  const junctionPlaced = turnActions.placeAgentAction(
+    {
+      ...junctionFixture,
+      alliances: { spacing: p2.id },
+      turnSpiceGains: {},
+    },
+    {
+      commanderTargets: {},
+      selectedCard: junctionHeadquarters,
+      selectedSpace: imperialBasin,
+    },
+  );
+  assert.equal(
+    junctionPlaced.pendingAction?.kind,
+    "trash-intrigue-for-reward",
+    "Junction Headquarters should queue Intrigue trash with the Spacing Guild Alliance and enough post-space spice",
+  );
+  assert.deepEqual(junctionPlaced.pendingAction?.cost, { spice: 2 }, "Junction Headquarters should carry its 2-spice cost");
+  assert.equal(junctionPlaced.pendingAction?.drawIntrigues, 0, "Junction Headquarters should not draw a replacement Intrigue");
+  assert.deepEqual(junctionPlaced.pendingAction?.gain, {}, "Junction Headquarters should not carry resource rewards");
+  assert.equal(junctionPlaced.pendingAction?.gainVp, 1, "Junction Headquarters should carry its VP reward");
+  assert.equal(junctionPlaced.pendingAction?.optional, true, "Junction Headquarters Intrigue trash should be optional");
+  const junctionResolved = state.resolveTrashIntrigueForRewardChoice(
+    junctionPlaced,
+    junctionPlaced.pendingAction,
+    junctionTrashIntrigue.id,
+  );
+  const junctionOwner = playerById(junctionResolved, p2.id);
+  assert.equal(
+    junctionOwner.intrigues.some((card) => card.id === junctionTrashIntrigue.id),
+    false,
+    "Junction Headquarters should remove the trashed Intrigue from hand",
+  );
+  assert.equal(junctionOwner.resources.spice, 0, "Junction Headquarters should spend the post-space 2 spice");
+  assert.equal(junctionOwner.vp, 1, "Junction Headquarters should gain 1 VP");
+  assert.equal(junctionResolved.turnSpiceGains[p2.id], 1, "Junction Headquarters should not erase the Imperial Basin spice gain");
+  assert.equal(junctionResolved.pendingAction, undefined, "Resolving Junction Headquarters should clear its pending action");
+  assert.match(junctionResolved.log[0], /Junction Headquarters: trashes .* and spends 2 spice and gains 1 VP/);
+  const junctionNoAlliance = turnActions.placeAgentAction(
+    {
+      ...junctionFixture,
+      alliances: {},
+    },
+    {
+      commanderTargets: {},
+      selectedCard: junctionHeadquarters,
+      selectedSpace: imperialBasin,
+    },
+  );
+  assert.equal(
+    junctionNoAlliance.pendingAction,
+    undefined,
+    "Junction Headquarters should not queue without the Spacing Guild Alliance",
+  );
+  const junctionNotEnoughSpice = turnActions.placeAgentAction(
+    {
+      ...junctionFixture,
+      alliances: { spacing: p2.id },
+      players: junctionFixture.players.map((player) =>
+        player.id === p2.id ? { ...player, resources: { solari: 0, spice: 0, water: 0 } } : player
+      ),
+    },
+    {
+      commanderTargets: {},
+      selectedCard: junctionHeadquarters,
+      selectedSpace: imperialBasin,
+    },
+  );
+  assert.equal(
+    junctionNotEnoughSpice.pendingAction,
+    undefined,
+    "Junction Headquarters should not queue when the owner cannot pay 2 spice after space rewards",
+  );
+  const junctionDeferredMakerTrashIntrigue = { ...backedByChoam, id: "junction-deferred-maker-trash-intrigue-card" };
+  const junctionDeferredMakerFixture = withActivePlayer(game, p3.id, () => ({
+    agentsReady: 1,
+    garrison: 0,
+    hand: [junctionHeadquarters],
+    intrigues: [junctionDeferredMakerTrashIntrigue],
+    makerHooks: true,
+    playArea: [],
+    resources: { solari: 0, spice: 1, water: 1 },
+    vp: 0,
+  }));
+  const junctionDeferredMakerPlaced = turnActions.placeAgentAction(
+    {
+      ...junctionDeferredMakerFixture,
+      alliances: { spacing: p3.id },
+      conflict: smugglersHavenConflict,
+      shieldWall: false,
+      turnSpiceGains: {},
+    },
+    {
+      commanderTargets: {},
+      selectedCard: junctionHeadquarters,
+      selectedSpace: haggaBasin,
+    },
+  );
+  assert.equal(
+    junctionDeferredMakerPlaced.pendingAction?.kind,
+    "maker-choice",
+    "Junction Headquarters should queue Hagga Basin Maker choice before the costed Intrigue trash choice",
+  );
+  assert.equal(
+    junctionDeferredMakerPlaced.pendingQueue[0]?.kind,
+    "trash-intrigue-for-reward",
+    "Junction Headquarters should count deferred Maker spice when checking its costed Intrigue trash payability",
+  );
+  assert.deepEqual(
+    junctionDeferredMakerPlaced.pendingQueue[0]?.cost,
+    { spice: 2 },
+    "Junction deferred Maker pending should keep the printed 2-spice Junction cost",
+  );
+  const junctionDeferredMakerSpiceChosen = state.resolveMakerChoice(
+    junctionDeferredMakerPlaced,
+    junctionDeferredMakerPlaced.pendingAction,
+    "spice",
+  );
+  assert.equal(
+    junctionDeferredMakerSpiceChosen.pendingAction?.kind,
+    "trash-intrigue-for-reward",
+    "Junction deferred Maker choice should advance to the Intrigue trash pending after taking spice",
+  );
+  const junctionDeferredMakerResolved = state.resolveTrashIntrigueForRewardChoice(
+    junctionDeferredMakerSpiceChosen,
+    junctionDeferredMakerSpiceChosen.pendingAction,
+    junctionDeferredMakerTrashIntrigue.id,
+  );
+  const junctionDeferredMakerOwner = playerById(junctionDeferredMakerResolved, p3.id);
+  assert.equal(
+    junctionDeferredMakerOwner.resources.spice,
+    1,
+    "Junction deferred Maker resolution should gain 2 Hagga spice and spend 2 Junction spice",
+  );
+  assert.equal(junctionDeferredMakerOwner.vp, 1, "Junction deferred Maker resolution should gain 1 VP");
+  const junctionDeferredMakerSandwormChosen = state.resolveMakerChoice(
+    junctionDeferredMakerPlaced,
+    junctionDeferredMakerPlaced.pendingAction,
+    "sandworms",
+  );
+  assert.equal(
+    junctionDeferredMakerSandwormChosen.pendingAction?.kind,
+    "trash-intrigue-for-reward",
+    "Junction deferred Maker sandworm choice should still advance to the optional Intrigue trash pending",
+  );
+  assert.equal(
+    state.canPayTrashIntrigueForReward(
+      playerById(junctionDeferredMakerSandwormChosen, p3.id),
+      junctionDeferredMakerSandwormChosen.pendingAction,
+    ),
+    false,
+    "Junction deferred Maker sandworm choice should leave the costed Intrigue trash pending unpayable",
+  );
+  const junctionDeferredMakerUnpayableAttempt = state.resolveTrashIntrigueForRewardChoice(
+    junctionDeferredMakerSandwormChosen,
+    junctionDeferredMakerSandwormChosen.pendingAction,
+    junctionDeferredMakerTrashIntrigue.id,
+  );
+  assert.strictEqual(
+    junctionDeferredMakerUnpayableAttempt,
+    junctionDeferredMakerSandwormChosen,
+    "Resolving an unpayable Junction pending should not mutate game state",
+  );
+  const junctionDeferredMakerSkipped = state.skipTrashIntrigueForReward(
+    junctionDeferredMakerSandwormChosen,
+    junctionDeferredMakerSandwormChosen.pendingAction,
+  );
+  assert.equal(
+    junctionDeferredMakerSkipped.pendingAction,
+    undefined,
+    "Skipping the unpayable optional Junction pending should advance the queue",
+  );
+  const junctionRevealFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 0,
+    garrison: 0,
+    hand: [junctionHeadquarters],
+    highCouncilSeat: false,
+    playArea: [],
+    resources: { solari: 0, spice: 0, water: 0 },
+  }));
+  const junctionRevealPlan = turnActions.revealTurnPlan(playerById(junctionRevealFixture, p2.id), junctionRevealFixture);
+  assert.equal(junctionRevealPlan.persuasion, 1, "Junction Headquarters should reveal for 1 persuasion");
+  assert.equal(junctionRevealPlan.revealGain.water, 1, "Junction Headquarters should reveal for 1 water");
+  assert.equal(junctionRevealPlan.recruitedTroops, 1, "Junction Headquarters should reveal for 1 recruited troop");
+  const junctionRevealed = turnActions.revealTurnAction(junctionRevealFixture, {
+    commanderTargets: {},
+    revealPlan: junctionRevealPlan,
+  });
+  const junctionRevealOwner = playerById(junctionRevealed, p2.id);
+  assert.equal(junctionRevealOwner.resources.water, 1, "Junction reveal should add its water");
+  assert.equal(junctionRevealOwner.garrison, 1, "Junction reveal should recruit its troop");
+  assert.equal(junctionRevealOwner.persuasion, 1, "Junction reveal should finalize its persuasion");
+  assert.match(junctionRevealed.log[0], /reveals for 1 persuasion, 0 strength and gains 1 water and recruits 1 troop/);
+  const junctionNoSupplyRevealFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 0,
+    deployedTroops: 0,
+    garrison: 12,
+    hand: [junctionHeadquarters],
+    highCouncilSeat: false,
+    jessicaMemories: 0,
+    playArea: [],
+    resources: { solari: 0, spice: 0, water: 0 },
+  }));
+  const junctionNoSupplyRevealPlan = turnActions.revealTurnPlan(
+    playerById(junctionNoSupplyRevealFixture, p2.id),
+    junctionNoSupplyRevealFixture,
+  );
+  assert.equal(
+    junctionNoSupplyRevealPlan.recruitedTroops,
+    1,
+    "Junction Headquarters reveal plan should still expose its printed troop reward when supply is empty",
+  );
+  const junctionNoSupplyRevealed = turnActions.revealTurnAction(junctionNoSupplyRevealFixture, {
+    commanderTargets: {},
+    revealPlan: junctionNoSupplyRevealPlan,
+  });
+  assert.equal(
+    playerById(junctionNoSupplyRevealed, p2.id).garrison,
+    12,
+    "Junction reveal should not recruit beyond the Ally troop supply",
+  );
+  assert.equal(
+    playerById(junctionNoSupplyRevealed, p2.id).resources.water,
+    1,
+    "Junction no-supply reveal should still add its water",
+  );
+  assert.equal(
+    junctionNoSupplyRevealed.log[0].includes("recruits 1 troop"),
+    false,
+    "Junction no-supply reveal should not log an unplaced troop",
+  );
+  const junctionCommanderBaseRevealFixture = withActivePlayer(game, p4.id, () => ({
+    agentsReady: 0,
+    garrison: 0,
+    hand: [junctionHeadquarters],
+    highCouncilSeat: false,
+    playArea: [],
+    resources: { solari: 0, spice: 0, water: 0 },
+  }));
+  const junctionCommanderRevealFixture = {
+    ...junctionCommanderBaseRevealFixture,
+    players: junctionCommanderBaseRevealFixture.players.map((player) =>
+      player.id === p6.id ? { ...player, garrison: 0 } : player
+    ),
+  };
+  const junctionCommanderRevealPlan = turnActions.revealTurnPlan(
+    playerById(junctionCommanderRevealFixture, p4.id),
+    junctionCommanderRevealFixture,
+  );
+  const junctionCommanderRevealed = turnActions.revealTurnAction(junctionCommanderRevealFixture, {
+    commanderTargets: { [p4.id]: p6.id },
+    revealPlan: junctionCommanderRevealPlan,
+  });
+  assert.equal(
+    playerById(junctionCommanderRevealed, p4.id).garrison,
+    0,
+    "Commander Junction reveal should not recruit troops to the Commander",
+  );
+  assert.equal(
+    playerById(junctionCommanderRevealed, p6.id).garrison,
+    1,
+    "Commander Junction reveal should recruit troops to the activated Ally",
+  );
+  assert.equal(
+    playerById(junctionCommanderRevealed, p4.id).resources.water,
+    1,
+    "Commander Junction reveal should keep water on the Commander",
+  );
+  assert.ok(
+    junctionCommanderRevealed.log[0].includes(`${p6.leader} recruits 1 troop`),
+    "Commander Junction reveal log should name the activated Ally as the troop recipient",
+  );
+  const junctionCommanderNoSupplyRevealFixture = {
+    ...junctionCommanderBaseRevealFixture,
+    players: junctionCommanderBaseRevealFixture.players.map((player) =>
+      player.id === p6.id
+        ? { ...player, deployedTroops: 0, garrison: 12, jessicaMemories: 0 }
+        : player
+    ),
+  };
+  const junctionCommanderNoSupplyRevealPlan = turnActions.revealTurnPlan(
+    playerById(junctionCommanderNoSupplyRevealFixture, p4.id),
+    junctionCommanderNoSupplyRevealFixture,
+  );
+  assert.equal(
+    junctionCommanderNoSupplyRevealPlan.recruitedTroops,
+    1,
+    "Commander Junction reveal plan should still expose its activated-Ally troop reward when supply is empty",
+  );
+  const junctionCommanderNoSupplyRevealed = turnActions.revealTurnAction(junctionCommanderNoSupplyRevealFixture, {
+    commanderTargets: { [p4.id]: p6.id },
+    revealPlan: junctionCommanderNoSupplyRevealPlan,
+  });
+  assert.equal(
+    playerById(junctionCommanderNoSupplyRevealed, p4.id).garrison,
+    0,
+    "Commander Junction no-supply reveal should not recruit troops to the Commander",
+  );
+  assert.equal(
+    playerById(junctionCommanderNoSupplyRevealed, p6.id).garrison,
+    12,
+    "Commander Junction no-supply reveal should not recruit beyond the activated Ally troop supply",
+  );
+  assert.equal(
+    playerById(junctionCommanderNoSupplyRevealed, p4.id).resources.water,
+    1,
+    "Commander Junction no-supply reveal should keep water on the Commander",
+  );
+  assert.equal(
+    junctionCommanderNoSupplyRevealed.log[0].includes(`${p6.leader} recruits 1 troop`),
+    false,
+    "Commander Junction no-supply reveal should not log an unplaced activated-Ally troop",
+  );
+
   const spacingGuildFavorDraw = { ...convincingArgument, id: "spacing-guild-favor-agent-draw-card" };
   const spacingGuildFavorAgentEffect = state.applyCardAgentEffect(
     spacingGuildFavor,
@@ -12780,6 +13385,24 @@ try {
   assert.equal(fedaykinMakerEffect.source.garrison, 1, "Fedaykin Stilltent should recruit 1 troop on a Maker Agent space");
   assert.equal(fedaykinMakerEffect.recruitedTroops, 1, "Fedaykin Stilltent recruit should count for deployment limits");
   assert.match(fedaykinMakerEffect.log ?? "", /Fedaykin Stilltent: recruits 1 troop/);
+  const fedaykinNoSupplyEffect = state.applyCardAgentEffect(
+    fedaykinStilltent,
+    { ...p2, deployedTroops: 0, garrison: 12, jessicaMemories: 0 },
+    p2,
+    game,
+    imperialBasin,
+  );
+  assert.equal(
+    fedaykinNoSupplyEffect.source.garrison,
+    12,
+    "Fedaykin Stilltent should not recruit beyond the Ally troop supply",
+  );
+  assert.equal(
+    fedaykinNoSupplyEffect.recruitedTroops ?? 0,
+    0,
+    "Fedaykin Stilltent should not count unplaced troops for deployment limits",
+  );
+  assert.equal(fedaykinNoSupplyEffect.log, undefined, "Fedaykin Stilltent should not log an unplaced troop");
   const fedaykinNonMakerEffect = state.applyCardAgentEffect(
     fedaykinStilltent,
     { ...p2, garrison: 0 },
@@ -12836,6 +13459,102 @@ try {
   );
   assert.equal(fedaykinPlaced.pendingAction?.kind, "deploy", "Fedaykin Stilltent's recruited troop should be deployable");
   assert.match(fedaykinPlaced.log.join("\n"), /Fedaykin Stilltent: recruits 1 troop/);
+  const arrakeenNoSupplyBoardEffect = state.applyBoardEffect(
+    { ...p2, deployedTroops: 0, garrison: 12, jessicaMemories: 0 },
+    p2,
+    arrakeen,
+  );
+  assert.equal(
+    arrakeenNoSupplyBoardEffect.source.garrison,
+    12,
+    "Board-space Agent troop rewards should not recruit beyond the Ally troop supply",
+  );
+  const arrakeenNoSupplyPlacementFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 1,
+    deployedTroops: 0,
+    garrison: 12,
+    hand: [reconnaissance],
+    jessicaMemories: 0,
+    playArea: [],
+  }));
+  const arrakeenNoSupplyPlaced = turnActions.placeAgentAction(arrakeenNoSupplyPlacementFixture, {
+    commanderTargets: {},
+    selectedCard: reconnaissance,
+    selectedSpace: arrakeen,
+  });
+  assert.equal(
+    playerById(arrakeenNoSupplyPlaced, p2.id).garrison,
+    12,
+    "Arrakeen placement should not recruit beyond the Ally troop supply",
+  );
+  assert.deepEqual(
+    arrakeenNoSupplyPlaced.pendingAction,
+    {
+      kind: "deploy",
+      ownerId: p2.id,
+      remaining: 2,
+      source: "Arrakeen",
+    },
+    "Arrakeen should only allow the base +2 deployment when no board troop was actually recruited",
+  );
+  const arrakeenCommanderNoSupplyBoardEffect = state.applyBoardEffect(
+    p4,
+    { ...p2, deployedTroops: 0, garrison: 12, jessicaMemories: 0 },
+    arrakeen,
+  );
+  assert.equal(
+    arrakeenCommanderNoSupplyBoardEffect.target.garrison,
+    12,
+    "Commander-routed board-space troop rewards should not recruit beyond the activated Ally troop supply",
+  );
+  const militarySupportNoSupplyPlayers = game.players.map((player) =>
+    player.team === p4.team && player.role === "Ally"
+      ? { ...player, deployedTroops: 0, garrison: 12, jessicaMemories: 0 }
+      : player
+  );
+  assert.equal(
+    state.pendingActionForSpace(militarySupport, p4, p6, militarySupportNoSupplyPlayers),
+    undefined,
+    "Military Support should not queue reinforcement when the team has no Ally troop supply",
+  );
+  const militarySupportLimitedPlayers = game.players.map((player) => {
+    if (player.id === p2.id) return { ...player, deployedTroops: 0, garrison: 11, jessicaMemories: 0 };
+    if (player.id === p6.id) return { ...player, deployedTroops: 0, garrison: 12, jessicaMemories: 0 };
+    return player;
+  });
+  const militarySupportLimitedPending = state.pendingActionForSpace(
+    militarySupport,
+    p4,
+    p6,
+    militarySupportLimitedPlayers,
+  );
+  assert.equal(
+    militarySupportLimitedPending?.remaining,
+    1,
+    "Military Support should cap pending reinforcements to available team troop supply",
+  );
+  const militarySupportLimitedState = {
+    ...game,
+    pendingAction: militarySupportLimitedPending,
+    pendingQueue: [],
+    players: militarySupportLimitedPlayers,
+  };
+  const militarySupportLimitedResolved = state.reinforceTroop(
+    militarySupportLimitedState,
+    militarySupportLimitedPending,
+    p2.id,
+    "garrison",
+  );
+  assert.equal(
+    playerById(militarySupportLimitedResolved, p2.id).garrison,
+    12,
+    "Military Support should recruit the last available troop into garrison",
+  );
+  assert.equal(
+    militarySupportLimitedResolved.pendingAction,
+    undefined,
+    "Military Support should finish after the team's troop supply is exhausted",
+  );
   const doubleAgentFixture = withActivePlayer(game, p2.id, () => ({
     agentsReady: 1,
     hand: [doubleAgent],
@@ -12915,6 +13634,42 @@ try {
   assert.equal(hiddenMissiveEffect.source.garrison, 1, "Hidden Missive Agent spec should recruit 1 troop");
   assert.equal(hiddenMissiveEffect.recruitedTroops, 1, "Hidden Missive Agent recruit should count for deployment limits");
   assert.match(hiddenMissiveEffect.log ?? "", /Hidden Missive: recruits 1 troop; draws 1 card/);
+  const hiddenMissiveNoSupplyDraw = { ...dagger, id: "hidden-missive-no-supply-agent-draw-fixture" };
+  const hiddenMissiveNoSupplyEffect = state.applyCardAgentEffect(
+    hiddenMissive,
+    {
+      ...p2,
+      deck: [hiddenMissiveNoSupplyDraw],
+      deployedTroops: 0,
+      discard: [],
+      hand: [],
+      garrison: 12,
+      influence: { ...p2.influence, bene: 2 },
+      jessicaMemories: 0,
+    },
+    p2,
+  );
+  assert.equal(
+    hiddenMissiveNoSupplyEffect.source.hand[0]?.id,
+    hiddenMissiveNoSupplyDraw.id,
+    "Hidden Missive should still draw when its troop recruit is supply-capped",
+  );
+  assert.equal(
+    hiddenMissiveNoSupplyEffect.source.garrison,
+    12,
+    "Hidden Missive should not recruit beyond the Ally troop supply",
+  );
+  assert.equal(
+    hiddenMissiveNoSupplyEffect.recruitedTroops ?? 0,
+    0,
+    "Hidden Missive should not count an unplaced troop for deployment limits",
+  );
+  assert.match(hiddenMissiveNoSupplyEffect.log ?? "", /Hidden Missive: draws 1 card/);
+  assert.equal(
+    hiddenMissiveNoSupplyEffect.log?.includes("recruits 1 troop"),
+    false,
+    "Hidden Missive should not log an unplaced troop",
+  );
   const hiddenMissiveCommanderDraw = { ...dagger, id: "hidden-missive-commander-agent-draw-fixture" };
   const hiddenMissiveCommanderEffect = state.applyCardAgentEffect(
     hiddenMissive,
@@ -12939,6 +13694,45 @@ try {
   assert.match(
     hiddenMissiveCommanderEffect.log ?? "",
     /Hidden Missive: draws 1 card; Feyd-Rautha Harkonnen recruits 1 troop/,
+  );
+  const hiddenMissiveCommanderNoSupplyDraw = { ...dagger, id: "hidden-missive-commander-no-supply-agent-draw-fixture" };
+  const hiddenMissiveCommanderNoSupplyEffect = state.applyCardAgentEffect(
+    hiddenMissive,
+    {
+      ...p4,
+      deck: [hiddenMissiveCommanderNoSupplyDraw],
+      discard: [],
+      hand: [],
+      garrison: 0,
+      influence: { ...p4.influence, bene: 2 },
+    },
+    { ...p2, deployedTroops: 0, garrison: 12, jessicaMemories: 0 },
+  );
+  assert.equal(
+    hiddenMissiveCommanderNoSupplyEffect.source.hand[0]?.id,
+    hiddenMissiveCommanderNoSupplyDraw.id,
+    "Commander Hidden Missive should still draw when activated-Ally troop recruit is supply-capped",
+  );
+  assert.equal(
+    hiddenMissiveCommanderNoSupplyEffect.source.garrison,
+    0,
+    "Commander Hidden Missive no-supply case should not recruit troops to the Commander",
+  );
+  assert.equal(
+    hiddenMissiveCommanderNoSupplyEffect.target.garrison,
+    12,
+    "Commander Hidden Missive should not recruit beyond the activated Ally troop supply",
+  );
+  assert.equal(
+    hiddenMissiveCommanderNoSupplyEffect.recruitedTroops ?? 0,
+    0,
+    "Commander Hidden Missive should not count unplaced activated-Ally troops for deployment limits",
+  );
+  assert.match(hiddenMissiveCommanderNoSupplyEffect.log ?? "", /Hidden Missive: draws 1 card/);
+  assert.equal(
+    hiddenMissiveCommanderNoSupplyEffect.log?.includes(`${p2.leader} recruits 1 troop`),
+    false,
+    "Commander Hidden Missive should not log an unplaced activated-Ally troop",
   );
   const hiddenMissiveUnqualified = state.applyCardAgentEffect(
     hiddenMissive,

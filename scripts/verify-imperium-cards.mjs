@@ -257,6 +257,8 @@ try {
   assert.ok(guildSpy, "Imperium deck should include Guild Spy");
   const branchingPath = data.imperiumDeck.find((card) => card.name === "Branching Path");
   assert.ok(branchingPath, "Imperium deck should include Branching Path");
+  const junctionHeadquarters = data.imperiumDeck.find((card) => card.name === "Junction Headquarters");
+  assert.ok(junctionHeadquarters, "Imperium deck should include Junction Headquarters");
   const spyNetwork = data.imperiumDeck.find((card) => card.name === "Spy Network");
   assert.ok(spyNetwork, "Imperium deck should include Spy Network");
   const shishakli = data.imperiumDeck.find((card) => card.name === "Shishakli");
@@ -398,6 +400,46 @@ try {
   assert.match(branchingPath.play, /Bene Gesserit Alliance.*may trash 1 Intrigue.*draw 1 Intrigue.*gain 2 spice/i);
   assert.equal(branchingPath.reveal, "+2 persuasion.", "Branching Path should keep its fixed Reveal persuasion");
   assert.deepEqual(
+    junctionHeadquarters.effects?.filter((spec) => spec.trigger === "agent-play"),
+    [
+      {
+        trigger: "agent-play",
+        conditions: [{ kind: "has-alliance", faction: "spacing" }],
+        effects: [
+          {
+            kind: "trash-intrigue-for-reward",
+            selector: "self",
+            cost: { spice: 2 },
+            gainVp: 1,
+            optional: true,
+          },
+        ],
+      },
+    ],
+    "Junction Headquarters should model its Spacing Guild Alliance Intrigue trash VP reward as a typed effect",
+  );
+  assert.ok(
+    junctionHeadquarters.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.effects.some((effect) => effect.kind === "gain-persuasion" && effect.amount === 1)
+    ) &&
+      junctionHeadquarters.effects?.some((spec) =>
+        spec.trigger === "reveal" &&
+        spec.effects.some((effect) => effect.kind === "gain-resource" && effect.resource === "water" && effect.amount === 1)
+      ) &&
+      junctionHeadquarters.effects?.some((spec) =>
+        spec.trigger === "reveal" &&
+        spec.effects.some((effect) => effect.kind === "recruit-troops" && effect.amount === 1)
+      ),
+    "Junction Headquarters should carry typed Reveal persuasion, water, and troop rewards",
+  );
+  assert.match(junctionHeadquarters.play, /Spacing Guild Alliance.*may trash 1 Intrigue.*pay 2 spice.*gain 1 VP/i);
+  assert.equal(
+    junctionHeadquarters.reveal,
+    "+1 persuasion. Gain 1 water and recruit 1 troop.",
+    "Junction Headquarters reveal text should expose all typed reveal rewards",
+  );
+  assert.deepEqual(
     shishakli.effects?.filter((spec) => spec.trigger === "agent-play"),
     [
       {
@@ -424,7 +466,7 @@ try {
     ),
     "Shishakli should keep its fixed Reveal strength spec",
   );
-  for (const name of ["Bene Gesserit Operative", "Branching Path", "Cargo Runner", "Chani, Clever Tactician", "Guild Spy", "In High Places", "Maker Keeper", "Maula Pistol", "Northern Watermaster", "Overthrow", "Paracompass", "Price is No Object", "Shishakli"]) {
+  for (const name of ["Bene Gesserit Operative", "Branching Path", "Cargo Runner", "Chani, Clever Tactician", "Guild Spy", "In High Places", "Junction Headquarters", "Maker Keeper", "Maula Pistol", "Northern Watermaster", "Overthrow", "Paracompass", "Price is No Object", "Shishakli"]) {
     const card = data.imperiumDeck.find((candidate) => candidate.name === name);
     assert.ok(card?.effects?.some((spec) => spec.trigger === "agent-play"), `${name} should use a structured Agent effect`);
   }

@@ -305,8 +305,10 @@ export function resolveAgentTrashIntrigueForRewards(
       .filter((effect) => effect.kind === "trash-intrigue-for-reward")
       .map((effect) => ({
         selector: effect.selector,
+        cost: resolvedResourceGain(effect.cost, context),
         drawIntrigues: effect.drawIntrigues === undefined ? 0 : amountFor(effect.drawIntrigues, context.source),
         gain: resolvedResourceGain(effect.gain, context),
+        gainVp: effect.gainVp === undefined ? 0 : amountFor(effect.gainVp, context.source),
         optional: effect.optional ?? false,
         source: effect.source,
       }));

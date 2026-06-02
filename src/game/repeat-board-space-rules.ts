@@ -104,7 +104,7 @@ export function resolveRepeatBoardSpaceChoice(
       [pending.resource]: owner.resources[pending.resource] - pending.cost,
     },
   };
-  const { source: repeatedOwner } = applyBoardEffect(paidOwner, paidOwner, space);
+  const { recruitedTroops, source: repeatedOwner } = applyBoardEffect(paidOwner, paidOwner, space);
   const players = state.players.map((player) => (player.id === owner.id ? repeatedOwner : player));
   const resourceLabel = resourceLabels[pending.resource];
   const baseState = recordRepeatUse({
@@ -113,7 +113,7 @@ export function resolveRepeatBoardSpaceChoice(
     ...advancePendingAction(state),
     log: [`${owner.leader} spends ${pending.cost} ${resourceLabel} for ${pending.source} to repeat ${space.name}.`, ...state.log],
   }, pending);
-  const repeatedPending = pendingActionForSpace(space, repeatedOwner, repeatedOwner, players);
+  const repeatedPending = pendingActionForSpace(space, repeatedOwner, repeatedOwner, players, 0, false, recruitedTroops);
   const repeatedTrashPending = pendingActionForBoardTrash(space, repeatedOwner);
   const withPending = prependPendingAction(
     prependPendingAction(baseState, repeatedPending),

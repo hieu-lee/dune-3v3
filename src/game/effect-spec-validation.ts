@@ -645,8 +645,10 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     if (effect.drawIntrigues !== undefined) {
       validatePositiveAmount("trash-intrigue-for-reward drawIntrigues", effect.drawIntrigues);
     }
+    validateResourceAmountMap("trash-intrigue-for-reward cost", effect.cost);
     const hasResourceReward = validateResourceAmountMap("trash-intrigue-for-reward gain", effect.gain);
-    if (effect.drawIntrigues === undefined && !hasResourceReward) {
+    if (effect.gainVp !== undefined) validatePositiveAmount("trash-intrigue-for-reward gainVp", effect.gainVp);
+    if (effect.drawIntrigues === undefined && !hasResourceReward && effect.gainVp === undefined) {
       invalidSpecField("trash-intrigue-for-reward reward", undefined);
     }
     validateOptionalBoolean("trash-intrigue-for-reward optional", (effect as { optional?: unknown }).optional);

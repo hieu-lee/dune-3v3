@@ -71,7 +71,7 @@ function rewardCanResolve(
   owner: Player,
   players: Player[],
 ) {
-  const leaderCounterTroopCosts = new Map<string, number>();
+  const troopSupplyDemandByRecipient = new Map<string, number>();
   for (const atomicReward of atomicRewards(reward)) {
     const recipient = players.find((player) => player.id === atomicReward.recipientId);
     if (
@@ -81,25 +81,32 @@ function rewardCanResolve(
     ) {
       return false;
     }
-    if (atomicReward.kind !== "gain-leader-counter") continue;
-    if (
-      atomicReward.counter !== "jessicaMemories" ||
-      atomicReward.troopSupplyCost <= 0 ||
-      atomicReward.troopSupplyCost !== atomicReward.amount
-    ) {
-      return false;
+    if (atomicReward.kind === "gain-leader-counter") {
+      if (
+        atomicReward.counter !== "jessicaMemories" ||
+        atomicReward.troopSupplyCost <= 0 ||
+        atomicReward.troopSupplyCost !== atomicReward.amount
+      ) {
+        return false;
+      }
+      troopSupplyDemandByRecipient.set(
+        atomicReward.recipientId,
+        (troopSupplyDemandByRecipient.get(atomicReward.recipientId) ?? 0) + atomicReward.troopSupplyCost,
+      );
     }
-    leaderCounterTroopCosts.set(
-      atomicReward.recipientId,
-      (leaderCounterTroopCosts.get(atomicReward.recipientId) ?? 0) + atomicReward.troopSupplyCost,
-    );
+    if (atomicReward.kind === "recruit-troops") {
+      troopSupplyDemandByRecipient.set(
+        atomicReward.recipientId,
+        (troopSupplyDemandByRecipient.get(atomicReward.recipientId) ?? 0) + atomicReward.amount,
+      );
+    }
   }
-  return [...leaderCounterTroopCosts.entries()].every(([recipientId, troopSupplyCost]) => {
+  return [...troopSupplyDemandByRecipient.entries()].every(([recipientId, troopSupplyDemand]) => {
     const recipient = players.find((player) => player.id === recipientId);
     return Boolean(
       recipient &&
         recipient.role === "Ally" &&
-        playerTroopSupply(recipient) >= troopSupplyCost,
+        playerTroopSupply(recipient) >= troopSupplyDemand,
     );
   });
 }

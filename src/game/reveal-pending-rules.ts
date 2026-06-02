@@ -3,6 +3,9 @@ import {
   playerHasConflictUnits,
 } from "./conflict-rules";
 import {
+  playerTroopSupply,
+} from "./deck-utils";
+import {
   resolveCardEffects,
   resolveRevealLoseInfluenceForIntrigues,
   resolveRevealPayResourceForSandworms,
@@ -82,6 +85,7 @@ export function pendingActionsForRevealPayResourceForTroops(
     if (effect.recipient !== "same-team-allies" || effect.destination !== "garrison") return [];
     const allies = sameTeamAllies(effectState.players, source);
     if (!allies) return [];
+    if (allies.some((ally) => playerTroopSupply(ally) < effect.troops)) return [];
     return [{
       kind: "pay-resource-for-troops",
       ownerId: source.id,

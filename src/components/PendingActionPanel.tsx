@@ -3,6 +3,7 @@ import { criticalLocationNames } from "../game/critical-locations";
 import { boardSpaces, factionLabels, iconLabels, teams } from "../game/data";
 import {
   acquirableCardsForPending,
+  canPayTrashIntrigueForReward,
   canResolveRetreatTroopsForStrength,
   canMoveCardToThroneRow,
   canPayConflictVpConversion,
@@ -249,6 +250,10 @@ export function PendingActionPanel({
     pendingAction.kind === "trash-intrigue-for-reward" && pendingTrashIntrigueOwner
       ? trashIntrigueForRewardChoices(pendingTrashIntrigueOwner, pendingAction)
       : [];
+  const pendingTrashIntrigueCanPay =
+    pendingAction.kind === "trash-intrigue-for-reward"
+      ? canPayTrashIntrigueForReward(pendingTrashIntrigueOwner, pendingAction)
+      : true;
   const pendingDiscardHandCardOwner =
     pendingAction.kind === "discard-hand-card" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingDiscardHandCardChoices =
@@ -285,6 +290,7 @@ export function PendingActionPanel({
   const pendingSietchLabel = pendingSietchSplit
     ? `${pendingSietchWaterOwner.leader} water / ${pendingSietchOwner.leader} units`
     : pendingSietchOwner?.leader;
+  const pendingSietchCanRecruitTroop = pendingSietchOwner ? playerTroopSupply(pendingSietchOwner) > 0 : false;
   const pendingResourceSplitCommander =
     pendingAction.kind === "commander-resource-split"
       ? game.players.find((player) => player.id === pendingAction.commanderId)
@@ -451,7 +457,9 @@ export function PendingActionPanel({
   const tradeLocked = pendingAction.kind === "trade" && pendingAction.actorGiven + pendingAction.partnerGiven > 0;
   const reinforceAllies =
     pendingAction.kind === "reinforce"
-      ? game.players.filter((player) => player.team === pendingAction.team && player.role === "Ally")
+      ? game.players.filter(
+          (player) => player.team === pendingAction.team && player.role === "Ally" && playerTroopSupply(player) > 0,
+        )
       : [];
   const conflictTieAllies =
     pendingAction.kind === "conflict-tie"
@@ -609,6 +617,7 @@ export function PendingActionPanel({
         <PendingSietchTabrPanel
           label={pendingSietchLabel}
           pending={pendingAction}
+          canRecruitTroop={pendingSietchCanRecruitTroop}
           onChoose={chooseSietchTabr}
         />
       )}
@@ -887,6 +896,7 @@ export function PendingActionPanel({
 
       {pendingAction.kind === "trash-intrigue-for-reward" && (
         <PendingTrashIntriguePanel
+          canPay={pendingTrashIntrigueCanPay}
           choices={pendingTrashIntrigueChoices}
           owner={pendingTrashIntrigueOwner}
           pending={pendingAction}

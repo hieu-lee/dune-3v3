@@ -244,8 +244,10 @@ export type PendingAction =
       kind: "trash-intrigue-for-reward";
       ownerId: string;
       source: string;
+      cost: Partial<Resources>;
       drawIntrigues: number;
       gain: Partial<Resources>;
+      gainVp: number;
       optional: boolean;
     }
   | {

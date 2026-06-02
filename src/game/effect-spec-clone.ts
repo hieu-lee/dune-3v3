@@ -44,8 +44,10 @@ export function cloneCardEffects(effects: CardEffectSpec[] | undefined): CardEff
       if (effect.kind === "trash-intrigue-for-reward") {
         return {
           ...effect,
+          ...(effect.cost ? { cost: cloneResourceAmountMap(effect.cost) } : {}),
           ...(effect.drawIntrigues !== undefined ? { drawIntrigues: cloneAmount(effect.drawIntrigues) } : {}),
           ...(effect.gain ? { gain: cloneResourceAmountMap(effect.gain) } : {}),
+          ...(effect.gainVp !== undefined ? { gainVp: cloneAmount(effect.gainVp) } : {}),
         };
       }
       return {

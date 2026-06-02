@@ -77,6 +77,7 @@ export {
 } from "./discard-draw-rules";
 
 export {
+  canPayTrashIntrigueForReward,
   trashIntrigueForRewardChoices,
 } from "./intrigue-trash-rules";
 
@@ -240,6 +241,7 @@ export type {
 } from "./plot-intrigue-influence-rules";
 
 export {
+  canResolveDepartForArrakisSpiceChoice,
   playBackedByChoamPlotIntrigue,
   playCouncilorsAmbitionPlotIntrigue,
   playDepartForArrakisPlotIntrigue,

@@ -2,7 +2,7 @@ import {
   automaticBoardInfluence,
   boardSpaceRewardApplies,
 } from "./board-rules";
-import { drawCards } from "./deck-utils";
+import { drawCards, playerTroopSupply } from "./deck-utils";
 import { resolveCardEffects, type GameEffectResult } from "./effect-resolver";
 import { adjustInfluence } from "./leader-rewards";
 import type { BoardSpace, Card, FactionId, GameState, Player, ResourceId, Resources } from "./types";
@@ -22,7 +22,7 @@ export function applyBoardEffect(
   cost: Partial<Resources> = {},
   bonusSpice = 0,
   deferMakerChoice = false,
-): { source: Player; target: Player } {
+): { recruitedTroops: number; source: Player; target: Player } {
   const resourcesNext = { ...sourcePlayer.resources };
   Object.entries(cost).forEach(([key, amount]) => {
     resourcesNext[key as ResourceId] -= amount ?? 0;
@@ -39,6 +39,7 @@ export function applyBoardEffect(
 
   let source: Player = { ...sourcePlayer, resources: resourcesNext };
   let target: Player = targetPlayer;
+  let recruitedTroops = 0;
 
   const influence = automaticBoardInfluence(space, sourcePlayer);
   if (influence) {
@@ -53,7 +54,8 @@ export function applyBoardEffect(
 
   if (rewardsApply && space.troops && space.team !== "reinforce") {
     const troopOwner = sourcePlayer.role === "Commander" ? target : source;
-    const troopNext = { ...troopOwner, garrison: troopOwner.garrison + space.troops };
+    recruitedTroops = Math.min(playerTroopSupply(troopOwner), space.troops);
+    const troopNext = { ...troopOwner, garrison: troopOwner.garrison + recruitedTroops };
     if (sourcePlayer.role === "Commander") target = troopNext;
     else source = troopNext;
   }
@@ -66,7 +68,7 @@ export function applyBoardEffect(
     source = { ...source, highCouncilSeat: true };
   }
 
-  return { source, target };
+  return { recruitedTroops, source, target };
 }
 
 export function applyCardAgentEffect(
@@ -127,7 +129,9 @@ function applyGenericCardAgentEffect(
   if (result.activatedAlly.cardsToDraw > 0) {
     throw new Error(`Unsupported activated Ally draw result for ${card.name}`);
   }
-  const recruitedTroops = result.recruitedTroops + result.activatedAlly.recruitedTroops;
+  const sourceRecruitedTroops = Math.min(playerTroopSupply(sourcePlayer), result.recruitedTroops);
+  const targetRecruitedTroops = Math.min(playerTroopSupply(targetPlayer), result.activatedAlly.recruitedTroops);
+  const recruitedTroops = sourceRecruitedTroops + targetRecruitedTroops;
   const intriguesToDraw = result.intriguesToDraw + result.activatedAlly.intriguesToDraw;
   const blocksDeploymentsThisTurn = result.blocksDeploymentsThisTurn;
   const hasSourceResourceGain = hasResourceGain(result.revealGain);
@@ -145,12 +149,12 @@ function applyGenericCardAgentEffect(
 
   let source = {
     ...sourcePlayer,
-    garrison: sourcePlayer.garrison + result.recruitedTroops,
+    garrison: sourcePlayer.garrison + sourceRecruitedTroops,
     resources: addResources(sourcePlayer.resources, result.revealGain),
   };
   let target = {
     ...targetPlayer,
-    garrison: targetPlayer.garrison + result.activatedAlly.recruitedTroops,
+    garrison: targetPlayer.garrison + targetRecruitedTroops,
     resources: addResources(targetPlayer.resources, result.activatedAlly.revealGain),
   };
   const handBeforeDraw = source.hand.length;
@@ -162,7 +166,7 @@ function applyGenericCardAgentEffect(
   return {
     source,
     target,
-    log: agentEffectLog(card, sourcePlayer, targetPlayer, result, cardsDrawn),
+    log: agentEffectLog(card, sourcePlayer, targetPlayer, result, cardsDrawn, sourceRecruitedTroops, targetRecruitedTroops),
     recruitedTroops,
     blocksDeploymentsThisTurn,
     sourceSpiceGained: result.revealGain.spice ?? 0,
@@ -190,14 +194,16 @@ function agentEffectLog(
   targetPlayer: Player,
   result: GameEffectResult,
   cardsDrawn: number,
+  sourceRecruitedTroops: number,
+  targetRecruitedTroops: number,
 ) {
   const parts = [
     resourceGainText(result.revealGain),
-    recruitText(undefined, result.recruitedTroops),
+    recruitText(undefined, sourceRecruitedTroops),
     drawText(result.cardsToDraw, cardsDrawn),
     deploymentBlockText(result.blocksDeploymentsThisTurn),
     playerResourceGainText(targetPlayer, result.activatedAlly.revealGain),
-    recruitText(targetPlayer.leader, result.activatedAlly.recruitedTroops),
+    recruitText(targetPlayer.leader, targetRecruitedTroops),
   ].filter((part): part is string => Boolean(part));
   if (parts.length === 0) return undefined;
   const sourceLabel = agentEffectSourceLabel(card, result, parts.length);

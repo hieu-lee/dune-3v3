@@ -142,6 +142,12 @@ function paidRewardChoiceRecipientIsValid(owner: Player, recipient: Player | und
   );
 }
 
+function paidRewardChoiceTroopSupplyDemand(reward: PaidRewardChoicePendingAtomicReward) {
+  if (reward.kind === "recruit-troops") return reward.amount;
+  if (reward.kind === "gain-leader-counter") return reward.troopSupplyCost;
+  return 0;
+}
+
 export function resolvePaidRewardChoice(
   state: GameState,
   pending: PaidRewardChoicePendingAction,
@@ -166,24 +172,28 @@ export function resolvePaidRewardChoice(
   const rewards = paidRewardChoiceAtomicRewards(option.reward);
   const recipients = rewards.map((reward) => state.players.find((player) => player.id === reward.recipientId));
   if (rewards.length === 0 || recipients.some((recipient) => !paidRewardChoiceRecipientIsValid(owner, recipient))) return state;
-  const leaderCounterTroopCostsByRecipient = new Map<string, number>();
+  const troopSupplyDemandByRecipient = new Map<string, number>();
   rewards.forEach((reward) => {
-    if (reward.kind !== "gain-leader-counter") return;
-    leaderCounterTroopCostsByRecipient.set(
+    const demand = paidRewardChoiceTroopSupplyDemand(reward);
+    if (demand <= 0) return;
+    troopSupplyDemandByRecipient.set(
       reward.recipientId,
-      (leaderCounterTroopCostsByRecipient.get(reward.recipientId) ?? 0) + reward.troopSupplyCost,
+      (troopSupplyDemandByRecipient.get(reward.recipientId) ?? 0) + demand,
     );
   });
-  for (const [recipientId, troopSupplyCost] of leaderCounterTroopCostsByRecipient.entries()) {
+  for (const [recipientId, troopSupplyDemand] of troopSupplyDemandByRecipient.entries()) {
     const counterRecipient = state.players.find((player) => player.id === recipientId);
     if (
       !counterRecipient ||
       counterRecipient.role !== "Ally" ||
-      counterRecipient.leader !== ladyJessicaLeaderName ||
-      playerTroopSupply(counterRecipient) < troopSupplyCost
+      playerTroopSupply(counterRecipient) < troopSupplyDemand
     ) {
       return state;
     }
+    const hasLeaderCounterReward = rewards.some(
+      (reward) => reward.recipientId === recipientId && reward.kind === "gain-leader-counter",
+    );
+    if (hasLeaderCounterReward && counterRecipient.leader !== ladyJessicaLeaderName) return state;
   }
   const resourceLabel = resourceLabels[option.resource];
   const players = state.players.map((player) => {
@@ -294,7 +304,8 @@ export function resolvePayResourceForTroopsChoice(
     recipients.some((recipient) =>
       !recipient ||
       recipient.team !== owner.team ||
-      recipient.role !== "Ally"
+      recipient.role !== "Ally" ||
+      playerTroopSupply(recipient) < pending.troops
     )
   ) {
     return state;

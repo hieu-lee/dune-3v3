@@ -13,6 +13,7 @@ import {
   resolveAgentPayResourceForContracts,
   resolveCardAcquireEffects,
 } from "./effect-resolver";
+import { playerTroopSupply } from "./deck-utils";
 import { advancePendingAction, prependPendingAction } from "./pending-actions";
 import type {
   ContractCard,
@@ -325,6 +326,7 @@ export function resolveAcquireCardForPending(
     : { valid: true, owner: undefined };
   if (!callToArmsRecruit.valid) return state;
   const recruitOwner = callToArmsRecruit.owner;
+  const recruitedTroops = recruitOwner ? Math.min(playerTroopSupply(recruitOwner), 1) : 0;
   const acquireReward = resolveCardAcquireEffects(card, owner, state);
   const players = state.players.map((player) => {
     let next = player;
@@ -335,8 +337,8 @@ export function resolveAcquireCardForPending(
         cardCost,
       );
     }
-    if (recruitOwner && player.id === recruitOwner.id) {
-      next = { ...next, garrison: next.garrison + 1 };
+    if (recruitOwner && recruitedTroops > 0 && player.id === recruitOwner.id) {
+      next = { ...next, garrison: next.garrison + recruitedTroops };
     }
     return next;
   });
@@ -344,7 +346,7 @@ export function resolveAcquireCardForPending(
   const paymentText = pending.paymentResource && cardCost > 0
     ? ` for ${cardCost} ${resourceLabels[pending.paymentResource]}`
     : "";
-  const recruitPart = recruitOwner
+  const recruitPart = recruitOwner && recruitedTroops > 0
     ? recruitOwner.id === owner.id
       ? "recruits 1 troop"
       : `${recruitOwner.leader} recruits 1 troop`

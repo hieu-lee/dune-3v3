@@ -23,6 +23,7 @@ import {
   pendingActionsForCard,
   pendingActionsForReveal,
   playerHasConflictUnits,
+  playerTroopSupply,
   queuePendingActions,
   recordRoundMakerSpaceVisit,
   recordTurnSpiceGain,
@@ -193,7 +194,7 @@ export function placeAgentAction(
     !player.swordmasterAgentSpent &&
     player.agentsTotal > 2 &&
     player.agentsReady === 1;
-  let { source, target: effectedTarget } = applyBoardEffect(
+  let { recruitedTroops: boardRecruitedTroops, source, target: effectedTarget } = applyBoardEffect(
     {
       ...player,
       hand,
@@ -251,6 +252,7 @@ export function placeAgentAction(
       players,
       cardAgentEffect.recruitedTroops,
       Boolean(cardAgentEffect.blocksDeploymentsThisTurn),
+      boardRecruitedTroops,
     );
   const spacePending = withPostDeployIntrigueDraw(
     baseSpacePending,
@@ -376,6 +378,7 @@ export function placeAgentAction(
 type RevealTurnPlan = {
   persuasion: number;
   printedRevealCards: string[];
+  recruitedTroops: number;
   revealGain: Partial<Resources>;
   swords: number;
 };
@@ -389,10 +392,11 @@ export function revealTurnPlan(
   const persuasion = effectResult.persuasion + highCouncilPersuasion;
   const swords = effectResult.swords + (activePlayer.swordmasterBonus ? 2 : 0);
   const revealGain = effectResult.revealGain;
+  const recruitedTroops = effectResult.recruitedTroops;
   const printedRevealCards = activePlayer.hand
     .filter((card) => card.conditionalPersuasion || card.conditionalSwords)
     .map((card) => card.name);
-  return { persuasion, printedRevealCards, revealGain, swords };
+  return { persuasion, printedRevealCards, recruitedTroops, revealGain, swords };
 }
 
 type RevealTurnInput = {
@@ -400,11 +404,17 @@ type RevealTurnInput = {
   revealPlan: RevealTurnPlan;
 };
 
+function revealRecruitLabel(troops: number, owner?: Player) {
+  if (troops <= 0) return "";
+  const ownerLabel = owner ? `${owner.leader} ` : "";
+  return ` and ${ownerLabel}recruits ${troops} troop${troops === 1 ? "" : "s"}`;
+}
+
 export function revealTurnAction(
   current: GameState,
   { commanderTargets, revealPlan }: RevealTurnInput,
 ): GameState {
-  const { persuasion, printedRevealCards, revealGain, swords } = revealPlan;
+  const { persuasion, printedRevealCards, recruitedTroops, revealGain, swords } = revealPlan;
   const player = current.players[current.activeSeat];
   const targetId =
     player.role === "Commander"
@@ -413,6 +423,8 @@ export function revealTurnAction(
   const target = current.players.find((candidate) => candidate.id === targetId);
   const combatRecipient = player.role === "Commander" ? target : player;
   const combatSwords = combatRecipient && playerHasConflictUnits(combatRecipient) ? swords : 0;
+  const recruitRecipient = player.role === "Commander" ? target : player;
+  const actualRecruitedTroops = recruitRecipient ? Math.min(playerTroopSupply(recruitRecipient), recruitedTroops) : 0;
   const players = current.players.map((candidate, index) => {
     if (index === current.activeSeat) {
       return {
@@ -423,12 +435,17 @@ export function revealTurnAction(
         persuasion,
         revealActivatedAllyId: candidate.role === "Commander" ? target?.id : undefined,
         conflict: candidate.role === "Commander" ? candidate.conflict : candidate.conflict + combatSwords,
+        garrison: candidate.role === "Commander" ? candidate.garrison : candidate.garrison + actualRecruitedTroops,
         playArea: [...candidate.playArea, ...candidate.hand],
         hand: [],
       };
     }
     if (candidate.id === targetId && player.role === "Commander") {
-      return { ...candidate, conflict: candidate.conflict + combatSwords };
+      return {
+        ...candidate,
+        conflict: candidate.conflict + combatSwords,
+        garrison: candidate.garrison + actualRecruitedTroops,
+      };
     }
     return candidate;
   });
@@ -455,8 +472,8 @@ export function revealTurnAction(
           : []
       ),
       player.role === "Commander"
-        ? `${player.leader} reveals for ${persuasion} persuasion${revealGainLabel(revealGain)} and gives ${combatSwords} strength to ${target?.leader ?? "an Ally"}.`
-        : `${player.leader} reveals for ${persuasion} persuasion, ${combatSwords} strength${revealGainLabel(revealGain)}.`,
+        ? `${player.leader} reveals for ${persuasion} persuasion${revealGainLabel(revealGain)}${revealRecruitLabel(actualRecruitedTroops, target)} and gives ${combatSwords} strength to ${target?.leader ?? "an Ally"}.`
+        : `${player.leader} reveals for ${persuasion} persuasion, ${combatSwords} strength${revealGainLabel(revealGain)}${revealRecruitLabel(actualRecruitedTroops)}.`,
       ...current.log,
     ],
   };

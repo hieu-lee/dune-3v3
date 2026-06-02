@@ -88,6 +88,7 @@ export const spaceTimeFoldingSourceId = 12;
 export const ecologicalTestingStationSourceId = 46;
 export const guildSpySourceId = 43;
 export const inHighPlacesSourceId = 64;
+export const junctionHeadquartersSourceId = 68;
 export const overthrowSourceId = 75;
 export const priceIsNoObjectSourceId = 73;
 export const spyNetworkSourceId = 25;

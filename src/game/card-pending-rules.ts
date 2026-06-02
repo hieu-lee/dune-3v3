@@ -189,11 +189,38 @@ function hasResourceGain(gain: Partial<Record<keyof Player["resources"], number>
   return Object.values(gain).some((amount) => (amount ?? 0) > 0);
 }
 
+function canPayResourceCost(
+  resources: Player["resources"],
+  cost: Partial<Record<keyof Player["resources"], number>>,
+  deferredResources: Partial<Record<keyof Player["resources"], number>> = {},
+) {
+  return Object.entries(cost).every(([resource, amount]) =>
+    resources[resource as keyof Player["resources"]] + (deferredResources[resource as keyof Player["resources"]] ?? 0) >=
+      (amount ?? 0)
+  );
+}
+
+function potentialDeferredResourcesForCost(
+  state: GameState | undefined,
+  source: Player,
+  target: Player | undefined,
+  space: BoardSpace | undefined,
+  cost: Partial<Record<keyof Player["resources"], number>>,
+) {
+  const deferredResources: Partial<Record<keyof Player["resources"], number>> = {};
+  if (!state || !space) return deferredResources;
+  if ((cost.spice ?? 0) > 0) {
+    deferredResources.spice = potentialDeferredMakerChoiceSpice(state, source, target, space);
+  }
+  return deferredResources;
+}
+
 function pendingActionForAgentTrashIntrigueForReward(
   card: Card,
   source: Player,
   state?: GameState,
   target?: Player,
+  space?: BoardSpace,
   futureIntrigues = 0,
 ): PendingAction | undefined {
   if (!card.effects || !source.playArea.some((candidate) => candidate.id === card.id)) return undefined;
@@ -207,14 +234,21 @@ function pendingActionForAgentTrashIntrigueForReward(
   });
   return effects
     .map((effect): PendingAction | undefined => {
-      if (effect.selector !== "self" || (effect.drawIntrigues <= 0 && !hasResourceGain(effect.gain))) return undefined;
+      if (
+        effect.selector !== "self" ||
+        (effect.drawIntrigues <= 0 && !hasResourceGain(effect.gain) && effect.gainVp <= 0)
+      ) return undefined;
       if (source.intrigues.length + futureIntrigues <= 0) return undefined;
+      const deferredResources = potentialDeferredResourcesForCost(state, source, target, space, effect.cost);
+      if (!canPayResourceCost(source.resources, effect.cost, deferredResources)) return undefined;
       return {
         kind: "trash-intrigue-for-reward",
         ownerId: source.id,
         source: effect.source ?? card.name,
+        cost: { ...effect.cost },
         drawIntrigues: effect.drawIntrigues,
         gain: { ...effect.gain },
+        gainVp: effect.gainVp,
         optional: effect.optional,
       };
     })
@@ -359,17 +393,22 @@ function pendingActionForAgentPaidRewardChoice(
       const rewards = reward.rewards.map(pendingRewardFor);
       if (rewards.some((candidate) => !candidate || candidate.kind === "bundle")) return undefined;
       const atomicRewards = rewards as PaidRewardChoicePendingAtomicReward[];
-      const leaderCounterTroopCostsByRecipient = new Map<string, number>();
+      const troopSupplyDemandByRecipient = new Map<string, number>();
       atomicRewards.forEach((atomicReward) => {
-        if (atomicReward.kind !== "gain-leader-counter") return;
-        leaderCounterTroopCostsByRecipient.set(
+        const demand = atomicReward.kind === "gain-leader-counter"
+          ? atomicReward.troopSupplyCost
+          : atomicReward.kind === "recruit-troops"
+            ? atomicReward.amount
+            : 0;
+        if (demand <= 0) return;
+        troopSupplyDemandByRecipient.set(
           atomicReward.recipientId,
-          (leaderCounterTroopCostsByRecipient.get(atomicReward.recipientId) ?? 0) + atomicReward.troopSupplyCost,
+          (troopSupplyDemandByRecipient.get(atomicReward.recipientId) ?? 0) + demand,
         );
       });
-      for (const [recipientId, troopSupplyCost] of leaderCounterTroopCostsByRecipient.entries()) {
+      for (const [recipientId, troopSupplyDemand] of troopSupplyDemandByRecipient.entries()) {
         const recipient = [source, target].find((candidate) => candidate?.id === recipientId);
-        if (!recipient || playerTroopSupply(recipient) < troopSupplyCost) return undefined;
+        if (!recipient || playerTroopSupply(recipient) < troopSupplyDemand) return undefined;
       }
       return { kind: "bundle", rewards: atomicRewards };
     }
@@ -402,7 +441,9 @@ function pendingActionForAgentPaidRewardChoice(
       };
     }
     if (reward.kind === "recruit-troops") {
-      if (reward.amount <= 0 || reward.destination !== "garrison") return undefined;
+      if (reward.amount <= 0 || reward.destination !== "garrison" || playerTroopSupply(recipient) < reward.amount) {
+        return undefined;
+      }
       return {
         kind: "recruit-troops",
         recipientId: recipient.id,
@@ -1024,7 +1065,7 @@ export function pendingActionsForCard(
   if (agentDiscardInfluenceDrawPending) typedPendings.push(agentDiscardInfluenceDrawPending);
   const agentDiscardDrawPending = pendingActionForAgentDiscardCardForDraw(card, source, state, target);
   if (agentDiscardDrawPending) typedPendings.push(agentDiscardDrawPending);
-  const agentTrashIntriguePending = pendingActionForAgentTrashIntrigueForReward(card, source, state, target, futureIntrigues);
+  const agentTrashIntriguePending = pendingActionForAgentTrashIntrigueForReward(card, source, state, target, space, futureIntrigues);
   if (agentTrashIntriguePending) typedPendings.push(agentTrashIntriguePending);
   const agentGainInfluencePending = pendingActionForAgentGainInfluenceChoice(card, source, state, target);
   if (agentGainInfluencePending) typedPendings.push(agentGainInfluencePending);

@@ -219,6 +219,66 @@ try {
   assert.equal(playerById(departTroopsOnly, "p2").resources.spice, 0);
   assert.equal(playerById(departTroopsOnly, "p2").garrison, 4);
   assert.match(departTroopsOnly.log[0], /spends 2 spice and recruits 3 troops/);
+  const noSupplyDepart = {
+    ...departTroopsOnlyFixture,
+    players: departTroopsOnlyFixture.players.map((candidate) =>
+      candidate.id === "p2"
+        ? {
+            ...candidate,
+            deployedTroops: 0,
+            discard: [],
+            garrison: 12,
+            jessicaMemories: 0,
+            resources: { ...candidate.resources, spice: 2 },
+            intrigues: [departForArrakis],
+          }
+        : candidate,
+    ),
+  };
+  assert.equal(
+    state.playDepartForArrakisPlotIntrigue(noSupplyDepart, "p2", departForArrakis.id, "spend-spice"),
+    noSupplyDepart,
+    "Depart For Arrakis troop branch should not spend spice when troop supply and draw payoff are both unavailable",
+  );
+  const noSupplyDrawDepart = {
+    ...departFixture,
+    players: departFixture.players.map((candidate) =>
+      candidate.id === "p2"
+        ? {
+            ...candidate,
+            deployedTroops: 0,
+            discard: [],
+            garrison: 12,
+            jessicaMemories: 0,
+            resources: { ...candidate.resources, spice: 2 },
+            intrigues: [departForArrakis],
+          }
+        : candidate,
+    ),
+  };
+  const noSupplyDrawDepartPlayed = state.playDepartForArrakisPlotIntrigue(
+    noSupplyDrawDepart,
+    "p2",
+    departForArrakis.id,
+    "spend-spice",
+  );
+  assert.equal(playerById(noSupplyDrawDepartPlayed, "p2").resources.spice, 0);
+  assert.equal(playerById(noSupplyDrawDepartPlayed, "p2").garrison, 12);
+  assert.equal(playerById(noSupplyDrawDepartPlayed, "p2").hand.length, 1);
+  assert.match(noSupplyDrawDepartPlayed.log[0], /draws 1 card, spends 2 spice/);
+  const noSupplyDrySpendDepart = {
+    ...noSupplyDrawDepart,
+    players: noSupplyDrawDepart.players.map((candidate) =>
+      candidate.id === "p2"
+        ? { ...candidate, deck: [], discard: [], hand: [], intrigues: [departForArrakis] }
+        : candidate,
+    ),
+  };
+  assert.equal(
+    state.playDepartForArrakisPlotIntrigue(noSupplyDrySpendDepart, "p2", departForArrakis.id, "spend-spice"),
+    noSupplyDrySpendDepart,
+    "Depart For Arrakis troop branch should not spend spice for an empty draw and zero recruited troops",
+  );
   const poorDepart = {
     ...departFixture,
     players: departFixture.players.map((candidate) =>

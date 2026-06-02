@@ -57,6 +57,7 @@ import { conflictProtectedByShieldWall } from "../game/critical-locations";
 import { battleIconLabels, factionLabels } from "../game/data";
 import {
   buyAccessPairChoices,
+  canResolveDepartForArrakisSpiceChoice,
   canPlayDistractionPlotIntrigue,
   canPlaySpecialMissionPlaceSpy,
   changeAllegiancesGainChoices,
@@ -71,6 +72,7 @@ import {
   imperiumPoliticsFactionChoices,
   influenceLossChoices,
   influenceLossPairChoices,
+  playerTroopSupply,
   sietchRitualFactionChoices,
   specialMissionCitySpySpaces,
   specialMissionRecallSpySpaces,
@@ -194,6 +196,8 @@ export function IntrigueHandPanel({
             activePlayer.resources.water >= 3 &&
             effectiveRequirementInfluence(activePlayer, "spacing", game.players) >= 3;
           const shaddamsFavorGainsSolari = effectiveEmperorIconInfluence(activePlayer, game.players) >= 3;
+          const shaddamsFavorCanRecruit = playerTroopSupply(shaddamsFavorOwner) > 0;
+          const shaddamsFavorCanResolve = shaddamsFavorCanRecruit || shaddamsFavorGainsSolari;
           const marketOpportunityCanSellSpice = activePlayer.resources.spice >= 2;
           const marketOpportunityCanBuySpice = activePlayer.resources.solari >= 5;
           const mercenariesCanPay = activePlayer.resources.solari >= 3;
@@ -247,7 +251,28 @@ export function IntrigueHandPanel({
             ? imperiumPoliticsFactionChoices(activePlayer)
             : [];
           const departForArrakisCanDraw = effectiveFremenIconInfluence(activePlayer, game.players) >= 3;
-          const departForArrakisCanPay = activePlayer.resources.spice >= 2;
+          const departForArrakisCanRecruit = playerTroopSupply(departForArrakisOwner) > 0;
+          const departForArrakisCanActuallyDraw = departForArrakisCanDraw &&
+            activePlayer.deck.length + activePlayer.discard.length > 0;
+          const departForArrakisTroopOwnerId = activePlayer.role === "Commander"
+            ? departForArrakisOwner.id
+            : undefined;
+          const departForArrakisCanPay = canResolveDepartForArrakisSpiceChoice(
+            game,
+            activePlayer.id,
+            card.id,
+            departForArrakisTroopOwnerId,
+          );
+          const departForArrakisSpendTitle = !departForArrakisCanPay
+            ? "Requires 2 spice and troop supply or an available card draw"
+            : departForArrakisCanRecruit
+              ? departForArrakisCanDraw
+                ? "Spend 2 spice to recruit 3 troops, and draw 1 card"
+                : "Spend 2 spice to recruit 3 troops"
+              : "Spend 2 spice to draw 1 card";
+          const departForArrakisSpendRewardLabel = departForArrakisCanRecruit || !departForArrakisCanActuallyDraw
+            ? "3 Troops"
+            : "Draw";
           return (
             <article className="intrigue-card" key={card.id}>
               {card.thumbnailPath && <img className="card-art" src={card.thumbnailPath} alt="" loading="lazy" />}
@@ -715,14 +740,14 @@ export function IntrigueHandPanel({
                     type="button"
                     onClick={() => playDepartForArrakisPlot(card.id, "spend-spice")}
                     disabled={plotIntrigueLocked || !departForArrakisCanPay}
-                    title={departForArrakisCanDraw
-                      ? "Spend 2 spice to recruit 3 troops, and draw 1 card"
-                      : "Spend 2 spice to recruit 3 troops"}
+                    title={departForArrakisSpendTitle}
                   >
                     <Users size={14} />
-                    2 Spice -&gt; 3 Troops
-                    {departForArrakisOwner.id !== activePlayer.id ? `: ${departForArrakisOwner.leader}` : ""}
-                    {departForArrakisCanDraw ? " + Draw" : ""}
+                    2 Spice -&gt; {departForArrakisSpendRewardLabel}
+                    {departForArrakisCanRecruit && departForArrakisOwner.id !== activePlayer.id
+                      ? `: ${departForArrakisOwner.leader}`
+                      : ""}
+                    {departForArrakisCanRecruit && departForArrakisCanActuallyDraw ? " + Draw" : ""}
                   </button>
                 </div>
               )}
@@ -772,10 +797,10 @@ export function IntrigueHandPanel({
                 <button
                   type="button"
                   onClick={() => playShaddamsFavorPlot(card.id)}
-                  disabled={plotIntrigueLocked}
+                  disabled={plotIntrigueLocked || !shaddamsFavorCanResolve}
                   title={shaddamsFavorGainsSolari
-                    ? "Recruit 1 troop and gain 3 Solari"
-                    : "Recruit 1 troop"}
+                    ? `${shaddamsFavorCanRecruit ? "Recruit 1 troop and gain" : "Gain"} 3 Solari`
+                    : "Requires troop supply or 3 Emperor/Great Houses Influence"}
                 >
                   <Users size={14} />
                   Recruit{activePlayer.role === "Commander" ? `: ${shaddamsFavorOwner.leader}` : ""}

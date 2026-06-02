@@ -18,6 +18,7 @@ import {
   inHighPlacesSourceId,
   interstellarTradeSourceId,
   imperialSpymasterSourceId,
+  junctionHeadquartersSourceId,
   leadershipSourceId,
   makerKeeperSourceId,
   maulaPistolSourceId,
@@ -87,6 +88,7 @@ import {
   revealLoseInfluenceForIntrigues,
   revealPayResourceForSandworms,
   revealRetreatTroopsForStrength,
+  revealRecruitTroops,
   revealTrashCardForStrength,
   visitedMakerSpace,
   visitedSpaceIcon,
@@ -138,6 +140,9 @@ function imperiumRevealText(card: HubCard, persuasion: number, swords: number, p
   }
   if (card.id === interstellarTradeSourceId) {
     return "+1 persuasion for each completed contract.";
+  }
+  if (card.id === junctionHeadquartersSourceId) {
+    return "+1 persuasion. Gain 1 water and recruit 1 troop.";
   }
   if (card.id === calculusOfPowerSourceId) {
     return "+2 persuasion. You may trash another Emperor card you have in play to add 3 strength.";
@@ -209,6 +214,18 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
         optional: true,
       }, [hasAlliance("bene")]),
       revealGainPersuasion(2),
+    ];
+  }
+  if (card.id === junctionHeadquartersSourceId) {
+    return [
+      agentTrashIntrigueForReward({
+        cost: { spice: 2 },
+        gainVp: 1,
+        optional: true,
+      }, [hasAlliance("spacing")]),
+      revealGainPersuasion(1),
+      revealGainResource("water", 1),
+      revealRecruitTroops(1),
     ];
   }
   if (card.id === calculusOfPowerSourceId) {
@@ -589,6 +606,9 @@ function imperiumPlayText(card: HubCard) {
   }
   if (card.id === branchingPathSourceId) {
     return "Bene Gesserit Alliance: may trash 1 Intrigue to draw 1 Intrigue card and gain 2 spice.";
+  }
+  if (card.id === junctionHeadquartersSourceId) {
+    return "Spacing Guild Alliance: may trash 1 Intrigue and pay 2 spice to gain 1 VP.";
   }
   if (card.id === spacingGuildFavorSourceId) {
     return "Draw 1 card. When discarded from hand, gain 2 spice.";

@@ -1,4 +1,4 @@
-import { drawCards } from "./deck-utils";
+import { drawCards, playerTroopSupply } from "./deck-utils";
 import { applyDiscardedFromHandTriggers } from "./discard-trigger-rules";
 import {
   type InfluenceAdjustmentEffect,
@@ -49,6 +49,7 @@ type PlayTypedPlotIntrigueOptions = {
 type TypedPlotIntrigueOutcome = {
   acquireDestination?: AcquireCardDestination;
   acquirePending?: AcquireCardPendingAction;
+  activatedAllyRecruitedTroops?: number;
   cardsDrawn: number;
   deployableTroops?: number;
   deployOwner?: Player;
@@ -56,6 +57,7 @@ type TypedPlotIntrigueOutcome = {
   discardedCard?: Card;
   manipulatedCard?: Card;
   recalledSpySpace?: BoardSpace;
+  recruitedTroops?: number;
   summonedSandworms?: number;
   summonOwner?: Player;
 };
@@ -354,7 +356,11 @@ export function playTypedPlotIntrigue(
   if (resolved.activatedAlly.spyPlacements.length > 0) {
     throw new Error(`Unsupported activated Ally Plot Intrigue spy placement for ${intrigue.name}`);
   }
-  const hasTroopRecruits = resolved.recruitedTroops > 0 || resolved.activatedAlly.recruitedTroops > 0;
+  const recruitedTroops = Math.min(playerTroopSupply(player), resolved.recruitedTroops);
+  const activatedAllyRecruitedTroops = activatedAlly
+    ? Math.min(playerTroopSupply(activatedAlly), resolved.activatedAlly.recruitedTroops)
+    : 0;
+  const hasTroopRecruits = recruitedTroops > 0 || activatedAllyRecruitedTroops > 0;
   const hasCardDraw = resolved.cardsToDraw > 0;
   const hasIntrigueDraw = resolved.intriguesToDraw > 0;
   const hasResourceSpend = hasResourceSpends(resolved.spentResources);
@@ -393,10 +399,12 @@ export function playTypedPlotIntrigue(
   const outcome: TypedPlotIntrigueOutcome = {
     acquireDestination: acquireEffect?.destination,
     acquirePending,
+    activatedAllyRecruitedTroops,
     cardsDrawn: 0,
     discardedCard,
     manipulatedCard: rowManipulation?.card,
     recalledSpySpace: spyRecall?.space,
+    recruitedTroops,
   };
   let sourceAfterEffects: Player | undefined;
   let players = state.players.map((candidate) => {
@@ -406,7 +414,7 @@ export function playTypedPlotIntrigue(
         resources: applyResourceChanges(candidate.resources, resolved.revealGain, resolved.spentResources),
         callToArmsActive: hasAcquireRecruitBonus ? true : candidate.callToArmsActive,
         discard: discardedCard ? [...candidate.discard, discardedCard] : candidate.discard,
-        garrison: candidate.garrison + resolved.recruitedTroops,
+        garrison: candidate.garrison + recruitedTroops,
         hand: discardedCard ? candidate.hand.filter((card) => card.id !== discardedCard.id) : candidate.hand,
         manipulatedCards: rowManipulation
           ? [...candidate.manipulatedCards, rowManipulation.card]
@@ -428,7 +436,7 @@ export function playTypedPlotIntrigue(
     if (!activatedAlly || candidate.id !== activatedAlly.id) return candidate;
     return {
       ...candidate,
-      garrison: candidate.garrison + resolved.activatedAlly.recruitedTroops,
+      garrison: candidate.garrison + activatedAllyRecruitedTroops,
     };
   });
   sourceAfterEffects = players.find((candidate) => candidate.id === player.id) ?? sourceAfterEffects;

@@ -557,6 +557,96 @@ export async function runCardChoicesSmoke({
     "Branching Path should draw one replacement Intrigue",
   );
 
+  await setDebugGameAndWait(page, states.junctionHeadquarters);
+  pendingText = await page.locator(".pending-panel").innerText();
+  const junctionTrashName = states.junctionHeadquarters.junctionTrashName;
+  const junctionTrashId = states.junctionHeadquarters.junctionTrashId;
+  assert.match(pendingText, /Junction Headquarters/i);
+  assert.match(pendingText, new RegExp(escapeRegExp(junctionTrashName)));
+  assert.match(pendingText, /spend 2 spice/i);
+  assert.match(pendingText, /gain 1 VP/i);
+  await screenshot(page, captures, "pending-junction-headquarters-trash-intrigue.png");
+
+  before = await currentGame(page);
+  ownerBefore = before.players.find((player) => player.id === "p2");
+  await page.locator(".pending-panel").getByRole("button", { name: junctionTrashName }).click();
+  await page.locator(".pending-panel").getByRole("button", { name: "Resolve Junction Headquarters" }).click();
+  await waitForNoPending(page);
+  after = await currentGame(page);
+  ownerAfter = after.players.find((player) => player.id === "p2");
+  assert.equal(
+    [
+      ...after.intrigueDeck,
+      ...after.intrigueDiscard,
+      ...ownerAfter.intrigues,
+    ].some((card) => card.id === junctionTrashId),
+    false,
+    "Junction Headquarters should remove the selected Intrigue from the Intrigue draw cycle",
+  );
+  assert.equal(ownerAfter.resources.spice, ownerBefore.resources.spice - 2, "Junction Headquarters should spend 2 spice");
+  assert.equal(ownerAfter.vp, ownerBefore.vp + 1, "Junction Headquarters should gain 1 VP");
+
+  await setDebugGameAndWait(page, states.junctionHeadquartersNoPay);
+  pendingText = await page.locator(".pending-panel").innerText();
+  const junctionNoPayTrashName = states.junctionHeadquartersNoPay.junctionTrashName;
+  assert.match(pendingText, /Junction Headquarters/i);
+  assert.match(pendingText, /spend 2 spice/i);
+  assert.match(pendingText, /Skip/i);
+  await page.locator(".pending-panel").getByRole("button", { name: junctionNoPayTrashName }).click();
+  const junctionNoPayResolve = page.locator(".pending-panel").getByRole("button", { name: "Resolve Junction Headquarters" });
+  assert.equal(await junctionNoPayResolve.isDisabled(), true, "Unpayable Junction Headquarters resolve button should be disabled");
+  await screenshot(page, captures, "pending-junction-headquarters-no-pay-trash-intrigue.png");
+
+  await setDebugGameAndWait(page, states.payResourceTroopsNoSupply);
+  pendingText = await page.locator(".pending-panel").innerText();
+  assert.match(pendingText, /Corrino Might/i);
+  assert.match(pendingText, /both Allies/i);
+  const payResourceTroopsNoSupplyButton = page
+    .locator(".pending-panel")
+    .getByRole("button", { name: /Spend 3 spice: both Allies \+2 troops/ });
+  assert.equal(
+    await payResourceTroopsNoSupplyButton.isDisabled(),
+    true,
+    "No-supply pay-resource-for-troops button should be disabled",
+  );
+  await screenshot(page, captures, "pending-pay-resource-troops-no-supply.png");
+
+  await setDebugGameAndWait(page, states.paidRewardNoSupply);
+  pendingText = await page.locator(".pending-panel").innerText();
+  assert.match(pendingText, /Emperor of the Known Universe/i);
+  assert.match(pendingText, /Princess Irulan recruits 1 troop/i);
+  const paidRewardNoSupplyButton = page
+    .locator(".pending-panel")
+    .getByRole("button", { name: /Spend 2: Princess Irulan recruits 1 troop/ });
+  assert.equal(
+    await paidRewardNoSupplyButton.isDisabled(),
+    true,
+    "No-supply paid reward troop button should be disabled",
+  );
+  await screenshot(page, captures, "pending-paid-reward-no-supply.png");
+
+  await setDebugGameAndWait(page, states.shaddamsFavorNoSupply);
+  const shaddamsFavorNoSupplyButton = page
+    .locator(".intrigue-hand")
+    .getByRole("button", { name: /Recruit/ });
+  assert.equal(
+    await shaddamsFavorNoSupplyButton.isDisabled(),
+    true,
+    "Shaddam's Favor should be disabled when it cannot recruit and cannot gain Solari",
+  );
+  await screenshot(page, captures, "intrigue-shaddams-favor-no-supply.png");
+
+  await setDebugGameAndWait(page, states.departForArrakisNoSupplyNoDraw);
+  const departForArrakisNoSupplyButton = page
+    .locator(".intrigue-hand")
+    .getByRole("button", { name: /2 Spice -> 3 Troops/ });
+  assert.equal(
+    await departForArrakisNoSupplyButton.isDisabled(),
+    true,
+    "Depart For Arrakis spend branch should be disabled when it cannot recruit or draw",
+  );
+  await screenshot(page, captures, "intrigue-depart-for-arrakis-no-supply.png");
+
   await setDebugGameAndWait(page, states.covertOperation);
   pendingText = await page.locator(".pending-panel").innerText();
   const covertOperationDiscardName = states.covertOperation.covertOperationDiscardName;
@@ -670,12 +760,18 @@ async function createCardChoiceStates(server, initialPlayableGame) {
   assert.ok(guildSpy, "Expected Guild Spy Imperium card");
   const branchingPath = data.imperiumDeck.find((card) => card.sourceId === 45);
   assert.ok(branchingPath, "Expected Branching Path Imperium card");
+  const junctionHeadquarters = data.imperiumDeck.find((card) => card.sourceId === 68);
+  assert.ok(junctionHeadquarters, "Expected Junction Headquarters Imperium card");
   const ecologicalTestingStation = data.imperiumDeck.find((card) => card.sourceId === 46);
   assert.ok(ecologicalTestingStation, "Expected Ecological Testing Station Imperium card");
   const covertOperation = data.imperiumDeck.find((card) => card.sourceId === 35);
   assert.ok(covertOperation, "Expected Covert Operation Imperium card");
   const leverage = data.intrigueCards.find((card) => card.sourceId === 447);
   assert.ok(leverage, "Expected Leverage Intrigue card");
+  const shaddamsFavor = data.intrigueCards.find((card) => card.name === "Shaddam's Favor");
+  assert.ok(shaddamsFavor, "Expected Shaddam's Favor Intrigue card");
+  const departForArrakis = data.intrigueCards.find((card) => card.sourceId === 132);
+  assert.ok(departForArrakis, "Expected Depart For Arrakis Intrigue card");
   const spySpace = data.boardSpaces.find((space) => space.id === "high-council");
   assert.ok(spySpace, "Expected High Council spy placement space");
   const spyPlaceAfterRecallSpace = data.boardSpaces.find((space) => space.id === "secrets");
@@ -686,6 +782,10 @@ async function createCardChoiceStates(server, initialPlayableGame) {
   assert.ok(spiceRefinery, "Expected Spice Refinery board space");
   const imperialBasin = data.boardSpaces.find((space) => space.id === "imperial-basin");
   assert.ok(imperialBasin, "Expected Imperial Basin board space");
+  const haggaBasin = data.boardSpaces.find((space) => space.id === "hagga-basin");
+  assert.ok(haggaBasin, "Expected Hagga Basin board space");
+  const unprotectedConflict = data.conflictCards.find((card) => card.name === "CHOAM Security");
+  assert.ok(unprotectedConflict, "Expected unprotected Conflict for Junction no-pay fixture");
   const capturedMentat = data.imperiumDeck.find((card) => card.sourceId === 61);
   assert.ok(capturedMentat, "Expected Captured Mentat Imperium card");
   const capturedMentatDiscard = { ...data.allyStarterCards[0], id: "browser-captured-mentat-discard-card" };
@@ -727,6 +827,11 @@ async function createCardChoiceStates(server, initialPlayableGame) {
   const branchingPathBoardIntrigue = {
     ...data.intrigueCards[4],
     id: "browser-branching-path-board-intrigue",
+  };
+  const junctionTrashIntrigue = {
+    ...data.intrigueCards[5],
+    id: "browser-junction-headquarters-trash-intrigue",
+    name: "Junction Headquarters Debug Intrigue",
   };
   const ecologicalTestingStationDrawOne = {
     ...data.allyStarterCards[0],
@@ -1019,6 +1124,87 @@ async function createCardChoiceStates(server, initialPlayableGame) {
   assert.equal(branchingPathState.pendingAction.drawIntrigues, 1, "Expected Branching Path replacement Intrigue reward");
   assert.equal(branchingPathState.pendingAction.gain.spice, 2, "Expected Branching Path spice reward");
   assert.equal(branchingPathState.pendingAction.optional, true, "Expected Branching Path Intrigue trash to be optional");
+  const junctionHeadquartersState = turnActions.placeAgentAction(
+    {
+      ...base,
+      alliances: { ...base.alliances, spacing: ownerId },
+      turnSpiceGains: {},
+      players: base.players.map((player) =>
+        player.id === ownerId
+          ? {
+              ...player,
+              agentsReady: 1,
+              discard: [],
+              garrison: 0,
+              hand: [junctionHeadquarters],
+              intrigues: [junctionTrashIntrigue],
+              playArea: [],
+              resources: { solari: 0, spice: 1, water: 0 },
+              vp: 0,
+            }
+          : player,
+      ),
+    },
+    {
+      commanderTargets: {},
+      selectedCard: junctionHeadquarters,
+      selectedSpace: imperialBasin,
+    },
+  );
+  assert.equal(
+    junctionHeadquartersState.pendingAction?.kind,
+    "trash-intrigue-for-reward",
+    "Expected Junction Headquarters Intrigue-trash pending action",
+  );
+  assert.deepEqual(junctionHeadquartersState.pendingAction.cost, { spice: 2 }, "Expected Junction Headquarters spice cost");
+  assert.equal(junctionHeadquartersState.pendingAction.gainVp, 1, "Expected Junction Headquarters VP reward");
+  assert.equal(junctionHeadquartersState.pendingAction.optional, true, "Expected Junction Headquarters Intrigue trash to be optional");
+  const junctionNoPayTrashIntrigue = {
+    ...junctionTrashIntrigue,
+    id: "browser-junction-headquarters-no-pay-trash-intrigue",
+  };
+  const junctionNoPayPlaced = turnActions.placeAgentAction(
+    {
+      ...base,
+      activeSeat: base.players.findIndex((player) => player.id === "p3"),
+      alliances: { ...base.alliances, spacing: "p3" },
+      conflict: unprotectedConflict,
+      shieldWall: false,
+      turnSpiceGains: {},
+      players: base.players.map((player) =>
+        player.id === "p3"
+          ? {
+              ...player,
+              agentsReady: 1,
+              discard: [],
+              garrison: 0,
+              hand: [junctionHeadquarters],
+              intrigues: [junctionNoPayTrashIntrigue],
+              makerHooks: true,
+              playArea: [],
+              resources: { solari: 0, spice: 1, water: 1 },
+              vp: 0,
+            }
+          : player,
+      ),
+    },
+    {
+      commanderTargets: {},
+      selectedCard: junctionHeadquarters,
+      selectedSpace: haggaBasin,
+    },
+  );
+  assert.equal(junctionNoPayPlaced.pendingAction?.kind, "maker-choice", "Expected Junction no-pay fixture to start with Maker choice");
+  const junctionNoPayState = state.resolveMakerChoice(
+    junctionNoPayPlaced,
+    junctionNoPayPlaced.pendingAction,
+    "sandworms",
+  );
+  assert.equal(
+    junctionNoPayState.pendingAction?.kind,
+    "trash-intrigue-for-reward",
+    "Expected Junction no-pay fixture to advance to an unpayable Intrigue-trash pending",
+  );
   const ecologicalTestingStationState = turnActions.placeAgentAction(
     {
       ...base,
@@ -1561,6 +1747,100 @@ async function createCardChoiceStates(server, initialPlayableGame) {
       branchingPathRewardIntrigueId: branchingPathRewardIntrigue.id,
       branchingPathTrashId: branchingPathTrashIntrigue.id,
       branchingPathTrashName: branchingPathTrashIntrigue.name,
+    },
+    junctionHeadquarters: {
+      ...junctionHeadquartersState,
+      junctionTrashId: junctionTrashIntrigue.id,
+      junctionTrashName: junctionTrashIntrigue.name,
+    },
+    junctionHeadquartersNoPay: {
+      ...junctionNoPayState,
+      junctionTrashName: junctionNoPayTrashIntrigue.name,
+    },
+    payResourceTroopsNoSupply: {
+      ...base,
+      pendingAction: {
+        kind: "pay-resource-for-troops",
+        ownerId: "p4",
+        recipientIds: ["p2", "p6"],
+        resource: "spice",
+        cost: 3,
+        troops: 2,
+        destination: "garrison",
+        optional: true,
+        source: "Corrino Might",
+      },
+      pendingQueue: [],
+      players: base.players.map((player) => {
+        if (player.id === "p4") return { ...player, resources: { ...player.resources, spice: 3 } };
+        if (player.id === "p2") return { ...player, deployedTroops: 0, garrison: 11, jessicaMemories: 0 };
+        if (player.id === "p6") return { ...player, deployedTroops: 0, garrison: 0, jessicaMemories: 0 };
+        return player;
+      }),
+    },
+    paidRewardNoSupply: {
+      ...base,
+      pendingAction: {
+        kind: "paid-reward-choice",
+        ownerId: "p4",
+        source: "Emperor of the Known Universe",
+        options: [{
+          id: "troop",
+          resource: "solari",
+          cost: 2,
+          reward: {
+            kind: "recruit-troops",
+            recipientId: "p6",
+            amount: 1,
+            destination: "garrison",
+          },
+        }],
+      },
+      pendingQueue: [],
+      players: base.players.map((player) => {
+        if (player.id === "p4") return { ...player, resources: { ...player.resources, solari: 2 } };
+        if (player.id === "p6") return { ...player, deployedTroops: 0, garrison: 12, jessicaMemories: 0 };
+        return player;
+      }),
+    },
+    shaddamsFavorNoSupply: {
+      ...base,
+      activeSeat,
+      pendingAction: undefined,
+      pendingQueue: [],
+      players: base.players.map((player) =>
+        player.id === ownerId
+          ? {
+              ...player,
+              deployedTroops: 0,
+              garrison: 12,
+              influence: { ...player.influence, emperor: 0, greatHouses: 0 },
+              intrigues: [shaddamsFavor],
+              jessicaMemories: 0,
+            }
+          : player
+      ),
+    },
+    departForArrakisNoSupplyNoDraw: {
+      ...base,
+      activeSeat,
+      pendingAction: undefined,
+      pendingQueue: [],
+      players: base.players.map((player) =>
+        player.id === ownerId
+          ? {
+              ...player,
+              deck: [],
+              deployedTroops: 0,
+              discard: [],
+              garrison: 12,
+              influence: { ...player.influence, fremen: 0, fringeWorlds: 0 },
+              intrigues: [departForArrakis],
+              jessicaMemories: 0,
+              resources: { ...player.resources, spice: 2 },
+            }
+          : player
+      ),
     },
     ecologicalTestingStation: {
       ...ecologicalTestingStationState,

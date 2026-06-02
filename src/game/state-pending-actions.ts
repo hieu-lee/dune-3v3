@@ -501,13 +501,14 @@ export function resolveSietchTabrChoice(
 
   const takeHooks = choice === "hooks";
   const shareMakerHooks = takeHooks && canHaveMakerHooks(owner);
+  const recruitedTroops = takeHooks ? Math.min(playerTroopSupply(owner), 1) : 0;
   const players = state.players.map((player) => {
     let next = player;
     if (shareMakerHooks && canHaveMakerHooks(next)) {
       next = { ...next, makerHooks: true };
     }
-    if (next.id === owner.id && takeHooks) {
-      next = { ...next, garrison: next.garrison + 1 };
+    if (next.id === owner.id && recruitedTroops > 0) {
+      next = { ...next, garrison: next.garrison + recruitedTroops };
     }
     if (next.id === waterOwner.id) {
       next = { ...next, resources: { ...next.resources, water: next.resources.water + 1 } };
@@ -515,7 +516,7 @@ export function resolveSietchTabrChoice(
     return next;
   });
   const ownerAfter = players.find((player) => player.id === owner.id) ?? owner;
-  const deployable = Math.min(ownerAfter.garrison, (takeHooks ? 1 : 0) + Math.max(0, pending.extraRecruitedTroops ?? 0) + 2);
+  const deployable = Math.min(ownerAfter.garrison, recruitedTroops + Math.max(0, pending.extraRecruitedTroops ?? 0) + 2);
   const deployPending: PendingAction | undefined = !pending.conflictBlocked && deployable > 0
     ? {
         kind: "deploy",
@@ -526,6 +527,16 @@ export function resolveSietchTabrChoice(
       }
     : undefined;
   const [nextAction, ...nextQueue] = state.pendingQueue;
+  const hookChoiceParts = [
+    shareMakerHooks && pending.canTakeMakerHooks ? "takes Maker Hooks" : undefined,
+    recruitedTroops > 0 ? "recruits 1 troop" : undefined,
+    `${waterOwner.leader} gains 1 water`,
+  ].filter((part): part is string => Boolean(part));
+  const hookChoiceText = hookChoiceParts.length <= 1
+    ? hookChoiceParts[0] ?? ""
+    : hookChoiceParts.length === 2
+      ? hookChoiceParts.join(" and ")
+      : `${hookChoiceParts.slice(0, -1).join(", ")}, and ${hookChoiceParts.at(-1)}`;
 
   return {
     ...state,
@@ -535,7 +546,7 @@ export function resolveSietchTabrChoice(
     pendingQueue: deployPending ? state.pendingQueue : nextQueue,
     log: [
       takeHooks
-        ? `${owner.leader} resolves ${pending.source}: ${pending.canTakeMakerHooks ? "takes Maker Hooks, " : ""}recruits 1 troop, and ${waterOwner.leader} gains 1 water.`
+        ? `${owner.leader} resolves ${pending.source}: ${hookChoiceText}.`
         : `${waterOwner.leader} gains 1 water from ${pending.source}${pending.canRemoveShieldWall ? " and removes the Shield Wall" : ""}.`,
       ...state.log,
     ],
@@ -616,6 +627,7 @@ export function reinforceTroop(
   if (destination === "conflict" && pending.conflictBlocked) return state;
   const recipient = state.players.find((player) => player.id === playerId);
   if (!recipient || recipient.team !== pending.team || recipient.role !== "Ally") return state;
+  if (playerTroopSupply(recipient) <= 0) return state;
 
   const players = state.players.map((player) =>
     player.id === playerId
@@ -628,10 +640,14 @@ export function reinforceTroop(
       : player,
   );
   const remaining = pending.remaining - 1;
+  const teamTroopSupply = players
+    .filter((player) => player.team === pending.team && player.role === "Ally")
+    .reduce((total, player) => total + playerTroopSupply(player), 0);
+  const canContinue = remaining > 0 && teamTroopSupply > 0;
   const reinforcedState = {
     ...state,
     players,
-    ...(remaining > 0 ? { pendingAction: { ...pending, remaining } } : advancePendingAction(state)),
+    ...(canContinue ? { pendingAction: { ...pending, remaining } } : advancePendingAction(state)),
     log: [`${recipient.leader} receives Military Support into ${destination}.`, ...state.log],
   };
   const actor = state.players[state.activeSeat];

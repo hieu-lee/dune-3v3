@@ -776,6 +776,26 @@ try {
     [],
     "Corrino Might should not queue when Shaddam cannot pay 3 spice",
   );
+  const noSupplyCorrinoMightAlly = {
+    ...baseCorrinoMightAllyA,
+    deployedTroops: 0,
+    garrison: 11,
+    jessicaMemories: 0,
+  };
+  assert.deepEqual(
+    state.pendingActionsForRevealPayResourceForTroops(
+      corrinoMight,
+      baseCorrinoMightCommander,
+      {
+        ...baseCorrinoMightGame,
+        players: baseCorrinoMightGame.players.map((player) =>
+          player.id === noSupplyCorrinoMightAlly.id ? noSupplyCorrinoMightAlly : player
+        ),
+      },
+    ),
+    [],
+    "Corrino Might should not queue when either Ally lacks troop supply for the payment",
+  );
   assert.deepEqual(
     state.pendingActionsForRevealPayResourceForTroops(
       corrinoMight,

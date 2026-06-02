@@ -373,8 +373,10 @@ export type GameEffectSpec =
   | {
       kind: "trash-intrigue-for-reward";
       selector: PlayerSelector;
+      cost?: Partial<Record<ResourceId, EffectAmountSpec>>;
       drawIntrigues?: EffectAmountSpec;
       gain?: Partial<Record<ResourceId, EffectAmountSpec>>;
+      gainVp?: EffectAmountSpec;
       optional?: boolean;
       source?: string;
     }

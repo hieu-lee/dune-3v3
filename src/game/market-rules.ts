@@ -6,6 +6,7 @@ import {
   type GameEffectResult,
 } from "./effect-resolver";
 import { changeAllegiancesGainChoices } from "./influence-choices";
+import { playerTroopSupply } from "./deck-utils";
 import { influenceEffectOwnerForChoice } from "./influence-loss-rules";
 import { drawIntrigueCards } from "./intrigue-deck";
 import { advancePendingAction, queuePendingActions } from "./pending-actions";
@@ -267,6 +268,7 @@ export function acquireMarketCard(
   const callToArmsRecruit = callToArmsRecruitOwner(state, buyer, callToArmsRecruitOwnerId);
   if (!callToArmsRecruit.valid) return state;
   const recruitOwner = callToArmsRecruit.owner;
+  const recruitedTroops = recruitOwner ? Math.min(playerTroopSupply(recruitOwner), 1) : 0;
   const acquireReward = resolveCardAcquireEffects(card, buyer, state);
   const players = state.players.map((player) => {
     let next = player;
@@ -279,10 +281,12 @@ export function acquireMarketCard(
       }
       next = addAcquiredCard(next, card, fromReserve, "discard", persuasionCost, acquireReward);
     }
-    if (recruitOwner && player.id === recruitOwner.id) next = { ...next, garrison: next.garrison + 1 };
+    if (recruitOwner && recruitedTroops > 0 && player.id === recruitOwner.id) {
+      next = { ...next, garrison: next.garrison + recruitedTroops };
+    }
     return next;
   });
-  const recruitPart = recruitOwner
+  const recruitPart = recruitOwner && recruitedTroops > 0
     ? recruitOwner.id === buyer.id
       ? "recruits 1 troop"
       : `${recruitOwner.leader} recruits 1 troop`

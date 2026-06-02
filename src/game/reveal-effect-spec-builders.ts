@@ -31,6 +31,14 @@ export function revealGainStrength(amount: EffectAmountSpec, conditions?: GameEf
   return revealEffects([{ kind: "gain-strength", selector: "self", amount }], conditions);
 }
 
+export function revealRecruitTroops(
+  amount: EffectAmountSpec,
+  options: { source?: string } = {},
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return revealEffects([{ kind: "recruit-troops", selector: "self", amount, ...options }], conditions);
+}
+
 export function revealPlaceSpies(
   amount: EffectAmountSpec,
   options: {

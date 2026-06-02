@@ -1,4 +1,5 @@
 import { BookOpen, CircleDollarSign, Droplets, Eye, HandCoins, Minus, Plus, RotateCcw, Sparkles } from "lucide-react";
+import { playerTroopSupply } from "../game/deck-utils";
 import type { BoardSpace, ContractCard, PendingAction, Player, ResourceId } from "../game/types";
 
 type StabanUnseenNetworkPendingAction = Extract<PendingAction, { kind: "staban-unseen-network" }>;
@@ -274,7 +275,8 @@ export function PendingPayResourceForTroopsPanel({
     : undefined;
   const resolvedRecipients = recipients.filter((recipient): recipient is Player => Boolean(recipient));
   const allRecipientsPresent = recipients.length === 2 && resolvedRecipients.length === recipients.length;
-  const canPay = typeof availableResource === "number" && availableResource >= cost;
+  const recipientsHaveSupply = resolvedRecipients.every((recipient) => playerTroopSupply(recipient) >= troops);
+  const canResolve = typeof availableResource === "number" && availableResource >= cost && recipientsHaveSupply;
   const recipientLabel = resolvedRecipients.length === 2 && resolvedRecipients.every((recipient) => recipient.role === "Ally")
     ? "both Allies"
     : resolvedRecipients.map((recipient) => recipient.leader).join(" and ");
@@ -284,7 +286,7 @@ export function PendingPayResourceForTroopsPanel({
         <button
           type="button"
           onClick={onChoose}
-          disabled={!owner || !canPay}
+          disabled={!owner || !canResolve}
         >
           <Sparkles size={15} />
           Spend {cost} {resourceLabel}: {recipientLabel} +{troops} troops{trashSource ? ", trash" : ""}

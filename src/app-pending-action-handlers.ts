@@ -24,7 +24,6 @@ import {
   resolveDiscardCardForDrawChoice,
   resolveDiscardHandCardChoice,
   resolveDiscardCardForInfluenceAndDrawChoice,
-  resolveIrulanSignetRingChoice,
   resolveBoardInfluenceChoice,
   resolveJessicaOtherMemoriesChoice,
   resolveJessicaReverendMotherChoice,
@@ -34,6 +33,7 @@ import {
   resolveMakerChoice,
   resolveOptionalSpacePayment,
   resolvePaidRewardChoice,
+  resolvePendingActionChoice,
   resolvePayResourceForContractsChoice,
   resolvePayResourceForDrawCardsChoice,
   resolvePayResourceForInfluenceChoice,
@@ -54,6 +54,7 @@ import {
   skipLoseInfluenceForIntrigues,
   skipOptionalSpacePayment,
   skipPaidRewardChoice,
+  skipPendingActionChoice,
   skipPayResourceForContracts,
   skipPayResourceForDrawCards,
   skipPayResourceForInfluence,
@@ -79,7 +80,6 @@ import type {
   TrashCardZone,
 } from "./game/types";
 import type {
-  IrulanSignetRingChoice,
   JessicaOtherMemoriesChoice,
   JessicaReverendMotherChoice,
   JessicaSpiceAgonyChoice,
@@ -181,8 +181,10 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     runPending("paid-reward-choice", (current, pending) => maybeStartCombatPhase(resolvePaidRewardChoice(current, pending, optionId)));
   const skipPaidReward = () =>
     runPending("paid-reward-choice", (current, pending) => maybeStartCombatPhase(skipPaidRewardChoice(current, pending)));
-  const chooseIrulanSignet = (choice: IrulanSignetRingChoice) =>
-    runPending("irulan-signet-ring", (current, pending) => maybeStartCombatPhase(resolveIrulanSignetRingChoice(current, pending, choice)));
+  const choosePendingActionChoice = (optionId: string) =>
+    runPending("pending-action-choice", (current, pending) => maybeStartCombatPhase(resolvePendingActionChoice(current, pending, optionId)));
+  const skipPendingActionChoiceHandler = () =>
+    runPending("pending-action-choice", (current, pending) => maybeStartCombatPhase(skipPendingActionChoice(current, pending)));
   const chooseStabanUnseenNetwork = (choice: StabanUnseenNetworkChoice) =>
     runPending("staban-unseen-network", (current, pending) => maybeStartCombatPhase(resolveStabanUnseenNetworkChoice(current, pending, choice)));
   const chooseLadyAmberDesertScouts = (choice: LadyAmberDesertScoutsChoice) =>
@@ -312,7 +314,6 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     chooseDiscardCardForDraw,
     chooseDiscardHandCard,
     chooseDiscardCardForInfluenceAndDraw,
-    chooseIrulanSignet,
     chooseJessicaOtherMemories,
     chooseJessicaReverendMother,
     chooseJessicaSpiceAgony,
@@ -326,6 +327,7 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     choosePayResourceForStrength,
     choosePayResourceForTroops,
     choosePaidReward,
+    choosePendingActionChoice,
     chooseRetreatTroopsForStrength,
     chooseSietchTabr,
     chooseStabanUnseenNetwork,
@@ -353,6 +355,7 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     skipLoseInfluenceForIntriguesChoice,
     skipOptionalSpacePaymentChoice,
     skipPaidReward,
+    skipPendingActionChoiceHandler,
     skipPayResourceForContractsChoice,
     skipPayResourceForDrawCardsChoice,
     skipPayResourceForInfluenceChoice,

@@ -12,8 +12,6 @@ import {
   discardCardForInfluenceAndDrawChoices,
   discardCardForInfluenceAndDrawDiscardChoices,
   influenceLossOptions,
-  irulanSignetAcquireCards,
-  irulanSignetTrashableCards,
   loseInfluenceForIntriguesChoices,
   placeableSpySpaces,
   playerTroopSupply,
@@ -22,7 +20,6 @@ import {
   trashableCardsForPending,
 } from "../game/state";
 import type {
-  IrulanSignetRingChoice,
   JessicaOtherMemoriesChoice,
   JessicaReverendMotherChoice,
   JessicaSpiceAgonyChoice,
@@ -41,7 +38,7 @@ import {
 import { PendingConflictInfluencePanel } from "./PendingConflictInfluencePanel";
 import { PendingConflictVpPanel } from "./PendingConflictVpPanel";
 import { PendingInfluenceLossPanel } from "./PendingInfluenceLossPanel";
-import { PendingIrulanSignetPanel } from "./PendingIrulanSignetPanel";
+import { PendingActionChoicePanel } from "./PendingActionChoicePanel";
 import {
   PendingJessicaOtherMemoriesPanel,
   PendingJessicaReverendMotherPanel,
@@ -87,7 +84,7 @@ type PendingActionPanelProps = {
   chooseDiscardHandCard: (discardCardId: string) => void;
   chooseDiscardCardForInfluenceAndDraw: (discardCardId: string, faction: FactionId) => void;
   chooseLoseInfluenceForIntrigues: (faction: FactionId) => void;
-  chooseIrulanSignet: (choice: IrulanSignetRingChoice) => void;
+  choosePendingActionChoice: (optionId: string) => void;
   chooseJessicaOtherMemories: (choice: JessicaOtherMemoriesChoice) => void;
   chooseJessicaReverendMother: (choice: JessicaReverendMotherChoice) => void;
   chooseJessicaSpiceAgony: (choice: JessicaSpiceAgonyChoice) => void;
@@ -127,6 +124,7 @@ type PendingActionPanelProps = {
   skipInfluenceLoss: () => void;
   skipOptionalSpacePaymentChoice: () => void;
   skipPaidReward: () => void;
+  skipPendingActionChoiceHandler: () => void;
   skipPayResourceForContractsChoice: () => void;
   skipPayResourceForDrawCardsChoice: () => void;
   skipPayResourceForInfluenceChoice: () => void;
@@ -158,7 +156,7 @@ export function PendingActionPanel({
   chooseDiscardHandCard,
   chooseDiscardCardForInfluenceAndDraw,
   chooseLoseInfluenceForIntrigues,
-  chooseIrulanSignet,
+  choosePendingActionChoice,
   chooseJessicaOtherMemories,
   chooseJessicaReverendMother,
   chooseJessicaSpiceAgony,
@@ -198,6 +196,7 @@ export function PendingActionPanel({
   skipInfluenceLoss,
   skipOptionalSpacePaymentChoice,
   skipPaidReward,
+  skipPendingActionChoiceHandler,
   skipPayResourceForContractsChoice,
   skipPayResourceForDrawCardsChoice,
   skipPayResourceForInfluenceChoice,
@@ -365,12 +364,8 @@ export function PendingActionPanel({
     pendingAction.kind === "trash-card" && pendingTrashOwner
       ? trashableCardsForPending(pendingTrashOwner, pendingAction)
       : [];
-  const pendingIrulanSignetOwner =
-    pendingAction.kind === "irulan-signet-ring" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
-  const pendingIrulanSignetAcquireCards =
-    pendingAction.kind === "irulan-signet-ring" ? irulanSignetAcquireCards(game, pendingAction) : [];
-  const pendingIrulanSignetTrashChoices =
-    pendingAction.kind === "irulan-signet-ring" ? irulanSignetTrashableCards(game, pendingAction) : [];
+  const pendingActionChoiceOwner =
+    pendingAction.kind === "pending-action-choice" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingStabanUnseenNetworkOwner =
     pendingAction.kind === "staban-unseen-network" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingStabanUnseenNetworkSpace =
@@ -491,7 +486,7 @@ export function PendingActionPanel({
           {pendingAction.kind === "sietch-tabr" && `${pendingSietchLabel ?? "Player"} Sietch Tabr`}
           {pendingAction.kind === "commander-resource-split" && `${pendingResourceSplitCommander?.leader ?? "Commander"} ${pendingAction.source}`}
           {pendingAction.kind === "paid-reward-choice" && `${pendingPaidRewardOwner?.leader ?? "Player"} ${pendingAction.source}`}
-          {pendingAction.kind === "irulan-signet-ring" && `${pendingIrulanSignetOwner?.leader ?? "Princess Irulan"} Chronicler's Insight`}
+          {pendingAction.kind === "pending-action-choice" && `${pendingActionChoiceOwner?.leader ?? "Player"} ${pendingAction.source}`}
           {pendingAction.kind === "staban-unseen-network" && `${pendingStabanUnseenNetworkOwner?.leader ?? "Staban Tuek"} Unseen Network`}
           {pendingAction.kind === "amber-desert-scouts" && `${pendingLadyAmberDesertScoutsOwner?.leader ?? "Lady Amber"} Desert Scouts`}
           {pendingAction.kind === "jessica-spice-agony" && `${pendingJessicaSpiceAgonyOwner?.leader ?? "Lady Jessica"} Spice Agony`}
@@ -639,12 +634,13 @@ export function PendingActionPanel({
         />
       )}
 
-      {pendingAction.kind === "irulan-signet-ring" && (
-        <PendingIrulanSignetPanel
-          acquireCount={pendingIrulanSignetAcquireCards.length}
-          owner={pendingIrulanSignetOwner}
-          trashCount={pendingIrulanSignetTrashChoices.length}
-          onChoose={chooseIrulanSignet}
+      {pendingAction.kind === "pending-action-choice" && (
+        <PendingActionChoicePanel
+          game={game}
+          owner={pendingActionChoiceOwner}
+          pending={pendingAction}
+          onChoose={choosePendingActionChoice}
+          onSkip={skipPendingActionChoiceHandler}
         />
       )}
 

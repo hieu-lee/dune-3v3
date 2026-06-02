@@ -6,6 +6,7 @@ import {
   agentGainResource,
   agentMoveCardToThroneRow,
   agentPaidRewardChoice,
+  agentPendingActionChoice,
   agentPayResourceForInfluence,
   agentPayResourceForContracts,
   agentPayResourceForSandworms,
@@ -32,6 +33,7 @@ import {
   gurneyHalleckLeaderName,
   ladyAmberMetulliLeaderName,
   ladyMargotFenringLeaderName,
+  princessIrulanLeaderName,
   reverendMotherJessicaLeaderName,
   stabanTuekLeaderName,
 } from "./leader-constants";
@@ -248,6 +250,35 @@ const allyStarterSpecs: StarterCardSpec[] = [
         }],
         { requirePayableOption: true, source: "Water of Life" },
         [hasLeader(reverendMotherJessicaLeaderName), hasRole("Ally")],
+      ),
+      agentPendingActionChoice(
+        [
+          {
+            id: "acquire",
+            label: "Acquire cost-1 card to hand",
+            effect: {
+              kind: "acquire-card",
+              selector: "self",
+              minCost: 1,
+              maxCost: 1,
+              destination: "hand",
+            },
+          },
+          {
+            id: "trash",
+            label: "Trash hand card",
+            effect: {
+              kind: "trash-card",
+              selector: "self",
+              optional: false,
+              zones: ["hand"],
+              spiceRewardCostThreshold: 1,
+              spiceReward: 2,
+            },
+          },
+        ],
+        { source: "Chronicler's Insight" },
+        [hasLeader(princessIrulanLeaderName), hasRole("Ally")],
       ),
       revealGainPersuasion(1),
     ],

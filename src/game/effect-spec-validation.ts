@@ -415,6 +415,77 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     });
     return;
   }
+  if (effect.kind === "pending-action-choice") {
+    if (trigger !== "agent-play") {
+      throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
+    }
+    const selector = (effect as { selector?: unknown }).selector;
+    if (selector !== "self") {
+      throw new Error(`Unsupported effect selector "${String(selector)}" for ${effect.kind}`);
+    }
+    validateSourceLabel("pending-action-choice source", effect.source);
+    if (!Array.isArray(effect.options) || effect.options.length === 0) {
+      invalidSpecField("pending-action-choice options", effect.options);
+    }
+    const optionIds = new Set<string>();
+    effect.options.forEach((option) => {
+      if (typeof option.id !== "string" || option.id.trim().length === 0) {
+        invalidSpecField("pending-action-choice option id", option.id);
+      }
+      if (optionIds.has(option.id)) {
+        invalidSpecField("pending-action-choice duplicate option id", option.id);
+      }
+      optionIds.add(option.id);
+      if (typeof option.label !== "string" || option.label.trim().length === 0) {
+        invalidSpecField("pending-action-choice option label", option.label);
+      }
+      const nestedSelector = (option.effect as { selector?: unknown }).selector;
+      if (nestedSelector !== "self") {
+        throw new Error(`Unsupported pending-action-choice selector "${String(nestedSelector)}"`);
+      }
+      if (option.effect.kind === "acquire-card") {
+        if (!supportedAcquireDestinations.has(option.effect.destination)) {
+          invalidSpecField("pending-action-choice acquire destination", option.effect.destination);
+        }
+        if (option.effect.paymentResource !== undefined && !supportedResources.has(option.effect.paymentResource)) {
+          throw new Error(`Unsupported effect resource "${option.effect.paymentResource}"`);
+        }
+        if (option.effect.minCost !== undefined) validateAmount(option.effect.minCost);
+        if (option.effect.maxCost !== undefined) validateAmount(option.effect.maxCost);
+        if (
+          typeof option.effect.minCost === "number" &&
+          typeof option.effect.maxCost === "number" &&
+          option.effect.minCost > option.effect.maxCost
+        ) {
+          invalidSpecField("pending-action-choice acquire cost bounds", `${option.effect.minCost}-${option.effect.maxCost}`);
+        }
+        if (option.effect.maxCost === undefined && option.effect.paymentResource === undefined) {
+          throw new Error("Invalid pending-action-choice acquire constraint: expected maxCost or paymentResource");
+        }
+        validateOptionalBoolean("pending-action-choice acquire optional", (option.effect as { optional?: unknown }).optional);
+        validateSourceLabel("pending-action-choice acquire source", option.effect.source);
+        return;
+      }
+      if (option.effect.kind === "trash-card") {
+        validateOptionalBoolean("pending-action-choice trash optional", (option.effect as { optional?: unknown }).optional);
+        if (option.effect.zones?.some((zone) => !supportedTrashZones.has(zone))) {
+          throw new Error(`Unsupported trash-card zone "${option.effect.zones.find((zone) => !supportedTrashZones.has(zone))}"`);
+        }
+        if (
+          option.effect.requiredTrait !== undefined &&
+          (typeof option.effect.requiredTrait !== "string" || option.effect.requiredTrait.trim().length === 0)
+        ) {
+          invalidSpecField("pending-action-choice trash requiredTrait", option.effect.requiredTrait);
+        }
+        if (option.effect.spiceRewardCostThreshold !== undefined) validateAmount(option.effect.spiceRewardCostThreshold);
+        if (option.effect.spiceReward !== undefined) validateAmount(option.effect.spiceReward);
+        validateSourceLabel("pending-action-choice trash source", option.effect.source);
+        return;
+      }
+      unsupportedKind("pending-action-choice effect", option.effect);
+    });
+    return;
+  }
   if (effect.kind === "acquire-card") {
     if (trigger !== "agent-play" && trigger !== "plot-intrigue" && trigger !== "combat-intrigue") {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);

@@ -27,6 +27,7 @@ import type {
   InfluenceEffectFaction,
   InfluenceEffectRecipient,
   PaidRewardChoiceEffectOption,
+  PendingActionChoiceEffectOption,
   Player,
   PlayerSelector,
   ResourceId,
@@ -226,6 +227,42 @@ export type AgentPaidRewardChoice = {
   >;
   requiredRecipient?: "activated-ally";
   requirePayableOption?: true;
+  source?: string;
+};
+
+export type AgentPendingActionChoice = {
+  selector: "self";
+  options: Array<
+    | {
+        id: string;
+        label: string;
+        effect: {
+          kind: "acquire-card";
+          selector: "self";
+          minCost?: number;
+          maxCost?: number;
+          destination: AcquireCardDestination;
+          paymentResource?: ResourceId;
+          optional: boolean;
+          source?: string;
+        };
+      }
+    | {
+        id: string;
+        label: string;
+        effect: {
+          kind: "trash-card";
+          selector: "self";
+          optional: boolean;
+          zones?: TrashCardZone[];
+          excludeSource: boolean;
+          requiredTrait?: string;
+          spiceRewardCostThreshold?: number;
+          spiceReward?: number;
+          source?: string;
+        };
+      }
+  >;
   source?: string;
 };
 
@@ -853,6 +890,9 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
   if (effect.kind === "paid-reward-choice") {
     return result;
   }
+  if (effect.kind === "pending-action-choice") {
+    return result;
+  }
   if (effect.kind === "acquire-card") {
     return result;
   }
@@ -1377,6 +1417,69 @@ export function resolveAgentPaidRewardChoices(
         options: effect.options.map((option) => resolvePaidRewardChoiceOption(option, context)),
         ...(effect.requiredRecipient ? { requiredRecipient: effect.requiredRecipient } : {}),
         ...(effect.requirePayableOption ? { requirePayableOption: true } : {}),
+        source: effect.source,
+      }));
+  });
+}
+
+function resolvePendingActionChoiceOption(
+  option: PendingActionChoiceEffectOption,
+  context: GameEffectContext,
+): AgentPendingActionChoice["options"][number] {
+  if (option.effect.kind === "acquire-card") {
+    return {
+      id: option.id,
+      label: option.label,
+      effect: {
+        kind: "acquire-card",
+        selector: option.effect.selector,
+        ...(option.effect.minCost !== undefined ? { minCost: amountFor(option.effect.minCost, context.source) } : {}),
+        ...(option.effect.maxCost !== undefined ? { maxCost: amountFor(option.effect.maxCost, context.source) } : {}),
+        destination: option.effect.destination,
+        ...(option.effect.paymentResource ? { paymentResource: option.effect.paymentResource } : {}),
+        optional: option.effect.optional ?? false,
+        ...(option.effect.source ? { source: option.effect.source } : {}),
+      },
+    };
+  }
+  if (option.effect.kind === "trash-card") {
+    return {
+      id: option.id,
+      label: option.label,
+      effect: {
+        kind: "trash-card",
+        selector: option.effect.selector,
+        optional: option.effect.optional ?? false,
+        ...(option.effect.zones ? { zones: [...option.effect.zones] } : {}),
+        excludeSource: option.effect.excludeSource ?? false,
+        ...(option.effect.requiredTrait ? { requiredTrait: option.effect.requiredTrait } : {}),
+        ...(option.effect.spiceRewardCostThreshold !== undefined
+          ? { spiceRewardCostThreshold: amountFor(option.effect.spiceRewardCostThreshold, context.source) }
+          : {}),
+        ...(option.effect.spiceReward !== undefined
+          ? { spiceReward: amountFor(option.effect.spiceReward, context.source) }
+          : {}),
+        ...(option.effect.source ? { source: option.effect.source } : {}),
+      },
+    };
+  }
+  const effect = option.effect as { kind?: unknown };
+  throw new Error(`Unsupported pending-action-choice effect "${String(effect.kind)}"`);
+}
+
+export function resolveAgentPendingActionChoices(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): AgentPendingActionChoice[] {
+  specs?.forEach(validateSpec);
+  return (specs ?? []).flatMap((spec) => {
+    if (spec.trigger !== "agent-play") return [];
+    if (!specApplies(spec, context)) return [];
+    return spec.effects
+      .filter((effect) => effect.kind === "pending-action-choice")
+      .map((effect) => ({
+        selector: effect.selector,
+        options: effect.options.map((option) => resolvePendingActionChoiceOption(option, context)),
         source: effect.source,
       }));
   });

@@ -285,10 +285,38 @@ async function createSignetChoiceStates(server, initialPlayableGame) {
       };
     }),
     pendingAction: {
-      kind: "irulan-signet-ring",
+      kind: "pending-action-choice",
       ownerId: "p6",
       cardId: irulanCard.id,
       source: "Chronicler's Insight",
+      options: [
+        {
+          id: "acquire",
+          label: "Acquire cost-1 card to hand",
+          pending: {
+            kind: "acquire-card",
+            ownerId: "p6",
+            source: "Chronicler's Insight",
+            minCost: 1,
+            maxCost: 1,
+            destination: "hand",
+            optional: false,
+          },
+        },
+        {
+          id: "trash",
+          label: "Trash hand card",
+          pending: {
+            kind: "trash-card",
+            ownerId: "p6",
+            source: "Chronicler's Insight",
+            optional: false,
+            zones: ["hand"],
+            spiceRewardCostThreshold: 1,
+            spiceReward: 2,
+          },
+        },
+      ],
     },
   };
 

@@ -17,6 +17,7 @@ import {
   resolveAgentMoveCardToThroneRows,
   resolveAgentOpponentsDiscardCards,
   resolveAgentPaidRewardChoices,
+  resolveAgentPendingActionChoices,
   resolveAgentPayResourceForContracts,
   resolveAgentPayResourceForDrawCards,
   resolveAgentPayResourceForInfluences,
@@ -41,14 +42,14 @@ import {
   feydRauthaLeaderName,
   ladyAmberMetulliLeaderName,
   ladyJessicaLeaderName,
-  princessIrulanLeaderName,
   reverendMotherJessicaLeaderName,
 } from "./leader-constants";
 import {
   acquirableCardsForPending,
-  irulanSignetAcquireCards,
-  irulanSignetTrashableCards,
 } from "./market-rules";
+import {
+  pendingActionChoiceOptionIsResolvable,
+} from "./pending-action-choice-rules";
 import {
   recallableSpySpaces,
 } from "./spy-choices";
@@ -66,12 +67,13 @@ import type {
   IconId,
   PaidRewardChoicePendingOption,
   PendingAction,
+  PendingActionChoiceNestedPending,
+  PendingActionChoicePendingOption,
   Player,
 } from "./types";
 
 export const stabanUnseenNetworkSource = "Unseen Network";
 export const stabanUnseenNetworkFactionIcons: IconId[] = ["emperor", "spacing", "bene", "fremen"];
-type IrulanSignetRingPendingAction = Extract<PendingAction, { kind: "irulan-signet-ring" }>;
 
 function sameTeamAllies(players: Player[], source: Player): [Player, Player] | undefined {
   const allies = players.filter((player) => player.team === source.team && player.role === "Ally");
@@ -451,6 +453,94 @@ function pendingActionForAgentAcquireCard(
     .find((pending): pending is PendingAction => Boolean(pending));
 }
 
+function pendingActionChoiceNestedPendingFor(
+  card: Card,
+  source: Player,
+  option: ReturnType<typeof resolveAgentPendingActionChoices>[number]["options"][number],
+  defaultSource: string,
+): PendingActionChoiceNestedPending | undefined {
+  const sourceLabel = option.effect.source ?? defaultSource;
+  if (option.effect.kind === "acquire-card") {
+    const pendingBase = {
+      kind: "acquire-card" as const,
+      ownerId: source.id,
+      source: sourceLabel,
+      ...(option.effect.minCost !== undefined ? { minCost: option.effect.minCost } : {}),
+      destination: option.effect.destination,
+      optional: option.effect.optional,
+    };
+    return option.effect.paymentResource !== undefined
+      ? {
+          ...pendingBase,
+          ...(option.effect.maxCost !== undefined ? { maxCost: option.effect.maxCost } : {}),
+          paymentResource: option.effect.paymentResource,
+        }
+      : option.effect.maxCost !== undefined
+        ? { ...pendingBase, maxCost: option.effect.maxCost }
+        : undefined;
+  }
+  if (option.effect.kind === "trash-card") {
+    return {
+      kind: "trash-card",
+      ownerId: source.id,
+      source: sourceLabel,
+      optional: option.effect.optional,
+      ...(option.effect.zones ? { zones: option.effect.zones } : {}),
+      ...(option.effect.excludeSource ? { excludeCardId: card.id } : {}),
+      ...(option.effect.requiredTrait ? { requiredTrait: option.effect.requiredTrait } : {}),
+      ...(option.effect.spiceRewardCostThreshold !== undefined ? {
+        spiceRewardCostThreshold: option.effect.spiceRewardCostThreshold,
+      } : {}),
+      ...(option.effect.spiceReward !== undefined ? { spiceReward: option.effect.spiceReward } : {}),
+    };
+  }
+  const effect = option.effect as { kind?: unknown };
+  throw new Error(`Unsupported pending-action-choice effect "${String(effect.kind)}"`);
+}
+
+function pendingActionForAgentPendingActionChoice(
+  card: Card,
+  source: Player,
+  state?: GameState,
+  target?: Player,
+  space?: BoardSpace,
+): PendingAction | undefined {
+  if (!card.effects || !source.playArea.some((candidate) => candidate.id === card.id)) return undefined;
+  if (!state) return undefined;
+  const players = playersWithPendingCardEffect(state, source, target);
+  const effectState = { ...state, players };
+  const effects = resolveAgentPendingActionChoices(card.effects, {
+    trigger: "agent-play",
+    source,
+    target,
+    state: effectState,
+    space,
+  });
+  if (effects.length > 1) throw new Error(`Unsupported multiple pending action choices for ${card.name}`);
+  const [effect] = effects;
+  if (!effect || effect.selector !== "self") return undefined;
+  const defaultSource = effect.source ?? card.name;
+  const options = effect.options.flatMap((option): PendingActionChoicePendingOption[] => {
+    const pending = pendingActionChoiceNestedPendingFor(card, source, option, defaultSource);
+    if (!pending) return [];
+    const pendingOption = {
+      id: option.id,
+      label: option.label,
+      pending,
+    };
+    return pendingActionChoiceOptionIsResolvable(effectState, pendingOption) ? [pendingOption] : [];
+  });
+  return options.length > 0
+    ? {
+        kind: "pending-action-choice",
+        ownerId: source.id,
+        cardId: card.id,
+        source: defaultSource,
+        options,
+      }
+    : undefined;
+}
+
 function pendingActionForAgentPayResourceForInfluence(
   card: Card,
   source: Player,
@@ -790,6 +880,8 @@ export function pendingActionsForCard(
   if (agentGainInfluencePending) typedPendings.push(agentGainInfluencePending);
   const agentPaidRewardChoicePending = pendingActionForAgentPaidRewardChoice(card, source, state, target, space);
   if (agentPaidRewardChoicePending) typedPendings.push(agentPaidRewardChoicePending);
+  const agentPendingActionChoice = pendingActionForAgentPendingActionChoice(card, source, state, target, space);
+  if (agentPendingActionChoice) typedPendings.push(agentPendingActionChoice);
   const agentOpponentDiscardPendings = pendingActionsForAgentOpponentsDiscardCards(card, source, state, target);
   typedPendings.push(...agentOpponentDiscardPendings);
   const agentAcquireCardPending = pendingActionForAgentAcquireCard(card, source, state, target, space);
@@ -811,22 +903,6 @@ export function pendingActionsForCard(
   const agentTrashSourceForTradePending = pendingActionForAgentTrashSourceForTrade(card, source, state, target);
   if (agentTrashSourceForTradePending) typedPendings.push(agentTrashSourceForTradePending);
   if (typedPendings.length > 0) return typedPendings;
-  if (
-    isGenericSignetRingCard(card) &&
-    source.leader === princessIrulanLeaderName &&
-    source.role === "Ally" &&
-    source.playArea.some((candidate) => candidate.id === card.id && isGenericSignetRingCard(candidate))
-  ) {
-    const pending: IrulanSignetRingPendingAction = {
-      kind: "irulan-signet-ring",
-      ownerId: source.id,
-      cardId: card.id,
-      source: "Chronicler's Insight",
-    };
-    const canAcquire = state ? irulanSignetAcquireCards(state, pending).length > 0 : false;
-    const canTrash = state ? irulanSignetTrashableCards(state, pending).length > 0 : source.hand.length > 0;
-    return canAcquire || canTrash ? [pending] : [];
-  }
   if (
     isGenericSignetRingCard(card) &&
     source.leader === ladyJessicaLeaderName &&

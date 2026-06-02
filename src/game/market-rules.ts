@@ -5,17 +5,10 @@ import { advancePendingAction, queuePendingActions } from "./pending-actions";
 import { defaultActivatedAllyId } from "./placement-rules";
 import { pendingActionForSpyPlacements } from "./spy-effect-pending-rules";
 import { recordTurnSpiceGain } from "./turn-trackers";
-import { trashableCardsForPending } from "./trash-rules";
 import type { Card, GameState, PendingAction, Player, ResourceId, Resources } from "./types";
 
 type AcquireCardPendingAction = Extract<PendingAction, { kind: "acquire-card" }>;
-type IrulanSignetRingPendingAction = Extract<PendingAction, { kind: "irulan-signet-ring" }>;
 type ThroneRowPendingAction = Extract<PendingAction, { kind: "throne-row" }>;
-type TrashCardPendingAction = Extract<PendingAction, { kind: "trash-card" }>;
-
-const irulanSignetAcquireCost = 1;
-const irulanSignetTrashRewardCost = 1;
-const irulanSignetTrashRewardSpice = 2;
 
 function resourceLabel(resource: ResourceId) {
   return resource === "solari" ? "Solari" : resource;
@@ -82,29 +75,6 @@ export function pendingActionForAcquireSpyReward(
 
 export function manipulateAcquisitionCost(card: Card) {
   return Math.max(0, (card.cost ?? 0) - 1);
-}
-
-export function irulanSignetAcquirePending(ownerId: string): AcquireCardPendingAction {
-  return {
-    kind: "acquire-card",
-    ownerId,
-    source: "Chronicler's Insight",
-    minCost: irulanSignetAcquireCost,
-    maxCost: irulanSignetAcquireCost,
-    destination: "hand",
-  };
-}
-
-export function irulanSignetTrashPending(ownerId: string): TrashCardPendingAction {
-  return {
-    kind: "trash-card",
-    ownerId,
-    source: "Chronicler's Insight",
-    optional: false,
-    zones: ["hand"],
-    spiceRewardCostThreshold: irulanSignetTrashRewardCost,
-    spiceReward: irulanSignetTrashRewardSpice,
-  };
 }
 
 function acquireCardCostBoundIsValid(cost: unknown) {
@@ -297,13 +267,4 @@ export function acquirableCardsForPending(state: GameState, pending: AcquireCard
     ...state.reserveMarket.filter(affordable),
     ...(owner.team === "shaddam" ? state.throneRow.filter(affordable) : []),
   ];
-}
-
-export function irulanSignetAcquireCards(state: GameState, pending: IrulanSignetRingPendingAction) {
-  return acquirableCardsForPending(state, irulanSignetAcquirePending(pending.ownerId));
-}
-
-export function irulanSignetTrashableCards(state: GameState, pending: IrulanSignetRingPendingAction) {
-  const owner = state.players.find((player) => player.id === pending.ownerId);
-  return owner ? trashableCardsForPending(owner, irulanSignetTrashPending(owner.id)) : [];
 }

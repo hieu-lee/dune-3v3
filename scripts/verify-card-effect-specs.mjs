@@ -3660,6 +3660,88 @@ try {
     ),
     "Generic Ally Signet Ring should carry declarative Staban Unseen Network spy spec",
   );
+  const irulanPendingActionChoiceOptions = [
+    {
+      id: "acquire",
+      label: "Acquire cost-1 card to hand",
+      effect: {
+        kind: "acquire-card",
+        selector: "self",
+        minCost: 1,
+        maxCost: 1,
+        destination: "hand",
+      },
+    },
+    {
+      id: "trash",
+      label: "Trash hand card",
+      effect: {
+        kind: "trash-card",
+        selector: "self",
+        optional: false,
+        zones: ["hand"],
+        spiceRewardCostThreshold: 1,
+        spiceReward: 2,
+      },
+    },
+  ];
+  const irulanPendingActionChoiceSpec = allySignet.effects?.find((spec) =>
+    spec.trigger === "agent-play" &&
+    spec.conditions?.some((condition) => condition.kind === "has-leader" && condition.leader === "Princess Irulan") &&
+    spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Ally") &&
+    spec.effects.some((effect) => effect.kind === "pending-action-choice" && effect.source === "Chronicler's Insight")
+  );
+  assert.ok(irulanPendingActionChoiceSpec, "Generic Ally Signet Ring should carry a typed Irulan Chronicler's Insight pending action choice spec");
+  assert.deepEqual(
+    irulanPendingActionChoiceSpec.effects.find((effect) => effect.kind === "pending-action-choice"),
+    {
+      kind: "pending-action-choice",
+      selector: "self",
+      source: "Chronicler's Insight",
+      options: irulanPendingActionChoiceOptions,
+    },
+    "Irulan Chronicler's Insight spec should encode acquire and trash pending branches",
+  );
+  assert.deepEqual(
+    effectResolver.resolveAgentPendingActionChoices(allySignet.effects, {
+      trigger: "agent-play",
+      source: { ...p6, leader: "Princess Irulan", role: "Ally" },
+      target: p6,
+      state: game,
+    }),
+    [{
+      selector: "self",
+      source: "Chronicler's Insight",
+      options: [
+        {
+          id: "acquire",
+          label: "Acquire cost-1 card to hand",
+          effect: {
+            kind: "acquire-card",
+            selector: "self",
+            minCost: 1,
+            maxCost: 1,
+            destination: "hand",
+            optional: false,
+          },
+        },
+        {
+          id: "trash",
+          label: "Trash hand card",
+          effect: {
+            kind: "trash-card",
+            selector: "self",
+            optional: false,
+            zones: ["hand"],
+            excludeSource: false,
+            spiceRewardCostThreshold: 1,
+            spiceReward: 2,
+          },
+        },
+      ],
+    }],
+    "Irulan Chronicler's Insight resolver should expose its acquire and trash pending branches",
+  );
   assert.ok(
     allySignet.effects?.some((spec) =>
       spec.trigger === "agent-play" &&
@@ -6819,6 +6901,262 @@ try {
     /Unsupported paid-reward-choice reward "gain-vp"/,
     "Paid reward choice specs should reject unsupported reward kinds",
   );
+  const pendingActionChoiceAcquireOption = {
+    id: "acquire",
+    label: "Acquire cost-1 card to hand",
+    effect: {
+      kind: "acquire-card",
+      selector: "self",
+      minCost: 1,
+      maxCost: 1,
+      destination: "hand",
+    },
+  };
+  const pendingActionChoiceEffect = (overrides = {}) => ({
+    kind: "pending-action-choice",
+    selector: "self",
+    source: "Test Pending Choice",
+    options: [pendingActionChoiceAcquireOption],
+    ...overrides,
+  });
+  const pendingActionChoiceCard = (id, effect) => ({
+    ...convincingArgument,
+    id,
+    name: id,
+    effects: [agentSpec([effect])],
+  });
+  const revealPendingActionChoiceCard = {
+    ...convincingArgument,
+    id: "effect-spec-reveal-pending-action-choice-card",
+    name: "Effect Spec Reveal Pending Action Choice",
+    effects: [revealSpec([pendingActionChoiceEffect()])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [revealPendingActionChoiceCard], highCouncilSeat: false }),
+    /Unsupported effect "pending-action-choice" for reveal/,
+    "Pending action choice specs should stay in Agent play",
+  );
+  assert.throws(
+    () => state.applyCardAgentEffect(
+      pendingActionChoiceCard(
+        "effect-spec-invalid-pending-action-choice-selector-card",
+        pendingActionChoiceEffect({ selector: "activated-ally" }),
+      ),
+      p4,
+      p6,
+    ),
+    /Unsupported effect selector "activated-ally" for pending-action-choice/,
+    "Pending action choice specs should reject activated Ally top-level selectors",
+  );
+  assert.throws(
+    () => state.applyCardAgentEffect(
+      pendingActionChoiceCard(
+        "effect-spec-invalid-pending-action-choice-source-card",
+        pendingActionChoiceEffect({ source: "" }),
+      ),
+      p4,
+      p6,
+    ),
+    /Invalid pending-action-choice source ""/,
+    "Pending action choice specs should reject empty source labels",
+  );
+  assert.throws(
+    () => state.applyCardAgentEffect(
+      pendingActionChoiceCard(
+        "effect-spec-invalid-pending-action-choice-empty-options-card",
+        pendingActionChoiceEffect({ options: [] }),
+      ),
+      p4,
+      p6,
+    ),
+    /Invalid pending-action-choice options ""/,
+    "Pending action choice specs should require at least one option",
+  );
+  assert.throws(
+    () => state.applyCardAgentEffect(
+      pendingActionChoiceCard(
+        "effect-spec-invalid-pending-action-choice-option-id-card",
+        pendingActionChoiceEffect({ options: [{ ...pendingActionChoiceAcquireOption, id: "" }] }),
+      ),
+      p4,
+      p6,
+    ),
+    /Invalid pending-action-choice option id ""/,
+    "Pending action choice specs should reject empty option ids",
+  );
+  assert.throws(
+    () => state.applyCardAgentEffect(
+      pendingActionChoiceCard(
+        "effect-spec-invalid-pending-action-choice-duplicate-option-card",
+        pendingActionChoiceEffect({
+          options: [
+            pendingActionChoiceAcquireOption,
+            { ...pendingActionChoiceAcquireOption },
+          ],
+        }),
+      ),
+      p4,
+      p6,
+    ),
+    /Invalid pending-action-choice duplicate option id "acquire"/,
+    "Pending action choice specs should reject duplicate option ids",
+  );
+  assert.throws(
+    () => state.applyCardAgentEffect(
+      pendingActionChoiceCard(
+        "effect-spec-invalid-pending-action-choice-option-label-card",
+        pendingActionChoiceEffect({ options: [{ ...pendingActionChoiceAcquireOption, label: "" }] }),
+      ),
+      p4,
+      p6,
+    ),
+    /Invalid pending-action-choice option label ""/,
+    "Pending action choice specs should reject empty option labels",
+  );
+  assert.throws(
+    () => state.applyCardAgentEffect(
+      pendingActionChoiceCard(
+        "effect-spec-invalid-pending-action-choice-nested-selector-card",
+        pendingActionChoiceEffect({
+          options: [{
+            ...pendingActionChoiceAcquireOption,
+            effect: { ...pendingActionChoiceAcquireOption.effect, selector: "opponent" },
+          }],
+        }),
+      ),
+      p4,
+      p6,
+    ),
+    /Unsupported pending-action-choice selector "opponent"/,
+    "Pending action choice specs should reject unsupported nested selectors",
+  );
+  assert.throws(
+    () => state.applyCardAgentEffect(
+      pendingActionChoiceCard(
+        "effect-spec-invalid-pending-action-choice-acquire-destination-card",
+        pendingActionChoiceEffect({
+          options: [{
+            ...pendingActionChoiceAcquireOption,
+            effect: { ...pendingActionChoiceAcquireOption.effect, destination: "trash" },
+          }],
+        }),
+      ),
+      p4,
+      p6,
+    ),
+    /Invalid pending-action-choice acquire destination "trash"/,
+    "Pending action choice acquire branches should reject unsupported destinations",
+  );
+  assert.throws(
+    () => state.applyCardAgentEffect(
+      pendingActionChoiceCard(
+        "effect-spec-invalid-pending-action-choice-acquire-resource-card",
+        pendingActionChoiceEffect({
+          options: [{
+            ...pendingActionChoiceAcquireOption,
+            effect: { ...pendingActionChoiceAcquireOption.effect, paymentResource: "melange" },
+          }],
+        }),
+      ),
+      p4,
+      p6,
+    ),
+    /Unsupported effect resource "melange"/,
+    "Pending action choice acquire branches should reject unsupported payment resources",
+  );
+  assert.throws(
+    () => state.applyCardAgentEffect(
+      pendingActionChoiceCard(
+        "effect-spec-invalid-pending-action-choice-acquire-cost-bounds-card",
+        pendingActionChoiceEffect({
+          options: [{
+            ...pendingActionChoiceAcquireOption,
+            effect: { ...pendingActionChoiceAcquireOption.effect, minCost: 3, maxCost: 1 },
+          }],
+        }),
+      ),
+      p4,
+      p6,
+    ),
+    /Invalid pending-action-choice acquire cost bounds "3-1"/,
+    "Pending action choice acquire branches should reject minCost greater than maxCost",
+  );
+  assert.throws(
+    () => state.applyCardAgentEffect(
+      pendingActionChoiceCard(
+        "effect-spec-invalid-pending-action-choice-acquire-unconstrained-card",
+        pendingActionChoiceEffect({
+          options: [{
+            ...pendingActionChoiceAcquireOption,
+            effect: {
+              kind: "acquire-card",
+              selector: "self",
+              minCost: 1,
+              destination: "hand",
+            },
+          }],
+        }),
+      ),
+      p4,
+      p6,
+    ),
+    /Invalid pending-action-choice acquire constraint: expected maxCost or paymentResource/,
+    "Pending action choice acquire branches should reject unconstrained acquisitions",
+  );
+  assert.throws(
+    () => state.applyCardAgentEffect(
+      pendingActionChoiceCard(
+        "effect-spec-invalid-pending-action-choice-trash-zone-card",
+        pendingActionChoiceEffect({
+          options: [{
+            id: "trash",
+            label: "Trash deck card",
+            effect: { kind: "trash-card", selector: "self", optional: false, zones: ["deck"] },
+          }],
+        }),
+      ),
+      p4,
+      p6,
+    ),
+    /Unsupported trash-card zone "deck"/,
+    "Pending action choice trash branches should reject unsupported zones",
+  );
+  assert.throws(
+    () => state.applyCardAgentEffect(
+      pendingActionChoiceCard(
+        "effect-spec-invalid-pending-action-choice-trash-required-trait-card",
+        pendingActionChoiceEffect({
+          options: [{
+            id: "trash",
+            label: "Trash trait card",
+            effect: { kind: "trash-card", selector: "self", optional: false, requiredTrait: "" },
+          }],
+        }),
+      ),
+      p4,
+      p6,
+    ),
+    /Invalid pending-action-choice trash requiredTrait ""/,
+    "Pending action choice trash branches should reject empty required traits",
+  );
+  assert.throws(
+    () => state.applyCardAgentEffect(
+      pendingActionChoiceCard(
+        "effect-spec-invalid-pending-action-choice-nested-kind-card",
+        pendingActionChoiceEffect({
+          options: [{
+            id: "vp",
+            label: "Gain VP",
+            effect: { kind: "gain-vp", selector: "self", amount: 1 },
+          }],
+        }),
+      ),
+      p4,
+      p6,
+    ),
+    /Unsupported pending-action-choice effect "gain-vp"/,
+    "Pending action choice specs should reject unsupported nested effect kinds",
+  );
   const revealPayResourceInfluenceCard = {
     ...convincingArgument,
     id: "effect-spec-reveal-pay-resource-influence-card",
@@ -8185,6 +8523,71 @@ try {
     state.pendingActionsForCard(emperorSignet, shaddamSignetPaidRewardSource, shaddamSignetPaidRewardFixture),
     [],
     "Shaddam Signet Ring paid reward choice should require a valid activated Ally target",
+  );
+  const irulanPendingActionChoiceAcquireCard = marketAndImperiumCards.find((card) => card.cost === 1);
+  assert.ok(irulanPendingActionChoiceAcquireCard, "Expected at least one cost-1 market or Imperium card for Irulan pending choice coverage");
+  const irulanPendingActionChoiceTrashCard = { ...dagger, id: "irulan-pending-action-choice-trash-card" };
+  const irulanPendingActionChoiceSource = {
+    ...p6,
+    leader: "Princess Irulan",
+    role: "Ally",
+    hand: [irulanPendingActionChoiceTrashCard],
+    playArea: [allySignet],
+  };
+  const irulanPendingActionChoiceFixture = {
+    ...game,
+    imperiumRow: [irulanPendingActionChoiceAcquireCard],
+    reserveMarket: [],
+    throneRow: [],
+    pendingAction: undefined,
+    pendingQueue: [],
+    players: game.players.map((player) =>
+      player.id === irulanPendingActionChoiceSource.id ? irulanPendingActionChoiceSource : player
+    ),
+  };
+  assert.deepEqual(
+    state.pendingActionsForCard(
+      allySignet,
+      irulanPendingActionChoiceSource,
+      irulanPendingActionChoiceFixture,
+      irulanPendingActionChoiceSource,
+      arrakeen,
+    ),
+    [{
+      kind: "pending-action-choice",
+      ownerId: irulanPendingActionChoiceSource.id,
+      cardId: allySignet.id,
+      source: "Chronicler's Insight",
+      options: [
+        {
+          id: "acquire",
+          label: "Acquire cost-1 card to hand",
+          pending: {
+            kind: "acquire-card",
+            ownerId: irulanPendingActionChoiceSource.id,
+            source: "Chronicler's Insight",
+            minCost: 1,
+            maxCost: 1,
+            destination: "hand",
+            optional: false,
+          },
+        },
+        {
+          id: "trash",
+          label: "Trash hand card",
+          pending: {
+            kind: "trash-card",
+            ownerId: irulanPendingActionChoiceSource.id,
+            source: "Chronicler's Insight",
+            optional: false,
+            zones: ["hand"],
+            spiceRewardCostThreshold: 1,
+            spiceReward: 2,
+          },
+        },
+      ],
+    }],
+    "Irulan Signet Ring should queue a generic pending action choice with acquire and trash branches",
   );
   const mixedPaidRewardCard = {
     ...convincingArgument,

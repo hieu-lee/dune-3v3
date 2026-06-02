@@ -116,6 +116,58 @@ export type PaidRewardChoicePendingOption =
         amount: number;
       };
     };
+export type PendingActionChoiceEffect =
+  | {
+      kind: "acquire-card";
+      selector: "self";
+      minCost?: EffectAmountSpec;
+      maxCost?: EffectAmountSpec;
+      destination: AcquireCardDestination;
+      paymentResource?: ResourceId;
+      optional?: boolean;
+      source?: string;
+    }
+  | {
+      kind: "trash-card";
+      selector: "self";
+      optional?: boolean;
+      zones?: TrashCardZone[];
+      excludeSource?: boolean;
+      requiredTrait?: string;
+      spiceRewardCostThreshold?: EffectAmountSpec;
+      spiceReward?: EffectAmountSpec;
+      source?: string;
+    };
+export type PendingActionChoiceEffectOption = {
+  id: string;
+  label: string;
+  effect: PendingActionChoiceEffect;
+};
+export type PendingActionChoiceNestedPending =
+  | ({
+      kind: "acquire-card";
+      ownerId: string;
+      source: string;
+      minCost?: number;
+      destination: AcquireCardDestination;
+      optional?: boolean;
+    } & AcquireCardPendingConstraint)
+  | {
+      kind: "trash-card";
+      ownerId: string;
+      source: string;
+      optional: boolean;
+      zones?: TrashCardZone[];
+      excludeCardId?: string;
+      requiredTrait?: string;
+      spiceRewardCostThreshold?: number;
+      spiceReward?: number;
+    };
+export type PendingActionChoicePendingOption = {
+  id: string;
+  label: string;
+  pending: PendingActionChoiceNestedPending;
+};
 export type TradeEffectPartner = "same-team-allies";
 export type ContractEffectRecipient = "same-team-allies";
 export type ContractEffectSourcePool = "public-offer";
@@ -180,6 +232,12 @@ export type GameEffectSpec =
       options: PaidRewardChoiceEffectOption[];
       requiredRecipient?: "activated-ally";
       requirePayableOption?: true;
+      source?: string;
+    }
+  | {
+      kind: "pending-action-choice";
+      selector: "self";
+      options: PendingActionChoiceEffectOption[];
       source?: string;
     }
   | {
@@ -875,6 +933,13 @@ export type PendingAction =
       options: PaidRewardChoicePendingOption[];
     }
   | {
+      kind: "pending-action-choice";
+      ownerId: string;
+      cardId?: string;
+      source: string;
+      options: PendingActionChoicePendingOption[];
+    }
+  | {
       kind: "team-resource-payment";
       ownerId: string;
       contributorIds: string[];
@@ -886,12 +951,6 @@ export type PendingAction =
       trashSource?: boolean;
       cardId: string;
       spaceId?: string;
-      source: string;
-    }
-  | {
-      kind: "irulan-signet-ring";
-      ownerId: string;
-      cardId: string;
       source: string;
     }
   | {

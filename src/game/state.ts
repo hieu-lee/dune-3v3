@@ -255,7 +255,6 @@ export {
 } from "./commander-pending-rules";
 
 export {
-  resolveIrulanSignetRingChoice,
   resolveJessicaOtherMemoriesChoice,
   resolveJessicaReverendMotherChoice,
   resolveJessicaSpiceAgonyChoice,
@@ -263,12 +262,17 @@ export {
 } from "./leader-pending-rules";
 
 export type {
-  IrulanSignetRingChoice,
   JessicaOtherMemoriesChoice,
   JessicaReverendMotherChoice,
   JessicaSpiceAgonyChoice,
   LadyAmberDesertScoutsChoice,
 } from "./leader-pending-rules";
+
+export {
+  pendingActionChoiceOptionIsResolvable,
+  resolvePendingActionChoice,
+  skipPendingActionChoice,
+} from "./pending-action-choice-rules";
 
 export {
   initialGame,
@@ -286,9 +290,6 @@ export {
 export {
   acquireMarketCard,
   acquirableCardsForPending,
-  irulanSignetAcquireCards,
-  irulanSignetAcquirePending,
-  irulanSignetTrashableCards,
   manipulateAcquisitionCost,
   moveImperiumCardToThroneRow,
 } from "./market-rules";

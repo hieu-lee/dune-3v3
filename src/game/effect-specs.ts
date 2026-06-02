@@ -13,6 +13,7 @@ import type {
   InfluenceEffectFaction,
   InfluenceEffectRecipient,
   PaidRewardChoiceEffectOption,
+  PendingActionChoiceEffectOption,
   PlayerSelector,
   ResourceId,
   Role,
@@ -884,6 +885,23 @@ export function agentPaidRewardChoice(
   ], conditions);
 }
 
+export function agentPendingActionChoice(
+  options: PendingActionChoiceEffectOption[],
+  specOptions: {
+    source?: string;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return agentPlayEffects([
+    {
+      kind: "pending-action-choice",
+      selector: "self",
+      options: clonePendingActionChoiceOptions(options),
+      ...(specOptions.source ? { source: specOptions.source } : {}),
+    },
+  ], conditions);
+}
+
 export function agentDiscardCardForInfluenceAndDraw(
   drawCards: EffectAmountSpec,
   influenceAmount: EffectAmountSpec,
@@ -1298,6 +1316,12 @@ export function cloneCardEffects(effects: CardEffectSpec[] | undefined): CardEff
           options: clonePaidRewardChoiceOptions(effect.options),
         };
       }
+      if (effect.kind === "pending-action-choice") {
+        return {
+          ...effect,
+          options: clonePendingActionChoiceOptions(effect.options),
+        };
+      }
       return {
         ...effect,
         ...("amount" in effect && effect.amount !== undefined
@@ -1333,6 +1357,38 @@ export function cloneCardEffects(effects: CardEffectSpec[] | undefined): CardEff
       };
     }),
   }));
+}
+
+function clonePendingActionChoiceOptions(options: PendingActionChoiceEffectOption[]): PendingActionChoiceEffectOption[] {
+  return options.map((option) => {
+    if (option.effect.kind === "acquire-card") {
+      return {
+        ...option,
+        effect: {
+          ...option.effect,
+          ...(option.effect.minCost !== undefined ? { minCost: cloneAmount(option.effect.minCost) } : {}),
+          ...(option.effect.maxCost !== undefined ? { maxCost: cloneAmount(option.effect.maxCost) } : {}),
+        },
+      };
+    }
+    if (option.effect.kind === "trash-card") {
+      return {
+        ...option,
+        effect: {
+          ...option.effect,
+          ...(option.effect.zones ? { zones: [...option.effect.zones] } : {}),
+          ...(option.effect.spiceRewardCostThreshold !== undefined
+            ? { spiceRewardCostThreshold: cloneAmount(option.effect.spiceRewardCostThreshold) }
+            : {}),
+          ...(option.effect.spiceReward !== undefined
+            ? { spiceReward: cloneAmount(option.effect.spiceReward) }
+            : {}),
+        },
+      };
+    }
+    const effect = option.effect as { kind?: unknown };
+    throw new Error(`Unsupported pending-action-choice effect "${String(effect.kind)}"`);
+  });
 }
 
 function clonePaidRewardChoiceOptions(options: PaidRewardChoiceEffectOption[]): PaidRewardChoiceEffectOption[] {

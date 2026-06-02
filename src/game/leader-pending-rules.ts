@@ -12,6 +12,9 @@ import {
   pendingActionForReverendMotherJessicaRepeat,
 } from "./card-pending-rules";
 import {
+  isGenericSignetRingCard,
+} from "./card-identifiers";
+import {
   drawCards,
   playerTroopSupply,
 } from "./deck-utils";
@@ -20,19 +23,12 @@ import { resolveSecretsIntriguePressure } from "./board-location-rules";
 import {
   ladyAmberMetulliLeaderName,
   ladyJessicaLeaderName,
-  princessIrulanLeaderName,
   reverendMotherJessicaLeaderName,
 } from "./leader-constants";
 import {
   adjustInfluence,
   resolveLeaderInfluenceThresholdRewards,
 } from "./leader-rewards";
-import {
-  irulanSignetAcquireCards,
-  irulanSignetAcquirePending,
-  irulanSignetTrashableCards,
-  irulanSignetTrashPending,
-} from "./market-rules";
 import {
   advancePendingAction,
   prependPendingAction,
@@ -46,21 +42,16 @@ import {
   recordReverendMotherJessicaRepeat,
   recordTurnSpiceGain,
 } from "./turn-trackers";
-import {
-  isGenericSignetRingCard,
-} from "./card-identifiers";
 import type {
   GameState,
   PendingAction,
 } from "./types";
 
-export type IrulanSignetRingChoice = "skip" | "acquire" | "trash";
 export type LadyAmberDesertScoutsChoice = "retreat" | "skip";
 export type JessicaSpiceAgonyChoice = "pay" | "skip";
 export type JessicaReverendMotherChoice = "repeat" | "skip";
 export type JessicaOtherMemoriesChoice = "flip" | "skip";
 
-type IrulanSignetRingPendingAction = Extract<PendingAction, { kind: "irulan-signet-ring" }>;
 type LadyAmberDesertScoutsPendingAction = Extract<PendingAction, { kind: "amber-desert-scouts" }>;
 type JessicaSpiceAgonyPendingAction = Extract<PendingAction, { kind: "jessica-spice-agony" }>;
 type JessicaReverendMotherPendingAction = Extract<PendingAction, { kind: "jessica-reverend-mother" }>;
@@ -97,46 +88,6 @@ export function resolveLadyAmberDesertScoutsChoice(
     ),
     ...advancePendingAction(state),
     log: [`${owner.leader} resolves ${pending.source}: retreats 1 troop.`, ...state.log],
-  };
-}
-
-export function resolveIrulanSignetRingChoice(
-  state: GameState,
-  pending: IrulanSignetRingPendingAction,
-  choice: IrulanSignetRingChoice,
-): GameState {
-  const owner = state.players.find((player) => player.id === pending.ownerId);
-  if (
-    !owner ||
-    owner.leader !== princessIrulanLeaderName ||
-    owner.role !== "Ally" ||
-    !owner.playArea.some((card) => card.id === pending.cardId && isGenericSignetRingCard(card))
-  ) {
-    return state;
-  }
-
-  if (choice === "skip") {
-    return {
-      ...state,
-      ...advancePendingAction(state),
-      log: [`${owner.leader} declines ${pending.source}.`, ...state.log],
-    };
-  }
-
-  if (choice === "acquire") {
-    if (irulanSignetAcquireCards(state, pending).length === 0) return state;
-    return {
-      ...state,
-      pendingAction: irulanSignetAcquirePending(owner.id),
-      log: [`${owner.leader} chooses the acquisition branch for ${pending.source}.`, ...state.log],
-    };
-  }
-
-  if (irulanSignetTrashableCards(state, pending).length === 0) return state;
-  return {
-    ...state,
-    pendingAction: irulanSignetTrashPending(owner.id),
-    log: [`${owner.leader} chooses the trash branch for ${pending.source}.`, ...state.log],
   };
 }
 

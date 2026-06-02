@@ -40,17 +40,30 @@ export function verifyLeaderIrulanSignetAndBirthright({ cards, game, players, sp
     arrakeen,
   );
   assert.deepEqual(irulanSignetPending, {
-    kind: "irulan-signet-ring",
+    kind: "pending-action-choice",
     ownerId: irulan.id,
     cardId: allySignet.id,
     source: "Chronicler's Insight",
+    options: [{
+      id: "acquire",
+      label: "Acquire cost-1 card to hand",
+      pending: {
+        kind: "acquire-card",
+        ownerId: irulan.id,
+        source: "Chronicler's Insight",
+        minCost: 1,
+        maxCost: 1,
+        destination: "hand",
+        optional: false,
+      },
+    }],
   });
   assert.deepEqual(
-    state.irulanSignetAcquireCards(irulanSignetState, irulanSignetPending).map((card) => card.id),
+    state.acquirableCardsForPending(irulanSignetState, irulanSignetPending.options[0].pending).map((card) => card.id),
     [costOneImperiumCard.id],
     "Chronicler's Insight should acquire exactly cost-1 cards, not cost-0 cards",
   );
-  const irulanAcquireChoice = state.resolveIrulanSignetRingChoice(
+  const irulanAcquireChoice = state.resolvePendingActionChoice(
     { ...irulanSignetState, pendingAction: irulanSignetPending, pendingQueue: [] },
     irulanSignetPending,
     "acquire",
@@ -62,6 +75,7 @@ export function verifyLeaderIrulanSignetAndBirthright({ cards, game, players, sp
     minCost: 1,
     maxCost: 1,
     destination: "hand",
+    optional: false,
   });
   const blockedFreeAcquire = state.acquireCardForPending(
     irulanAcquireChoice,
@@ -106,12 +120,45 @@ export function verifyLeaderIrulanSignetAndBirthright({ cards, game, players, sp
   };
   const irulanTrashState = {
     ...game,
-    pendingAction: irulanSignetPending,
+    imperiumRow: [],
+    reserveMarket: [],
+    throneRow: [],
+    pendingAction: undefined,
     pendingQueue: [],
     turnSpiceGains: {},
     players: game.players.map((player) => (player.id === irulan.id ? irulanTrashOwner : player)),
   };
-  const irulanTrashChoice = state.resolveIrulanSignetRingChoice(irulanTrashState, irulanSignetPending, "trash");
+  const irulanTrashPending = state.pendingActionForCard(
+    allySignet,
+    irulanTrashOwner,
+    irulanTrashState,
+    irulanTrashOwner,
+    arrakeen,
+  );
+  assert.deepEqual(irulanTrashPending, {
+    kind: "pending-action-choice",
+    ownerId: irulan.id,
+    cardId: allySignet.id,
+    source: "Chronicler's Insight",
+    options: [{
+      id: "trash",
+      label: "Trash hand card",
+      pending: {
+        kind: "trash-card",
+        ownerId: irulan.id,
+        source: "Chronicler's Insight",
+        optional: false,
+        zones: ["hand"],
+        spiceRewardCostThreshold: 1,
+        spiceReward: 2,
+      },
+    }],
+  });
+  const irulanTrashChoice = state.resolvePendingActionChoice(
+    { ...irulanTrashState, pendingAction: irulanTrashPending },
+    irulanTrashPending,
+    "trash",
+  );
   assert.equal(irulanTrashChoice.pendingAction.kind, "trash-card", "Chronicler's Insight should queue a trash-card pending action");
   assert.deepEqual(irulanTrashChoice.pendingAction.zones, ["hand"], "Chronicler's Insight should only trash from hand");
   assert.deepEqual(

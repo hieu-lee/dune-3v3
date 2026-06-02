@@ -56,6 +56,7 @@ import {
   agentDiscardCardForInfluenceAndDraw,
   agentDrawCards,
   agentDrawIntrigues,
+  agentGainBoardSpaceInfluence,
   agentGainInfluenceChoice,
   agentGainResource,
   agentOpponentsDiscardCards,
@@ -376,6 +377,9 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
         attributeNumber(card, "Persuasion on reveal"),
         attributeNumber(card, "Swords"),
       ) ?? []),
+      ...(card.id === subversiveAdvisorSourceId
+        ? [agentGainBoardSpaceInfluence(1, { trashSource: true })]
+        : []),
       acquirePlaceSpies(1, { recallForSupply: true, mustPlace: true }),
     ];
   }
@@ -562,6 +566,9 @@ function imperiumPlayText(card: HubCard) {
   }
   if (card.id === priceIsNoObjectSourceId) {
     return "You may acquire a card to your hand using Solari instead of persuasion.";
+  }
+  if (card.id === subversiveAdvisorSourceId) {
+    return "If you sent an Agent to a Faction board space this turn, gain two Influence instead of one and trash this card.";
   }
   return summarizeAttributes(card);
 }

@@ -109,6 +109,7 @@ export type PendingAction =
       kind: "board-influence-choice";
       source: string;
       sourceTrigger?: "acquire";
+      sourceEffect?: "gain-influence-choice" | "gain-board-space-influence";
       amount?: number;
       trashSource?: boolean;
       cardId?: string;

@@ -219,6 +219,13 @@ export type GameEffectSpec =
       source?: string;
     }
   | {
+      kind: "gain-board-space-influence";
+      selector: "self";
+      amount: EffectAmountSpec;
+      trashSource?: boolean;
+      source?: string;
+    }
+  | {
       kind: "paid-reward-choice";
       selector: "self";
       options: PaidRewardChoiceEffectOption[];

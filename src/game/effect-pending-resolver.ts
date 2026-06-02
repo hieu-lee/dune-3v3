@@ -12,6 +12,7 @@ import { spyPostCount } from "./spy-posts";
 import type { CardEffectSpec } from "./types";
 import type {
   AgentAcquireCard,
+  AgentBoardSpaceInfluence,
   AgentCommanderResourceSplit,
   AgentDiscardCardForDraw,
   AgentDiscardCardForInfluenceAndDraw,
@@ -273,6 +274,25 @@ export function resolveAgentGainInfluenceChoices(
 ): AgentGainInfluenceChoice[] {
   if (context.trigger !== "agent-play") return [];
   return resolveGainInfluenceChoices(specs, context);
+}
+
+export function resolveAgentBoardSpaceInfluences(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): AgentBoardSpaceInfluence[] {
+  specs?.forEach(validateSpec);
+  return (specs ?? []).flatMap((spec) => {
+    if (spec.trigger !== "agent-play") return [];
+    if (!specApplies(spec, context)) return [];
+    return spec.effects
+      .filter((effect) => effect.kind === "gain-board-space-influence")
+      .map((effect) => ({
+        selector: effect.selector,
+        amount: amountFor(effect.amount, context.source),
+        trashSource: effect.trashSource ?? false,
+        source: effect.source,
+      }));
+  });
 }
 
 export function resolveGainInfluenceChoices(

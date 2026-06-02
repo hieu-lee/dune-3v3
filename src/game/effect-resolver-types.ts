@@ -315,6 +315,13 @@ export type AgentGainInfluenceChoice = {
   source?: string;
 };
 
+export type AgentBoardSpaceInfluence = {
+  selector: "self";
+  amount: number;
+  trashSource: boolean;
+  source?: string;
+};
+
 export type AgentPayResourceForInfluence = {
   selector: PlayerSelector;
   resource: ResourceId;

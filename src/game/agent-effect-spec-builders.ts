@@ -396,6 +396,17 @@ export function agentGainInfluenceChoice(
   return agentPlayEffects([{ kind: "gain-influence-choice", selector: "self", amount, ...options }], conditions);
 }
 
+export function agentGainBoardSpaceInfluence(
+  amount: EffectAmountSpec,
+  options: {
+    trashSource?: boolean;
+    source?: string;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return agentPlayEffects([{ kind: "gain-board-space-influence", selector: "self", amount, ...options }], conditions);
+}
+
 export function agentGainResource(
   resource: ResourceId,
   amount: EffectAmountSpec,

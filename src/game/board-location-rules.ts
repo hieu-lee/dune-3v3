@@ -1,7 +1,8 @@
 import { advancePendingAction } from "./pending-actions";
 import { canPay } from "./board-rules";
+import { boardSpaceInfluenceChoicesFor } from "./board-influence-effect-rules";
 import { boardSpaces, factionIds, factionLabels } from "./data";
-import { resolveGainInfluenceChoices } from "./effect-resolver";
+import { resolveAgentBoardSpaceInfluences, resolveGainInfluenceChoices } from "./effect-resolver";
 import { adjustInfluenceAndResolveThresholdRewards } from "./leader-rewards";
 import { pendingActionForBoardInfluenceChoice } from "./placement-rules";
 import { recordTurnSpiceGain } from "./turn-trackers";
@@ -27,6 +28,11 @@ function boardInfluenceChoicePendingIsValid(pending: BoardInfluenceChoicePending
   return typeof pending.source === "string" &&
     pending.source.trim().length > 0 &&
     (pending.sourceTrigger === undefined || pending.sourceTrigger === "acquire") &&
+    (
+      pending.sourceEffect === undefined ||
+      pending.sourceEffect === "gain-influence-choice" ||
+      pending.sourceEffect === "gain-board-space-influence"
+    ) &&
     (pending.amount === undefined || (Number.isInteger(pending.amount) && pending.amount > 0)) &&
     (pending.trashSource === undefined || typeof pending.trashSource === "boolean") &&
     (pending.trashSource !== true || (hasSourceCard && !isAcquireSource)) &&
@@ -119,6 +125,7 @@ function sourceCardSupportsInfluenceChoice(
   sourceCard: Card,
   amount: number,
 ) {
+  if (pending.sourceEffect === "gain-board-space-influence") return false;
   const trigger: GameEffectTrigger = pending.sourceTrigger ?? "agent-play";
   const effects = resolveGainInfluenceChoices(sourceCard.effects, {
     trigger,
@@ -131,6 +138,63 @@ function sourceCardSupportsInfluenceChoice(
     effect.amount === amount &&
     (effect.source ?? sourceCard.name) === pending.source
   );
+}
+
+function sourceCardSupportsBoardSpaceInfluenceChoice(
+  state: GameState,
+  pending: BoardInfluenceChoicePendingAction,
+  sourceOwner: Player,
+  sourceCard: Card,
+  amount: number,
+) {
+  if (pending.sourceEffect === "gain-influence-choice") return false;
+  const trigger: GameEffectTrigger = pending.sourceTrigger ?? "agent-play";
+  if (trigger !== "agent-play") return false;
+  const space = boardSpaces.find((candidate) => candidate.id === sourceCard.agentPlacementSpaceId);
+  const target = pending.targetOwnerId
+    ? state.players.find((player) => player.id === pending.targetOwnerId)
+    : sourceOwner;
+  const effects = resolveAgentBoardSpaceInfluences(sourceCard.effects, {
+    trigger,
+    source: sourceOwner,
+    target,
+    space,
+    state,
+  });
+  const expectedChoices = space ? boardSpaceInfluenceChoicesFor(space, sourceOwner, target) : [];
+  const baseBoardChoice = space && target ? pendingActionForBoardInfluenceChoice(space, sourceOwner, target) : undefined;
+  const includesBaseBoardChoice =
+    baseBoardChoice?.kind === "board-influence-choice" &&
+    boardInfluenceChoiceArraysMatch(baseBoardChoice.choices, pending.choices);
+  if (!effects.some((effect) =>
+    effect.selector === "self" &&
+    effect.trashSource === (pending.trashSource === true) &&
+    (
+      effect.amount === amount ||
+      (includesBaseBoardChoice && effect.amount + (baseBoardChoice.amount ?? 1) === amount)
+    ) &&
+    (effect.source ?? sourceCard.name) === pending.source
+  )) {
+    return false;
+  }
+  return boardInfluenceChoiceArraysMatch(expectedChoices, pending.choices);
+}
+
+function sourceCardSupportsSourceInfluenceChoice(
+  state: GameState,
+  pending: BoardInfluenceChoicePendingAction,
+  sourceOwner: Player,
+  sourceCard: Card,
+  amount: number,
+) {
+  const supportsOpenInfluenceChoice =
+    sourceCardSupportsInfluenceChoice(state, pending, sourceOwner, sourceCard, amount) &&
+    sourceCardInfluenceChoicesMatchCurrentRouting(state, sourceOwner, pending) &&
+    pending.choices.every((choice) =>
+      boardInfluenceChoiceMatchesCurrentRouting(state, sourceOwner, pending.targetOwnerId, choice)
+    );
+  return supportsOpenInfluenceChoice ||
+    sourceCardSupportsBoardSpaceInfluenceChoice(state, pending, sourceOwner, sourceCard, amount);
 }
 
 function resourceLabel(resource: ResourceId) {
@@ -165,9 +229,7 @@ export function resolveBoardInfluenceChoice(
     !sourceOwner ||
     !sourceCard ||
     !sourceCardPlacementMetadataMatches(sourceOwner, sourceCard, pending) ||
-    !sourceCardSupportsInfluenceChoice(state, pending, sourceOwner, sourceCard, amount) ||
-    !sourceCardInfluenceChoicesMatchCurrentRouting(state, sourceOwner, pending) ||
-    !pending.choices.every((choice) => boardInfluenceChoiceMatchesCurrentRouting(state, sourceOwner, pending.targetOwnerId, choice))
+    !sourceCardSupportsSourceInfluenceChoice(state, pending, sourceOwner, sourceCard, amount)
   )) {
     return state;
   }

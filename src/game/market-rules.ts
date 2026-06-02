@@ -104,6 +104,7 @@ function pendingActionForAcquireInfluenceChoice(
       return {
         kind: "board-influence-choice",
         sourceTrigger: "acquire",
+        sourceEffect: "gain-influence-choice",
         source: effect.source ?? card.name,
         amount: effect.amount,
         cardId: acquiredCardId,

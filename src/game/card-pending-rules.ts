@@ -1,4 +1,5 @@
 import { resolveInfluence } from "./agent-effects";
+import { boardSpaceInfluenceChoicesFor } from "./board-influence-effect-rules";
 import {
   canMoveCardToThroneRow,
 } from "./card-identifiers";
@@ -8,6 +9,7 @@ import {
 } from "./conflict-rules";
 import { playerTroopSupply } from "./deck-utils";
 import {
+  resolveAgentBoardSpaceInfluences,
   resolveAgentCommanderResourceSplits,
   resolveAgentDiscardCardForDraws,
   resolveAgentDiscardCardForInfluenceAndDraws,
@@ -209,6 +211,49 @@ function pendingActionForAgentGainInfluenceChoice(
       return {
         kind: "board-influence-choice",
         source: effect.source ?? card.name,
+        sourceEffect: "gain-influence-choice",
+        amount: effect.amount,
+        cardId: card.id,
+        cardOwnerId: source.id,
+        ...(sourceCardInPlay.agentPlacementSpaceId ? { spaceId: sourceCardInPlay.agentPlacementSpaceId } : {}),
+        ...(source.role === "Commander" && (sourceCardInPlay.agentPlacementTargetOwnerId ?? target?.id)
+          ? { targetOwnerId: sourceCardInPlay.agentPlacementTargetOwnerId ?? target?.id }
+          : {}),
+        ...(effect.trashSource ? { trashSource: true } : {}),
+        choices,
+      };
+    })
+    .find((pending): pending is PendingAction => Boolean(pending));
+}
+
+function pendingActionForAgentBoardSpaceInfluence(
+  card: Card,
+  source: Player,
+  state?: GameState,
+  target?: Player,
+  space?: BoardSpace,
+): PendingAction | undefined {
+  const sourceCardInPlay = source.playArea.find((candidate) => candidate.id === card.id);
+  if (!card.effects || !sourceCardInPlay || !state || !space) return undefined;
+  const players = playersWithPendingCardEffect(state, source, target);
+  const effectState = { ...state, players };
+  const effects = resolveAgentBoardSpaceInfluences(card.effects, {
+    trigger: "agent-play",
+    source,
+    target,
+    space,
+    state: effectState,
+  });
+  return effects
+    .map((effect): PendingAction | undefined => {
+      if (effect.selector !== "self" || effect.amount <= 0) return undefined;
+      if (effect.trashSource && !source.playArea.some((candidate) => candidate.id === card.id)) return undefined;
+      const choices = boardSpaceInfluenceChoicesFor(space, source, target);
+      if (choices.length === 0) return undefined;
+      return {
+        kind: "board-influence-choice",
+        source: effect.source ?? card.name,
+        sourceEffect: "gain-board-space-influence",
         amount: effect.amount,
         cardId: card.id,
         cardOwnerId: source.id,
@@ -941,6 +986,8 @@ export function pendingActionsForCard(
   if (agentDiscardDrawPending) typedPendings.push(agentDiscardDrawPending);
   const agentGainInfluencePending = pendingActionForAgentGainInfluenceChoice(card, source, state, target);
   if (agentGainInfluencePending) typedPendings.push(agentGainInfluencePending);
+  const agentBoardSpaceInfluencePending = pendingActionForAgentBoardSpaceInfluence(card, source, state, target, space);
+  if (agentBoardSpaceInfluencePending) typedPendings.push(agentBoardSpaceInfluencePending);
   const agentPaidRewardChoicePending = pendingActionForAgentPaidRewardChoice(card, source, state, target, space);
   if (agentPaidRewardChoicePending) typedPendings.push(agentPaidRewardChoicePending);
   const agentPendingActionChoice = pendingActionForAgentPendingActionChoice(card, source, state, target, space);

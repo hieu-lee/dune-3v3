@@ -253,6 +253,7 @@ try {
   const highCouncil = data.boardSpaces.find((space) => space.id === "high-council");
   const dutifulService = data.boardSpaces.find((space) => space.id === "dutiful-service");
   const deliverSupplies = data.boardSpaces.find((space) => space.id === "deliver-supplies");
+  const shipping = data.boardSpaces.find((space) => space.id === "shipping");
   const sietchTabr = data.boardSpaces.find((space) => space.id === "sietch-tabr");
   const spiceRefinery = data.boardSpaces.find((space) => space.id === "spice-refinery");
   assert.ok(
@@ -303,7 +304,7 @@ try {
   );
   assert.ok(commandRespect && prepareTheWay && spiceMustFlow && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
   assert.ok(backedByChoam && buyAccess && callToArms && changeAllegiances && councilorsAmbition && contingencyPlan && cunning && departForArrakis && detonation && unexpectedAllies && devour && distraction && findWeakness && goToGround && impress && imperiumPolitics && inspireAwe && intelligenceReport && leverage && manipulate && marketOpportunity && mercenaries && opportunism && questionableMethods && reachAgreement && shaddamsFavor && spiceIsPower && specialMission && springTheTrap && tacticalOption && sietchRitual && strategicStockpiling && weirdingCombat);
-  assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && dutifulService && deliverSupplies && sietchTabr && spiceRefinery);
+  assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && dutifulService && deliverSupplies && shipping && sietchTabr && spiceRefinery);
   assert.equal(revealSpecCards.length, 79, "Unexpected number of cards with declarative Reveal specs");
   assert.equal(
     marketAndImperiumCards.filter(hasFixedRevealReward).length,
@@ -3272,6 +3273,23 @@ try {
     "Price is No Object should use a typed Agent acquire-card Solari payment effect",
   );
   assert.ok(
+    subversiveAdvisor.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-board-space-influence" &&
+        effect.selector === "self" &&
+        effect.amount === 1 &&
+        effect.trashSource === true
+      )
+    ),
+    "Subversive Advisor should use a typed Agent current-board-space Influence bonus with source trash",
+  );
+  assert.equal(
+    subversiveAdvisor.play,
+    "If you sent an Agent to a Faction board space this turn, gain two Influence instead of one and trash this card.",
+    "Subversive Advisor play text should expose its automated Faction-space Influence bonus",
+  );
+  assert.ok(
     spiceMustFlow.effects?.some((spec) =>
       spec.trigger === "acquire" &&
       spec.effects.some((effect) => effect.kind === "gain-vp" && effect.selector === "self" && effect.amount === 1)
@@ -3347,6 +3365,7 @@ try {
       "Space-time Folding",
       "Spacing Guild's Favor",
       "Stilgar, The Devoted",
+      "Subversive Advisor",
       "Theacherous Maneuver",
       "Tread in Darkness",
       "Undercover Asset",
@@ -5825,6 +5844,38 @@ try {
     ),
     /Invalid effect amount "-1"/,
     "Gain-influence specs should validate effect amounts",
+  );
+  assert.throws(
+    () => effectResolver.resolveGameEffects(
+      [revealSpec([{ kind: "gain-board-space-influence", selector: "self", amount: 1 }])],
+      { trigger: "reveal", source: p2, state: game },
+    ),
+    /Unsupported effect "gain-board-space-influence" for reveal/,
+    "Board-space Influence specs should stay on Agent play",
+  );
+  assert.throws(
+    () => effectResolver.resolveGameEffects(
+      [agentSpec([{ kind: "gain-board-space-influence", selector: "self", amount: 0 }])],
+      { trigger: "agent-play", source: p2, state: game },
+    ),
+    /Invalid gain-board-space-influence amount "0"/,
+    "Board-space Influence specs should validate positive effect amounts",
+  );
+  assert.throws(
+    () => effectResolver.resolveGameEffects(
+      [agentSpec([{ kind: "gain-board-space-influence", selector: "activated-ally", amount: 1 }])],
+      { trigger: "agent-play", source: p2, target: p2, state: game },
+    ),
+    /Unsupported effect selector "activated-ally" for gain-board-space-influence/,
+    "Board-space Influence specs should stay self-scoped",
+  );
+  assert.throws(
+    () => effectResolver.resolveGameEffects(
+      [agentSpec([{ kind: "gain-board-space-influence", selector: "self", amount: 1, trashSource: "yes" }])],
+      { trigger: "agent-play", source: p2, state: game },
+    ),
+    /Invalid gain-board-space-influence trashSource "yes"/,
+    "Board-space Influence specs should reject malformed trashSource flags",
   );
   assert.throws(
     () => effectResolver.resolveGameEffects(
@@ -9120,6 +9171,7 @@ try {
   assert.equal(publicSpectaclePendings[0].ownerId, p2.id, "Public Spectacle spy placement should target the source player");
   assert.equal(publicSpectaclePendings[0].source, "Public Spectacle");
   assert.equal(publicSpectaclePendings[1].source, "Public Spectacle");
+  assert.equal(publicSpectaclePendings[1].sourceEffect, "gain-influence-choice");
   assert.equal(publicSpectaclePendings[1].amount, 1);
   assert.equal(publicSpectaclePendings[1].cardId, publicSpectacle.id);
   assert.equal(publicSpectaclePendings[1].cardOwnerId, p2.id);
@@ -9138,6 +9190,7 @@ try {
     "Theacherous Maneuver should queue a typed Influence choice",
   );
   assert.equal(theacherousManeuverPendings[0].source, "Theacherous Maneuver");
+  assert.equal(theacherousManeuverPendings[0].sourceEffect, "gain-influence-choice");
   assert.equal(theacherousManeuverPendings[0].amount, 1);
   assert.equal(theacherousManeuverPendings[0].cardId, theacherousManeuver.id);
   assert.equal(theacherousManeuverPendings[0].cardOwnerId, p2.id);
@@ -11433,6 +11486,63 @@ try {
     dangerousRhetoricStrippedSourceCardState,
     "Dangerous Rhetoric should reject metadata-stripped card Influence pendings",
   );
+  const dangerousRhetoricShippingPlaced = turnActions.placeAgentAction(
+    {
+      ...withActivePlayer(game, p2.id, (player) => ({
+        agentsReady: 1,
+        hand: [dangerousRhetoric],
+        influence: { ...player.influence, bene: 0, emperor: 0, greatHouses: 0, spacing: 2 },
+        playArea: [],
+        resources: { solari: 0, spice: 3, water: 0 },
+      })),
+      sharedSpyPosts: {},
+      spyPosts: { [shipping.id]: p2.id },
+    },
+    {
+      commanderTargets: {},
+      selectedCard: dangerousRhetoric,
+      selectedSpace: shipping,
+    },
+  );
+  assert.equal(
+    dangerousRhetoricShippingPlaced.pendingAction?.source,
+    "Shipping",
+    "Shipping board Influence should remain the active pending action before Dangerous Rhetoric",
+  );
+  assert.equal(dangerousRhetoricShippingPlaced.pendingAction?.sourceEffect, undefined);
+  assert.equal(
+    dangerousRhetoricShippingPlaced.pendingQueue[0]?.source,
+    "Dangerous Rhetoric",
+    "Dangerous Rhetoric should stay queued separately after Shipping's board Influence",
+  );
+  assert.equal(dangerousRhetoricShippingPlaced.pendingQueue[0]?.sourceEffect, "gain-influence-choice");
+  assert.equal(dangerousRhetoricShippingPlaced.pendingQueue[0]?.amount, 1);
+  const dangerousRhetoricShippingBoardResolved = state.resolveBoardInfluenceChoice(
+    dangerousRhetoricShippingPlaced,
+    dangerousRhetoricShippingPlaced.pendingAction,
+    p2.id,
+    "greatHouses",
+  );
+  assert.equal(playerById(dangerousRhetoricShippingBoardResolved, p2.id).influence.greatHouses, 1);
+  assert.equal(
+    dangerousRhetoricShippingBoardResolved.pendingAction?.source,
+    "Dangerous Rhetoric",
+    "Resolving Shipping should advance to the separate Dangerous Rhetoric Influence choice",
+  );
+  assert.equal(dangerousRhetoricShippingBoardResolved.pendingAction?.amount, 1);
+  const dangerousRhetoricShippingCardResolved = state.resolveBoardInfluenceChoice(
+    dangerousRhetoricShippingBoardResolved,
+    dangerousRhetoricShippingBoardResolved.pendingAction,
+    p2.id,
+    "bene",
+  );
+  assert.equal(playerById(dangerousRhetoricShippingCardResolved, p2.id).influence.bene, 1);
+  assert.equal(dangerousRhetoricShippingCardResolved.pendingAction, undefined);
+  assert.equal(
+    playerById(dangerousRhetoricShippingCardResolved, p2.id).playArea.some((card) => card.id === dangerousRhetoric.id),
+    false,
+    "Dangerous Rhetoric should still resolve and trash after a separate Shipping board Influence choice",
+  );
   const dangerousRhetoricCommanderPlaced = turnActions.placeAgentAction(
     withActivePlayer(game, p4.id, () => ({
       agentsReady: 1,
@@ -11514,6 +11624,161 @@ try {
     ),
     dangerousRhetoricForgedLockedTargetState,
     "Commander Dangerous Rhetoric should reject forged targetOwnerId values that disagree with the source card",
+  );
+  const subversiveNonFactionPlaced = turnActions.placeAgentAction(
+    {
+      ...withActivePlayer(game, p2.id, () => ({
+        agentsReady: 1,
+        hand: [subversiveAdvisor],
+        playArea: [],
+        resources: { solari: 10, spice: 0, water: 0 },
+      })),
+      sharedSpyPosts: {},
+      spyPosts: { [highCouncil.id]: p2.id },
+    },
+    {
+      commanderTargets: {},
+      selectedCard: subversiveAdvisor,
+      selectedSpace: highCouncil,
+    },
+  );
+  assert.equal(
+    subversiveNonFactionPlaced.pendingAction,
+    undefined,
+    "Subversive Advisor should not queue its Influence bonus outside Faction board spaces",
+  );
+  assert.equal(
+    playerById(subversiveNonFactionPlaced, p2.id).playArea.some((card) => card.id === subversiveAdvisor.id),
+    true,
+    "Subversive Advisor should stay in play when its Faction-space condition is not met",
+  );
+  const subversiveFactionPlaced = turnActions.placeAgentAction(
+    {
+      ...withActivePlayer(game, p2.id, () => ({
+        agentsReady: 1,
+        hand: [subversiveAdvisor],
+        playArea: [],
+        resources: { solari: 0, spice: 0, water: 0 },
+      })),
+      sharedSpyPosts: {},
+      spyPosts: { [secrets.id]: p2.id },
+    },
+    {
+      commanderTargets: {},
+      selectedCard: subversiveAdvisor,
+      selectedSpace: secrets,
+    },
+  );
+  assert.equal(
+    playerById(subversiveFactionPlaced, p2.id).influence.bene,
+    1,
+    "Subversive Advisor should keep the normal board-space Influence before its pending bonus resolves",
+  );
+  assert.equal(subversiveFactionPlaced.pendingAction?.kind, "board-influence-choice");
+  assert.equal(subversiveFactionPlaced.pendingAction.source, "Subversive Advisor");
+  assert.equal(subversiveFactionPlaced.pendingAction.sourceEffect, "gain-board-space-influence");
+  assert.equal(subversiveFactionPlaced.pendingAction.amount, 1);
+  assert.equal(subversiveFactionPlaced.pendingAction.trashSource, true);
+  assert.equal(subversiveFactionPlaced.pendingAction.cardId, subversiveAdvisor.id);
+  assert.equal(subversiveFactionPlaced.pendingAction.cardOwnerId, p2.id);
+  assert.equal(subversiveFactionPlaced.pendingAction.spaceId, secrets.id);
+  assert.deepEqual(
+    subversiveFactionPlaced.pendingAction.choices,
+    [{ ownerId: p2.id, faction: "bene" }],
+    "Ally Subversive Advisor should only offer the current board-space Influence",
+  );
+  const subversiveForgedChoicePending = {
+    ...subversiveFactionPlaced.pendingAction,
+    choices: [
+      ...subversiveFactionPlaced.pendingAction.choices,
+      { ownerId: p2.id, faction: "spacing" },
+    ],
+  };
+  const subversiveForgedChoiceState = {
+    ...subversiveFactionPlaced,
+    pendingAction: subversiveForgedChoicePending,
+  };
+  assert.equal(
+    state.resolveBoardInfluenceChoice(
+      subversiveForgedChoiceState,
+      subversiveForgedChoicePending,
+      p2.id,
+      "spacing",
+    ),
+    subversiveForgedChoiceState,
+    "Subversive Advisor should reject forged off-space Influence choices",
+  );
+  const subversiveFactionResolved = state.resolveBoardInfluenceChoice(
+    subversiveFactionPlaced,
+    subversiveFactionPlaced.pendingAction,
+    p2.id,
+    "bene",
+  );
+  assert.equal(playerById(subversiveFactionResolved, p2.id).influence.bene, 2);
+  assert.ok(
+    playerById(subversiveFactionResolved, p2.id).vp > playerById(subversiveFactionPlaced, p2.id).vp,
+    "Subversive Advisor should resolve Influence threshold rewards after its bonus",
+  );
+  assert.equal(
+    playerById(subversiveFactionResolved, p2.id).playArea.some((card) => card.id === subversiveAdvisor.id),
+    false,
+    "Subversive Advisor should trash itself after the board-space Influence bonus",
+  );
+  assert.match(subversiveFactionResolved.log[0], /gains 1 Bene Gesserit Influence from Subversive Advisor/);
+  const subversiveCommanderPlaced = turnActions.placeAgentAction(
+    {
+      ...withActivePlayer(game, p4.id, () => ({
+        agentsReady: 1,
+        hand: [subversiveAdvisor],
+        playArea: [],
+        resources: { solari: 0, spice: 0, water: 0 },
+      })),
+      sharedSpyPosts: {},
+      spyPosts: { [dutifulService.id]: p4.id },
+    },
+    {
+      commanderTargets: { [p4.id]: p2.id },
+      selectedCard: subversiveAdvisor,
+      selectedSpace: dutifulService,
+    },
+  );
+  assert.equal(
+    subversiveCommanderPlaced.pendingAction?.kind,
+    "board-influence-choice",
+    "Commander Subversive Advisor should combine with the mapped board Influence choice",
+  );
+  assert.equal(subversiveCommanderPlaced.pendingAction.source, "Subversive Advisor");
+  assert.equal(subversiveCommanderPlaced.pendingAction.sourceEffect, "gain-board-space-influence");
+  assert.equal(subversiveCommanderPlaced.pendingAction.amount, 2);
+  assert.equal(subversiveCommanderPlaced.pendingAction.trashSource, true);
+  assert.equal(subversiveCommanderPlaced.pendingAction.targetOwnerId, p2.id);
+  assert.deepEqual(
+    subversiveCommanderPlaced.pendingAction.choices,
+    [
+      { ownerId: p2.id, faction: "greatHouses" },
+      { ownerId: p4.id, faction: "emperor" },
+    ],
+    "Commander Subversive Advisor should keep the normal mapped board-space choices but make the chosen one worth 2",
+  );
+  assert.equal(
+    subversiveCommanderPlaced.pendingQueue.find((pending) =>
+      pending.kind === "board-influence-choice" && pending.source === "Dutiful Service"
+    ),
+    undefined,
+    "Subversive Advisor should not leave the original 1-Influence board choice queued separately",
+  );
+  const subversiveCommanderResolved = state.resolveBoardInfluenceChoice(
+    subversiveCommanderPlaced,
+    subversiveCommanderPlaced.pendingAction,
+    p4.id,
+    "emperor",
+  );
+  assert.equal(playerById(subversiveCommanderResolved, p4.id).influence.emperor, 2);
+  assert.equal(playerById(subversiveCommanderResolved, p2.id).influence.greatHouses, 0);
+  assert.equal(
+    playerById(subversiveCommanderResolved, p4.id).playArea.some((card) => card.id === subversiveAdvisor.id),
+    false,
+    "Commander Subversive Advisor should trash itself after resolving the combined Influence choice",
   );
   const fedaykinMakerEffect = state.applyCardAgentEffect(
     fedaykinStilltent,

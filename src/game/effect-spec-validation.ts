@@ -191,8 +191,9 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     if (trigger !== "plot-intrigue" && trigger !== "combat-intrigue") {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
     }
-    if (effect.selector !== "self") {
-      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    const selector = (effect as { selector?: unknown }).selector;
+    if (selector !== "self") {
+      throw new Error(`Unsupported effect selector "${selector}" for ${effect.kind}`);
     }
     if (!supportedResources.has(effect.resource)) {
       throw new Error(`Unsupported effect resource "${effect.resource}"`);
@@ -297,6 +298,19 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
       invalidSpecField("acquire gain-influence-choice trashSource", effect.trashSource);
     }
     validateSourceLabel("gain-influence-choice source", effect.source);
+    return;
+  }
+  if (effect.kind === "gain-board-space-influence") {
+    if (trigger !== "agent-play") {
+      throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
+    }
+    const selector = (effect as { selector?: unknown }).selector;
+    if (selector !== "self") {
+      throw new Error(`Unsupported effect selector "${selector}" for gain-board-space-influence`);
+    }
+    validatePositiveAmount("gain-board-space-influence amount", effect.amount);
+    validateOptionalBoolean("gain-board-space-influence trashSource", effect.trashSource);
+    validateSourceLabel("gain-board-space-influence source", effect.source);
     return;
   }
   if (effect.kind === "paid-reward-choice") {

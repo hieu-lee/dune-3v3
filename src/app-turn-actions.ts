@@ -48,6 +48,7 @@ import type {
 } from "./game/types";
 
 type CommanderTargets = Record<string, string>;
+type BoardInfluenceChoicePendingAction = Extract<PendingAction, { kind: "board-influence-choice" }>;
 
 export function activatedAllyIdFor(player: Player, players: Player[], commanderTargets: CommanderTargets) {
   if (player.role !== "Commander") return player.id;
@@ -109,6 +110,44 @@ function paidRewardResourceGain(pending: PendingAction | undefined, ownerId: str
     }
     return total;
   }, 0);
+}
+
+function boardInfluenceChoicesMatch(
+  first: BoardInfluenceChoicePendingAction,
+  second: BoardInfluenceChoicePendingAction,
+) {
+  return (
+    first.choices.length === second.choices.length &&
+    first.choices.every((choice, index) =>
+      choice.ownerId === second.choices[index]?.ownerId &&
+      choice.faction === second.choices[index]?.faction
+    )
+  );
+}
+
+function combinedBoardInfluenceChoicePending(
+  boardPending: PendingAction | undefined,
+  cardPending: PendingAction | undefined,
+): { boardPending: PendingAction | undefined; cardPending: PendingAction | undefined } {
+  if (
+    boardPending?.kind !== "board-influence-choice" ||
+    cardPending?.kind !== "board-influence-choice" ||
+    cardPending.sourceEffect !== "gain-board-space-influence" ||
+    !cardPending.cardId ||
+    !cardPending.cardOwnerId ||
+    cardPending.spaceId !== boardPending.spaceId ||
+    cardPending.sourceTrigger !== undefined ||
+    !boardInfluenceChoicesMatch(boardPending, cardPending)
+  ) {
+    return { boardPending, cardPending };
+  }
+  return {
+    boardPending: {
+      ...cardPending,
+      amount: (boardPending.amount ?? 1) + (cardPending.amount ?? 1),
+    },
+    cardPending: undefined,
+  };
 }
 
 export function placeAgentAction(
@@ -204,13 +243,14 @@ export function placeAgentAction(
   const [firstCardPending, ...remainingCardPendings] = cardPendings;
   const optionalSpacePaymentPending = pendingActionForOptionalSpacePayment(selectedSpace, source);
   const boardInfluencePending = pendingActionForBoardInfluenceChoice(selectedSpace, source, effectedTarget);
+  const combinedBoardInfluence = combinedBoardInfluenceChoicePending(boardInfluencePending, firstCardPending);
   const boardTrashPending = pendingActionForBoardTrash(selectedSpace, source);
   const boardChoicePendings = [
     optionalSpacePaymentPending,
-    boardInfluencePending,
+    combinedBoardInfluence.boardPending,
   ].filter((action): action is PendingAction => Boolean(action));
   const [leaderPlacementPending, ...remainingLeaderPlacementPendings] = pendingActionsForLeaderPlacementEffects(postEffectState, source, selectedSpace);
-  const paidRewardWater = paidRewardResourceGain(firstCardPending, source.id, "water");
+  const paidRewardWater = paidRewardResourceGain(combinedBoardInfluence.cardPending, source.id, "water");
   const jessicaRepeatDeferredWater = paidRewardWater;
   const jessicaReverendMotherPending = pendingActionForReverendMotherJessicaRepeat(
     current,
@@ -218,22 +258,25 @@ export function placeAgentAction(
     selectedSpace,
     jessicaRepeatDeferredWater,
   );
+  const cardPendingIsSpiceAgonyReward =
+    combinedBoardInfluence.cardPending?.kind === "paid-reward-choice" &&
+    combinedBoardInfluence.cardPending.source === "Spice Agony";
   const prioritizedCardPending =
-    (firstCardPending?.kind === "paid-reward-choice" && firstCardPending.source === "Spice Agony") || paidRewardWater > 0
-      ? firstCardPending
+    cardPendingIsSpiceAgonyReward || paidRewardWater > 0
+      ? combinedBoardInfluence.cardPending
       : undefined;
   const pendingActions = prioritizedCardPending || leaderPlacementPending || jessicaReverendMotherPending
     ? [
         ...[prioritizedCardPending, leaderPlacementPending, jessicaReverendMotherPending].filter((action): action is PendingAction => Boolean(action)),
         ...boardChoicePendings,
-        ...pendingActionsFor(spacePending, prioritizedCardPending ? undefined : firstCardPending, source.spies),
+        ...pendingActionsFor(spacePending, prioritizedCardPending ? undefined : combinedBoardInfluence.cardPending, source.spies),
         ...remainingCardPendings,
         ...remainingLeaderPlacementPendings,
         ...[boardTrashPending].filter((action): action is PendingAction => Boolean(action)),
       ]
     : [
         ...boardChoicePendings,
-        ...pendingActionsFor(spacePending, firstCardPending, source.spies),
+        ...pendingActionsFor(spacePending, combinedBoardInfluence.cardPending, source.spies),
         ...remainingCardPendings,
         ...remainingLeaderPlacementPendings,
         ...[boardTrashPending].filter((action): action is PendingAction => Boolean(action)),

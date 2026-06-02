@@ -41,6 +41,7 @@ export {
 export * from "./effect-pending-resolver";
 export type {
   AgentAcquireCard,
+  AgentBoardSpaceInfluence,
   AgentCommanderResourceSplit,
   AgentDiscardCardForDraw,
   AgentDiscardCardForInfluenceAndDraw,
@@ -320,6 +321,9 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
     return { ...result, removeShieldWall: true };
   }
   if (effect.kind === "gain-influence-choice") {
+    return result;
+  }
+  if (effect.kind === "gain-board-space-influence") {
     return result;
   }
   if (effect.kind === "paid-reward-choice") {

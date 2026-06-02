@@ -51,6 +51,7 @@ import type {
   PendingActionChoiceNestedPending,
   PendingActionChoicePendingOption,
   Player,
+  SandwormEffectRecipient,
 } from "./types";
 
 export const stabanUnseenNetworkSource = "Unseen Network";
@@ -591,6 +592,17 @@ function pendingActionForAgentPayResourceForInfluence(
     .find((pending): pending is PendingAction => Boolean(pending));
 }
 
+function agentSandwormPaymentRecipient(recipient: SandwormEffectRecipient, source: Player, target: Player) {
+  if (recipient === "activated-ally") {
+    return source.role === "Commander" && target.team === source.team && target.role === "Ally" ? target : undefined;
+  }
+  if (recipient === "self-or-activated-ally") {
+    if (source.role !== "Commander") return source;
+    return target.team === source.team && target.role === "Ally" ? target : undefined;
+  }
+  return undefined;
+}
+
 function pendingActionForAgentPayResourceForSandworms(
   card: Card,
   source: Player,
@@ -613,15 +625,16 @@ function pendingActionForAgentPayResourceForSandworms(
     .map((effect): PendingAction | undefined => {
       if (effect.selector !== "self" || effect.cost <= 0 || effect.sandworms <= 0) return undefined;
       if (source.resources[effect.resource] < effect.cost) return undefined;
-      if (effect.recipient !== "activated-ally" || effect.destination !== "conflict") return undefined;
-      if (source.role !== "Commander" || target.team !== source.team || target.role !== "Ally") return undefined;
-      if (conflictDeploymentBlockedFor(state, source.id, target.id) || !canSummonSandworms(state, target, effect.sandworms)) {
+      if (effect.destination !== "conflict") return undefined;
+      const recipient = agentSandwormPaymentRecipient(effect.recipient, source, target);
+      if (!recipient) return undefined;
+      if (conflictDeploymentBlockedFor(state, source.id, recipient.id) || !canSummonSandworms(state, recipient, effect.sandworms)) {
         return undefined;
       }
       return {
         kind: "pay-resource-for-sandworms",
         ownerId: source.id,
-        recipientId: target.id,
+        recipientId: recipient.id,
         resource: effect.resource,
         cost: effect.cost,
         sandworms: effect.sandworms,

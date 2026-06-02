@@ -3327,6 +3327,7 @@ try {
       "Reliable Informant",
       "Sardaukar Soldier",
       "Smuggler's Harvester",
+      "Smuggler's Haven",
       "Southern Elders",
       "Space-time Folding",
       "Stilgar, The Devoted",
@@ -4477,6 +4478,22 @@ try {
     smugglersHaven.play,
     "Pay 4 spice to summon 1 sandworm.",
     "Smuggler's Haven play text should expose its Agent sandworm payment",
+  );
+  assert.ok(
+    smugglersHaven.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.effects.some((effect) =>
+        effect.kind === "pay-resource-for-sandworms" &&
+        effect.selector === "self" &&
+        effect.resource === "spice" &&
+        effect.cost === 4 &&
+        effect.sandworms === 1 &&
+        effect.recipient === "self-or-activated-ally" &&
+        effect.destination === "conflict" &&
+        effect.optional === true
+      )
+    ),
+    "Smuggler's Haven should carry a typed Agent self-or-activated-Ally sandworm payment spec",
   );
   assert.equal(
     smugglersHaven.reveal,
@@ -10133,6 +10150,121 @@ try {
   );
   assert.equal(reliableInformantReveal.persuasion, 1, "Reliable Informant should reveal for 1 persuasion");
   assert.deepEqual(reliableInformantReveal.revealGain, { solari: 1 }, "Reliable Informant should reveal for 1 Solari");
+  const smugglersHavenConflict = data.conflictCards.find((card) => card.name === "CHOAM Security");
+  assert.ok(smugglersHavenConflict, "Verifier needs an unprotected Conflict for Smuggler's Haven sandworms");
+  const smugglersHavenAllySource = {
+    ...p3,
+    conflict: 0,
+    deployedSandworms: 0,
+    makerHooks: true,
+    playArea: [smugglersHaven],
+    resources: { solari: 0, spice: 4, water: 0 },
+  };
+  const smugglersHavenAllyState = {
+    ...game,
+    conflict: smugglersHavenConflict,
+    players: game.players.map((player) => player.id === p3.id ? smugglersHavenAllySource : player),
+    shieldWall: false,
+  };
+  const smugglersHavenAllyPending = state.pendingActionForCard(
+    smugglersHaven,
+    smugglersHavenAllySource,
+    smugglersHavenAllyState,
+    smugglersHavenAllySource,
+    deliverSupplies,
+  );
+  assert.deepEqual(
+    smugglersHavenAllyPending,
+    {
+      kind: "pay-resource-for-sandworms",
+      ownerId: p3.id,
+      recipientId: p3.id,
+      resource: "spice",
+      cost: 4,
+      sandworms: 1,
+      strength: 3,
+      destination: "conflict",
+      optional: true,
+      source: "Smuggler's Haven",
+      cardId: smugglersHaven.id,
+    },
+    "Smuggler's Haven should queue a self sandworm payment for an Ally",
+  );
+  const smugglersHavenAllyResolved = state.resolvePayResourceForSandwormsChoice(
+    { ...smugglersHavenAllyState, pendingAction: smugglersHavenAllyPending },
+    smugglersHavenAllyPending,
+  );
+  assert.equal(playerById(smugglersHavenAllyResolved, p3.id).resources.spice, 0, "Smuggler's Haven Ally payment should spend 4 spice");
+  assert.equal(playerById(smugglersHavenAllyResolved, p3.id).deployedSandworms, 1, "Smuggler's Haven Ally payment should deploy a self sandworm");
+  assert.equal(playerById(smugglersHavenAllyResolved, p3.id).conflict, 3, "Smuggler's Haven Ally sandworm should add 3 strength");
+  assert.equal(
+    smugglersHavenAllyResolved.turnUnitDeployments[p3.id],
+    1,
+    "Smuggler's Haven Ally sandworm should count as that player's turn deployment",
+  );
+  assert.equal(
+    state.pendingActionForCard(
+      smugglersHaven,
+      { ...smugglersHavenAllySource, makerHooks: false },
+      {
+        ...smugglersHavenAllyState,
+        players: smugglersHavenAllyState.players.map((player) =>
+          player.id === p3.id ? { ...smugglersHavenAllySource, makerHooks: false } : player,
+        ),
+      },
+      { ...smugglersHavenAllySource, makerHooks: false },
+      deliverSupplies,
+    ),
+    undefined,
+    "Smuggler's Haven should not queue self sandworms without Maker Hooks",
+  );
+  const smugglersHavenCommanderSource = {
+    ...p1,
+    playArea: [smugglersHaven],
+    resources: { solari: 0, spice: 4, water: 0 },
+  };
+  const smugglersHavenCommanderAlly = {
+    ...p3,
+    conflict: 0,
+    deployedSandworms: 0,
+    makerHooks: true,
+  };
+  const smugglersHavenCommanderState = {
+    ...game,
+    conflict: smugglersHavenConflict,
+    players: game.players.map((player) => {
+      if (player.id === p1.id) return smugglersHavenCommanderSource;
+      if (player.id === p3.id) return smugglersHavenCommanderAlly;
+      return player;
+    }),
+    shieldWall: false,
+  };
+  const smugglersHavenCommanderPending = state.pendingActionForCard(
+    smugglersHaven,
+    smugglersHavenCommanderSource,
+    smugglersHavenCommanderState,
+    smugglersHavenCommanderAlly,
+    deliverSupplies,
+  );
+  assert.ok(smugglersHavenCommanderPending, "Smuggler's Haven should queue for a Commander with a hooked activated Ally");
+  assert.equal(smugglersHavenCommanderPending?.ownerId, p1.id, "Commander Smuggler's Haven payment should be paid by the Commander");
+  assert.equal(
+    smugglersHavenCommanderPending?.recipientId,
+    p3.id,
+    "Commander Smuggler's Haven payment should summon for the activated Ally",
+  );
+  const smugglersHavenCommanderResolved = state.resolvePayResourceForSandwormsChoice(
+    { ...smugglersHavenCommanderState, pendingAction: smugglersHavenCommanderPending },
+    smugglersHavenCommanderPending,
+  );
+  assert.equal(playerById(smugglersHavenCommanderResolved, p1.id).resources.spice, 0, "Commander Smuggler's Haven should spend Commander spice");
+  assert.equal(playerById(smugglersHavenCommanderResolved, p3.id).deployedSandworms, 1, "Commander Smuggler's Haven should deploy the Ally sandworm");
+  assert.equal(playerById(smugglersHavenCommanderResolved, p3.id).conflict, 3, "Commander Smuggler's Haven sandworm should add Ally strength");
+  assert.equal(
+    smugglersHavenCommanderResolved.turnUnitDeployments[p1.id],
+    1,
+    "Commander Smuggler's Haven sandworm should count for the Commander turn",
+  );
   const smugglersHavenSpiedMakerReveal = turnActions.revealTurnPlan(
     { ...p2, hand: [smugglersHaven], highCouncilSeat: false },
     { ...game, spyPosts: { [imperialBasin.id]: p2.id } },

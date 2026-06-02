@@ -57,6 +57,7 @@ import {
   agentGainResource,
   agentOpponentsDiscardCards,
   agentPayResourceForDrawCards,
+  agentPayResourceForSandworms,
   agentPlaceSpies,
   agentRecruitTroops,
   hasCardTraitInPlay,
@@ -246,6 +247,7 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
   }
   if (card.id === smugglersHavenSourceId) {
     return [
+      agentPayResourceForSandworms("spice", 4, 1, { recipient: "self-or-activated-ally" }),
       revealGainPersuasion(1),
       revealGainResource("spice", 2, [hasSpyPostOnMakerSpace()]),
     ];

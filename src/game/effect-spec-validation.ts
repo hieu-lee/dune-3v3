@@ -595,7 +595,11 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
       throw new Error(`Unsupported effect resource "${effect.resource}"`);
     }
     const recipient = (effect as { recipient?: unknown }).recipient;
-    if (trigger === "agent-play" && recipient !== "activated-ally") {
+    if (
+      trigger === "agent-play" &&
+      recipient !== "activated-ally" &&
+      recipient !== "self-or-activated-ally"
+    ) {
       invalidSpecField("pay-resource-for-sandworms recipient", recipient);
     }
     if (trigger === "reveal" && recipient !== "combat-recipient") {

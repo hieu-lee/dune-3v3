@@ -99,6 +99,7 @@ function validateOptionalTrue(label: string, value: unknown) {
 
 function validateCondition(condition: GameEffectConditionSpec) {
   if (condition.kind === "visited-maker-space") return;
+  if (condition.kind === "visited-space-has-spy-post") return;
   if (condition.kind === "visited-space-icon") {
     if (supportedIcons.has(condition.icon)) return;
     throw new Error(`Unsupported effect icon "${condition.icon}"`);

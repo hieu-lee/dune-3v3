@@ -448,6 +448,10 @@ export function visitedSpaceIcon(icon: IconId) {
   return { kind: "visited-space-icon", icon } as const;
 }
 
+export function visitedSpaceWithSpyPost() {
+  return { kind: "visited-space-has-spy-post" } as const;
+}
+
 export function hasSpyPosts(count: number) {
   return { kind: "has-spy-posts", count } as const;
 }

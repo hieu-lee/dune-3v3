@@ -6,7 +6,7 @@ import {
 } from "./board-rules";
 import { playerConflictUnitCount } from "./conflict-rules";
 import { validateSpec } from "./effect-spec-validation";
-import { spyPostCount } from "./spy-posts";
+import { playerHasSpyPost, spyPostCount } from "./spy-posts";
 import type {
   BoardSpace,
   Card,
@@ -56,7 +56,7 @@ export type GameEffectContext = {
   trigger: GameEffectTrigger;
   source: Player;
   target?: Player;
-  space?: Pick<BoardSpace, "icon" | "maker">;
+  space?: Pick<BoardSpace, "id" | "icon" | "maker">;
   state?: EffectResolverState;
 };
 
@@ -274,6 +274,18 @@ function conditionApplies(condition: GameEffectConditionSpec, context: GameEffec
   }
   if (condition.kind === "visited-space-icon") {
     return context.space?.icon === condition.icon;
+  }
+  if (condition.kind === "visited-space-has-spy-post") {
+    return Boolean(
+      context.space?.id &&
+      context.state?.spyPosts &&
+      context.state.sharedSpyPosts &&
+      playerHasSpyPost(
+        { spyPosts: context.state.spyPosts, sharedSpyPosts: context.state.sharedSpyPosts },
+        context.space.id,
+        context.source.id,
+      ),
+    );
   }
   if (condition.kind === "has-spy-posts") {
     return context.state?.spyPosts && context.state.sharedSpyPosts

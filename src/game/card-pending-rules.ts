@@ -144,6 +144,7 @@ function pendingActionForAgentSpyPlacement(
   source: Player,
   state?: GameState,
   target?: Player,
+  space?: BoardSpace,
 ): PendingAction | undefined {
   if (!card.effects || !source.playArea.some((candidate) => candidate.id === card.id)) return undefined;
   const players = state ? playersWithPendingCardEffect(state, source, target) : undefined;
@@ -152,6 +153,7 @@ function pendingActionForAgentSpyPlacement(
     trigger: "agent-play",
     source,
     target,
+    space,
     state: effectState,
   });
   const sourcePlacement = mergedSpyPlacement(card, result.spyPlacements);
@@ -492,7 +494,7 @@ export function pendingActionForCard(
   target?: Player,
   space?: BoardSpace,
 ): PendingAction | undefined {
-  const agentSpyPlacementPending = pendingActionForAgentSpyPlacement(card, source, state, target);
+  const agentSpyPlacementPending = pendingActionForAgentSpyPlacement(card, source, state, target, space);
   if (agentSpyPlacementPending) return agentSpyPlacementPending;
   const agentDiscardInfluenceDrawPending = pendingActionForAgentDiscardCardForInfluenceAndDraw(card, source, state, target);
   if (agentDiscardInfluenceDrawPending) return agentDiscardInfluenceDrawPending;

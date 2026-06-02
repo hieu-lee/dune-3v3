@@ -74,7 +74,7 @@ export function applyCardAgentEffect(
   sourcePlayer: Player,
   targetPlayer: Player,
   state?: Pick<GameState, "alliances" | "players">,
-  space?: Pick<BoardSpace, "icon" | "maker">,
+  space?: Pick<BoardSpace, "id" | "icon" | "maker">,
 ): {
   source: Player;
   target: Player;
@@ -97,7 +97,7 @@ function applyGenericCardAgentEffect(
   targetPlayer: Player,
   state?: Pick<GameState, "players"> &
     Partial<Pick<GameState, "alliances" | "roundMakerSpaceVisits" | "sharedSpyPosts" | "spyPosts">>,
-  space?: Pick<BoardSpace, "icon" | "maker">,
+  space?: Pick<BoardSpace, "id" | "icon" | "maker">,
 ): {
   source: Player;
   target: Player;

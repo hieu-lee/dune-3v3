@@ -42,6 +42,7 @@ const generatedScreenshotNames = [
   "pending-acquire-card.png",
   "pending-acquire-prepare-the-way.png",
   "pending-bene-gesserit-operative-spy.png",
+  "pending-double-agent-shared-spy.png",
   "pending-bene-gesserit-operative-recall-spy.png",
   "pending-captured-mentat.png",
   "pending-captured-mentat-reveal.png",

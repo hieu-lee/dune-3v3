@@ -5,6 +5,7 @@ import {
   cargoRunnerSourceId,
   capturedMentatSourceId,
   chaniCleverTacticianSourceId,
+  doubleAgentSourceId,
   fedaykinStilltentSourceId,
   hiddenMissiveSourceId,
   interstellarTradeSourceId,
@@ -36,6 +37,7 @@ import {
   revealRetreatTroopsForStrength,
   revealTrashCardForStrength,
   visitedMakerSpace,
+  visitedSpaceWithSpyPost,
 } from "./effect-specs";
 import type {
   BattleIconId,
@@ -216,6 +218,9 @@ function imperiumRevealText(card: HubCard, persuasion: number, swords: number, p
   if (card.id === fedaykinStilltentSourceId) {
     return "Gain 1 water.";
   }
+  if (card.id === doubleAgentSourceId) {
+    return "+1 persuasion and +1 strength.";
+  }
   if (card.id === wheelsWithinWheelsSourceId) {
     return "+1 persuasion. Place 1 spy.";
   }
@@ -263,6 +268,16 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
       agentRecruitTroops("activated-ally", 1, [visitedMakerSpace(), hasRole("Commander")]),
     ];
   }
+  if (card.id === doubleAgentSourceId) {
+    return [
+      agentPlaceSpies(
+        "self",
+        1,
+        { allowSharedPost: true },
+        [visitedSpaceWithSpyPost()],
+      ),
+    ];
+  }
   if (card.id === hiddenMissiveSourceId) {
     return [
       agentDrawCards(1, [hasInfluence("bene", 2)]),
@@ -308,6 +323,9 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
 }
 
 function imperiumPlayText(card: HubCard) {
+  if (card.id === doubleAgentSourceId) {
+    return "If you have a spy on the board space you sent an Agent to this turn, you may place a spy on the same observation post as another player's spy.";
+  }
   if (card.id === fedaykinStilltentSourceId) {
     return "If you sent an Agent to a Maker board space this turn, recruit 1 troop.";
   }

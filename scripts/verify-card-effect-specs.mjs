@@ -86,6 +86,7 @@ try {
   const calculus = data.imperiumDeck.find((card) => card.name === "Calculus of Power");
   const capturedMentat = data.imperiumDeck.find((card) => card.name === "Captured Mentat");
   const beneGesseritOperative = data.imperiumDeck.find((card) => card.name === "Bene Gesserit Operative");
+  const doubleAgent = data.imperiumDeck.find((card) => card.name === "Double Agent");
   const fedaykinStilltent = data.imperiumDeck.find((card) => card.name === "Fedaykin Stilltent");
   const hiddenMissive = data.imperiumDeck.find((card) => card.name === "Hidden Missive");
   const cargoRunner = data.imperiumDeck.find((card) => card.name === "Cargo Runner");
@@ -125,6 +126,7 @@ try {
     calculus &&
     capturedMentat &&
     beneGesseritOperative &&
+    doubleAgent &&
     fedaykinStilltent &&
     hiddenMissive &&
     cargoRunner &&
@@ -148,6 +150,7 @@ try {
       "Captured Mentat",
       "Cargo Runner",
       "Chani, Clever Tactician",
+      "Double Agent",
       "Fedaykin Stilltent",
       "Hidden Missive",
       "Maker Keeper",
@@ -566,6 +569,29 @@ try {
       )
     ),
     "Fedaykin Stilltent should carry a Commander-to-activated-Ally Maker-space troop spec",
+  );
+  assert.equal(
+    doubleAgent.play,
+    "If you have a spy on the board space you sent an Agent to this turn, you may place a spy on the same observation post as another player's spy.",
+    "Double Agent play text should include its current-space spy condition",
+  );
+  assert.equal(
+    doubleAgent.reveal,
+    "+1 persuasion and +1 strength.",
+    "Double Agent reveal text should preserve its printed reveal",
+  );
+  assert.ok(
+    doubleAgent.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.conditions?.some((condition) => condition.kind === "visited-space-has-spy-post") &&
+      spec.effects.some((effect) =>
+        effect.kind === "place-spies" &&
+        effect.selector === "self" &&
+        effect.amount === 1 &&
+        effect.allowSharedPost === true
+      )
+    ),
+    "Double Agent should carry a current-space spy-post gated shared spy placement spec",
   );
   assert.ok(
     hiddenMissive.effects?.some((spec) =>
@@ -2883,6 +2909,68 @@ try {
   );
   assert.equal(fedaykinPlaced.pendingAction?.kind, "deploy", "Fedaykin Stilltent's recruited troop should be deployable");
   assert.match(fedaykinPlaced.log.join("\n"), /Fedaykin Stilltent: recruits 1 troop/);
+  const doubleAgentFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 1,
+    hand: [doubleAgent],
+    playArea: [],
+    spies: 2,
+  }));
+  const doubleAgentSpiedSpace = turnActions.placeAgentAction(
+    {
+      ...doubleAgentFixture,
+      spyPosts: { [highCouncil.id]: p2.id, [secrets.id]: p3.id },
+      sharedSpyPosts: {},
+      spaces: {},
+    },
+    { commanderTargets: {}, selectedCard: doubleAgent, selectedSpace: highCouncil },
+  );
+  assert.equal(doubleAgentSpiedSpace.pendingAction?.kind, "spy", "Double Agent should queue optional spy placement");
+  assert.equal(doubleAgentSpiedSpace.pendingAction?.ownerId, p2.id, "Double Agent spy placement should belong to the card player");
+  assert.equal(doubleAgentSpiedSpace.pendingAction?.allowSharedPost, true, "Double Agent should use shared-post placement");
+  assert.equal(doubleAgentSpiedSpace.pendingAction?.mustPlaceSpy, undefined, "Double Agent spy placement should be optional");
+  assert.equal(doubleAgentSpiedSpace.pendingAction?.source, "Double Agent");
+  assert.deepEqual(
+    state.placeableSpySpaces(doubleAgentSpiedSpace, doubleAgentSpiedSpace.pendingAction).map((space) => space.id),
+    [secrets.id],
+    "Double Agent should only allow sharing another player's observation post",
+  );
+  const doubleAgentSkipped = state.finishPendingAction(doubleAgentSpiedSpace);
+  assert.equal(doubleAgentSkipped.pendingAction, undefined, "Double Agent optional spy placement should be skippable");
+  assert.equal(playerById(doubleAgentSkipped, p2.id).spies, playerById(doubleAgentSpiedSpace, p2.id).spies);
+  const doubleAgentPlacedSpy = state.placeSpyForPending(doubleAgentSpiedSpace, doubleAgentSpiedSpace.pendingAction, secrets.id);
+  assert.equal(doubleAgentPlacedSpy.pendingAction, undefined, "Placing Double Agent's spy should clear the pending action");
+  assert.equal(doubleAgentPlacedSpy.spyPosts[secrets.id], p3.id, "Double Agent should leave the original spy owner in place");
+  assert.deepEqual(doubleAgentPlacedSpy.sharedSpyPosts[secrets.id], [p2.id], "Double Agent should share the chosen spy post");
+  assert.equal(playerById(doubleAgentPlacedSpy, p2.id).spies, playerById(doubleAgentSpiedSpace, p2.id).spies - 1);
+  assert.match(doubleAgentPlacedSpy.log[0], /places a spy near Secrets from Double Agent/);
+  const doubleAgentUnspiedSpace = turnActions.placeAgentAction(
+    {
+      ...doubleAgentFixture,
+      spyPosts: { [secrets.id]: p3.id },
+      sharedSpyPosts: {},
+      spaces: {},
+    },
+    { commanderTargets: {}, selectedCard: doubleAgent, selectedSpace: highCouncil },
+  );
+  assert.equal(
+    doubleAgentUnspiedSpace.pendingAction,
+    undefined,
+    "Double Agent should not queue placement without own spy on the current Agent space",
+  );
+  const doubleAgentNoSharedTarget = turnActions.placeAgentAction(
+    {
+      ...doubleAgentFixture,
+      spyPosts: { [highCouncil.id]: p2.id },
+      sharedSpyPosts: {},
+      spaces: {},
+    },
+    { commanderTargets: {}, selectedCard: doubleAgent, selectedSpace: highCouncil },
+  );
+  assert.equal(
+    doubleAgentNoSharedTarget.pendingAction,
+    undefined,
+    "Double Agent should not pause when no other player's spy post can be shared",
+  );
   const hiddenMissiveDraw = { ...dagger, id: "hidden-missive-agent-draw-fixture" };
   const hiddenMissiveEffect = state.applyCardAgentEffect(
     hiddenMissive,

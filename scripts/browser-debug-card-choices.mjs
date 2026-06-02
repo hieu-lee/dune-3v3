@@ -95,6 +95,23 @@ export async function runCardChoicesSmoke({
   assert.equal(ownerAfter.spies, ownerBefore.spies - 1, "Bene Gesserit Operative should spend one spy");
   assert.equal(after.spyPosts[states.beneGesseritOperativeSpy.spySpaceId], "p2", "Bene Gesserit Operative should place the chosen spy");
 
+  await setDebugGameAndWait(page, states.doubleAgentSharedSpy);
+  pendingText = await page.locator(".pending-panel").innerText();
+  assert.match(pendingText, /Double Agent/i);
+  assert.match(pendingText, /spy placement/i);
+  assert.equal(await page.locator(".pending-panel").getByRole("button", { name: "Done" }).isDisabled(), false);
+  await screenshot(page, captures, "pending-double-agent-shared-spy.png");
+
+  before = await currentGame(page);
+  ownerBefore = before.players.find((player) => player.id === "p2");
+  await page.locator(".pending-panel").getByRole("button", { name: states.doubleAgentSharedSpy.sharedSpySpaceName }).click();
+  await waitForNoPending(page);
+  after = await currentGame(page);
+  ownerAfter = after.players.find((player) => player.id === "p2");
+  assert.equal(ownerAfter.spies, ownerBefore.spies - 1, "Double Agent should spend one spy");
+  assert.equal(after.spyPosts[states.doubleAgentSharedSpy.sharedSpySpaceId], "p3", "Double Agent should keep the original spy owner");
+  assert.deepEqual(after.sharedSpyPosts[states.doubleAgentSharedSpy.sharedSpySpaceId], ["p2"], "Double Agent should share the target spy post");
+
   await setDebugGameAndWait(page, states.beneGesseritOperativeRecallSpy);
   pendingText = await page.locator(".pending-panel").innerText();
   assert.match(pendingText, /Bene Gesserit Operative/i);
@@ -176,6 +193,8 @@ async function createCardChoiceStates(server, initialPlayableGame) {
   assert.ok(prepareTheWay, "Expected Prepare The Way reserve card");
   const beneGesseritOperative = data.imperiumDeck.find((card) => card.sourceId === 30);
   assert.ok(beneGesseritOperative, "Expected Bene Gesserit Operative Imperium card");
+  const doubleAgent = data.imperiumDeck.find((card) => card.sourceId === 37);
+  assert.ok(doubleAgent, "Expected Double Agent Imperium card");
   const spySpace = data.boardSpaces.find((space) => space.id === "high-council");
   assert.ok(spySpace, "Expected High Council spy placement space");
   const spyPlaceAfterRecallSpace = data.boardSpaces.find((space) => space.id === "secrets");
@@ -229,6 +248,31 @@ async function createCardChoiceStates(server, initialPlayableGame) {
       selectedSpace: spyPlaceAfterRecallSpace,
     },
   );
+  const doubleAgentSharedSpyState = turnActions.placeAgentAction(
+    {
+      ...base,
+      spyPosts: { [spySpace.id]: ownerId, [spyPlaceAfterRecallSpace.id]: "p3" },
+      sharedSpyPosts: {},
+      spaces: {},
+      players: base.players.map((player) =>
+        player.id === ownerId
+          ? {
+              ...player,
+              agentsReady: 1,
+              hand: [doubleAgent],
+              playArea: [],
+              resources: { solari: 6, spice: 0, water: 0 },
+              spies: 2,
+            }
+          : player,
+      ),
+    },
+    {
+      commanderTargets: {},
+      selectedCard: doubleAgent,
+      selectedSpace: spySpace,
+    },
+  );
 
   return {
     contractPublic: {
@@ -278,6 +322,11 @@ async function createCardChoiceStates(server, initialPlayableGame) {
       ...beneGesseritOperativeSpyState,
       spySpaceId: spySpace.id,
       spySpaceName: spySpace.name,
+    },
+    doubleAgentSharedSpy: {
+      ...doubleAgentSharedSpyState,
+      sharedSpySpaceId: spyPlaceAfterRecallSpace.id,
+      sharedSpySpaceName: spyPlaceAfterRecallSpace.name,
     },
     beneGesseritOperativeRecallSpy: {
       ...beneGesseritOperativeRecallSpyState,

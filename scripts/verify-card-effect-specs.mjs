@@ -200,6 +200,7 @@ try {
   const spiceIsPower = data.intrigueCards.find((card) => card.name === "Spice is Power");
   const specialMission = data.intrigueCards.find((card) => card.name === "Special Mission");
   const springTheTrap = data.intrigueCards.find((card) => card.name === "Spring The Trap");
+  const tacticalOption = data.intrigueCards.find((card) => card.name === "Tactical Option");
   const sietchRitual = data.intrigueCards.find((card) => card.name === "Sietch Ritual");
   const strategicStockpiling = data.intrigueCards.find((card) => card.name === "Strategic Stockpiling");
   const weirdingCombat = data.intrigueCards.find((card) => card.name === "Weirding Combat");
@@ -270,7 +271,7 @@ try {
     wheelsWithinWheels,
   );
   assert.ok(commandRespect && prepareTheWay && spiceMustFlow && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
-  assert.ok(backedByChoam && buyAccess && callToArms && changeAllegiances && councilorsAmbition && contingencyPlan && cunning && departForArrakis && devour && distraction && findWeakness && goToGround && impress && imperiumPolitics && inspireAwe && intelligenceReport && leverage && manipulate && marketOpportunity && mercenaries && opportunism && questionableMethods && reachAgreement && shaddamsFavor && spiceIsPower && specialMission && springTheTrap && sietchRitual && strategicStockpiling && weirdingCombat);
+  assert.ok(backedByChoam && buyAccess && callToArms && changeAllegiances && councilorsAmbition && contingencyPlan && cunning && departForArrakis && devour && distraction && findWeakness && goToGround && impress && imperiumPolitics && inspireAwe && intelligenceReport && leverage && manipulate && marketOpportunity && mercenaries && opportunism && questionableMethods && reachAgreement && shaddamsFavor && spiceIsPower && specialMission && springTheTrap && tacticalOption && sietchRitual && strategicStockpiling && weirdingCombat);
   assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && dutifulService && deliverSupplies && sietchTabr && spiceRefinery);
   assert.equal(revealSpecCards.length, 79, "Unexpected number of cards with declarative Reveal specs");
   assert.equal(
@@ -621,6 +622,82 @@ try {
   assert.equal(spiceIsPowerNoChoice.swords, 0, "Spice is Power specs should remain choice-gated");
   assert.deepEqual(spiceIsPowerNoChoice.revealGain, {}, "Spice is Power should not gain spice without a branch choice");
   assert.deepEqual(spiceIsPowerNoChoice.spentResources, {}, "Spice is Power should not spend spice without a branch choice");
+  assert.ok(
+    tacticalOption.effects?.some((spec) =>
+      spec.trigger === "combat-intrigue" &&
+      spec.choiceId === "add-strength" &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-strength" &&
+        effect.selector === "self" &&
+        effect.amount === 2
+      )
+    ),
+    "Tactical Option should carry a typed selected Combat strength branch spec",
+  );
+  assert.ok(
+    tacticalOption.effects?.some((spec) =>
+      spec.trigger === "combat-intrigue" &&
+      spec.choiceId === "retreat-troops" &&
+      spec.effects.some((effect) =>
+        effect.kind === "retreat-troops" &&
+        effect.selector === "self" &&
+        effect.min === 1 &&
+        effect.max?.kind === "deployed-troops" &&
+        effect.source === "Tactical Option"
+      )
+    ),
+    "Tactical Option should carry a typed selected Combat dynamic troop-retreat spec",
+  );
+  const tacticalStrengthResolved = effectResolver.resolveGameEffects(tacticalOption.effects, {
+    trigger: "combat-intrigue",
+    choiceId: "add-strength",
+    source: p2,
+    target: p2,
+    state: game,
+  });
+  assert.equal(tacticalStrengthResolved.swords, 2, "Tactical Option strength branch should resolve typed Combat strength");
+  const tacticalNoChoice = effectResolver.resolveGameEffects(tacticalOption.effects, {
+    trigger: "combat-intrigue",
+    source: p2,
+    target: p2,
+    state: game,
+  });
+  assert.equal(tacticalNoChoice.swords, 0, "Tactical Option specs should remain choice-gated");
+  const tacticalRetreatSource = { ...p2, deployedTroops: 4 };
+  const tacticalRetreatContext = {
+    trigger: "combat-intrigue",
+    choiceId: "retreat-troops",
+    selectedTroopCount: 4,
+    source: tacticalRetreatSource,
+    target: tacticalRetreatSource,
+    state: game,
+  };
+  assert.deepEqual(
+    effectResolver.resolveCombatRetreatTroops(tacticalOption.effects, tacticalRetreatContext),
+    [{ selector: "self", count: 4, min: 1, max: 4, source: "Tactical Option" }],
+    "Tactical Option selected retreat spec should resolve up to the source Ally's deployed troop count",
+  );
+  assert.deepEqual(
+    effectResolver.resolveCombatRetreatTroops(tacticalOption.effects, {
+      ...tacticalRetreatContext,
+      selectedTroopCount: 5,
+    }),
+    [],
+    "Tactical Option selected retreat spec should reject more than the source Ally's deployed troop count",
+  );
+  const tacticalCommanderTarget = { ...p6, deployedTroops: 3 };
+  assert.deepEqual(
+    effectResolver.resolveCombatRetreatTroops(tacticalOption.effects, {
+      trigger: "combat-intrigue",
+      choiceId: "retreat-troops",
+      selectedTroopCount: 3,
+      source: p4,
+      target: tacticalCommanderTarget,
+      state: game,
+    }),
+    [{ selector: "self", count: 3, min: 1, max: 3, source: "Tactical Option" }],
+    "Tactical Option selected retreat spec should resolve up to the Commander target Ally's deployed troop count",
+  );
   assert.ok(
     hasCombatEffect(questionableMethods, (effect) =>
       effect.kind === "gain-strength" &&
@@ -7053,6 +7130,22 @@ try {
     ),
     /Invalid retreat-troops bounds "2-1"/,
     "Combat selected retreat specs should reject inverted troop-count bounds",
+  );
+  assert.throws(
+    () => effectResolver.resolveCombatRetreatTroops(
+      [combatSpec([{ kind: "retreat-troops", selector: "self", min: { kind: "deployed-troops" }, max: 2 }])],
+      { trigger: "combat-intrigue", source: p2, state: game },
+    ),
+    /Invalid retreat-troops min/,
+    "Combat selected retreat specs should reject dynamic minimum troop counts",
+  );
+  assert.throws(
+    () => effectResolver.resolveCombatRetreatTroops(
+      [combatSpec([{ kind: "retreat-troops", selector: "self", min: 1, max: { kind: "garrison" } }])],
+      { trigger: "combat-intrigue", source: p2, state: game },
+    ),
+    /Unsupported retreat-troops max "garrison"/,
+    "Combat selected retreat specs should reject unsupported dynamic maximum troop bounds",
   );
 	  const unsupportedEffectCard = {
     ...convincingArgument,

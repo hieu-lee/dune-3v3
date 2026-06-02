@@ -61,6 +61,7 @@ import {
   spyNetworkSourceId,
   springTheTrapSourceId,
   stilgarDevotedSourceId,
+  tacticalOptionSourceId,
   theacherousManeuverSourceId,
   undercoverAssetSourceId,
   smugglersHarvesterSourceId,
@@ -97,6 +98,7 @@ import {
   combatSpendResource,
   combatTakeContracts,
   combatTrashCard,
+  deployedTroopsRetreatBound,
   deployedUnitsThisTurn,
   hasCombatRecipient,
   hasCombatRecipientSandworms,
@@ -1043,6 +1045,12 @@ function intrigueCardEffects(card: HubCard): CardEffectSpec[] | undefined {
       combatGainResource("spice", 3, { source: "Spice is Power" }, undefined, { choiceId: "retreat-troops" }),
       combatSpendResource("spice", 3, { source: "Spice is Power" }, undefined, { choiceId: "spend-spice" }),
       combatGainStrength(6, undefined, { choiceId: "spend-spice" }),
+    ];
+  }
+  if (card.id === tacticalOptionSourceId) {
+    return [
+      combatGainStrength(2, undefined, { choiceId: "add-strength" }),
+      combatRetreatTroops(1, deployedTroopsRetreatBound(), { source: "Tactical Option" }, undefined, { choiceId: "retreat-troops" }),
     ];
   }
   if (card.id === questionableMethodsSourceId) {

@@ -36,6 +36,7 @@ import type {
   TeamResourcePaymentRecipient,
   TradeEffectPartner,
   TradeGoodId,
+  TroopRetreatBoundSpec,
   TroopEffectDestination,
   TroopEffectRecipient,
   TrashCardZone,
@@ -527,6 +528,12 @@ function combatEffectRecipient(context: GameEffectContext) {
       : undefined;
   }
   return context.source;
+}
+
+function retreatBoundFor(bound: TroopRetreatBoundSpec, context: GameEffectContext) {
+  if (typeof bound === "number") return bound;
+  if (bound.kind === "deployed-troops") return combatEffectRecipient(context)?.deployedTroops ?? 0;
+  return unsupportedKind("retreat-troops bound", bound);
 }
 
 function specApplies(spec: CardEffectSpec, context: GameEffectContext) {
@@ -1487,11 +1494,12 @@ export function resolveCombatRetreatTroops(
       .filter((effect) => effect.kind === "retreat-troops")
       .flatMap((effect) => {
         const count = context.selectedTroopCount;
+        const max = retreatBoundFor(effect.max, context);
         if (
           count === undefined ||
           !Number.isInteger(count) ||
           count < effect.min ||
-          count > effect.max
+          count > max
         ) {
           return [];
         }
@@ -1499,7 +1507,7 @@ export function resolveCombatRetreatTroops(
           selector: effect.selector,
           count,
           min: effect.min,
-          max: effect.max,
+          max,
           source: effect.source,
         };
       });

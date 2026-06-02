@@ -139,8 +139,13 @@ export function verifyCombatIntrigueRetreatBranches({ cards: { spiceIsPower, tac
   const tacticalAddCombat = state.startCombatPhase(tacticalAddFixture);
   assert.equal(
     state.combatIntrigueStrength(tacticalAddCombat, playerById(tacticalAddCombat, "p2"), tacticalOption),
+    undefined,
+    "Tactical Option should require an explicit strength branch choice",
+  );
+  assert.equal(
+    state.combatIntrigueStrength(tacticalAddCombat, playerById(tacticalAddCombat, "p2"), tacticalOption, undefined, "add-strength"),
     2,
-    "Tactical Option should expose its +2 strength branch",
+    "Tactical Option should expose its typed +2 strength branch when selected",
   );
   assert.equal(
     state.playCombatIntrigue(tacticalAddCombat, "p2", tacticalOption.id),
@@ -163,6 +168,11 @@ export function verifyCombatIntrigueRetreatBranches({ cards: { spiceIsPower, tac
     ),
   );
   const tacticalRetreatCombat = state.startCombatPhase(tacticalRetreatFixture);
+  assert.equal(
+    state.playCombatIntrigue(tacticalRetreatCombat, "p2", tacticalOption.id, undefined, "retreat-troops"),
+    tacticalRetreatCombat,
+    "Tactical Option retreat branch should require a selected troop count",
+  );
   assert.equal(
     state.playCombatIntrigue(tacticalRetreatCombat, "p2", tacticalOption.id, undefined, { kind: "retreat-troops", count: 0 }),
     tacticalRetreatCombat,

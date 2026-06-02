@@ -3,9 +3,6 @@ import {
   combatIntrigueTargets,
 } from "./combat-intrigue-rules";
 import {
-  isTacticalOptionIntrigue,
-} from "./card-identifiers";
-import {
   resolveAcquireCards,
   resolveCombatInfluenceLossForStrengths,
   resolveCombatRetreatTroops,
@@ -432,45 +429,6 @@ export function resolvePlayCombatIntrigue(
   if (!resolvedTargetId || !targets.includes(resolvedTargetId)) return state;
   const target = state.players.find((player) => player.id === resolvedTargetId);
   if (!target) return state;
-  if (isTacticalOptionIntrigue(intrigue)) {
-    const retreatCount =
-      typeof combatChoice === "object" && combatChoice.kind === "retreat-troops" ? combatChoice.count : undefined;
-    const addsStrength = combatChoice === "add-strength";
-    if (!addsStrength && !retreatCount) return state;
-    if (
-      retreatCount !== undefined &&
-      (!Number.isInteger(retreatCount) || retreatCount < 1 || retreatCount > target.deployedTroops)
-    ) return state;
-
-    const players = state.players.map((player) => {
-      let next = player;
-      if (player.id === actor.id) {
-        next = { ...next, intrigues: next.intrigues.filter((card) => card.id !== intrigue.id) };
-      }
-      if (player.id === target.id && addsStrength) {
-        next = { ...next, conflict: next.conflict + 2 };
-      }
-      if (player.id === target.id && retreatCount !== undefined) {
-        next = {
-          ...next,
-          conflict: Math.max(0, next.conflict - retreatCount * 2),
-          deployedTroops: next.deployedTroops - retreatCount,
-          garrison: next.garrison + retreatCount,
-        };
-      }
-      return next;
-    });
-    const logEntry = addsStrength
-      ? `${actor.leader} plays Tactical Option for ${target.leader}, adding 2 strength.`
-      : `${actor.leader} plays Tactical Option for ${target.leader}; ${target.leader} retreats ${retreatCount} ${retreatCount === 1 ? "troop" : "troops"}.`;
-    return advanceAfterCombatIntriguePlay({
-      ...state,
-      players,
-      combatPasses: [],
-      intrigueDiscard: [...state.intrigueDiscard, intrigue],
-      log: [logEntry, ...state.log],
-    });
-  }
   const combatSwords = combatIntrigueStrength(state, actor, intrigue, target, combatChoiceIdFor(combatChoice));
   const combatRetreat = resolveCombatRetreatActions(state, intrigue, actor, target, combatChoice);
   const combatAcquire = resolveCombatAcquirePendingActions(state, intrigue, actor, target, combatChoice);

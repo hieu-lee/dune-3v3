@@ -22,6 +22,7 @@ import type {
   TeamResourcePaymentRecipient,
   TradeEffectPartner,
   TradeGoodId,
+  TroopRetreatBoundSpec,
   TroopEffectDestination,
   TroopEffectRecipient,
   TrashCardZone,
@@ -244,7 +245,7 @@ export function combatLoseInfluenceForStrength(
 
 export function combatRetreatTroops(
   min: number,
-  max: number,
+  max: TroopRetreatBoundSpec,
   options: {
     source?: string;
   } = {},
@@ -260,6 +261,10 @@ export function combatRetreatTroops(
       ...(options.source ? { source: options.source } : {}),
     },
   ], conditions, specOptions);
+}
+
+export function deployedTroopsRetreatBound(): TroopRetreatBoundSpec {
+  return { kind: "deployed-troops" };
 }
 
 export function combatTakeContracts(

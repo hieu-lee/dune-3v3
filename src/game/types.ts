@@ -57,6 +57,9 @@ export type InfluenceLossForStrengthAlternateOwner = "source-commander-personal"
 export type EffectAmountSpec =
   | number
   | { kind: "completed-contracts"; multiplier?: number };
+export type TroopRetreatBoundSpec =
+  | number
+  | { kind: "deployed-troops" };
 export type GameEffectConditionSpec =
   | { kind: "visited-maker-space" }
   | { kind: "visited-space-icon"; icon: IconId }
@@ -123,7 +126,7 @@ export type GameEffectSpec =
       kind: "retreat-troops";
       selector: PlayerSelector;
       min: number;
-      max: number;
+      max: TroopRetreatBoundSpec;
       source?: string;
     }
   | {

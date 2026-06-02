@@ -11,6 +11,7 @@ import type {
   Role,
   TeamId,
   TradeGoodId,
+  TroopRetreatBoundSpec,
   TrashCardZone,
 } from "./types";
 
@@ -86,6 +87,18 @@ function validateFixedAmount(label: string, amount: number) {
 
 function validatePositiveFixedAmount(label: string, amount: unknown): asserts amount is number {
   if (typeof amount === "number" && isPositiveInteger(amount)) return;
+  invalidSpecField(label, amount);
+}
+
+function validateRetreatBound(label: string, amount: unknown): asserts amount is TroopRetreatBoundSpec {
+  if (typeof amount === "number") {
+    if (isPositiveInteger(amount)) return;
+    invalidSpecField(label, amount);
+  }
+  if (typeof amount === "object" && amount !== null && "kind" in amount) {
+    if ((amount as { kind?: unknown }).kind === "deployed-troops") return;
+    unsupportedKind(label, amount);
+  }
   invalidSpecField(label, amount);
 }
 
@@ -384,8 +397,8 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
       throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
     }
     validatePositiveFixedAmount("retreat-troops min", effect.min);
-    validatePositiveFixedAmount("retreat-troops max", effect.max);
-    if (effect.min > effect.max) {
+    validateRetreatBound("retreat-troops max", effect.max);
+    if (typeof effect.max === "number" && effect.min > effect.max) {
       invalidSpecField("retreat-troops bounds", `${effect.min}-${effect.max}`);
     }
     validateSourceLabel("retreat-troops source", effect.source);

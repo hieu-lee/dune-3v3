@@ -349,6 +349,48 @@ export async function runCombatIntriguesSmoke({
   );
   await screenshot(page, captures, "combat-intrigues-reach-agreement-pending.png");
 
+  await setDebugGameAndWait(page, states.tacticalRetreat);
+  const beforeTacticalRetreat = await currentGame(page);
+  const gurneyBeforeTacticalRetreat = playerById(beforeTacticalRetreat, "p3");
+  await combatCard(page, "Tactical Option").getByRole("button", { name: "Gurney Halleck: retreat 3" }).click();
+  await page.waitForFunction(() => {
+    const game = window.__DUNE_DEBUG__?.getGame();
+    const activePlayer = game?.players[game.activeSeat];
+    const gurney = game?.players.find((player) => player.id === "p3");
+    const muadDib = game?.players.find((player) => player.id === "p1");
+    return Boolean(
+      game &&
+        activePlayer?.id === "p3" &&
+        gurney?.conflict === 6 &&
+        gurney?.deployedTroops === 0 &&
+        gurney?.deployedSandworms === 1 &&
+        !muadDib?.intrigues.some((card) => card.name === "Tactical Option"),
+    );
+  });
+  const afterTacticalRetreat = await currentGame(page);
+  const gurneyAfterTacticalRetreat = playerById(afterTacticalRetreat, "p3");
+  assert.equal(
+    gurneyAfterTacticalRetreat.conflict,
+    gurneyBeforeTacticalRetreat.conflict - 6,
+    "Tactical Option retreat branch should remove each selected troop's strength and preserve sandworm strength",
+  );
+  assert.equal(
+    gurneyAfterTacticalRetreat.deployedTroops,
+    0,
+    "Tactical Option retreat branch should allow all target Ally troops to retreat",
+  );
+  assert.equal(
+    gurneyAfterTacticalRetreat.garrison,
+    gurneyBeforeTacticalRetreat.garrison + 3,
+    "Tactical Option retreat branch should return retreated troops to the recipient's garrison",
+  );
+  assert.equal(
+    gurneyAfterTacticalRetreat.deployedSandworms,
+    gurneyBeforeTacticalRetreat.deployedSandworms,
+    "Tactical Option retreat branch should not retreat sandworms",
+  );
+  await screenshot(page, captures, "combat-intrigues-tactical-option-retreat.png");
+
   await setDebugGameAndWait(page, states.commander);
   const before = await currentGame(page);
   const gurneyBefore = playerById(before, "p3");
@@ -467,7 +509,16 @@ async function createCombatIntrigueStates(server, initialPlayableGame) {
     }),
   };
 
-  return { commander: base };
+  const tacticalRetreat = {
+    ...base,
+    players: base.players.map((player) =>
+      player.id === "p3"
+        ? { ...player, conflict: 12 }
+        : player,
+    ),
+  };
+
+  return { commander: base, tacticalRetreat };
 }
 
 function combatCard(page, name) {

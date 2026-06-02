@@ -1,7 +1,6 @@
 import { effectiveRequirementInfluence } from "./board-rules";
 import {
   isBackedByChoamIntrigue,
-  isTacticalOptionIntrigue,
   isWeirdingCombatIntrigue,
 } from "./card-identifiers";
 import { playerHasConflictUnits } from "./conflict-rules";
@@ -67,7 +66,6 @@ export function combatIntrigueStrength(
     .reduce((total, effect) => total + effect.strength, 0);
   if (mandatoryRecallStrength > 0) return mandatoryRecallStrength;
   if (intrigue.automatedCombatSwords) return intrigue.automatedCombatSwords;
-  if (isTacticalOptionIntrigue(intrigue)) return 2;
   if (isWeirdingCombatIntrigue(intrigue)) {
     return effectiveRequirementInfluence(actor, "bene", state.players) >= 3 ? 5 : 3;
   }

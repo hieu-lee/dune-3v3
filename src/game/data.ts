@@ -47,6 +47,7 @@ import {
   reliableInformantSourceId,
   sardaukarSoldierSourceId,
   shaddamsFavorSourceId,
+  specialMissionSourceId,
   sietchRitualSourceId,
   southernEldersSourceId,
   spaceTimeFoldingSourceId,
@@ -1036,6 +1037,16 @@ function intrigueCardEffects(card: HubCard): CardEffectSpec[] | undefined {
       plotPlaceSpies(1, { recallForSupply: true, allowSharedPost: true, source: "Distraction" }, [
         deployedUnitsThisTurn(3),
       ]),
+    ];
+  }
+  if (card.id === specialMissionSourceId) {
+    return [
+      plotPlaceSpies(1, {
+        recallForSupply: true,
+        mustPlace: true,
+        placementIcon: "city",
+        source: "Special Mission",
+      }, undefined, { choiceId: "place-spy" }),
     ];
   }
   if (card.id === leverageSourceId) {

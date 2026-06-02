@@ -352,8 +352,9 @@ export function plotPlaceSpies(
     postPlacementAction?: "staban-unseen-network";
   } = {},
   conditions?: GameEffectConditionSpec[],
+  specOptions?: CardEffectSpecOptions,
 ): CardEffectSpec {
-  return plotIntrigueEffects([{ kind: "place-spies", selector: "self", amount, ...options }], conditions);
+  return plotIntrigueEffects([{ kind: "place-spies", selector: "self", amount, ...options }], conditions, specOptions);
 }
 
 export function acquireGainResource(

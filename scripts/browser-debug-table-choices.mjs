@@ -327,6 +327,54 @@ export async function runTableChoicesSmoke({
   assert.match(commanderSietchAfter.log[0], /Princess Irulan gains 1 Bene Gesserit Influence/);
   await screenshot(page, captures, "sietch-ritual-commander-after.png");
 
+  await setDebugGameAndWait(page, states.specialMissionPlaceSpy);
+  await waitForActiveIntrigue(page, "Special Mission");
+  const specialMissionCard = page.locator(".intrigue-card").filter({ hasText: "Special Mission" });
+  const specialMissionCityButton = specialMissionCard.getByRole("button", { name: "City Spy" });
+  assert.equal(await specialMissionCityButton.count(), 1, "Expected one Special Mission City Spy button");
+  assert.equal(await specialMissionCityButton.isEnabled(), true, "Special Mission City Spy should be playable");
+  await screenshot(page, captures, "special-mission-ready.png");
+
+  const specialMissionBefore = await currentGame(page);
+  const specialMissionOwnerBefore = specialMissionBefore.players.find((player) => player.id === "p2");
+  assert.ok(specialMissionOwnerBefore, "Expected Feyd before Special Mission");
+  await specialMissionCityButton.click();
+  await page.waitForFunction(() => {
+    const game = window.__DUNE_DEBUG__?.getGame();
+    return game?.pendingAction?.kind === "spy" &&
+      game.pendingAction.source === "Special Mission" &&
+      game.pendingAction.placementIcon === "city" &&
+      game.pendingAction.mustPlaceSpy === true;
+  });
+  pendingText = await page.locator(".pending-panel").innerText();
+  assert.match(pendingText, /Special Mission City spy placement/i);
+  assert.match(pendingText, new RegExp(escapeRegExp(states.specialMissionSpySpaceName)));
+  await screenshot(page, captures, "pending-special-mission-city-spy.png");
+
+  await page.locator(".pending-panel").getByRole("button", { name: states.specialMissionSpySpaceName }).click();
+  await waitForNoPending(page);
+  const specialMissionAfter = await currentGame(page);
+  const specialMissionOwnerAfter = specialMissionAfter.players.find((player) => player.id === "p2");
+  assert.ok(specialMissionOwnerAfter, "Expected Feyd after Special Mission");
+  assert.equal(
+    specialMissionOwnerAfter.spies,
+    specialMissionOwnerBefore.spies - 1,
+    "Special Mission should spend one ready spy",
+  );
+  assert.equal(
+    specialMissionAfter.spyPosts[states.specialMissionSpySpaceId],
+    "p2",
+    "Special Mission should place the spy on the selected City post",
+  );
+  assert.equal(
+    specialMissionOwnerAfter.intrigues.some((card) => card.name === "Special Mission"),
+    false,
+    "Special Mission browser flow should discard the played Intrigue",
+  );
+  assert.equal(specialMissionAfter.intrigueDiscard.at(-1)?.name, "Special Mission");
+  assert.match(specialMissionAfter.log[0], /places a spy near .* from Special Mission/);
+  await screenshot(page, captures, "special-mission-after-spy.png");
+
   await setDebugGameAndWait(page, states.changeAllegiancesAlly);
   await waitForActiveIntrigue(page, "Change Allegiances");
   const allyChangeCard = page.locator(".intrigue-card").filter({ hasText: "Change Allegiances" });
@@ -778,6 +826,8 @@ async function createTableChoiceStates(server, initialPlayableGame) {
   assert.ok(inspireAwe, "Expected Inspire Awe for Plot acquisition browser debug state");
   const sietchRitual = data.intrigueCards.find((card) => card.name === "Sietch Ritual");
   assert.ok(sietchRitual, "Expected Sietch Ritual for Plot discard-for-Influence browser debug state");
+  const specialMission = data.intrigueCards.find((card) => card.name === "Special Mission");
+  assert.ok(specialMission, "Expected Special Mission for Plot City spy browser debug state");
   const changeAllegiances = data.intrigueCards.find((card) => card.name === "Change Allegiances");
   assert.ok(changeAllegiances, "Expected Change Allegiances for Plot Influence browser debug state");
   const buyAccess = data.intrigueCards.find((card) => card.name === "Buy Access");
@@ -857,6 +907,28 @@ async function createTableChoiceStates(server, initialPlayableGame) {
   };
   const wheelsSpySpace = state.placeableSpySpaces(wheelsRevealSpy, wheelsSpyPending)[0];
   assert.ok(wheelsSpySpace, "Expected a legal Wheels Within Wheels reveal spy post for browser debug state");
+  const specialMissionPlaceSpy = {
+    ...base,
+    activeSeat: feydSeat,
+    intrigueDiscard: [],
+    sharedSpyPosts: {},
+    spyPosts: {},
+    players: base.players.map((player) =>
+      player.id === "p2"
+        ? {
+            ...player,
+            hand: [],
+            intrigues: [cloneCard(specialMission)],
+            revealed: false,
+            spies: 1,
+          }
+        : { ...player, intrigues: [] }
+    ),
+  };
+  const specialMissionPlayer = specialMissionPlaceSpy.players.find((player) => player.id === "p2");
+  assert.ok(specialMissionPlayer, "Expected Feyd for Special Mission browser debug state");
+  const specialMissionSpySpace = state.specialMissionCitySpySpaces(specialMissionPlaceSpy, specialMissionPlayer)[0];
+  assert.ok(specialMissionSpySpace, "Expected a legal Special Mission City spy post for browser debug state");
 
   return {
     revealAdjust: {
@@ -1058,6 +1130,9 @@ async function createTableChoiceStates(server, initialPlayableGame) {
     },
     sietchRitualDiscardCardId: sietchRitualDiscardCard.id,
     sietchRitualDiscardCardName: sietchRitualDiscardCard.name,
+    specialMissionPlaceSpy,
+    specialMissionSpySpaceId: specialMissionSpySpace.id,
+    specialMissionSpySpaceName: specialMissionSpySpace.name,
     changeAllegiancesAlly: {
       ...base,
       activeSeat: feydSeat,

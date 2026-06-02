@@ -179,6 +179,7 @@ try {
   const mercenaries = data.intrigueCards.find((card) => card.name === "Mercenaries");
   const opportunism = data.intrigueCards.find((card) => card.name === "Opportunism");
   const shaddamsFavor = data.intrigueCards.find((card) => card.name === "Shaddam's Favor");
+  const specialMission = data.intrigueCards.find((card) => card.name === "Special Mission");
   const sietchRitual = data.intrigueCards.find((card) => card.name === "Sietch Ritual");
   const strategicStockpiling = data.intrigueCards.find((card) => card.name === "Strategic Stockpiling");
   const commandRespect = data.muadDibCommanderCards.find((card) => card.name === "Command Respect");
@@ -248,7 +249,7 @@ try {
     wheelsWithinWheels,
   );
   assert.ok(commandRespect && prepareTheWay && spiceMustFlow && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
-  assert.ok(backedByChoam && buyAccess && callToArms && changeAllegiances && councilorsAmbition && contingencyPlan && cunning && departForArrakis && distraction && imperiumPolitics && inspireAwe && intelligenceReport && leverage && manipulate && marketOpportunity && mercenaries && opportunism && shaddamsFavor && sietchRitual && strategicStockpiling);
+  assert.ok(backedByChoam && buyAccess && callToArms && changeAllegiances && councilorsAmbition && contingencyPlan && cunning && departForArrakis && distraction && imperiumPolitics && inspireAwe && intelligenceReport && leverage && manipulate && marketOpportunity && mercenaries && opportunism && shaddamsFavor && specialMission && sietchRitual && strategicStockpiling);
   assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && dutifulService && deliverSupplies && sietchTabr && spiceRefinery);
   assert.equal(revealSpecCards.length, 79, "Unexpected number of cards with declarative Reveal specs");
   assert.equal(
@@ -673,6 +674,53 @@ try {
     distractionBeforeDeployResolved.spyPlacements,
     [],
     "Distraction Plot spec should not resolve before three deployed units this turn",
+  );
+  assert.ok(
+    specialMission.effects?.some((spec) =>
+      spec.trigger === "plot-intrigue" &&
+      spec.choiceId === "place-spy" &&
+      spec.effects.some((effect) =>
+        effect.kind === "place-spies" &&
+        effect.selector === "self" &&
+        effect.amount === 1 &&
+        effect.recallForSupply === true &&
+        effect.mustPlace === true &&
+        effect.placementIcon === "city" &&
+        effect.source === "Special Mission"
+      )
+    ),
+    "Special Mission should carry a typed Plot City spy placement choice spec",
+  );
+  const specialMissionNoChoiceResolved = effectResolver.resolveGameEffects(specialMission.effects, {
+    trigger: "plot-intrigue",
+    source: p2,
+    state: game,
+  });
+  assert.deepEqual(
+    specialMissionNoChoiceResolved.spyPlacements,
+    [],
+    "Special Mission Plot choice spec should not place spies without a selected choice",
+  );
+  const specialMissionPlaceSpyResolved = effectResolver.resolveGameEffects(specialMission.effects, {
+    trigger: "plot-intrigue",
+    choiceId: "place-spy",
+    source: p2,
+    state: game,
+  });
+  assert.deepEqual(
+    specialMissionPlaceSpyResolved.spyPlacements,
+    [
+      {
+        count: 1,
+        recallForSupply: true,
+        mustPlace: true,
+        placementIcon: "city",
+        allowSharedPost: undefined,
+        source: "Special Mission",
+        postPlacementAction: undefined,
+      },
+    ],
+    "Special Mission Plot place-spy choice should resolve a mandatory City spy placement",
   );
   assert.ok(
     hasPlotEffect(leverage, (effect) =>

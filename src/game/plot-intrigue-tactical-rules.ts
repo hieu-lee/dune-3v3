@@ -17,7 +17,6 @@ import { playTypedPlotIntrigue } from "./plot-intrigue-effect-rules";
 import {
   canPlaySpecialMissionPlaceSpy,
   specialMissionRecallSpySpaces,
-  specialMissionSpyPending,
 } from "./spy-pending-rules";
 import {
   removeSpyPostOwner,
@@ -49,20 +48,14 @@ export function playSpecialMissionPlotIntrigue(
 
   if (choice.kind === "place-spy") {
     if (!canPlaySpecialMissionPlaceSpy(state, player)) return state;
-    return {
-      ...state,
-      players: state.players.map((candidate) =>
-        candidate.id === player.id
-          ? { ...candidate, intrigues: candidate.intrigues.filter((card) => card.id !== intrigue.id) }
-          : candidate,
-      ),
-      pendingAction: specialMissionSpyPending(player),
-      intrigueDiscard: [...state.intrigueDiscard, intrigue],
-      log: [
-        `${player.leader} plays Special Mission and may place a spy on a City observation post.`,
-        ...state.log,
-      ],
-    };
+    return playTypedPlotIntrigue(
+      state,
+      playerId,
+      intrigueId,
+      isSpecialMissionIntrigue,
+      (actor) => `${actor.leader} plays Special Mission and may place a spy on a City observation post.`,
+      { choiceId: "place-spy" },
+    );
   }
 
   if (choice.kind === "recall-spy") {

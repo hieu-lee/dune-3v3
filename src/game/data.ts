@@ -46,6 +46,7 @@ import {
   prepareTheWaySourceId,
   priceIsNoObjectSourceId,
   publicSpectacleSourceId,
+  questionableMethodsSourceId,
   rebelSupplierSourceId,
   reliableInformantSourceId,
   sardaukarSoldierSourceId,
@@ -85,6 +86,7 @@ import {
   agentRecruitTroops,
   combatAcquireCard,
   combatGainStrength,
+  combatLoseInfluenceForStrength,
   combatRecallSpiesForStrength,
   combatTrashCard,
   deployedUnitsThisTurn,
@@ -1019,6 +1021,15 @@ function intrigueCardEffects(card: HubCard): CardEffectSpec[] | undefined {
     return [
       combatGainStrength(2),
       combatRecallSpiesForStrength(1, 3, { optional: true, source: "Find Weakness" }, [hasSpyPosts(1)]),
+    ];
+  }
+  if (card.id === questionableMethodsSourceId) {
+    return [
+      combatGainStrength(1),
+      combatLoseInfluenceForStrength(4, {
+        source: "Questionable Methods",
+        alternateOwner: "source-commander-personal",
+      }),
     ];
   }
   if (card.id === springTheTrapSourceId) {

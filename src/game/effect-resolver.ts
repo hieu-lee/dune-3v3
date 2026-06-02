@@ -22,6 +22,8 @@ import type {
   GameEffectTrigger,
   GameState,
   IconId,
+  InfluenceLossForStrengthAlternateOwner,
+  InfluenceLossForStrengthOwner,
   InfluenceEffectFaction,
   InfluenceEffectRecipient,
   Player,
@@ -59,6 +61,16 @@ export type CombatSpyRecallForStrength = {
   amount: number;
   strength: number;
   optional: boolean;
+  source?: string;
+};
+
+export type CombatInfluenceLossForStrength = {
+  selector: PlayerSelector;
+  amount: number;
+  strength: number;
+  owner: InfluenceLossForStrengthOwner;
+  alternateOwner?: InfluenceLossForStrengthAlternateOwner;
+  optional: true;
   source?: string;
 };
 
@@ -780,6 +792,9 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
   if (effect.kind === "lose-influence-for-intrigues") {
     return result;
   }
+  if (effect.kind === "lose-influence-for-strength") {
+    return result;
+  }
   if (effect.kind === "pay-resource-for-strength") {
     return result;
   }
@@ -1423,6 +1438,28 @@ export function resolveCombatSpyRecallForStrengths(
           source: effect.source,
         };
       });
+  });
+}
+
+export function resolveCombatInfluenceLossForStrengths(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): CombatInfluenceLossForStrength[] {
+  specs?.forEach(validateSpec);
+  return (specs ?? []).flatMap((spec) => {
+    if (spec.trigger !== "combat-intrigue") return [];
+    if (!specApplies(spec, context)) return [];
+    return spec.effects
+      .filter((effect) => effect.kind === "lose-influence-for-strength")
+      .map((effect) => ({
+        selector: effect.selector,
+        amount: amountFor(effect.amount, context.source),
+        strength: amountFor(effect.strengthReward, context.source),
+        owner: effect.owner,
+        alternateOwner: effect.alternateOwner,
+        optional: true,
+        source: effect.source,
+      }));
   });
 }
 

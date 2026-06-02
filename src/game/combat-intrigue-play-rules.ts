@@ -4,16 +4,17 @@ import {
 } from "./combat-intrigue-rules";
 import {
   isGoToGroundIntrigue,
-  isQuestionableMethodsIntrigue,
   isReachAgreementIntrigue,
   isSpiceIsPowerIntrigue,
   isTacticalOptionIntrigue,
 } from "./card-identifiers";
 import {
   resolveAcquireCards,
+  resolveCombatInfluenceLossForStrengths,
   resolveCombatSpyRecallForStrengths,
   resolveTrashCardEffects,
   type AgentAcquireCard,
+  type CombatInfluenceLossForStrength,
   type CombatSpyRecallForStrength,
   type TrashCardEffect,
 } from "./effect-resolver";
@@ -41,6 +42,7 @@ export type TacticalOptionChoice = "add-strength" | { kind: "retreat-troops"; co
 export type CombatIntrigueChoice = SpiceIsPowerChoice | TacticalOptionChoice;
 
 type AcquireCardPendingAction = Extract<PendingAction, { kind: "acquire-card" }>;
+type LoseInfluencePendingAction = Extract<PendingAction, { kind: "lose-influence" }>;
 type RecallSpyPendingAction = Extract<PendingAction, { kind: "recall-spy" }>;
 type SpyPendingAction = Extract<PendingAction, { kind: "spy" }>;
 type TrashCardPendingAction = Extract<PendingAction, { kind: "trash-card" }>;
@@ -160,6 +162,64 @@ function resolveCombatSpyRecallPendingActions(
     return {
       pendingActions: [...result.pendingActions, pending],
       logTexts: [...result.logTexts, combatSpyRecallDescription(pending)],
+    };
+  }, { pendingActions: [], logTexts: [] });
+}
+
+function influenceLossPendingForCombatEffect(
+  intrigue: IntrigueCard,
+  actor: Player,
+  target: Player,
+  effect: CombatInfluenceLossForStrength,
+): LoseInfluencePendingAction | undefined {
+  if (
+    effect.selector !== "self" ||
+    effect.amount !== 1 ||
+    effect.strength <= 0 ||
+    effect.owner !== "combat-recipient"
+  ) return undefined;
+  const alternateOwnerIds =
+    effect.alternateOwner === "source-commander-personal" &&
+    actor.role === "Commander" &&
+    allowedInfluenceLossChoices(actor).length > 0
+      ? [actor.id]
+      : undefined;
+  const targetCanLoseInfluence = allowedInfluenceLossChoices(target).length > 0;
+  if (!targetCanLoseInfluence && !alternateOwnerIds) return undefined;
+  return {
+    kind: "lose-influence",
+    ownerId: target.id,
+    ...(alternateOwnerIds ? { alternateOwnerIds } : {}),
+    combatRecipientId: target.id,
+    strength: effect.strength,
+    source: effect.source ?? intrigue.name,
+    optional: effect.optional,
+  };
+}
+
+function combatInfluenceLossDescription(pending: LoseInfluencePendingAction) {
+  return `${pending.optional ? "may" : "must"} lose 1 Influence`;
+}
+
+function resolveCombatInfluenceLossPendingActions(
+  state: GameState,
+  intrigue: IntrigueCard,
+  actor: Player,
+  target: Player,
+) {
+  const effects = resolveCombatInfluenceLossForStrengths(intrigue.effects, {
+    trigger: "combat-intrigue",
+    source: actor,
+    target,
+    state,
+  });
+  if (effects.length > 1) throw new Error("Unsupported multiple Combat Intrigue lose-influence-for-strength effects");
+  return effects.reduce<{ pendingActions: LoseInfluencePendingAction[]; logTexts: string[] }>((result, effect) => {
+    const pending = influenceLossPendingForCombatEffect(intrigue, actor, target, effect);
+    if (!pending) return result;
+    return {
+      pendingActions: [...result.pendingActions, pending],
+      logTexts: [...result.logTexts, combatInfluenceLossDescription(pending)],
     };
   }, { pendingActions: [], logTexts: [] });
 }
@@ -386,30 +446,16 @@ export function resolvePlayCombatIntrigue(
   }
   const combatSwords = combatIntrigueStrength(state, actor, intrigue, target);
   const combatAcquire = resolveCombatAcquirePendingActions(state, intrigue, actor, target);
+  const combatInfluenceLoss = resolveCombatInfluenceLossPendingActions(state, intrigue, actor, target);
   const combatSpyRecall = resolveCombatSpyRecallPendingActions(state, intrigue, actor, target);
   const combatTrash = resolveCombatTrashPendingActions(state, intrigue, actor, target);
   if (
     !combatSwords &&
     combatAcquire.logTexts.length === 0 &&
+    combatInfluenceLoss.logTexts.length === 0 &&
     combatSpyRecall.logTexts.length === 0 &&
     combatTrash.logTexts.length === 0
   ) return state;
-  const alternateInfluenceLossOwnerIds =
-    actor.role === "Commander" && allowedInfluenceLossChoices(actor).length > 0 ? [actor.id] : undefined;
-  const canLoseInfluenceForQuestionableMethods =
-    isQuestionableMethodsIntrigue(intrigue)
-    && (allowedInfluenceLossChoices(target).length > 0 || Boolean(alternateInfluenceLossOwnerIds));
-  const influenceLossPending: PendingAction | undefined = canLoseInfluenceForQuestionableMethods
-    ? {
-        kind: "lose-influence",
-        ownerId: target.id,
-        ...(alternateInfluenceLossOwnerIds ? { alternateOwnerIds: alternateInfluenceLossOwnerIds } : {}),
-        combatRecipientId: target.id,
-        strength: 4,
-        source: "Questionable Methods",
-        optional: true,
-      }
-    : undefined;
   const requiredSpyRecallStrength = combatSpyRecall.pendingActions
     .filter((pending) => !pending.optional)
     .reduce((total, pending) => total + pending.strength, 0);
@@ -428,8 +474,7 @@ export function resolvePlayCombatIntrigue(
     return next;
   });
   const pendingActions: PendingAction[] = [];
-  const cardSpecificPending = influenceLossPending;
-  if (cardSpecificPending) pendingActions.push(cardSpecificPending);
+  pendingActions.push(...combatInfluenceLoss.pendingActions);
   pendingActions.push(...combatTrash.pendingActions);
   pendingActions.push(...combatSpyRecall.pendingActions);
   pendingActions.push(...combatAcquire.pendingActions);
@@ -441,9 +486,7 @@ export function resolvePlayCombatIntrigue(
     pendingAction: pendingActions[0],
     pendingQueue: pendingActions.slice(1),
   };
-  const pendingText = influenceLossPending
-      ? " and may lose 1 Influence"
-      : "";
+  const influenceLossText = combatInfluenceLoss.logTexts.length > 0 ? ` and ${combatInfluenceLoss.logTexts.join(" and ")}` : "";
   const trashText = combatTrash.logTexts.length > 0 ? ` and ${combatTrash.logTexts.join(" and ")}` : "";
   const spyRecallText = combatSpyRecall.logTexts.length > 0 ? ` and ${combatSpyRecall.logTexts.join(" and ")}` : "";
   const acquireText = combatAcquire.logTexts.length > 0 ? ` and ${combatAcquire.logTexts.join(" and ")}` : "";
@@ -455,7 +498,7 @@ export function resolvePlayCombatIntrigue(
   return advanceAfterCombatIntriguePlay({
     ...nextState,
     log: [
-      `${actor.leader} plays ${intrigue.name} for ${target.leader}, ${strengthText}${pendingText}${trashText}${spyRecallText}${acquireText}.`,
+      `${actor.leader} plays ${intrigue.name} for ${target.leader}, ${strengthText}${influenceLossText}${trashText}${spyRecallText}${acquireText}.`,
       ...state.log,
     ],
   });

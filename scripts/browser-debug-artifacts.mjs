@@ -36,6 +36,7 @@ const generatedScreenshotNames = [
   "combat-intrigues-find-weakness-pending.png",
   "combat-intrigues-spring-recall-pending.png",
   "combat-intrigues-devour-trash-pending.png",
+  "combat-intrigues-questionable-methods-pending.png",
   "combat-intrigues-after-play.png",
   "commander-reveal-ready.png",
   "commander-reveal-call-to-arms.png",

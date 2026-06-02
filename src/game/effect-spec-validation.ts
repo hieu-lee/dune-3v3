@@ -416,6 +416,33 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     validateAmount(effect.amount);
     return;
   }
+  if (effect.kind === "lose-influence-for-strength") {
+    if (trigger !== "combat-intrigue") {
+      throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
+    }
+    if (effect.selector !== "self") {
+      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
+    if (effect.amount !== 1) {
+      invalidSpecField("lose-influence-for-strength amount", effect.amount);
+    }
+    if (effect.owner !== "combat-recipient") {
+      invalidSpecField("lose-influence-for-strength owner", effect.owner);
+    }
+    if (
+      effect.alternateOwner !== undefined &&
+      effect.alternateOwner !== "source-commander-personal"
+    ) {
+      invalidSpecField("lose-influence-for-strength alternateOwner", effect.alternateOwner);
+    }
+    validatePositiveAmount("lose-influence-for-strength strengthReward", effect.strengthReward);
+    const optional = (effect as { optional?: unknown }).optional;
+    if (optional !== true) {
+      invalidSpecField("lose-influence-for-strength optional", optional);
+    }
+    validateSourceLabel("lose-influence-for-strength source", effect.source);
+    return;
+  }
   if (effect.kind === "pay-resource-for-strength") {
     if (trigger !== "reveal") {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);

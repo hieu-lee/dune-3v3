@@ -52,6 +52,8 @@ export type ContractEffectRecipient = "same-team-allies";
 export type ContractEffectSourcePool = "public-offer";
 export type TeamResourcePaymentContributor = "self-and-same-team-allies";
 export type TeamResourcePaymentRecipient = "self";
+export type InfluenceLossForStrengthOwner = "combat-recipient";
+export type InfluenceLossForStrengthAlternateOwner = "source-commander-personal";
 export type EffectAmountSpec =
   | number
   | { kind: "completed-contracts"; multiplier?: number };
@@ -133,6 +135,16 @@ export type GameEffectSpec =
       selector: PlayerSelector;
       amount: EffectAmountSpec;
       optional?: boolean;
+    }
+  | {
+      kind: "lose-influence-for-strength";
+      selector: PlayerSelector;
+      amount: EffectAmountSpec;
+      strengthReward: EffectAmountSpec;
+      owner: InfluenceLossForStrengthOwner;
+      alternateOwner?: InfluenceLossForStrengthAlternateOwner;
+      optional: true;
+      source?: string;
     }
   | {
       kind: "pay-resource-for-strength";

@@ -9,6 +9,7 @@ import type {
   GameEffectConditionSpec,
   GameEffectSpec,
   IconId,
+  InfluenceLossForStrengthAlternateOwner,
   InfluenceEffectFaction,
   InfluenceEffectRecipient,
   PlayerSelector,
@@ -153,6 +154,28 @@ export function combatRecallSpiesForStrength(
       strengthReward: strength,
       ...(options.source ? { source: options.source } : {}),
       ...(options.optional !== undefined ? { optional: options.optional } : {}),
+    },
+  ], conditions);
+}
+
+export function combatLoseInfluenceForStrength(
+  strengthReward: EffectAmountSpec,
+  options: {
+    source?: string;
+    alternateOwner?: InfluenceLossForStrengthAlternateOwner;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return combatIntrigueEffects([
+    {
+      kind: "lose-influence-for-strength",
+      selector: "self",
+      amount: 1,
+      strengthReward,
+      owner: "combat-recipient",
+      optional: true,
+      ...(options.source ? { source: options.source } : {}),
+      ...(options.alternateOwner ? { alternateOwner: options.alternateOwner } : {}),
     },
   ], conditions);
 }

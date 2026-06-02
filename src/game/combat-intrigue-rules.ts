@@ -1,7 +1,6 @@
 import { effectiveRequirementInfluence } from "./board-rules";
 import {
   isBackedByChoamIntrigue,
-  isQuestionableMethodsIntrigue,
   isSpiceIsPowerIntrigue,
   isTacticalOptionIntrigue,
   isWeirdingCombatIntrigue,
@@ -54,7 +53,6 @@ export function combatIntrigueStrength(
     .reduce((total, effect) => total + effect.strength, 0);
   if (mandatoryRecallStrength > 0) return mandatoryRecallStrength;
   if (intrigue.automatedCombatSwords) return intrigue.automatedCombatSwords;
-  if (isQuestionableMethodsIntrigue(intrigue)) return 1;
   if (isSpiceIsPowerIntrigue(intrigue)) {
     const effectOwner = actor.role === "Commander" ? target : actor;
     return effectOwner && effectOwner.resources.spice >= 3 ? 6 : undefined;

@@ -193,6 +193,7 @@ try {
   const marketOpportunity = data.intrigueCards.find((card) => card.name === "Market Opportunity");
   const mercenaries = data.intrigueCards.find((card) => card.name === "Mercenaries");
   const opportunism = data.intrigueCards.find((card) => card.name === "Opportunism");
+  const questionableMethods = data.intrigueCards.find((card) => card.name === "Questionable Methods");
   const shaddamsFavor = data.intrigueCards.find((card) => card.name === "Shaddam's Favor");
   const specialMission = data.intrigueCards.find((card) => card.name === "Special Mission");
   const springTheTrap = data.intrigueCards.find((card) => card.name === "Spring The Trap");
@@ -266,7 +267,7 @@ try {
     wheelsWithinWheels,
   );
   assert.ok(commandRespect && prepareTheWay && spiceMustFlow && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
-  assert.ok(backedByChoam && buyAccess && callToArms && changeAllegiances && councilorsAmbition && contingencyPlan && cunning && departForArrakis && devour && distraction && findWeakness && impress && imperiumPolitics && inspireAwe && intelligenceReport && leverage && manipulate && marketOpportunity && mercenaries && opportunism && shaddamsFavor && specialMission && springTheTrap && sietchRitual && strategicStockpiling && weirdingCombat);
+  assert.ok(backedByChoam && buyAccess && callToArms && changeAllegiances && councilorsAmbition && contingencyPlan && cunning && departForArrakis && devour && distraction && findWeakness && impress && imperiumPolitics && inspireAwe && intelligenceReport && leverage && manipulate && marketOpportunity && mercenaries && opportunism && questionableMethods && shaddamsFavor && specialMission && springTheTrap && sietchRitual && strategicStockpiling && weirdingCombat);
   assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && dutifulService && deliverSupplies && sietchTabr && spiceRefinery);
   assert.equal(revealSpecCards.length, 79, "Unexpected number of cards with declarative Reveal specs");
   assert.equal(
@@ -461,6 +462,51 @@ try {
     findWeaknessSpyRecallEffects,
     [{ selector: "self", amount: 1, strength: 3, optional: true, source: "Find Weakness" }],
     "Find Weakness spy-recall spec should resolve with one owned spy post",
+  );
+  assert.ok(
+    hasCombatEffect(questionableMethods, (effect) =>
+      effect.kind === "gain-strength" &&
+      effect.selector === "self" &&
+      effect.amount === 1
+    ),
+    "Questionable Methods should carry a typed Combat Intrigue base strength spec",
+  );
+  assert.ok(
+    hasCombatEffect(questionableMethods, (effect) =>
+      effect.kind === "lose-influence-for-strength" &&
+      effect.selector === "self" &&
+      effect.amount === 1 &&
+      effect.strengthReward === 4 &&
+      effect.owner === "combat-recipient" &&
+      effect.alternateOwner === "source-commander-personal" &&
+      effect.optional === true &&
+      effect.source === "Questionable Methods"
+    ),
+    "Questionable Methods should carry a typed optional Combat Influence-loss strength spec",
+  );
+  const questionableCombatResolved = effectResolver.resolveGameEffects(questionableMethods.effects, {
+    trigger: "combat-intrigue",
+    source: p2,
+    state: game,
+  });
+  assert.equal(questionableCombatResolved.swords, 1, "Questionable Methods Combat spec should resolve its base strength");
+  assert.deepEqual(
+    effectResolver.resolveCombatInfluenceLossForStrengths(questionableMethods.effects, {
+      trigger: "combat-intrigue",
+      source: p4,
+      target: p6,
+      state: game,
+    }),
+    [{
+      selector: "self",
+      amount: 1,
+      strength: 4,
+      owner: "combat-recipient",
+      alternateOwner: "source-commander-personal",
+      optional: true,
+      source: "Questionable Methods",
+    }],
+    "Questionable Methods Influence-loss spec should resolve with recipient and Commander-personal owner routing",
   );
   assert.ok(
     springTheTrap.effects?.some((spec) =>
@@ -4662,6 +4708,126 @@ try {
     ),
     /Unsupported recall-spy amount for plot-intrigue/,
     "Plot recall-spy specs should reject Combat-style spy counts",
+  );
+  assert.throws(
+    () => effectResolver.resolveCombatInfluenceLossForStrengths(
+      [plotSpec([{
+        kind: "lose-influence-for-strength",
+        selector: "self",
+        amount: 1,
+        strengthReward: 4,
+        owner: "combat-recipient",
+        optional: true,
+      }])],
+      { trigger: "plot-intrigue", source: p2, state: game },
+    ),
+    /Unsupported effect "lose-influence-for-strength" for plot-intrigue/,
+    "Influence-loss-for-strength specs should stay on Combat Intrigue triggers",
+  );
+  assert.throws(
+    () => effectResolver.resolveCombatInfluenceLossForStrengths(
+      [combatSpec([{
+        kind: "lose-influence-for-strength",
+        selector: "activated-ally",
+        amount: 1,
+        strengthReward: 4,
+        owner: "combat-recipient",
+        optional: true,
+      }])],
+      { trigger: "combat-intrigue", source: p4, target: p6, state: game },
+    ),
+    /Unsupported effect selector "activated-ally" for combat-intrigue/,
+    "Combat Influence-loss strength specs should target the selected recipient through self routing",
+  );
+  assert.throws(
+    () => effectResolver.resolveCombatInfluenceLossForStrengths(
+      [combatSpec([{
+        kind: "lose-influence-for-strength",
+        selector: "self",
+        amount: 2,
+        strengthReward: 4,
+        owner: "combat-recipient",
+        optional: true,
+      }])],
+      { trigger: "combat-intrigue", source: p2, state: game },
+    ),
+    /Invalid lose-influence-for-strength amount "2"/,
+    "Combat Influence-loss strength specs should reject unsupported Influence-loss amounts",
+  );
+  assert.throws(
+    () => effectResolver.resolveCombatInfluenceLossForStrengths(
+      [combatSpec([{
+        kind: "lose-influence-for-strength",
+        selector: "self",
+        amount: 1,
+        strengthReward: 0,
+        owner: "combat-recipient",
+        optional: true,
+      }])],
+      { trigger: "combat-intrigue", source: p2, state: game },
+    ),
+    /Invalid lose-influence-for-strength strengthReward "0"/,
+    "Combat Influence-loss strength specs should reject zero strength rewards",
+  );
+  assert.throws(
+    () => effectResolver.resolveCombatInfluenceLossForStrengths(
+      [combatSpec([{
+        kind: "lose-influence-for-strength",
+        selector: "self",
+        amount: 1,
+        strengthReward: 4,
+        owner: "self",
+        optional: true,
+      }])],
+      { trigger: "combat-intrigue", source: p2, state: game },
+    ),
+    /Invalid lose-influence-for-strength owner "self"/,
+    "Combat Influence-loss strength specs should reject unsupported owner routing",
+  );
+  assert.throws(
+    () => effectResolver.resolveCombatInfluenceLossForStrengths(
+      [combatSpec([{
+        kind: "lose-influence-for-strength",
+        selector: "self",
+        amount: 1,
+        strengthReward: 4,
+        owner: "combat-recipient",
+        alternateOwner: "activated-ally",
+        optional: true,
+      }])],
+      { trigger: "combat-intrigue", source: p4, target: p6, state: game },
+    ),
+    /Invalid lose-influence-for-strength alternateOwner "activated-ally"/,
+    "Combat Influence-loss strength specs should reject unsupported alternate owner routing",
+  );
+  assert.throws(
+    () => effectResolver.resolveCombatInfluenceLossForStrengths(
+      [combatSpec([{
+        kind: "lose-influence-for-strength",
+        selector: "self",
+        amount: 1,
+        strengthReward: 4,
+        owner: "combat-recipient",
+        optional: false,
+      }])],
+      { trigger: "combat-intrigue", source: p2, state: game },
+    ),
+    /Invalid lose-influence-for-strength optional "false"/,
+    "Combat Influence-loss strength specs should stay optional so players can decline the branch",
+  );
+  assert.throws(
+    () => effectResolver.resolveCombatInfluenceLossForStrengths(
+      [combatSpec([{
+        kind: "lose-influence-for-strength",
+        selector: "self",
+        amount: 1,
+        strengthReward: 4,
+        owner: "combat-recipient",
+      }])],
+      { trigger: "combat-intrigue", source: p2, state: game },
+    ),
+    /Invalid lose-influence-for-strength optional "undefined"/,
+    "Combat Influence-loss strength specs should require explicit optional true",
   );
   const invalidSpyPlacementSourceCard = {
     ...convincingArgument,

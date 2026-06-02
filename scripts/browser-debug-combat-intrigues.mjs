@@ -185,6 +185,47 @@ export async function runCombatIntriguesSmoke({
   await screenshot(page, captures, "combat-intrigues-devour-trash-pending.png");
 
   await setDebugGameAndWait(page, states.commander);
+  const beforeQuestionable = await currentGame(page);
+  const gurneyBeforeQuestionable = playerById(beforeQuestionable, "p3");
+  await combatCard(page, "Questionable Methods").getByRole("button", { name: "Gurney Halleck (+1)" }).click();
+  await page.waitForFunction(() => {
+    const game = window.__DUNE_DEBUG__?.getGame();
+    const gurney = game?.players.find((player) => player.id === "p3");
+    const muadDib = game?.players.find((player) => player.id === "p1");
+    return Boolean(
+      game &&
+        game.pendingAction?.kind === "lose-influence" &&
+        game.pendingAction.ownerId === "p3" &&
+        game.pendingAction.combatRecipientId === "p3" &&
+        game.pendingAction.strength === 4 &&
+        game.pendingAction.source === "Questionable Methods" &&
+        game.pendingAction.optional === true &&
+        gurney?.conflict === 7 &&
+        !muadDib?.intrigues.some((card) => card.name === "Questionable Methods"),
+    );
+  });
+  const afterQuestionable = await currentGame(page);
+  const gurneyAfterQuestionable = playerById(afterQuestionable, "p3");
+  assert.equal(
+    gurneyAfterQuestionable.conflict,
+    gurneyBeforeQuestionable.conflict + 1,
+    "Questionable Methods should add base strength before optional Influence loss",
+  );
+  assert.deepEqual(
+    afterQuestionable.pendingAction,
+    {
+      kind: "lose-influence",
+      ownerId: "p3",
+      combatRecipientId: "p3",
+      strength: 4,
+      source: "Questionable Methods",
+      optional: true,
+    },
+    "Questionable Methods should queue an optional Influence-loss pending action for the chosen Ally",
+  );
+  await screenshot(page, captures, "combat-intrigues-questionable-methods-pending.png");
+
+  await setDebugGameAndWait(page, states.commander);
   const before = await currentGame(page);
   const gurneyBefore = playerById(before, "p3");
   await combatCard(page, "Tactical Option").getByRole("button", { name: "Gurney Halleck: +2" }).click();

@@ -131,6 +131,33 @@ export function verifyCombatIntrigueCatalog({ cards, data, state }) {
     "Add 1 strength; the recipient may lose 1 Influence, or a Commander may lose personal Influence, to add 4 more strength.",
     "Questionable Methods should expose its base strength and optional Influence loss",
   );
+  assert.ok(
+    questionableMethods.effects?.some((spec) =>
+      spec.trigger === "combat-intrigue" &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-strength" &&
+        effect.selector === "self" &&
+        effect.amount === 1
+      )
+    ),
+    "Questionable Methods should carry a typed Combat Intrigue base strength spec",
+  );
+  assert.ok(
+    questionableMethods.effects?.some((spec) =>
+      spec.trigger === "combat-intrigue" &&
+      spec.effects.some((effect) =>
+        effect.kind === "lose-influence-for-strength" &&
+        effect.selector === "self" &&
+        effect.amount === 1 &&
+        effect.strengthReward === 4 &&
+        effect.owner === "combat-recipient" &&
+        effect.alternateOwner === "source-commander-personal" &&
+        effect.optional === true &&
+        effect.source === "Questionable Methods"
+      )
+    ),
+    "Questionable Methods should carry a typed Combat Influence-loss strength spec",
+  );
   assert.equal(weirdingCombat.combatSwords, 5, "Weirding Combat should expose its structured Combat strength");
   assert.equal(
     weirdingCombat.summary,
@@ -232,7 +259,7 @@ export function verifyCombatIntrigueCatalog({ cards, data, state }) {
   assert.equal(impress.automatedCombatSwords, undefined, "Impress should resolve through typed Combat Intrigue specs");
   assert.equal(findWeakness.automatedCombatSwords, undefined, "Find Weakness should resolve through typed Combat spy-recall state");
   assert.equal(goToGround.automatedCombatSwords, undefined, "Go To Ground should resolve through retreat and spy choices");
-  assert.equal(questionableMethods.automatedCombatSwords, undefined, "Questionable Methods should resolve through Influence-loss state");
+  assert.equal(questionableMethods.automatedCombatSwords, undefined, "Questionable Methods should resolve through typed Combat Influence-loss state");
   assert.equal(spiceIsPower.automatedCombatSwords, undefined, "Spice is Power should resolve through an explicit branch choice");
   assert.equal(tacticalOption.automatedCombatSwords, undefined, "Tactical Option should resolve through an explicit branch choice");
   assert.equal(reachAgreement.automatedCombatSwords, undefined, "Reach Agreement should resolve through retreat and contract choices");

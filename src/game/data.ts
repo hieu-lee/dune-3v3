@@ -5,6 +5,7 @@ import {
   cargoRunnerSourceId,
   capturedMentatSourceId,
   chaniCleverTacticianSourceId,
+  hiddenMissiveSourceId,
   interstellarTradeSourceId,
   makerKeeperSourceId,
   maulaPistolSourceId,
@@ -13,6 +14,7 @@ import {
   prepareTheWaySourceId,
   smugglersHarvesterSourceId,
   spiceMustFlowSourceId,
+  wheelsWithinWheelsSourceId,
 } from "./card-identifiers";
 import {
   agentDiscardCardForInfluenceAndDraw,
@@ -20,10 +22,12 @@ import {
   agentDrawIntrigues,
   agentGainResource,
   agentPlaceSpies,
+  agentRecruitTroops,
   hasCompletedContracts,
   hasCardTraitInPlay,
   hasConflictUnits,
   hasInfluence,
+  hasRole,
   hasSpyPosts,
   revealGainPersuasion,
   revealGainResource,
@@ -208,6 +212,9 @@ function imperiumRevealText(card: HubCard, persuasion: number, swords: number, p
   if (card.id === chaniCleverTacticianSourceId) {
     return "Fremen Bond: +2 persuasion. You may retreat two troops to add 4 strength.";
   }
+  if (card.id === wheelsWithinWheelsSourceId) {
+    return "+1 persuasion. Place 1 spy.";
+  }
   return printedReveal ? "Resolve printed reveal text." : revealText(persuasion, swords);
 }
 
@@ -245,6 +252,13 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
       revealGainPersuasion(2, [hasSpyPosts(2)]),
     ];
   }
+  if (card.id === hiddenMissiveSourceId) {
+    return [
+      agentDrawCards(1, [hasInfluence("bene", 2)]),
+      agentRecruitTroops("self", 1, [hasInfluence("bene", 2), hasRole("Ally")]),
+      agentRecruitTroops("activated-ally", 1, [hasInfluence("bene", 2), hasRole("Commander")]),
+    ];
+  }
   if (card.id === makerKeeperSourceId) {
     return [
       agentGainResource("water", 1, [hasInfluence("bene", 2)]),
@@ -273,7 +287,23 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
   if (card.id === paracompassSourceId) {
     return [agentGainResource("solari", 2)];
   }
+  if (card.id === wheelsWithinWheelsSourceId) {
+    return [
+      agentGainResource("solari", 2, [hasInfluence("emperor", 2)]),
+      agentGainResource("spice", 1, [hasInfluence("spacing", 2)]),
+    ];
+  }
   return undefined;
+}
+
+function imperiumPlayText(card: HubCard) {
+  if (card.id === hiddenMissiveSourceId) {
+    return "If you have 2 or more Bene Gesserit Influence, recruit 1 troop and draw 1 card.";
+  }
+  if (card.id === wheelsWithinWheelsSourceId) {
+    return "If you have 2 or more Emperor/Great Houses Influence, gain 2 Solari. If you have 2 or more Spacing Guild Influence, gain 1 spice.";
+  }
+  return summarizeAttributes(card);
 }
 
 function toImperiumCard(card: HubCard): Card {
@@ -382,7 +412,7 @@ function toImperiumCard(card: HubCard): Card {
     conditionalPersuasion,
     conditionalSwords,
     effects,
-    play: summarizeAttributes(card),
+    play: imperiumPlayText(card),
     reveal: imperiumRevealText(card, persuasion, swords, conditionalPersuasion || conditionalSwords),
     cost: attributeNumber(card, "Persuasion cost"),
     imagePath: card.localImagePath ?? card.fullImageUrl ?? undefined,

@@ -86,12 +86,14 @@ try {
   const calculus = data.imperiumDeck.find((card) => card.name === "Calculus of Power");
   const capturedMentat = data.imperiumDeck.find((card) => card.name === "Captured Mentat");
   const beneGesseritOperative = data.imperiumDeck.find((card) => card.name === "Bene Gesserit Operative");
+  const hiddenMissive = data.imperiumDeck.find((card) => card.name === "Hidden Missive");
   const cargoRunner = data.imperiumDeck.find((card) => card.name === "Cargo Runner");
   const chani = data.imperiumDeck.find((card) => card.name === "Chani, Clever Tactician");
   const makerKeeper = data.imperiumDeck.find((card) => card.name === "Maker Keeper");
   const maulaPistol = data.imperiumDeck.find((card) => card.name === "Maula Pistol");
   const northernWatermaster = data.imperiumDeck.find((card) => card.name === "Northern Watermaster");
   const paracompass = data.imperiumDeck.find((card) => card.name === "Paracompass");
+  const wheelsWithinWheels = data.imperiumDeck.find((card) => card.name === "Wheels Within Wheels");
   const prepareTheWay = data.reserveMarket.find((card) => card.sourceId === 537);
   const commandRespect = data.muadDibCommanderCards.find((card) => card.name === "Command Respect");
   const limitedLandsraadAccess = data.muadDibCommanderCards.find((card) => card.name === "Limited Landsraad Access");
@@ -121,12 +123,14 @@ try {
     calculus &&
     capturedMentat &&
     beneGesseritOperative &&
+    hiddenMissive &&
     cargoRunner &&
     chani &&
     makerKeeper &&
     maulaPistol &&
     northernWatermaster &&
-    paracompass,
+    paracompass &&
+    wheelsWithinWheels,
   );
   assert.ok(commandRespect && prepareTheWay && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
   assert.ok(arrakeen && haggaBasin && imperialBasin && secrets && highCouncil);
@@ -141,11 +145,13 @@ try {
       "Captured Mentat",
       "Cargo Runner",
       "Chani, Clever Tactician",
+      "Hidden Missive",
       "Maker Keeper",
       "Maula Pistol",
       "Northern Watermaster",
       "Paracompass",
       "Prepare The Way",
+      "Wheels Within Wheels",
     ],
     "Unexpected cards with declarative Agent-play specs",
   );
@@ -520,6 +526,67 @@ try {
       spec.effects.some((effect) => effect.kind === "gain-resource" && effect.resource === "solari" && effect.amount === 2)
     ),
     "Paracompass should carry a Solari Agent spec",
+  );
+  assert.ok(
+    hiddenMissive.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.conditions?.some((condition) => condition.kind === "has-influence" && condition.faction === "bene" && condition.amount === 2) &&
+      spec.effects.some((effect) => effect.kind === "draw-cards" && effect.amount === 1)
+    ),
+    "Hidden Missive should carry a Bene Influence-gated card-draw spec",
+  );
+  assert.equal(
+    hiddenMissive.play,
+    "If you have 2 or more Bene Gesserit Influence, recruit 1 troop and draw 1 card.",
+    "Hidden Missive play text should include its Influence condition",
+  );
+  assert.ok(
+    hiddenMissive.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.conditions?.some((condition) => condition.kind === "has-influence" && condition.faction === "bene" && condition.amount === 2) &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Ally") &&
+      spec.effects.some((effect) =>
+        effect.kind === "recruit-troops" && effect.selector === "self" && effect.amount === 1
+      )
+    ),
+    "Hidden Missive should carry a Bene Influence-gated Ally troop spec",
+  );
+  assert.ok(
+    hiddenMissive.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.conditions?.some((condition) => condition.kind === "has-influence" && condition.faction === "bene" && condition.amount === 2) &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Commander") &&
+      spec.effects.some((effect) =>
+        effect.kind === "recruit-troops" && effect.selector === "activated-ally" && effect.amount === 1
+      )
+    ),
+    "Hidden Missive should carry a Bene Influence-gated Commander-to-activated-Ally troop spec",
+  );
+  assert.ok(
+    wheelsWithinWheels.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.conditions?.some((condition) => condition.kind === "has-influence" && condition.faction === "emperor" && condition.amount === 2) &&
+      spec.effects.some((effect) => effect.kind === "gain-resource" && effect.resource === "solari" && effect.amount === 2)
+    ),
+    "Wheels Within Wheels should carry an Emperor Influence-gated Solari spec",
+  );
+  assert.equal(
+    wheelsWithinWheels.play,
+    "If you have 2 or more Emperor/Great Houses Influence, gain 2 Solari. If you have 2 or more Spacing Guild Influence, gain 1 spice.",
+    "Wheels Within Wheels play text should include its Influence conditions",
+  );
+  assert.equal(
+    wheelsWithinWheels.reveal,
+    "+1 persuasion. Place 1 spy.",
+    "Wheels Within Wheels reveal text should preserve its printed spy icon",
+  );
+  assert.ok(
+    wheelsWithinWheels.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.conditions?.some((condition) => condition.kind === "has-influence" && condition.faction === "spacing" && condition.amount === 2) &&
+      spec.effects.some((effect) => effect.kind === "gain-resource" && effect.resource === "spice" && effect.amount === 1)
+    ),
+    "Wheels Within Wheels should carry a Spacing Guild Influence-gated spice spec",
   );
   assert.ok(
     corrinoMight.effects?.some((spec) =>
@@ -2710,6 +2777,124 @@ try {
   );
   assert.deepEqual(paracompassEffect.source.resources, { solari: 2, spice: 0, water: 0 }, "Paracompass should gain 2 Agent Solari");
   assert.match(paracompassEffect.log ?? "", /Paracompass: gains 2 Solari/);
+  const hiddenMissiveDraw = { ...dagger, id: "hidden-missive-agent-draw-fixture" };
+  const hiddenMissiveEffect = state.applyCardAgentEffect(
+    hiddenMissive,
+    {
+      ...p2,
+      deck: [hiddenMissiveDraw],
+      discard: [],
+      hand: [],
+      garrison: 0,
+      influence: { ...p2.influence, bene: 2 },
+    },
+    p2,
+  );
+  assert.equal(hiddenMissiveEffect.source.hand[0]?.id, hiddenMissiveDraw.id, "Hidden Missive Agent spec should draw 1 card");
+  assert.equal(hiddenMissiveEffect.source.garrison, 1, "Hidden Missive Agent spec should recruit 1 troop");
+  assert.equal(hiddenMissiveEffect.recruitedTroops, 1, "Hidden Missive Agent recruit should count for deployment limits");
+  assert.match(hiddenMissiveEffect.log ?? "", /Hidden Missive: recruits 1 troop; draws 1 card/);
+  const hiddenMissiveCommanderDraw = { ...dagger, id: "hidden-missive-commander-agent-draw-fixture" };
+  const hiddenMissiveCommanderEffect = state.applyCardAgentEffect(
+    hiddenMissive,
+    {
+      ...p4,
+      deck: [hiddenMissiveCommanderDraw],
+      discard: [],
+      hand: [],
+      garrison: 0,
+      influence: { ...p4.influence, bene: 2 },
+    },
+    { ...p2, garrison: 0 },
+  );
+  assert.equal(
+    hiddenMissiveCommanderEffect.source.hand[0]?.id,
+    hiddenMissiveCommanderDraw.id,
+    "Hidden Missive Commander Agent spec should draw 1 card for the source",
+  );
+  assert.equal(hiddenMissiveCommanderEffect.source.garrison, 0, "Hidden Missive should not recruit troops to the Commander");
+  assert.equal(hiddenMissiveCommanderEffect.target.garrison, 1, "Hidden Missive should recruit 1 troop to the activated Ally");
+  assert.equal(hiddenMissiveCommanderEffect.recruitedTroops, 1, "Hidden Missive Commander recruit should count for deployment limits");
+  assert.match(
+    hiddenMissiveCommanderEffect.log ?? "",
+    /Hidden Missive: draws 1 card; Feyd-Rautha Harkonnen recruits 1 troop/,
+  );
+  const hiddenMissiveUnqualified = state.applyCardAgentEffect(
+    hiddenMissive,
+    { ...p2, deck: [hiddenMissiveDraw], discard: [], hand: [], garrison: 0 },
+    p2,
+  );
+  assert.equal(hiddenMissiveUnqualified.source.hand.length, 0, "Hidden Missive should not draw below 2 Bene Gesserit Influence");
+  assert.equal(hiddenMissiveUnqualified.source.garrison, 0, "Hidden Missive should not recruit below 2 Bene Gesserit Influence");
+  assert.equal(hiddenMissiveUnqualified.log, undefined, "Hidden Missive should not log below its Influence threshold");
+  const wheelsEffect = state.applyCardAgentEffect(
+    wheelsWithinWheels,
+    {
+      ...p2,
+      influence: { ...p2.influence, greatHouses: 2, spacing: 2 },
+      resources: { solari: 0, spice: 0, water: 0 },
+    },
+    p2,
+  );
+  assert.deepEqual(
+    wheelsEffect.source.resources,
+    { solari: 2, spice: 1, water: 0 },
+    "Wheels Within Wheels should gain its Agent Solari and spice through specs",
+  );
+  assert.match(wheelsEffect.log ?? "", /Wheels Within Wheels: gains 2 Solari and 1 spice/);
+  const wheelsEmperorIconOnly = state.applyCardAgentEffect(
+    wheelsWithinWheels,
+    {
+      ...p2,
+      influence: { ...p2.influence, greatHouses: 2 },
+      resources: { solari: 0, spice: 0, water: 0 },
+    },
+    p2,
+  );
+  assert.deepEqual(
+    wheelsEmperorIconOnly.source.resources,
+    { solari: 2, spice: 0, water: 0 },
+    "Wheels Within Wheels should allow the Emperor-icon Influence reward independently",
+  );
+  const wheelsShaddamPersonalEmperor = state.applyCardAgentEffect(
+    wheelsWithinWheels,
+    {
+      ...p4,
+      influence: { ...p4.influence, emperor: 2 },
+      resources: { solari: 0, spice: 0, water: 0 },
+    },
+    p4,
+  );
+  assert.deepEqual(
+    wheelsShaddamPersonalEmperor.source.resources,
+    { solari: 2, spice: 0, water: 0 },
+    "Wheels Within Wheels should count Shaddam Commander personal Emperor Influence for the Emperor-icon reward",
+  );
+  const wheelsSpacingOnly = state.applyCardAgentEffect(
+    wheelsWithinWheels,
+    {
+      ...p2,
+      influence: { ...p2.influence, spacing: 2 },
+      resources: { solari: 0, spice: 0, water: 0 },
+    },
+    p2,
+  );
+  assert.deepEqual(
+    wheelsSpacingOnly.source.resources,
+    { solari: 0, spice: 1, water: 0 },
+    "Wheels Within Wheels should allow the Spacing Guild Influence reward independently",
+  );
+  const wheelsUnqualified = state.applyCardAgentEffect(
+    wheelsWithinWheels,
+    { ...p2, resources: { solari: 0, spice: 0, water: 0 } },
+    p2,
+  );
+  assert.deepEqual(
+    wheelsUnqualified.source.resources,
+    { solari: 0, spice: 0, water: 0 },
+    "Wheels Within Wheels should not gain resources below its Influence thresholds",
+  );
+  assert.equal(wheelsUnqualified.log, undefined, "Wheels Within Wheels should not log below its Influence thresholds");
   const devastatingAssaultEffect = state.applyCardAgentEffect(
     devastatingAssault,
     { ...p4, resources: { solari: 0, spice: 0, water: 0 } },

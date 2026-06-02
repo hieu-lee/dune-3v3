@@ -28,7 +28,7 @@ Unsupported spec shapes, including triggers, intentionally throw instead of fall
 ## Next Primitive Candidates
 
 1. Agent immediate gains: gain resources, draw cards, or draw Intrigues with non-self routing.
-2. Agent spy primitives: optional place spy, shared post placement, restricted post icon, post-placement rewards.
+2. Agent spy primitives: optional place spy, shared post placement, restricted post icon, "sent an Agent to a spy board space" conditions for cards like Double Agent, post-placement rewards.
 3. Costs and choices: remaining Agent pay-resource shapes, optional pay, discard/trash selected card, lose Influence.
 4. Routing: self versus activated Ally, Commander personal board influence, team-shared Influence checks.
 5. Market/contract effects: acquire card up to cost, take face-up CHOAM contract, complete contract.

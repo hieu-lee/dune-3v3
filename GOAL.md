@@ -71,7 +71,7 @@ Each card/rules subagent should return reusable primitives plus migrated cards, 
 
 /code_quality Keep the code clean, typed, and easy to maintain. Avoid files over 1000 LOC. Break large files into focused modules/components/classes. If an existing file grows too large, do refactor commits. Preserve clear domain boundaries: data/specs, generic effect resolver, pending actions, state transitions, UI panels, browser debug scripts, and verification scripts.
 
-/git_workflow Init/use git repo here. Make small, precise commits, each ideally under 1000 LOC changed. Do not bundle unrelated work. Prefer commits organized by reusable system milestone, for example "add declarative resource effect primitive," then "migrate simple resource cards," then "add browser coverage for migrated cards."
+/git_workflow Init/use git repo here. Make precise commits, each ideally under 5000 LOC changed. Do not bundle unrelated work.
 
 /review_gate You are only allowed to commit after getting 3 consecutive clean reviews from codex --yolo gpt 5.5 high thinking effort subagents. Definition of clean review: no real problem found. Codex can return false positives, so you must inspect the outputs and decide whether findings are real. Only count the review as clean if all real issues are resolved or the remaining findings are clearly false positives.
 

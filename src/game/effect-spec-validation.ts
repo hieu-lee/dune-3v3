@@ -460,7 +460,7 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     return;
   }
   if (effect.kind === "place-spies") {
-    if (trigger !== "agent-play") {
+    if (trigger !== "agent-play" && trigger !== "reveal") {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
     }
     validateSourceLabel("place-spies source", effect.source);

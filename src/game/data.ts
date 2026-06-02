@@ -39,6 +39,7 @@ import {
   hasSpyPosts,
   hasSwordmasterBonus,
   revealGainPersuasion,
+  revealPlaceSpies,
   revealGainResource,
   revealGainStrength,
   revealLoseInfluenceForIntrigues,
@@ -390,6 +391,8 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
     return [
       agentGainResource("solari", 2, [hasInfluence("emperor", 2)]),
       agentGainResource("spice", 1, [hasInfluence("spacing", 2)]),
+      revealGainPersuasion(1),
+      revealPlaceSpies(1, { mustPlace: true }),
     ];
   }
   return undefined;

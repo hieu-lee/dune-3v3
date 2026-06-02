@@ -172,6 +172,25 @@ function pendingActionForAgentSpyPlacement(
   return undefined;
 }
 
+function pendingActionForRevealSpyPlacement(
+  card: Card,
+  source: Player,
+  state: GameState,
+): PendingAction | undefined {
+  if (!card.effects) return undefined;
+  const result = resolveCardEffects([card], {
+    trigger: "reveal",
+    source,
+    state,
+  });
+  const sourcePlacement = mergedSpyPlacement(card, result.spyPlacements);
+  const allyPlacement = mergedSpyPlacement(card, result.activatedAlly.spyPlacements);
+  if (allyPlacement) {
+    throw new Error(`Unsupported activated Ally reveal spy placement for ${card.name}`);
+  }
+  return sourcePlacement ? spyPendingForPlacement(card, source, sourcePlacement, state) : undefined;
+}
+
 function pendingActionForAgentDiscardCardForInfluenceAndDraw(
   card: Card,
   source: Player,
@@ -747,6 +766,9 @@ export function pendingActionsForReveal(
   const revealTrashCardPendings = revealedCards.flatMap((card) =>
     pendingActionsForRevealTrashCards(card, source, state, combatRecipientId)
   );
+  const revealSpyPlacementPendings = revealedCards
+    .map((card) => pendingActionForRevealSpyPlacement(card, source, state))
+    .filter((pending): pending is PendingAction => Boolean(pending));
   const payResourceStrengthPendings = revealedCards.flatMap((card) =>
     pendingActionsForRevealPayResourceForStrength(card, source, state, combatRecipientId)
   );
@@ -764,6 +786,7 @@ export function pendingActionsForReveal(
 
   return [
     revealAdjustPending,
+    ...revealSpyPlacementPendings,
     ...revealTrashCardPendings,
     ...payResourceStrengthPendings,
     ...payResourceTroopPendings,

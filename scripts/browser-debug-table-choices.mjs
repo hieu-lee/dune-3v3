@@ -110,6 +110,27 @@ export async function runTableChoicesSmoke({
   assert.equal(paracompassRevealAfter.pendingAction, undefined, "Paracompass should not create a reveal-adjust pending action");
   await screenshot(page, captures, "paracompass-reveal-after.png");
 
+  await setDebugGameAndWait(page, states.wheelsWithinWheelsRevealSpy);
+  await screenshot(page, captures, "wheels-within-wheels-reveal-ready.png");
+  await page.getByTestId("reveal-turn").click();
+  await page.waitForFunction(() => window.__DUNE_DEBUG__?.getGame().pendingAction?.kind === "spy");
+  pendingText = await page.locator(".pending-panel").innerText();
+  assert.match(pendingText, /Wheels Within Wheels/i);
+  assert.match(pendingText, /spy placement/i);
+  assert.equal(await page.locator(".pending-panel").getByRole("button", { name: "Done" }).isDisabled(), true);
+  await screenshot(page, captures, "pending-wheels-within-wheels-reveal-spy.png");
+  const wheelsBefore = await currentGame(page);
+  const wheelsOwnerBefore = wheelsBefore.players.find((player) => player.id === "p2");
+  assert.ok(wheelsOwnerBefore, "Expected Feyd before Wheels Within Wheels reveal spy placement");
+  await page.locator(".pending-panel").getByRole("button", { name: states.wheelsRevealSpySpaceName }).click();
+  await waitForNoPending(page);
+  const wheelsAfter = await currentGame(page);
+  const wheelsOwnerAfter = wheelsAfter.players.find((player) => player.id === "p2");
+  assert.ok(wheelsOwnerAfter, "Expected Feyd after Wheels Within Wheels reveal spy placement");
+  assert.equal(wheelsAfter.spyPosts[states.wheelsRevealSpySpaceId], "p2", "Wheels Within Wheels should place the chosen reveal spy");
+  assert.equal(wheelsOwnerAfter.spies, wheelsOwnerBefore.spies - 1, "Wheels Within Wheels should spend one spy");
+  assert.equal(wheelsOwnerAfter.persuasion, 1, "Wheels Within Wheels should keep its typed reveal persuasion after spy placement");
+
   await setDebugGameAndWait(page, states.calculusTrashReveal);
   await screenshot(page, captures, "calculus-trash-ready.png");
   await page.getByTestId("reveal-turn").click();
@@ -222,6 +243,8 @@ async function createTableChoiceStates(server, initialPlayableGame) {
   assert.ok(chani, "Expected Chani for Fremen Bond browser debug state");
   const paracompass = data.imperiumDeck.find((card) => card.name === "Paracompass");
   assert.ok(paracompass, "Expected Paracompass for conditional reveal browser debug state");
+  const wheelsWithinWheels = data.imperiumDeck.find((card) => card.name === "Wheels Within Wheels");
+  assert.ok(wheelsWithinWheels, "Expected Wheels Within Wheels for reveal spy browser debug state");
   const fremenSupport = data.imperiumDeck.find((card) =>
     card.id !== chani.id && card.traits?.includes("Faction: Fremen")
   );
@@ -271,6 +294,38 @@ async function createTableChoiceStates(server, initialPlayableGame) {
     { kind: "throne-row", ownerId: "p4", source: "Imperial Tent" },
     "Imperial Tent should create the browser debug Throne Row pending action through card rules",
   );
+  const wheelsRevealSpy = {
+    ...base,
+    activeSeat: feydSeat,
+    sharedSpyPosts: {},
+    spyPosts: {},
+    players: base.players.map((player) =>
+      player.id === "p2"
+        ? {
+            ...player,
+            agentsReady: 0,
+            conflict: 0,
+            deployedTroops: 0,
+            discard: [],
+            hand: [cloneCard(wheelsWithinWheels)],
+            highCouncilSeat: false,
+            persuasion: 0,
+            playArea: [],
+            revealed: false,
+            spies: 1,
+          }
+        : { ...player, conflict: 0, deployedTroops: 0 }
+    ),
+  };
+  const wheelsSpyPending = {
+    kind: "spy",
+    ownerId: "p2",
+    remaining: 1,
+    mustPlaceSpy: true,
+    source: "Wheels Within Wheels",
+  };
+  const wheelsSpySpace = state.placeableSpySpaces(wheelsRevealSpy, wheelsSpyPending)[0];
+  assert.ok(wheelsSpySpace, "Expected a legal Wheels Within Wheels reveal spy post for browser debug state");
 
   return {
     revealAdjust: {
@@ -350,6 +405,9 @@ async function createTableChoiceStates(server, initialPlayableGame) {
           : { ...player, conflict: 0, deployedTroops: 0 }
       ),
     },
+    wheelsWithinWheelsRevealSpy: wheelsRevealSpy,
+    wheelsRevealSpySpaceId: wheelsSpySpace.id,
+    wheelsRevealSpySpaceName: wheelsSpySpace.name,
     calculusTrashReveal: {
       ...base,
       activeSeat: feydSeat,

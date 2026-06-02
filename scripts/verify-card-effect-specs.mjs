@@ -153,7 +153,7 @@ try {
   );
   assert.ok(commandRespect && prepareTheWay && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
   assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && dutifulService && deliverSupplies);
-  assert.equal(revealSpecCards.length, 46, "Unexpected number of cards with declarative Reveal specs");
+  assert.equal(revealSpecCards.length, 47, "Unexpected number of cards with declarative Reveal specs");
   assert.deepEqual(
     [
       ...data.reserveMarket,
@@ -201,6 +201,7 @@ try {
       reliableInformant,
       spaceTimeFolding,
       guildEnvoy,
+      wheelsWithinWheels,
 	    beneGesseritOperative,
 	    chani,
 	  ]) {
@@ -860,6 +861,19 @@ try {
     "Wheels Within Wheels reveal text should preserve its printed spy icon",
   );
   assert.ok(
+    hasRevealEffect(wheelsWithinWheels, (effect) => effect.kind === "gain-persuasion" && effect.amount === 1),
+    "Wheels Within Wheels should carry a fixed Reveal persuasion spec",
+  );
+  assert.ok(
+    hasRevealEffect(wheelsWithinWheels, (effect) =>
+      effect.kind === "place-spies" &&
+        effect.selector === "self" &&
+        effect.amount === 1 &&
+        effect.mustPlace === true
+    ),
+    "Wheels Within Wheels should carry a Reveal spy placement spec",
+  );
+  assert.ok(
     wheelsWithinWheels.effects?.some((spec) =>
       spec.trigger === "agent-play" &&
       spec.conditions?.some((condition) => condition.kind === "has-influence" && condition.faction === "spacing" && condition.amount === 2) &&
@@ -1386,16 +1400,16 @@ try {
     /Invalid place-spies postPlacementAction "draw-card"/,
     "Spy placement specs should reject unsupported post-placement actions",
   );
-	  const revealSpyPlacementCard = {
-	    ...convincingArgument,
+  const revealSpyPlacementCard = {
+    ...convincingArgument,
     id: "effect-spec-reveal-spy-placement-card",
     name: "Effect Spec Reveal Spy Placement",
     effects: [revealSpec([{ kind: "place-spies", selector: "self", amount: 1 }])],
   };
-  assert.throws(
-    () => turnActions.revealTurnPlan({ ...p2, hand: [revealSpyPlacementCard], highCouncilSeat: false }),
-    /Unsupported effect "place-spies" for reveal/,
-    "Spy placement specs should stay out of Reveal until a pending-action resolver supports them",
+  assert.deepEqual(
+    turnActions.revealTurnPlan({ ...p2, hand: [revealSpyPlacementCard], highCouncilSeat: false }),
+    { persuasion: 0, printedRevealCards: [], revealGain: {}, swords: 0 },
+    "Reveal spy placement specs should not alter fixed reveal totals",
   );
   const agentTrashCard = {
     ...convincingArgument,
@@ -3703,6 +3717,53 @@ try {
     "Wheels Within Wheels should not gain resources below its Influence thresholds",
   );
   assert.equal(wheelsUnqualified.log, undefined, "Wheels Within Wheels should not log below its Influence thresholds");
+  const wheelsRevealFixture = {
+    ...withActivePlayer(game, p2.id, () => ({
+      agentsReady: 0,
+      hand: [wheelsWithinWheels],
+      highCouncilSeat: false,
+      persuasion: 0,
+      playArea: [],
+      revealed: false,
+      spies: 1,
+    })),
+    sharedSpyPosts: {},
+    spyPosts: {},
+  };
+  const wheelsRevealPlan = turnActions.revealTurnPlan(playerById(wheelsRevealFixture, p2.id), wheelsRevealFixture);
+  assert.equal(wheelsRevealPlan.persuasion, 1, "Wheels Within Wheels should reveal for 1 persuasion through specs");
+  assert.deepEqual(wheelsRevealPlan.printedRevealCards, [], "Wheels Within Wheels typed Reveal should not need manual fallback");
+  const wheelsRevealed = turnActions.revealTurnAction(wheelsRevealFixture, {
+    commanderTargets: {},
+    revealPlan: wheelsRevealPlan,
+  });
+  assert.equal(wheelsRevealed.pendingAction?.kind, "spy", "Wheels Within Wheels Reveal should queue a spy placement");
+  assert.equal(wheelsRevealed.pendingAction?.source, "Wheels Within Wheels");
+  assert.equal(wheelsRevealed.pendingAction?.ownerId, p2.id);
+  assert.equal(wheelsRevealed.pendingAction?.remaining, 1);
+  assert.equal(wheelsRevealed.pendingAction?.mustPlaceSpy, true);
+  assert.equal(playerById(wheelsRevealed, p2.id).persuasion, 1);
+  const wheelsRevealSpySpace = state.placeableSpySpaces(wheelsRevealed, wheelsRevealed.pendingAction)[0];
+  assert.ok(wheelsRevealSpySpace, "Wheels Within Wheels Reveal should have a legal spy placement space");
+  const wheelsPlacedSpy = state.placeSpyForPending(wheelsRevealed, wheelsRevealed.pendingAction, wheelsRevealSpySpace.id);
+  assert.equal(wheelsPlacedSpy.pendingAction, undefined, "Placing the Wheels Within Wheels reveal spy should clear pending");
+  assert.equal(wheelsPlacedSpy.spyPosts[wheelsRevealSpySpace.id], p2.id, "Wheels Within Wheels should place the chosen spy");
+  assert.equal(playerById(wheelsPlacedSpy, p2.id).spies, 0, "Wheels Within Wheels should spend the reveal spy");
+  assert.match(wheelsPlacedSpy.log[0], /places a spy near .* from Wheels Within Wheels/);
+  const wheelsRevealNoSpyFixture = {
+    ...wheelsRevealFixture,
+    players: wheelsRevealFixture.players.map((player) => player.id === p2.id ? { ...player, spies: 0 } : player),
+  };
+  const wheelsNoSpyPlan = turnActions.revealTurnPlan(playerById(wheelsRevealNoSpyFixture, p2.id), wheelsRevealNoSpyFixture);
+  const wheelsNoSpyReveal = turnActions.revealTurnAction(wheelsRevealNoSpyFixture, {
+    commanderTargets: {},
+    revealPlan: wheelsNoSpyPlan,
+  });
+  assert.equal(
+    wheelsNoSpyReveal.pendingAction,
+    undefined,
+    "Wheels Within Wheels should not pause Reveal when no spy can be placed",
+  );
   const devastatingAssaultEffect = state.applyCardAgentEffect(
     devastatingAssault,
     { ...p4, resources: { solari: 0, spice: 0, water: 0 } },

@@ -94,6 +94,8 @@ const generatedScreenshotNames = [
   "chani-fremen-bond-after-reveal.png",
   "paracompass-reveal-ready.png",
   "paracompass-reveal-after.png",
+  "wheels-within-wheels-reveal-ready.png",
+  "pending-wheels-within-wheels-reveal-spy.png",
   "calculus-trash-ready.png",
   "pending-calculus-trash.png",
   "pending-throne-row.png",

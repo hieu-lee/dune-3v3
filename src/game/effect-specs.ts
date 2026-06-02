@@ -60,6 +60,21 @@ export function revealGainStrength(amount: EffectAmountSpec, conditions?: GameEf
   return revealEffects([{ kind: "gain-strength", selector: "self", amount }], conditions);
 }
 
+export function revealPlaceSpies(
+  amount: EffectAmountSpec,
+  options: {
+    recallForSupply?: boolean;
+    mustPlace?: boolean;
+    placementIcon?: IconId;
+    allowSharedPost?: boolean;
+    source?: string;
+    postPlacementAction?: "staban-unseen-network";
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return revealEffects([{ kind: "place-spies", selector: "self", amount, ...options }], conditions);
+}
+
 export function revealRetreatTroopsForStrength(
   troops: EffectAmountSpec,
   strength: EffectAmountSpec,

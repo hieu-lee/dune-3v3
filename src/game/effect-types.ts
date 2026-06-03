@@ -285,6 +285,7 @@ export type GameEffectSpec =
       min: number;
       max: TroopRetreatBoundSpec;
       source?: string;
+      optional?: boolean;
     }
   | {
       kind: "trash-card";

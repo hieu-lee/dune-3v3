@@ -339,7 +339,7 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     return;
   }
   if (effect.kind === "retreat-troops") {
-    if (trigger !== "combat-intrigue") {
+    if (trigger !== "combat-intrigue" && trigger !== "reveal") {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
     }
     if (effect.selector !== "self") {
@@ -350,6 +350,7 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     if (typeof effect.max === "number" && effect.min > effect.max) {
       invalidSpecField("retreat-troops bounds", `${effect.min}-${effect.max}`);
     }
+    validateOptionalBoolean("retreat-troops optional", effect.optional);
     validateSourceLabel("retreat-troops source", effect.source);
     return;
   }
@@ -799,23 +800,26 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     if (trigger === "reveal") {
       const amount = effect.amount;
       const drawIntrigues = effect.drawIntrigues;
+      const strengthReward = effect.strengthReward;
       if (amount === undefined) {
         invalidSpecField("recall-spy amount", amount);
       }
-      if (drawIntrigues === undefined) {
-        invalidSpecField("recall-spy drawIntrigues", drawIntrigues);
+      if ((drawIntrigues === undefined && strengthReward === undefined) || (drawIntrigues !== undefined && strengthReward !== undefined)) {
+        invalidSpecField("recall-spy reveal reward", { drawIntrigues, strengthReward });
       }
       if (effect.reward !== undefined) {
         throw new Error(`Unsupported recall-spy reward for ${trigger}`);
-      }
-      if (effect.strengthReward !== undefined) {
-        throw new Error(`Unsupported recall-spy strengthReward for ${trigger}`);
       }
       if (effect.removeShieldWall !== undefined) {
         throw new Error(`Unsupported recall-spy removeShieldWall for ${trigger}`);
       }
       validatePositiveFixedAmount("recall-spy amount", amount);
-      validatePositiveAmount("recall-spy drawIntrigues", drawIntrigues);
+      if (drawIntrigues !== undefined) {
+        validatePositiveAmount("recall-spy drawIntrigues", drawIntrigues);
+      }
+      if (strengthReward !== undefined) {
+        validatePositiveAmount("recall-spy strengthReward", strengthReward);
+      }
       validateOptionalBoolean("recall-spy optional", effect.optional);
       return;
     }

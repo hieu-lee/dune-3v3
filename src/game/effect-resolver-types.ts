@@ -51,6 +51,8 @@ export type CombatSpyRecallForStrength = {
   source?: string;
 };
 
+export type RevealSpyRecallForStrength = CombatSpyRecallForStrength;
+
 export type RevealSpyRecallForIntrigues = {
   selector: PlayerSelector;
   amount: number;
@@ -74,6 +76,13 @@ export type CombatRetreatTroops = {
   count: number;
   min: number;
   max: number;
+  source?: string;
+};
+
+export type RevealRetreatTroops = {
+  selector: PlayerSelector;
+  count: number;
+  optional: boolean;
   source?: string;
 };
 

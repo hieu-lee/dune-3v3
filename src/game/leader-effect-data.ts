@@ -1,11 +1,16 @@
 import {
   agentPlacementEffects,
+  hasConflictUnits,
   hasLeader,
   hasLeaderCounter,
   hasRole,
+  hasSpyPosts,
+  revealEffects,
   visitedSpaceIcon,
 } from "./effect-specs";
 import {
+  feydRauthaLeaderName,
+  ladyAmberMetulliLeaderName,
   ladyJessicaLeaderName,
   reverendMotherJessicaLeaderName,
 } from "./leader-constants";
@@ -36,6 +41,40 @@ export const leaderPlacementEffectSpecs: CardEffectSpec[] = [
       hasRole("Ally"),
       hasLeaderCounter("jessicaMemories", 1),
       visitedSpaceIcon("bene"),
+    ],
+  ),
+];
+
+export const leaderRevealEffectSpecs: CardEffectSpec[] = [
+  revealEffects(
+    [{
+      kind: "recall-spy",
+      selector: "self",
+      amount: 1,
+      strengthReward: 2,
+      optional: true,
+      source: "Devious Strength",
+    }],
+    [
+      hasLeader(feydRauthaLeaderName),
+      hasRole("Ally"),
+      hasConflictUnits(1),
+      hasSpyPosts(1),
+    ],
+  ),
+  revealEffects(
+    [{
+      kind: "retreat-troops",
+      selector: "self",
+      min: 1,
+      max: 1,
+      optional: true,
+      source: "Desert Scouts",
+    }],
+    [
+      hasLeader(ladyAmberMetulliLeaderName),
+      hasRole("Ally"),
+      hasConflictUnits(1),
     ],
   ),
 ];

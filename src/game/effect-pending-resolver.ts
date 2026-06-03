@@ -43,7 +43,9 @@ import type {
   RevealPayResourceForStrength,
   RevealPayResourceForTroops,
   RevealRetreatTroopsForStrength,
+  RevealRetreatTroops,
   RevealSpyRecallForIntrigues,
+  RevealSpyRecallForStrength,
   RevealTrashCardEffect,
   TakeContractsEffect,
   TrashCardEffect,
@@ -140,6 +142,31 @@ export function resolveRevealDeployOrRetreatTroops(
   });
 }
 
+export function resolveRevealRetreatTroops(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): RevealRetreatTroops[] {
+  specs?.forEach(validateSpec);
+  return (specs ?? []).flatMap((spec) => {
+    if (spec.trigger !== "reveal") return [];
+    if (!specApplies(spec, context)) return [];
+    return spec.effects
+      .filter((effect) => effect.kind === "retreat-troops")
+      .map((effect) => {
+        const max = retreatBoundFor(effect.max, context);
+        if (effect.min !== max) {
+          throw new Error("Unsupported Reveal retreat-troops range without a troop-count choice");
+        }
+        return {
+          selector: effect.selector,
+          count: max,
+          optional: effect.optional ?? true,
+          source: effect.source,
+        };
+      });
+  });
+}
+
 export function resolveTrashCardEffects(
   specs: CardEffectSpec[] | undefined,
   context: GameEffectContext,
@@ -205,6 +232,7 @@ export function resolveRevealSpyRecallForIntrigues(
     if (!specApplies(spec, context)) return [];
     return spec.effects
       .filter((effect) => effect.kind === "recall-spy")
+      .filter((effect) => effect.drawIntrigues !== undefined)
       .map((effect) => {
         if (effect.amount === undefined || effect.drawIntrigues === undefined) {
           throw new Error("Unsupported Reveal recall-spy effect without amount and drawIntrigues");
@@ -213,6 +241,43 @@ export function resolveRevealSpyRecallForIntrigues(
           selector: effect.selector,
           amount: amountFor(effect.amount, context.source),
           drawIntrigues: amountFor(effect.drawIntrigues, context.source),
+          optional: effect.optional ?? true,
+          source: effect.source,
+        };
+      });
+  });
+}
+
+export function resolveRevealSpyRecallForStrengths(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): RevealSpyRecallForStrength[] {
+  specs?.forEach(validateSpec);
+  return (specs ?? []).flatMap((spec) => {
+    if (spec.trigger !== "reveal") return [];
+    if (!specApplies(spec, context)) return [];
+    return spec.effects
+      .filter((effect) => effect.kind === "recall-spy")
+      .filter((effect) => effect.strengthReward !== undefined)
+      .flatMap((effect) => {
+        if (effect.amount === undefined || effect.strengthReward === undefined) {
+          throw new Error("Unsupported Reveal recall-spy effect without amount and strengthReward");
+        }
+        const amount = amountFor(effect.amount, context.source);
+        if (
+          context.state?.spyPosts &&
+          context.state.sharedSpyPosts &&
+          spyPostCount(
+            { spyPosts: context.state.spyPosts, sharedSpyPosts: context.state.sharedSpyPosts },
+            context.source.id,
+          ) < amount
+        ) {
+          return [];
+        }
+        return {
+          selector: effect.selector,
+          amount,
+          strength: amountFor(effect.strengthReward, context.source),
           optional: effect.optional ?? true,
           source: effect.source,
         };

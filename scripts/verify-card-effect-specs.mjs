@@ -6950,8 +6950,31 @@ try {
       [revealSpec([{ kind: "recall-spy", selector: "self", amount: 1, source: "Test" }])],
       { trigger: "reveal", source: p2, state: game },
     ),
-    /Invalid recall-spy drawIntrigues "undefined"/,
-    "Reveal recall-spy specs should require an Intrigue reward",
+    /Invalid recall-spy reveal reward/,
+    "Reveal recall-spy specs should require exactly one reveal reward",
+  );
+  assert.deepEqual(
+    effectResolver.resolveRevealSpyRecallForStrengths(
+      [revealSpec(
+        [{ kind: "recall-spy", selector: "self", amount: 1, strengthReward: 2, optional: true, source: "Test" }],
+        [{ kind: "has-spy-posts", count: 1 }],
+      )],
+      {
+        trigger: "reveal",
+        source: p2,
+        state: { ...game, spyPosts: { [secrets.id]: p2.id }, sharedSpyPosts: {} },
+      },
+    ),
+    [{ selector: "self", amount: 1, strength: 2, optional: true, source: "Test" }],
+    "Reveal recall-spy specs should resolve strength rewards with enough owned spy posts",
+  );
+  assert.deepEqual(
+    effectResolver.resolveRevealSpyRecallForIntrigues(
+      [revealSpec([{ kind: "recall-spy", selector: "self", amount: 1, strengthReward: 2, source: "Test" }])],
+      { trigger: "reveal", source: p2, state: game },
+    ),
+    [],
+    "Reveal Intrigue spy-recall resolver should ignore strength-reward recall specs",
   );
   assert.throws(
     () => effectResolver.resolveRevealSpyRecallForIntrigues(
@@ -6973,8 +6996,8 @@ try {
       }])],
       { trigger: "reveal", source: p2, state: game },
     ),
-    /Unsupported recall-spy strengthReward for reveal/,
-    "Reveal recall-spy specs should reject Combat-style strength rewards",
+    /Invalid recall-spy reveal reward/,
+    "Reveal recall-spy specs should reject multiple simultaneous reveal rewards",
   );
   assert.throws(
     () => effectResolver.resolveCombatSpyRecallForStrengths(
@@ -10799,6 +10822,22 @@ try {
     }),
     [{ selector: "self", troopCount: 1, optional: true, source: "Deploy Or Retreat Test" }],
     "Deploy-or-retreat specs should resolve as reveal pending effects",
+  );
+  assert.deepEqual(
+    effectResolver.resolveRevealRetreatTroops(
+      [revealSpec([{ kind: "retreat-troops", selector: "self", min: 1, max: 1, optional: true, source: "Retreat Test" }])],
+      { trigger: "reveal", source: { ...p2, deployedTroops: 1 }, state: game },
+    ),
+    [{ selector: "self", count: 1, optional: true, source: "Retreat Test" }],
+    "Exact retreat specs should resolve as reveal pending effects",
+  );
+  assert.throws(
+    () => effectResolver.resolveRevealRetreatTroops(
+      [revealSpec([{ kind: "retreat-troops", selector: "self", min: 1, max: 2, optional: true, source: "Retreat Test" }])],
+      { trigger: "reveal", source: { ...p2, deployedTroops: 2 }, state: game },
+    ),
+    /Unsupported Reveal retreat-troops range/,
+    "Reveal retreat specs should require exact troop counts until a count-choice UI exists",
   );
   const agentDeployOrRetreatCard = {
     ...convincingArgument,

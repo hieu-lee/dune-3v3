@@ -16,7 +16,16 @@ const server = await createServer({
 try {
   const data = await server.ssrLoadModule("/src/game/data.ts");
   const state = await server.ssrLoadModule("/src/game/state.ts");
+  const { validateSpec } = await server.ssrLoadModule("/src/game/effect-spec-validation.ts");
+  const { leaderRevealEffectSpecs } = await server.ssrLoadModule("/src/game/leader-effect-data.ts");
   const appTurnActions = await server.ssrLoadModule("/src/app-turn-actions.ts");
+
+  leaderRevealEffectSpecs.forEach(validateSpec);
+  assert.deepEqual(
+    leaderRevealEffectSpecs.map((spec) => spec.effects.map((effect) => effect.source)),
+    [["Devious Strength"], ["Desert Scouts"]],
+    "Feyd and Amber reveal abilities should be modeled as typed leader reveal specs",
+  );
 
   const {
     cards: {

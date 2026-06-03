@@ -1,6 +1,6 @@
 import { memoryCountLabel } from "../app-helpers";
 import { criticalLocationNames } from "../game/critical-locations";
-import { boardSpaces, factionLabels, iconLabels, teams } from "../game/data";
+import { boardSpaces, factionLabels } from "../game/data";
 import {
   acquirableCardsForPending,
   canPayTrashIntrigueForReward,
@@ -26,6 +26,7 @@ import {
   trashableCardsForPending,
 } from "../game/state";
 import type { Player } from "../game/types";
+import { PendingActionPanelHeader } from "./PendingActionPanelHeader";
 import type { PendingActionPanelProps } from "./PendingActionPanel.types";
 import { PendingBoardInfluenceChoicePanel, PendingOptionalSpacePaymentPanel } from "./PendingBoardChoicePanels";
 import { PendingAcquireCardPanel, PendingContractPanel } from "./PendingCardChoicePanels";
@@ -442,55 +443,7 @@ export function PendingActionPanel({
 
   return (
     <div className="pending-panel">
-      <div>
-        <p className="eyebrow">Pending table choice</p>
-        <h2>
-          {pendingAction.kind === "deploy" && `${pendingOwner?.leader ?? "Player"} deployment`}
-          {pendingAction.kind === "control-defense" && `${pendingControlDefenseOwner?.leader ?? "Player"} control deployment`}
-          {pendingAction.kind === "reinforce" && `Military Support - ${pendingAction.remaining} troops`}
-          {pendingAction.kind === "trade" && `Trade from ${pendingAction.source}`}
-          {pendingAction.kind === "spy" && `${pendingAction.source}${pendingAction.placementIcon ? ` ${iconLabels[pendingAction.placementIcon]}` : ""} spy placement - ${pendingAction.remaining}`}
-          {pendingAction.kind === "reveal-adjust" && "Printed reveal adjustment"}
-          {pendingAction.kind === "retreat-troops-for-strength" && `${pendingRetreatStrengthOwner?.leader ?? "Player"} ${pendingAction.source}`}
-          {pendingAction.kind === "deploy-or-retreat-troops" && `${pendingDeployOrRetreatOwner?.leader ?? "Player"} ${pendingAction.source}`}
-          {pendingAction.kind === "contract" && `${pendingContractOwner?.leader ?? "Player"} CHOAM contract`}
-          {pendingAction.kind === "acquire-card" && `${pendingAcquireOwner?.leader ?? "Player"} acquisition from ${pendingAction.source}`}
-          {pendingAction.kind === "discard-card-for-influence-and-draw" && `${pendingDiscardInfluenceDrawOwner?.leader ?? "Player"} ${pendingAction.source}`}
-          {pendingAction.kind === "discard-card-for-draw" && `${pendingDiscardDrawOwner?.leader ?? "Player"} ${pendingAction.source}`}
-          {pendingAction.kind === "discard-cards-for-reward" && `${pendingDiscardRewardOwner?.leader ?? "Player"} ${pendingAction.source}`}
-          {pendingAction.kind === "top-deck-selection" && `${pendingTopDeckSelectionOwner?.leader ?? "Player"} ${pendingAction.source}`}
-          {pendingAction.kind === "trash-intrigue-for-reward" && `${pendingTrashIntrigueOwner?.leader ?? "Player"} ${pendingAction.source}`}
-          {pendingAction.kind === "discard-hand-card" && `${pendingDiscardHandCardOwner?.leader ?? "Player"} ${pendingAction.source}`}
-          {pendingAction.kind === "lose-influence-for-intrigues" && `${pendingInfluenceIntrigueOwner?.leader ?? "Player"} ${pendingAction.source} reveal`}
-          {pendingAction.kind === "maker-choice" && `${pendingMakerLabel ?? "Player"} Maker space`}
-          {pendingAction.kind === "sietch-tabr" && `${pendingSietchLabel ?? "Player"} Sietch Tabr`}
-          {pendingAction.kind === "commander-resource-split" && `${pendingResourceSplitCommander?.leader ?? "Commander"} ${pendingAction.source}`}
-          {pendingAction.kind === "paid-reward-choice" && `${pendingPaidRewardOwner?.leader ?? "Player"} ${pendingAction.source}`}
-          {pendingAction.kind === "pending-action-choice" && `${pendingActionChoiceOwner?.leader ?? "Player"} ${pendingAction.source}`}
-          {pendingAction.kind === "staban-unseen-network" && `${pendingStabanUnseenNetworkOwner?.leader ?? "Staban Tuek"} Unseen Network`}
-          {pendingAction.kind === "amber-desert-scouts" && `${pendingLadyAmberDesertScoutsOwner?.leader ?? "Lady Amber"} Desert Scouts`}
-          {pendingAction.kind === "repeat-board-space" && `${pendingRepeatBoardSpaceOwner?.leader ?? "Player"} ${pendingAction.source}`}
-          {pendingAction.kind === "leader-transition" && `${pendingLeaderTransitionOwner?.leader ?? "Player"} ${pendingAction.source}`}
-          {pendingAction.kind === "conflict-influence" && `${pendingConflictInfluenceOwner?.leader ?? "Player"} Conflict Influence`}
-          {pendingAction.kind === "board-influence-choice" && `${pendingAction.source} Influence`}
-          {pendingAction.kind === "optional-space-payment" && `${pendingOptionalSpacePaymentOwner?.leader ?? "Player"} ${pendingAction.source}`}
-          {pendingAction.kind === "conflict-vp-conversion" && `${pendingConflictVpOwner?.leader ?? "Player"} Conflict reward`}
-          {pendingAction.kind === "trash-source-for-trade" && `${pendingTrashSourceTradeOwner?.leader ?? "Player"} ${pendingAction.source}`}
-          {pendingAction.kind === "pay-resource-for-contracts" && `${pendingPayResourceContractsOwner?.leader ?? "Player"} ${pendingAction.source}`}
-          {pendingAction.kind === "pay-resource-for-strength" && `${pendingPayResourceStrengthOwner?.leader ?? "Player"} ${pendingAction.source}`}
-          {pendingAction.kind === "pay-resource-for-influence" && `${pendingPayResourceInfluenceOwner?.leader ?? "Player"} ${pendingAction.source}`}
-          {pendingAction.kind === "pay-resource-for-troops" && `${pendingPayResourceTroopsOwner?.leader ?? "Player"} ${pendingAction.source}`}
-          {pendingAction.kind === "pay-resource-for-draw-cards" && `${pendingPayResourceDrawCardsOwner?.leader ?? "Player"} ${pendingAction.source}`}
-          {pendingAction.kind === "pay-resource-for-high-council-seat" && `${pendingPayResourceHighCouncilSeatOwner?.leader ?? "Player"} ${pendingAction.source}`}
-          {pendingAction.kind === "pay-resource-for-sandworms" && `${pendingPayResourceSandwormsOwner?.leader ?? "Player"} ${pendingAction.source}`}
-          {pendingAction.kind === "team-resource-payment" && `${pendingTeamResourcePaymentOwner?.leader ?? "Player"} ${pendingAction.source}`}
-          {pendingAction.kind === "throne-row" && `${pendingThroneOwner?.leader ?? "Shaddam"} Throne Row`}
-          {pendingAction.kind === "trash-card" && `${pendingTrashOwner?.leader ?? "Player"} ${pendingAction.optional ? "optional " : ""}trash from ${pendingAction.source}`}
-          {pendingAction.kind === "recall-spy" && `${pendingRecallSpyOwner?.leader ?? "Player"} recall spy`}
-          {pendingAction.kind === "lose-influence" && `${pendingInfluencePayerLabel ?? "Player"} influence choice`}
-          {pendingAction.kind === "conflict-tie" && `${teams[pendingAction.team].name} conflict tie`}
-        </h2>
-      </div>
+      <PendingActionPanelHeader game={game} pendingAction={pendingAction} />
 
       {pendingAction.kind === "deploy" && (
         <PendingDeployPanel

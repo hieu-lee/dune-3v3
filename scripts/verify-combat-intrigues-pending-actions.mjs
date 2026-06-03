@@ -328,4 +328,32 @@ export function verifyCombatIntriguePendingActions({
     devourTrashed.log[0].includes(`trashes ${devourTrashChoice.name} from Devour`),
     "Devour trash should log the selected card",
   );
+
+  const devourHandTrashChoice = starterCard(data, 2);
+  const devourHandFixture = combatFixture(state, data, (players) =>
+    players.map((player) =>
+      player.id === "p2"
+        ? {
+            ...player,
+            conflict: 2,
+            deployedTroops: 1,
+            deployedSandworms: 1,
+            hand: [devourHandTrashChoice],
+            intrigues: [devour],
+          }
+        : player.id === "p3"
+          ? { ...player, conflict: 4, deployedTroops: 1 }
+          : player,
+    ),
+  );
+  const devourHand = state.startCombatPhase(devourHandFixture);
+  const devourHandPlayed = state.playCombatIntrigue(devourHand, "p2", devour.id);
+  assert.ok(devourHandPlayed.pendingAction, "Devour should queue trash when the only eligible card is in hand");
+  const devourHandTrashed = state.trashPlayerCard(
+    devourHandPlayed,
+    devourHandPlayed.pendingAction,
+    "hand",
+    devourHandTrashChoice.id,
+  );
+  assert.deepEqual(playerById(devourHandTrashed, "p2").hand, [], "Devour should trash from hand when selected");
 }

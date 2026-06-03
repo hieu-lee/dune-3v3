@@ -249,6 +249,48 @@ function expectedFinalScoreLog(teamScores, winningTeam) {
   return `${teams[winningTeam].name} wins ${Math.max(teamScores.muaddib, teamScores.shaddam)}-${Math.min(teamScores.muaddib, teamScores.shaddam)}.`;
 }
 
+async function recordRoundCleanup(before, after, coverage, clients) {
+  if (after.round === before.round) return;
+  assert.equal(after.round, before.round + 1, "Marathon should advance one round at a time");
+  assert.equal(after.phase, "playing", "Round cleanup should resume the table in playing phase");
+  assert.ok(before.conflictDeck.length > 0, "Round cleanup should have a Conflict card to reveal");
+  assert.ok(after.conflict, "Round cleanup should reveal the next Conflict");
+  assert.equal(after.conflictDeck.length, before.conflictDeck.length - 1, "Round cleanup should consume exactly one Conflict card");
+  assert.equal(after.firstSeat, (before.firstSeat + 1) % after.players.length, "Round cleanup should rotate first seat");
+  assert.equal(after.activeSeat, after.firstSeat, "Round cleanup should start with the new first seat");
+  assert.equal(after.agentTurnComplete, false, "Round cleanup should clear Agent turn completion");
+  assert.deepEqual(after.spaces, {}, "Round cleanup should clear occupied board spaces");
+  assert.deepEqual(after.roundMakerSpaceVisits, {}, "Round cleanup should clear round Maker visits");
+  assert.deepEqual(after.turnHarvestContractIds, {}, "Round cleanup should clear turn harvest contract ids");
+  assert.deepEqual(after.turnMakerSpaceVisits, {}, "Round cleanup should clear turn Maker visits");
+  assert.deepEqual(after.turnSpiceGains, {}, "Round cleanup should clear turn spice gains");
+  assert.deepEqual(after.turnReverendMotherJessicaRepeats, {}, "Round cleanup should clear repeat-board-space memory");
+  assert.deepEqual(after.turnSpyRecalls, {}, "Round cleanup should clear turn spy recalls");
+  assert.deepEqual(after.turnUnitDeployments, {}, "Round cleanup should clear turn deployments");
+  assert.deepEqual(after.combatPasses, [], "Round cleanup should clear combat passes");
+  assert.deepEqual(after.pendingQueue, [], "Round cleanup should not carry a pending queue into the next round");
+  for (const player of after.players) {
+    assert.equal(player.revealed, false, `${player.id} should start the new round unrevealed`);
+    assert.equal(player.persuasion, 0, `${player.id} should clear Reveal persuasion during cleanup`);
+    assert.equal(player.agentsReady, player.agentsTotal, `${player.id} should ready all available Agents during cleanup`);
+    assert.equal(player.conflict, 0, `${player.id} should clear combat strength during cleanup`);
+    assert.equal(player.deployedTroops, 0, `${player.id} should return deployed troops during cleanup`);
+    assert.equal(player.deployedSandworms, 0, `${player.id} should return deployed sandworms during cleanup`);
+    assert.equal(player.playArea.length, 0, `${player.id} should clear played cards during cleanup`);
+    assert.equal(player.manipulatedCards.length, 0, `${player.id} should clear manipulated cards during cleanup`);
+    assert.equal(player.callToArmsActive, false, `${player.id} should clear Call to Arms during cleanup`);
+    assert.equal(player.revealActivatedAllyId, undefined, `${player.id} should clear Reveal activated Ally during cleanup`);
+    assert.equal(player.gurneyAlwaysSmilingScored, false, `${player.id} should clear Gurney scoring memory during cleanup`);
+    assert.ok(player.hand.length <= 5, `${player.id} should draw up to a five-card hand during cleanup`);
+  }
+  coverage.cleanupTransitions += 1;
+  coverage.cleanupRounds.push(after.round);
+  if (!coverage.capturedFirstCleanup) {
+    await capture(clients[0].page, "marathon-first-round-cleanup.png");
+    coverage.capturedFirstCleanup = true;
+  }
+}
+
 function pendingOwnerId(room, pending, command) {
   if (!pending) return undefined;
   if (command?.kind === "choose-board-influence") return command.ownerId;
@@ -504,6 +546,7 @@ async function resolvePending(roomId, tokens, clients, coverage, max = 300) {
     if (!ownerId || !command) {
       throw new Error(`Unsupported pending ${JSON.stringify(pending, null, 2)}`);
     }
+    const beforeGame = room.game;
     const gameBefore = JSON.stringify(room.game);
     const deployedOwnerId = command.kind === "deploy-one" ? pending.ownerId : undefined;
     const deployedBefore = deployedOwnerId
@@ -515,6 +558,7 @@ async function resolvePending(roomId, tokens, clients, coverage, max = 300) {
       throw new Error(`Pending command made no progress ${JSON.stringify({ pending, command })}`);
     }
     await assertConverged(roomId, clients);
+    await recordRoundCleanup(beforeGame, snapshot.game, coverage, clients);
     if (deployedOwnerId) {
       const deployedAfter = snapshot.game.players.find((player) => player.id === deployedOwnerId)?.deployedTroops ?? 0;
       if (deployedAfter > deployedBefore) {
@@ -579,9 +623,24 @@ async function driveMarathon(roomId, tokens, clients) {
   let buyActions = 0;
   const buySourceCounts = { imperium: 0, manipulated: 0, reserve: 0, throne: 0 };
   const buyPlayerIds = new Set();
-  const combatCoverage = { capturedFirstDeploy: false, combatPlayerIds: new Set(), deployActions: 0 };
+  const coverage = {
+    capturedFirstCleanup: false,
+    capturedFirstDeploy: false,
+    cleanupRounds: [],
+    cleanupTransitions: 0,
+    combatPlayerIds: new Set(),
+    deployActions: 0,
+  };
+  async function applyMarathonAction(playerId, action) {
+    const before = roomRecord(roomId).game;
+    const snapshot = await roomAction(roomId, playerId, tokens, action);
+    await assertConverged(roomId, clients);
+    await recordRoundCleanup(before, snapshot.game, coverage, clients);
+    return snapshot;
+  }
+
   for (let step = 1; step <= 700; step += 1) {
-    await resolvePending(roomId, tokens, clients, combatCoverage);
+    await resolvePending(roomId, tokens, clients, coverage);
     const room = roomRecord(roomId);
     const game = room.game;
     if (!capturedMidpoint && game.round >= 5 && game.phase === "playing") {
@@ -596,23 +655,23 @@ async function driveMarathon(roomId, tokens, clients) {
         buyActions,
         buyPlayerIds: [...buyPlayerIds].sort(),
         buySourceCounts,
-        combatPlayerIds: [...combatCoverage.combatPlayerIds].sort(),
-        deployActions: combatCoverage.deployActions,
+        cleanupRounds: [...coverage.cleanupRounds],
+        cleanupTransitions: coverage.cleanupTransitions,
+        combatPlayerIds: [...coverage.combatPlayerIds].sort(),
+        deployActions: coverage.deployActions,
       };
     }
     if (game.phase === "playing") {
       const active = game.players[game.activeSeat];
       if (game.agentTurnComplete) {
-        await roomAction(roomId, active.id, tokens, { kind: "end-agent" });
-        await assertConverged(roomId, clients);
+        await applyMarathonAction(active.id, { kind: "end-agent" });
         continue;
       }
       const placement = legalAgentPlacement(game, active);
       if (placement) {
-        await roomAction(roomId, active.id, tokens, placement.action);
+        await applyMarathonAction(active.id, placement.action);
         agentPlacements += 1;
         agentPlayerIds.add(active.id);
-        await assertConverged(roomId, clients);
         if (!capturedAgentPlacement) {
           await capture(clients[0].page, "marathon-first-agent-placement.png");
           capturedAgentPlacement = true;
@@ -620,17 +679,15 @@ async function driveMarathon(roomId, tokens, clients) {
         continue;
       }
       if (!active.revealed) {
-        await roomAction(roomId, active.id, tokens, { kind: "reveal-turn" });
-        await assertConverged(roomId, clients);
+        await applyMarathonAction(active.id, { kind: "reveal-turn" });
         continue;
       }
       const buySelection = legalBuyAction(game, active);
       if (buySelection) {
-        await roomAction(roomId, active.id, tokens, buySelection.action);
+        await applyMarathonAction(active.id, buySelection.action);
         buyActions += 1;
         buySourceCounts[buySelection.source] += 1;
         buyPlayerIds.add(active.id);
-        await assertConverged(roomId, clients);
         if (!capturedBuy) {
           const buyerClient = clients.find((client) => client.playerId === active.id) ?? clients[0];
           await capture(buyerClient.page, "marathon-first-buy-card.png");
@@ -638,14 +695,12 @@ async function driveMarathon(roomId, tokens, clients) {
         }
         continue;
       }
-      await roomAction(roomId, active.id, tokens, { kind: "end-reveal" });
-      await assertConverged(roomId, clients);
+      await applyMarathonAction(active.id, { kind: "end-reveal" });
       continue;
     }
     if (game.phase === "combat") {
       const active = game.players[game.activeSeat];
-      await roomAction(roomId, active.id, tokens, { kind: "pass-combat" });
-      await assertConverged(roomId, clients);
+      await applyMarathonAction(active.id, { kind: "pass-combat" });
       continue;
     }
     if (game.phase === "endgame") {
@@ -702,7 +757,18 @@ try {
   await capture(firstPage, "marathon-all-seats-claimed.png");
 
   await resolveSetup(roomId, tokens, clients);
-  const { steps, agentPlacements, agentPlayerIds, buyActions, buyPlayerIds, buySourceCounts, combatPlayerIds, deployActions } = await driveMarathon(roomId, tokens, clients);
+  const {
+    steps,
+    agentPlacements,
+    agentPlayerIds,
+    buyActions,
+    buyPlayerIds,
+    buySourceCounts,
+    cleanupRounds,
+    cleanupTransitions,
+    combatPlayerIds,
+    deployActions,
+  } = await driveMarathon(roomId, tokens, clients);
   await assertConverged(roomId, clients);
   const finished = roomRecord(roomId).game;
   assert.equal(finished.phase, "finished", "Marathon should finish through normal room actions");
@@ -720,6 +786,9 @@ try {
   assert.ok(buySourceCounts.imperium >= 6, "Marathon should exercise Imperium Row online card buying");
   assert.ok(buySourceCounts.reserve >= 6, "Marathon should exercise Reserve online card buying");
   assert.ok(buySourceCounts.throne >= 1, "Marathon should exercise Shaddam Throne Row online card buying");
+  const expectedCleanupRounds = Array.from({ length: finished.round - 1 }, (_, index) => index + 2);
+  assert.equal(cleanupTransitions, finished.round - 1, "Marathon should verify cleanup for every natural round advance");
+  assert.deepEqual(cleanupRounds, expectedCleanupRounds, "Marathon should verify each post-cleanup round exactly once");
   assert.ok(deployActions >= allySeatIds.length, "Marathon should exercise online troop deployment for each Ally seat");
   assert.deepEqual(combatPlayerIds, allySeatIds, "Marathon should exercise combat participation for all Ally seats");
   for (const { page, playerId } of clients) assertRoomPrivacy(await currentGame(page), playerId);
@@ -746,6 +815,8 @@ try {
     buyActions,
     buyPlayerIds,
     buySourceCounts,
+    cleanupRounds,
+    cleanupTransitions,
     combatPlayerIds,
     deployActions,
     actionCount: actionLog.length,
@@ -769,6 +840,7 @@ try {
   console.log(`card buys: ${summary.buyActions}`);
   console.log(`buying seats: ${summary.buyPlayerIds.length}`);
   console.log(`buy sources: ${JSON.stringify(summary.buySourceCounts)}`);
+  console.log(`round cleanups: ${summary.cleanupTransitions}`);
   console.log(`troop deployments: ${summary.deployActions}`);
   console.log(`combat participant seats: ${summary.combatPlayerIds.length}`);
   console.log(`actions: ${summary.actionCount}`);

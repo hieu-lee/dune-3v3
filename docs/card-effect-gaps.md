@@ -28,7 +28,7 @@ Unsupported spec shapes, including triggers, intentionally throw instead of fall
 2. Agent spy primitives: restricted post icon, recall spy costs beyond typed Reveal Intrigue/strength rewards, post-placement rewards.
 3. Costs and choices: remaining Agent pay-resource shapes beyond current paid reward/payment primitives, optional pay, Agent discard selected card beyond current typed hand-discard, discard-for-reward, and top-deck selection shapes, reward-bearing selected-card trash beyond current source-card, selected-Intrigue, Reveal source-card VP trash, and top-deck selection rewards, discard triggers beyond immediate resource gains, lose Influence outside typed Plot branches and the typed Combat Influence-loss strength path.
 4. Routing: self versus activated Ally outside current typed routes, remaining Commander personal-board influence cases, team-shared Influence checks.
-5. Market/contract effects: discounted and targeted acquire-card variants, remaining take face-up CHOAM contract variants beyond typed acquire/Agent/Plot/Combat public-offer pending actions, complete contract.
+5. Market/contract effects: discounted and targeted acquire-card variants, remaining take face-up CHOAM contract variants beyond typed acquire/Agent/Plot/Combat public-offer pending actions, remaining CHOAM completion triggers for Acquire, Harvest thresholds, and Sardaukar II.
 
 ## Bespoke Rule
 

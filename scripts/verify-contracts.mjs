@@ -27,6 +27,56 @@ const server = await createServer({
 try {
   const data = await server.ssrLoadModule("/src/game/data.ts");
   const state = await server.ssrLoadModule("/src/game/state.ts");
+  const turnActions = await server.ssrLoadModule("/src/app-turn-actions.ts");
+
+  function contractByName(name) {
+    const contract = [...data.standardContracts, ...data.shaddamReservedContracts].find((candidate) => candidate.name === name);
+    assert.ok(contract, `Missing CHOAM contract fixture: ${name}`);
+    return contract;
+  }
+
+  function boardSpaceById(id) {
+    const space = data.boardSpaces.find((candidate) => candidate.id === id);
+    assert.ok(space, `Missing board-space fixture: ${id}`);
+    return space;
+  }
+
+  function playerById(gameState, playerId) {
+    const player = gameState.players.find((candidate) => candidate.id === playerId);
+    assert.ok(player, `Missing player fixture: ${playerId}`);
+    return player;
+  }
+
+  function updatePlayer(gameState, playerId, updater) {
+    return {
+      ...gameState,
+      players: gameState.players.map((player) => player.id === playerId ? updater(player) : player),
+    };
+  }
+
+  function withHeldContracts(gameState, playerId, names) {
+    return updatePlayer(gameState, playerId, (player) => ({
+      ...player,
+      contracts: [
+        ...player.contracts,
+        ...names.map((name) => ({
+          card: contractByName(name),
+          completed: false,
+          takenRound: gameState.round,
+        })),
+      ],
+    }));
+  }
+
+  function playerContract(gameState, playerId, name) {
+    const contract = playerById(gameState, playerId).contracts.find((candidate) => candidate.card.name === name);
+    assert.ok(contract, `${playerId} should hold ${name}`);
+    return contract;
+  }
+
+  function assertCompleted(gameState, playerId, name) {
+    assert.equal(playerContract(gameState, playerId, name).completed, true, `${name} should be complete`);
+  }
 
   assert.equal(data.standardContracts.length, 18, "Public CHOAM bank should exclude reserved Sardaukar contracts");
   assert.deepEqual(
@@ -42,6 +92,34 @@ try {
   assertLocalArt(data.shaddamReservedContracts, "Shaddam reserve");
 
   const game = state.initialGame();
+  const automatedContracts = [...data.standardContracts, ...data.shaddamReservedContracts]
+    .filter((contract) => state.contractHasAutomatedCompletion(contract))
+    .map((contract) => contract.name)
+    .sort();
+  assert.deepEqual(
+    automatedContracts,
+    [
+      "Arrakeen I",
+      "Arrakeen II",
+      "Deliver Supplies",
+      "Espionage I",
+      "Espionage II",
+      "Heighliner I",
+      "Heighliner II",
+      "High Council I",
+      "High Council II",
+      "Immediate",
+      "Research Station I",
+      "Research Station II",
+      "Sardaukar I",
+      "Secrets",
+      "Spice Refinery I",
+      "Spice Refinery II",
+    ].sort(),
+    "Only fully modeled CHOAM contracts should leave the manual fallback path",
+  );
+  assert.equal(state.contractHasAutomatedCompletion(contractByName("Acquire")), false);
+  assert.equal(state.contractHasAutomatedCompletion(contractByName("Harvest 3+")), false);
   assert.equal(game.contractOffer.length, 2, "Initial game should reveal two public CHOAM contracts");
   assert.equal(game.contractDeck.length, 16, "Initial public CHOAM deck should hold the remaining sixteen contracts");
   assert.equal(
@@ -140,6 +218,126 @@ try {
     publicOnlyReservedBlocked,
     game,
     "Public-only CHOAM contract choices with fallback should still reject reserved contracts",
+  );
+
+  const immediate = contractByName("Immediate");
+  const immediatePending = {
+    ...game,
+    contractOffer: [immediate, contractByName("Secrets")],
+    contractDeck: [],
+    pendingAction: { kind: "contract", ownerId: ally.id, source: "Immediate Test", spaceId: "accept-contract" },
+  };
+  const immediateTaken = state.takeChoamContract(immediatePending, immediatePending.pendingAction, immediate.id);
+  const immediateOwner = playerById(immediateTaken, ally.id);
+  assert.equal(
+    immediateOwner.resources.solari,
+    ally.resources.solari + 2,
+    "Immediate should complete and pay 2 Solari as soon as it is taken",
+  );
+  assertCompleted(immediateTaken, ally.id, "Immediate");
+
+  const arrakeenContract = contractByName("Arrakeen I");
+  const arrakeenTakePending = {
+    ...game,
+    contractOffer: [arrakeenContract],
+    contractDeck: [],
+    pendingAction: { kind: "contract", ownerId: ally.id, source: "Arrakeen", spaceId: "arrakeen" },
+  };
+  const arrakeenTaken = state.takeChoamContract(arrakeenTakePending, arrakeenTakePending.pendingAction, arrakeenContract.id);
+  assert.equal(
+    playerContract(arrakeenTaken, ally.id, "Arrakeen I").completed,
+    false,
+    "A board-space contract taken at that same space should wait for a later board-space visit",
+  );
+  assert.equal(playerById(arrakeenTaken, ally.id).resources.water, ally.resources.water);
+
+  const arrakeenHeld = withHeldContracts(game, ally.id, ["Arrakeen I", "Arrakeen II"]);
+  const arrakeenCompleted = state.completeChoamContractsForBoardSpace(arrakeenHeld, ally.id, "arrakeen");
+  const arrakeenOwner = playerById(arrakeenCompleted.state, ally.id);
+  assert.deepEqual(
+    arrakeenCompleted.completedContractIds.sort(),
+    [contractByName("Arrakeen I").id, contractByName("Arrakeen II").id].sort(),
+    "A single board-space visit should complete every matching incomplete contract",
+  );
+  assert.equal(arrakeenCompleted.recruitedTroops, 1);
+  assert.equal(arrakeenOwner.resources.water, ally.resources.water + 1);
+  assert.equal(arrakeenOwner.resources.solari, ally.resources.solari + 1);
+  assert.equal(arrakeenOwner.garrison, ally.garrison + 1);
+  assertCompleted(arrakeenCompleted.state, ally.id, "Arrakeen I");
+  assertCompleted(arrakeenCompleted.state, ally.id, "Arrakeen II");
+
+  const espionageHeld = withHeldContracts(game, ally.id, ["Espionage II"]);
+  const espionageCompleted = state.completeChoamContractsForBoardSpace(espionageHeld, ally.id, "espionage");
+  const espionageOwner = playerById(espionageCompleted.state, ally.id);
+  assert.equal(espionageOwner.resources.solari, ally.resources.solari + 1);
+  assert.equal(espionageOwner.intrigues.length, ally.intrigues.length + 1);
+  assertCompleted(espionageCompleted.state, ally.id, "Espionage II");
+
+  const highCouncilHeld = withHeldContracts(
+    updatePlayer(game, ally.id, (player) => ({
+      ...player,
+      influence: { ...player.influence, bene: 1 },
+    })),
+    ally.id,
+    ["High Council I"],
+  );
+  const highCouncilCompleted = state.completeChoamContractsForBoardSpace(highCouncilHeld, ally.id, "high-council");
+  const highCouncilOwner = playerById(highCouncilCompleted.state, ally.id);
+  assert.equal(highCouncilOwner.influence.bene, 2);
+  assert.equal(highCouncilOwner.vp, playerById(highCouncilHeld, ally.id).vp + 1);
+  assertCompleted(highCouncilCompleted.state, ally.id, "High Council I");
+
+  const sardaukarHeld = withHeldContracts(game, shaddam.id, ["Sardaukar I"]);
+  const sardaukarCompleted = state.completeChoamContractsForBoardSpace(sardaukarHeld, shaddam.id, "sardaukar");
+  assert.equal(playerById(sardaukarCompleted.state, shaddam.id).hand.length, shaddam.hand.length + 2);
+  assertCompleted(sardaukarCompleted.state, shaddam.id, "Sardaukar I");
+
+  const agentCard = {
+    id: "verify-contract-city-card",
+    name: "Verify Contract City Card",
+    icons: ["city"],
+    persuasion: 0,
+    swords: 0,
+    play: "",
+    reveal: "",
+  };
+  const activeAllySeat = game.players.findIndex((player) => player.id === ally.id);
+  const researchStationReady = withHeldContracts(
+    updatePlayer(
+      {
+        ...game,
+        activeSeat: activeAllySeat,
+      },
+      ally.id,
+      (player) => ({
+        ...player,
+        hand: [agentCard],
+        resources: { ...player.resources, water: player.resources.water + 2 },
+      }),
+    ),
+    ally.id,
+    ["Research Station I"],
+  );
+  const researchBefore = playerById(researchStationReady, ally.id);
+  const researchPlaced = turnActions.placeAgentAction(researchStationReady, {
+    commanderTargets: {},
+    selectedCard: agentCard,
+    selectedSpace: boardSpaceById("research-station"),
+  });
+  const researchAfter = playerById(researchPlaced, ally.id);
+  assertCompleted(researchPlaced, ally.id, "Research Station I");
+  assert.equal(
+    researchAfter.garrison,
+    researchBefore.garrison + 3,
+    "Research Station plus Research Station I should recruit all troops before deployment is queued",
+  );
+  const researchDeployPending = [researchPlaced.pendingAction, ...researchPlaced.pendingQueue]
+    .find((pending) => pending?.kind === "deploy");
+  assert.ok(researchDeployPending, "Research Station contract completion should queue a deployment");
+  assert.equal(
+    researchDeployPending.remaining,
+    Math.min(researchAfter.garrison, 5),
+    "Contract-recruited troops should be deployable during the same combat-space Agent turn",
   );
 
   const completed = state.setChoamContractCompleted(next, shaddam.id, sardaukar.id, true);

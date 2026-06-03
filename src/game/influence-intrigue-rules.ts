@@ -1,3 +1,4 @@
+import { resolveAllianceOwnersForInfluenceChanges } from "./alliance-rules";
 import { factionLabels } from "./data";
 import { drawIntrigueCards } from "./intrigue-deck";
 import { allowedInfluenceLossChoices } from "./influence-loss-rules";
@@ -20,6 +21,7 @@ export function resolveLoseInfluenceForIntrigues(
   const owner = state.players.find((player) => player.id === pending.ownerId);
   if (!owner || !loseInfluenceForIntriguesChoices(owner).includes(faction)) return state;
 
+  const previousPlayers = state.players;
   const influenceState = {
     ...state,
     players: state.players.map((player) =>
@@ -31,7 +33,12 @@ export function resolveLoseInfluenceForIntrigues(
       ...state.log,
     ],
   };
-  return drawIntrigueCards(influenceState, owner.id, pending.amount, pending.source);
+  return drawIntrigueCards(
+    resolveAllianceOwnersForInfluenceChanges(influenceState, previousPlayers),
+    owner.id,
+    pending.amount,
+    pending.source,
+  );
 }
 
 export function skipLoseInfluenceForIntrigues(

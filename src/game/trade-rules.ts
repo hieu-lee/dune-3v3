@@ -138,6 +138,7 @@ export function updateTradeSelection(
   resource: TradeGoodId,
   partnerId?: string,
 ): GameState {
+  if (!supportedTradeGoods.has(resource)) return state;
   const nextPartnerId = partnerId ?? pending.partnerId;
   const actor = state.players.find((player) => player.id === pending.actorId);
   const partner = state.players.find((player) => player.id === nextPartnerId);
@@ -146,6 +147,7 @@ export function updateTradeSelection(
 
   const transfersStarted = pending.actorGiven + pending.partnerGiven > 0;
   const selectionChanged = resource !== pending.resource || nextPartnerId !== pending.partnerId;
+  if (!selectionChanged) return state;
   if (transfersStarted && selectionChanged) return state;
 
   return {
@@ -177,6 +179,8 @@ export function transferTradeGood(
   if (from.team !== to.team) return state;
 
   const actorMoved = fromId === pending.actorId;
+  if (actorMoved ? pending.actorGiven > 0 : pending.partnerGiven > 0) return state;
+
   const pendingAction = {
     ...pending,
     actorGiven: pending.actorGiven + (actorMoved ? 1 : 0),
@@ -200,7 +204,7 @@ export function transferTradeGood(
       ...state,
       players,
       pendingAction,
-      log: [`${from.leader} trades ${card.name} to ${to.leader}.`, ...state.log],
+      log: [`${from.leader} trades 1 Intrigue card to ${to.leader}.`, ...state.log],
     };
   }
 

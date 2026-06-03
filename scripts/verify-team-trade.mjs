@@ -47,8 +47,12 @@ try {
     "water",
     "Trade good can be changed before any goods move",
   );
+  const sameSelection = state.updateTradeSelection(spiceTradeState, pending, "spice", partner.id);
+  assert.equal(sameSelection, spiceTradeState, "Re-selecting the current trade good and partner should be a no-op");
   const opponentSelection = state.updateTradeSelection(spiceTradeState, pending, "spice", "p3");
   assert.equal(opponentSelection, spiceTradeState, "Trade partner selection must stay within the actor's team");
+  const unsupportedSelection = state.updateTradeSelection(spiceTradeState, pending, "melange");
+  assert.equal(unsupportedSelection, spiceTradeState, "Trade goods outside the supported set must be ignored");
 
   const spiceActor = spiceTradeState.players.find((player) => player.id === actor.id);
   const spicePartner = spiceTradeState.players.find((player) => player.id === partner.id);
@@ -66,6 +70,14 @@ try {
     "Resource trade should add one good to the recipient",
   );
   assert.equal(spiceAfter.pendingAction?.kind === "trade" ? spiceAfter.pendingAction.actorGiven : 0, 1);
+  const repeatedSpiceAfter = state.transferTradeGood(spiceAfter, spiceAfter.pendingAction, actor.id, partner.id);
+  assert.equal(repeatedSpiceAfter, spiceAfter, "A trade participant cannot give the selected good more than once");
+  const partnerReturnAfter = state.transferTradeGood(spiceAfter, spiceAfter.pendingAction, partner.id, actor.id);
+  assert.equal(
+    partnerReturnAfter.pendingAction?.kind === "trade" ? partnerReturnAfter.pendingAction.partnerGiven : 0,
+    1,
+    "The trade partner can still give their one selected good",
+  );
   const lockedTrade = state.updateTradeSelection(spiceAfter, spiceAfter.pendingAction, "intrigue");
   assert.equal(lockedTrade, spiceAfter, "Trade good cannot change after goods have moved");
   const lockedPartner = state.updateTradeSelection(spiceAfter, spiceAfter.pendingAction, "spice", "p6");
@@ -102,7 +114,18 @@ try {
     "Intrigue trade should add the chosen card to the recipient",
   );
   assert.equal(intrigueAfter.pendingAction?.kind === "trade" ? intrigueAfter.pendingAction.actorGiven : 0, 1);
-  assert.match(intrigueAfter.log[0], new RegExp(`trades ${intrigue.name} to`));
+  assert.equal(
+    intrigueAfter.log[0],
+    `${actor.leader} trades 1 Intrigue card to ${partner.leader}.`,
+    "Intrigue trade logs should not expose the private card name",
+  );
+  assert.equal(
+    intrigueAfter.log[0].includes(intrigue.name),
+    false,
+    "Intrigue trade logs should keep the exact card private",
+  );
+  const repeatedIntrigueAfter = state.transferTradeGood(intrigueAfter, intrigueAfter.pendingAction, actor.id, partner.id, intrigue.id);
+  assert.equal(repeatedIntrigueAfter, intrigueAfter, "A trade participant cannot give multiple Intrigue cards in one trade");
 
   const emptyAfter = state.transferTradeGood(intrigueTradeState, intriguePending, partner.id, actor.id);
   assert.equal(emptyAfter, intrigueTradeState, "Players without Intrigue cards cannot trade one");

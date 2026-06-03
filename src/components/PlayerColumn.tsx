@@ -5,23 +5,27 @@ import {
   resources,
 } from "../app-helpers";
 import { battleIconLabels, factionIds, factionLabels, teams } from "../game/data";
-import { canHaveMakerHooks, playerDoublesConflictRewards } from "../game/state";
-import type { FactionId, GameState } from "../game/types";
+import { canHaveMakerHooks, contractHasAutomatedCompletion, playerDoublesConflictRewards } from "../game/state";
+import type { GameState } from "../game/types";
 
 type PlayerColumnProps = {
+  claimedPlayerId?: string;
+  contractCompletionLocked: boolean;
   game: GameState;
+  roomMode?: boolean;
   tableStateLockedByPending: boolean;
   onOpenLeaderReference: (playerId: string, opener: HTMLButtonElement) => void;
-  onAllianceOwnerChange: (playerId: string, faction: FactionId, ownsAlliance: boolean) => void;
   onMakerHooksChange: (playerId: string, hasHooks: boolean) => void;
   onContractCompletedChange: (playerId: string, contractId: string, completed: boolean) => void;
 };
 
 export function PlayerColumn({
+  claimedPlayerId,
+  contractCompletionLocked,
   game,
+  roomMode = false,
   tableStateLockedByPending,
   onOpenLeaderReference,
-  onAllianceOwnerChange,
   onMakerHooksChange,
   onContractCompletedChange,
 }: PlayerColumnProps) {
@@ -107,15 +111,14 @@ export function PlayerColumn({
             {factionIds.map((faction) => {
               const ownsAlliance = game.alliances[faction] === player.id;
               return (
-                <label className={ownsAlliance ? "selected" : ""} key={faction} title={`${factionLabels[faction]} Alliance`}>
-                  <input
-                    type="checkbox"
-                    checked={ownsAlliance}
-                    aria-label={`${factionLabels[faction]} Alliance`}
-                    onChange={(event) => onAllianceOwnerChange(player.id, faction, event.currentTarget.checked)}
-                  />
+                <span
+                  className={`alliance-token-chip ${ownsAlliance ? "selected" : ""}`}
+                  key={faction}
+                  title={ownsAlliance ? `${player.leader} holds the ${factionLabels[faction]} Alliance` : `${factionLabels[faction]} Alliance`}
+                  aria-label={ownsAlliance ? `${player.leader} holds the ${factionLabels[faction]} Alliance` : `${factionLabels[faction]} Alliance not held by ${player.leader}`}
+                >
                   <span>{factionShortLabels[faction]}</span>
-                </label>
+                </span>
               );
             })}
           </div>
@@ -140,18 +143,42 @@ export function PlayerColumn({
           )}
           {player.contracts.length > 0 && (
             <div className="contract-status-row">
-              {player.contracts.map((contract) => (
-                <label className={contract.completed ? "completed" : ""} key={contract.card.id} title={contract.card.name}>
-                  <input
-                    type="checkbox"
-                    checked={contract.completed}
-                    onChange={(event) =>
-                      onContractCompletedChange(player.id, contract.card.id, event.currentTarget.checked)
-                    }
-                  />
-                  <span>{contract.card.name}</span>
-                </label>
-              ))}
+              {player.contracts.map((contract) => {
+                const automatedCompletion = contractHasAutomatedCompletion(contract.card);
+                const canToggleFallbackCompletion =
+                  !contractCompletionLocked && (!roomMode || claimedPlayerId === player.id);
+                return automatedCompletion
+                  ? (
+                      <div
+                        className={`contract-status-chip ${contract.completed ? "completed" : ""}`}
+                        key={contract.card.id}
+                        title={contract.card.name}
+                      >
+                        <span>{contract.card.name}</span>
+                        <small>{contract.completed ? "Done" : "Pending"}</small>
+                      </div>
+                    )
+                  : (
+                      <label
+                        className={[
+                          contract.completed ? "completed" : "",
+                          canToggleFallbackCompletion ? "" : "disabled",
+                        ].filter(Boolean).join(" ")}
+                        key={contract.card.id}
+                        title={contract.card.name}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={contract.completed}
+                          disabled={!canToggleFallbackCompletion}
+                          onChange={(event) =>
+                            onContractCompletedChange(player.id, contract.card.id, event.currentTarget.checked)
+                          }
+                        />
+                        <span>{contract.card.name}</span>
+                      </label>
+                    );
+              })}
             </div>
           )}
         </article>

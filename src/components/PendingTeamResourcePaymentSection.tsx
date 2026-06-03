@@ -148,6 +148,7 @@ function teamResourcePaymentViewModel(pendingAction: TeamResourcePaymentPendingA
 type PendingTeamResourcePaymentSectionProps = {
   game: GameState;
   pendingAction: TeamResourcePaymentPendingAction;
+  viewerPlayerId?: string;
   onAdjust: (contributorId: string, delta: number) => void;
   onPay: () => void;
   onSkip: () => void;
@@ -156,6 +157,7 @@ type PendingTeamResourcePaymentSectionProps = {
 export function PendingTeamResourcePaymentSection({
   game,
   pendingAction,
+  viewerPlayerId,
   onAdjust,
   onPay,
   onSkip,
@@ -173,6 +175,7 @@ export function PendingTeamResourcePaymentSection({
       source={view.source}
       total={view.total}
       vp={view.vp}
+      viewerPlayerId={viewerPlayerId}
       onAdjust={onAdjust}
       onPay={onPay}
       onSkip={onSkip}

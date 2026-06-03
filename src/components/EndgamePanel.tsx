@@ -17,8 +17,11 @@ type EndgameConditionalChoice = {
 
 type EndgamePanelProps = {
   conditionalChoices: EndgameConditionalChoice[];
+  endgameReady?: Record<string, boolean | undefined>;
   game: GameState;
   iconChoices: EndgameBattleIconChoice[];
+  roomMode?: boolean;
+  viewerPlayerId?: string;
   onFinalize: () => void;
   onScoreConditional: (playerId: string, intrigueId: string) => void;
   onScoreIcon: (playerId: string, intrigueId: string, conflictId: string) => void;
@@ -26,13 +29,31 @@ type EndgamePanelProps = {
 
 export function EndgamePanel({
   conditionalChoices,
+  endgameReady = {},
   game,
   iconChoices,
+  roomMode = false,
+  viewerPlayerId,
   onFinalize,
   onScoreConditional,
   onScoreIcon,
 }: EndgamePanelProps) {
   const hasChoices = iconChoices.length + conditionalChoices.length > 0;
+  const viewerHasChoices = Boolean(
+    viewerPlayerId &&
+    (iconChoices.some((choice) => choice.playerId === viewerPlayerId) ||
+      conditionalChoices.some((choice) => choice.playerId === viewerPlayerId)),
+  );
+  const viewerReady = Boolean(viewerPlayerId && endgameReady[viewerPlayerId]);
+  const readyCount = game.players.filter((player) => endgameReady[player.id]).length;
+  const finalizeDisabled = roomMode && (!viewerPlayerId || viewerReady || viewerHasChoices);
+  const finalizeLabel = roomMode
+    ? viewerReady
+      ? `Ready (${readyCount}/${game.players.length})`
+      : viewerHasChoices
+        ? "Score Your Endgame Intrigues"
+        : `Ready (${readyCount}/${game.players.length})`
+    : "Finalize Scores";
 
   return (
     <div className="pending-panel endgame-panel">
@@ -73,7 +94,7 @@ export function EndgamePanel({
             );
           })}
           {!hasChoices && <span>No Endgame Intrigues are scoreable.</span>}
-          <button type="button" onClick={onFinalize}>Finalize Scores</button>
+          <button type="button" disabled={finalizeDisabled} onClick={onFinalize}>{finalizeLabel}</button>
         </div>
       )}
     </div>

@@ -9,6 +9,7 @@ type PendingTradePanelProps = {
   partners: Player[];
   pending: TradePendingAction;
   tradeLocked: boolean;
+  viewerPlayerId?: string;
   onDone: () => void;
   onTransfer: (fromId: string, toId: string, intrigueId?: string) => void;
   onUpdateTrade: (resource: TradeGoodId, partnerId?: string) => void;
@@ -20,10 +21,16 @@ export function PendingTradePanel({
   partners,
   pending,
   tradeLocked,
+  viewerPlayerId,
   onDone,
   onTransfer,
   onUpdateTrade,
 }: PendingTradePanelProps) {
+  const actorCanGive = pending.actorGiven === 0;
+  const partnerCanGive = pending.partnerGiven === 0;
+  const actorControlsLocked = Boolean(viewerPlayerId && viewerPlayerId !== actor.id);
+  const viewerCanTransfer = (ownerId: string) => !viewerPlayerId || viewerPlayerId === ownerId;
+
   return (
     <div className="pending-controls trade-controls">
       <div className="resource-picker">
@@ -33,7 +40,7 @@ export function PendingTradePanel({
             className={pending.resource === id ? "selected" : ""}
             key={id}
             onClick={() => onUpdateTrade(id)}
-            disabled={tradeLocked && pending.resource !== id}
+            disabled={actorControlsLocked || pending.resource === id || (tradeLocked && pending.resource !== id)}
             title={label}
           >
             <Icon size={14} />
@@ -48,7 +55,7 @@ export function PendingTradePanel({
             className={partner.id === candidate.id ? "selected" : ""}
             key={candidate.id}
             onClick={() => onUpdateTrade(pending.resource, candidate.id)}
-            disabled={tradeLocked && partner.id !== candidate.id}
+            disabled={actorControlsLocked || partner.id === candidate.id || (tradeLocked && partner.id !== candidate.id)}
           >
             {candidate.leader}
           </button>
@@ -58,6 +65,7 @@ export function PendingTradePanel({
         <div className="trade-intrigue-grid">
           {[actor, partner].map((owner) => {
             const recipient = owner.id === actor.id ? partner : actor;
+            const canGive = owner.id === actor.id ? actorCanGive : partnerCanGive;
             return (
               <div className="trade-intrigue-column" key={owner.id}>
                 <strong>{owner.leader}</strong>
@@ -67,6 +75,7 @@ export function PendingTradePanel({
                     type="button"
                     key={card.id}
                     onClick={() => onTransfer(owner.id, recipient.id, card.id)}
+                    disabled={!viewerCanTransfer(owner.id) || !canGive}
                     title={`Trade ${card.name} to ${recipient.leader}`}
                   >
                     {card.thumbnailPath && <img src={card.thumbnailPath} alt="" />}
@@ -79,15 +88,23 @@ export function PendingTradePanel({
         </div>
       ) : (
         <>
-          <button type="button" onClick={() => onTransfer(actor.id, partner.id)}>
+          <button
+            type="button"
+            onClick={() => onTransfer(actor.id, partner.id)}
+            disabled={!viewerCanTransfer(actor.id) || !actorCanGive}
+          >
             {actor.leader} gives 1 ({pending.actorGiven})
           </button>
-          <button type="button" onClick={() => onTransfer(partner.id, actor.id)}>
+          <button
+            type="button"
+            onClick={() => onTransfer(partner.id, actor.id)}
+            disabled={!viewerCanTransfer(partner.id) || !partnerCanGive}
+          >
             {partner.leader} gives 1 ({pending.partnerGiven})
           </button>
         </>
       )}
-      <button type="button" onClick={onDone}>Done</button>
+      <button type="button" onClick={onDone} disabled={actorControlsLocked}>Done</button>
     </div>
   );
 }

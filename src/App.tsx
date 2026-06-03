@@ -10,6 +10,9 @@ import { MarketPanel } from "./components/MarketPanel";
 import { PendingActionPanel } from "./components/PendingActionPanel";
 import { PlayerColumn } from "./components/PlayerColumn";
 import { RecentLogPanel } from "./components/RecentLogPanel";
+import { RoomPanel } from "./components/RoomPanel";
+import { RoomPendingPanel } from "./components/RoomPendingPanel";
+import { RoomPrivatePanel } from "./components/RoomPrivatePanel";
 import { TableSidebar } from "./components/TableSidebar";
 import {
   tableStateLockedByPendingActions,
@@ -43,15 +46,18 @@ import {
   scoreEndgameConditionalIntrigue,
   setMakerHooks,
   setShieldWall,
-  setAllianceOwner,
   setChoamContractCompleted,
 } from "./game/state";
 import type {
   Card,
-  FactionId,
   GameState,
 } from "./game/types";
 import type { CombatIntrigueChoice } from "./game/state";
+import { roomPendingActionCanResolve } from "./multiplayer/room-actions";
+import { createRoomPendingActionHandlers } from "./multiplayer/room-pending-action-handlers";
+import { createRoomPlotActionHandlers } from "./multiplayer/room-plot-action-handlers";
+import type { RoomSnapshot } from "./multiplayer/room-state";
+import { useRoomSession } from "./multiplayer/useRoomSession";
 
 export {
   boardSpaceIntrigueGainFor,
@@ -64,10 +70,11 @@ declare global {
   interface Window {
     __DUNE_DEBUG__?: {
       capture: (label?: string) => Promise<unknown>;
-      getCommanderTargets: () => Record<string, string>;
-      getGame: () => GameState;
-      setGame: (game: GameState) => void;
-      setCommanderTarget: (commanderId: string, allyId: string) => void;
+	      getCommanderTargets: () => Record<string, string>;
+	      getGame: () => GameState;
+	      getRoomSnapshot: () => RoomSnapshot | null;
+	      setGame: (game: GameState) => void;
+	      setCommanderTarget: (commanderId: string, allyId: string) => void;
     };
     __DUNE_DEBUG_CAPTURE__?: (request: { label?: string; game: GameState }) => Promise<unknown>;
   }
@@ -77,6 +84,7 @@ const appEnv = (import.meta as ImportMeta & { env?: { DEV?: boolean; VITE_DUNE_D
 const browserDebugEnabled = Boolean(appEnv?.DEV || appEnv?.VITE_DUNE_DEBUG === "1");
 
 export default function App() {
+  const roomSession = useRoomSession();
   const [game, setGame] = useState<GameState>(() => initialGame());
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [selectedSpaceId, setSelectedSpaceId] = useState<string | null>(null);
@@ -84,6 +92,8 @@ export default function App() {
   const [commanderTargets, setCommanderTargets] = useState<Record<string, string>>({});
   const [changeAllegiancesSelections, setChangeAllegiancesSelections] = useState<Record<string, ChangeAllegiancesSelection>>({});
   const leaderOpenerRef = useRef<HTMLButtonElement | null>(null);
+  const localGameRef = useRef<GameState | null>(null);
+  const wasInRoomRef = useRef(false);
 
   useEffect(() => {
     if (!browserDebugEnabled) {
@@ -104,20 +114,43 @@ export default function App() {
       void window.__DUNE_DEBUG__?.capture("hotkey");
     }
     window.__DUNE_DEBUG__ = {
-      capture,
-      getCommanderTargets: () => commanderTargets,
-      getGame: () => game,
-      setCommanderTarget: (commanderId, allyId) => setCommanderTargets((current) => ({ ...current, [commanderId]: allyId })),
-      setGame: (nextGame) => setGame(nextGame),
-    };
+	      capture,
+	      getCommanderTargets: () => commanderTargets,
+	      getGame: () => game,
+	      getRoomSnapshot: () => roomSession.snapshot,
+	      setCommanderTarget: (commanderId, allyId) => setCommanderTargets((current) => ({ ...current, [commanderId]: allyId })),
+	      setGame: (nextGame) => setGame(nextGame),
+	    };
     window.addEventListener("keydown", handleDebugCaptureKeydown);
     return () => {
       window.removeEventListener("keydown", handleDebugCaptureKeydown);
       delete window.__DUNE_DEBUG__;
     };
-  }, [commanderTargets, game]);
+	  }, [commanderTargets, game, roomSession.snapshot]);
+
+  useEffect(() => {
+    if (!roomSession.snapshot) {
+      if (wasInRoomRef.current && !roomSession.inRoom) {
+        wasInRoomRef.current = false;
+        setGame(localGameRef.current ?? initialGame());
+        setSelectedCardId(null);
+        setSelectedSpaceId(null);
+      }
+      return;
+    }
+    if (!wasInRoomRef.current) {
+      localGameRef.current = game;
+      wasInRoomRef.current = true;
+    }
+    setGame(roomSession.snapshot.game);
+    setSelectedCardId(null);
+    setSelectedSpaceId(null);
+  }, [roomSession.inRoom, roomSession.snapshot]);
 
   const activePlayer = game.players[game.activeSeat];
+  const claimedPlayer = roomSession.claimedPlayerId
+    ? game.players.find((player) => player.id === roomSession.claimedPlayerId)
+    : undefined;
   const activeAllies = game.players.filter((player) => player.team === activePlayer.team && player.role === "Ally");
   const activatedAlly =
     activePlayer.role === "Commander"
@@ -126,6 +159,7 @@ export default function App() {
   const selectedCard = activePlayer.hand.find((card) => card.id === selectedCardId) ?? null;
   const selectedSpace = boardSpaces.find((space) => space.id === selectedSpaceId) ?? null;
   const selectedLeader = game.players.find((player) => player.id === selectedLeaderId) ?? null;
+  const canControlActivePlayer = !roomSession.inRoom || roomSession.claimedPlayerId === activePlayer.id;
 
   function closeLeaderReference() {
     setSelectedLeaderId(null);
@@ -138,7 +172,7 @@ export default function App() {
   }
 
   const legalSpaces = useMemo(() => {
-    if (game.phase !== "playing" || game.agentTurnComplete || !selectedCard || activePlayer.agentsReady <= 0 || game.pendingAction) return new Set<string>();
+    if (!canControlActivePlayer || game.phase !== "playing" || game.agentTurnComplete || !selectedCard || activePlayer.agentsReady <= 0 || game.pendingAction) return new Set<string>();
     return new Set(
       boardSpaces
         .filter((space) => !game.spaces[space.id])
@@ -146,19 +180,40 @@ export default function App() {
         .filter((space) => canPay(activePlayer, effectiveCost(space, game.players)))
         .map((space) => space.id),
     );
-  }, [activePlayer, game.agentTurnComplete, game.pendingAction, game.phase, game.players, game.sharedSpyPosts, game.spaces, game.spyPosts, game.swordmasterClaimed, selectedCard]);
+  }, [activePlayer, canControlActivePlayer, game.agentTurnComplete, game.pendingAction, game.phase, game.players, game.sharedSpyPosts, game.spaces, game.spyPosts, game.swordmasterClaimed, selectedCard]);
 
-  const canPlayAgent = Boolean(game.phase === "playing" && !game.agentTurnComplete && selectedCard && selectedSpace && legalSpaces.has(selectedSpace.id) && !game.pendingAction);
+  const canPlayAgent = Boolean(canControlActivePlayer && game.phase === "playing" && !game.agentTurnComplete && selectedCard && selectedSpace && legalSpaces.has(selectedSpace.id) && !game.pendingAction);
 
   function playAgent() {
     if (game.phase !== "playing" || !canPlayAgent || !selectedCard || !selectedSpace) return;
+    if (roomSession.inRoom) {
+      void roomSession.sendAction({
+        kind: "place-agent",
+        cardId: selectedCard.id,
+        spaceId: selectedSpace.id,
+        commanderTargets,
+      }).then((applied) => {
+        if (!applied) return;
+        setSelectedCardId(null);
+        setSelectedSpaceId(null);
+      });
+      return;
+    }
     setGame((current) => placeAgentAction(current, { commanderTargets, selectedCard, selectedSpace }));
     setSelectedCardId(null);
     setSelectedSpaceId(null);
   }
 
   function endAgentTurn() {
-    if (game.phase !== "playing" || game.pendingAction || game.pendingQueue.length > 0 || !game.agentTurnComplete) return;
+    if (!canControlActivePlayer || game.phase !== "playing" || game.pendingAction || game.pendingQueue.length > 0 || !game.agentTurnComplete) return;
+    if (roomSession.inRoom) {
+      void roomSession.sendAction({ kind: "end-agent" }).then((applied) => {
+        if (!applied) return;
+        setSelectedCardId(null);
+        setSelectedSpaceId(null);
+      });
+      return;
+    }
     setGame((current) => {
       if (current.phase !== "playing" || current.pendingAction || current.pendingQueue.length > 0 || !current.agentTurnComplete) {
         return current;
@@ -179,20 +234,28 @@ export default function App() {
   }
 
   function revealTurn() {
-    if (game.phase !== "playing") return;
+    if (!canControlActivePlayer || game.phase !== "playing") return;
     if (game.pendingAction) return;
     if (game.agentTurnComplete) return;
     if (activePlayer.revealed) return;
+    if (roomSession.inRoom) {
+      void roomSession.sendAction({ kind: "reveal-turn", commanderTargets });
+      return;
+    }
     const revealPlan = revealTurnPlan(activePlayer, game);
     setGame((current) => revealTurnAction(current, { commanderTargets, revealPlan }));
   }
 
   function buyCard(card: Card) {
-    if (game.phase !== "playing") return;
+    if (!canControlActivePlayer || game.phase !== "playing") return;
     if (game.pendingAction || game.pendingQueue.length > 0) return;
     const manipulatedCard = activePlayer.manipulatedCards.some((candidate) => candidate.id === card.id);
     const cardCost = manipulatedCard ? manipulateAcquisitionCost(card) : card.cost ?? 0;
     if (!activePlayer.revealed || activePlayer.persuasion < cardCost) return;
+    if (roomSession.inRoom) {
+      void roomSession.sendAction({ kind: "buy-card", cardId: card.id, commanderTargets });
+      return;
+    }
     setGame((current) => {
       const buyer = current.players[current.activeSeat];
       const callToArmsRecruitOwnerId =
@@ -204,9 +267,17 @@ export default function App() {
   }
 
   function endReveal() {
-    if (game.phase !== "playing") return;
+    if (!canControlActivePlayer || game.phase !== "playing") return;
     if (game.pendingAction) return;
     if (!activePlayer.revealed) return;
+    if (roomSession.inRoom) {
+      void roomSession.sendAction({ kind: "end-reveal" }).then((applied) => {
+        if (!applied) return;
+        setSelectedCardId(null);
+        setSelectedSpaceId(null);
+      });
+      return;
+    }
     setGame((current) => {
       return finishRevealTurn(current, current.players[current.activeSeat].id);
     });
@@ -215,14 +286,15 @@ export default function App() {
   }
 
   function updateContractCompleted(playerId: string, contractId: string, completed: boolean) {
+    if (roomSession.inRoom) {
+      void roomSession.sendAction({ kind: "set-contract-completed", playerId, contractId, completed });
+      return;
+    }
     setGame((current) => setChoamContractCompleted(current, playerId, contractId, completed));
   }
 
-  function updateAllianceOwner(playerId: string, faction: FactionId, ownsAlliance: boolean) {
-    setGame((current) => setAllianceOwner(current, faction, ownsAlliance ? playerId : undefined));
-  }
-
   function updateMakerHooks(playerId: string, hasHooks: boolean) {
+    if (roomSession.inRoom) return;
     setGame((current) => {
       if (tableStateLockedByPendingActions(current)) return current;
       return setMakerHooks(current, playerId, hasHooks);
@@ -230,6 +302,7 @@ export default function App() {
   }
 
   function updateShieldWall(standing: boolean) {
+    if (roomSession.inRoom) return;
     setGame((current) => {
       if (tableStateLockedByPendingActions(current)) return current;
       return setShieldWall(current, standing);
@@ -238,6 +311,11 @@ export default function App() {
 
   function playCombatCard(intrigueId: string, targetId?: string, combatChoice?: CombatIntrigueChoice) {
     if (game.phase !== "combat") return;
+    if (!canControlActivePlayer) return;
+    if (roomSession.inRoom) {
+      void roomSession.sendAction({ kind: "play-combat-intrigue", intrigueId, targetId, combatChoice });
+      return;
+    }
     setGame((current) =>
       playCombatIntrigue(current, current.players[current.activeSeat].id, intrigueId, targetId, combatChoice),
     );
@@ -245,22 +323,40 @@ export default function App() {
 
   function passCombatCard() {
     if (game.phase !== "combat") return;
+    if (!canControlActivePlayer) return;
+    if (roomSession.inRoom) {
+      void roomSession.sendAction({ kind: "pass-combat" });
+      return;
+    }
     setGame((current) => passCombatIntrigue(current, current.players[current.activeSeat].id));
   }
 
   function scoreEndgameIntrigue(playerId: string, intrigueId: string, conflictId: string) {
+    if (roomSession.inRoom) {
+      void roomSession.sendAction({ kind: "score-endgame-icon", playerId, intrigueId, conflictId });
+      return;
+    }
     setGame((current) => scoreEndgameBattleIconIntrigue(current, playerId, intrigueId, conflictId));
   }
 
   function scoreConditionalEndgameIntrigue(playerId: string, intrigueId: string) {
+    if (roomSession.inRoom) {
+      void roomSession.sendAction({ kind: "score-endgame-conditional", playerId, intrigueId });
+      return;
+    }
     setGame((current) => scoreEndgameConditionalIntrigue(current, playerId, intrigueId));
   }
 
   function finalizeEndgame() {
+    if (roomSession.inRoom) {
+      void roomSession.sendAction({ kind: "finalize-endgame" });
+      return;
+    }
     setGame((current) => finishEndgame(current));
   }
 
   function resetGame() {
+    if (roomSession.inRoom) return;
     setGame(initialGame());
     setSelectedCardId(null);
     setSelectedSpaceId(null);
@@ -269,27 +365,60 @@ export default function App() {
   }
 
   const pendingAction = game.pendingAction;
-  const tableStateLockedByPending = tableStateLockedByPendingActions(game);
+  const tableStateLockedByPending = tableStateLockedByPendingActions(game) || roomSession.inRoom;
   const combatActor = game.phase === "combat" ? game.players[game.activeSeat] : undefined;
-  const endgameChoices = endgameBattleIconChoices(game);
-  const conditionalEndgameChoices = endgameConditionalIntrigueChoices(game);
+  const endgameChoices = roomSession.inRoom
+    ? roomSession.snapshot?.endgameChoices.iconChoices ?? []
+    : endgameBattleIconChoices(game);
+  const conditionalEndgameChoices = roomSession.inRoom
+    ? roomSession.snapshot?.endgameChoices.conditionalChoices ?? []
+    : endgameConditionalIntrigueChoices(game);
   const playingPhase = game.phase === "playing";
-  const pendingLocked = Boolean(game.pendingAction) || game.pendingQueue.length > 0;
+  const roomActionLocked = roomSession.inRoom && !canControlActivePlayer;
+  const pendingLocked = Boolean(game.pendingAction) || game.pendingQueue.length > 0 || roomActionLocked;
   const plotIntrigueLocked = !playingPhase || pendingLocked;
   const debugCaptureAvailable = browserDebugEnabled && typeof window.__DUNE_DEBUG_CAPTURE__ === "function";
+  const canResolveRoomPending = roomSession.inRoom && roomPendingActionCanResolve(game, roomSession.claimedPlayerId);
   const pendingActionHandlers = createPendingActionHandlers({
     commanderTargets,
     game,
     setGame,
   });
+  const roomPendingActionHandlers = createRoomPendingActionHandlers(roomSession.sendAction);
   const plotActionHandlers = createPlotActionHandlers({
     commanderTargets,
     setChangeAllegiancesSelections,
     setGame,
   });
+  const roomPlotActionHandlers = createRoomPlotActionHandlers(
+    roomSession.sendAction,
+    commanderTargets,
+    setChangeAllegiancesSelections,
+  );
 
   return (
     <main className="app-shell">
+      <RoomPanel
+        claimedPlayerId={roomSession.claimedPlayerId}
+        error={roomSession.error}
+        inRoom={roomSession.inRoom}
+        roomId={roomSession.roomId}
+        snapshot={roomSession.snapshot}
+        status={roomSession.status}
+        onClaimSeat={roomSession.claimSeat}
+        onCreateRoom={roomSession.createRoom}
+        onJoinRoom={roomSession.joinRoom}
+        onLeaveRoom={roomSession.leaveRoom}
+      />
+      {roomSession.inRoom && <RoomPrivatePanel player={claimedPlayer} />}
+      {roomSession.inRoom && !canResolveRoomPending && (
+        <RoomPendingPanel
+          claimedPlayerId={roomSession.claimedPlayerId}
+          game={game}
+          onChooseThroneRowCard={(cardId) => void roomSession.sendAction({ kind: "choose-throne-row-card", cardId })}
+        />
+      )}
+
       <CommandBar
         activePlayer={activePlayer}
         game={game}
@@ -307,16 +436,18 @@ export default function App() {
         <BoardPanel
           game={game}
           legalSpaceIds={legalSpaces}
-          playingPhase={playingPhase}
+          playingPhase={playingPhase && !roomActionLocked}
           selectedSpaceId={selectedSpaceId}
           onSelectSpace={setSelectedSpaceId}
         />
 
         <PlayerColumn
+          claimedPlayerId={roomSession.claimedPlayerId}
+          contractCompletionLocked={tableStateLockedByPendingActions(game) || game.phase === "finished"}
           game={game}
+          roomMode={roomSession.inRoom}
           tableStateLockedByPending={tableStateLockedByPending}
           onOpenLeaderReference={openLeaderReference}
-          onAllianceOwnerChange={updateAllianceOwner}
           onMakerHooksChange={updateMakerHooks}
           onContractCompletedChange={updateContractCompleted}
         />
@@ -325,7 +456,7 @@ export default function App() {
       <LeaderReferenceModal player={selectedLeader} onClose={closeLeaderReference} />
 
       <section className="action-dock">
-        {game.phase === "combat" && combatActor && !pendingAction && (
+        {game.phase === "combat" && combatActor && !pendingAction && (!roomSession.inRoom || canControlActivePlayer) && (
           <CombatIntriguePanel
             actor={combatActor}
             game={game}
@@ -337,19 +468,23 @@ export default function App() {
         {(game.phase === "endgame" || game.phase === "finished") && (
           <EndgamePanel
             conditionalChoices={conditionalEndgameChoices}
+            endgameReady={roomSession.snapshot?.endgameReady}
             game={game}
             iconChoices={endgameChoices}
+            roomMode={roomSession.inRoom}
+            viewerPlayerId={roomSession.claimedPlayerId}
             onFinalize={finalizeEndgame}
             onScoreConditional={scoreConditionalEndgameIntrigue}
             onScoreIcon={scoreEndgameIntrigue}
           />
         )}
 
-        {pendingAction && (
+        {pendingAction && (!roomSession.inRoom || canResolveRoomPending) && (
           <PendingActionPanel
             game={game}
             pendingAction={pendingAction}
-            {...pendingActionHandlers}
+            viewerPlayerId={roomSession.inRoom ? roomSession.claimedPlayerId : undefined}
+            {...(roomSession.inRoom ? roomPendingActionHandlers : pendingActionHandlers)}
           />
         )}
 
@@ -361,7 +496,7 @@ export default function App() {
           canPlayAgent={canPlayAgent}
           pendingActionActive={Boolean(game.pendingAction)}
           pendingLocked={pendingLocked}
-          playingPhase={playingPhase}
+          playingPhase={playingPhase && !roomActionLocked}
           selectedCardId={selectedCardId}
           onEndAgentTurn={endAgentTurn}
           onEndReveal={endReveal}
@@ -381,7 +516,7 @@ export default function App() {
             changeAllegiancesSelections={changeAllegiancesSelections}
             game={game}
             plotIntrigueLocked={plotIntrigueLocked}
-            {...plotActionHandlers}
+            {...(roomSession.inRoom ? roomPlotActionHandlers : plotActionHandlers)}
           />
         </ActiveHandPanel>
 
@@ -389,7 +524,7 @@ export default function App() {
           activePlayer={activePlayer}
           game={game}
           pendingLocked={pendingLocked}
-          playingPhase={playingPhase}
+          playingPhase={playingPhase && !roomActionLocked}
           onBuyCard={buyCard}
         />
 

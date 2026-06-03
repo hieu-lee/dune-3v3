@@ -9,19 +9,24 @@ type OptionalSpacePaymentPendingAction = Extract<PendingAction, { kind: "optiona
 type PendingBoardInfluenceChoicePanelProps = {
   game: GameState;
   pending: BoardInfluenceChoicePendingAction;
+  viewerPlayerId?: string;
   onChoose: (ownerId: string, faction: FactionId) => void;
 };
 
 export function PendingBoardInfluenceChoicePanel({
   game,
   pending,
+  viewerPlayerId,
   onChoose,
 }: PendingBoardInfluenceChoicePanelProps) {
   const amount = pending.amount ?? 1;
+  const choices = viewerPlayerId
+    ? pending.choices.filter((choice) => choice.ownerId === viewerPlayerId)
+    : pending.choices;
   return (
     <div className="pending-controls support-grid">
       <span>Choose Influence from {pending.source}</span>
-      {pending.choices.map((choice) => {
+      {choices.map((choice) => {
         const owner = game.players.find((player) => player.id === choice.ownerId);
         return (
           <button
@@ -36,6 +41,7 @@ export function PendingBoardInfluenceChoicePanel({
           </button>
         );
       })}
+      {choices.length === 0 && <span>No Influence choices for this seat</span>}
     </div>
   );
 }

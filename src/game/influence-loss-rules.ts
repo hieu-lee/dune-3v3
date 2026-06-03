@@ -1,3 +1,4 @@
+import { resolveAllianceOwnersForInfluenceChanges } from "./alliance-rules";
 import { factionLabels } from "./data";
 import { commanderPersonalFaction } from "./commander-rules";
 import {
@@ -77,6 +78,7 @@ export function loseInfluenceForPending(
   const owner = state.players.find((player) => player.id === ownerId);
   if (!owner) return state;
 
+  const previousPlayers = state.players;
   const players = state.players.map((player) => {
     let next = player;
     if (player.id === owner.id) next = adjustInfluence(next, faction, -1);
@@ -84,7 +86,7 @@ export function loseInfluenceForPending(
     return next;
   });
 
-  return {
+  return resolveAllianceOwnersForInfluenceChanges({
     ...state,
     players,
     ...advancePendingAction(state),
@@ -92,7 +94,7 @@ export function loseInfluenceForPending(
       `${owner.leader} loses 1 ${factionLabels[faction]} Influence for ${pending.source}, adding ${pending.strength} strength to ${recipient.leader}.`,
       ...state.log,
     ],
-  };
+  }, previousPlayers);
 }
 
 export function skipLoseInfluence(state: GameState, pending: LoseInfluencePendingAction): GameState {

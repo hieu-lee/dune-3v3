@@ -4,6 +4,7 @@ export {
 } from "./agent-effects";
 
 export {
+  resolveAllianceOwners,
   setAllianceOwner,
 } from "./alliance-rules";
 
@@ -40,6 +41,9 @@ export {
 } from "./round-transition-rules";
 
 export {
+  completeChoamContractsForBoardSpace,
+  completeImmediateChoamContracts,
+  contractHasAutomatedCompletion,
   resolvePayResourceForContractsChoice,
   setChoamContractCompleted,
   skipPayResourceForContracts,

@@ -10,6 +10,7 @@ import type { FactionId, GameState, PendingAction, TradeGoodId, TrashCardZone } 
 export type PendingActionPanelProps = {
   game: GameState;
   pendingAction: PendingAction;
+  viewerPlayerId?: string;
   acquirePendingCard: (cardId: string) => void;
   adjustRevealReward: (persuasionDelta: number, strengthDelta: number) => void;
   adjustTeamResourcePayment: (contributorId: string, delta: number) => void;

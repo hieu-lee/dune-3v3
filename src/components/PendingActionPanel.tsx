@@ -72,6 +72,7 @@ import { PendingTopDeckSelectionPanel } from "./PendingTopDeckSelectionPanel";
 export function PendingActionPanel({
   game,
   pendingAction,
+  viewerPlayerId,
   acquirePendingCard,
   adjustRevealReward,
   adjustTeamResourcePayment,
@@ -445,6 +446,7 @@ export function PendingActionPanel({
           pending={pendingAction}
           players={game.players}
           recipient={pendingInfluenceRecipient}
+          viewerPlayerId={viewerPlayerId}
           onLoseInfluence={loseInfluence}
           onSkip={skipInfluenceLoss}
         />
@@ -489,6 +491,7 @@ export function PendingActionPanel({
           owner={pendingMakerOwner}
           pending={pendingAction}
           spiceOwner={pendingMakerSpiceOwner}
+          viewerPlayerId={viewerPlayerId}
           onChoose={chooseMakerReward}
         />
       )}
@@ -498,6 +501,7 @@ export function PendingActionPanel({
           label={pendingSietchLabel}
           pending={pendingAction}
           canRecruitTroop={pendingSietchCanRecruitTroop}
+          viewerPlayerId={viewerPlayerId}
           onChoose={chooseSietchTabr}
         />
       )}
@@ -588,6 +592,7 @@ export function PendingActionPanel({
         <PendingBoardInfluenceChoicePanel
           game={game}
           pending={pendingAction}
+          viewerPlayerId={viewerPlayerId}
           onChoose={chooseBoardInfluence}
         />
       )}
@@ -633,6 +638,7 @@ export function PendingActionPanel({
         <PendingTeamResourcePaymentSection
           game={game}
           pendingAction={pendingAction}
+          viewerPlayerId={viewerPlayerId}
           onAdjust={adjustTeamResourcePayment}
           onPay={chooseTeamResourcePayment}
           onSkip={skipTeamResourcePaymentChoice}
@@ -654,6 +660,7 @@ export function PendingActionPanel({
           partners={tradePartners}
           pending={pendingAction}
           tradeLocked={tradeLocked}
+          viewerPlayerId={viewerPlayerId}
           onDone={clearPendingAction}
           onTransfer={transferTrade}
           onUpdateTrade={updateTrade}

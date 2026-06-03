@@ -41,11 +41,20 @@ pnpm run debug:browser -- --scenario all --out artifacts/qa/browser-debug-all-ch
 pnpm run debug:browser -- --scenario commander-reveal --out artifacts/qa/browser-debug-commander-reveal --no-trace
 pnpm run debug:browser:headed -- --scenario all --out artifacts/qa/browser-debug-headed-all
 pnpm run debug:game
+pnpm run debug:room:smoke
+pnpm run debug:room:complete
+pnpm run debug:room:marathon
 ```
 
 `pnpm run verify:browser-debug-pipeline` is a static contract check that keeps the package scripts, scenario inventory, generated artifact names, debug globals, README, and this document aligned. It is included in `pnpm run verify`, but it does not replace a real browser smoke run when the browser pipeline itself changes.
 
 Use `debug:game:smoke` before every gameplay/browser-debug commit. It runs the manual scenario with `--capture-smoke`, is short and headless, and proves the manual capture bridge still works.
+
+Use `debug:room:smoke` when the room/session layer, hidden projection, reconnect behavior, room action dispatch, or room pending dispatch changes. It starts the private room server, verifies claim/reconnect/private projection, resolves setup online, advances an online Reveal turn, resolves a server-backed pending choice, plays a Plot Intrigue online, plays and passes combat online, scores battle-icon plus conditional Endgame Intrigues before finalizing online, and writes screenshots, state JSON, console logs, request failures, and `summary.json` under `artifacts/qa/browser-room-smoke`. Use `pnpm run verify:room-server` with it when persistence changes; that verifier restarts the room server against the same storage file and checks token recovery, hidden projections, and continued legal actions.
+
+Use `debug:room:complete` when a change may affect all-seat room coordination. It opens six isolated browser contexts, claims p1-p6, verifies seat identity, hidden projections, reconnect recovery, client and server permission failures, cross-client convergence, pending ownership, and six-player Endgame readiness/finalization. It writes screenshots, state JSON, console logs, request failures, and `summary.json` under `artifacts/qa/browser-room-complete-flow`.
+
+Use `debug:room:marathon` for a heavier six-browser reveal-only natural room marathon. It claims p1-p6, verifies private projections, resolves setup, drives legal room actions through repeated Reveal/end-Reveal/combat-pass cycles until the Conflict deck naturally empties, resolves Endgame Intrigue scoring, finalizes all seats, and writes screenshots, state JSON, action logs, console logs, request failures, and `summary.json` under `artifacts/qa/browser-room-marathon`.
 
 Use `debug:browser -- --scenario all` when a change may affect several pending-action surfaces. It creates many scenario screenshots under the selected `--out` directory and records a trace unless `--no-trace` is passed.
 
@@ -118,6 +127,7 @@ Current scenarios:
 | `combat-intrigues` | Combat Intrigue targeting/play flow, Go To Ground retreat plus optional spy placement, Spice is Power spend branch, Impress pending acquisition, Find Weakness optional spy recall, Spring The Trap required spy recall, Devour optional trash, Questionable Methods optional Influence loss, Reach Agreement retreat plus contract pending, Tactical Option dynamic retreat and strength branches, plus a mobile layout screenshot. |
 | `commander-reveal` | Commander reveal targeting, Call to Arms, and acquire follow-up. |
 | `control-defense` | Critical-location control defense on desktop/mobile. |
+| `contract-completion` | Immediate CHOAM completion on take, modeled board-space CHOAM completion from Agent placement, and automated contract chips. |
 | `conflict-vp` | Conflict VP conversion resource and spy branches. |
 | `military-choices` | Deploy, reinforce, and blocked reinforce surfaces. |
 | `pending-choices` | Recall spy, lose Influence, conflict Influence, and fixed-choice conflict Influence surfaces. |

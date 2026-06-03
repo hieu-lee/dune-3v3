@@ -14,6 +14,7 @@ type PendingInfluenceLossPanelProps = {
   pending: LoseInfluencePendingAction;
   players: Player[];
   recipient?: Player;
+  viewerPlayerId?: string;
   onLoseInfluence: (ownerId: string, faction: FactionId) => void;
   onSkip: () => void;
 };
@@ -24,10 +25,15 @@ export function PendingInfluenceLossPanel({
   pending,
   players,
   recipient,
+  viewerPlayerId,
   onLoseInfluence,
   onSkip,
 }: PendingInfluenceLossPanelProps) {
-  const choiceOwnerIds = [...new Set(choices.map((choice) => choice.ownerId))];
+  const visibleChoices = viewerPlayerId
+    ? choices.filter((choice) => choice.ownerId === viewerPlayerId)
+    : choices;
+  const choiceOwnerIds = [...new Set(visibleChoices.map((choice) => choice.ownerId))];
+  const canSkip = pending.optional && (!viewerPlayerId || viewerPlayerId === pending.ownerId);
 
   return (
     <div className="pending-controls support-grid">
@@ -35,7 +41,7 @@ export function PendingInfluenceLossPanel({
         {payerLabel}: lose 1 Influence for +{pending.strength} strength
         {recipient ? ` to ${recipient.leader}` : ""}
       </span>
-      {choices.map(({ ownerId, faction }) => {
+      {visibleChoices.map(({ ownerId, faction }) => {
         const owner = players.find((player) => player.id === ownerId);
         const showOwner = owner && (choiceOwnerIds.length > 1 || owner.id !== pending.ownerId);
         const ownerRoleLabel = owner?.id === pending.combatRecipientId ? "Recipient" : "Commander personal";
@@ -54,8 +60,8 @@ export function PendingInfluenceLossPanel({
           </button>
         );
       })}
-      {choices.length === 0 && <span>No Influence to lose</span>}
-      {pending.optional && <button type="button" onClick={onSkip}>Skip</button>}
+      {visibleChoices.length === 0 && <span>No Influence to lose</span>}
+      {canSkip && <button type="button" onClick={onSkip}>Skip</button>}
     </div>
   );
 }

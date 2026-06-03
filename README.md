@@ -6,6 +6,7 @@ Private web-table implementation for a six-player `Dune: Imperium - Uprising` te
 
 - Vite + React + TypeScript client.
 - Repo-local Playwright browser debug harness captures scripted gameplay screenshots under `artifacts/qa/browser-debug`.
+- Private room dev server supports create/join by room code, seat claims, local reconnect tokens, file-backed room persistence, live room snapshots, per-seat hidden hand/Intrigue/objective plus draw/shared-deck projection, server-authoritative core turn actions, Combat pass/play, Endgame scoring/finalization, and server-backed pending-choice resolution.
 - Six seats split into Muad'Dib and Shaddam teams.
 - Hotseat turn flow for agent turns and reveal turns.
 - Board space model for the 6-player surface.
@@ -15,7 +16,7 @@ Private web-table implementation for a six-player `Dune: Imperium - Uprising` te
 - Catalog-backed Uprising leader roster with local leader card art.
 - Full leader-card reference modal from each seat.
 - Catalog-backed six-player Conflict deck display with printed battle icons.
-- CHOAM contract bank with two face-up offers, contract-space pickup flow, and Shaddam's reserved Sardaukar contracts.
+- CHOAM contract bank with two face-up offers, contract-space pickup flow, Shaddam's reserved Sardaukar contracts, and automatic completion for Immediate plus modeled board-space contracts.
 - Catalog-backed Intrigue deck with physical card draws and active-player references.
 - Team trade flow supports spice, water, Solari, and chosen Intrigue-card transfers.
 - Shaddam Throne Row support for Emperor-board setup, Imperial Tent movement, and Shaddam-team acquisition.
@@ -50,8 +51,8 @@ Private web-table implementation for a six-player `Dune: Imperium - Uprising` te
 - Combat phase opens before Conflict resolution and sequences Combat Intrigue pass/play timing.
 - Endgame phase triggers at 10 VP or an empty Conflict deck and scores battle-icon Endgame Intrigues against matching or wild Conflict cards.
 - Endgame scores Secure Spice Trade, CHOAM Profits, and Shadow Alliance rewards when their printed conditions are met.
-- Taken CHOAM contracts can be marked complete from player panels for contract-based Endgame scoring.
-- Alliance tokens can be assigned from player panels and transfer their VP with the token owner.
+- Modeled CHOAM contracts complete automatically for their printed rewards; remaining unmodeled completion triggers stay available as table-correction checkboxes for contract-based Endgame scoring.
+- Alliance tokens are claimed, transferred, returned, and scored automatically from Faction Influence changes.
 - Reaching or dropping below 2 Influence automatically adds or removes the faction-track VP.
 - Active players can play the Plot side of battle-icon Intrigues for 1 spice during normal play.
 - Contingency Plan can be played as a Plot Intrigue for 2 Solari or as a Combat Intrigue for 3 strength.
@@ -92,6 +93,7 @@ Private web-table implementation for a six-player `Dune: Imperium - Uprising` te
 - Catalog-backed board-space art on matching placement tiles.
 - Printed reveal adjustments and spy-post targeting for cards whose text is not reducible to a fixed number.
 - Remaining printed edge cases are being reduced into structured card, Conflict, and reserve effects as they are modeled.
+- Multiplayer room mode supports server-authoritative Shaddam setup Throne Row, active-player Agent placement, Agent turn end, Reveal, card acquisition, Reveal turn end, Plot Intrigue dispatch, Combat Intrigue pass/play, Endgame Intrigue scoring/finalization, most generated pending choices, file-backed restart recovery, and six-browser room smokes covering all seats, reconnect, permissions, pending resolution, Endgame readiness, and a reveal-only natural marathon through Conflict-deck exhaustion.
 - Asset pipeline conventions for owned scans or public reference images.
 
 ## Run
@@ -99,9 +101,10 @@ Private web-table implementation for a six-player `Dune: Imperium - Uprising` te
 ```bash
 pnpm install
 pnpm dev
+pnpm run room:dev
 ```
 
-Open the URL printed by Vite.
+Use `pnpm dev` for local hotseat development. Use `pnpm run room:dev` for the private room server with create/join/claim/reconnect flow. Room state persists outside the web-served project tree at `~/.dune-3v3/room-server/rooms.json` by default; pass `-- --storage-file=<path>` or `-- --no-storage` when starting `room:dev` to override that behavior.
 
 ## Verification
 
@@ -109,6 +112,9 @@ Open the URL printed by Vite.
 pnpm run verify:all
 pnpm run verify:all -- --list
 pnpm build
+pnpm run debug:room:smoke
+pnpm run debug:room:complete
+pnpm run debug:room:marathon
 ```
 
 `verify:all` runs every package verifier script in order and stops on the first failure.
@@ -125,6 +131,9 @@ pnpm run debug:browser:headed -- --scenario all
 pnpm run debug:browser:manual
 pnpm run debug:game
 pnpm run debug:game:smoke
+pnpm run debug:room:smoke
+pnpm run debug:room:complete
+pnpm run debug:room:marathon
 ```
 
 The default debug run starts a local Vite server, drives scripted Playwright scenarios, and writes screenshots, per-capture game state, `console.json`, `request-failures.json`, `<scenario>-trace.zip`, and `summary.json` under `artifacts/qa/browser-debug`. Use the headed command to watch the scripted scenarios. When passing `--port`, treat it as the requested starting port and check the printed URL or `summary.json` for the actual port.
@@ -134,6 +143,12 @@ The Codex in-app browser (`iab`) is optional. If it is not exposed in the curren
 Use `pnpm run debug:game` when you need to play the table in a browser with artifacts isolated under `artifacts/qa/browser-debug-manual`. `pnpm run debug:browser:manual` uses the default artifact directory unless you pass `--out`. While it is running, use the camera button in the top bar, press `Ctrl+Shift+S` or `Cmd+Shift+S`, or run `window.__DUNE_DEBUG__.capture("descriptive-label")` from the browser console to capture the current full-page screenshot and game state. The harness writes `manual-ready.png` and `manual-ready.state.json` at startup, captures as `manual-capture-###[-label].png` with matching `.state.json` files, and `manual-final.png`, `manual-final.state.json`, `console.json`, `request-failures.json`, `manual-trace.zip`, and `summary.json` after `Ctrl+C`.
 
 Use `pnpm run debug:game:smoke` to verify the manual capture bridge without keeping a browser open. It exits after writing `manual-ready.png`, `manual-ready.state.json`, `manual-capture-001-button.png`, its matching `.state.json`, `console.json`, `request-failures.json`, and `summary.json`.
+
+Use `pnpm run debug:room:smoke` after room/session changes. It starts the private room server, creates a room, claims a seat, reloads to prove reconnect recovery, joins from a second browser context, checks hidden hand projection, resolves setup online, advances an online Reveal turn, resolves a server-backed pending choice, plays a Plot Intrigue online, plays and passes combat online, and scores battle-icon plus conditional Endgame Intrigues before finalizing online.
+
+Use `pnpm run debug:room:complete` when room/session changes affect full-table coordination. It opens six isolated browser contexts, claims all six seats, verifies hidden projections and turn permissions, reloads a claimed seat, resolves setup, advances a room turn, resolves a server-backed pending choice, and has all six seats mark Endgame ready until the shared room finishes.
+
+Use `pnpm run debug:room:marathon` for the heavier six-browser reveal-only natural room marathon. It claims all six seats, verifies private projections, resolves setup, drives legal room actions until the Conflict deck naturally empties, resolves any Endgame Intrigue scoring, finalizes all seats, and writes screenshots, state JSON, console logs, request failures, action logs, and `summary.json` under `artifacts/qa/browser-room-marathon`.
 
 See [docs/browser-testing-pipeline.md](docs/browser-testing-pipeline.md) for the full IAB-free browser testing workflow, subagent instructions, artifact contract, and scenario-extension checklist.
 

@@ -10,6 +10,7 @@ import {
   applyBoardEffect,
   applyCardAgentEffect,
   collectMakerSpice,
+  completeChoamContractsForBoardSpace,
   defaultActivatedAllyId,
   drawIntrigueCards,
   effectiveCost,
@@ -283,7 +284,15 @@ export function placeAgentAction(
   source = players.find((candidate) => candidate.id === source.id) ?? source;
   effectedTarget = players.find((candidate) => candidate.id === effectedTarget.id) ?? effectedTarget;
   deploymentOwner = player.role === "Commander" ? effectedTarget : source;
-  const postEffectState = { ...controlledPostEffectState, players, conflictDeploymentBlock };
+  let postEffectState: GameState = { ...controlledPostEffectState, players, conflictDeploymentBlock };
+  const contractCompletion = completeChoamContractsForBoardSpace(postEffectState, source.id, selectedSpace.id);
+  postEffectState = contractCompletion.state;
+  players = postEffectState.players;
+  source = players.find((candidate) => candidate.id === source.id) ?? source;
+  effectedTarget = players.find((candidate) => candidate.id === effectedTarget.id) ?? effectedTarget;
+  deploymentOwner = player.role === "Commander" ? effectedTarget : source;
+  const extraRecruitedTroops =
+    (cardAgentEffect.recruitedTroops ?? 0) + contractCompletion.recruitedTroops;
   const futureSourceIntrigues = futureSourceIntriguesBeforePendingChoice(
     postEffectState,
     selectedSpace,
@@ -299,7 +308,7 @@ export function placeAgentAction(
       source,
       deploymentOwner,
       players,
-      cardAgentEffect.recruitedTroops,
+      extraRecruitedTroops,
       Boolean(cardAgentEffect.blocksDeploymentsThisTurn),
       boardRecruitedTroops,
     );
@@ -307,7 +316,7 @@ export function placeAgentAction(
     !baseSpacePending && cardAgentEffect.deployRecruitedTroops && !cardAgentEffect.blocksDeploymentsThisTurn
       ? pendingActionForRecruitedTroopDeployment(
         deploymentOwner,
-        boardRecruitedTroops + (cardAgentEffect.recruitedTroops ?? 0),
+        boardRecruitedTroops + extraRecruitedTroops,
         cardAgentEffect.deployRecruitedTroopsSource ?? selectedCard.name,
       )
       : undefined;
@@ -384,7 +393,7 @@ export function placeAgentAction(
   }
   const topDeckReservations = reserveTopDeckSelectionCards(players, pendingActions);
   players = topDeckReservations.players;
-  const stateAfterTopDeckReservations = { ...controlledPostEffectState, players, conflictDeploymentBlock };
+  const stateAfterTopDeckReservations = { ...postEffectState, players, conflictDeploymentBlock };
   const pending = queuePendingActions(
     stateAfterTopDeckReservations,
     topDeckReservations.pendingActions,
@@ -409,7 +418,7 @@ export function placeAgentAction(
       player.role === "Commander"
         ? `${player.leader} activates ${target.leader} at ${selectedSpace.name} with ${selectedCard.name}.`
         : `${player.leader} sends an Agent to ${selectedSpace.name} with ${selectedCard.name}.`,
-      ...controlledPostEffectState.log,
+      ...postEffectState.log,
     ].filter((entry): entry is string => Boolean(entry)),
   };
   const intrigueGain = boardSpaceIntrigueGainFor(selectedSpace, player);

@@ -1,0 +1,93 @@
+import type { PendingActionPanelProps } from "../components/PendingActionPanel.types";
+import type { RoomActionCommand, RoomPendingActionCommand } from "./room-actions";
+
+type RoomSendAction = (action: RoomActionCommand) => void | Promise<boolean>;
+type PendingHandlers = Omit<PendingActionPanelProps, "game" | "pendingAction">;
+
+export function createRoomPendingActionHandlers(sendAction: RoomSendAction): PendingHandlers {
+  const pending = (command: RoomPendingActionCommand) => {
+    void sendAction({ kind: "pending", command });
+  };
+
+  return {
+    acquirePendingCard: (cardId) => pending({ kind: "acquire-pending-card", cardId }),
+    adjustRevealReward: (persuasionDelta, strengthDelta) =>
+      pending({ kind: "adjust-reveal-reward", persuasionDelta, strengthDelta }),
+    adjustTeamResourcePayment: (contributorId, delta) =>
+      pending({ kind: "adjust-team-resource-payment", contributorId, delta }),
+    chooseBoardInfluence: (ownerId, faction) => pending({ kind: "choose-board-influence", ownerId, faction }),
+    chooseCommanderResourceSplit: (optionIndex) => pending({ kind: "choose-commander-resource-split", optionIndex }),
+    chooseConflictInfluence: (faction) => pending({ kind: "choose-conflict-influence", faction }),
+    chooseConflictTieWinner: (winnerId) => pending({ kind: "choose-conflict-tie-winner", winnerId }),
+    chooseDeployOrRetreatTroops: (choice) => pending({ kind: "choose-deploy-or-retreat-troops", choice }),
+    chooseDiscardCardForDraw: (discardCardId) => pending({ kind: "choose-discard-card-for-draw", discardCardId }),
+    chooseDiscardCardForInfluenceAndDraw: (discardCardId, faction) =>
+      pending({ kind: "choose-discard-card-for-influence-and-draw", discardCardId, faction }),
+    chooseDiscardCardsForReward: (discardCardId) => pending({ kind: "choose-discard-cards-for-reward", discardCardId }),
+    chooseDiscardHandCard: (discardCardId) => pending({ kind: "choose-discard-hand-card", discardCardId }),
+    chooseLadyAmberDesertScouts: (choice) => pending({ kind: "choose-lady-amber-desert-scouts", choice }),
+    chooseLeaderTransition: (choice) => pending({ kind: "choose-leader-transition", choice }),
+    chooseLoseInfluenceForIntrigues: (faction) => pending({ kind: "choose-lose-influence-for-intrigues", faction }),
+    chooseMakerReward: (choice) => pending({ kind: "choose-maker-reward", choice }),
+    choosePaidReward: (optionId) => pending({ kind: "choose-paid-reward", optionId }),
+    choosePayResourceForContracts: (optionIndex) => pending({ kind: "choose-pay-resource-for-contracts", optionIndex }),
+    choosePayResourceForDrawCards: () => pending({ kind: "choose-pay-resource-for-draw-cards" }),
+    choosePayResourceForHighCouncilSeat: () => pending({ kind: "choose-pay-resource-for-high-council-seat" }),
+    choosePayResourceForInfluence: () => pending({ kind: "choose-pay-resource-for-influence" }),
+    choosePayResourceForSandworms: () => pending({ kind: "choose-pay-resource-for-sandworms" }),
+    choosePayResourceForStrength: () => pending({ kind: "choose-pay-resource-for-strength" }),
+    choosePayResourceForTroops: () => pending({ kind: "choose-pay-resource-for-troops" }),
+    choosePendingActionChoice: (optionId) => pending({ kind: "choose-pending-action-choice", optionId }),
+    chooseRepeatBoardSpace: (choice) => pending({ kind: "choose-repeat-board-space", choice }),
+    chooseRetreatTroopsForStrength: () => pending({ kind: "choose-retreat-troops-for-strength" }),
+    chooseSietchTabr: (choice) => pending({ kind: "choose-sietch-tabr", choice }),
+    chooseStabanUnseenNetwork: (choice) => pending({ kind: "choose-staban-unseen-network", choice }),
+    chooseTeamResourcePayment: () => pending({ kind: "choose-team-resource-payment" }),
+    chooseThroneRowCard: (cardId) => pending({ kind: "choose-throne-row-card", cardId }),
+    chooseTopDeckSelection: (choice) => pending({ kind: "choose-top-deck-selection", choice }),
+    chooseTrashIntrigueForReward: (intrigueId) => pending({ kind: "choose-trash-intrigue-for-reward", intrigueId }),
+    chooseTrashSourceForTrade: (partnerId) => pending({ kind: "choose-trash-source-for-trade", partnerId }),
+    clearPendingAction: () => pending({ kind: "clear-pending-action" }),
+    collectContractFallback: () => pending({ kind: "collect-contract-fallback" }),
+    deployControlDefense: () => pending({ kind: "deploy-control-defense" }),
+    deployOne: () => pending({ kind: "deploy-one" }),
+    finishRevealAdjust: () => pending({ kind: "finish-reveal-adjust" }),
+    loseInfluence: (ownerId, faction) => pending({ kind: "lose-influence", ownerId, faction }),
+    payConflictVpReward: () => pending({ kind: "pay-conflict-vp-reward" }),
+    payOptionalSpacePayment: () => pending({ kind: "pay-optional-space-payment" }),
+    placeSpy: (spaceId) => pending({ kind: "place-spy", spaceId }),
+    recallConflictRewardSpy: (spaceId) => pending({ kind: "recall-conflict-reward-spy", spaceId }),
+    recallSpy: (spaceId) => pending({ kind: "recall-spy", spaceId }),
+    recallSpyForSupply: (spaceId) => pending({ kind: "recall-spy-for-supply", spaceId }),
+    reinforceOne: (playerId, destination) => pending({ kind: "reinforce-one", playerId, destination }),
+    skipControlDefense: () => pending({ kind: "skip-control-defense" }),
+    skipConflictVpReward: () => pending({ kind: "skip-conflict-vp-reward" }),
+    skipDiscardCardForDrawChoice: () => pending({ kind: "skip-discard-card-for-draw" }),
+    skipDiscardCardForInfluenceAndDrawChoice: () => pending({ kind: "skip-discard-card-for-influence-and-draw" }),
+    skipDiscardCardsForRewardChoice: () => pending({ kind: "skip-discard-cards-for-reward" }),
+    skipDeployOrRetreatTroops: () => pending({ kind: "skip-deploy-or-retreat-troops" }),
+    skipInfluenceLoss: () => pending({ kind: "skip-influence-loss" }),
+    skipLoseInfluenceForIntriguesChoice: () => pending({ kind: "skip-lose-influence-for-intrigues" }),
+    skipOptionalSpacePaymentChoice: () => pending({ kind: "skip-optional-space-payment" }),
+    skipPaidReward: () => pending({ kind: "skip-paid-reward" }),
+    skipPayResourceForContractsChoice: () => pending({ kind: "skip-pay-resource-for-contracts" }),
+    skipPayResourceForDrawCardsChoice: () => pending({ kind: "skip-pay-resource-for-draw-cards" }),
+    skipPayResourceForHighCouncilSeatChoice: () => pending({ kind: "skip-pay-resource-for-high-council-seat" }),
+    skipPayResourceForInfluenceChoice: () => pending({ kind: "skip-pay-resource-for-influence" }),
+    skipPayResourceForSandwormsChoice: () => pending({ kind: "skip-pay-resource-for-sandworms" }),
+    skipPayResourceForStrengthChoice: () => pending({ kind: "skip-pay-resource-for-strength" }),
+    skipPayResourceForTroopsChoice: () => pending({ kind: "skip-pay-resource-for-troops" }),
+    skipPendingActionChoiceHandler: () => pending({ kind: "skip-pending-action-choice" }),
+    skipRecall: () => pending({ kind: "skip-recall" }),
+    skipRetreatTroopsForStrengthChoice: () => pending({ kind: "skip-retreat-troops-for-strength" }),
+    skipTeamResourcePaymentChoice: () => pending({ kind: "skip-team-resource-payment" }),
+    skipTopDeckSelection: () => pending({ kind: "skip-top-deck-selection" }),
+    skipTrash: () => pending({ kind: "skip-trash" }),
+    skipTrashIntrigueForRewardChoice: () => pending({ kind: "skip-trash-intrigue-for-reward" }),
+    skipTrashSourceForTradeChoice: () => pending({ kind: "skip-trash-source-for-trade" }),
+    takeContract: (contractId) => pending({ kind: "take-contract", contractId }),
+    transferTrade: (fromId, toId, intrigueId) => pending({ kind: "transfer-trade", fromId, toId, intrigueId }),
+    trashCard: (zone, cardId, choiceIndex) => pending({ kind: "trash-card", zone, cardId, choiceIndex }),
+    updateTrade: (resource, partnerId) => pending({ kind: "update-trade", resource, partnerId }),
+  };
+}

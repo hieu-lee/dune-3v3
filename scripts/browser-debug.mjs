@@ -19,6 +19,7 @@ import {
 import { runCardChoicesSmoke } from "./browser-debug-card-choices.mjs";
 import { runCombatIntriguesSmoke } from "./browser-debug-combat-intrigues.mjs";
 import { runCommanderRevealSmoke } from "./browser-debug-commander-reveal.mjs";
+import { runContractCompletionSmoke } from "./browser-debug-contract-completion.mjs";
 import { runConflictVpSmoke } from "./browser-debug-conflict-vp.mjs";
 import { runLeaderCharacterChoicesSmoke } from "./browser-debug-leader-character-choices.mjs";
 import { createBrowserDebugPageTools } from "./browser-debug-page-tools.mjs";
@@ -652,6 +653,21 @@ try {
     }
     if (scenario === "control-defense" || scenario === "all") {
       await interruptible(runControlDefenseSmoke(page, url, server, captures));
+    }
+    if (scenario === "contract-completion" || scenario === "all") {
+      await interruptible(runContractCompletionSmoke({
+        captures,
+        currentGame,
+        initialPlayableGame,
+        openApp,
+        page,
+        screenshot,
+        server,
+        setDebugGameAndWait,
+        url,
+        waitForNoPending,
+        writeJson,
+      }));
     }
     if (scenario === "conflict-vp" || scenario === "all") {
       await interruptible(runConflictVpSmoke({

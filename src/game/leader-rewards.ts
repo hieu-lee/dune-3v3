@@ -1,3 +1,4 @@
+import { resolveAllianceOwnersForInfluenceChanges } from "./alliance-rules";
 import { playerHasConflictUnits } from "./conflict-rules";
 import { drawIntrigueCards } from "./intrigue-deck";
 import {
@@ -81,7 +82,7 @@ function reachesLadyMargotLoyalty(previous: Player, next: Player) {
 }
 
 export function resolveLeaderInfluenceThresholdRewards(state: GameState, previousPlayers: Player[]): GameState {
-  return previousPlayers.reduce((nextState, previous) => {
+  const thresholdRewardState = previousPlayers.reduce((nextState, previous) => {
     const current = nextState.players.find((player) => player.id === previous.id);
     if (!current) return nextState;
     if (reachesPrincessIrulanBirthright(previous, current)) {
@@ -119,6 +120,7 @@ export function resolveLeaderInfluenceThresholdRewards(state: GameState, previou
     };
     return recordTurnSpiceGain(rewardedState, current.id, margotLoyaltySpice);
   }, state);
+  return resolveAllianceOwnersForInfluenceChanges(thresholdRewardState, previousPlayers);
 }
 
 export function adjustInfluenceAndResolveThresholdRewards(

@@ -521,6 +521,7 @@ type PendingTeamResourcePaymentPanelProps = {
   source: string;
   total: number;
   vp: number;
+  viewerPlayerId?: string;
   onAdjust: (contributorId: string, delta: number) => void;
   onPay: () => void;
   onSkip: () => void;
@@ -537,12 +538,14 @@ export function PendingTeamResourcePaymentPanel({
   source,
   total,
   vp,
+  viewerPlayerId,
   onAdjust,
   onPay,
   onSkip,
 }: PendingTeamResourcePaymentPanelProps) {
   const resourceLabel = resourceLabels[resource];
   const canRenderPaymentControls = Boolean(resourceLabel) && owner && contributors.length === contributorIds.length;
+  const canResolvePayment = !viewerPlayerId || owner?.id === viewerPlayerId;
   return (
     <div className="pending-controls threaten-spice-choice">
       {canRenderPaymentControls ? (
@@ -554,6 +557,7 @@ export function PendingTeamResourcePaymentPanel({
               const contribution =
                 Number.isInteger(rawContribution) && rawContribution >= 0 ? rawContribution : 0;
               const available = contributor.resources[resource];
+              const canAdjustContribution = !viewerPlayerId || contributor.id === viewerPlayerId;
               return (
                 <div className="threaten-spice-contributor" key={contributor.id}>
                   <strong>{contributor.leader}</strong>
@@ -561,7 +565,7 @@ export function PendingTeamResourcePaymentPanel({
                   <button
                     type="button"
                     onClick={() => onAdjust(contributor.id, -1)}
-                    disabled={contribution <= 0}
+                    disabled={!canAdjustContribution || contribution <= 0}
                     title={`Remove 1 ${resourceLabel} from ${contributor.leader}`}
                     aria-label={`Remove 1 ${resourceLabel} from ${contributor.leader}`}
                   >
@@ -570,7 +574,7 @@ export function PendingTeamResourcePaymentPanel({
                   <button
                     type="button"
                     onClick={() => onAdjust(contributor.id, 1)}
-                    disabled={contribution >= available || total >= cost}
+                    disabled={!canAdjustContribution || contribution >= available || total >= cost}
                     title={`Add 1 ${resourceLabel} from ${contributor.leader}`}
                     aria-label={`Add 1 ${resourceLabel} from ${contributor.leader}`}
                   >
@@ -580,7 +584,7 @@ export function PendingTeamResourcePaymentPanel({
               );
             })}
           </div>
-          <button type="button" onClick={onPay} disabled={!canPay}>
+          <button type="button" onClick={onPay} disabled={!canResolvePayment || !canPay}>
             <Sparkles size={15} />
             Pay {cost}: +{vp} VP
           </button>
@@ -588,7 +592,7 @@ export function PendingTeamResourcePaymentPanel({
       ) : (
         <span>{source} can no longer resolve with the current table state.</span>
       )}
-      <button type="button" onClick={onSkip}>Skip</button>
+      {canResolvePayment && <button type="button" onClick={onSkip}>Skip</button>}
     </div>
   );
 }

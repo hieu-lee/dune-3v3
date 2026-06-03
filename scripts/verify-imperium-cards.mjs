@@ -362,9 +362,22 @@ try {
   );
   assert.equal(
     data.imperiumDeck.find((card) => card.name === "Smuggler's Haven")?.acquired,
-    1,
-    "Smuggler's Haven should retain its legacy printed-VP marker until its VP text is typed",
+    undefined,
+    "Smuggler's Haven VP should be modeled by its typed Agent effect",
   );
+  const smugglersHaven = data.imperiumDeck.find((card) => card.name === "Smuggler's Haven");
+  assert.ok(
+    smugglersHaven?.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-vp" &&
+        effect.selector === "self" &&
+        effect.amount === 1
+      )
+    ),
+    "Smuggler's Haven should carry its printed Agent VP as a typed effect",
+  );
+  assert.match(smugglersHaven.play, /Gain 1 VP.*Pay 4 spice to summon 1 sandworm/i);
   const prepareTheWay = data.reserveMarket.find((card) => card.sourceId === 537);
   assert.ok(prepareTheWay, "Reserve market should include Prepare The Way");
   const spiceMustFlow = data.reserveMarket.find((card) => card.sourceId === 538);

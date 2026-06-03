@@ -334,6 +334,7 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
   }
   if (card.id === smugglersHavenSourceId) {
     return [
+      agentGainVp(1),
       agentPayResourceForSandworms("spice", 4, 1, { recipient: "self-or-activated-ally" }),
       revealGainPersuasion(1),
       revealGainResource("spice", 2, [hasSpyPostOnMakerSpace()]),
@@ -650,7 +651,7 @@ function imperiumPlayText(card: HubCard) {
     return "Gain 1 Solari on Emperor, Bene Gesserit, or Spacing Guild board spaces.";
   }
   if (card.id === smugglersHavenSourceId) {
-    return "Pay 4 spice to summon 1 sandworm.";
+    return "Gain 1 VP. Pay 4 spice to summon 1 sandworm.";
   }
   if (card.id === spaceTimeFoldingSourceId) {
     return "Discard 1 card to draw 1 card. If you discarded a Spacing Guild card, draw 1 more card.";

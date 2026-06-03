@@ -3572,7 +3572,7 @@ try {
   assert.equal(junctionHeadquarters.acquired, undefined, "Junction Headquarters VP should be modeled by its typed Agent effect");
   assert.equal(corrinthCity.acquired, 1, "Corrinth City should retain its legacy printed-VP marker until its VP text is typed");
   assert.equal(deliveryAgreement.acquired, 1, "Delivery Agreement should retain its legacy printed-VP marker until its VP text is typed");
-  assert.equal(smugglersHaven.acquired, 1, "Smuggler's Haven should retain its legacy printed-VP marker until its VP text is typed");
+  assert.equal(smugglersHaven.acquired, undefined, "Smuggler's Haven VP should be modeled by its typed Agent effect");
   assert.deepEqual(
     marketAndImperiumCards.filter(hasAgentPlaySpec).map((card) => card.name).sort(),
     [
@@ -5066,8 +5066,18 @@ try {
   );
   assert.equal(
     smugglersHaven.play,
-    "Pay 4 spice to summon 1 sandworm.",
-    "Smuggler's Haven play text should expose its Agent sandworm payment",
+    "Gain 1 VP. Pay 4 spice to summon 1 sandworm.",
+    "Smuggler's Haven play text should expose its Agent VP and sandworm payment",
+  );
+  assert.ok(
+    hasAgentEffect(
+      smugglersHaven,
+      (effect) =>
+        effect.kind === "gain-vp" &&
+        effect.selector === "self" &&
+        effect.amount === 1,
+    ),
+    "Smuggler's Haven should carry a typed Agent VP effect",
   );
   assert.ok(
     smugglersHaven.effects?.some((spec) =>
@@ -11773,6 +11783,19 @@ try {
     players: game.players.map((player) => player.id === p3.id ? smugglersHavenAllySource : player),
     shieldWall: false,
   };
+  const smugglersHavenAgentEffect = state.applyCardAgentEffect(
+    smugglersHaven,
+    smugglersHavenAllySource,
+    smugglersHavenAllySource,
+    smugglersHavenAllyState,
+    deliverSupplies,
+  );
+  assert.equal(
+    smugglersHavenAgentEffect.source.vp,
+    smugglersHavenAllySource.vp + 1,
+    "Smuggler's Haven should gain its printed VP during Agent play",
+  );
+  assert.match(smugglersHavenAgentEffect.log ?? "", /Smuggler's Haven: gains 1 VP/);
   const smugglersHavenAllyPending = state.pendingActionForCard(
     smugglersHaven,
     smugglersHavenAllySource,

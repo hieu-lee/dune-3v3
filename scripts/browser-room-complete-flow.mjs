@@ -428,6 +428,14 @@ try {
     0,
     "Non-owner room client should not receive Conflict VP resource controls",
   );
+  const conflictVpResourceButton = conflictVpOwnerPage
+    .locator(".pending-panel")
+    .getByRole("button", { name: /Spend 2 spice: \+1 VP/ });
+  assert.equal(
+    await conflictVpResourceButton.isDisabled(),
+    false,
+    "Conflict VP resource owner should receive an enabled payment control",
+  );
   const conflictVpResourceResult = await roomActionFor(roomId, tokens, conflictVpOwnerId, {
     kind: "pending",
     command: { kind: "pay-conflict-vp-reward" },
@@ -489,6 +497,22 @@ try {
     await firstPage.locator(".pending-controls").count(),
     0,
     "Non-owner room client should not receive Conflict VP spy controls",
+  );
+  const conflictVpArrakeenButton = conflictVpOwnerPage
+    .locator(".pending-panel")
+    .getByRole("button", { name: "Arrakeen", exact: true });
+  const conflictVpCarthagButton = conflictVpOwnerPage
+    .locator(".pending-panel")
+    .getByRole("button", { name: "Carthag", exact: true });
+  assert.equal(
+    await conflictVpArrakeenButton.isDisabled(),
+    false,
+    "Conflict VP spy owner should receive an enabled Arrakeen recall control",
+  );
+  assert.equal(
+    await conflictVpCarthagButton.isDisabled(),
+    false,
+    "Conflict VP spy owner should receive an enabled Carthag recall control",
   );
   const conflictVpFirstSpyResult = await roomActionFor(roomId, tokens, conflictVpOwnerId, {
     kind: "pending",

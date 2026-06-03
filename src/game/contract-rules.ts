@@ -48,6 +48,7 @@ type ContractCompletionReward = {
   drawCards?: number;
   drawIntrigues?: number;
   recruitTroops?: number;
+  recallAgents?: number;
   influence?: Partial<Record<FactionId, number>>;
 };
 type ContractCompletionSpec = {
@@ -57,6 +58,7 @@ type ContractCompletionSpec = {
 type ContractCompletionResult = {
   state: GameState;
   recruitedTroops: number;
+  recalledAgents: number;
   completedContractIds: string[];
 };
 
@@ -64,6 +66,7 @@ const automatedContractCompletionSpecsBySourceId: Record<number, ContractComplet
   491: { condition: { kind: "board-space", spaceId: "secrets" }, reward: { drawIntrigues: 1 } },
   496: { condition: { kind: "board-space", spaceId: "espionage" }, reward: { resources: { solari: 1 }, drawIntrigues: 1 } },
   501: { condition: { kind: "immediate" }, reward: { resources: { solari: 2 } } },
+  502: { condition: { kind: "board-space", spaceId: "sardaukar" }, reward: { recallAgents: 1 } },
   503: { condition: { kind: "board-space", spaceId: "sardaukar" }, reward: { drawCards: 2 } },
   504: { condition: { kind: "board-space", spaceId: "heighliner" }, reward: { recruitTroops: 2 } },
   505: { condition: { kind: "board-space", spaceId: "heighliner" }, reward: { resources: { water: 2 } } },
@@ -110,7 +113,7 @@ function contractCompletionMatches(spec: ContractCompletionSpec, condition: Cont
     spec.condition.spaceId === condition.spaceId;
 }
 
-function rewardParts(reward: ContractCompletionReward, recruitedTroops: number) {
+function gainRewardParts(reward: ContractCompletionReward, recruitedTroops: number) {
   return [
     ...Object.entries(reward.resources ?? {})
       .filter((entry): entry is [ResourceId, number] => (entry[1] ?? 0) > 0)
@@ -126,9 +129,28 @@ function rewardParts(reward: ContractCompletionReward, recruitedTroops: number) 
   ].filter((part): part is string => Boolean(part));
 }
 
-function completionLog(owner: Player, contract: ContractCard, reward: ContractCompletionReward, recruitedTroops: number) {
-  const parts = rewardParts(reward, recruitedTroops);
-  const outcome = parts.length > 0 ? ` and gains ${parts.join(", ")}` : "";
+function actionRewardParts(recalledAgents: number) {
+  return [
+    recalledAgents > 0
+      ? `recalls ${recalledAgents === 1 ? "the Agent" : `${recalledAgents} Agents`}`
+      : undefined,
+  ].filter((part): part is string => Boolean(part));
+}
+
+function completionLog(
+  owner: Player,
+  contract: ContractCard,
+  reward: ContractCompletionReward,
+  recruitedTroops: number,
+  recalledAgents: number,
+) {
+  const gainParts = gainRewardParts(reward, recruitedTroops);
+  const actionParts = actionRewardParts(recalledAgents);
+  const gainOutcome = gainParts.length > 0 ? ` and gains ${gainParts.join(", ")}` : "";
+  const actionOutcome = actionParts.length > 0
+    ? `${gainParts.length > 0 ? ", and " : " and "}${actionParts.join(", ")}`
+    : "";
+  const outcome = `${gainOutcome}${actionOutcome}`;
   return `${owner.leader} completes the ${contract.name} CHOAM contract${outcome}.`;
 }
 
@@ -157,8 +179,9 @@ function applyContractCompletionReward(
   reward: ContractCompletionReward,
 ): ContractCompletionResult {
   const owner = state.players.find((player) => player.id === ownerId);
-  if (!owner) return { state, recruitedTroops: 0, completedContractIds: [] };
+  if (!owner) return { state, recruitedTroops: 0, recalledAgents: 0, completedContractIds: [] };
   const recruitedTroops = Math.min(playerTroopSupply(owner), reward.recruitTroops ?? 0);
+  const recalledAgents = Math.min(Math.max(0, owner.agentsTotal - owner.agentsReady), reward.recallAgents ?? 0);
   const spiceGain = reward.resources?.spice ?? 0;
   const previousPlayers = state.players;
   let nextState: GameState = {
@@ -173,6 +196,7 @@ function applyContractCompletionReward(
         ...player,
         resources,
         garrison: player.garrison + recruitedTroops,
+        agentsReady: Math.min(player.agentsTotal, player.agentsReady + recalledAgents),
         contracts: player.contracts.map((candidate) =>
           candidate.card.id === contract.id ? { ...candidate, completed: true } : candidate
         ),
@@ -198,9 +222,10 @@ function applyContractCompletionReward(
   return {
     state: {
       ...nextState,
-      log: [completionLog(owner, contract, reward, recruitedTroops), ...nextState.log],
+      log: [completionLog(owner, contract, reward, recruitedTroops, recalledAgents), ...nextState.log],
     },
     recruitedTroops,
+    recalledAgents,
     completedContractIds: [contract.id],
   };
 }
@@ -213,6 +238,7 @@ function completeChoamContractsForCondition(
 ): ContractCompletionResult {
   let nextState = state;
   let recruitedTroops = 0;
+  let recalledAgents = 0;
   const completedContractIds: string[] = [];
   const owner = state.players.find((player) => player.id === ownerId);
   const eligibleContractIdSet = eligibleContractIds ? new Set(eligibleContractIds) : undefined;
@@ -229,10 +255,11 @@ function completeChoamContractsForCondition(
     const result = applyContractCompletionReward(nextState, ownerId, contract.card, spec.reward);
     nextState = result.state;
     recruitedTroops += result.recruitedTroops;
+    recalledAgents += result.recalledAgents;
     completedContractIds.push(...result.completedContractIds);
   }
 
-  return { state: nextState, recruitedTroops, completedContractIds };
+  return { state: nextState, recruitedTroops, recalledAgents, completedContractIds };
 }
 
 export function completeImmediateChoamContracts(state: GameState, ownerId: string): ContractCompletionResult {
@@ -253,7 +280,7 @@ export function completeChoamContractsForAcquiredCard(
   card: Card,
 ): ContractCompletionResult {
   return card.sourceId === undefined
-    ? { state, recruitedTroops: 0, completedContractIds: [] }
+    ? { state, recruitedTroops: 0, recalledAgents: 0, completedContractIds: [] }
     : completeChoamContractsForCondition(state, ownerId, { kind: "acquire-card", sourceId: card.sourceId });
 }
 
@@ -281,6 +308,7 @@ export function completeChoamContractsForCurrentTurnHarvests(
 ): ContractCompletionResult {
   let nextState = state;
   let recruitedTroops = 0;
+  let recalledAgents = 0;
   const completedContractIds: string[] = [];
   for (const player of state.players) {
     if (!hasVisitedMakerSpaceThisTurn(nextState, player.id)) continue;
@@ -297,9 +325,10 @@ export function completeChoamContractsForCurrentTurnHarvests(
     );
     nextState = result.state;
     recruitedTroops += result.recruitedTroops;
+    recalledAgents += result.recalledAgents;
     completedContractIds.push(...result.completedContractIds);
   }
-  return { state: nextState, recruitedTroops, completedContractIds };
+  return { state: nextState, recruitedTroops, recalledAgents, completedContractIds };
 }
 
 export function recordTurnSpiceGainAndCompleteHarvestContracts(

@@ -306,6 +306,8 @@ export function placeAgentAction(
   source = players.find((candidate) => candidate.id === source.id) ?? source;
   effectedTarget = players.find((candidate) => candidate.id === effectedTarget.id) ?? effectedTarget;
   deploymentOwner = player.role === "Commander" ? effectedTarget : source;
+  const totalRecalledAgents =
+    (cardAgentEffect.recalledAgents ?? 0) + contractCompletion.recalledAgents + harvestCompletion.recalledAgents;
   const extraRecruitedTroops =
     (cardAgentEffect.recruitedTroops ?? 0) + contractCompletion.recruitedTroops + harvestCompletion.recruitedTroops;
   const futureSourceIntrigues = futureSourceIntriguesBeforePendingChoice(
@@ -420,7 +422,7 @@ export function placeAgentAction(
     ...stateAfterTopDeckReservations,
     agentTurnComplete: true,
     players,
-    spaces: agentPlacementSpaces(current.spaces, selectedSpace, target, cardAgentEffect.recalledAgents),
+    spaces: agentPlacementSpaces(current.spaces, selectedSpace, target, totalRecalledAgents),
     makerSpice: collectMakerSpice(current, selectedSpace),
     swordmasterClaimed: current.swordmasterClaimed || selectedSpace.id === "swordmaster",
     conflictDeploymentBlock,

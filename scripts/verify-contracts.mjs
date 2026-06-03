@@ -133,6 +133,7 @@ try {
       "Research Station I",
       "Research Station II",
       "Sardaukar I",
+      "Sardaukar II",
       "Secrets",
       "Spice Refinery I",
       "Spice Refinery II",
@@ -142,7 +143,7 @@ try {
   assert.equal(state.contractHasAutomatedCompletion(contractByName("Acquire")), true);
   assert.equal(state.contractHasAutomatedCompletion(contractByName("Harvest 3+")), true);
   assert.equal(state.contractHasAutomatedCompletion(contractByName("Harvest 4+")), true);
-  assert.equal(state.contractHasAutomatedCompletion(contractByName("Sardaukar II")), false);
+  assert.equal(state.contractHasAutomatedCompletion(contractByName("Sardaukar II")), true);
   assert.equal(game.contractOffer.length, 2, "Initial game should reveal two public CHOAM contracts");
   assert.equal(game.contractDeck.length, 16, "Initial public CHOAM deck should hold the remaining sixteen contracts");
   assert.equal(
@@ -802,6 +803,63 @@ try {
   assert.equal(playerById(sardaukarCompleted.state, shaddam.id).hand.length, shaddam.hand.length + 2);
   assertCompleted(sardaukarCompleted.state, shaddam.id, "Sardaukar I");
 
+  const sardaukarAgentCard = {
+    id: "verify-contract-sardaukar-card",
+    name: "Verify Contract Sardaukar Card",
+    icons: ["emperor"],
+    persuasion: 0,
+    swords: 0,
+    play: "",
+    reveal: "",
+  };
+  const shaddamActiveSeat = game.players.findIndex((player) => player.id === shaddam.id);
+  const sardaukarRecallHeld = withHeldContracts(
+    updatePlayer(
+      {
+        ...game,
+        activeSeat: shaddamActiveSeat,
+        pendingAction: undefined,
+        pendingQueue: [],
+        spaces: {},
+      },
+      shaddam.id,
+      (player) => ({
+        ...player,
+        hand: [sardaukarAgentCard],
+        playArea: [],
+        agentsReady: Math.max(1, player.agentsReady),
+        reservedContracts: [],
+        resources: { ...player.resources, spice: player.resources.spice + 3 },
+      }),
+    ),
+    shaddam.id,
+    ["Sardaukar II"],
+  );
+  const sardaukarRecallBefore = playerById(sardaukarRecallHeld, shaddam.id);
+  const sardaukarRecallCompleted = turnActions.placeAgentAction(sardaukarRecallHeld, {
+    commanderTargets: {},
+    selectedCard: sardaukarAgentCard,
+    selectedSpace: boardSpaceById("sardaukar"),
+  });
+  const sardaukarRecallOwner = playerById(sardaukarRecallCompleted, shaddam.id);
+  assertCompleted(sardaukarRecallCompleted, shaddam.id, "Sardaukar II");
+  assert.equal(
+    sardaukarRecallOwner.agentsReady,
+    sardaukarRecallBefore.agentsReady,
+    "Sardaukar II should recall the just-sent Agent back to ready supply",
+  );
+  assert.equal(
+    sardaukarRecallCompleted.spaces.sardaukar,
+    undefined,
+    "Sardaukar II should leave the Sardaukar space unoccupied after recalling the Agent",
+  );
+  assert.ok(
+    sardaukarRecallCompleted.log.some((entry) =>
+      /completes the Sardaukar II CHOAM contract and recalls the Agent/.test(entry)
+    ),
+    "Sardaukar II completion should log its Agent recall reward",
+  );
+
   const agentCard = {
     id: "verify-contract-city-card",
     name: "Verify Contract City Card",
@@ -850,22 +908,30 @@ try {
     "Contract-recruited troops should be deployable during the same combat-space Agent turn",
   );
 
-  const completed = state.setChoamContractCompleted(next, shaddam.id, sardaukar.id, true);
+  const manualContract = { id: "contract-verifier-manual", name: "Verifier Manual Contract" };
+  const manualHeld = updatePlayer(next, shaddam.id, (player) => ({
+    ...player,
+    contracts: [
+      ...player.contracts,
+      { card: manualContract, completed: false, takenRound: next.round },
+    ],
+  }));
+  const completed = state.setChoamContractCompleted(manualHeld, shaddam.id, manualContract.id, true);
   assert.equal(
-    completed.players.find((player) => player.id === shaddam.id)?.contracts.at(-1)?.completed,
+    playerContract(completed, shaddam.id, manualContract.name).completed,
     true,
     "Contract completion should be tracked on the player contract",
   );
-  assert.match(completed.log[0], /completes the Sardaukar I CHOAM contract/);
+  assert.match(completed.log[0], /completes the Verifier Manual Contract CHOAM contract/);
   assert.equal(
-    state.setChoamContractCompleted(completed, shaddam.id, sardaukar.id, true),
+    state.setChoamContractCompleted(completed, shaddam.id, manualContract.id, true),
     completed,
     "Completing an already complete contract should be a no-op",
   );
 
-  const reopened = state.setChoamContractCompleted(completed, shaddam.id, sardaukar.id, false);
+  const reopened = state.setChoamContractCompleted(completed, shaddam.id, manualContract.id, false);
   assert.equal(
-    reopened.players.find((player) => player.id === shaddam.id)?.contracts.at(-1)?.completed,
+    playerContract(reopened, shaddam.id, manualContract.name).completed,
     false,
     "Contract completion should be reversible for table corrections",
   );

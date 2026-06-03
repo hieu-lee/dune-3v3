@@ -1141,8 +1141,8 @@ try {
   const contractRoomRecord = server.rooms.get(contractRoom.body.roomId);
   assert.ok(contractRoomRecord, "Contract fallback room should be stored in memory");
   const fallbackContractOwnerId = "p4";
-  const fallbackContract = contractByName("Sardaukar II");
-  const automatedContract = contractByName("Immediate");
+  const fallbackContract = { id: "contract-room-verifier-manual", name: "Verifier Manual Contract" };
+  const automatedContract = contractByName("Sardaukar II");
   contractRoomRecord.game = {
     ...contractRoomRecord.game,
     pendingAction: undefined,

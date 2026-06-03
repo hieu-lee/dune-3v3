@@ -1,4 +1,4 @@
-import { Link, LogOut, PlugZap, UserCheck } from "lucide-react";
+import { Link, LogOut, PlugZap, UserCheck, UserMinus } from "lucide-react";
 import { useState } from "react";
 import { teams } from "../game/data";
 import type { RoomSnapshot } from "../multiplayer/room-state";
@@ -14,6 +14,7 @@ type RoomPanelProps = {
   onCreateRoom: () => void;
   onJoinRoom: (roomId: string) => void;
   onLeaveRoom: () => void;
+  onReleaseSeat: (playerId: string) => void;
 };
 
 export function RoomPanel({
@@ -27,6 +28,7 @@ export function RoomPanel({
   onCreateRoom,
   onJoinRoom,
   onLeaveRoom,
+  onReleaseSeat,
 }: RoomPanelProps) {
   const [joinCode, setJoinCode] = useState("");
   const [playerName, setPlayerName] = useState("");
@@ -47,9 +49,9 @@ export function RoomPanel({
             </button>
             <input
               aria-label="Room code"
-              placeholder="Room code"
+              placeholder="Room code or link"
               value={joinCode}
-              onChange={(event) => setJoinCode(event.currentTarget.value.toUpperCase())}
+              onChange={(event) => setJoinCode(event.currentTarget.value)}
             />
             <button type="button" onClick={() => onJoinRoom(joinCode)}>
               <Link size={16} />
@@ -65,6 +67,12 @@ export function RoomPanel({
               value={playerName}
               onChange={(event) => setPlayerName(event.currentTarget.value)}
             />
+            {claimedPlayerId && (
+              <button type="button" onClick={() => onReleaseSeat(claimedPlayerId)}>
+                <UserMinus size={16} />
+                Release
+              </button>
+            )}
             <button type="button" onClick={onLeaveRoom}>
               <LogOut size={16} />
               Local
@@ -80,26 +88,37 @@ export function RoomPanel({
           {snapshot.seats.map((seat) => {
             const claimed = Boolean(seat.claimedBy);
             const mine = seat.playerId === claimedPlayerId;
-            const unavailable = (claimed && !mine) || Boolean(claimedPlayerId && !mine);
+            const canRecoverOffline = claimed && !seat.connected && !claimedPlayerId;
+            const canSwitch = !claimed && Boolean(claimedPlayerId);
+            const unavailable = !mine && !canRecoverOffline && !canSwitch && claimed;
+            const pendingName = playerName.trim();
+            const canUpdateName = mine && pendingName && pendingName !== seat.claimedBy;
             return (
               <button
                 type="button"
-                className={["room-seat", mine ? "selected" : "", unavailable ? "claimed" : ""]
+                className={["room-seat", mine ? "selected" : "", unavailable ? "claimed" : "", canSwitch ? "switchable" : "", canRecoverOffline ? "recoverable" : ""]
                   .filter(Boolean)
                   .join(" ")}
                 data-testid={`room-seat-${seat.playerId}`}
                 key={seat.playerId}
                 disabled={unavailable}
-                onClick={() => onClaimSeat(seat.playerId, playerName)}
+                onClick={() => {
+                  if (mine && !canUpdateName) return;
+                  onClaimSeat(seat.playerId, playerName);
+                }}
               >
                 <span>{seat.role} - {teams[seat.team].name}</span>
                 <strong>{seat.leader}</strong>
                 <small>
                   {mine
-                    ? "Your seat"
+                    ? canUpdateName ? "Update name" : "Your seat"
                     : seat.claimedBy
-                      ? `${seat.claimedBy}${seat.connected ? "" : " offline"}`
-                      : "Claim"}
+                      ? seat.connected
+                        ? seat.claimedBy
+                        : `${seat.claimedBy} offline - reclaim`
+                      : canSwitch
+                        ? "Switch"
+                        : "Claim"}
                 </small>
                 {mine && <UserCheck size={15} />}
               </button>

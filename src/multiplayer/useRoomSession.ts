@@ -30,11 +30,26 @@ function writeStoredIdentity(roomId: string, identity: StoredRoomIdentity) {
   window.localStorage.setItem(identityKey(roomId), JSON.stringify(identity));
 }
 
+function removeStoredIdentity(roomId: string) {
+  window.localStorage.removeItem(identityKey(roomId));
+}
+
 function setRoomUrl(roomId?: string) {
   const url = new URL(window.location.href);
   if (roomId) url.searchParams.set("room", roomId);
   else url.searchParams.delete("room");
   window.history.pushState({}, "", url);
+}
+
+function roomIdFromJoinInput(input: string) {
+  const trimmedInput = input.trim();
+  try {
+    const url = new URL(trimmedInput);
+    const roomEntry = [...url.searchParams.entries()].find(([key]) => key.toLowerCase() === "room");
+    return (roomEntry?.[1] ?? trimmedInput).trim().toUpperCase();
+  } catch {
+    return trimmedInput.toUpperCase();
+  }
 }
 
 async function fetchRoom(roomId: string, token?: string) {
@@ -68,6 +83,10 @@ export function useRoomSession() {
     try {
       const nextSnapshot = await fetchRoom(nextRoomId, nextIdentity?.token);
       if (loadGenerationRef.current !== generation) return;
+      if (nextIdentity?.token && !nextSnapshot.viewerPlayerId) {
+        removeStoredIdentity(nextRoomId);
+        setIdentity(undefined);
+      }
       setSnapshot(nextSnapshot);
       setStatus("ready");
     } catch (loadError) {
@@ -110,7 +129,12 @@ export function useRoomSession() {
     eventSourceRef.current = events;
     events.addEventListener("room", (event) => {
       if (!active || eventSourceGenerationRef.current !== generation) return;
-      setSnapshot(JSON.parse((event as MessageEvent).data) as RoomSnapshot);
+      const nextSnapshot = JSON.parse((event as MessageEvent).data) as RoomSnapshot;
+      if (token && !nextSnapshot.viewerPlayerId) {
+        removeStoredIdentity(roomId);
+        setIdentity(undefined);
+      }
+      setSnapshot(nextSnapshot);
       setStatus("ready");
       setError(null);
     });
@@ -144,7 +168,7 @@ export function useRoomSession() {
   }, []);
 
   const joinRoom = useCallback(async (code: string) => {
-    const nextRoomId = code.trim().toUpperCase();
+    const nextRoomId = roomIdFromJoinInput(code);
     if (!nextRoomId) return;
     setRoomUrl(nextRoomId);
     await loadRoom(nextRoomId);
@@ -170,6 +194,27 @@ export function useRoomSession() {
     setSnapshot(body.snapshot);
     setStatus("ready");
     setError(null);
+  }, [identity?.token, roomId]);
+
+  const releaseSeat = useCallback(async (playerId: string) => {
+    if (!roomId || !identity?.token) return false;
+    loadGenerationRef.current += 1;
+    const response = await fetch(`/api/rooms/${roomId}/seats/${encodeURIComponent(playerId)}/release`, {
+      method: "POST",
+      headers: { "x-room-token": identity.token },
+    });
+    const body = await response.json().catch(() => undefined) as { error?: string; snapshot?: RoomSnapshot } | undefined;
+    if (!response.ok) {
+      setStatus("error");
+      setError(body?.error ?? "Unable to release seat");
+      return false;
+    }
+    removeStoredIdentity(roomId);
+    setIdentity(undefined);
+    if (body?.snapshot) setSnapshot(body.snapshot);
+    setStatus("ready");
+    setError(null);
+    return true;
   }, [identity?.token, roomId]);
 
   const sendAction = useCallback(async (action: RoomActionCommand) => {
@@ -216,9 +261,10 @@ export function useRoomSession() {
     inRoom: Boolean(roomId),
     joinRoom,
     leaveRoom,
+    releaseSeat,
     roomId,
     sendAction,
     snapshot,
     status,
-  }), [claimSeat, createRoom, error, joinRoom, leaveRoom, roomId, sendAction, snapshot, status]);
+  }), [claimSeat, createRoom, error, joinRoom, leaveRoom, releaseSeat, roomId, sendAction, snapshot, status]);
 }

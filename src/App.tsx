@@ -402,6 +402,7 @@ export default function App() {
         onCreateRoom={roomSession.createRoom}
         onJoinRoom={roomSession.joinRoom}
         onLeaveRoom={roomSession.leaveRoom}
+        onReleaseSeat={roomSession.releaseSeat}
       />
       {roomSession.inRoom && <RoomPrivatePanel player={claimedPlayer} />}
       {roomSession.inRoom && !canResolveRoomPending && (

@@ -300,17 +300,6 @@ try {
     "/public/qa-room-server-public-storage.json",
   ]);
 
-  const duplicateTokenClaim = await jsonFetch(`/api/rooms/${roomId}/seats/p3/claim`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ name: "Alice Again", token: p1Claim.body.token }),
-  });
-  assert.equal(
-    duplicateTokenClaim.response.status,
-    409,
-    "A reconnect token should not be reusable for a different seat",
-  );
-
   const recovered = await jsonFetch(`/api/rooms/${roomId}`, {
     headers: { "x-room-token": p1Claim.body.token },
   });
@@ -340,6 +329,83 @@ try {
   assertHiddenDrawDeck(p2Claim.body.snapshot, "p2");
   assertVisibleObjectives(p2Claim.body.snapshot, "p2");
   assertHiddenSharedDecks(p2Claim.body.snapshot);
+
+  const connectedClaimWithOtherToken = await jsonFetch(`/api/rooms/${roomId}/seats/p1/claim`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: "Bob As Alice", token: p2Claim.body.token }),
+  });
+  assert.equal(connectedClaimWithOtherToken.response.status, 409, "Connected claimed seats should reject another seat token");
+
+  const recoveryRoom = await jsonFetch("/api/rooms", { method: "POST" });
+  assert.equal(recoveryRoom.response.status, 201, "Seat recovery room creation should succeed");
+  const recoveryRoomId = recoveryRoom.body.roomId;
+  const recoveryWrongSeat = await jsonFetch(`/api/rooms/${recoveryRoomId}/seats/p1/claim`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: "Wrong Seat" }),
+  });
+  assert.equal(recoveryWrongSeat.response.status, 200, "Initial recovery-room seat claim should succeed");
+  const switchedSeat = await jsonFetch(`/api/rooms/${recoveryRoomId}/seats/p3/claim`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: "Switched Seat", token: recoveryWrongSeat.body.token }),
+  });
+  assert.equal(switchedSeat.response.status, 200, "Same-token seat switch should move to an unclaimed role");
+  assert.equal(switchedSeat.body.token, recoveryWrongSeat.body.token, "Seat switching should preserve the reconnect token");
+  assert.equal(switchedSeat.body.snapshot.viewerPlayerId, "p3", "Seat switching should restore the viewer on the new seat");
+  assert.equal(
+    switchedSeat.body.snapshot.seats.find((seat) => seat.playerId === "p1")?.claimedBy,
+    undefined,
+    "Seat switching should release the previous wrong seat",
+  );
+  assert.equal(
+    switchedSeat.body.snapshot.seats.find((seat) => seat.playerId === "p3")?.claimedBy,
+    "Switched Seat",
+    "Seat switching should claim the target seat",
+  );
+  const wrongRelease = await jsonFetch(`/api/rooms/${recoveryRoomId}/seats/p3/release`, {
+    method: "POST",
+    headers: { "x-room-token": "wrong-release-token" },
+  });
+  assert.equal(wrongRelease.response.status, 403, "Seat release should require the current reconnect token");
+  const releasedSeat = await jsonFetch(`/api/rooms/${recoveryRoomId}/seats/p3/release`, {
+    method: "POST",
+    headers: { "x-room-token": switchedSeat.body.token },
+  });
+  assert.equal(releasedSeat.response.status, 200, "Seat owner should release a mistaken seat claim");
+  assert.equal(releasedSeat.body.snapshot.viewerPlayerId, undefined, "Released token should no longer view private seat state");
+  assert.equal(
+    releasedSeat.body.snapshot.seats.find((seat) => seat.playerId === "p3")?.claimedBy,
+    undefined,
+    "Seat release should make the role claimable again",
+  );
+  const offlineOriginalClaim = await jsonFetch(`/api/rooms/${recoveryRoomId}/seats/p3/claim`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: "Offline Friend" }),
+  });
+  assert.equal(offlineOriginalClaim.response.status, 200, "Recovered role should be claimable after release");
+  const recoveryRoomRecord = server.rooms.get(recoveryRoomId);
+  assert.ok(recoveryRoomRecord, "Seat recovery room should remain stored");
+  recoveryRoomRecord.seats.p3.connected = false;
+  const offlineReclaim = await jsonFetch(`/api/rooms/${recoveryRoomId}/seats/p3/claim`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: "Offline Friend Reopened" }),
+  });
+  assert.equal(offlineReclaim.response.status, 200, "Disconnected claimed seats should be recoverable without the old token");
+  assert.notEqual(
+    offlineReclaim.body.token,
+    offlineOriginalClaim.body.token,
+    "Offline recovery without the original token should issue a fresh reconnect token",
+  );
+  assert.equal(offlineReclaim.body.snapshot.viewerPlayerId, "p3", "Offline recovery should restore the reclaimed viewer seat");
+  assert.equal(
+    offlineReclaim.body.snapshot.seats.find((seat) => seat.playerId === "p3")?.claimedBy,
+    "Offline Friend Reopened",
+    "Offline recovery should update the displayed claimant",
+  );
 
   const firstP1Stream = await openRoomEventStream(roomId, p1Claim.body.token);
   const secondP1Stream = await openRoomEventStream(roomId, p1Claim.body.token);
@@ -424,16 +490,6 @@ try {
     body: JSON.stringify({ name: "Mallory", token: "wrong-token-after-restart" }),
   });
   assert.equal(persistedWrongClaim.response.status, 409, "Persisted claimed seats should still reject a different token");
-  const persistedWrongTokenReuse = await jsonFetch(`/api/rooms/${roomId}/seats/p3/claim`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ name: "Alice Reuse", token: p1Claim.body.token }),
-  });
-  assert.equal(
-    persistedWrongTokenReuse.response.status,
-    409,
-    "Persisted reconnect tokens should not become claimable by a different seat",
-  );
   const persistedBob = await jsonFetch(`/api/rooms/${roomId}`, {
     headers: { "x-room-token": p2Claim.body.token },
   });

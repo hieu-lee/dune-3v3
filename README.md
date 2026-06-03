@@ -6,7 +6,7 @@ Private web-table implementation for a six-player `Dune: Imperium - Uprising` te
 
 - Vite + React + TypeScript client.
 - Repo-local Playwright browser debug harness captures scripted gameplay screenshots under `artifacts/qa/browser-debug`.
-- Private room dev server supports create/join by room code, seat claims, local reconnect tokens, file-backed room persistence, live room snapshots, per-seat hidden hand/Intrigue/objective plus draw/shared-deck projection, server-authoritative core turn actions, Combat pass/play, Endgame scoring/finalization, and server-backed pending-choice resolution.
+- Private room dev server supports create/join by room code or invite link, seat claims, wrong-seat switch/release, disconnected-seat recovery, local reconnect tokens, file-backed room persistence, live room snapshots, per-seat hidden hand/Intrigue/objective plus draw/shared-deck projection, server-authoritative core turn actions, Combat pass/play, Endgame scoring/finalization, and server-backed pending-choice resolution.
 - Six seats split into Muad'Dib and Shaddam teams.
 - Hotseat turn flow for agent turns and reveal turns.
 - Board space model for the 6-player surface.
@@ -146,7 +146,7 @@ Use `pnpm run debug:game` when you need to play the table in a browser with arti
 
 Use `pnpm run debug:game:smoke` to verify the manual capture bridge without keeping a browser open. It exits after writing `manual-ready.png`, `manual-ready.state.json`, `manual-capture-001-button.png`, its matching `.state.json`, `console.json`, `request-failures.json`, and `summary.json`.
 
-Use `pnpm run debug:room:smoke` after room/session changes. It starts the private room server, creates a room, claims a seat, reloads to prove reconnect recovery, joins from a second browser context, checks hidden hand projection, resolves setup online, advances an online Reveal turn, resolves a server-backed pending choice, plays a Plot Intrigue online, plays and passes combat online, and scores battle-icon plus conditional Endgame Intrigues before finalizing online.
+Use `pnpm run debug:room:smoke` after room/session changes. It starts the private room server, creates a room, claims a seat, switches and releases a mistaken seat, reloads to prove reconnect recovery, recovers a disconnected claimed seat from a fresh browser context, joins from a second browser context, checks hidden hand projection, resolves setup online, advances an online Reveal turn, resolves a server-backed pending choice, plays a Plot Intrigue online, plays and passes combat online, and scores battle-icon plus conditional Endgame Intrigues before finalizing online.
 
 Use `pnpm run debug:room:complete` when room/session changes affect full-table coordination. It opens six isolated browser contexts, claims all six seats, verifies hidden projections and turn permissions, reloads a claimed seat, resolves setup, advances a room turn, resolves server-backed pending choices including Conflict VP resource and spy conversions, and has all six seats mark Endgame ready until the shared room finishes.
 

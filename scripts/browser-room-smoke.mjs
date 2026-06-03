@@ -152,6 +152,7 @@ try {
   await alicePage.getByRole("button", { name: "Create" }).click();
   await alicePage.waitForFunction(() => new URL(window.location.href).searchParams.has("room"));
   const roomId = await alicePage.evaluate(() => new URL(window.location.href).searchParams.get("room"));
+  const inviteUrl = alicePage.url();
   assert.match(roomId, /^[A-F0-9]{8}$/);
   await alicePage.goBack();
   await alicePage.waitForFunction(() =>
@@ -161,27 +162,42 @@ try {
     window.__DUNE_DEBUG__?.getGame?.()?.marketDeck.some((card) => card.name !== "Hidden card")
   );
   await alicePage.getByRole("button", { name: "Create" }).waitFor({ state: "visible" });
-  await alicePage.goForward();
+  await alicePage.getByLabel("Room code").fill(inviteUrl);
+  await alicePage.getByRole("button", { name: "Join" }).click();
   await alicePage.waitForFunction((expectedRoomId) =>
     new URL(window.location.href).searchParams.get("room") === expectedRoomId &&
     window.__DUNE_DEBUG__?.getRoomSnapshot?.()?.roomId === expectedRoomId,
     roomId,
   );
+  await capture(alicePage, "room-joined-by-invite-link.png");
   await alicePage.getByLabel("Player name").fill("Alice");
   await alicePage.getByTestId("room-seat-p1").click();
   await alicePage.waitForFunction(() => document.querySelector(".room-seat.selected")?.textContent?.includes("Muad'Dib"));
   await waitForVisiblePrivateHand(alicePage, "p1");
-  assert.equal(
-    await alicePage.getByTestId("room-seat-p2").isDisabled(),
-    true,
-    "Claiming one seat should lock other seats in that browser session",
-  );
   assert.doesNotMatch(
     await alicePage.locator(".room-private-panel").innerText(),
     /Hidden card/,
     "Alice's private hand panel should show her own cards",
   );
   await capture(alicePage, "room-alice-claimed.png");
+  assert.equal(
+    await alicePage.getByTestId("room-seat-p2").isDisabled(),
+    false,
+    "Claimed browsers should be able to switch to an unclaimed role",
+  );
+  await alicePage.getByTestId("room-seat-p2").click();
+  await waitForSelectedSeat(alicePage, "p2");
+  await alicePage.waitForFunction(() =>
+    window.__DUNE_DEBUG__?.getRoomSnapshot?.()?.seats.find((seat) => seat.playerId === "p1")?.claimedBy === undefined
+  );
+  await capture(alicePage, "room-alice-switched-seat.png");
+  await alicePage.getByRole("button", { name: "Release" }).click();
+  await alicePage.waitForFunction(() =>
+    !document.querySelector(".room-seat.selected") &&
+    window.__DUNE_DEBUG__?.getRoomSnapshot?.()?.viewerPlayerId === undefined
+  );
+  await capture(alicePage, "room-alice-released-seat.png");
+  await claimSeat(alicePage, "p1", "Alice");
 
   await alicePage.reload({ waitUntil: "domcontentloaded" });
   await alicePage.waitForFunction(() => document.querySelector(".room-seat.selected")?.textContent?.includes("Muad'Dib"));
@@ -225,6 +241,26 @@ try {
   );
   assertHiddenSharedDecks(bobGame);
   await capture(bobPage, "room-bob-claimed.png");
+  await bobContext.close();
+  await alicePage.waitForFunction(() =>
+    window.__DUNE_DEBUG__?.getRoomSnapshot?.()?.seats.find((seat) => seat.playerId === "p2")?.connected === false
+  );
+  const bobRecoveryContext = await browser.newContext({ viewport: { width: 1440, height: 1100 } });
+  const bobRecoveryPage = await bobRecoveryContext.newPage();
+  observePage(bobRecoveryPage);
+  await bobRecoveryPage.goto(`${server.resolvedUrls.local[0]}?room=${roomId}`, { waitUntil: "domcontentloaded" });
+  await bobRecoveryPage.waitForFunction(() =>
+    document.querySelector("[data-testid='room-seat-p2']")?.textContent?.includes("offline")
+  );
+  assert.equal(
+    await bobRecoveryPage.getByTestId("room-seat-p2").isDisabled(),
+    false,
+    "Disconnected claimed seats should be recoverable from a browser without the old token",
+  );
+  await claimSeat(bobRecoveryPage, "p2", "Bob Reopened");
+  await waitForVisiblePrivateHand(bobRecoveryPage, "p2");
+  await capture(bobRecoveryPage, "room-bob-offline-reclaimed.png");
+  await bobRecoveryContext.close();
 
   const actionContext = await browser.newContext({ viewport: { width: 1440, height: 1100 } });
   const actionPage = await actionContext.newPage();

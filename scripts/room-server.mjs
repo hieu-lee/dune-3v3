@@ -300,6 +300,18 @@ export async function createRoomServer({
     });
   }
 
+  function seatClaimForToken(room, token) {
+    if (!token) return undefined;
+    return Object.values(room.seats).find((seat) => seat?.token === token);
+  }
+
+  async function persistAndBroadcastRoom(room) {
+    room.version += 1;
+    room.updatedAt = Date.now();
+    await persistRooms();
+    await broadcast(room);
+  }
+
   async function handleApi(request, response, url) {
     const createRoomMatch = request.method === "POST" && url.pathname === "/api/rooms";
     if (createRoomMatch) {
@@ -339,28 +351,46 @@ export async function createRoomServer({
       const previousToken = typeof body.token === "string" ? body.token : undefined;
       return await enqueueRoomWrite(room.id, async () => {
         const existing = room.seats[playerId];
-        if (existing && existing.token !== previousToken) {
+        const existingTokenSeat = seatClaimForToken(room, previousToken);
+        if (existing && existing.token !== previousToken && existing.connected) {
           return sendError(response, 409, "Seat already claimed");
         }
-        const existingTokenSeat = Object.values(room.seats).find((seat) => seat?.token === previousToken);
-        if (!existing && existingTokenSeat && existingTokenSeat.playerId !== playerId) {
-          return sendError(response, 409, "Reconnect token already belongs to another seat");
+        if (existingTokenSeat && existingTokenSeat.playerId !== playerId) {
+          if (existing) return sendError(response, 409, "Reconnect token already belongs to another claimed seat");
+          room.seats[existingTokenSeat.playerId] = undefined;
         }
-        const token = existing?.token ?? previousToken ?? reconnectToken();
+        const token = previousToken && (existing?.token === previousToken || existingTokenSeat)
+          ? previousToken
+          : reconnectToken();
         room.seats[playerId] = {
           playerId,
           name,
           token,
           connected: true,
         };
-        room.version += 1;
-        room.updatedAt = Date.now();
-        await persistRooms();
-        await broadcast(room);
+        await persistAndBroadcastRoom(room);
         return sendJson(response, 200, {
           token,
           snapshot: await snapshotFor(room, token),
         });
+      });
+    }
+
+    const releaseMatch = url.pathname.match(/^\/api\/rooms\/([A-Z0-9]+)\/seats\/([^/]+)\/release$/);
+    if (request.method === "POST" && releaseMatch) {
+      const room = rooms.get(releaseMatch[1]);
+      if (!room) return sendError(response, 404, "Room not found");
+      const playerId = decodeURIComponent(releaseMatch[2]);
+      const token = tokenFromRequest(request, url);
+      return await enqueueRoomWrite(room.id, async () => {
+        const existing = room.seats[playerId];
+        if (!existing) return sendError(response, 409, "Seat is not claimed");
+        if (!token || existing.token !== token) {
+          return sendError(response, 403, "Only the current seat token can release that seat");
+        }
+        room.seats[playerId] = undefined;
+        await persistAndBroadcastRoom(room);
+        return sendJson(response, 200, { snapshot: await snapshotFor(room, token) });
       });
     }
 

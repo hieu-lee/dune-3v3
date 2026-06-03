@@ -45,6 +45,17 @@ export function hasConditionalAttribute(card: HubCard, name: string) {
   return card.attributes.some(([attributeName, value]) => attributeName === name && value === null);
 }
 
+export function catalogCardTrait(name: string) {
+  return name === "Faction: Bene Geserit" ? "Faction: Bene Gesserit" : name;
+}
+
+export function catalogCardTraits(card: Pick<HubCard, "attributes">) {
+  const traits = card.attributes
+    .map(([name]) => catalogCardTrait(name))
+    .filter((name) => name.startsWith("Faction: "));
+  return [...new Set(traits)];
+}
+
 export function summarizeAttributes(card: HubCard) {
   const traits = card.attributes
     .filter(([name]) => !summaryIgnore.has(name) && !name.startsWith("Agent icon:") && !name.includes("Commander deck"))

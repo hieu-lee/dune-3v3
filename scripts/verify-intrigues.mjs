@@ -38,6 +38,15 @@ function assertLocalArt(card) {
   );
 }
 
+function assertOnlyFactionTraits(card) {
+  const traits = card.traits ?? [];
+  assert.deepEqual(
+    traits.filter((trait) => !trait.startsWith("Faction: ")),
+    [],
+    `${card.name} should not expose catalog reward metadata as Intrigue rule traits`,
+  );
+}
+
 function playerById(game, playerId) {
   const player = game.players.find((candidate) => candidate.id === playerId);
   assert.ok(player, `Expected player ${playerId}`);
@@ -67,6 +76,7 @@ try {
   for (const card of data.intrigueCards) {
     assert.ok(card.summary, `${card.name} should include a summary`);
     assertLocalArt(card);
+    assertOnlyFactionTraits(card);
   }
   assert.deepEqual(
     data.intrigueCards

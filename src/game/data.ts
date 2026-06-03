@@ -82,6 +82,7 @@ import {
 } from "./effect-specs";
 import {
   attributeNumber,
+  catalogCardTraits,
   catalog,
   summarizeAttributes,
   type HubCard,
@@ -647,7 +648,7 @@ function toIntrigueCard(card: HubCard): IntrigueCard {
     thumbnailPath: card.localThumbnailPath ?? card.thumbnailImageUrl ?? undefined,
     sourceId: card.id,
     sourceSlug: card.slug,
-    traits: card.attributes.map(([name]) => name),
+    traits: catalogCardTraits(card),
   };
 }
 

@@ -27,6 +27,18 @@ function assertLocalArt(cards, label) {
   }
 }
 
+function assertStarterTraits(cards, label) {
+  for (const card of cards) {
+    const traits = card.traits ?? [];
+    assert.ok(traits.includes("Starter deck"), `${label}: ${card.name} should keep the Starter deck trait`);
+    assert.deepEqual(
+      traits.filter((trait) => trait !== "Starter deck" && !trait.startsWith("Faction: ")),
+      [],
+      `${label}: ${card.name} should not expose catalog deck labels or reward metadata as rule traits`,
+    );
+  }
+}
+
 export function verifyStarterDeckCatalog({ data, state }) {
   assert.equal(data.allyStarterCards.length, 10, "Ally deck should contain 10 cards");
   assert.deepEqual(countNames(data.allyStarterCards), {
@@ -48,6 +60,7 @@ export function verifyStarterDeckCatalog({ data, state }) {
     "Ally Seek Allies should use typed source-card trash instead of trashOnPlay",
   );
   assertLocalArt(data.allyStarterCards, "Ally deck");
+  assertStarterTraits(data.allyStarterCards, "Ally deck");
 
   assert.equal(data.muadDibCommanderCards.length, 10, "Muad'Dib Commander deck should contain 10 cards");
   assert.deepEqual(countNames(data.muadDibCommanderCards), {
@@ -82,6 +95,7 @@ export function verifyStarterDeckCatalog({ data, state }) {
     "Command Respect should expose its automated Swordmaster trade payment",
   );
   assertLocalArt(data.muadDibCommanderCards, "Muad'Dib Commander deck");
+  assertStarterTraits(data.muadDibCommanderCards, "Muad'Dib Commander deck");
 
   assert.equal(data.emperorCommanderCards.length, 10, "Emperor Commander deck should contain 10 cards");
   assert.deepEqual(countNames(data.emperorCommanderCards), {
@@ -125,6 +139,7 @@ export function verifyStarterDeckCatalog({ data, state }) {
     "Emperor Seek Allies should use typed source-card trash instead of trashOnPlay",
   );
   assertLocalArt(data.emperorCommanderCards, "Emperor Commander deck");
+  assertStarterTraits(data.emperorCommanderCards, "Emperor Commander deck");
 
   const game = state.initialGame();
   const [muadDib, shaddamAlly, muadDibAllyA, emperor, muadDibAllyB, shaddamAllyB] = game.players;

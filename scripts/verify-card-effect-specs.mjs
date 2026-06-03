@@ -4697,10 +4697,18 @@ try {
   assert.match(unswervingLoyalty.reveal, /\+1 persuasion.*Recruit 1 troop.*Fremen Bond.*deploy or retreat 1 troop/i);
   assert.match(truthtrance.play, /No Agent effect/i);
   assert.doesNotMatch(truthtrance.play, /Faction|Bene Geserit/i);
-  assert.equal(truthtrance.traits.includes("Faction: Bene Gesserit"), true, "Truthtrance should normalize its Bene Gesserit trait");
-  assert.equal(truthtrance.traits.includes("Faction: Bene Geserit"), false, "Truthtrance should not expose the misspelled Bene Gesserit trait");
+  assert.deepEqual(
+    truthtrance.traits,
+    ["Faction: Bene Gesserit"],
+    "Truthtrance should expose only its normalized Bene Gesserit card trait",
+  );
   assert.match(spyNetwork.play, /No agent icons/i);
   assert.doesNotMatch(spyNetwork.play, /Acquire bonus|Intrigue 1|Spy 1/i);
+  assert.deepEqual(
+    spyNetwork.traits,
+    ["Faction: Emperor", "Faction: Spacing Guild"],
+    "Spy Network should expose only its printed faction card traits",
+  );
   assert.ok(
     calculus.effects?.some((spec) =>
       spec.trigger === "reveal" &&

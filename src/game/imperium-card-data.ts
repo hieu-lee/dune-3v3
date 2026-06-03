@@ -119,6 +119,7 @@ import {
 } from "./effect-specs";
 import {
   attributeNumber,
+  catalogCardTraits,
   catalog,
   hasConditionalAttribute,
   iconAttributeMap,
@@ -139,14 +140,6 @@ const acquireSpySourceIds = new Set([
   strikeFleetSourceId,
   subversiveAdvisorSourceId,
 ]);
-
-function imperiumTrait(name: string) {
-  return name === "Faction: Bene Geserit" ? "Faction: Bene Gesserit" : name;
-}
-
-function imperiumTraits(card: HubCard) {
-  return card.attributes.map(([name]) => imperiumTrait(name));
-}
 
 function revealText(persuasion: number, swords: number) {
   const parts = [`+${persuasion} persuasion`];
@@ -864,7 +857,7 @@ function toImperiumCard(card: HubCard): Card {
       sourceId: card.id,
       sourceSlug: card.slug,
       sourceType: card.type,
-      traits: imperiumTraits(card),
+      traits: catalogCardTraits(card),
     };
   }
   if (card.id === beneGesseritOperativeSourceId) {
@@ -944,7 +937,7 @@ function toImperiumCard(card: HubCard): Card {
     sourceId: card.id,
     sourceSlug: card.slug,
     sourceType: card.type,
-    traits: card.id === unswervingLoyaltySourceId ? ["Faction: Fremen"] : imperiumTraits(card),
+    traits: card.id === unswervingLoyaltySourceId ? ["Faction: Fremen"] : catalogCardTraits(card),
   };
 }
 

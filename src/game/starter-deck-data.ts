@@ -1,5 +1,8 @@
 import catalogJson from "./uprising-catalog.generated.json";
 import {
+  catalogCardTraits,
+} from "./catalog-data";
+import {
   agentBlockConflictDeployment,
   agentCommanderResourceSplit,
   agentDrawCards,
@@ -103,7 +106,7 @@ function commanderStarterCard(spec: StarterCardSpec & { sourceId: number }): Car
     thumbnailPath: source.localThumbnailPath ?? source.thumbnailImageUrl ?? source.localImagePath ?? undefined,
     sourceSlug: source.slug,
     sourceType: source.type,
-    traits: [...(spec.traits ?? []), ...source.attributes.map(([name]) => name)],
+    traits: [...(spec.traits ?? []), ...catalogCardTraits(source)],
   });
 }
 

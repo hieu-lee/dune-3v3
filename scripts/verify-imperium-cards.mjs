@@ -38,12 +38,24 @@ function withActivePlayer(game, playerId, patch) {
   };
 }
 
+function assertOnlyFactionTraits(card) {
+  const traits = card.traits ?? [];
+  assert.deepEqual(
+    traits.filter((trait) => !trait.startsWith("Faction: ")),
+    [],
+    `${card.name} should not expose catalog reward or icon metadata as rule traits`,
+  );
+}
+
 try {
   const data = await server.ssrLoadModule("/src/game/data.ts");
   const state = await server.ssrLoadModule("/src/game/state.ts");
   const turnActions = await server.ssrLoadModule("/src/app-turn-actions.ts");
 
   const game = resolveSetupPendingActions(state, state.initialGame());
+  for (const card of [...data.reserveMarket, ...data.imperiumDeck]) {
+    assertOnlyFactionTraits(card);
+  }
   const smuggler = data.imperiumDeck.find((card) => card.name === "Smuggler's Harvester");
   assert.ok(smuggler, "Imperium deck should include Smuggler's Harvester");
   assert.equal(state.isSmugglersHarvesterCard(smuggler), true, "Smuggler's Harvester should be recognized");
@@ -60,6 +72,11 @@ try {
   assert.match(interstellarTrade.play, /No Agent effect/i);
   assert.doesNotMatch(interstellarTrade.play, /Acquire bonus|Gain one Influence|Take a face-up contract/i);
   assert.match(interstellarTrade.reveal, /completed contract/, "Interstellar Trade should describe its contract reveal text");
+  assert.deepEqual(
+    interstellarTrade.traits,
+    ["Faction: Spacing Guild"],
+    "Interstellar Trade should expose only its Spacing Guild card trait",
+  );
   assert.ok(
     interstellarTrade.effects?.some((spec) =>
       spec.trigger === "acquire" &&
@@ -354,8 +371,11 @@ try {
   const truthtrance = data.imperiumDeck.find((card) => card.name === "Truthtrance");
   assert.ok(truthtrance, "Imperium deck should include Truthtrance");
   assert.deepEqual(truthtrance.icons, ["bene", "emperor", "fremen", "spacing"], "Truthtrance should keep its Agent icons");
-  assert.equal(truthtrance.traits.includes("Faction: Bene Gesserit"), true, "Truthtrance should normalize its Bene Gesserit trait");
-  assert.equal(truthtrance.traits.includes("Faction: Bene Geserit"), false, "Truthtrance should not expose the misspelled Bene Gesserit trait");
+  assert.deepEqual(
+    truthtrance.traits,
+    ["Faction: Bene Gesserit"],
+    "Truthtrance should expose only its normalized Bene Gesserit card trait",
+  );
   assert.match(truthtrance.play, /No Agent effect/i);
   assert.doesNotMatch(truthtrance.play, /Faction|Bene Geserit/i);
   assert.match(truthtrance.reveal, /\+1 persuasion/i);
@@ -465,6 +485,11 @@ try {
   );
   assert.match(priorityContracts.play, /Spice 2.*Take a face-up contract.*Victory Point/i);
   assert.equal(priorityContracts.acquired, undefined, "Priority Contracts VP should not be treated as an acquire bonus");
+  assert.deepEqual(
+    priorityContracts.traits,
+    ["Faction: Spacing Guild"],
+    "Priority Contracts should expose only its Spacing Guild card trait",
+  );
   assert.equal(
     data.imperiumDeck.find((card) => card.name === "Junction Headquarters")?.acquired,
     undefined,
@@ -608,6 +633,11 @@ try {
   assert.match(prepareTheWay.play, /2 or more Bene Gesserit Influence.*draw 1 card/i);
   assert.match(prepareTheWay.reveal, /\+2 persuasion/i);
   assert.equal(spiceMustFlow.acquired, 1, "The Spice Must Flow should keep its legacy acquisition VP display");
+  assert.deepEqual(
+    spiceMustFlow.traits,
+    ["Faction: Spacing Guild"],
+    "The Spice Must Flow should expose only its Spacing Guild card trait",
+  );
   assert.ok(
     spiceMustFlow.effects?.some((spec) =>
       spec.trigger === "acquire" &&
@@ -634,6 +664,11 @@ try {
       )
     ),
     "Spy Network should model its acquisition spy bonus as a typed acquire effect",
+  );
+  assert.deepEqual(
+    spyNetwork.traits,
+    ["Faction: Emperor", "Faction: Spacing Guild"],
+    "Spy Network should expose only its printed faction card traits",
   );
   assert.match(spyNetwork.play, /No agent icons/i);
   assert.doesNotMatch(spyNetwork.play, /Acquire bonus|Intrigue 1|Spy 1/i);

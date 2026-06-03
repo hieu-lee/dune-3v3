@@ -52,6 +52,29 @@ function contractPaymentSourceIsValid(pending: { source?: unknown }) {
   return typeof pending.source === "string" && pending.source.trim().length > 0;
 }
 
+function publicContractPendingIsUnavailable(state: GameState) {
+  const pending = state.pendingAction;
+  return pending?.kind === "contract" &&
+    pending.publicOnly === true &&
+    pending.allowFallback !== true &&
+    pending.optional !== true &&
+    state.contractOffer.length === 0;
+}
+
+function skipUnavailablePublicContractPendings(state: GameState): GameState {
+  let next = state;
+  const skippedLogs: string[] = [];
+  while (publicContractPendingIsUnavailable(next)) {
+    const pending = next.pendingAction as ContractPendingAction;
+    const owner = next.players.find((player) => player.id === pending.ownerId);
+    skippedLogs.push(
+      `${owner?.leader ?? "Player"} cannot take a face-up CHOAM contract from ${pending.source}; no face-up CHOAM contracts remain.`,
+    );
+    next = { ...next, ...advancePendingAction(next) };
+  }
+  return skippedLogs.length > 0 ? { ...next, log: [...skippedLogs, ...next.log] } : next;
+}
+
 function spendAcquireCardPayment(player: Player, pending: AcquireCardPendingAction, cost: number): Player {
   if (!pending.paymentResource || cost <= 0) return player;
   return {
@@ -177,14 +200,14 @@ export function resolvePayResourceForContractsChoice(
     return player;
   });
 
-  return {
+  return skipUnavailablePublicContractPendings({
     ...state,
     players,
     contractOffer,
     contractDeck,
     ...advancePendingAction(state),
     log: [`${owner.leader} spends ${pending.cost} ${resourceLabel} for ${pending.source}; ${assignedText}.`, ...state.log],
-  };
+  });
 }
 
 export function skipPayResourceForContracts(
@@ -243,12 +266,12 @@ export function resolveTakeChoamContract(
           }
         : player,
     );
-    return finishPendingResolution({
+    return finishPendingResolution(skipUnavailablePublicContractPendings({
       ...state,
       players,
       ...advancePendingAction(state),
       log: [`${owner.leader} takes the reserved ${reservedContract.name} CHOAM contract from ${pending.source}.`, ...state.log],
-    });
+    }));
   }
 
   const [replacement, ...contractDeck] = state.contractDeck;
@@ -272,14 +295,14 @@ export function resolveTakeChoamContract(
         }
       : player,
   );
-  return finishPendingResolution({
+  return finishPendingResolution(skipUnavailablePublicContractPendings({
     ...state,
     players,
     contractOffer,
     contractDeck,
     ...advancePendingAction(state),
     log: [`${owner.leader} takes the ${contract.name} CHOAM contract from ${pending.source}.`, ...state.log],
-  });
+  }));
 }
 
 export function resolveAcquireCardForPending(

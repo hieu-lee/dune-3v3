@@ -28,6 +28,7 @@ import {
   paracompassSourceId,
   prepareTheWaySourceId,
   priceIsNoObjectSourceId,
+  priorityContractsSourceId,
   publicSpectacleSourceId,
   rebelSupplierSourceId,
   reliableInformantSourceId,
@@ -64,6 +65,7 @@ import {
   agentGainBoardSpaceInfluence,
   agentGainInfluenceChoice,
   agentGainResource,
+  agentGainVp,
   agentOpponentsDiscardCards,
   agentPayResourceForDrawCards,
   agentPayResourceForSandworms,
@@ -71,6 +73,7 @@ import {
   agentRecallAgent,
   agentRecruitTroops,
   agentSelectTopDeckCards,
+  agentTakeContracts,
   agentTrashCards,
   agentTrashIntrigueForReward,
   agentTrashSource,
@@ -379,6 +382,13 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
       revealGainStrength(3),
     ];
   }
+  if (card.id === priorityContractsSourceId) {
+    return [
+      agentGainResource("spice", 2),
+      agentGainVp(1),
+      agentTakeContracts(1, { source: "Priority Contracts" }),
+    ];
+  }
   if (card.id === maulaPistolSourceId) {
     return [
       agentDrawCards(1),
@@ -601,6 +611,22 @@ function fixedRevealEffects(
   return effects.length > 0 ? effects : undefined;
 }
 
+function effectModelsVictoryPoint(effect: CardEffectSpec["effects"][number]) {
+  return effect.kind === "gain-vp" ||
+    effect.kind === "pay-team-resource-for-vp" ||
+    (effect.kind === "trash-intrigue-for-reward" && effect.gainVp !== undefined);
+}
+
+function effectsModelVictoryPoints(effects: CardEffectSpec[] | undefined) {
+  return effects?.some((spec) => spec.effects.some(effectModelsVictoryPoint)) ?? false;
+}
+
+function acquiredVictoryPoints(card: HubCard, effects: CardEffectSpec[] | undefined) {
+  if (!hasConditionalAttribute(card, "Victory Point")) return undefined;
+  if (hasConditionalAttribute(card, "Acquire bonus")) return 1;
+  return effectsModelVictoryPoints(effects) ? undefined : 1;
+}
+
 function imperiumPlayText(card: HubCard) {
   if (card.id === smugglersHarvesterSourceId) {
     return "If you sent an Agent to a Maker board space this turn, gain 1 spice.";
@@ -791,7 +817,7 @@ function toImperiumCard(card: HubCard): Card {
     id: `hub-${card.id}`,
     name: card.name,
     icons: card.attributes.flatMap(([name]) => iconAttributeMap[name] ?? []),
-    acquired: hasConditionalAttribute(card, "Victory Point") ? 1 : undefined,
+    acquired: acquiredVictoryPoints(card, effects),
     persuasion,
     swords,
     conditionalPersuasion,

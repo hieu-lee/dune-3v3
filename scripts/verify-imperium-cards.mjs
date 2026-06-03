@@ -311,6 +311,60 @@ try {
   );
   assert.match(longLiveTheFighters.play, /deck has three or more cards.*top three cards.*Draw one.*discard one.*trash one/i);
   assert.match(longLiveTheFighters.reveal, /\+2 persuasion.*3 strength/i);
+  const priorityContracts = data.imperiumDeck.find((card) => card.name === "Priority Contracts");
+  assert.ok(priorityContracts, "Imperium deck should include Priority Contracts");
+  assert.ok(
+    priorityContracts.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.effects.some((effect) =>
+        effect.kind === "gain-resource" &&
+        effect.selector === "self" &&
+        effect.resource === "spice" &&
+        effect.amount === 2
+      )
+    ) &&
+      priorityContracts.effects?.some((spec) =>
+        spec.trigger === "agent-play" &&
+        spec.effects.some((effect) =>
+          effect.kind === "gain-vp" &&
+          effect.selector === "self" &&
+          effect.amount === 1
+        )
+      ) &&
+      priorityContracts.effects?.some((spec) =>
+        spec.trigger === "agent-play" &&
+        spec.effects.some((effect) =>
+          effect.kind === "take-contracts" &&
+          effect.selector === "self" &&
+          effect.amount === 1 &&
+          effect.sourcePool === "public-offer" &&
+          effect.source === "Priority Contracts"
+        )
+      ),
+    "Priority Contracts should model its Agent spice, VP, and public contract rewards as typed effects",
+  );
+  assert.match(priorityContracts.play, /Spice 2.*Take a face-up contract.*Victory Point/i);
+  assert.equal(priorityContracts.acquired, undefined, "Priority Contracts VP should not be treated as an acquire bonus");
+  assert.equal(
+    data.imperiumDeck.find((card) => card.name === "Junction Headquarters")?.acquired,
+    undefined,
+    "Junction Headquarters VP should be modeled by its typed Agent effect",
+  );
+  assert.equal(
+    data.imperiumDeck.find((card) => card.name === "Corrinth City")?.acquired,
+    1,
+    "Corrinth City should retain its legacy printed-VP marker until its VP text is typed",
+  );
+  assert.equal(
+    data.imperiumDeck.find((card) => card.name === "Delivery Agreement")?.acquired,
+    1,
+    "Delivery Agreement should retain its legacy printed-VP marker until its VP text is typed",
+  );
+  assert.equal(
+    data.imperiumDeck.find((card) => card.name === "Smuggler's Haven")?.acquired,
+    1,
+    "Smuggler's Haven should retain its legacy printed-VP marker until its VP text is typed",
+  );
   const prepareTheWay = data.reserveMarket.find((card) => card.sourceId === 537);
   assert.ok(prepareTheWay, "Reserve market should include Prepare The Way");
   const spiceMustFlow = data.reserveMarket.find((card) => card.sourceId === 538);
@@ -548,7 +602,7 @@ try {
     ),
     "Shishakli should model its Fremen Bond Reveal Influence as a typed effect",
   );
-  for (const name of ["Bene Gesserit Operative", "Branching Path", "Calculus of Power", "Cargo Runner", "Chani, Clever Tactician", "Guild Spy", "In High Places", "Junction Headquarters", "Long Live the Fighters", "Maker Keeper", "Maula Pistol", "Northern Watermaster", "Overthrow", "Paracompass", "Price is No Object", "Shishakli", "Steersman"]) {
+  for (const name of ["Bene Gesserit Operative", "Branching Path", "Calculus of Power", "Cargo Runner", "Chani, Clever Tactician", "Guild Spy", "In High Places", "Junction Headquarters", "Long Live the Fighters", "Maker Keeper", "Maula Pistol", "Northern Watermaster", "Overthrow", "Paracompass", "Price is No Object", "Priority Contracts", "Shishakli", "Steersman"]) {
     const card = data.imperiumDeck.find((candidate) => candidate.name === name);
     assert.ok(card?.effects?.some((spec) => spec.trigger === "agent-play"), `${name} should use a structured Agent effect`);
   }
@@ -2430,6 +2484,80 @@ try {
     [],
     "Interstellar Trade should not queue a contract choice when no face-up contracts remain",
   );
+
+  const priorityContractsSpace = {
+    id: "priority-contracts-test-space",
+    name: "Priority Contracts Test Space",
+    zone: "Landsraad",
+    icon: "landsraad",
+    detail: "Verifier-only Landsraad space without board pending rewards.",
+  };
+  const priorityContractsOffer = data.standardContracts[6];
+  const priorityContractsReplacement = data.standardContracts[7];
+  assert.ok(priorityContractsOffer && priorityContractsReplacement, "Expected standard contracts for Priority Contracts coverage");
+  const priorityContractsPlaced = turnActions.placeAgentAction(
+    {
+      ...withActivePlayer(game, p2.id, () => ({
+        agentsReady: 1,
+        contracts: [],
+        discard: [],
+        hand: [priorityContracts],
+        playArea: [],
+        resources: { solari: 0, spice: 1, water: 0 },
+        vp: 0,
+      })),
+      contractOffer: [priorityContractsOffer],
+      contractDeck: [priorityContractsReplacement],
+    },
+    {
+      commanderTargets: {},
+      selectedCard: priorityContracts,
+      selectedSpace: priorityContractsSpace,
+    },
+  );
+  assert.deepEqual(
+    priorityContractsPlaced.pendingAction,
+    { kind: "contract", ownerId: p2.id, source: "Priority Contracts", publicOnly: true },
+    "Priority Contracts should queue a public CHOAM contract after Agent placement",
+  );
+  assert.equal(playerById(priorityContractsPlaced, p2.id).resources.spice, 3, "Priority Contracts should grant 2 spice immediately");
+  assert.equal(playerById(priorityContractsPlaced, p2.id).vp, 1, "Priority Contracts should grant 1 VP immediately");
+  assert.match(priorityContractsPlaced.log[0], /Priority Contracts: gains 2 spice; gains 1 VP/);
+  const priorityContractsResolved = state.takeChoamContract(
+    priorityContractsPlaced,
+    priorityContractsPlaced.pendingAction,
+    priorityContractsOffer.id,
+  );
+  assert.equal(priorityContractsResolved.pendingAction, undefined);
+  assert.equal(playerById(priorityContractsResolved, p2.id).contracts.at(-1)?.card.id, priorityContractsOffer.id);
+  assert.deepEqual(
+    priorityContractsResolved.contractOffer.map((contract) => contract.id),
+    [priorityContractsReplacement.id],
+    "Priority Contracts should refill the public contract offer after taking a contract",
+  );
+  const priorityContractsNoOffer = turnActions.placeAgentAction(
+    {
+      ...withActivePlayer(game, p2.id, () => ({
+        agentsReady: 1,
+        contracts: [],
+        discard: [],
+        hand: [priorityContracts],
+        playArea: [],
+        resources: { solari: 0, spice: 1, water: 0 },
+        vp: 0,
+      })),
+      contractOffer: [],
+      contractDeck: [],
+    },
+    {
+      commanderTargets: {},
+      selectedCard: priorityContracts,
+      selectedSpace: priorityContractsSpace,
+    },
+  );
+  assert.equal(priorityContractsNoOffer.pendingAction, undefined, "Priority Contracts should not queue when no public contracts remain");
+  assert.equal(playerById(priorityContractsNoOffer, p2.id).resources.spice, 3, "Priority Contracts no-offer path should still grant spice");
+  assert.equal(playerById(priorityContractsNoOffer, p2.id).vp, 1, "Priority Contracts no-offer path should still grant VP");
 
   const calculusFixture = withActivePlayer(game, p2.id, () => ({
     agentsReady: 0,

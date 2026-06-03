@@ -23,6 +23,7 @@ import {
   resolveAgentPayResourceForInfluences,
   resolveAgentPayResourceForSandworms,
   resolveAgentPayTeamResourceForVps,
+  resolveTakeContracts,
   resolveAgentTrashIntrigueForRewards,
   resolveAgentTrashSourceForTrades,
   resolveAgentTopDeckSelections,
@@ -820,6 +821,38 @@ function pendingActionForAgentPayResourceForContracts(
     .find((pending): pending is PendingAction => Boolean(pending));
 }
 
+function pendingActionForAgentTakeContracts(
+  card: Card,
+  source: Player,
+  state?: GameState,
+  target?: Player,
+  space?: BoardSpace,
+): PendingAction | undefined {
+  if (!card.effects || !source.playArea.some((candidate) => candidate.id === card.id)) return undefined;
+  if (!state || state.contractOffer.length === 0) return undefined;
+  const players = playersWithPendingCardEffect(state, source, target);
+  const effectState = { ...state, players };
+  const effects = resolveTakeContracts(card.effects, {
+    trigger: "agent-play",
+    source,
+    target,
+    state: effectState,
+    space,
+  });
+  return effects
+    .map((effect): PendingAction | undefined => {
+      if (effect.selector !== "self" || effect.amount !== 1 || effect.sourcePool !== "public-offer") return undefined;
+      return {
+        kind: "contract",
+        ownerId: source.id,
+        source: effect.source ?? card.name,
+        publicOnly: true,
+        ...(effect.optional ? { optional: true } : {}),
+      };
+    })
+    .find((pending): pending is PendingAction => Boolean(pending));
+}
+
 function pendingActionForAgentPayResourceForDrawCards(
   card: Card,
   source: Player,
@@ -1153,6 +1186,8 @@ export function pendingActionsForCard(
   if (agentPayResourceSandwormsPending) typedPendings.push(agentPayResourceSandwormsPending);
   const agentPayResourceContractsPending = pendingActionForAgentPayResourceForContracts(card, source, state, target);
   if (agentPayResourceContractsPending) typedPendings.push(agentPayResourceContractsPending);
+  const agentTakeContractsPending = pendingActionForAgentTakeContracts(card, source, state, target, space);
+  if (agentTakeContractsPending) typedPendings.push(agentTakeContractsPending);
   const agentPayResourceDrawCardsPending = pendingActionForAgentPayResourceForDrawCards(card, source, state, target, space);
   if (agentPayResourceDrawCardsPending) typedPendings.push(agentPayResourceDrawCardsPending);
   const agentPayTeamResourceVpPending = pendingActionForAgentPayTeamResourceForVp(card, source, state, target, space);

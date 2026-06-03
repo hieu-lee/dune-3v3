@@ -244,7 +244,7 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     return;
   }
   if (effect.kind === "gain-vp") {
-    if (trigger !== "acquire" && trigger !== "plot-intrigue") {
+    if (trigger !== "agent-play" && trigger !== "acquire" && trigger !== "plot-intrigue") {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
     }
     if (effect.selector !== "self") {
@@ -806,7 +806,12 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     return;
   }
   if (effect.kind === "take-contracts") {
-    if (trigger !== "plot-intrigue" && trigger !== "combat-intrigue" && trigger !== "acquire") {
+    if (
+      trigger !== "agent-play" &&
+      trigger !== "plot-intrigue" &&
+      trigger !== "combat-intrigue" &&
+      trigger !== "acquire"
+    ) {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
     }
     if (effect.selector !== "self") {
@@ -821,8 +826,14 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
       invalidSpecField("take-contracts amount", effect.amount);
     }
     validateOptionalTrue("take-contracts optional", (effect as { optional?: unknown }).optional);
-    if ((trigger === "combat-intrigue" || trigger === "acquire") && effect.optional === true) {
-      invalidSpecField(`${trigger === "combat-intrigue" ? "combat" : "acquire"} take-contracts optional`, effect.optional);
+    if ((trigger === "agent-play" || trigger === "combat-intrigue" || trigger === "acquire") && effect.optional === true) {
+      const triggerLabel =
+        trigger === "agent-play"
+          ? "agent"
+          : trigger === "combat-intrigue"
+            ? "combat"
+            : "acquire";
+      invalidSpecField(`${triggerLabel} take-contracts optional`, effect.optional);
     }
     return;
   }

@@ -143,6 +143,7 @@ function applyGenericCardAgentEffect(
     result.recalledAgents === 0 &&
     recruitedTroops === 0 &&
     intriguesToDraw === 0 &&
+    result.vp === 0 &&
     !blocksDeploymentsThisTurn &&
     !hasSourceResourceGain &&
     !hasTargetResourceGain
@@ -155,6 +156,7 @@ function applyGenericCardAgentEffect(
     agentsReady: Math.min(sourcePlayer.agentsTotal, sourcePlayer.agentsReady + result.recalledAgents),
     garrison: sourcePlayer.garrison + sourceRecruitedTroops,
     resources: addResources(sourcePlayer.resources, result.revealGain),
+    vp: sourcePlayer.vp + result.vp,
   };
   let target = {
     ...targetPlayer,
@@ -204,6 +206,7 @@ function agentEffectLog(
 ) {
   const parts = [
     resourceGainText(result.revealGain),
+    vpGainText(result.vp),
     recruitText(undefined, sourceRecruitedTroops),
     drawText(result.cardsToDraw, cardsDrawn),
     recallAgentText(result.recalledAgents),
@@ -252,6 +255,10 @@ function resourceGainText(gain: Partial<Resources>) {
     resourceAmountText("water", gain.water),
   ].filter((part): part is string => Boolean(part));
   return parts.length > 0 ? `gains ${parts.join(" and ")}` : undefined;
+}
+
+function vpGainText(amount: number) {
+  return amount > 0 ? `gains ${amount} VP` : undefined;
 }
 
 function playerResourceGainText(player: Player, gain: Partial<Resources>) {

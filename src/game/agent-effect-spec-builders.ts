@@ -306,6 +306,25 @@ export function agentPayResourceForContracts(
   ], conditions);
 }
 
+export function agentTakeContracts(
+  amount: EffectAmountSpec,
+  options: {
+    sourcePool?: ContractEffectSourcePool;
+    source?: string;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return agentPlayEffects([
+    {
+      kind: "take-contracts",
+      selector: "self",
+      amount,
+      sourcePool: options.sourcePool ?? "public-offer",
+      ...(options.source ? { source: options.source } : {}),
+    },
+  ], conditions);
+}
+
 export function agentPayTeamResourceForVp(
   resource: ResourceId,
   cost: EffectAmountSpec,
@@ -511,6 +530,13 @@ export function agentGainResource(
   const options = Array.isArray(optionsOrConditions) ? {} : optionsOrConditions;
   const resolvedConditions = Array.isArray(optionsOrConditions) ? optionsOrConditions : conditions;
   return agentPlayEffects([{ kind: "gain-resource", selector: "self", resource, amount, ...options }], resolvedConditions);
+}
+
+export function agentGainVp(
+  amount: EffectAmountSpec,
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return agentPlayEffects([{ kind: "gain-vp", selector: "self", amount }], conditions);
 }
 
 export function agentRecruitTroops(

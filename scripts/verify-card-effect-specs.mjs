@@ -164,10 +164,12 @@ try {
   const calculus = data.imperiumDeck.find((card) => card.name === "Calculus of Power");
   const capturedMentat = data.imperiumDeck.find((card) => card.name === "Captured Mentat");
   const beneGesseritOperative = data.imperiumDeck.find((card) => card.name === "Bene Gesserit Operative");
+  const corrinthCity = data.imperiumDeck.find((card) => card.name === "Corrinth City");
   const covertOperation = data.imperiumDeck.find((card) => card.name === "Covert Operation");
   const dangerousRhetoric = data.imperiumDeck.find((card) => card.name === "Dangerous Rhetoric");
   const desertPower = data.imperiumDeck.find((card) => card.name === "Desert Power");
   const desertSurvival = data.imperiumDeck.find((card) => card.name === "Desert Survival");
+  const deliveryAgreement = data.imperiumDeck.find((card) => card.name === "Delivery Agreement");
   const doubleAgent = data.imperiumDeck.find((card) => card.name === "Double Agent");
   const imperialSpymaster = data.imperiumDeck.find((card) => card.name === "Imperial Spymaster");
   const fedaykinStilltent = data.imperiumDeck.find((card) => card.name === "Fedaykin Stilltent");
@@ -181,6 +183,7 @@ try {
   const maulaPistol = data.imperiumDeck.find((card) => card.name === "Maula Pistol");
   const northernWatermaster = data.imperiumDeck.find((card) => card.name === "Northern Watermaster");
   const paracompass = data.imperiumDeck.find((card) => card.name === "Paracompass");
+  const priorityContracts = data.imperiumDeck.find((card) => card.name === "Priority Contracts");
   const publicSpectacle = data.imperiumDeck.find((card) => card.name === "Public Spectacle");
   const rebelSupplier = data.imperiumDeck.find((card) => card.name === "Rebel Supplier");
   const reliableInformant = data.imperiumDeck.find((card) => card.name === "Reliable Informant");
@@ -277,7 +280,9 @@ try {
     calculus &&
     capturedMentat &&
     beneGesseritOperative &&
+    corrinthCity &&
     covertOperation &&
+    deliveryAgreement &&
     doubleAgent &&
     desertPower &&
     desertSurvival &&
@@ -293,6 +298,7 @@ try {
     maulaPistol &&
     northernWatermaster &&
     paracompass &&
+    priorityContracts &&
     publicSpectacle &&
     rebelSupplier &&
     reliableInformant &&
@@ -3529,6 +3535,44 @@ try {
     ),
     "Interstellar Trade should use a typed acquire face-up contract effect",
   );
+  assert.ok(
+    hasAgentEffect(
+      priorityContracts,
+      (effect) =>
+        effect.kind === "gain-resource" &&
+        effect.selector === "self" &&
+        effect.resource === "spice" &&
+        effect.amount === 2,
+    ),
+    "Priority Contracts should use a typed Agent spice effect",
+  );
+  assert.ok(
+    hasAgentEffect(
+      priorityContracts,
+      (effect) =>
+        effect.kind === "gain-vp" &&
+        effect.selector === "self" &&
+        effect.amount === 1,
+    ),
+    "Priority Contracts should use a typed Agent VP effect",
+  );
+  assert.ok(
+    hasAgentEffect(
+      priorityContracts,
+      (effect) =>
+        effect.kind === "take-contracts" &&
+        effect.selector === "self" &&
+        effect.amount === 1 &&
+        effect.sourcePool === "public-offer" &&
+        effect.source === "Priority Contracts",
+    ),
+    "Priority Contracts should use a typed Agent face-up contract effect",
+  );
+  assert.equal(priorityContracts.acquired, undefined, "Priority Contracts VP should not be treated as an acquire bonus");
+  assert.equal(junctionHeadquarters.acquired, undefined, "Junction Headquarters VP should be modeled by its typed Agent effect");
+  assert.equal(corrinthCity.acquired, 1, "Corrinth City should retain its legacy printed-VP marker until its VP text is typed");
+  assert.equal(deliveryAgreement.acquired, 1, "Delivery Agreement should retain its legacy printed-VP marker until its VP text is typed");
+  assert.equal(smugglersHaven.acquired, 1, "Smuggler's Haven should retain its legacy printed-VP marker until its VP text is typed");
   assert.deepEqual(
     marketAndImperiumCards.filter(hasAgentPlaySpec).map((card) => card.name).sort(),
     [
@@ -3560,6 +3604,7 @@ try {
       "Paracompass",
       "Prepare The Way",
       "Price is No Object",
+      "Priority Contracts",
       "Public Spectacle",
       "Rebel Supplier",
       "Reliable Informant",
@@ -6280,13 +6325,13 @@ try {
     /Invalid choiceId ""/,
     "Choice specs should reject empty choice ids",
   );
-  assert.throws(
-    () => effectResolver.resolveGameEffects(
+  assert.deepEqual(
+    effectResolver.resolveTakeContracts(
       [agentSpec([{ kind: "take-contracts", selector: "self", amount: 1, sourcePool: "public-offer" }])],
       { trigger: "agent-play", source: p2, state: game },
     ),
-    /Unsupported effect "take-contracts" for agent-play/,
-    "Take-contract specs should stay on typed Plot or Combat Intrigue resolvers",
+    [{ selector: "self", amount: 1, sourcePool: "public-offer", optional: false, source: undefined }],
+    "Take-contract specs should support Agent public-offer contract pendings",
   );
   assert.throws(
     () => effectResolver.resolveTakeContracts(
@@ -6335,6 +6380,14 @@ try {
     ),
     /Invalid combat take-contracts optional "true"/,
     "Combat take-contract specs should remain mandatory until an optional Combat contract UI exists",
+  );
+  assert.throws(
+    () => effectResolver.resolveTakeContracts(
+      [agentSpec([{ kind: "take-contracts", selector: "self", amount: 1, sourcePool: "public-offer", optional: true }])],
+      { trigger: "agent-play", source: p2, state: game },
+    ),
+    /Invalid agent take-contracts optional "true"/,
+    "Agent take-contract specs should remain mandatory until an optional Agent contract UI exists",
   );
   assert.throws(
     () => effectResolver.resolveTakeContracts(
@@ -9911,6 +9964,224 @@ try {
     [{ selector: "self", amount: 1, sourcePool: "public-offer", optional: false, source: "Interstellar Trade" }],
     "Interstellar Trade acquire contract bonus should resolve from typed specs",
   );
+  const priorityContractsAgentResult = effectResolver.resolveGameEffects(priorityContracts.effects, {
+    trigger: "agent-play",
+    source: p2,
+    state: game,
+  });
+  assert.equal(
+    priorityContractsAgentResult.revealGain.spice,
+    2,
+    "Priority Contracts Agent spice bonus should resolve from typed specs",
+  );
+  assert.equal(
+    priorityContractsAgentResult.vp,
+    1,
+    "Priority Contracts Agent VP bonus should resolve from typed specs",
+  );
+  assert.deepEqual(
+    effectResolver.resolveTakeContracts(priorityContracts.effects, {
+      trigger: "agent-play",
+      source: p2,
+      state: game,
+    }),
+    [{ selector: "self", amount: 1, sourcePool: "public-offer", optional: false, source: "Priority Contracts" }],
+    "Priority Contracts contract bonus should resolve from typed Agent specs",
+  );
+  const priorityContractsAcquireReplacement = data.imperiumDeck.find((card) => card.id !== priorityContracts.id);
+  assert.ok(priorityContractsAcquireReplacement, "Expected an Imperium Row replacement for Priority Contracts acquisition coverage");
+  const priorityContractsAcquired = state.acquireMarketCard(
+    {
+      ...withActivePlayer(game, p2.id, () => ({
+        discard: [],
+        hand: [],
+        persuasion: priorityContracts.cost,
+        playArea: [],
+        revealed: true,
+        resources: { solari: 0, spice: 0, water: 0 },
+        vp: 0,
+      })),
+      imperiumRow: [priorityContracts],
+      marketDeck: [priorityContractsAcquireReplacement],
+    },
+    p2.id,
+    priorityContracts.id,
+  );
+  assert.equal(playerById(priorityContractsAcquired, p2.id).vp, 0, "Acquiring Priority Contracts should not award its Agent VP");
+  assert.equal(playerById(priorityContractsAcquired, p2.id).discard.at(-1)?.id, priorityContracts.id);
+  assert.equal(priorityContractsAcquired.pendingAction, undefined, "Acquiring Priority Contracts should not queue Agent contract effects");
+  const priorityContractsSpace = {
+    id: "priority-contracts-test-space",
+    name: "Priority Contracts Test Space",
+    zone: "Landsraad",
+    icon: "landsraad",
+    detail: "Verifier-only Landsraad space without board pending rewards.",
+  };
+  const priorityContractsOffer = data.standardContracts[6];
+  const priorityContractsReplacement = data.standardContracts[7];
+  assert.ok(priorityContractsOffer && priorityContractsReplacement, "Expected standard contracts for Priority Contracts coverage");
+  const priorityContractsPlaced = turnActions.placeAgentAction(
+    {
+      ...withActivePlayer(game, p2.id, () => ({
+        agentsReady: 1,
+        contracts: [],
+        discard: [],
+        hand: [priorityContracts],
+        playArea: [],
+        resources: { solari: 0, spice: 1, water: 0 },
+        vp: 0,
+      })),
+      contractOffer: [priorityContractsOffer],
+      contractDeck: [priorityContractsReplacement],
+    },
+    {
+      commanderTargets: {},
+      selectedCard: priorityContracts,
+      selectedSpace: priorityContractsSpace,
+    },
+  );
+  assert.deepEqual(
+    priorityContractsPlaced.pendingAction,
+    { kind: "contract", ownerId: p2.id, source: "Priority Contracts", publicOnly: true },
+    "Priority Contracts should queue a public CHOAM contract after Agent placement",
+  );
+  assert.equal(playerById(priorityContractsPlaced, p2.id).resources.spice, 3, "Priority Contracts should grant 2 spice immediately");
+  assert.equal(playerById(priorityContractsPlaced, p2.id).vp, 1, "Priority Contracts should grant 1 VP immediately");
+  assert.match(priorityContractsPlaced.log[0], /Priority Contracts: gains 2 spice; gains 1 VP/);
+  const priorityContractsResolved = state.takeChoamContract(
+    priorityContractsPlaced,
+    priorityContractsPlaced.pendingAction,
+    priorityContractsOffer.id,
+  );
+  assert.equal(priorityContractsResolved.pendingAction, undefined);
+  assert.equal(playerById(priorityContractsResolved, p2.id).contracts.at(-1)?.card.id, priorityContractsOffer.id);
+  assert.deepEqual(
+    priorityContractsResolved.contractOffer.map((contract) => contract.id),
+    [priorityContractsReplacement.id],
+    "Priority Contracts should refill the public contract offer after taking a contract",
+  );
+  const priorityContractsAcceptOffer = data.standardContracts[8];
+  const priorityContractsAcceptRefillOffer = data.standardContracts[9];
+  const priorityContractsAcceptReplacement = data.standardContracts[10];
+  assert.ok(
+    priorityContractsAcceptOffer && priorityContractsAcceptRefillOffer && priorityContractsAcceptReplacement,
+    "Expected standard contracts for Priority Contracts Accept Contract coverage",
+  );
+  const priorityContractsAcceptPlaced = turnActions.placeAgentAction(
+    {
+      ...withActivePlayer(game, p2.id, () => ({
+        agentsReady: 1,
+        contracts: [],
+        deck: [dagger],
+        discard: [],
+        hand: [priorityContracts],
+        playArea: [],
+        resources: { solari: 0, spice: 1, water: 0 },
+        vp: 0,
+      })),
+      contractOffer: [priorityContractsAcceptOffer],
+      contractDeck: [],
+    },
+    {
+      commanderTargets: {},
+      selectedCard: priorityContracts,
+      selectedSpace: acceptContract,
+    },
+  );
+  assert.deepEqual(
+    priorityContractsAcceptPlaced.pendingAction,
+    { kind: "contract", ownerId: p2.id, source: "Accept Contract", spaceId: "accept-contract" },
+    "Accept Contract should queue its board contract choice before Priority Contracts",
+  );
+  assert.deepEqual(
+    priorityContractsAcceptPlaced.pendingQueue,
+    [{ kind: "contract", ownerId: p2.id, source: "Priority Contracts", publicOnly: true }],
+    "Priority Contracts should queue behind the board contract choice",
+  );
+  const priorityContractsAcceptResolved = state.takeChoamContract(
+    priorityContractsAcceptPlaced,
+    priorityContractsAcceptPlaced.pendingAction,
+    priorityContractsAcceptOffer.id,
+  );
+  assert.equal(
+    priorityContractsAcceptResolved.pendingAction,
+    undefined,
+    "Priority Contracts should not leave a stale public-only contract pending when Accept Contract consumes the last offer",
+  );
+  assert.equal(priorityContractsAcceptResolved.pendingQueue.length, 0);
+  assert.equal(playerById(priorityContractsAcceptResolved, p2.id).contracts.at(-1)?.card.id, priorityContractsAcceptOffer.id);
+  assert.match(
+    priorityContractsAcceptResolved.log[0],
+    /cannot take a face-up CHOAM contract from Priority Contracts; no face-up CHOAM contracts remain/,
+  );
+  const priorityContractsAcceptRefillPlaced = turnActions.placeAgentAction(
+    {
+      ...withActivePlayer(game, p2.id, () => ({
+        agentsReady: 1,
+        contracts: [],
+        deck: [dagger],
+        discard: [],
+        hand: [priorityContracts],
+        playArea: [],
+        resources: { solari: 0, spice: 1, water: 0 },
+        vp: 0,
+      })),
+      contractOffer: [priorityContractsAcceptRefillOffer],
+      contractDeck: [priorityContractsAcceptReplacement],
+    },
+    {
+      commanderTargets: {},
+      selectedCard: priorityContracts,
+      selectedSpace: acceptContract,
+    },
+  );
+  const priorityContractsAcceptRefilled = state.takeChoamContract(
+    priorityContractsAcceptRefillPlaced,
+    priorityContractsAcceptRefillPlaced.pendingAction,
+    priorityContractsAcceptRefillOffer.id,
+  );
+  assert.deepEqual(
+    priorityContractsAcceptRefilled.pendingAction,
+    { kind: "contract", ownerId: p2.id, source: "Priority Contracts", publicOnly: true },
+    "Priority Contracts should remain pending when Accept Contract refills a public contract",
+  );
+  assert.deepEqual(priorityContractsAcceptRefilled.contractOffer.map((contract) => contract.id), [
+    priorityContractsAcceptReplacement.id,
+  ]);
+  const priorityContractsAcceptRefilledResolved = state.takeChoamContract(
+    priorityContractsAcceptRefilled,
+    priorityContractsAcceptRefilled.pendingAction,
+    priorityContractsAcceptReplacement.id,
+  );
+  assert.equal(priorityContractsAcceptRefilledResolved.pendingAction, undefined);
+  assert.deepEqual(
+    playerById(priorityContractsAcceptRefilledResolved, p2.id).contracts.slice(-2).map((contract) => contract.card.id),
+    [priorityContractsAcceptRefillOffer.id, priorityContractsAcceptReplacement.id],
+    "Accept Contract plus Priority Contracts should take both contracts when the public offer refills",
+  );
+  const priorityContractsNoOffer = turnActions.placeAgentAction(
+    {
+      ...withActivePlayer(game, p2.id, () => ({
+        agentsReady: 1,
+        contracts: [],
+        discard: [],
+        hand: [priorityContracts],
+        playArea: [],
+        resources: { solari: 0, spice: 1, water: 0 },
+        vp: 0,
+      })),
+      contractOffer: [],
+      contractDeck: [],
+    },
+    {
+      commanderTargets: {},
+      selectedCard: priorityContracts,
+      selectedSpace: priorityContractsSpace,
+    },
+  );
+  assert.equal(priorityContractsNoOffer.pendingAction, undefined, "Priority Contracts should not queue when no public contracts remain");
+  assert.equal(playerById(priorityContractsNoOffer, p2.id).resources.spice, 3, "Priority Contracts no-offer path should still grant spice");
+  assert.equal(playerById(priorityContractsNoOffer, p2.id).vp, 1, "Priority Contracts no-offer path should still grant VP");
 
   const beneReveal = turnActions.revealTurnPlan(
     { ...p2, hand: [beneGesseritOperative], highCouncilSeat: false },

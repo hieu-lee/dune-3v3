@@ -78,6 +78,7 @@ export const stilgarDevotedSourceId = 70;
 export const theacherousManeuverSourceId = 66;
 export const undercoverAssetSourceId = 28;
 export const cargoRunnerSourceId = 181;
+export const priorityContractsSourceId = 183;
 export const chaniCleverTacticianSourceId = 67;
 export const guildEnvoySourceId = 38;
 export const makerKeeperSourceId = 19;

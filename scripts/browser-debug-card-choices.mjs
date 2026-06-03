@@ -331,6 +331,30 @@ export async function runCardChoicesSmoke({
   );
   assert.equal(ownerAfter.discard.at(-1).name, "Interstellar Trade", "Interstellar Trade should remain acquired after its bonuses");
 
+  await setDebugGameAndWait(page, states.priorityContracts);
+  pendingText = await page.locator(".pending-panel").innerText();
+  assert.match(pendingText, /CHOAM contract/i);
+  const priorityContractName = states.priorityContracts.priorityContractName;
+  assert.match(pendingText, new RegExp(escapeRegExp(priorityContractName)));
+  await screenshot(page, captures, "pending-priority-contracts-contract.png");
+
+  before = await currentGame(page);
+  assert.equal(before.pendingAction?.source, "Priority Contracts", "Priority Contracts should source the browser contract pending");
+  ownerBefore = before.players.find((player) => player.id === "p2");
+  assert.equal(ownerBefore.resources.spice, 2, "Priority Contracts should grant 2 spice before contract selection");
+  assert.equal(ownerBefore.vp, 1, "Priority Contracts should grant 1 VP before contract selection");
+  await page.locator(".pending-panel").getByRole("button", { name: priorityContractName }).click();
+  await waitForNoPending(page);
+  after = await currentGame(page);
+  ownerAfter = after.players.find((player) => player.id === "p2");
+  assert.equal(ownerAfter.contracts.length, ownerBefore.contracts.length + 1, "Priority Contracts should add one CHOAM contract");
+  assert.equal(ownerAfter.contracts.at(-1).card.name, priorityContractName, "Priority Contracts should take the selected contract");
+  assert.equal(
+    after.contractOffer.length,
+    before.contractOffer.length,
+    "Priority Contracts should refill the public contract offer after taking a contract",
+  );
+
   await setDebugGameAndWait(page, states.inHighPlaces);
   pendingText = await page.locator(".pending-panel").innerText();
   assert.match(pendingText, /In High Places/i);
@@ -834,6 +858,8 @@ async function createCardChoiceStates(server, initialPlayableGame) {
   assert.ok(interstellarTrade, "Expected Interstellar Trade Imperium card");
   const interstellarTradeReplacement = data.imperiumDeck.find((card) => card.id !== interstellarTrade.id);
   assert.ok(interstellarTradeReplacement, "Expected Interstellar Trade replacement card");
+  const priorityContracts = data.imperiumDeck.find((card) => card.sourceId === 183);
+  assert.ok(priorityContracts, "Expected Priority Contracts Imperium card");
   const beneGesseritOperative = data.imperiumDeck.find((card) => card.sourceId === 30);
   assert.ok(beneGesseritOperative, "Expected Bene Gesserit Operative Imperium card");
   const inHighPlaces = data.imperiumDeck.find((card) => card.sourceId === 64);
@@ -1047,6 +1073,13 @@ async function createCardChoiceStates(server, initialPlayableGame) {
     zone: "City",
     icon: "city",
     detail: "Browser-debug city space without board pending rewards.",
+  };
+  const priorityContractsSpace = {
+    id: "browser-priority-contracts-test-space",
+    name: "Browser Priority Contracts Test Space",
+    zone: "Landsraad",
+    icon: "landsraad",
+    detail: "Browser-debug Landsraad space without board pending rewards.",
   };
   const beneGesseritOperativeAgentBase = {
     ...base,
@@ -1770,6 +1803,44 @@ async function createCardChoiceStates(server, initialPlayableGame) {
     ["contract"],
     "Expected Interstellar Trade purchase to queue a contract after Influence",
   );
+  const priorityContractsState = turnActions.placeAgentAction(
+    {
+      ...base,
+      players: base.players.map((player) =>
+        player.id === ownerId
+          ? {
+              ...player,
+              agentsReady: 1,
+              contracts: [],
+              hand: [priorityContracts],
+              playArea: [],
+              resources: { solari: 0, spice: 0, water: 0 },
+              vp: 0,
+            }
+          : player,
+      ),
+    },
+    {
+      commanderTargets: {},
+      selectedCard: priorityContracts,
+      selectedSpace: priorityContractsSpace,
+    },
+  );
+  assert.deepEqual(
+    priorityContractsState.pendingAction,
+    { kind: "contract", ownerId, source: "Priority Contracts", publicOnly: true },
+    "Expected Priority Contracts Agent play to queue a public contract",
+  );
+  assert.equal(
+    priorityContractsState.players.find((player) => player.id === ownerId)?.resources.spice,
+    2,
+    "Expected Priority Contracts browser state to grant 2 spice",
+  );
+  assert.equal(
+    priorityContractsState.players.find((player) => player.id === ownerId)?.vp,
+    1,
+    "Expected Priority Contracts browser state to grant 1 VP",
+  );
   const contractOptionalState = state.playLeveragePlotIntrigue(
     {
       ...base,
@@ -1870,6 +1941,10 @@ async function createCardChoiceStates(server, initialPlayableGame) {
       spySpaceName: spySpace.name,
     },
     acquireInterstellarTrade: acquireInterstellarTradeState,
+    priorityContracts: {
+      ...priorityContractsState,
+      priorityContractName: priorityContractsState.contractOffer[0].name,
+    },
     inHighPlaces: {
       ...inHighPlacesState,
       inHighPlacesDrawCardId: inHighPlacesDrawCard.id,

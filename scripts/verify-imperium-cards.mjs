@@ -575,6 +575,8 @@ try {
   assert.ok(junctionHeadquarters, "Imperium deck should include Junction Headquarters");
   const spyNetwork = data.imperiumDeck.find((card) => card.name === "Spy Network");
   assert.ok(spyNetwork, "Imperium deck should include Spy Network");
+  const strikeFleet = data.imperiumDeck.find((card) => card.name === "Strike Fleet");
+  assert.ok(strikeFleet, "Imperium deck should include Strike Fleet");
   const shishakli = data.imperiumDeck.find((card) => card.name === "Shishakli");
   assert.ok(shishakli, "Imperium deck should include Shishakli");
   assert.equal(state.isPrepareTheWayCard(prepareTheWay), true, "Prepare The Way should be recognized");
@@ -622,6 +624,60 @@ try {
     ),
     "Spy Network should model its acquisition spy bonus as a typed acquire effect",
   );
+  assert.equal(strikeFleet.cost, 5, "Strike Fleet should cost 5 persuasion");
+  assert.deepEqual(strikeFleet.icons, ["spy"], "Strike Fleet should use the Spy Agent icon");
+  assert.ok(
+    strikeFleet.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.conditions?.some((condition) => condition.kind === "recalled-spy-this-turn") &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Ally") &&
+      spec.effects.some((effect) =>
+        effect.kind === "recruit-troops" &&
+        effect.selector === "self" &&
+        effect.amount === 3
+      )
+    ),
+    "Strike Fleet should model its same-turn spy recall Ally recruit as a typed Agent effect",
+  );
+  assert.ok(
+    strikeFleet.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.conditions?.some((condition) => condition.kind === "recalled-spy-this-turn") &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Commander") &&
+      spec.effects.some((effect) =>
+        effect.kind === "recruit-troops" &&
+        effect.selector === "activated-ally" &&
+        effect.amount === 3
+      )
+    ),
+    "Strike Fleet should route Commander same-turn spy recall recruits to the activated Ally",
+  );
+  assert.ok(
+    strikeFleet.effects?.some((spec) =>
+      spec.trigger === "acquire" &&
+      spec.effects.some((effect) =>
+        effect.kind === "place-spies" &&
+        effect.selector === "self" &&
+        effect.amount === 1 &&
+        effect.recallForSupply === true &&
+        effect.mustPlace === true
+      )
+    ),
+    "Strike Fleet should keep its acquisition spy bonus as a typed acquire effect",
+  );
+  assert.ok(
+    strikeFleet.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.effects.some((effect) => effect.kind === "gain-persuasion" && effect.amount === 1)
+    ) &&
+    strikeFleet.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.effects.some((effect) => effect.kind === "gain-strength" && effect.amount === 3)
+    ),
+    "Strike Fleet should keep typed Reveal persuasion and strength effects",
+  );
+  assert.equal(strikeFleet.play, "If you recalled a Spy this turn, recruit 3 troops.");
+  assert.equal(strikeFleet.reveal, "+1 persuasion and +3 strength.");
   assert.ok(
     overthrow.effects?.some((spec) =>
       spec.trigger === "acquire" &&

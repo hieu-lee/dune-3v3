@@ -48,6 +48,21 @@ export function recordReverendMotherJessicaRepeat(state: GameState, playerId: st
   };
 }
 
+export function hasRecalledSpyThisTurn(state: Pick<GameState, "turnSpyRecalls">, playerId: string) {
+  return (state.turnSpyRecalls[playerId] ?? 0) > 0;
+}
+
+export function recordTurnSpyRecall(state: GameState, playerId: string, amount = 1): GameState {
+  if (state.phase !== "playing" || amount <= 0) return state;
+  return {
+    ...state,
+    turnSpyRecalls: {
+      ...state.turnSpyRecalls,
+      [playerId]: (state.turnSpyRecalls[playerId] ?? 0) + amount,
+    },
+  };
+}
+
 export function hasDeployedThreeOrMoreUnitsThisTurn(
   state: Pick<GameState, "turnUnitDeployments">,
   playerId: string,

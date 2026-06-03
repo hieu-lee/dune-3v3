@@ -19,6 +19,7 @@ import {
 } from "./spy-posts";
 import {
   hasDeployedThreeOrMoreUnitsThisTurn,
+  recordTurnSpyRecall,
   recordTurnSpiceGain,
 } from "./turn-trackers";
 import type {
@@ -135,7 +136,7 @@ export function recallSpyForSupplyForPending(
   if (!recallableSpySupplySpaces(state, pending).some((candidate) => candidate.id === space.id)) return state;
 
   const { spyPosts, sharedSpyPosts } = removeSpyPostOwner(state, space.id, owner.id);
-  return {
+  return recordTurnSpyRecall({
     ...state,
     players: state.players.map((player) =>
       player.id === owner.id ? { ...player, spies: player.spies + 1 } : player,
@@ -144,7 +145,7 @@ export function recallSpyForSupplyForPending(
     sharedSpyPosts,
     pendingAction: { ...pending, recallForSupply: pending.remaining > 1, mustPlaceSpy: true },
     log: [`${owner.leader} recalls a spy from ${space.name} for ${pending.source}.`, ...state.log],
-  };
+  }, owner.id);
 }
 
 export function resolveStabanSmuggleSpice(state: GameState, actorId: string, spaceId: string): GameState {
@@ -257,14 +258,14 @@ export function recallSpyForPending(
     ? `, adding ${pending.strength} strength to ${recipient?.leader ?? "the chosen combatant"}`
     : "";
 
-  return {
+  return recordTurnSpyRecall({
     ...state,
     players,
     spyPosts,
     sharedSpyPosts,
     ...(finalRecall ? advancePendingAction(state) : { pendingAction: { ...pending, remaining } }),
     log: [`${owner.leader} recalls a spy from ${space.name} for ${pending.source}${strengthText}.`, ...state.log],
-  };
+  }, owner.id);
 }
 
 export function skipRecallSpy(state: GameState, pending: RecallSpyPendingAction): GameState {

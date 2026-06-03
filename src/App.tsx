@@ -168,6 +168,7 @@ export default function App() {
         agentTurnComplete: false,
         turnSpiceGains: {},
         turnReverendMotherJessicaRepeats: {},
+        turnSpyRecalls: {},
         turnUnitDeployments: {},
         activeSeat: advanceSeat(current),
       };

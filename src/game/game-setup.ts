@@ -53,6 +53,7 @@ export function initialGame(): GameState {
     roundMakerSpaceVisits: {},
     turnSpiceGains: {},
     turnReverendMotherJessicaRepeats: {},
+    turnSpyRecalls: {},
     turnUnitDeployments: {},
     players,
     spaces: {},

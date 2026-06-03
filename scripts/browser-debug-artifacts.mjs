@@ -82,6 +82,7 @@ const generatedScreenshotNames = [
   "pending-branching-path-trash-intrigue.png",
   "pending-junction-headquarters-trash-intrigue.png",
   "pending-junction-headquarters-no-pay-trash-intrigue.png",
+  "pending-strike-fleet-deploy.png",
   "pending-pay-resource-troops-no-supply.png",
   "pending-paid-reward-no-supply.png",
   "intrigue-shaddams-favor-no-supply.png",

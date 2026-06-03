@@ -81,6 +81,10 @@ export function deployedUnitsThisTurn(count: number) {
   return { kind: "deployed-units-this-turn", count } as const;
 }
 
+export function recalledSpyThisTurn() {
+  return { kind: "recalled-spy-this-turn" } as const;
+}
+
 export function gainedSpiceThisTurn() {
   return { kind: "gained-spice-this-turn" } as const;
 }

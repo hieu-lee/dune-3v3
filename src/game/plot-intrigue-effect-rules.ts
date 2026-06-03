@@ -21,7 +21,7 @@ import { acquirableCardsForPending, activatedAllyEffectOwner } from "./market-ru
 import { pendingActionForSpyPlacements } from "./spy-effect-pending-rules";
 import { playerHasSpyPost, removeSpyPostOwner } from "./spy-posts";
 import { trashableCardsForPending } from "./trash-rules";
-import { recordTurnUnitDeployment } from "./turn-trackers";
+import { recordTurnSpyRecall, recordTurnUnitDeployment } from "./turn-trackers";
 import { boardSpaces } from "./data";
 import type {
   AcquireCardDestination,
@@ -509,7 +509,10 @@ export function playTypedPlotIntrigue(
   const adjustedState = hasInfluenceAdjustment
     ? applyInfluenceAdjustments(playedState, player.id, activatedAlly?.id, resolved.influenceAdjustments)
     : playedState;
-  return summonEffect
-    ? recordTurnUnitDeployment(adjustedState, player.id, summonEffect.amount)
+  const spyRecallTrackedState = hasSpyRecall
+    ? recordTurnSpyRecall(adjustedState, player.id)
     : adjustedState;
+  return summonEffect
+    ? recordTurnUnitDeployment(spyRecallTrackedState, player.id, summonEffect.amount)
+    : spyRecallTrackedState;
 }

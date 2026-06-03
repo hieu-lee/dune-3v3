@@ -130,6 +130,7 @@ function validateCondition(condition: GameEffectConditionSpec, trigger: GameEffe
     if (isNonNegativeInteger(condition.count)) return;
     invalidSpecField("deployed-units-this-turn count", condition.count);
   }
+  if (condition.kind === "recalled-spy-this-turn") return;
   if (condition.kind === "gained-spice-this-turn") return;
   unsupportedKind("effect condition", condition);
 }

@@ -70,7 +70,17 @@ export type CombatRetreatTroops = {
 };
 
 export type EffectResolverState = Partial<
-  Pick<GameState, "alliances" | "players" | "roundMakerSpaceVisits" | "sharedSpyPosts" | "spyPosts" | "turnSpiceGains" | "turnUnitDeployments">
+  Pick<
+    GameState,
+    "alliances" |
+    "players" |
+    "roundMakerSpaceVisits" |
+    "sharedSpyPosts" |
+    "spyPosts" |
+    "turnSpiceGains" |
+    "turnSpyRecalls" |
+    "turnUnitDeployments"
+  >
 >;
 
 export type GameEffectContext = {

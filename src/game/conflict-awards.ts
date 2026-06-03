@@ -46,6 +46,7 @@ import {
 } from "./leader-rewards";
 import { mainBoardInfluenceChoices } from "./influence-choices";
 import { trashableCards } from "./trash-rules";
+import { recordTurnSpyRecall } from "./turn-trackers";
 import type {
   BattleIconId,
   ConflictCard,
@@ -632,7 +633,7 @@ export function recallSpyForConflictVpConversion(
     },
   };
 
-  return {
+  return recordTurnSpyRecall({
     ...state,
     players: state.players.map((player) => {
       if (player.id !== owner.id) return player;
@@ -655,7 +656,7 @@ export function recallSpyForConflictVpConversion(
         : `${owner.leader} recalls a spy from ${space.name} for ${pending.source} (${recalled}/${pending.cost.count}).`,
       ...state.log,
     ],
-  };
+  }, owner.id);
 }
 
 export function skipConflictVpConversion(

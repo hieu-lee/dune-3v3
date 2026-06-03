@@ -821,6 +821,25 @@ export async function runCardChoicesSmoke({
   assert.equal(await junctionNoPayResolve.isDisabled(), true, "Unpayable Junction Headquarters resolve button should be disabled");
   await screenshot(page, captures, "pending-junction-headquarters-no-pay-trash-intrigue.png");
 
+  await setDebugGameAndWait(page, states.strikeFleetDeploy);
+  pendingText = await page.locator(".pending-panel").innerText();
+  assert.match(pendingText, /deployment/i);
+  assert.match(pendingText, /4 deployable/i);
+  before = await currentGame(page);
+  assert.equal(before.pendingAction?.source, "Arrakeen", "Strike Fleet deployment should come from Arrakeen");
+  await screenshot(page, captures, "pending-strike-fleet-deploy.png");
+
+  ownerBefore = before.players.find((player) => player.id === "p2");
+  await page.locator(".pending-panel").getByRole("button", { name: "Deploy 1" }).click();
+  await page.waitForFunction(() => window.__DUNE_DEBUG__?.getGame()?.pendingAction?.remaining === 3);
+  after = await currentGame(page);
+  ownerAfter = after.players.find((player) => player.id === "p2");
+  assert.equal(ownerAfter.garrison, ownerBefore.garrison - 1, "Strike Fleet deploy should move one garrison troop");
+  assert.equal(ownerAfter.deployedTroops, ownerBefore.deployedTroops + 1, "Strike Fleet deploy should add one conflict troop");
+  assert.equal(after.turnUnitDeployments.p2, 1, "Strike Fleet deploy should count as a same-turn unit deployment");
+  await page.locator(".pending-panel").getByRole("button", { name: "Done" }).click();
+  await waitForNoPending(page);
+
   await setDebugGameAndWait(page, states.payResourceTroopsNoSupply);
   pendingText = await page.locator(".pending-panel").innerText();
   assert.match(pendingText, /Corrino Might/i);
@@ -956,6 +975,8 @@ async function createCardChoiceStates(server, initialPlayableGame) {
   assert.ok(interstellarTradeReplacement, "Expected Interstellar Trade replacement card");
   const priorityContracts = data.imperiumDeck.find((card) => card.sourceId === 183);
   assert.ok(priorityContracts, "Expected Priority Contracts Imperium card");
+  const strikeFleet = data.imperiumDeck.find((card) => card.name === "Strike Fleet");
+  assert.ok(strikeFleet, "Expected Strike Fleet Imperium card");
   const beneGesseritOperative = data.imperiumDeck.find((card) => card.sourceId === 30);
   assert.ok(beneGesseritOperative, "Expected Bene Gesserit Operative Imperium card");
   const inHighPlaces = data.imperiumDeck.find((card) => card.sourceId === 64);
@@ -1010,6 +1031,8 @@ async function createCardChoiceStates(server, initialPlayableGame) {
   assert.ok(spySpace, "Expected High Council spy placement space");
   const spyPlaceAfterRecallSpace = data.boardSpaces.find((space) => space.id === "secrets");
   assert.ok(spyPlaceAfterRecallSpace, "Expected Secrets spy placement space");
+  const arrakeen = data.boardSpaces.find((space) => space.id === "arrakeen");
+  assert.ok(arrakeen, "Expected Arrakeen board space");
   const deliverSupplies = data.boardSpaces.find((space) => space.id === "deliver-supplies");
   assert.ok(deliverSupplies, "Expected Deliver Supplies board space");
   const spiceRefinery = data.boardSpaces.find((space) => space.id === "spice-refinery");
@@ -1049,6 +1072,11 @@ async function createCardChoiceStates(server, initialPlayableGame) {
   const guildSpyDraw = { ...data.allyStarterCards[0], id: "browser-guild-spy-draw-card" };
   const guildSpyBoardIntrigue = { ...data.intrigueCards[0], id: "browser-guild-spy-board-intrigue-card" };
   const guildSpyBonusIntrigue = { ...data.intrigueCards[1], id: "browser-guild-spy-bonus-intrigue-card" };
+  const strikeFleetArrakeenDraw = {
+    ...data.allyStarterCards[0],
+    id: "browser-strike-fleet-arrakeen-draw-card",
+    name: "Strike Fleet Arrakeen Draw",
+  };
   const corrinthDiscardOne = {
     ...data.allyStarterCards[0],
     id: "browser-corrinth-city-discard-one",
@@ -2111,6 +2139,43 @@ async function createCardChoiceStates(server, initialPlayableGame) {
     1,
     "Expected Priority Contracts browser state to grant 1 VP",
   );
+  const strikeFleetDeployState = turnActions.placeAgentAction(
+    {
+      ...base,
+      sharedSpyPosts: {},
+      spaces: {},
+      spyPosts: { [arrakeen.id]: ownerId },
+      turnSpyRecalls: { [ownerId]: 1 },
+      players: base.players.map((player) =>
+        player.id === ownerId
+          ? {
+              ...player,
+              agentsReady: 1,
+              deck: [strikeFleetArrakeenDraw],
+              deployedTroops: 0,
+              discard: [],
+              garrison: 0,
+              hand: [strikeFleet],
+              playArea: [],
+              resources: { solari: 0, spice: 0, water: 0 },
+              spies: 0,
+            }
+          : player,
+      ),
+    },
+    {
+      commanderTargets: {},
+      selectedCard: strikeFleet,
+      selectedSpace: arrakeen,
+    },
+  );
+  assert.equal(strikeFleetDeployState.pendingAction?.kind, "deploy", "Expected Strike Fleet Arrakeen to queue deploy pending");
+  assert.equal(strikeFleetDeployState.pendingAction.remaining, 4, "Expected Strike Fleet plus Arrakeen to make four troops deployable");
+  assert.equal(
+    strikeFleetDeployState.players.find((player) => player.id === ownerId)?.garrison,
+    4,
+    "Expected Strike Fleet to combine its three recruits with Arrakeen's troop",
+  );
   const contractOptionalState = state.playLeveragePlotIntrigue(
     {
       ...base,
@@ -2219,6 +2284,7 @@ async function createCardChoiceStates(server, initialPlayableGame) {
       ...priorityContractsState,
       priorityContractName: priorityContractsState.contractOffer[0].name,
     },
+    strikeFleetDeploy: strikeFleetDeployState,
     inHighPlaces: {
       ...inHighPlacesState,
       inHighPlacesDrawCardId: inHighPlacesDrawCard.id,

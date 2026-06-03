@@ -1,4 +1,9 @@
-import { hasDeployedUnitsThisTurn, hasGainedSpiceThisTurn, hasVisitedMakerSpaceThisRound } from "./turn-trackers";
+import {
+  hasDeployedUnitsThisTurn,
+  hasGainedSpiceThisTurn,
+  hasRecalledSpyThisTurn,
+  hasVisitedMakerSpaceThisRound,
+} from "./turn-trackers";
 import {
   effectiveEmperorIconInfluence,
   effectiveFremenIconInfluence,
@@ -170,6 +175,11 @@ export function conditionApplies(condition: GameEffectConditionSpec, context: Ga
           context.source.id,
           condition.count,
         )
+      : false;
+  }
+  if (condition.kind === "recalled-spy-this-turn") {
+    return context.state?.turnSpyRecalls
+      ? hasRecalledSpyThisTurn({ turnSpyRecalls: context.state.turnSpyRecalls }, context.source.id)
       : false;
   }
   if (condition.kind === "gained-spice-this-turn") {

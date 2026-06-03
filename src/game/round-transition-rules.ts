@@ -85,6 +85,7 @@ export function startNextRound(state: GameState): GameState {
     roundMakerSpaceVisits: {},
     turnSpiceGains: {},
     turnReverendMotherJessicaRepeats: {},
+    turnSpyRecalls: {},
     turnUnitDeployments: {},
     firstSeat,
     activeSeat: firstSeat,
@@ -134,6 +135,7 @@ export function startCombatPhase(state: GameState): GameState {
     agentTurnComplete: false,
     turnSpiceGains: {},
     turnReverendMotherJessicaRepeats: {},
+    turnSpyRecalls: {},
     turnUnitDeployments: {},
     activeSeat,
     combatPasses: [],
@@ -161,6 +163,7 @@ export function finishRevealTurn(state: GameState, playerId: string): GameState 
     agentTurnComplete: false,
     turnSpiceGains: {},
     turnReverendMotherJessicaRepeats: {},
+    turnSpyRecalls: {},
     turnUnitDeployments: {},
     conflictDeploymentBlock: undefined,
     players: state.players.map((candidate) =>

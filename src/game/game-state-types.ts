@@ -499,6 +499,7 @@ export type GameState = {
   roundMakerSpaceVisits?: Record<string, boolean>;
   turnSpiceGains: Record<string, number>;
   turnReverendMotherJessicaRepeats: Record<string, boolean>;
+  turnSpyRecalls: Record<string, number>;
   players: Player[];
   spaces: Record<string, string>;
   spyPosts: Record<string, string>;

@@ -1446,6 +1446,30 @@ try {
     true,
     "Special Mission Plot recall choice should resolve Shield Wall removal",
   );
+  const recalledSpyConditionResolved = effectResolver.resolveGameEffects(
+    [agentSpec(
+      [{ kind: "recruit-troops", selector: "self", amount: 2 }],
+      [{ kind: "recalled-spy-this-turn" }],
+    )],
+    { trigger: "agent-play", source: p2, state: { turnSpyRecalls: { [p2.id]: 1 } } },
+  );
+  assert.equal(
+    recalledSpyConditionResolved.recruitedTroops,
+    2,
+    "Recalled-spy turn conditions should resolve after the source recalled a spy this turn",
+  );
+  const recalledSpyConditionWithoutRecall = effectResolver.resolveGameEffects(
+    [agentSpec(
+      [{ kind: "recruit-troops", selector: "self", amount: 2 }],
+      [{ kind: "recalled-spy-this-turn" }],
+    )],
+    { trigger: "agent-play", source: p2, state: { turnSpyRecalls: {} } },
+  );
+  assert.equal(
+    recalledSpyConditionWithoutRecall.recruitedTroops,
+    0,
+    "Recalled-spy turn conditions should not resolve before the source recalls a spy",
+  );
   assert.ok(
     hasPlotEffect(leverage, (effect) =>
       effect.kind === "gain-resource" &&
@@ -3542,6 +3566,37 @@ try {
     "Sardaukar Coordination play text should expose its typed Agent deployment modifier",
   );
   assert.ok(
+    strikeFleet.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.conditions?.some((condition) => condition.kind === "recalled-spy-this-turn") &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Ally") &&
+      spec.effects.some((effect) =>
+        effect.kind === "recruit-troops" &&
+        effect.selector === "self" &&
+        effect.amount === 3
+      )
+    ),
+    "Strike Fleet should use a typed Ally Agent recruit spec gated by same-turn spy recall",
+  );
+  assert.ok(
+    strikeFleet.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.conditions?.some((condition) => condition.kind === "recalled-spy-this-turn") &&
+      spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Commander") &&
+      spec.effects.some((effect) =>
+        effect.kind === "recruit-troops" &&
+        effect.selector === "activated-ally" &&
+        effect.amount === 3
+      )
+    ),
+    "Strike Fleet should route Commander same-turn-spy-recall troop recruitment to the activated Ally",
+  );
+  assert.equal(
+    strikeFleet.play,
+    "If you recalled a Spy this turn, recruit 3 troops.",
+    "Strike Fleet play text should expose its conditional Agent troop recruitment",
+  );
+  assert.ok(
     spiceMustFlow.effects?.some((spec) =>
       spec.trigger === "acquire" &&
       spec.effects.some((effect) => effect.kind === "gain-vp" && effect.selector === "self" && effect.amount === 1)
@@ -3756,6 +3811,7 @@ try {
       "Spacing Guild's Favor",
       "Steersman",
       "Stilgar, The Devoted",
+      "Strike Fleet",
       "Subversive Advisor",
       "Theacherous Maneuver",
       "Tread in Darkness",
@@ -12449,6 +12505,33 @@ try {
   assert.equal(stilgarCommanderEffect.target.garrison, 2, "Commander Stilgar should recruit troops to the activated Ally");
   assert.equal(stilgarCommanderEffect.recruitedTroops, 2, "Commander Stilgar recruited troops should count for deployment limits");
 
+  const strikeFleetNoRecallEffect = state.applyCardAgentEffect(
+    strikeFleet,
+    { ...p2, garrison: 0 },
+    p2,
+    { ...game, turnSpyRecalls: {} },
+  );
+  assert.equal(strikeFleetNoRecallEffect.source.garrison, 0, "Strike Fleet should not recruit before the player recalls a spy this turn");
+  assert.equal(strikeFleetNoRecallEffect.recruitedTroops, undefined, "Strike Fleet should not count troops before a same-turn spy recall");
+  const strikeFleetRecallEffect = state.applyCardAgentEffect(
+    strikeFleet,
+    { ...p2, garrison: 0 },
+    p2,
+    { ...game, turnSpyRecalls: { [p2.id]: 1 } },
+  );
+  assert.equal(strikeFleetRecallEffect.source.garrison, 3, "Strike Fleet should recruit 3 troops after a same-turn spy recall");
+  assert.equal(strikeFleetRecallEffect.recruitedTroops, 3, "Strike Fleet recruited troops should count for deployment limits");
+  assert.match(strikeFleetRecallEffect.log ?? "", /Strike Fleet: recruits 3 troops/);
+  const strikeFleetCommanderEffect = state.applyCardAgentEffect(
+    strikeFleet,
+    { ...p4, garrison: 0 },
+    { ...p2, garrison: 0 },
+    { ...game, turnSpyRecalls: { [p4.id]: 1 } },
+  );
+  assert.equal(strikeFleetCommanderEffect.source.garrison, 0, "Commander Strike Fleet should not recruit troops to the Commander");
+  assert.equal(strikeFleetCommanderEffect.target.garrison, 3, "Commander Strike Fleet should recruit troops to the activated Ally");
+  assert.equal(strikeFleetCommanderEffect.recruitedTroops, 3, "Commander Strike Fleet recruited troops should count for deployment limits");
+
   const desertPowerMakerEffect = state.applyCardAgentEffect(
     desertPower,
     { ...p2, resources: { solari: 0, spice: 0, water: 0 } },
@@ -15761,6 +15844,59 @@ try {
   );
   assert.equal(fedaykinPlaced.pendingAction?.kind, "deploy", "Fedaykin Stilltent's recruited troop should be deployable");
   assert.match(fedaykinPlaced.log.join("\n"), /Fedaykin Stilltent: recruits 1 troop/);
+  const strikeFleetRecallPending = {
+    kind: "recall-spy",
+    ownerId: p2.id,
+    combatRecipientId: p2.id,
+    remaining: 1,
+    strength: 0,
+    source: "Verifier Spy Recall",
+    optional: true,
+  };
+  const strikeFleetSpyRecallFixture = {
+    ...withActivePlayer(game, p2.id, () => ({
+      agentsReady: 1,
+      deployedTroops: 0,
+      discard: [],
+      garrison: 0,
+      hand: [strikeFleet],
+      playArea: [],
+    })),
+    pendingAction: strikeFleetRecallPending,
+    pendingQueue: [],
+    spyPosts: {
+      [arrakeen.id]: p2.id,
+      [secrets.id]: p2.id,
+    },
+    sharedSpyPosts: {},
+  };
+  const strikeFleetSpyRecalled = state.recallSpyForPending(
+    strikeFleetSpyRecallFixture,
+    strikeFleetRecallPending,
+    secrets.id,
+  );
+  assert.equal(strikeFleetSpyRecalled.turnSpyRecalls[p2.id], 1, "Spy recall pending resolution should mark same-turn spy recalls");
+  const strikeFleetPlaced = turnActions.placeAgentAction(strikeFleetSpyRecalled, {
+    commanderTargets: {},
+    selectedCard: strikeFleet,
+    selectedSpace: arrakeen,
+  });
+  assert.equal(
+    playerById(strikeFleetPlaced, p2.id).garrison,
+    4,
+    "Strike Fleet should combine Arrakeen's troop with its same-turn-spy-recall recruits",
+  );
+  assert.deepEqual(
+    strikeFleetPlaced.pendingAction,
+    {
+      kind: "deploy",
+      ownerId: p2.id,
+      remaining: 4,
+      source: "Arrakeen",
+    },
+    "Strike Fleet recruited troops should be deployable through the normal combat-space pending cap",
+  );
+  assert.match(strikeFleetPlaced.log.join("\n"), /Strike Fleet: recruits 3 troops/);
   const sardaukarPlacementFixture = withActivePlayer(game, p2.id, () => ({
     agentsReady: 1,
     deployedTroops: 0,

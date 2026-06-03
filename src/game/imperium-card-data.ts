@@ -97,6 +97,7 @@ import {
   hasSpyPostOnMakerSpace,
   hasSpyPosts,
   hasSwordmasterBonus,
+  recalledSpyThisTurn,
   revealDeployOrRetreatTroops,
   revealGainInfluence,
   revealGainPersuasion,
@@ -518,6 +519,7 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
   }
   if (acquireSpySourceIds.has(card.id)) {
     const inHighPlacesAgentCondition = [hasCardTraitInPlay("Faction: Bene Gesserit", 2)];
+    const strikeFleetAgentCondition = [recalledSpyThisTurn()];
     return [
       ...(fixedRevealEffects(
         attributeNumber(card, "Persuasion on reveal"),
@@ -538,6 +540,9 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
             agentDrawCards(1, inHighPlacesAgentCondition),
             agentPlaceSpies("self", 1, { recallForSupply: true, mustPlace: true }, inHighPlacesAgentCondition),
           ]
+        : []),
+      ...(card.id === strikeFleetSourceId
+        ? agentRecruitTroopsForActivatedOwner(3, strikeFleetAgentCondition)
         : []),
       ...(card.id === subversiveAdvisorSourceId
         ? [agentGainBoardSpaceInfluence(1, { trashSource: true })]
@@ -790,6 +795,9 @@ function imperiumPlayText(card: HubCard) {
   }
   if (card.id === sardaukarCoordinationSourceId) {
     return "You may deploy any troops you recruit this turn to the Conflict.";
+  }
+  if (card.id === strikeFleetSourceId) {
+    return "If you recalled a Spy this turn, recruit 3 troops.";
   }
   return summarizeAttributes(card);
 }

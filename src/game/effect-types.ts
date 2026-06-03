@@ -182,6 +182,7 @@ export type GameEffectConditionSpec =
   | { kind: "has-leader-counter"; counter: LeaderCounterId; amount: number }
   | { kind: "has-alliance"; faction?: FactionId }
   | { kind: "deployed-units-this-turn"; count: number }
+  | { kind: "recalled-spy-this-turn" }
   | { kind: "gained-spice-this-turn" };
 export type LeaderTransitionFollowUpEffect =
   | {

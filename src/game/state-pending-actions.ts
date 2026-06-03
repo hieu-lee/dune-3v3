@@ -20,6 +20,14 @@ import {
   playerTroopSupply,
 } from "./deck-utils";
 import {
+  canDeployForDeployOrRetreatTroops,
+  canResolveDeployOrRetreatTroopsChoice,
+  canRetreatForDeployOrRetreatTroops,
+  resolveDeployOrRetreatTroopsChoice as resolveDeployOrRetreatTroopsChoiceForPending,
+  skipDeployOrRetreatTroopsChoice as resolveSkipDeployOrRetreatTroopsChoice,
+  type DeployOrRetreatTroopsChoice,
+} from "./deploy-or-retreat-rules";
+import {
   resolveDiscardCardForDraw as resolveDiscardCardForDrawForPending,
   skipDiscardCardForDraw as resolveSkipDiscardCardForDraw,
 } from "./discard-draw-rules";
@@ -130,6 +138,7 @@ type SpyPendingAction = Extract<PendingAction, { kind: "spy" }>;
 type StabanUnseenNetworkPendingAction = Extract<PendingAction, { kind: "staban-unseen-network" }>;
 type RevealAdjustPendingAction = Extract<PendingAction, { kind: "reveal-adjust" }>;
 type RetreatTroopsForStrengthPendingAction = Extract<PendingAction, { kind: "retreat-troops-for-strength" }>;
+type DeployOrRetreatTroopsPendingAction = Extract<PendingAction, { kind: "deploy-or-retreat-troops" }>;
 type CommanderResourceSplitPendingAction = Extract<PendingAction, { kind: "commander-resource-split" }>;
 type TrashCardPendingAction = Extract<PendingAction, { kind: "trash-card" }>;
 type DiscardCardForInfluenceAndDrawPendingAction = Extract<PendingAction, { kind: "discard-card-for-influence-and-draw" }>;
@@ -433,6 +442,32 @@ export function skipRetreatTroopsForStrength(
   pending: RetreatTroopsForStrengthPendingAction,
 ): GameState {
   return continueAfterResolvedConflictReward(resolveSkipRetreatTroopsForStrength(state, pending));
+}
+
+export {
+  canDeployForDeployOrRetreatTroops,
+  canResolveDeployOrRetreatTroopsChoice,
+  canRetreatForDeployOrRetreatTroops,
+};
+
+export function resolveDeployOrRetreatTroopsChoice(
+  state: GameState,
+  pending: DeployOrRetreatTroopsPendingAction,
+  choice: DeployOrRetreatTroopsChoice,
+): GameState {
+  const resolvedState = resolveDeployOrRetreatTroopsChoiceForPending(state, pending, choice);
+  if (resolvedState === state) return state;
+  const scoredState = choice === "deploy"
+    ? scoreGurneyAlwaysSmiling(resolvedState, pending.ownerId)
+    : resolvedState;
+  return continueAfterResolvedConflictReward(scoredState);
+}
+
+export function skipDeployOrRetreatTroopsChoice(
+  state: GameState,
+  pending: DeployOrRetreatTroopsPendingAction,
+): GameState {
+  return continueAfterResolvedConflictReward(resolveSkipDeployOrRetreatTroopsChoice(state, pending));
 }
 
 function resourceLogLabel(resource: ResourceId) {

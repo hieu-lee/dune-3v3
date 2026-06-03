@@ -413,6 +413,18 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     validateAmount(effect.strength);
     return;
   }
+  if (effect.kind === "deploy-or-retreat-troops") {
+    if (trigger !== "reveal") {
+      throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
+    }
+    if (effect.selector !== "self") {
+      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
+    validatePositiveAmount("deploy-or-retreat-troops amount", effect.amount);
+    validateOptionalBoolean("deploy-or-retreat-troops optional", (effect as { optional?: unknown }).optional);
+    validateSourceLabel("deploy-or-retreat-troops source", effect.source);
+    return;
+  }
   if (effect.kind === "retreat-troops") {
     if (trigger !== "combat-intrigue") {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);

@@ -6,6 +6,7 @@ type ControlDefensePendingAction = Extract<PendingAction, { kind: "control-defen
 type ReinforceDestination = "garrison" | "conflict";
 type ReinforcePendingAction = Extract<PendingAction, { kind: "reinforce" }>;
 type RetreatTroopsForStrengthPendingAction = Extract<PendingAction, { kind: "retreat-troops-for-strength" }>;
+type DeployOrRetreatTroopsPendingAction = Extract<PendingAction, { kind: "deploy-or-retreat-troops" }>;
 
 type PendingDeployPanelProps = {
   owner?: Player;
@@ -134,7 +135,50 @@ export function PendingRetreatTroopsForStrengthPanel({
       ) : (
         <span>{pending.source} can no longer resolve with the current table state.</span>
       )}
-      <button type="button" onClick={onSkip}>Skip</button>
+      {pending.optional && <button type="button" onClick={onSkip}>Skip</button>}
+    </div>
+  );
+}
+
+type PendingDeployOrRetreatTroopsPanelProps = {
+  canDeploy: boolean;
+  canRetreat: boolean;
+  owner?: Player;
+  pending: DeployOrRetreatTroopsPendingAction;
+  recipient?: Player;
+  onChoose: (choice: "deploy" | "retreat") => void;
+  onSkip: () => void;
+};
+
+export function PendingDeployOrRetreatTroopsPanel({
+  canDeploy,
+  canRetreat,
+  owner,
+  pending,
+  recipient,
+  onChoose,
+  onSkip,
+}: PendingDeployOrRetreatTroopsPanelProps) {
+  return (
+    <div className="pending-controls">
+      {owner && recipient ? (
+        <>
+          <span>
+            {recipient.leader}: {recipient.garrison} garrison / {recipient.deployedTroops} deployed
+          </span>
+          <button type="button" onClick={() => onChoose("deploy")} disabled={!canDeploy}>
+            <Swords size={15} />
+            Deploy {pending.troopCount}
+          </button>
+          <button type="button" onClick={() => onChoose("retreat")} disabled={!canRetreat}>
+            <RotateCcw size={15} />
+            Retreat {pending.troopCount}
+          </button>
+        </>
+      ) : (
+        <span>{pending.source} can no longer resolve with the current table state.</span>
+      )}
+      {pending.optional && <button type="button" onClick={onSkip}>Skip</button>}
     </div>
   );
 }

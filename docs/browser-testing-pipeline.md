@@ -123,7 +123,7 @@ Current scenarios:
 | `pending-choices` | Recall spy, lose Influence, conflict Influence, and fixed-choice conflict Influence surfaces. |
 | `space-choices` | Maker, Sietch Tabr, resource split, optional-space payment, and board Influence choice panels. |
 | `signet-choices` | Muad'Dib, Gurney, and Amber immediate Signet log/state captures plus Margot, Staban, Shaddam paid reward, and Irulan Signet pending choices. |
-| `table-choices` | Reveal adjust, retreat-for-strength, Chani Fremen Bond, Paracompass reveal, Wheels Within Wheels reveal spy, Calculus trash, Inspire Awe acquisition, Sietch Ritual selected discards, Special Mission City spy placement and spy recall, Change Allegiances Influence shifts/routed losses, Buy Access and Imperium Politics Influence routing, Throne Row, and conflict tie surfaces. |
+| `table-choices` | Reveal adjust, retreat-for-strength, Chani Fremen Bond, Unswerving Loyalty deploy-or-retreat, Paracompass reveal, Wheels Within Wheels reveal spy, Calculus trash, Inspire Awe acquisition, Sietch Ritual selected discards, Special Mission City spy placement and spy recall, Change Allegiances Influence shifts/routed losses, Buy Access and Imperium Politics Influence routing, Throne Row, and conflict tie surfaces. |
 | `trade-choices` | Resource and Intrigue trade surfaces. |
 | `leader-modal` | Leader-card modal focus and close behavior. |
 | `leader-character-choices` | Leader-specific pending choices and Commander starter-card choices. |

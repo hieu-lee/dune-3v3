@@ -36,6 +36,7 @@ import type {
   ManipulateRowCardEffect,
   PlotDeployTroops,
   PlotSummonSandworms,
+  RevealDeployOrRetreatTroops,
   RevealLoseInfluenceForIntrigues,
   RevealPayResourceForHighCouncilSeat,
   RevealPayResourceForSandworms,
@@ -115,6 +116,25 @@ export function resolveRevealRetreatTroopsForStrength(
         troopCount: amountFor(effect.amount, context.source),
         strength: amountFor(effect.strength, context.source),
         optional: effect.optional ?? true,
+      }));
+  });
+}
+
+export function resolveRevealDeployOrRetreatTroops(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): RevealDeployOrRetreatTroops[] {
+  specs?.forEach(validateSpec);
+  return (specs ?? []).flatMap((spec) => {
+    if (spec.trigger !== "reveal") return [];
+    if (!specApplies(spec, context)) return [];
+    return spec.effects
+      .filter((effect) => effect.kind === "deploy-or-retreat-troops")
+      .map((effect) => ({
+        selector: effect.selector,
+        troopCount: amountFor(effect.amount, context.source),
+        optional: effect.optional ?? true,
+        source: effect.source,
       }));
   });
 }

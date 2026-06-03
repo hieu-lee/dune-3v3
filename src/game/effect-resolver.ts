@@ -76,6 +76,7 @@ export type {
   RevealPayResourceForSandworms,
   RevealPayResourceForStrength,
   RevealPayResourceForTroops,
+  RevealDeployOrRetreatTroops,
   RevealRetreatTroopsForStrength,
   RevealTrashCardEffect,
   SpyPlacementEffectResult,
@@ -349,6 +350,9 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
     return result;
   }
   if (effect.kind === "retreat-troops-for-strength") {
+    return result;
+  }
+  if (effect.kind === "deploy-or-retreat-troops") {
     return result;
   }
   if (effect.kind === "retreat-troops") {

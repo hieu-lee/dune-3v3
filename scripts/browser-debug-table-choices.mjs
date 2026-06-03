@@ -86,6 +86,34 @@ export async function runTableChoicesSmoke({
   assert.equal(chaniBondAfter.pendingAction, undefined, "Chani Fremen Bond should not create a reveal-adjust pending action");
   await screenshot(page, captures, "chani-fremen-bond-after-reveal.png");
 
+  await setDebugGameAndWait(page, states.unswervingLoyaltyRevealDeployOrRetreat);
+  await screenshot(page, captures, "unswerving-loyalty-reveal-ready.png");
+  await page.getByTestId("reveal-turn").click();
+  await page.waitForFunction(() => {
+    const game = window.__DUNE_DEBUG__?.getGame();
+    return game?.pendingAction?.kind === "deploy-or-retreat-troops" &&
+      game.pendingAction.source === "Unswerving Loyalty";
+  });
+  pendingText = await page.locator(".pending-panel").innerText();
+  assert.match(pendingText, /Unswerving Loyalty/i);
+  assert.match(pendingText, /Deploy 1/i);
+  assert.match(pendingText, /Retreat 1/i);
+  await screenshot(page, captures, "pending-unswerving-loyalty-deploy-or-retreat.png");
+  const unswervingBefore = await currentGame(page);
+  const unswervingOwnerBefore = unswervingBefore.players.find((player) => player.id === "p2");
+  assert.ok(unswervingOwnerBefore, "Expected Feyd before Unswerving deploy-or-retreat");
+  assert.equal(unswervingOwnerBefore.persuasion, 1, "Unswerving should grant its typed reveal persuasion");
+  assert.equal(unswervingOwnerBefore.garrison, 1, "Unswerving should recruit before offering the deploy-or-retreat choice");
+  await page.locator(".pending-panel").getByRole("button", { name: /Retreat 1/i }).click();
+  await waitForNoPending(page);
+  const unswervingAfter = await currentGame(page);
+  const unswervingOwnerAfter = unswervingAfter.players.find((player) => player.id === "p2");
+  assert.ok(unswervingOwnerAfter, "Expected Feyd after Unswerving retreat");
+  assert.equal(unswervingOwnerAfter.deployedTroops, unswervingOwnerBefore.deployedTroops - 1);
+  assert.equal(unswervingOwnerAfter.garrison, unswervingOwnerBefore.garrison + 1);
+  assert.equal(unswervingOwnerAfter.conflict, unswervingOwnerBefore.conflict - 2);
+  await screenshot(page, captures, "unswerving-loyalty-after-retreat.png");
+
   await setDebugGameAndWait(page, states.paracompassReveal);
   await screenshot(page, captures, "paracompass-reveal-ready.png");
   await page.getByTestId("reveal-turn").click();
@@ -840,6 +868,8 @@ async function createTableChoiceStates(server, initialPlayableGame) {
   assert.ok(conflict, "Expected a conflict card for same-team tie debug state");
   const chani = data.imperiumDeck.find((card) => card.name === "Chani, Clever Tactician");
   assert.ok(chani, "Expected Chani for Fremen Bond browser debug state");
+  const unswervingLoyalty = data.imperiumDeck.find((card) => card.name === "Unswerving Loyalty");
+  assert.ok(unswervingLoyalty, "Expected Unswerving Loyalty for Fremen Bond deploy-or-retreat browser debug state");
   const paracompass = data.imperiumDeck.find((card) => card.name === "Paracompass");
   assert.ok(paracompass, "Expected Paracompass for conditional reveal browser debug state");
   const wheelsWithinWheels = data.imperiumDeck.find((card) => card.name === "Wheels Within Wheels");
@@ -1056,6 +1086,27 @@ async function createTableChoiceStates(server, initialPlayableGame) {
               deployedTroops: 0,
               discard: [],
               hand: [cloneCard(chani), chaniFremenSupport],
+              highCouncilSeat: false,
+              persuasion: 0,
+              playArea: [],
+              revealed: false,
+            }
+          : { ...player, conflict: 0, deployedTroops: 0 }
+      ),
+    },
+    unswervingLoyaltyRevealDeployOrRetreat: {
+      ...base,
+      activeSeat: feydSeat,
+      players: base.players.map((player) =>
+        player.id === "p2"
+          ? {
+              ...player,
+              agentsReady: 0,
+              conflict: 2,
+              deployedTroops: 1,
+              discard: [],
+              garrison: 0,
+              hand: [cloneCard(unswervingLoyalty), chaniFremenSupport],
               highCouncilSeat: false,
               persuasion: 0,
               playArea: [],

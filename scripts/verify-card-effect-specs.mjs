@@ -199,6 +199,7 @@ try {
   const stilgar = data.imperiumDeck.find((card) => card.name === "Stilgar, The Devoted");
   const theacherousManeuver = data.imperiumDeck.find((card) => card.name === "Theacherous Maneuver");
   const undercoverAsset = data.imperiumDeck.find((card) => card.name === "Undercover Asset");
+  const unswervingLoyalty = data.imperiumDeck.find((card) => card.name === "Unswerving Loyalty");
   const guildEnvoy = data.imperiumDeck.find((card) => card.name === "Guild Envoy");
   const guildSpy = data.imperiumDeck.find((card) => card.name === "Guild Spy");
   const branchingPath = data.imperiumDeck.find((card) => card.name === "Branching Path");
@@ -313,6 +314,7 @@ try {
     stilgar &&
     theacherousManeuver &&
     undercoverAsset &&
+    unswervingLoyalty &&
     guildEnvoy &&
     guildSpy &&
     branchingPath &&
@@ -4494,6 +4496,64 @@ try {
 	    ),
     "Chani should carry a declarative Reveal troop-retreat strength spec",
 	  );
+  assert.equal(unswervingLoyalty.cost, 1, "Unswerving Loyalty should cost 1 persuasion");
+  assert.deepEqual(unswervingLoyalty.icons, [], "Unswerving Loyalty should have no Agent icons");
+  assert.equal(unswervingLoyalty.persuasion, 1, "Unswerving Loyalty should reveal for 1 base persuasion");
+  assert.equal(unswervingLoyalty.swords, 0, "Unswerving Loyalty should not reveal for printed strength");
+  assert.equal(unswervingLoyalty.conditionalPersuasion, false, "Unswerving Loyalty should use typed Fremen Bond handling");
+  assert.equal(unswervingLoyalty.conditionalSwords, false, "Unswerving Loyalty should not require manual reveal strength handling");
+  assert.deepEqual(unswervingLoyalty.traits, ["Faction: Fremen"], "Unswerving Loyalty should keep its Fremen trait");
+  assert.ok(
+    hasRevealEffect(
+      unswervingLoyalty,
+      (effect) => effect.kind === "gain-persuasion" && effect.selector === "self" && effect.amount === 1,
+    ),
+    "Unswerving Loyalty should carry its base persuasion as a typed Reveal effect",
+  );
+  assert.ok(
+    hasRevealEffect(
+      unswervingLoyalty,
+      (effect) => effect.kind === "recruit-troops" && effect.selector === "self" && effect.amount === 1,
+    ),
+    "Unswerving Loyalty should carry its printed troop recruit as a typed Reveal effect",
+  );
+  assert.ok(
+    unswervingLoyalty.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.conditions?.some((condition) =>
+        condition.kind === "has-card-trait-in-play" &&
+        condition.trait === "Faction: Fremen" &&
+        condition.count === 2
+      ) &&
+      spec.effects.some((effect) =>
+        effect.kind === "deploy-or-retreat-troops" &&
+        effect.selector === "self" &&
+        effect.amount === 1 &&
+        effect.optional === true
+      )
+    ),
+    "Unswerving Loyalty should model its Fremen Bond deploy-or-retreat choice as a typed Reveal pending effect",
+  );
+  assert.deepEqual(
+    effectResolver.resolveRevealDeployOrRetreatTroops(unswervingLoyalty.effects, {
+      trigger: "reveal",
+      source: { ...p2, playArea: [unswervingLoyalty, fedaykinStilltent] },
+      state: game,
+    }),
+    [{ selector: "self", troopCount: 1, optional: true, source: undefined }],
+    "Unswerving Loyalty should resolve its deploy-or-retreat pending effect after Fremen Bond is active",
+  );
+  assert.deepEqual(
+    effectResolver.resolveRevealDeployOrRetreatTroops(unswervingLoyalty.effects, {
+      trigger: "reveal",
+      source: { ...p2, playArea: [unswervingLoyalty] },
+      state: game,
+    }),
+    [],
+    "Unswerving Loyalty should not resolve its deploy-or-retreat pending effect before Fremen Bond is active",
+  );
+  assert.match(unswervingLoyalty.play, /No agent icons/i);
+  assert.match(unswervingLoyalty.reveal, /\+1 persuasion.*Recruit 1 troop.*Fremen Bond.*deploy or retreat 1 troop/i);
   assert.ok(
     calculus.effects?.some((spec) =>
       spec.trigger === "reveal" &&
@@ -10341,6 +10401,82 @@ try {
 	    /Invalid effect amount "-4"/,
 	    "Retreat-for-strength specs should require non-negative strength",
 	  );
+  const deployOrRetreatCard = {
+    ...convincingArgument,
+    id: "effect-spec-deploy-or-retreat-card",
+    name: "Effect Spec Deploy Or Retreat",
+    effects: [revealSpec([{
+      kind: "deploy-or-retreat-troops",
+      selector: "self",
+      amount: 1,
+      optional: true,
+      source: "Deploy Or Retreat Test",
+    }])],
+  };
+  assert.deepEqual(
+    effectResolver.resolveRevealDeployOrRetreatTroops(deployOrRetreatCard.effects, {
+      trigger: "reveal",
+      source: p2,
+      state: game,
+    }),
+    [{ selector: "self", troopCount: 1, optional: true, source: "Deploy Or Retreat Test" }],
+    "Deploy-or-retreat specs should resolve as reveal pending effects",
+  );
+  const agentDeployOrRetreatCard = {
+    ...convincingArgument,
+    id: "effect-spec-agent-deploy-or-retreat-card",
+    name: "Effect Spec Agent Deploy Or Retreat",
+    effects: [agentSpec([{ kind: "deploy-or-retreat-troops", selector: "self", amount: 1 }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(agentDeployOrRetreatCard, p2, p2),
+    /Unsupported effect "deploy-or-retreat-troops" for agent-play/,
+    "Deploy-or-retreat specs should stay in Reveal until other trigger resolvers support them",
+  );
+  const invalidDeployOrRetreatSelectorCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-deploy-or-retreat-selector-card",
+    name: "Effect Spec Invalid Deploy Or Retreat Selector",
+    effects: [revealSpec([{ kind: "deploy-or-retreat-troops", selector: "activated-ally", amount: 1 }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [invalidDeployOrRetreatSelectorCard], highCouncilSeat: false }),
+    /Unsupported effect selector "activated-ally" for reveal/,
+    "Deploy-or-retreat specs should reject activated Ally selectors",
+  );
+  const invalidDeployOrRetreatAmountCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-deploy-or-retreat-amount-card",
+    name: "Effect Spec Invalid Deploy Or Retreat Amount",
+    effects: [revealSpec([{ kind: "deploy-or-retreat-troops", selector: "self", amount: 0 }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [invalidDeployOrRetreatAmountCard], highCouncilSeat: false }),
+    /Invalid deploy-or-retreat-troops amount "0"/,
+    "Deploy-or-retreat specs should require a positive troop count",
+  );
+  const invalidDeployOrRetreatOptionalCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-deploy-or-retreat-optional-card",
+    name: "Effect Spec Invalid Deploy Or Retreat Optional",
+    effects: [revealSpec([{ kind: "deploy-or-retreat-troops", selector: "self", amount: 1, optional: "true" }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [invalidDeployOrRetreatOptionalCard], highCouncilSeat: false }),
+    /Invalid deploy-or-retreat-troops optional "true"/,
+    "Deploy-or-retreat specs should reject non-boolean optional values",
+  );
+  const invalidDeployOrRetreatSourceCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-deploy-or-retreat-source-card",
+    name: "Effect Spec Invalid Deploy Or Retreat Source",
+    effects: [revealSpec([{ kind: "deploy-or-retreat-troops", selector: "self", amount: 1, source: "" }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [invalidDeployOrRetreatSourceCard], highCouncilSeat: false }),
+    /Invalid deploy-or-retreat-troops source ""/,
+    "Deploy-or-retreat specs should reject empty source labels",
+  );
   assert.throws(
     () => effectResolver.resolveCombatRetreatTroops(
       [agentSpec([{ kind: "retreat-troops", selector: "self", min: 1, max: 2 }])],

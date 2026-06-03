@@ -50,6 +50,7 @@ import {
   theacherousManeuverSourceId,
   treadInDarknessSourceId,
   undercoverAssetSourceId,
+  unswervingLoyaltySourceId,
   wheelsWithinWheelsSourceId,
 } from "./card-identifiers";
 import {
@@ -92,6 +93,7 @@ import {
   hasSpyPostOnMakerSpace,
   hasSpyPosts,
   hasSwordmasterBonus,
+  revealDeployOrRetreatTroops,
   revealGainInfluence,
   revealGainPersuasion,
   revealPlaceSpies,
@@ -151,6 +153,9 @@ function imperiumRevealText(card: HubCard, persuasion: number, swords: number, p
   }
   if (card.id === smugglersHarvesterSourceId) {
     return "+1 persuasion.";
+  }
+  if (card.id === unswervingLoyaltySourceId) {
+    return "+1 persuasion. Recruit 1 troop. Fremen Bond: you may deploy or retreat 1 troop.";
   }
   if (card.id === interstellarTradeSourceId) {
     return "+1 persuasion for each completed contract.";
@@ -220,6 +225,13 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
     return [
       agentGainResource("spice", 1, [visitedMakerSpace()]),
       revealGainPersuasion(1),
+    ];
+  }
+  if (card.id === unswervingLoyaltySourceId) {
+    return [
+      revealGainPersuasion(1),
+      revealRecruitTroops(1),
+      revealDeployOrRetreatTroops(1, {}, [hasCardTraitInPlay("Faction: Fremen", 2)]),
     ];
   }
   if (card.id === interstellarTradeSourceId) {
@@ -752,6 +764,9 @@ function imperiumPlayText(card: HubCard) {
   if (card.id === longLiveTheFightersSourceId) {
     return "If your deck has three or more cards, look at the top three cards. Draw one, discard one, and trash one.";
   }
+  if (card.id === unswervingLoyaltySourceId) {
+    return "No agent icons.";
+  }
   return summarizeAttributes(card);
 }
 
@@ -878,7 +893,7 @@ function toImperiumCard(card: HubCard): Card {
     sourceId: card.id,
     sourceSlug: card.slug,
     sourceType: card.type,
-    traits: imperiumTraits(card),
+    traits: card.id === unswervingLoyaltySourceId ? ["Faction: Fremen"] : imperiumTraits(card),
   };
 }
 

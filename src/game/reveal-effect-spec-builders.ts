@@ -79,6 +79,25 @@ export function revealRetreatTroopsForStrength(
   ], conditions);
 }
 
+export function revealDeployOrRetreatTroops(
+  troops: EffectAmountSpec,
+  options: {
+    optional?: boolean;
+    source?: string;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return revealEffects([
+    {
+      kind: "deploy-or-retreat-troops",
+      selector: "self",
+      amount: troops,
+      optional: options.optional ?? true,
+      ...(options.source ? { source: options.source } : {}),
+    },
+  ], conditions);
+}
+
 export function revealTrashCardForStrength(
   strength: EffectAmountSpec,
   options: {

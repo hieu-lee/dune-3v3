@@ -276,6 +276,44 @@ try {
   assert.deepEqual(chani.traits, ["Faction: Fremen"], "Chani should keep her Fremen trait");
   assert.match(chani.play, /three or more units.*draw 1 Intrigue/i);
   assert.match(chani.reveal, /Fremen Bond.*\+2 persuasion.*retreat two troops.*4 strength/i);
+  const unswervingLoyalty = data.imperiumDeck.find((card) => card.name === "Unswerving Loyalty");
+  assert.ok(unswervingLoyalty, "Imperium deck should include Unswerving Loyalty");
+  assert.equal(unswervingLoyalty.cost, 1, "Unswerving Loyalty should cost 1 persuasion");
+  assert.deepEqual(unswervingLoyalty.icons, [], "Unswerving Loyalty should have no Agent icons");
+  assert.equal(unswervingLoyalty.persuasion, 1, "Unswerving Loyalty should reveal for 1 persuasion");
+  assert.equal(unswervingLoyalty.swords, 0, "Unswerving Loyalty should not reveal for printed strength");
+  assert.equal(
+    unswervingLoyalty.conditionalPersuasion,
+    false,
+    "Unswerving Loyalty should use typed reveal handling instead of manual printed reveal handling",
+  );
+  assert.ok(
+    unswervingLoyalty.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.effects.some((effect) => effect.kind === "gain-persuasion" && effect.amount === 1)
+    ) &&
+      unswervingLoyalty.effects?.some((spec) =>
+        spec.trigger === "reveal" &&
+        spec.effects.some((effect) => effect.kind === "recruit-troops" && effect.amount === 1)
+      ) &&
+      unswervingLoyalty.effects?.some((spec) =>
+        spec.trigger === "reveal" &&
+        spec.conditions?.some((condition) =>
+          condition.kind === "has-card-trait-in-play" &&
+          condition.trait === "Faction: Fremen" &&
+          condition.count === 2
+        ) &&
+        spec.effects.some((effect) =>
+          effect.kind === "deploy-or-retreat-troops" &&
+          effect.amount === 1 &&
+          effect.optional === true
+        )
+      ),
+    "Unswerving Loyalty should carry typed Reveal persuasion, troop recruit, and Fremen Bond deploy-or-retreat effects",
+  );
+  assert.deepEqual(unswervingLoyalty.traits, ["Faction: Fremen"], "Unswerving Loyalty should keep its Fremen trait");
+  assert.match(unswervingLoyalty.play, /No agent icons/i);
+  assert.match(unswervingLoyalty.reveal, /\+1 persuasion.*Recruit 1 troop.*Fremen Bond.*deploy or retreat 1 troop/i);
   const longLiveTheFighters = data.imperiumDeck.find((card) => card.name === "Long Live the Fighters");
   assert.ok(longLiveTheFighters, "Imperium deck should include Long Live the Fighters");
   assert.deepEqual(
@@ -903,6 +941,224 @@ try {
   assert.equal(playerById(chaniCommanderRetreated, p2.id).deployedTroops, 0, "Commander Chani should retreat the activated Ally's troops");
   assert.equal(playerById(chaniCommanderRetreated, p2.id).garrison, 2, "Commander Chani should return activated Ally troops to garrison");
   assert.equal(playerById(chaniCommanderRetreated, p2.id).conflict, 4, "Commander Chani should add strength to the activated Ally");
+
+  const unswervingSoloFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 0,
+    conflict: 0,
+    deployedTroops: 0,
+    discard: [],
+    garrison: 0,
+    hand: [unswervingLoyalty],
+    playArea: [],
+    persuasion: 0,
+    resources: { solari: 0, spice: 0, water: 0 },
+  }));
+  const unswervingSoloPlan = turnActions.revealTurnPlan(playerById(unswervingSoloFixture, p2.id), unswervingSoloFixture);
+  assert.equal(unswervingSoloPlan.persuasion, 1, "Unswerving Loyalty should reveal for 1 persuasion");
+  assert.equal(unswervingSoloPlan.recruitedTroops, 1, "Unswerving Loyalty should recruit 1 troop on reveal");
+  assert.deepEqual(
+    unswervingSoloPlan.printedRevealCards,
+    [],
+    "Unswerving Loyalty should not need manual printed reveal handling",
+  );
+  const unswervingSoloRevealed = turnActions.revealTurnAction(unswervingSoloFixture, {
+    commanderTargets: {},
+    revealPlan: unswervingSoloPlan,
+  });
+  assert.equal(playerById(unswervingSoloRevealed, p2.id).garrison, 1, "Unswerving Loyalty should add its recruited troop to garrison");
+  assert.equal(unswervingSoloRevealed.pendingAction, undefined, "Unswerving Loyalty should not queue deploy-or-retreat without Fremen Bond");
+
+  const unswervingDeployFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 0,
+    conflict: 0,
+    deployedTroops: 0,
+    discard: [],
+    garrison: 0,
+    hand: [unswervingLoyalty, chaniFremenSupport],
+    playArea: [],
+    persuasion: 0,
+    resources: { solari: 0, spice: 0, water: 0 },
+  }));
+  const unswervingDeployPlan = turnActions.revealTurnPlan(playerById(unswervingDeployFixture, p2.id), unswervingDeployFixture);
+  const unswervingDeployRevealed = turnActions.revealTurnAction(unswervingDeployFixture, {
+    commanderTargets: {},
+    revealPlan: unswervingDeployPlan,
+  });
+  assert.equal(
+    unswervingDeployRevealed.pendingAction?.kind,
+    "deploy-or-retreat-troops",
+    "Unswerving Loyalty Fremen Bond should queue deploy-or-retreat after the reveal recruit",
+  );
+  const unswervingDeployPending = unswervingDeployRevealed.pendingAction;
+  assert.equal(unswervingDeployPending.ownerId, p2.id);
+  assert.equal(unswervingDeployPending.recipientId, p2.id);
+  assert.equal(unswervingDeployPending.troopCount, 1);
+  assert.equal(unswervingDeployPending.source, "Unswerving Loyalty");
+  assert.equal(unswervingDeployPending.optional, true);
+  assert.equal(playerById(unswervingDeployRevealed, p2.id).garrison, 1, "Unswerving deploy choice should see the reveal-recruited troop");
+  assert.equal(state.canDeployForDeployOrRetreatTroops(unswervingDeployRevealed, unswervingDeployPending), true);
+  assert.equal(state.canRetreatForDeployOrRetreatTroops(unswervingDeployRevealed, unswervingDeployPending), false);
+  const unswervingSkipped = state.skipDeployOrRetreatTroopsChoice(unswervingDeployRevealed, unswervingDeployPending);
+  assert.equal(unswervingSkipped.pendingAction, undefined, "Unswerving deploy-or-retreat should be optional");
+  assert.equal(playerById(unswervingSkipped, p2.id).garrison, 1, "Skipping Unswerving should keep the recruited troop in garrison");
+  const unswervingMandatorySkip = state.skipDeployOrRetreatTroopsChoice(
+    { ...unswervingDeployRevealed, pendingAction: { ...unswervingDeployPending, optional: false } },
+    { ...unswervingDeployPending, optional: false },
+  );
+  assert.equal(
+    unswervingMandatorySkip.pendingAction?.kind,
+    "deploy-or-retreat-troops",
+    "Mandatory deploy-or-retreat pending actions should not be skippable",
+  );
+  const unswervingDeployed = state.resolveDeployOrRetreatTroopsChoice(
+    unswervingDeployRevealed,
+    unswervingDeployPending,
+    "deploy",
+  );
+  assert.equal(playerById(unswervingDeployed, p2.id).garrison, 0, "Unswerving deploy should spend the garrison troop");
+  assert.equal(playerById(unswervingDeployed, p2.id).deployedTroops, 1, "Unswerving deploy should add one deployed troop");
+  assert.equal(playerById(unswervingDeployed, p2.id).conflict, 2, "Unswerving deploy should add troop strength");
+  assert.equal(unswervingDeployed.turnUnitDeployments[p2.id], 1, "Unswerving deploy should count as a turn deployment");
+  assert.equal(unswervingDeployed.pendingAction, undefined, "Unswerving deploy should clear its pending action");
+
+  const unswervingRetreatFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 0,
+    conflict: 2,
+    deployedTroops: 1,
+    discard: [],
+    garrison: 0,
+    hand: [unswervingLoyalty, chaniFremenSupport],
+    playArea: [],
+    persuasion: 0,
+    resources: { solari: 0, spice: 0, water: 0 },
+  }));
+  const unswervingRetreatPlan = turnActions.revealTurnPlan(playerById(unswervingRetreatFixture, p2.id), unswervingRetreatFixture);
+  const unswervingRetreatRevealed = turnActions.revealTurnAction(unswervingRetreatFixture, {
+    commanderTargets: {},
+    revealPlan: unswervingRetreatPlan,
+  });
+  assert.equal(unswervingRetreatRevealed.pendingAction?.kind, "deploy-or-retreat-troops");
+  assert.equal(state.canDeployForDeployOrRetreatTroops(unswervingRetreatRevealed, unswervingRetreatRevealed.pendingAction), true);
+  assert.equal(state.canRetreatForDeployOrRetreatTroops(unswervingRetreatRevealed, unswervingRetreatRevealed.pendingAction), true);
+  const unswervingRetreated = state.resolveDeployOrRetreatTroopsChoice(
+    unswervingRetreatRevealed,
+    unswervingRetreatRevealed.pendingAction,
+    "retreat",
+  );
+  assert.equal(playerById(unswervingRetreated, p2.id).deployedTroops, 0, "Unswerving retreat should remove one deployed troop");
+  assert.equal(playerById(unswervingRetreated, p2.id).garrison, 2, "Unswerving retreat should keep the reveal recruit and return the retreated troop");
+  assert.equal(playerById(unswervingRetreated, p2.id).conflict, 0, "Unswerving retreat should remove the retreated troop strength");
+  assert.equal(unswervingRetreated.pendingAction, undefined, "Unswerving retreat should clear its pending action");
+
+  const unswervingCommanderFixture = withActivePlayer(game, p4.id, () => ({
+    agentsReady: 0,
+    discard: [],
+    hand: [unswervingLoyalty, chaniFremenSupport],
+    playArea: [],
+    persuasion: 0,
+    resources: { solari: 0, spice: 0, water: 0 },
+  }));
+  const unswervingCommanderState = {
+    ...unswervingCommanderFixture,
+    players: unswervingCommanderFixture.players.map((player) =>
+      player.id === p2.id
+        ? { ...player, conflict: 0, deployedTroops: 0, garrison: 0 }
+        : player,
+    ),
+  };
+  const unswervingCommanderPlan = turnActions.revealTurnPlan(
+    playerById(unswervingCommanderState, p4.id),
+    unswervingCommanderState,
+  );
+  const unswervingCommanderRevealed = turnActions.revealTurnAction(unswervingCommanderState, {
+    commanderTargets: { [p4.id]: p2.id },
+    revealPlan: unswervingCommanderPlan,
+  });
+  assert.equal(
+    unswervingCommanderRevealed.pendingAction?.kind === "deploy-or-retreat-troops"
+      ? unswervingCommanderRevealed.pendingAction.recipientId
+      : undefined,
+    p2.id,
+    "Commander Unswerving Loyalty should route deploy-or-retreat to the activated Ally",
+  );
+  assert.equal(playerById(unswervingCommanderRevealed, p2.id).garrison, 1, "Commander Unswerving should recruit to the activated Ally");
+  const unswervingCommanderBlockedState = {
+    ...unswervingCommanderRevealed,
+    pendingAction: undefined,
+    pendingQueue: [],
+    conflictDeploymentBlock: {
+      actorId: p4.id,
+      ownerId: p2.id,
+      source: "Verifier deployment block",
+    },
+  };
+  const unswervingCommanderBlockedPendings = state.pendingActionsForReveal(
+    playerById(unswervingCommanderBlockedState, p4.id),
+    unswervingCommanderBlockedState,
+    [unswervingLoyalty],
+    p2.id,
+  );
+  assert.equal(
+    unswervingCommanderBlockedPendings.some((pending) => pending.kind === "deploy-or-retreat-troops"),
+    false,
+    "Commander Unswerving should not queue deploy-or-retreat when the Commander/Ally deployment pair is blocked and no troop can retreat",
+  );
+  const unswervingCommanderBlockedDeploy = {
+    ...unswervingCommanderRevealed,
+    conflictDeploymentBlock: {
+      actorId: p4.id,
+      ownerId: p2.id,
+      source: "Verifier deployment block",
+    },
+  };
+  assert.equal(
+    state.canDeployForDeployOrRetreatTroops(
+      unswervingCommanderBlockedDeploy,
+      unswervingCommanderRevealed.pendingAction,
+    ),
+    false,
+    "Commander Unswerving deploy resolution should respect Commander/Ally deployment blocks",
+  );
+  assert.equal(
+    state.resolveDeployOrRetreatTroopsChoice(
+      unswervingCommanderBlockedDeploy,
+      unswervingCommanderRevealed.pendingAction,
+      "deploy",
+    ),
+    unswervingCommanderBlockedDeploy,
+    "Commander Unswerving should not resolve a stale deploy pending when the Commander/Ally deployment pair is blocked",
+  );
+  const unswervingCommanderRevealedWithBlock = turnActions.revealTurnAction(
+    {
+      ...unswervingCommanderState,
+      conflictDeploymentBlock: {
+        actorId: p4.id,
+        ownerId: p2.id,
+        source: "Verifier deployment block",
+      },
+    },
+    {
+      commanderTargets: { [p4.id]: p2.id },
+      revealPlan: unswervingCommanderPlan,
+    },
+  );
+  assert.equal(
+    unswervingCommanderRevealedWithBlock.pendingAction?.kind,
+    "deploy-or-retreat-troops",
+    "Reveal clears the previous Agent-play deployment block before Unswerving pending actions are generated",
+  );
+  const unswervingCommanderDeployed = state.resolveDeployOrRetreatTroopsChoice(
+    unswervingCommanderRevealed,
+    unswervingCommanderRevealed.pendingAction,
+    "deploy",
+  );
+  assert.equal(playerById(unswervingCommanderDeployed, p2.id).deployedTroops, 1, "Commander Unswerving should deploy the activated Ally's troop");
+  assert.equal(playerById(unswervingCommanderDeployed, p2.id).conflict, 2, "Commander Unswerving should add strength to the activated Ally");
+  assert.equal(
+    unswervingCommanderDeployed.turnUnitDeployments[p4.id],
+    1,
+    "Commander Unswerving deployment should count on the active Commander's turn",
+  );
 
   const prepareBuyFixture = withActivePlayer(game, p2.id, () => ({
     revealed: true,

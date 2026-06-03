@@ -1,5 +1,6 @@
 import {
   canSummonSandworms,
+  conflictDeploymentBlockedFor,
   playerHasConflictUnits,
 } from "./conflict-rules";
 import {
@@ -11,6 +12,7 @@ import {
 } from "./deck-utils";
 import {
   resolveCardEffects,
+  resolveRevealDeployOrRetreatTroops,
   resolveRevealLoseInfluenceForIntrigues,
   resolveRevealPayResourceForHighCouncilSeats,
   resolveRevealPayResourceForSandworms,
@@ -309,6 +311,43 @@ function pendingActionsForRevealRetreatTroopsForStrength(
   });
 }
 
+function pendingActionsForRevealDeployOrRetreatTroops(
+  card: Card,
+  source: Player,
+  state: GameState,
+  combatRecipientId: string,
+): PendingAction[] {
+  const recipient = state.players.find((player) => player.id === combatRecipientId);
+  if (!card.effects || !source.playArea.some((candidate) => candidate.id === card.id) || !state.conflict || !recipient) {
+    return [];
+  }
+  if (source.role === "Commander" && (recipient.team !== source.team || recipient.role !== "Ally")) return [];
+  if (source.role !== "Commander" && recipient.id !== source.id) return [];
+
+  const players = playersWithPendingCardEffect(state, source, recipient);
+  const effectState = { ...state, players };
+  return resolveRevealDeployOrRetreatTroops(card.effects, {
+    trigger: "reveal",
+    source,
+    target: recipient,
+    state: effectState,
+  }).flatMap((effect) => {
+    if (effect.selector !== "self" || effect.troopCount <= 0) return [];
+    const canDeploy =
+      recipient.garrison >= effect.troopCount && !conflictDeploymentBlockedFor(state, source.id, recipient.id);
+    const canRetreat = recipient.deployedTroops >= effect.troopCount;
+    if (!canDeploy && !canRetreat) return [];
+    return [{
+      kind: "deploy-or-retreat-troops",
+      ownerId: source.id,
+      recipientId: recipient.id,
+      troopCount: effect.troopCount,
+      optional: effect.optional,
+      source: effect.source ?? card.name,
+    }];
+  });
+}
+
 export function pendingActionsForReveal(
   source: Player,
   state: GameState,
@@ -357,6 +396,9 @@ export function pendingActionsForReveal(
   const retreatTroopStrengthPendings = revealedCards.flatMap((card) =>
     pendingActionsForRevealRetreatTroopsForStrength(card, source, state, combatRecipientId)
   );
+  const deployOrRetreatTroopPendings = revealedCards.flatMap((card) =>
+    pendingActionsForRevealDeployOrRetreatTroops(card, source, state, combatRecipientId)
+  );
   const leaderAbilityPendings = pendingActionsForRevealLeaderAbilities(source, state, combatRecipientId);
 
   return [
@@ -369,6 +411,7 @@ export function pendingActionsForReveal(
     ...payResourceHighCouncilSeatPendings,
     ...influenceIntriguePendings,
     ...retreatTroopStrengthPendings,
+    ...deployOrRetreatTroopPendings,
     ...leaderAbilityPendings,
   ].filter((action): action is PendingAction => Boolean(action));
 }

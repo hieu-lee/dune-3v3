@@ -96,6 +96,13 @@ export type RevealRetreatTroopsForStrength = {
   optional: boolean;
 };
 
+export type RevealDeployOrRetreatTroops = {
+  selector: PlayerSelector;
+  troopCount: number;
+  optional: boolean;
+  source?: string;
+};
+
 export type TrashCardEffect = {
   selector: PlayerSelector;
   optional: boolean;

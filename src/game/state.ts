@@ -337,6 +337,12 @@ export {
 } from "./troop-retreat-rules";
 
 export {
+  canDeployForDeployOrRetreatTroops,
+  canResolveDeployOrRetreatTroopsChoice,
+  canRetreatForDeployOrRetreatTroops,
+} from "./deploy-or-retreat-rules";
+
+export {
   adjustTeamResourcePaymentContribution,
   resolveTeamResourcePaymentChoice,
   skipTeamResourcePayment,
@@ -429,12 +435,14 @@ export {
   resolveMakerChoice,
   resolveOptionalSpacePayment,
   resolvePayResourceForHighCouncilSeatChoice,
+  resolveDeployOrRetreatTroopsChoice,
   resolveTrashIntrigueForRewardChoice,
   resolveRetreatTroopsForStrength,
   resolveSietchTabrChoice,
   resolveStabanUnseenNetworkChoice,
   resolveTopDeckSelectionChoice,
   skipControlDefenseTroop,
+  skipDeployOrRetreatTroopsChoice,
   skipDiscardCardsForReward,
   skipDiscardCardForDraw,
   skipDiscardCardForInfluenceAndDraw,

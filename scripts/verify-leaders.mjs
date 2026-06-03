@@ -381,6 +381,33 @@ try {
     2,
     "Always Smiling should score after a Reveal-turn deployment brings Gurney to 10 strength",
   );
+  const deployOrRetreatCrossingPending = {
+    kind: "deploy-or-retreat-troops",
+    ownerId: muadDibAllyA.id,
+    recipientId: muadDibAllyA.id,
+    troopCount: 1,
+    optional: true,
+    source: "Verifier deploy-or-retreat",
+  };
+  const gurneyAfterDeployOrRetreatChoice = state.resolveDeployOrRetreatTroopsChoice(
+    {
+      ...gurneyRevealBase,
+      pendingAction: deployOrRetreatCrossingPending,
+      pendingQueue: [],
+      players: gurneyRevealBase.players.map((player) =>
+        player.id === muadDibAllyA.id
+          ? { ...player, conflict: 8, garrison: 1, deployedTroops: 4, vp: 1, gurneyAlwaysSmilingScored: false }
+          : player,
+      ),
+    },
+    deployOrRetreatCrossingPending,
+    "deploy",
+  );
+  assert.equal(
+    playerById(gurneyAfterDeployOrRetreatChoice, muadDibAllyA.id).vp,
+    2,
+    "Always Smiling should score after a deploy-or-retreat choice brings Gurney to 10 strength",
+  );
   const gurneyUnexpectedAlliesState = {
     ...gurneyRevealBase,
     shieldWall: false,

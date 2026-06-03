@@ -167,6 +167,14 @@ export type PendingAction =
       optional: boolean;
     }
   | {
+      kind: "deploy-or-retreat-troops";
+      ownerId: string;
+      recipientId: string;
+      troopCount: number;
+      source: string;
+      optional: boolean;
+    }
+  | {
       kind: "pay-resource-for-strength";
       ownerId: string;
       combatRecipientId: string;

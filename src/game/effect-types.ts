@@ -271,6 +271,13 @@ export type GameEffectSpec =
       optional?: boolean;
     }
   | {
+      kind: "deploy-or-retreat-troops";
+      selector: PlayerSelector;
+      amount: EffectAmountSpec;
+      optional?: boolean;
+      source?: string;
+    }
+  | {
       kind: "retreat-troops";
       selector: PlayerSelector;
       min: number;

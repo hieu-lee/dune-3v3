@@ -4,7 +4,9 @@ import { boardSpaces, factionLabels, iconLabels, teams } from "../game/data";
 import {
   acquirableCardsForPending,
   canPayTrashIntrigueForReward,
+  canDeployForDeployOrRetreatTroops,
   canResolveRetreatTroopsForStrength,
+  canRetreatForDeployOrRetreatTroops,
   canMoveCardToThroneRow,
   canPayConflictVpConversion,
   conflictVpConversionSpyChoices,
@@ -57,6 +59,7 @@ import { PendingPaidRewardChoicePanel } from "./PendingPaidRewardChoicePanel";
 import {
   PendingControlDefensePanel,
   PendingDeployPanel,
+  PendingDeployOrRetreatTroopsPanel,
   PendingReinforcePanel,
   PendingRetreatTroopsForStrengthPanel,
 } from "./PendingMilitaryPanels";
@@ -85,6 +88,7 @@ export function PendingActionPanel({
   chooseDiscardCardForDraw,
   chooseDiscardHandCard,
   chooseDiscardCardForInfluenceAndDraw,
+  chooseDeployOrRetreatTroops,
   chooseLoseInfluenceForIntrigues,
   choosePendingActionChoice,
   chooseLeaderTransition,
@@ -123,6 +127,7 @@ export function PendingActionPanel({
   skipDiscardCardsForRewardChoice,
   skipDiscardCardForDrawChoice,
   skipDiscardCardForInfluenceAndDrawChoice,
+  skipDeployOrRetreatTroops,
   skipLoseInfluenceForIntriguesChoice,
   skipControlDefense,
   skipConflictVpReward,
@@ -395,6 +400,22 @@ export function PendingActionPanel({
     pendingAction.kind === "retreat-troops-for-strength"
       ? canResolveRetreatTroopsForStrength(game, pendingAction)
       : false;
+  const pendingDeployOrRetreatOwner =
+    pendingAction.kind === "deploy-or-retreat-troops"
+      ? game.players.find((player) => player.id === pendingAction.ownerId)
+      : undefined;
+  const pendingDeployOrRetreatRecipient =
+    pendingAction.kind === "deploy-or-retreat-troops"
+      ? game.players.find((player) => player.id === pendingAction.recipientId)
+      : undefined;
+  const pendingDeployOrRetreatCanDeploy =
+    pendingAction.kind === "deploy-or-retreat-troops"
+      ? canDeployForDeployOrRetreatTroops(game, pendingAction)
+      : false;
+  const pendingDeployOrRetreatCanRetreat =
+    pendingAction.kind === "deploy-or-retreat-troops"
+      ? canRetreatForDeployOrRetreatTroops(game, pendingAction)
+      : false;
   const tradePartners =
     pendingActor && pendingAction.kind === "trade"
       ? game.players.filter((player) =>
@@ -431,6 +452,7 @@ export function PendingActionPanel({
           {pendingAction.kind === "spy" && `${pendingAction.source}${pendingAction.placementIcon ? ` ${iconLabels[pendingAction.placementIcon]}` : ""} spy placement - ${pendingAction.remaining}`}
           {pendingAction.kind === "reveal-adjust" && "Printed reveal adjustment"}
           {pendingAction.kind === "retreat-troops-for-strength" && `${pendingRetreatStrengthOwner?.leader ?? "Player"} ${pendingAction.source}`}
+          {pendingAction.kind === "deploy-or-retreat-troops" && `${pendingDeployOrRetreatOwner?.leader ?? "Player"} ${pendingAction.source}`}
           {pendingAction.kind === "contract" && `${pendingContractOwner?.leader ?? "Player"} CHOAM contract`}
           {pendingAction.kind === "acquire-card" && `${pendingAcquireOwner?.leader ?? "Player"} acquisition from ${pendingAction.source}`}
           {pendingAction.kind === "discard-card-for-influence-and-draw" && `${pendingDiscardInfluenceDrawOwner?.leader ?? "Player"} ${pendingAction.source}`}
@@ -552,6 +574,18 @@ export function PendingActionPanel({
           recipient={pendingRetreatStrengthRecipient}
           onRetreat={chooseRetreatTroopsForStrength}
           onSkip={skipRetreatTroopsForStrengthChoice}
+        />
+      )}
+
+      {pendingAction.kind === "deploy-or-retreat-troops" && (
+        <PendingDeployOrRetreatTroopsPanel
+          canDeploy={pendingDeployOrRetreatCanDeploy}
+          canRetreat={pendingDeployOrRetreatCanRetreat}
+          owner={pendingDeployOrRetreatOwner}
+          pending={pendingAction}
+          recipient={pendingDeployOrRetreatRecipient}
+          onChoose={chooseDeployOrRetreatTroops}
+          onSkip={skipDeployOrRetreatTroops}
         />
       )}
 

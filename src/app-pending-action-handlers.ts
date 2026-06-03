@@ -41,6 +41,7 @@ import {
   resolvePayResourceForStrengthChoice,
   resolvePayResourceForTroopsChoice,
   resolveRepeatBoardSpaceChoice,
+  resolveDeployOrRetreatTroopsChoice,
   resolveRetreatTroopsForStrength,
   resolveSietchTabrChoice,
   resolveStabanUnseenNetworkChoice,
@@ -67,6 +68,7 @@ import {
   skipPayResourceForStrength,
   skipPayResourceForTroops,
   skipRecallSpy,
+  skipDeployOrRetreatTroopsChoice,
   skipRetreatTroopsForStrength,
   skipTeamResourcePayment,
   skipTopDeckSelectionChoice,
@@ -172,9 +174,17 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     runPending("retreat-troops-for-strength", (current, pending) =>
       maybeStartCombatPhase(resolveRetreatTroopsForStrength(current, pending))
     );
+  const chooseDeployOrRetreatTroops = (choice: "deploy" | "retreat") =>
+    runPending("deploy-or-retreat-troops", (current, pending) =>
+      maybeStartCombatPhase(resolveDeployOrRetreatTroopsChoice(current, pending, choice))
+    );
   const skipRetreatTroopsForStrengthChoice = () =>
     runPending("retreat-troops-for-strength", (current, pending) =>
       maybeStartCombatPhase(skipRetreatTroopsForStrength(current, pending))
+    );
+  const skipDeployOrRetreatTroops = () =>
+    runPending("deploy-or-retreat-troops", (current, pending) =>
+      maybeStartCombatPhase(skipDeployOrRetreatTroopsChoice(current, pending))
     );
   const chooseMakerReward = (choice: "spice" | "sandworms") =>
     runPending("maker-choice", (current, pending) =>
@@ -354,6 +364,7 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     chooseDiscardCardForDraw,
     chooseDiscardHandCard,
     chooseDiscardCardForInfluenceAndDraw,
+    chooseDeployOrRetreatTroops,
     chooseLadyAmberDesertScouts,
     chooseLeaderTransition,
     chooseLoseInfluenceForIntrigues,
@@ -390,6 +401,7 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     recallSpyForSupply,
     reinforceOne,
     skipControlDefense,
+    skipDeployOrRetreatTroops,
     skipConflictVpReward,
     skipDiscardCardsForRewardChoice,
     skipDiscardCardForDrawChoice,

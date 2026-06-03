@@ -54,7 +54,7 @@ Use `debug:room:smoke` when the room/session layer, hidden projection, reconnect
 
 Use `debug:room:complete` when a change may affect all-seat room coordination. It opens six isolated browser contexts, claims p1-p6, verifies seat identity, hidden projections, reconnect recovery, client and server permission failures, cross-client convergence, pending ownership, and six-player Endgame readiness/finalization. It writes screenshots, state JSON, console logs, request failures, and `summary.json` under `artifacts/qa/browser-room-complete-flow`.
 
-Use `debug:room:marathon` for a heavier six-browser reveal-only natural room marathon. It claims p1-p6, verifies private projections, resolves setup, drives legal room actions through repeated Reveal/end-Reveal/combat-pass cycles until the Conflict deck naturally empties, resolves Endgame Intrigue scoring, finalizes all seats, and writes screenshots, state JSON, action logs, console logs, request failures, and `summary.json` under `artifacts/qa/browser-room-marathon`.
+Use `debug:room:marathon` for a heavier six-browser natural room marathon. It claims p1-p6, verifies private projections, resolves setup, places legal Agents when available, resolves generated pending actions, drives Reveal/end-Reveal/combat-pass cycles until the Conflict deck naturally empties, resolves Endgame Intrigue scoring, finalizes all seats, and writes screenshots, state JSON, action logs, console logs, request failures, and `summary.json` under `artifacts/qa/browser-room-marathon`.
 
 Use `debug:browser -- --scenario all` when a change may affect several pending-action surfaces. It creates many scenario screenshots under the selected `--out` directory and records a trace unless `--no-trace` is passed.
 

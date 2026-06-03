@@ -34,10 +34,16 @@ const actionLog = [];
 const server = await createRoomServer({ port: 0, log: false, storageFile: join(outDir, "rooms.json") });
 const browser = await chromium.launch({ headless: true });
 const {
+  canPay,
+  effectiveCost,
+  iconCanReach,
   canMoveCardToThroneRow,
   endgameBattleIconChoices,
   endgameConditionalIntrigueChoices,
+  playerTroopSupply,
+  trashableCardsForPending,
 } = await server.ssrLoadModule("/src/game/state.ts");
+const { boardSpaces } = await server.ssrLoadModule("/src/game/data.ts");
 
 function observePage(page) {
   page.on("console", (message) => {
@@ -209,13 +215,52 @@ function firstFaction(choices) {
   return choices?.[0]?.faction ?? choices?.[0] ?? "emperor";
 }
 
-function pendingOwnerId(room, pending) {
+function pendingOwnerId(room, pending, command) {
   if (!pending) return undefined;
-  if ("ownerId" in pending) return pending.ownerId;
+  if (command?.kind === "choose-board-influence") return command.ownerId;
+  if (command?.kind === "choose-maker-reward") {
+    return command.choice === "spice" ? pending.spiceOwnerId : pending.ownerId;
+  }
+  if (command?.kind === "choose-sietch-tabr") {
+    return command.choice === "hooks" ? pending.ownerId : pending.waterOwnerId;
+  }
+  if (command?.kind === "adjust-team-resource-payment") return command.contributorId;
+  if (command?.kind === "reinforce-one") return command.playerId;
+  if (command?.kind === "lose-influence") return command.ownerId;
   if (pending.kind === "commander-resource-split") return pending.commanderId;
   if (pending.kind === "trade") return pending.actorId;
   if (pending.kind === "reinforce" || pending.kind === "conflict-tie") {
     return room.game.players.find((player) => player.team === pending.team)?.id;
+  }
+  if ("ownerId" in pending) return pending.ownerId;
+  return undefined;
+}
+
+function commanderTargetsFor(player, players) {
+  if (player.role !== "Commander") return undefined;
+  const ally = players.find((candidate) => candidate.team === player.team && candidate.role === "Ally");
+  return ally ? { [player.id]: ally.id } : undefined;
+}
+
+function legalAgentPlacement(game, player) {
+  if (player.revealed || player.agentsReady <= 0 || game.agentTurnComplete) return undefined;
+  const commanderTargets = commanderTargetsFor(player, game.players);
+  for (const card of player.hand) {
+    for (const space of boardSpaces) {
+      if (game.spaces[space.id]) continue;
+      if (!canPay(player, effectiveCost(space, game.players))) continue;
+      if (!iconCanReach(card, space, player, game.swordmasterClaimed, game.spyPosts, game.players, game.sharedSpyPosts)) {
+        continue;
+      }
+      return {
+        action: {
+          kind: "place-agent",
+          cardId: card.id,
+          spaceId: space.id,
+          ...(commanderTargets ? { commanderTargets } : {}),
+        },
+      };
+    }
   }
   return undefined;
 }
@@ -230,8 +275,19 @@ function pendingCommand(room, pending) {
       return { kind: "skip-paid-reward" };
     case "pending-action-choice":
       return { kind: "skip-pending-action-choice" };
-    case "trash-card":
-      return { kind: "skip-trash" };
+    case "trash-card": {
+      if (pending.optional) return { kind: "skip-trash" };
+      const owner = room.game.players.find((player) => player.id === pending.ownerId);
+      const choice = owner ? trashableCardsForPending(owner, pending)[0] : undefined;
+      return choice
+        ? {
+            kind: "trash-card",
+            zone: choice.zone,
+            cardId: choice.card.id,
+            choiceIndex: 0,
+          }
+        : undefined;
+    }
     case "trash-intrigue-for-reward":
       return { kind: "skip-trash-intrigue-for-reward" };
     case "trash-source-for-trade":
@@ -296,12 +352,20 @@ function pendingCommand(room, pending) {
       return { kind: "choose-conflict-tie-winner" };
     case "team-resource-payment":
       return { kind: "skip-team-resource-payment" };
-    case "contract":
-      return pending.optional
+    case "trade":
+      return pending.actorGiven === 0 && pending.partnerGiven === 0
         ? { kind: "clear-pending-action" }
-        : room.game.contractOffer[0]
-          ? { kind: "take-contract", contractId: room.game.contractOffer[0].id }
-          : { kind: "collect-contract-fallback" };
+        : undefined;
+    case "contract":
+      if (pending.optional) return { kind: "clear-pending-action" };
+      if (room.game.contractOffer[0]) return { kind: "take-contract", contractId: room.game.contractOffer[0].id };
+      if (!pending.publicOnly) {
+        const owner = room.game.players.find((player) => player.id === pending.ownerId);
+        if (owner?.reservedContracts[0]) {
+          return { kind: "take-contract", contractId: owner.reservedContracts[0].id };
+        }
+      }
+      return { kind: "collect-contract-fallback" };
     case "acquire-card": {
       if (pending.optional) return { kind: "clear-pending-action" };
       const card = [...room.game.reserveMarket, ...room.game.imperiumRow].find((candidate) =>
@@ -317,8 +381,16 @@ function pendingCommand(room, pending) {
       return { kind: "choose-repeat-board-space", choice: "skip" };
     case "leader-transition":
       return { kind: "choose-leader-transition", choice: firstChoiceId(pending.choices) ?? "skip" };
+    case "throne-row": {
+      const card = room.game.imperiumRow.find(canMoveCardToThroneRow);
+      return card ? { kind: "choose-throne-row-card", cardId: card.id } : { kind: "clear-pending-action" };
+    }
     case "reinforce": {
-      const player = room.game.players.find((candidate) => candidate.team === pending.team && candidate.garrison > 0);
+      const player = room.game.players.find((candidate) =>
+        candidate.team === pending.team &&
+        candidate.role === "Ally" &&
+        playerTroopSupply(candidate) > 0
+      );
       return player ? { kind: "reinforce-one", playerId: player.id, destination: "garrison" } : { kind: "clear-pending-action" };
     }
     default:
@@ -331,8 +403,8 @@ async function resolvePending(roomId, tokens, clients, max = 100) {
     const room = roomRecord(roomId);
     const pending = room.game.pendingAction;
     if (!pending) return;
-    const ownerId = pendingOwnerId(room, pending);
     const command = pendingCommand(room, pending);
+    const ownerId = pendingOwnerId(room, pending, command);
     if (!ownerId || !command) {
       throw new Error(`Unsupported pending ${JSON.stringify(pending, null, 2)}`);
     }
@@ -383,6 +455,8 @@ async function resolveEndgameChoices(roomId, tokens, clients) {
 
 async function driveMarathon(roomId, tokens, clients) {
   let capturedMidpoint = false;
+  let capturedAgentPlacement = false;
+  let agentPlacements = 0;
   for (let step = 1; step <= 700; step += 1) {
     await resolvePending(roomId, tokens, clients);
     const room = roomRecord(roomId);
@@ -391,9 +465,25 @@ async function driveMarathon(roomId, tokens, clients) {
       await capture(clients[0].page, "marathon-round-five.png");
       capturedMidpoint = true;
     }
-    if (game.phase === "finished") return step;
+    if (game.phase === "finished") return { steps: step, agentPlacements };
     if (game.phase === "playing") {
       const active = game.players[game.activeSeat];
+      if (game.agentTurnComplete) {
+        await roomAction(roomId, active.id, tokens, { kind: "end-agent" });
+        await assertConverged(roomId, clients);
+        continue;
+      }
+      const placement = legalAgentPlacement(game, active);
+      if (placement) {
+        await roomAction(roomId, active.id, tokens, placement.action);
+        agentPlacements += 1;
+        await assertConverged(roomId, clients);
+        if (!capturedAgentPlacement) {
+          await capture(clients[0].page, "marathon-first-agent-placement.png");
+          capturedAgentPlacement = true;
+        }
+        continue;
+      }
       if (!active.revealed) {
         await roomAction(roomId, active.id, tokens, { kind: "reveal-turn" });
         await assertConverged(roomId, clients);
@@ -463,12 +553,13 @@ try {
   await capture(firstPage, "marathon-all-seats-claimed.png");
 
   await resolveSetup(roomId, tokens, clients);
-  const steps = await driveMarathon(roomId, tokens, clients);
+  const { steps, agentPlacements } = await driveMarathon(roomId, tokens, clients);
   await assertConverged(roomId, clients);
   const finished = roomRecord(roomId).game;
   assert.equal(finished.phase, "finished", "Marathon should finish through normal room actions");
   assert.equal(finished.conflictDeck.length, 0, "Marathon should naturally empty the Conflict deck");
   assert.ok(finished.round >= 9, "Marathon should reach the late-game round count");
+  assert.ok(agentPlacements >= 6, "Marathon should exercise online Agent placement for all six seats");
   for (const { page, playerId } of clients) assertRoomPrivacy(await currentGame(page), playerId);
   await capture(firstPage, "marathon-finished.png");
 
@@ -485,6 +576,7 @@ try {
     finalRound: finished.round,
     finalConflictDeckCount: finished.conflictDeck.length,
     steps,
+    agentPlacements,
     actionCount: actionLog.length,
     screenshots,
     consoleErrorCount: consoleFailures.length,
@@ -499,6 +591,7 @@ try {
   console.log("browser room marathon passed");
   console.log(`claimed seats: ${summary.claimedSeats.length}`);
   console.log(`final round: ${summary.finalRound}`);
+  console.log(`agent placements: ${summary.agentPlacements}`);
   console.log(`actions: ${summary.actionCount}`);
   console.log(`screenshot count: ${summary.screenshots.length}`);
   console.log(`console error count: ${summary.consoleErrorCount}`);

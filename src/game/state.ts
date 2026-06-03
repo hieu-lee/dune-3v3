@@ -41,7 +41,9 @@ export {
 } from "./round-transition-rules";
 
 export {
+  acquireMarketCard,
   completeChoamContractsForBoardSpace,
+  completeChoamContractsForAcquiredCard,
   completeImmediateChoamContracts,
   contractHasAutomatedCompletion,
   resolvePayResourceForContractsChoice,
@@ -201,7 +203,6 @@ export {
 } from "./leader-rewards";
 
 export {
-  acquireMarketCard,
   acquirableCardsForPending,
   manipulateAcquisitionCost,
   moveImperiumCardToThroneRow,

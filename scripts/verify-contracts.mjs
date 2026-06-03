@@ -41,6 +41,12 @@ try {
     return space;
   }
 
+  function reserveCardByName(name) {
+    const card = data.reserveMarket.find((candidate) => candidate.name === name);
+    assert.ok(card, `Missing reserve card fixture: ${name}`);
+    return card;
+  }
+
   function playerById(gameState, playerId) {
     const player = gameState.players.find((candidate) => candidate.id === playerId);
     assert.ok(player, `Missing player fixture: ${playerId}`);
@@ -99,6 +105,7 @@ try {
   assert.deepEqual(
     automatedContracts,
     [
+      "Acquire",
       "Arrakeen I",
       "Arrakeen II",
       "Deliver Supplies",
@@ -118,7 +125,7 @@ try {
     ].sort(),
     "Only fully modeled CHOAM contracts should leave the manual fallback path",
   );
-  assert.equal(state.contractHasAutomatedCompletion(contractByName("Acquire")), false);
+  assert.equal(state.contractHasAutomatedCompletion(contractByName("Acquire")), true);
   assert.equal(state.contractHasAutomatedCompletion(contractByName("Harvest 3+")), false);
   assert.equal(game.contractOffer.length, 2, "Initial game should reveal two public CHOAM contracts");
   assert.equal(game.contractDeck.length, 16, "Initial public CHOAM deck should hold the remaining sixteen contracts");
@@ -235,6 +242,106 @@ try {
     "Immediate should complete and pay 2 Solari as soon as it is taken",
   );
   assertCompleted(immediateTaken, ally.id, "Immediate");
+
+  const spiceMustFlow = reserveCardByName("The Spice Must Flow");
+  const prepareTheWay = reserveCardByName("Prepare The Way");
+  const acquireActiveSeat = game.players.findIndex((player) => player.id === ally.id);
+  const acquireHeld = withHeldContracts(
+    updatePlayer(
+      {
+        ...game,
+        activeSeat: acquireActiveSeat,
+        pendingAction: undefined,
+        pendingQueue: [],
+      },
+      ally.id,
+      (player) => ({
+        ...player,
+        revealed: true,
+        persuasion: spiceMustFlow.cost ?? 0,
+      }),
+    ),
+    ally.id,
+    ["Acquire"],
+  );
+  const acquireBefore = playerById(acquireHeld, ally.id);
+  const acquireCompleted = state.acquireMarketCard(acquireHeld, ally.id, spiceMustFlow.id);
+  const acquireOwner = playerById(acquireCompleted, ally.id);
+  assertCompleted(acquireCompleted, ally.id, "Acquire");
+  assert.equal(acquireOwner.vp, acquireBefore.vp + 1, "The Spice Must Flow acquire VP should still apply");
+  assert.equal(acquireOwner.resources.spice, acquireBefore.resources.spice + 1, "The Spice Must Flow acquire spice should still apply");
+  assert.equal(acquireOwner.resources.solari, acquireBefore.resources.solari + 3, "Acquire contract should pay 3 Solari");
+  assert.equal(
+    acquireCompleted.turnSpiceGains[ally.id],
+    (acquireHeld.turnSpiceGains?.[ally.id] ?? 0) + 1,
+    "The Spice Must Flow acquire spice should remain turn-spice tracked",
+  );
+  assert.match(acquireCompleted.log[0], /acquires The Spice Must Flow/);
+  assert.match(acquireCompleted.log[1], /completes the Acquire CHOAM contract and gains 3 Solari/);
+
+  const acquireAlreadyCompleted = updatePlayer(acquireCompleted, ally.id, (player) => ({
+    ...player,
+    persuasion: spiceMustFlow.cost ?? 0,
+  }));
+  const acquireBoughtAgain = state.acquireMarketCard(acquireAlreadyCompleted, ally.id, spiceMustFlow.id);
+  assert.equal(
+    playerById(acquireBoughtAgain, ally.id).resources.solari,
+    playerById(acquireAlreadyCompleted, ally.id).resources.solari,
+    "Already-completed Acquire contracts should not pay again",
+  );
+  assert.doesNotMatch(acquireBoughtAgain.log[0], /Acquire CHOAM contract/);
+
+  const nonMatchingAcquire = withHeldContracts(
+    updatePlayer(
+      {
+        ...game,
+        activeSeat: acquireActiveSeat,
+        pendingAction: undefined,
+        pendingQueue: [],
+      },
+      ally.id,
+      (player) => ({
+        ...player,
+        revealed: true,
+        persuasion: prepareTheWay.cost ?? 0,
+      }),
+    ),
+    ally.id,
+    ["Acquire"],
+  );
+  const nonMatchingBought = state.acquireMarketCard(nonMatchingAcquire, ally.id, prepareTheWay.id);
+  assert.equal(playerContract(nonMatchingBought, ally.id, "Acquire").completed, false);
+  assert.equal(
+    playerById(nonMatchingBought, ally.id).resources.solari,
+    playerById(nonMatchingAcquire, ally.id).resources.solari,
+    "Acquire should not complete for non-The Spice Must Flow acquisitions",
+  );
+
+  const pendingAcquireHeld = withHeldContracts(
+    {
+      ...game,
+      pendingAction: {
+        kind: "acquire-card",
+        ownerId: ally.id,
+        source: "Verifier Acquire",
+        maxCost: spiceMustFlow.cost ?? 0,
+        destination: "hand",
+      },
+      pendingQueue: [],
+    },
+    ally.id,
+    ["Acquire"],
+  );
+  const pendingAcquireBefore = playerById(pendingAcquireHeld, ally.id);
+  const pendingAcquireCompleted = state.acquireCardForPending(
+    pendingAcquireHeld,
+    pendingAcquireHeld.pendingAction,
+    spiceMustFlow.id,
+  );
+  const pendingAcquireOwner = playerById(pendingAcquireCompleted, ally.id);
+  assertCompleted(pendingAcquireCompleted, ally.id, "Acquire");
+  assert.equal(pendingAcquireOwner.hand.at(-1)?.sourceId, spiceMustFlow.sourceId);
+  assert.equal(pendingAcquireOwner.resources.solari, pendingAcquireBefore.resources.solari + 3);
 
   const arrakeenContract = contractByName("Arrakeen I");
   const arrakeenTakePending = {

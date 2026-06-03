@@ -1140,7 +1140,7 @@ try {
   const contractRoomRecord = server.rooms.get(contractRoom.body.roomId);
   assert.ok(contractRoomRecord, "Contract fallback room should be stored in memory");
   const fallbackContractOwnerId = "p2";
-  const fallbackContract = contractByName("Acquire");
+  const fallbackContract = contractByName("Harvest 3+");
   const automatedContract = contractByName("Immediate");
   contractRoomRecord.game = {
     ...contractRoomRecord.game,

@@ -1,6 +1,7 @@
 import {
   addAcquiredCard,
   acquiredCardIdFor,
+  acquireMarketCard as acquireMarketCardBase,
   acquireCardPendingIsValid,
   acquireRewardParts,
   callToArmsRecruitOwner,
@@ -13,6 +14,7 @@ import {
   resolveAgentPayResourceForContracts,
   resolveCardAcquireEffects,
 } from "./effect-resolver";
+import { spiceMustFlowSourceId } from "./card-identifiers";
 import { drawCards, playerTroopSupply } from "./deck-utils";
 import { drawIntrigueCards } from "./intrigue-deck";
 import {
@@ -22,6 +24,7 @@ import {
 import { advancePendingAction, prependPendingAction } from "./pending-actions";
 import { recordTurnSpiceGain } from "./turn-trackers";
 import type {
+  Card,
   ContractCard,
   FactionId,
   GameState,
@@ -37,7 +40,8 @@ type PayResourceForContractsPendingAction = Extract<PendingAction, { kind: "pay-
 type FinishPendingResolution = (state: GameState) => GameState;
 type ContractCompletionCondition =
   | { kind: "immediate" }
-  | { kind: "board-space"; spaceId: string };
+  | { kind: "board-space"; spaceId: string }
+  | { kind: "acquire-card"; sourceId: number };
 type ContractCompletionReward = {
   resources?: Partial<Resources>;
   drawCards?: number;
@@ -71,6 +75,7 @@ const automatedContractCompletionSpecsBySourceId: Record<number, ContractComplet
   514: { condition: { kind: "board-space", spaceId: "spice-refinery" }, reward: { resources: { water: 1 } } },
   515: { condition: { kind: "board-space", spaceId: "high-council" }, reward: { resources: { solari: 3 } } },
   516: { condition: { kind: "board-space", spaceId: "high-council" }, reward: { influence: { bene: 1 } } },
+  517: { condition: { kind: "acquire-card", sourceId: spiceMustFlowSourceId }, reward: { resources: { solari: 3 } } },
   518: { condition: { kind: "board-space", spaceId: "deliver-supplies" }, reward: { resources: { solari: 3 } } },
 };
 
@@ -91,6 +96,9 @@ export function contractHasAutomatedCompletion(card: ContractCard) {
 function contractCompletionMatches(spec: ContractCompletionSpec, condition: ContractCompletionCondition) {
   if (spec.condition.kind !== condition.kind) return false;
   if (spec.condition.kind === "immediate" && condition.kind === "immediate") return true;
+  if (spec.condition.kind === "acquire-card" && condition.kind === "acquire-card") {
+    return spec.condition.sourceId === condition.sourceId;
+  }
   return spec.condition.kind === "board-space" &&
     condition.kind === "board-space" &&
     spec.condition.spaceId === condition.spaceId;
@@ -228,6 +236,38 @@ export function completeChoamContractsForBoardSpace(
   spaceId: string,
 ): ContractCompletionResult {
   return completeChoamContractsForCondition(state, ownerId, { kind: "board-space", spaceId });
+}
+
+export function completeChoamContractsForAcquiredCard(
+  state: GameState,
+  ownerId: string,
+  card: Card,
+): ContractCompletionResult {
+  return card.sourceId === undefined
+    ? { state, recruitedTroops: 0, completedContractIds: [] }
+    : completeChoamContractsForCondition(state, ownerId, { kind: "acquire-card", sourceId: card.sourceId });
+}
+
+export function acquireMarketCard(
+  state: GameState,
+  buyerId: string,
+  cardId: string,
+  callToArmsRecruitOwnerId?: string,
+): GameState {
+  const buyer = state.players[state.activeSeat];
+  const reserveCard = state.reserveMarket.find((card) => card.id === cardId);
+  const throneCard = state.throneRow.find((card) => card.id === cardId);
+  const rowCard = state.imperiumRow.find((card) => card.id === cardId);
+  const manipulatedCard = buyer?.manipulatedCards.find((card) => card.id === cardId);
+  const card = reserveCard ?? throneCard ?? rowCard ?? manipulatedCard;
+  const acquiredState = acquireMarketCardBase(state, buyerId, cardId, callToArmsRecruitOwnerId);
+  if (acquiredState === state || !buyer || !card) return acquiredState;
+
+  const acquisitionLog = acquiredState.log.find((log) => log.startsWith(`${buyer.leader} acquires ${card.name}`));
+  const contractCompletion = completeChoamContractsForAcquiredCard(acquiredState, buyerId, card);
+  return acquisitionLog
+    ? withPrimaryLogBeforeCompletionLogs(contractCompletion.state, acquisitionLog)
+    : contractCompletion.state;
 }
 
 function contractPaymentOptionalIsValid(pending: { optional?: unknown }) {
@@ -591,6 +631,8 @@ export function resolveAcquireCardForPending(
     ...acquireRewardParts(acquireReward),
     ...(recruitPart ? [recruitPart] : []),
   ]);
+  const actionLog =
+    `${owner.leader} acquires ${card.name} to their ${destinationText}${paymentText} from ${pending.source}${outcomeText}.`;
   const acquiredStateBase = recordAcquireSpiceGain({
     ...state,
     players,
@@ -599,16 +641,18 @@ export function resolveAcquireCardForPending(
     throneRow,
     ...advancePendingAction(state),
     log: [
-      `${owner.leader} acquires ${card.name} to their ${destinationText}${paymentText} from ${pending.source}${outcomeText}.`,
+      actionLog,
       ...state.log,
     ],
   }, owner.id, acquireReward);
   const acquiredState = drawAcquireIntrigues(acquiredStateBase, owner.id, card, acquireReward);
-  const pendingActions = pendingActionsForAcquireRewards(acquiredState, owner.id, card, acquiredCardId, acquireReward);
+  const contractCompletion = completeChoamContractsForAcquiredCard(acquiredState, owner.id, card);
+  const completedState = withPrimaryLogBeforeCompletionLogs(contractCompletion.state, actionLog);
+  const pendingActions = pendingActionsForAcquireRewards(completedState, owner.id, card, acquiredCardId, acquireReward);
   return finishPendingResolution(
     pendingActions.reduceRight(
       (nextState, pendingAction) => prependPendingAction(nextState, pendingAction),
-      acquiredState,
+      completedState,
     ),
   );
 }

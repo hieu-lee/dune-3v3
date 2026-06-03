@@ -57,6 +57,17 @@ function drawnCardsText(requested: number, actual: number) {
   return `draws ${actual} of ${requested} cards`;
 }
 
+function sourcePlayAreaVpReward(pending: TrashCardPendingAction, zone: TrashCardZone, cardId: string) {
+  const vpReward = pending.vpReward ?? 0;
+  if (vpReward <= 0) return 0;
+  return zone === "playArea" &&
+    pending.requiredCardId === cardId &&
+    pending.zones?.length === 1 &&
+    pending.zones[0] === "playArea"
+    ? vpReward
+    : 0;
+}
+
 export function advancePastUnresolvableMandatoryTrash(state: GameState): GameState {
   let nextState = state;
   while (nextState.pendingAction?.kind === "trash-card" && !nextState.pendingAction.optional) {
@@ -109,6 +120,7 @@ export function trashPlayerCard(
       ? pending.spiceReward
       : 0;
   const drawCardsReward = pending.drawCardsReward ?? 0;
+  const vpReward = sourcePlayAreaVpReward(pending, zone, card.id);
   let cardsDrawn = 0;
   const players = state.players.map((player) => {
     let nextPlayer = player;
@@ -119,6 +131,7 @@ export function trashPlayerCard(
           ...player.resources,
           spice: player.resources.spice + spiceReward,
         },
+        vp: player.vp + vpReward,
       };
       if (drawCardsReward > 0) {
         const handBeforeDraw = ownerAfterTrash.hand.length;
@@ -138,7 +151,7 @@ export function trashPlayerCard(
     players,
     ...advancePendingAction(state),
     log: [
-      `${owner.leader} trashes ${card.name} from ${pending.source}${spiceReward > 0 ? ` and gains ${spiceReward} spice` : ""}${strengthReward > 0 ? ` and adds ${strengthReward} strength` : ""}${drawCardsReward > 0 ? ` and ${drawnCardsText(drawCardsReward, cardsDrawn)}` : ""}.`,
+      `${owner.leader} trashes ${card.name} from ${pending.source}${spiceReward > 0 ? ` and gains ${spiceReward} spice` : ""}${vpReward > 0 ? ` and gains ${vpReward} VP` : ""}${strengthReward > 0 ? ` and adds ${strengthReward} strength` : ""}${drawCardsReward > 0 ? ` and ${drawnCardsText(drawCardsReward, cardsDrawn)}` : ""}.`,
       ...state.log,
     ],
   };

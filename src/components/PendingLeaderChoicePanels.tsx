@@ -383,6 +383,49 @@ export function PendingPayResourceForStrengthPanel({
   );
 }
 
+type PendingPayResourceForHighCouncilSeatPanelProps = {
+  cost: number;
+  onChoose: () => void;
+  onSkip: () => void;
+  owner?: Player;
+  persuasionCost: number;
+  persuasionReward: number;
+  resource: ResourceId;
+  source: string;
+};
+
+export function PendingPayResourceForHighCouncilSeatPanel({
+  cost,
+  onChoose,
+  onSkip,
+  owner,
+  persuasionCost,
+  persuasionReward,
+  resource,
+  source,
+}: PendingPayResourceForHighCouncilSeatPanelProps) {
+  const resourceLabel = resourceLabels[resource];
+  const canPay = Boolean(owner && owner.resources[resource] >= cost && owner.persuasion >= persuasionCost);
+  const persuasionText = [
+    persuasionCost > 0 ? `forgo ${persuasionCost} persuasion` : undefined,
+    persuasionReward > 0 ? `gain ${persuasionReward} persuasion` : undefined,
+  ].filter((part): part is string => Boolean(part));
+
+  return (
+    <div className="pending-controls">
+      {owner ? (
+        <button type="button" onClick={onChoose} disabled={!canPay}>
+          <CircleDollarSign size={15} />
+          Spend {cost} {resourceLabel}: take High Council seat{persuasionText.length > 0 ? `, ${persuasionText.join(", ")}` : ""}
+        </button>
+      ) : (
+        <span>{source} can no longer resolve with the current table state.</span>
+      )}
+      <button type="button" onClick={onSkip}>Skip</button>
+    </div>
+  );
+}
+
 type PendingPayResourceForInfluencePanelProps = {
   amount: number;
   cost: number;

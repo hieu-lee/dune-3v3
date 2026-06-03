@@ -475,13 +475,45 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
         }
         validateAmount(effect.drawCardsReward);
       }
+      if (effect.vpReward !== undefined) {
+        throw new Error(`Unsupported trash-card vpReward for ${trigger}`);
+      }
       return;
     }
-    if (effect.sourceOnly !== undefined) {
+    const revealSourceOnly = trigger === "reveal" && effect.sourceOnly === true;
+    if (effect.sourceOnly !== undefined && !revealSourceOnly) {
       throw new Error(`Unsupported trash-card sourceOnly for ${trigger}`);
     }
     if (effect.drawCardsReward !== undefined) {
       throw new Error(`Unsupported trash-card drawCardsReward for ${trigger}`);
+    }
+    if (effect.vpReward !== undefined && !revealSourceOnly) {
+      throw new Error(`Unsupported trash-card vpReward for ${trigger}`);
+    }
+    if (revealSourceOnly) {
+      if (!effect.zones || effect.zones.length !== 1 || effect.zones[0] !== "playArea") {
+        invalidSpecField("reveal source trash-card zones", effect.zones);
+      }
+      if (effect.excludeSource !== undefined) {
+        invalidSpecField("trash-card excludeSource", effect.excludeSource);
+      }
+      if (effect.requiredTrait !== undefined) {
+        invalidSpecField("trash-card requiredTrait", effect.requiredTrait);
+      }
+      if (effect.strengthReward !== undefined) {
+        throw new Error(`Unsupported trash-card strengthReward for ${trigger} sourceOnly`);
+      }
+      if (effect.spiceRewardCostThreshold !== undefined) {
+        throw new Error(`Unsupported trash-card spiceRewardCostThreshold for ${trigger} sourceOnly`);
+      }
+      if (effect.spiceReward !== undefined) {
+        throw new Error(`Unsupported trash-card spiceReward for ${trigger} sourceOnly`);
+      }
+      if (effect.vpReward === undefined) {
+        invalidSpecField("trash-card vpReward", effect.vpReward);
+      }
+      validatePositiveAmount("trash-card vpReward", effect.vpReward);
+      return;
     }
     if (trigger === "combat-intrigue" && effect.optional !== true) {
       invalidSpecField("combat trash-card optional", effect.optional);
@@ -807,6 +839,27 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     if (effect.persuasionCost !== undefined) validateAmount(effect.persuasionCost);
     validateOptionalTrue("pay-resource-for-sandworms optional", (effect as { optional?: unknown }).optional);
     validateOptionalBoolean("pay-resource-for-sandworms trashSource", (effect as { trashSource?: unknown }).trashSource);
+    return;
+  }
+  if (effect.kind === "pay-resource-for-high-council-seat") {
+    if (trigger !== "reveal") {
+      throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
+    }
+    if (effect.selector !== "self") {
+      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
+    if (!supportedResources.has(effect.resource)) {
+      throw new Error(`Unsupported effect resource "${effect.resource}"`);
+    }
+    validateSourceLabel("pay-resource-for-high-council-seat source", effect.source);
+    validatePositiveAmount("pay-resource-for-high-council-seat cost", effect.cost);
+    if (effect.persuasionCost !== undefined) {
+      validateAmount(effect.persuasionCost);
+    }
+    if (effect.persuasionReward !== undefined) {
+      validateAmount(effect.persuasionReward);
+    }
+    validateOptionalTrue("pay-resource-for-high-council-seat optional", (effect as { optional?: unknown }).optional);
     return;
   }
   if (effect.kind === "pay-resource-for-contracts") {

@@ -31,6 +31,7 @@ import {
   resolveLoseInfluenceForIntriguesChoice,
   resolveMakerChoice,
   resolveOptionalSpacePayment,
+  resolvePayResourceForHighCouncilSeatChoice,
   resolvePaidRewardChoice,
   resolvePendingActionChoice,
   resolvePayResourceForContractsChoice,
@@ -56,6 +57,7 @@ import {
   skipLoseInfluence,
   skipLoseInfluenceForIntrigues,
   skipOptionalSpacePayment,
+  skipPayResourceForHighCouncilSeat,
   skipPaidRewardChoice,
   skipPendingActionChoice,
   skipPayResourceForContracts,
@@ -214,6 +216,14 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     runPending("pay-resource-for-strength", (current, pending) => maybeStartCombatPhase(resolvePayResourceForStrengthChoice(current, pending)));
   const skipPayResourceForStrengthChoice = () =>
     runPending("pay-resource-for-strength", (current, pending) => maybeStartCombatPhase(skipPayResourceForStrength(current, pending)));
+  const choosePayResourceForHighCouncilSeat = () =>
+    runPending("pay-resource-for-high-council-seat", (current, pending) =>
+      maybeStartCombatPhase(resolvePayResourceForHighCouncilSeatChoice(current, pending))
+    );
+  const skipPayResourceForHighCouncilSeatChoice = () =>
+    runPending("pay-resource-for-high-council-seat", (current, pending) =>
+      maybeStartCombatPhase(skipPayResourceForHighCouncilSeat(current, pending))
+    );
   const choosePayResourceForTroops = () =>
     runPending("pay-resource-for-troops", (current, pending) => maybeStartCombatPhase(resolvePayResourceForTroopsChoice(current, pending)));
   const skipPayResourceForTroopsChoice = () =>
@@ -350,6 +360,7 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     chooseMakerReward,
     choosePayResourceForContracts,
     choosePayResourceForDrawCards,
+    choosePayResourceForHighCouncilSeat,
     choosePayResourceForInfluence,
     choosePayResourceForSandworms,
     choosePayResourceForStrength,
@@ -390,6 +401,7 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     skipPendingActionChoiceHandler,
     skipPayResourceForContractsChoice,
     skipPayResourceForDrawCardsChoice,
+    skipPayResourceForHighCouncilSeatChoice,
     skipPayResourceForInfluenceChoice,
     skipPayResourceForSandwormsChoice,
     skipPayResourceForStrengthChoice,

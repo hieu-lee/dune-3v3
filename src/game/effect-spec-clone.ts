@@ -90,6 +90,9 @@ export function cloneCardEffects(effects: CardEffectSpec[] | undefined): CardEff
         ...("drawCardsReward" in effect && effect.drawCardsReward !== undefined
           ? { drawCardsReward: cloneAmount(effect.drawCardsReward) }
           : {}),
+        ...("vpReward" in effect && effect.vpReward !== undefined
+          ? { vpReward: cloneAmount(effect.vpReward) }
+          : {}),
         ...("drawCards" in effect
           ? { drawCards: cloneAmount(effect.drawCards) }
           : {}),
@@ -101,6 +104,12 @@ export function cloneCardEffects(effects: CardEffectSpec[] | undefined): CardEff
           : {}),
         ...("influenceAmount" in effect
           ? { influenceAmount: cloneAmount(effect.influenceAmount) }
+          : {}),
+        ...("persuasionCost" in effect && effect.persuasionCost !== undefined
+          ? { persuasionCost: cloneAmount(effect.persuasionCost) }
+          : {}),
+        ...("persuasionReward" in effect && effect.persuasionReward !== undefined
+          ? { persuasionReward: cloneAmount(effect.persuasionReward) }
           : {}),
         ...("options" in effect
           ? { options: effect.options.map((option) => ({ ...option })) }

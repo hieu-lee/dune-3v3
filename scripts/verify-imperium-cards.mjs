@@ -375,6 +375,21 @@ try {
   );
   assert.match(corrinthCity.play, /Discard 2 cards.*spend 5 Solari.*gain 1 VP/i);
   assert.match(corrinthCity.reveal, /\+5 persuasion.*High Council/i);
+  assert.ok(
+    corrinthCity.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.effects.some((effect) =>
+        effect.kind === "pay-resource-for-high-council-seat" &&
+        effect.selector === "self" &&
+        effect.resource === "solari" &&
+        effect.cost === 5 &&
+        effect.persuasionCost === 5 &&
+        effect.persuasionReward === 2 &&
+        effect.source === "Corrinth City"
+      )
+    ),
+    "Corrinth City should model its paid High Council Reveal branch as a typed effect",
+  );
   assert.equal(
     corrinthCity.acquired,
     undefined,
@@ -403,6 +418,19 @@ try {
   );
   assert.match(deliveryAgreement.play, /Discard 1 card.*face-up CHOAM contract/i);
   assert.match(deliveryAgreement.reveal, /Gain 1 spice.*four or more contracts.*gain 1 VP/i);
+  assert.ok(
+    deliveryAgreement.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.conditions?.some((condition) => condition.kind === "has-completed-contracts" && condition.count === 4) &&
+      spec.effects.some((effect) =>
+        effect.kind === "trash-card" &&
+        effect.selector === "self" &&
+        effect.sourceOnly === true &&
+        effect.vpReward === 1
+      )
+    ),
+    "Delivery Agreement should model its completed-contract Reveal source-trash VP branch as a typed effect",
+  );
   assert.equal(
     deliveryAgreement.acquired,
     undefined,
@@ -2622,8 +2650,48 @@ try {
 
   const corrinthReveal = turnActions.revealTurnPlan({ ...p2, hand: [corrinthCity], highCouncilSeat: false }, game);
   assert.equal(corrinthReveal.persuasion, 5, "Corrinth City should resolve its typed +5 persuasion Reveal branch");
+  const corrinthRevealFixture = withActivePlayer(game, p2.id, () => ({
+    hand: [corrinthCity],
+    highCouncilSeat: false,
+    persuasion: 0,
+    playArea: [],
+    resources: { solari: 5, spice: 0, water: 0 },
+    revealed: false,
+  }));
+  const corrinthRevealActionPlan = turnActions.revealTurnPlan(playerById(corrinthRevealFixture, p2.id), corrinthRevealFixture);
+  const corrinthRevealed = turnActions.revealTurnAction(corrinthRevealFixture, {
+    commanderTargets: {},
+    revealPlan: corrinthRevealActionPlan,
+  });
+  assert.equal(corrinthRevealed.pendingAction?.kind, "pay-resource-for-high-council-seat", "Corrinth City should queue High Council payment on Reveal");
+  const corrinthCouncilPaid = state.resolvePayResourceForHighCouncilSeatChoice(corrinthRevealed, corrinthRevealed.pendingAction);
+  assert.equal(playerById(corrinthCouncilPaid, p2.id).highCouncilSeat, true, "Corrinth City Reveal payment should take High Council seat");
+  assert.equal(playerById(corrinthCouncilPaid, p2.id).resources.solari, 0, "Corrinth City Reveal payment should spend 5 Solari");
+  assert.equal(playerById(corrinthCouncilPaid, p2.id).persuasion, 2, "Corrinth City Reveal payment should leave the current High Council +2 persuasion");
   const deliveryReveal = turnActions.revealTurnPlan({ ...p2, hand: [deliveryAgreement], highCouncilSeat: false }, game);
   assert.equal(deliveryReveal.revealGain.spice, 1, "Delivery Agreement should resolve its typed Reveal spice reward");
+  const deliveryCompletedContracts = data.standardContracts.slice(0, 4).map((card, index) => ({
+    card,
+    completed: true,
+    takenRound: index + 1,
+  }));
+  const deliveryRevealFixture = withActivePlayer(game, p2.id, () => ({
+    contracts: deliveryCompletedContracts,
+    discard: [],
+    hand: [deliveryAgreement],
+    playArea: [],
+    resources: { solari: 0, spice: 0, water: 0 },
+    vp: 0,
+  }));
+  const deliveryRevealActionPlan = turnActions.revealTurnPlan(playerById(deliveryRevealFixture, p2.id), deliveryRevealFixture);
+  const deliveryRevealed = turnActions.revealTurnAction(deliveryRevealFixture, {
+    commanderTargets: {},
+    revealPlan: deliveryRevealActionPlan,
+  });
+  assert.equal(deliveryRevealed.pendingAction?.kind, "trash-card", "Delivery Agreement should queue completed-contract Reveal trash");
+  assert.equal(deliveryRevealed.pendingAction?.vpReward, 1, "Delivery Agreement Reveal trash should carry VP reward");
+  const deliveryVpTrashed = state.trashPlayerCard(deliveryRevealed, deliveryRevealed.pendingAction, "playArea", deliveryAgreement.id, 0);
+  assert.equal(playerById(deliveryVpTrashed, p2.id).vp, 1, "Delivery Agreement Reveal trash should gain 1 VP");
   const discardBase = data.allyStarterCards.find((card) => card.name === "Dagger");
   const discardBaseTwo = data.allyStarterCards.find((card) => card.name === "Convincing Argument");
   assert.ok(discardBase && discardBaseTwo, "Expected starter discard fixtures for discard-reward coverage");

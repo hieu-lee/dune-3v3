@@ -563,6 +563,46 @@ export async function runCardChoicesSmoke({
     "Corrinth City should discard both selected cards",
   );
 
+  await setDebugGameAndWait(page, states.corrinthCityHighCouncil);
+  pendingText = await page.locator(".pending-panel").innerText();
+  assert.match(pendingText, /Corrinth City/i);
+  assert.match(pendingText, /High Council seat/i);
+  assert.match(pendingText, /Spend 5 Solari/i);
+  assert.match(pendingText, /forgo 5 persuasion/i);
+  assert.match(pendingText, /gain 2 persuasion/i);
+  await screenshot(page, captures, "pending-corrinth-city-high-council.png");
+
+  before = await currentGame(page);
+  ownerBefore = before.players.find((player) => player.id === "p2");
+  await page.locator(".pending-panel").getByRole("button", { name: /Spend 5 Solari/ }).click();
+  await waitForNoPending(page);
+  after = await currentGame(page);
+  ownerAfter = after.players.find((player) => player.id === "p2");
+  assert.equal(ownerAfter.highCouncilSeat, true, "Corrinth City Reveal should take the High Council seat");
+  assert.equal(ownerAfter.resources.solari, ownerBefore.resources.solari - 5, "Corrinth City Reveal should spend 5 Solari");
+  assert.equal(ownerAfter.persuasion, 2, "Corrinth City Reveal should replace +5 persuasion with the current High Council +2");
+
+  await setDebugGameAndWait(page, states.deliveryAgreementRevealTrash);
+  pendingText = await page.locator(".pending-panel").innerText();
+  assert.match(pendingText, /Delivery Agreement/i);
+  assert.match(pendingText, /Trash reward: gain 1 VP/i);
+  assert.match(pendingText, /Skip/i);
+  await screenshot(page, captures, "pending-delivery-agreement-reveal-trash.png");
+
+  before = await currentGame(page);
+  ownerBefore = before.players.find((player) => player.id === "p2");
+  assert.equal(ownerBefore.resources.spice, 1, "Delivery Agreement should gain its Reveal spice before the VP trash choice");
+  await page.locator(".pending-panel").getByRole("button", { name: /Delivery Agreement \(in play\)/ }).click();
+  await waitForNoPending(page);
+  after = await currentGame(page);
+  ownerAfter = after.players.find((player) => player.id === "p2");
+  assert.equal(ownerAfter.vp, ownerBefore.vp + 1, "Delivery Agreement Reveal trash should gain 1 VP");
+  assert.equal(
+    ownerAfter.playArea.some((card) => card.id === before.pendingAction.requiredCardId),
+    false,
+    "Delivery Agreement Reveal trash should remove the source card from play",
+  );
+
   await setDebugGameAndWait(page, states.longLiveTheFighters);
   pendingText = await page.locator(".pending-panel").innerText();
   const longLiveDrawnName = states.longLiveTheFighters.longLiveDrawnName;
@@ -923,6 +963,8 @@ async function createCardChoiceStates(server, initialPlayableGame) {
   assert.ok(guildSpy, "Expected Guild Spy Imperium card");
   const corrinthCity = data.imperiumDeck.find((card) => card.sourceId === 69);
   assert.ok(corrinthCity, "Expected Corrinth City Imperium card");
+  const deliveryAgreement = data.imperiumDeck.find((card) => card.name === "Delivery Agreement");
+  assert.ok(deliveryAgreement, "Expected Delivery Agreement Imperium card");
   const longLiveTheFighters = data.imperiumDeck.find((card) => card.sourceId === 74);
   assert.ok(longLiveTheFighters, "Expected Long Live the Fighters Imperium card");
   const branchingPath = data.imperiumDeck.find((card) => card.sourceId === 45);
@@ -1332,6 +1374,85 @@ async function createCardChoiceStates(server, initialPlayableGame) {
   );
   assert.equal(corrinthCityState.pendingAction?.kind, "discard-cards-for-reward", "Expected Corrinth City discard-reward pending action");
   assert.equal(corrinthCityState.pendingAction.remaining, 2, "Expected Corrinth City to require two discards");
+  const corrinthCityRevealBase = {
+    ...base,
+    players: base.players.map((player) =>
+      player.id === ownerId
+        ? {
+            ...player,
+            agentsReady: 0,
+            discard: [],
+            hand: [corrinthCity],
+            highCouncilSeat: false,
+            persuasion: 0,
+            playArea: [],
+            resources: { solari: 5, spice: 0, water: 0 },
+            revealed: false,
+          }
+        : player,
+    ),
+  };
+  const corrinthCityRevealPlan = turnActions.revealTurnPlan(
+    corrinthCityRevealBase.players.find((player) => player.id === ownerId),
+    corrinthCityRevealBase,
+  );
+  const corrinthCityHighCouncilState = turnActions.revealTurnAction(corrinthCityRevealBase, {
+    commanderTargets: {},
+    revealPlan: corrinthCityRevealPlan,
+  });
+  assert.equal(
+    corrinthCityHighCouncilState.pendingAction?.kind,
+    "pay-resource-for-high-council-seat",
+    "Expected Corrinth City Reveal to queue High Council payment",
+  );
+  assert.equal(
+    corrinthCityHighCouncilState.players.find((player) => player.id === ownerId)?.persuasion,
+    5,
+    "Expected Corrinth City Reveal to add +5 persuasion before the High Council payment",
+  );
+  const deliveryCompletedContracts = data.standardContracts.slice(0, 4).map((card, index) => ({
+    card,
+    completed: true,
+    takenRound: index + 1,
+  }));
+  const deliveryAgreementRevealBase = {
+    ...base,
+    players: base.players.map((player) =>
+      player.id === ownerId
+        ? {
+            ...player,
+            contracts: deliveryCompletedContracts,
+            discard: [],
+            hand: [deliveryAgreement],
+            highCouncilSeat: false,
+            persuasion: 0,
+            playArea: [],
+            resources: { solari: 0, spice: 0, water: 0 },
+            revealed: false,
+            vp: 0,
+          }
+        : player,
+    ),
+  };
+  const deliveryAgreementRevealPlan = turnActions.revealTurnPlan(
+    deliveryAgreementRevealBase.players.find((player) => player.id === ownerId),
+    deliveryAgreementRevealBase,
+  );
+  const deliveryAgreementRevealTrashState = turnActions.revealTurnAction(deliveryAgreementRevealBase, {
+    commanderTargets: {},
+    revealPlan: deliveryAgreementRevealPlan,
+  });
+  assert.equal(
+    deliveryAgreementRevealTrashState.pendingAction?.kind,
+    "trash-card",
+    "Expected Delivery Agreement Reveal to queue source-card trash",
+  );
+  assert.equal(deliveryAgreementRevealTrashState.pendingAction.vpReward, 1, "Expected Delivery Agreement Reveal trash to carry VP reward");
+  assert.equal(
+    deliveryAgreementRevealTrashState.players.find((player) => player.id === ownerId)?.resources.spice,
+    1,
+    "Expected Delivery Agreement Reveal to gain spice before the VP trash choice",
+  );
   const longLiveTheFightersState = turnActions.placeAgentAction(
     {
       ...base,
@@ -2099,6 +2220,8 @@ async function createCardChoiceStates(server, initialPlayableGame) {
       corrinthDiscardTwoId: corrinthDiscardTwo.id,
       corrinthDiscardTwoName: corrinthDiscardTwo.name,
     },
+    corrinthCityHighCouncil: corrinthCityHighCouncilState,
+    deliveryAgreementRevealTrash: deliveryAgreementRevealTrashState,
     longLiveTheFighters: {
       ...longLiveTheFightersState,
       longLiveDiscardedId: longLiveDiscarded.id,

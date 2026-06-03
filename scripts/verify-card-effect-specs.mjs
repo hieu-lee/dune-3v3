@@ -3591,6 +3591,38 @@ try {
     "Corrinth City should carry its default +5 persuasion Reveal branch as a typed effect",
   );
   assert.ok(
+    hasRevealEffect(
+      corrinthCity,
+      (effect) =>
+        effect.kind === "pay-resource-for-high-council-seat" &&
+        effect.selector === "self" &&
+        effect.resource === "solari" &&
+        effect.cost === 5 &&
+        effect.persuasionCost === 5 &&
+        effect.persuasionReward === 2 &&
+        effect.optional === true &&
+        effect.source === "Corrinth City",
+    ),
+    "Corrinth City should carry its paid High Council Reveal branch as a typed effect",
+  );
+  assert.deepEqual(
+    effectResolver.resolveRevealPayResourceForHighCouncilSeats(corrinthCity.effects, {
+      trigger: "reveal",
+      source: p2,
+      state: game,
+    }),
+    [{
+      selector: "self",
+      resource: "solari",
+      cost: 5,
+      optional: true,
+      persuasionCost: 5,
+      persuasionReward: 2,
+      source: "Corrinth City",
+    }],
+    "Corrinth City should resolve its paid High Council Reveal branch through the typed pending resolver",
+  );
+  assert.ok(
     hasAgentEffect(
       deliveryAgreement,
       (effect) =>
@@ -3609,6 +3641,22 @@ try {
       (effect) => effect.kind === "gain-resource" && effect.selector === "self" && effect.resource === "spice" && effect.amount === 1,
     ),
     "Delivery Agreement should carry its default Reveal spice reward as a typed effect",
+  );
+  assert.ok(
+    deliveryAgreement.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.conditions?.some((condition) => condition.kind === "has-completed-contracts" && condition.count === 4) &&
+      spec.effects.some((effect) =>
+        effect.kind === "trash-card" &&
+        effect.selector === "self" &&
+        effect.sourceOnly === true &&
+        effect.zones?.length === 1 &&
+        effect.zones[0] === "playArea" &&
+        effect.vpReward === 1 &&
+        effect.optional === true
+      )
+    ),
+    "Delivery Agreement should carry its completed-contract source-trash VP Reveal branch as a typed effect",
   );
   assert.equal(corrinthCity.acquired, undefined, "Corrinth City VP should be modeled by its typed Agent effect");
   assert.equal(deliveryAgreement.acquired, undefined, "Delivery Agreement's conditional Reveal VP should not be treated as an acquire bonus");
@@ -4906,6 +4954,17 @@ try {
     ],
     "Corrinth City should model its Agent discard-cost VP reward as a typed effect",
   );
+  assert.ok(
+    hasRevealEffect(corrinthCity, (effect) =>
+      effect.kind === "pay-resource-for-high-council-seat" &&
+      effect.resource === "solari" &&
+      effect.cost === 5 &&
+      effect.persuasionCost === 5 &&
+      effect.persuasionReward === 2 &&
+      effect.source === "Corrinth City"
+    ),
+    "Corrinth City should model its paid High Council Reveal branch as a typed effect",
+  );
   assert.equal(
     deliveryAgreement.play,
     "Discard 1 card to take a face-up CHOAM contract.",
@@ -4933,6 +4992,18 @@ try {
       ]),
     ],
     "Delivery Agreement should model its Agent discard-contract reward as a typed effect",
+  );
+  assert.ok(
+    deliveryAgreement.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.conditions?.some((condition) => condition.kind === "has-completed-contracts" && condition.count === 4) &&
+      spec.effects.some((effect) =>
+        effect.kind === "trash-card" &&
+        effect.sourceOnly === true &&
+        effect.vpReward === 1
+      )
+    ),
+    "Delivery Agreement should model its completed-contract Reveal source-trash VP branch as a typed effect",
   );
   assert.equal(
     longLiveTheFighters.play,
@@ -6901,6 +6972,28 @@ try {
     /Unsupported trash-card drawCardsReward for agent-play without sourceOnly/,
     "Agent selected trash-card specs should reject draw rewards until reward-bearing selected trash is supported",
   );
+  const invalidAgentTrashVpRewardCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-agent-trash-vp-reward-card",
+    name: "Effect Spec Invalid Agent Trash VP Reward",
+    effects: [agentSpec([{
+      kind: "trash-card",
+      selector: "self",
+      optional: true,
+      zones: ["playArea"],
+      sourceOnly: true,
+      vpReward: 1,
+    }])],
+  };
+  assert.throws(
+    () => effectResolver.resolveTrashCardEffects(invalidAgentTrashVpRewardCard.effects, {
+      trigger: "agent-play",
+      source: p2,
+      state: game,
+    }),
+    /Unsupported trash-card vpReward for agent-play/,
+    "Agent source trash-card specs should reject VP rewards until that pending path carries them explicitly",
+  );
   const invalidTrashOptionalCard = {
     ...convincingArgument,
     id: "effect-spec-invalid-trash-optional-card",
@@ -7019,6 +7112,52 @@ try {
     () => turnActions.revealTurnPlan({ ...p2, hand: [invalidRevealTrashDrawRewardCard], highCouncilSeat: false }),
     /Unsupported trash-card drawCardsReward for reveal/,
     "Trash-card draw rewards should stay scoped to Agent source trash until other pending paths support them",
+  );
+  const invalidRevealSourceTrashMissingVpCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-reveal-source-trash-missing-vp-card",
+    name: "Effect Spec Invalid Reveal Source Trash Missing VP",
+    effects: [revealSpec([{
+      kind: "trash-card",
+      selector: "self",
+      optional: true,
+      sourceOnly: true,
+      zones: ["playArea"],
+    }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [invalidRevealSourceTrashMissingVpCard], highCouncilSeat: false }),
+    /Invalid trash-card vpReward "undefined"/,
+    "Reveal source trash-card specs should require an explicit VP reward",
+  );
+  const invalidRevealSourceTrashZoneCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-reveal-source-trash-zone-card",
+    name: "Effect Spec Invalid Reveal Source Trash Zone",
+    effects: [revealSpec([{
+      kind: "trash-card",
+      selector: "self",
+      optional: true,
+      sourceOnly: true,
+      zones: ["hand"],
+      vpReward: 1,
+    }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [invalidRevealSourceTrashZoneCard], highCouncilSeat: false }),
+    /Invalid reveal source trash-card zones "hand"/,
+    "Reveal source trash-card specs should only target the source card in play",
+  );
+  const invalidRevealSelectedTrashVpCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-reveal-selected-trash-vp-card",
+    name: "Effect Spec Invalid Reveal Selected Trash VP",
+    effects: [revealSpec([{ kind: "trash-card", selector: "self", optional: true, vpReward: 1 }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [invalidRevealSelectedTrashVpCard], highCouncilSeat: false }),
+    /Unsupported trash-card vpReward for reveal/,
+    "Reveal selected trash-card specs should reject VP rewards until that path is explicitly modeled",
   );
   const agentInfluenceIntrigueCard = {
     ...convincingArgument,
@@ -7194,6 +7333,152 @@ try {
   );
   assert.equal(playerById(selfPayResolved, p2.id).resources.spice, 0, "Self resource-for-strength should spend the owner resource");
   assert.equal(playerById(selfPayResolved, p2.id).conflict, 5, "Self resource-for-strength should add strength to the same player");
+  const agentPayResourceHighCouncilCard = {
+    ...convincingArgument,
+    id: "effect-spec-agent-pay-resource-high-council-card",
+    name: "Effect Spec Agent Pay Resource High Council",
+    effects: [agentSpec([{
+      kind: "pay-resource-for-high-council-seat",
+      selector: "self",
+      resource: "solari",
+      cost: 5,
+      optional: true,
+      source: "Agent High Council",
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(agentPayResourceHighCouncilCard, p2, p2),
+    /Unsupported effect "pay-resource-for-high-council-seat" for agent-play/,
+    "High Council payment specs should stay in Reveal until other triggers support that timing",
+  );
+  const invalidPayResourceHighCouncilSelectorCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-pay-resource-high-council-selector-card",
+    name: "Effect Spec Invalid Pay Resource High Council Selector",
+    effects: [revealSpec([{
+      kind: "pay-resource-for-high-council-seat",
+      selector: "activated-ally",
+      resource: "solari",
+      cost: 5,
+      optional: true,
+      source: "High Council Selector",
+    }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [invalidPayResourceHighCouncilSelectorCard], highCouncilSeat: false }),
+    /Unsupported effect selector "activated-ally" for reveal/,
+    "High Council payment specs should reject activated Ally reveal selectors",
+  );
+  const invalidPayResourceHighCouncilResourceCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-pay-resource-high-council-resource-card",
+    name: "Effect Spec Invalid Pay Resource High Council Resource",
+    effects: [revealSpec([{
+      kind: "pay-resource-for-high-council-seat",
+      selector: "self",
+      resource: "melange",
+      cost: 5,
+      optional: true,
+      source: "High Council Resource",
+    }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [invalidPayResourceHighCouncilResourceCard], highCouncilSeat: false }),
+    /Unsupported effect resource "melange"/,
+    "High Council payment specs should reject unsupported resource ids",
+  );
+  const invalidPayResourceHighCouncilCostCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-pay-resource-high-council-cost-card",
+    name: "Effect Spec Invalid Pay Resource High Council Cost",
+    effects: [revealSpec([{
+      kind: "pay-resource-for-high-council-seat",
+      selector: "self",
+      resource: "solari",
+      cost: 0,
+      optional: true,
+      source: "High Council Cost",
+    }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [invalidPayResourceHighCouncilCostCard], highCouncilSeat: false }),
+    /Invalid pay-resource-for-high-council-seat cost "0"/,
+    "High Council payment specs should require a positive resource cost",
+  );
+  const invalidPayResourceHighCouncilSourceCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-pay-resource-high-council-source-card",
+    name: "Effect Spec Invalid Pay Resource High Council Source",
+    effects: [revealSpec([{
+      kind: "pay-resource-for-high-council-seat",
+      selector: "self",
+      resource: "solari",
+      cost: 5,
+      optional: true,
+      source: "",
+    }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [invalidPayResourceHighCouncilSourceCard], highCouncilSeat: false }),
+    /Invalid pay-resource-for-high-council-seat source ""/,
+    "High Council payment specs should reject empty source labels",
+  );
+  const invalidPayResourceHighCouncilOptionalCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-pay-resource-high-council-optional-card",
+    name: "Effect Spec Invalid Pay Resource High Council Optional",
+    effects: [revealSpec([{
+      kind: "pay-resource-for-high-council-seat",
+      selector: "self",
+      resource: "solari",
+      cost: 5,
+      optional: false,
+      source: "High Council Optional",
+    }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [invalidPayResourceHighCouncilOptionalCard], highCouncilSeat: false }),
+    /Invalid pay-resource-for-high-council-seat optional "false"/,
+    "High Council payment specs should stay optional so queued payments cannot deadlock if resources change",
+  );
+  const invalidPayResourceHighCouncilPersuasionCostCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-pay-resource-high-council-persuasion-cost-card",
+    name: "Effect Spec Invalid Pay Resource High Council Persuasion Cost",
+    effects: [revealSpec([{
+      kind: "pay-resource-for-high-council-seat",
+      selector: "self",
+      resource: "solari",
+      cost: 5,
+      optional: true,
+      persuasionCost: -1,
+      source: "High Council Persuasion Cost",
+    }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [invalidPayResourceHighCouncilPersuasionCostCard], highCouncilSeat: false }),
+    /Invalid effect amount "-1"/,
+    "High Council payment specs should require non-negative persuasion replacement costs",
+  );
+  const invalidPayResourceHighCouncilPersuasionRewardCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-pay-resource-high-council-persuasion-reward-card",
+    name: "Effect Spec Invalid Pay Resource High Council Persuasion Reward",
+    effects: [revealSpec([{
+      kind: "pay-resource-for-high-council-seat",
+      selector: "self",
+      resource: "solari",
+      cost: 5,
+      optional: true,
+      persuasionReward: -1,
+      source: "High Council Persuasion Reward",
+    }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [invalidPayResourceHighCouncilPersuasionRewardCard], highCouncilSeat: false }),
+    /Invalid effect amount "-1"/,
+    "High Council payment specs should require non-negative persuasion rewards",
+  );
   const agentPayResourceTroopsCard = {
     ...convincingArgument,
     id: "effect-spec-agent-pay-resource-troops-card",
@@ -8446,6 +8731,24 @@ try {
     ),
     /Invalid pending-action-choice trash requiredTrait ""/,
     "Pending action choice trash branches should reject empty required traits",
+  );
+  assert.throws(
+    () => state.applyCardAgentEffect(
+      pendingActionChoiceCard(
+        "effect-spec-invalid-pending-action-choice-trash-vp-reward-card",
+        pendingActionChoiceEffect({
+          options: [{
+            id: "trash",
+            label: "Trash card for VP",
+            effect: { kind: "trash-card", selector: "self", optional: false, zones: ["hand"], vpReward: 1 },
+          }],
+        }),
+      ),
+      p4,
+      p6,
+    ),
+    /Unsupported pending-action-choice trash vpReward/,
+    "Pending action choice trash branches should reject VP rewards until that nested pending path carries them explicitly",
   );
   assert.throws(
     () => state.applyCardAgentEffect(
@@ -10439,11 +10742,210 @@ try {
     game,
   );
   assert.equal(corrinthReveal.persuasion, 5, "Corrinth City should resolve its default +5 persuasion Reveal branch");
+  const corrinthRevealFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 0,
+    discard: [],
+    hand: [corrinthCity],
+    highCouncilSeat: false,
+    persuasion: 0,
+    playArea: [],
+    resources: { solari: 5, spice: 0, water: 0 },
+    revealed: false,
+  }));
+  const corrinthRevealActionPlan = turnActions.revealTurnPlan(
+    playerById(corrinthRevealFixture, p2.id),
+    corrinthRevealFixture,
+  );
+  const corrinthRevealed = turnActions.revealTurnAction(corrinthRevealFixture, {
+    commanderTargets: {},
+    revealPlan: corrinthRevealActionPlan,
+  });
+  assert.deepEqual(
+    corrinthRevealed.pendingAction,
+    {
+      kind: "pay-resource-for-high-council-seat",
+      ownerId: p2.id,
+      resource: "solari",
+      cost: 5,
+      optional: true,
+      persuasionCost: 5,
+      persuasionReward: 2,
+      source: "Corrinth City",
+      cardId: corrinthCity.id,
+    },
+    "Corrinth City should queue its paid High Council Reveal branch",
+  );
+  assert.equal(playerById(corrinthRevealed, p2.id).persuasion, 5, "Corrinth City should add +5 persuasion before branch payment");
+  const corrinthCouncilPaid = state.resolvePayResourceForHighCouncilSeatChoice(
+    corrinthRevealed,
+    corrinthRevealed.pendingAction,
+  );
+  assert.equal(corrinthCouncilPaid.pendingAction, undefined, "Corrinth City High Council payment should resolve its pending action");
+  assert.equal(playerById(corrinthCouncilPaid, p2.id).resources.solari, 0, "Corrinth City High Council branch should spend 5 Solari");
+  assert.equal(playerById(corrinthCouncilPaid, p2.id).highCouncilSeat, true, "Corrinth City High Council branch should take a seat");
+  assert.equal(
+    playerById(corrinthCouncilPaid, p2.id).persuasion,
+    2,
+    "Corrinth City High Council branch should replace +5 persuasion with the current High Council +2",
+  );
+  assert.match(corrinthCouncilPaid.log[0], /spends 5 Solari.*takes a High Council seat.*gains 2 persuasion/i);
+  const corrinthCouncilSkipped = state.skipPayResourceForHighCouncilSeat(
+    corrinthRevealed,
+    corrinthRevealed.pendingAction,
+  );
+  assert.equal(playerById(corrinthCouncilSkipped, p2.id).resources.solari, 5, "Skipping Corrinth City High Council should keep Solari");
+  assert.equal(playerById(corrinthCouncilSkipped, p2.id).persuasion, 5, "Skipping Corrinth City High Council should keep +5 persuasion");
+  assert.equal(playerById(corrinthCouncilSkipped, p2.id).highCouncilSeat, false, "Skipping Corrinth City High Council should not take a seat");
+  const { cardId: _corrinthHighCouncilCardId, ...corrinthMissingCardPending } = corrinthRevealed.pendingAction;
+  const corrinthMissingCardIdState = {
+    ...corrinthRevealed,
+    pendingAction: corrinthMissingCardPending,
+    pendingQueue: [],
+  };
+  const corrinthMissingCardIdResolved = state.resolvePayResourceForHighCouncilSeatChoice(
+    corrinthMissingCardIdState,
+    corrinthMissingCardIdState.pendingAction,
+  );
+  assert.equal(
+    playerById(corrinthMissingCardIdResolved, p2.id).highCouncilSeat,
+    false,
+    "Corrinth City High Council payment should reject malformed pendings without a source card id",
+  );
+  assert.equal(
+    playerById(corrinthMissingCardIdResolved, p2.id).resources.solari,
+    5,
+    "Malformed Corrinth City High Council payment should not spend Solari",
+  );
+  const corrinthFullCouncilFixture = {
+    ...corrinthRevealFixture,
+    players: corrinthRevealFixture.players.map((player) =>
+      ["p1", "p3", "p4", "p5"].includes(player.id)
+        ? { ...player, highCouncilSeat: true }
+        : player.id === p2.id
+          ? { ...player, highCouncilSeat: false }
+          : player
+    ),
+  };
+  const corrinthFullCouncilPlan = turnActions.revealTurnPlan(
+    playerById(corrinthFullCouncilFixture, p2.id),
+    corrinthFullCouncilFixture,
+  );
+  const corrinthFullCouncilRevealed = turnActions.revealTurnAction(corrinthFullCouncilFixture, {
+    commanderTargets: {},
+    revealPlan: corrinthFullCouncilPlan,
+  });
+  assert.equal(corrinthFullCouncilRevealed.pendingAction, undefined, "Corrinth City should not queue High Council payment when seats are full");
   const deliveryReveal = turnActions.revealTurnPlan(
     { ...p2, hand: [deliveryAgreement], highCouncilSeat: false },
     game,
   );
   assert.equal(deliveryReveal.revealGain.spice, 1, "Delivery Agreement should resolve its default Reveal spice reward");
+  const deliveryCompletedContracts = data.standardContracts.slice(0, 4).map((card, index) => ({
+    card,
+    completed: true,
+    takenRound: index + 1,
+  }));
+  const deliveryRevealFixture = withActivePlayer(game, p2.id, () => ({
+    contracts: deliveryCompletedContracts,
+    discard: [],
+    hand: [deliveryAgreement],
+    highCouncilSeat: false,
+    persuasion: 0,
+    playArea: [],
+    resources: { solari: 0, spice: 0, water: 0 },
+    revealed: false,
+    vp: 0,
+  }));
+  const deliveryRevealActionPlan = turnActions.revealTurnPlan(
+    playerById(deliveryRevealFixture, p2.id),
+    deliveryRevealFixture,
+  );
+  const deliveryRevealed = turnActions.revealTurnAction(deliveryRevealFixture, {
+    commanderTargets: {},
+    revealPlan: deliveryRevealActionPlan,
+  });
+  assert.deepEqual(
+    deliveryRevealed.pendingAction,
+    {
+      kind: "trash-card",
+      ownerId: p2.id,
+      source: "Delivery Agreement",
+      optional: true,
+      zones: ["playArea"],
+      requiredCardId: deliveryAgreement.id,
+      vpReward: 1,
+    },
+    "Delivery Agreement should queue its completed-contract Reveal source-trash VP branch",
+  );
+  assert.equal(playerById(deliveryRevealed, p2.id).resources.spice, 1, "Delivery Agreement should gain Reveal spice before optional trash");
+  const deliveryVpTrashed = state.trashPlayerCard(
+    deliveryRevealed,
+    deliveryRevealed.pendingAction,
+    "playArea",
+    deliveryAgreement.id,
+    0,
+  );
+  assert.equal(deliveryVpTrashed.pendingAction, undefined, "Delivery Agreement Reveal trash should resolve its pending action");
+  assert.equal(playerById(deliveryVpTrashed, p2.id).vp, 1, "Delivery Agreement Reveal trash should gain 1 VP");
+  assert.equal(
+    playerById(deliveryVpTrashed, p2.id).playArea.some((card) => card.id === deliveryAgreement.id),
+    false,
+    "Delivery Agreement Reveal trash should remove the source card from play",
+  );
+  const deliveryVpSkipped = state.skipTrashCard(deliveryRevealed, deliveryRevealed.pendingAction);
+  assert.equal(playerById(deliveryVpSkipped, p2.id).vp, 0, "Skipping Delivery Agreement Reveal trash should not gain VP");
+  assert.equal(
+    playerById(deliveryVpSkipped, p2.id).playArea.some((card) => card.id === deliveryAgreement.id),
+    true,
+    "Skipping Delivery Agreement Reveal trash should leave the source card in play",
+  );
+  const malformedVpTrashPending = {
+    kind: "trash-card",
+    ownerId: p2.id,
+    source: "Malformed VP Trash",
+    optional: true,
+    zones: ["hand"],
+    vpReward: 1,
+  };
+  const malformedVpTrashFixture = {
+    ...withActivePlayer(game, p2.id, () => ({
+      discard: [],
+      hand: [dagger],
+      playArea: [],
+      vp: 0,
+    })),
+    pendingAction: malformedVpTrashPending,
+    pendingQueue: [],
+  };
+  const malformedVpTrashResolved = state.trashPlayerCard(
+    malformedVpTrashFixture,
+    malformedVpTrashPending,
+    "hand",
+    dagger.id,
+    0,
+  );
+  assert.equal(
+    playerById(malformedVpTrashResolved, p2.id).vp,
+    0,
+    "Trash-card VP rewards should only apply to source-card play-area trash pendings",
+  );
+  const deliveryUndercontractedFixture = withActivePlayer(game, p2.id, () => ({
+    contracts: deliveryCompletedContracts.slice(0, 3),
+    hand: [deliveryAgreement],
+    highCouncilSeat: false,
+    playArea: [],
+    resources: { solari: 0, spice: 0, water: 0 },
+    vp: 0,
+  }));
+  const deliveryUndercontractedPlan = turnActions.revealTurnPlan(
+    playerById(deliveryUndercontractedFixture, p2.id),
+    deliveryUndercontractedFixture,
+  );
+  const deliveryUndercontractedRevealed = turnActions.revealTurnAction(deliveryUndercontractedFixture, {
+    commanderTargets: {},
+    revealPlan: deliveryUndercontractedPlan,
+  });
+  assert.equal(deliveryUndercontractedRevealed.pendingAction, undefined, "Delivery Agreement should not queue Reveal trash below four completed contracts");
   const corrinthAcquireReplacement = data.imperiumDeck.find((card) => card.id !== corrinthCity.id);
   const deliveryAcquireReplacement = data.imperiumDeck.find((card) => card.id !== deliveryAgreement.id);
   assert.ok(corrinthAcquireReplacement && deliveryAcquireReplacement, "Expected Imperium Row replacements for discard-reward acquisition coverage");

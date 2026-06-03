@@ -76,12 +76,29 @@ try {
     cardId: "desert-call",
     source: "Desert Call",
   };
+  const corrinthCityPending = {
+    kind: "pay-resource-for-high-council-seat",
+    ownerId: "p2",
+    resource: "solari",
+    cost: 5,
+    optional: true,
+    persuasionCost: 5,
+    persuasionReward: 2,
+    source: "Corrinth City",
+    cardId: "corrinth-city",
+  };
   assert.equal(app.pendingLocksTableState(deployPending), false, "Deploy pending alone should not lock table toggles");
   assert.equal(app.pendingLocksTableState(desertCallPending), true, "Desert Call pending should lock table toggles");
+  assert.equal(app.pendingLocksTableState(corrinthCityPending), true, "Corrinth City High Council pending should lock table toggles");
   assert.equal(
     app.tableStateLockedByPendingActions({ pendingAction: deployPending, pendingQueue: [desertCallPending] }),
     true,
     "Queued Desert Call should lock table toggles while earlier pending actions resolve",
+  );
+  assert.equal(
+    app.tableStateLockedByPendingActions({ pendingAction: deployPending, pendingQueue: [corrinthCityPending] }),
+    true,
+    "Queued Corrinth City High Council payment should lock table toggles while earlier pending actions resolve",
   );
   assert.equal(
     app.tableStateLockedByPendingActions({ pendingAction: deployPending, pendingQueue: [] }),

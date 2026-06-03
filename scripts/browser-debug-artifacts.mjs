@@ -71,6 +71,8 @@ const generatedScreenshotNames = [
   "pending-guild-envoy-discard-draw.png",
   "pending-guild-spy-discard-draw.png",
   "pending-corrinth-city-discard-reward.png",
+  "pending-corrinth-city-high-council.png",
+  "pending-delivery-agreement-reveal-trash.png",
   "pending-long-live-top-deck.png",
   "pending-long-live-top-deck-mobile.png",
   "pending-long-live-top-deck-selected.png",

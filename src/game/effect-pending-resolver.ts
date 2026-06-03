@@ -37,6 +37,7 @@ import type {
   PlotDeployTroops,
   PlotSummonSandworms,
   RevealLoseInfluenceForIntrigues,
+  RevealPayResourceForHighCouncilSeat,
   RevealPayResourceForSandworms,
   RevealPayResourceForStrength,
   RevealPayResourceForTroops,
@@ -143,6 +144,7 @@ export function resolveTrashCardEffects(
         drawCardsReward: effect.drawCardsReward === undefined
           ? undefined
           : amountFor(effect.drawCardsReward, context.source),
+        vpReward: effect.vpReward === undefined ? undefined : amountFor(effect.vpReward, context.source),
       }));
   });
 }
@@ -237,6 +239,28 @@ export function resolveRevealPayResourceForSandworms(
         optional: true,
         trashSource: effect.trashSource ?? false,
         persuasionCost: effect.persuasionCost !== undefined ? amountFor(effect.persuasionCost, context.source) : 0,
+        source: effect.source,
+      }));
+  });
+}
+
+export function resolveRevealPayResourceForHighCouncilSeats(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): RevealPayResourceForHighCouncilSeat[] {
+  specs?.forEach(validateSpec);
+  return (specs ?? []).flatMap((spec) => {
+    if (spec.trigger !== "reveal") return [];
+    if (!specApplies(spec, context)) return [];
+    return spec.effects
+      .filter((effect) => effect.kind === "pay-resource-for-high-council-seat")
+      .map((effect) => ({
+        selector: effect.selector,
+        resource: effect.resource,
+        cost: amountFor(effect.cost, context.source),
+        optional: true,
+        persuasionCost: effect.persuasionCost === undefined ? 0 : amountFor(effect.persuasionCost, context.source),
+        persuasionReward: effect.persuasionReward === undefined ? 0 : amountFor(effect.persuasionReward, context.source),
         source: effect.source,
       }));
   });

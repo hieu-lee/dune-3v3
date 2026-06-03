@@ -3,11 +3,16 @@ import {
   playerHasConflictUnits,
 } from "./conflict-rules";
 import {
+  canPay,
+  highCouncilSeatsTaken,
+} from "./board-rules";
+import {
   playerTroopSupply,
 } from "./deck-utils";
 import {
   resolveCardEffects,
   resolveRevealLoseInfluenceForIntrigues,
+  resolveRevealPayResourceForHighCouncilSeats,
   resolveRevealPayResourceForSandworms,
   resolveRevealPayResourceForStrengths,
   resolveRevealPayResourceForTroops,
@@ -236,8 +241,42 @@ function pendingActionsForRevealTrashCards(
         spiceRewardCostThreshold: effect.spiceRewardCostThreshold,
       } : {}),
       ...(effect.spiceReward !== undefined ? { spiceReward: effect.spiceReward } : {}),
+      ...(effect.vpReward !== undefined ? { vpReward: effect.vpReward } : {}),
+      ...(effect.sourceOnly ? { zones: ["playArea"], requiredCardId: card.id } : {}),
     };
     return trashableCardsForPending(source, pending).length > 0 ? [pending] : [];
+  });
+}
+
+function pendingActionsForRevealPayResourceForHighCouncilSeat(
+  card: Card,
+  source: Player,
+  state: GameState,
+): PendingAction[] {
+  if (!card.effects || !source.playArea.some((candidate) => candidate.id === card.id)) return [];
+  if (source.highCouncilSeat || highCouncilSeatsTaken(state.players) >= 4) return [];
+
+  return resolveRevealPayResourceForHighCouncilSeats(card.effects, {
+    trigger: "reveal",
+    source,
+    state,
+  }).flatMap((effect) => {
+    if (effect.selector !== "self" || effect.cost <= 0 || effect.persuasionCost < 0 || effect.persuasionReward < 0) {
+      return [];
+    }
+    if (!canPay(source, { [effect.resource]: effect.cost })) return [];
+    if (source.persuasion < effect.persuasionCost) return [];
+    return [{
+      kind: "pay-resource-for-high-council-seat",
+      ownerId: source.id,
+      resource: effect.resource,
+      cost: effect.cost,
+      optional: effect.optional,
+      persuasionCost: effect.persuasionCost,
+      persuasionReward: effect.persuasionReward,
+      source: effect.source ?? card.name,
+      cardId: card.id,
+    }];
   });
 }
 
@@ -309,6 +348,9 @@ export function pendingActionsForReveal(
   const payResourceSandwormPendings = revealedCards.flatMap((card) =>
     pendingActionsForRevealPayResourceForSandworms(card, source, state, combatRecipientId)
   );
+  const payResourceHighCouncilSeatPendings = revealedCards.flatMap((card) =>
+    pendingActionsForRevealPayResourceForHighCouncilSeat(card, source, state)
+  );
   const influenceIntriguePendings = revealedCards.flatMap((card) =>
     pendingActionsForRevealInfluenceIntrigues(card, source, state, combatRecipientId)
   );
@@ -324,6 +366,7 @@ export function pendingActionsForReveal(
     ...payResourceStrengthPendings,
     ...payResourceTroopPendings,
     ...payResourceSandwormPendings,
+    ...payResourceHighCouncilSeatPendings,
     ...influenceIntriguePendings,
     ...retreatTroopStrengthPendings,
     ...leaderAbilityPendings,

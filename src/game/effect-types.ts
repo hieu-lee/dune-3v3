@@ -289,6 +289,7 @@ export type GameEffectSpec =
       spiceRewardCostThreshold?: EffectAmountSpec;
       spiceReward?: EffectAmountSpec;
       drawCardsReward?: EffectAmountSpec;
+      vpReward?: EffectAmountSpec;
     }
   | {
       kind: "lose-influence-for-intrigues";
@@ -347,6 +348,16 @@ export type GameEffectSpec =
       optional?: true;
       trashSource?: boolean;
       persuasionCost?: EffectAmountSpec;
+      source?: string;
+    }
+  | {
+      kind: "pay-resource-for-high-council-seat";
+      selector: PlayerSelector;
+      resource: ResourceId;
+      cost: EffectAmountSpec;
+      optional?: true;
+      persuasionCost?: EffectAmountSpec;
+      persuasionReward?: EffectAmountSpec;
       source?: string;
     }
   | {

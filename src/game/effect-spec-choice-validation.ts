@@ -171,6 +171,9 @@ export function validatePendingActionChoiceEffect(effect: PendingActionChoiceEff
       ) {
         invalidSpecField("pending-action-choice trash requiredTrait", option.effect.requiredTrait);
       }
+      if ((option.effect as { vpReward?: unknown }).vpReward !== undefined) {
+        throw new Error("Unsupported pending-action-choice trash vpReward");
+      }
       if (option.effect.spiceRewardCostThreshold !== undefined) validateAmount(option.effect.spiceRewardCostThreshold);
       if (option.effect.spiceReward !== undefined) validateAmount(option.effect.spiceReward);
       validateSourceLabel("pending-action-choice trash source", option.effect.source);

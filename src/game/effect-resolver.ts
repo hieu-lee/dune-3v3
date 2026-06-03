@@ -72,6 +72,7 @@ export type {
   PlotDeployTroops,
   PlotSummonSandworms,
   RevealLoseInfluenceForIntrigues,
+  RevealPayResourceForHighCouncilSeat,
   RevealPayResourceForSandworms,
   RevealPayResourceForStrength,
   RevealPayResourceForTroops,
@@ -393,6 +394,9 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
     return result;
   }
   if (effect.kind === "pay-resource-for-sandworms") {
+    return result;
+  }
+  if (effect.kind === "pay-resource-for-high-council-seat") {
     return result;
   }
   if (effect.kind === "pay-resource-for-contracts") {

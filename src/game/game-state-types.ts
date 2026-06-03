@@ -144,6 +144,7 @@ export type PendingAction =
       combatRecipientId?: string;
       strengthReward?: number;
       drawCardsReward?: number;
+      vpReward?: number;
     }
   | {
       kind: "reveal-adjust";
@@ -175,6 +176,17 @@ export type PendingAction =
       source: string;
       optional: true;
       cardId?: string;
+    }
+  | {
+      kind: "pay-resource-for-high-council-seat";
+      ownerId: string;
+      resource: ResourceId;
+      cost: number;
+      optional: true;
+      persuasionCost: number;
+      persuasionReward: number;
+      source: string;
+      cardId: string;
     }
   | {
       kind: "pay-resource-for-troops";

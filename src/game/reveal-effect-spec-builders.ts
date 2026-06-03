@@ -100,6 +100,26 @@ export function revealTrashCardForStrength(
   ], conditions);
 }
 
+export function revealTrashSourceForVp(
+  vp: EffectAmountSpec,
+  options: {
+    optional?: boolean;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return revealEffects([
+    {
+      kind: "trash-card",
+      selector: "self",
+      sourceOnly: true,
+      zones: ["playArea"],
+      vpReward: vp,
+      optional: true,
+      ...options,
+    },
+  ], conditions);
+}
+
 export function revealLoseInfluenceForIntrigues(
   amount: EffectAmountSpec,
   options: {
@@ -196,6 +216,31 @@ export function revealPayResourceForSandworms(
       optional: true,
       ...(options.trashSource ? { trashSource: true } : {}),
       ...(options.persuasionCost !== undefined ? { persuasionCost: options.persuasionCost } : {}),
+      ...(options.source ? { source: options.source } : {}),
+    },
+  ], conditions);
+}
+
+export function revealPayResourceForHighCouncilSeat(
+  resource: ResourceId,
+  cost: EffectAmountSpec,
+  options: {
+    optional?: true;
+    persuasionCost?: EffectAmountSpec;
+    persuasionReward?: EffectAmountSpec;
+    source?: string;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return revealEffects([
+    {
+      kind: "pay-resource-for-high-council-seat",
+      selector: "self",
+      resource,
+      cost,
+      optional: true,
+      ...(options.persuasionCost !== undefined ? { persuasionCost: options.persuasionCost } : {}),
+      ...(options.persuasionReward !== undefined ? { persuasionReward: options.persuasionReward } : {}),
       ...(options.source ? { source: options.source } : {}),
     },
   ], conditions);

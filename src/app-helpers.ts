@@ -75,6 +75,7 @@ export function pendingLocksTableState(action: PendingAction | undefined) {
   return action?.kind === "maker-choice" ||
     action?.kind === "sietch-tabr" ||
     action?.kind === "pay-resource-for-sandworms" ||
+    action?.kind === "pay-resource-for-high-council-seat" ||
     action?.kind === "control-defense";
 }
 

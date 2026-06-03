@@ -35,6 +35,10 @@ import {
   resolveDiscardHandCard as resolveDiscardHandCardForPending,
 } from "./discard-hand-rules";
 import {
+  resolvePayResourceForHighCouncilSeatChoice as resolvePayResourceForHighCouncilSeatForPending,
+  skipPayResourceForHighCouncilSeat as resolveSkipPayResourceForHighCouncilSeat,
+} from "./high-council-rules";
+import {
   allPlayersDone,
 } from "./game-flow";
 import {
@@ -135,6 +139,7 @@ type TrashIntrigueForRewardPendingAction = Extract<PendingAction, { kind: "trash
 type TopDeckSelectionPendingAction = Extract<PendingAction, { kind: "top-deck-selection" }>;
 type DiscardHandCardPendingAction = Extract<PendingAction, { kind: "discard-hand-card" }>;
 type LoseInfluenceForIntriguesPendingAction = Extract<PendingAction, { kind: "lose-influence-for-intrigues" }>;
+type PayResourceForHighCouncilSeatPendingAction = Extract<PendingAction, { kind: "pay-resource-for-high-council-seat" }>;
 type BoardInfluenceChoicePendingAction = Extract<PendingAction, { kind: "board-influence-choice" }>;
 type OptionalSpacePaymentPendingAction = Extract<PendingAction, { kind: "optional-space-payment" }>;
 type PostDeployIntrigueDrawPendingAction = DeployPendingAction | MakerChoicePendingAction | SietchTabrPendingAction;
@@ -366,6 +371,20 @@ export function skipLoseInfluenceForIntrigues(
   pending: LoseInfluenceForIntriguesPendingAction,
 ): GameState {
   return continueAfterResolvedConflictReward(resolveSkipLoseInfluenceForIntrigues(state, pending));
+}
+
+export function resolvePayResourceForHighCouncilSeatChoice(
+  state: GameState,
+  pending: PayResourceForHighCouncilSeatPendingAction,
+): GameState {
+  return continueAfterResolvedConflictReward(resolvePayResourceForHighCouncilSeatForPending(state, pending));
+}
+
+export function skipPayResourceForHighCouncilSeat(
+  state: GameState,
+  pending: PayResourceForHighCouncilSeatPendingAction,
+): GameState {
+  return continueAfterResolvedConflictReward(resolveSkipPayResourceForHighCouncilSeat(state, pending));
 }
 
 export function placeSpyForPending(

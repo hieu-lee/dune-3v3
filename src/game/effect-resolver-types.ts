@@ -107,6 +107,7 @@ export type TrashCardEffect = {
   spiceRewardCostThreshold?: number;
   spiceReward?: number;
   drawCardsReward?: number;
+  vpReward?: number;
 };
 
 export type RevealTrashCardEffect = TrashCardEffect;
@@ -148,6 +149,16 @@ export type RevealPayResourceForSandworms = {
   optional: true;
   trashSource: boolean;
   persuasionCost: number;
+  source?: string;
+};
+
+export type RevealPayResourceForHighCouncilSeat = {
+  selector: PlayerSelector;
+  resource: ResourceId;
+  cost: number;
+  optional: true;
+  persuasionCost: number;
+  persuasionReward: number;
   source?: string;
 };
 

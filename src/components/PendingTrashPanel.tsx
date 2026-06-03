@@ -22,6 +22,7 @@ export function PendingTrashPanel({
   onTrash,
 }: PendingTrashPanelProps) {
   const drawCardsReward = pending.drawCardsReward ?? 0;
+  const vpReward = pending.vpReward ?? 0;
 
   return (
     <div className="pending-controls trade-intrigue-grid">
@@ -29,6 +30,9 @@ export function PendingTrashPanel({
         <strong>{owner.leader}</strong>
         {drawCardsReward > 0 && (
           <span>Trash reward: draw {drawCardsReward} card{drawCardsReward === 1 ? "" : "s"}</span>
+        )}
+        {vpReward > 0 && (
+          <span>Trash reward: gain {vpReward} VP</span>
         )}
         {choices.length === 0 && <span>No trashable cards</span>}
         {choices.map(({ zone, card }, index) => (

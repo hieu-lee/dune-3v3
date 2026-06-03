@@ -98,10 +98,12 @@ import {
   revealGainResource,
   revealGainStrength,
   revealLoseInfluenceForIntrigues,
+  revealPayResourceForHighCouncilSeat,
   revealPayResourceForSandworms,
   revealRetreatTroopsForStrength,
   revealRecruitTroops,
   revealTrashCardForStrength,
+  revealTrashSourceForVp,
   visitedMakerSpace,
   visitedSpaceIcon,
   visitedSpaceWithSpyPost,
@@ -357,6 +359,11 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
         source: "Corrinth City",
       }),
       revealGainPersuasion(5),
+      revealPayResourceForHighCouncilSeat("solari", 5, {
+        persuasionCost: 5,
+        persuasionReward: 2,
+        source: "Corrinth City",
+      }),
     ];
   }
   if (card.id === deliveryAgreementSourceId) {
@@ -366,6 +373,7 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
         source: "Delivery Agreement",
       }),
       revealGainResource("spice", 1),
+      revealTrashSourceForVp(1, {}, [hasCompletedContracts(4)]),
     ];
   }
   if (card.id === hiddenMissiveSourceId) {
@@ -643,6 +651,7 @@ function fixedRevealEffects(
 function effectModelsVictoryPoint(effect: CardEffectSpec["effects"][number]) {
   return effect.kind === "gain-vp" ||
     effect.kind === "pay-team-resource-for-vp" ||
+    (effect.kind === "trash-card" && effect.vpReward !== undefined) ||
     (effect.kind === "discard-cards-for-reward" && effect.gainVp !== undefined) ||
     (effect.kind === "trash-intrigue-for-reward" && effect.gainVp !== undefined);
 }

@@ -12,6 +12,10 @@ import {
   scenarioNames,
   scenarios,
 } from "./browser-debug-artifacts.mjs";
+import {
+  createBrowserDebugCliOptions,
+  printBrowserDebugUsage,
+} from "./browser-debug-cli-options.mjs";
 import { runCardChoicesSmoke } from "./browser-debug-card-choices.mjs";
 import { runCombatIntriguesSmoke } from "./browser-debug-combat-intrigues.mjs";
 import { runCommanderRevealSmoke } from "./browser-debug-commander-reveal.mjs";
@@ -25,148 +29,31 @@ import { runSpaceChoicesSmoke } from "./browser-debug-space-choices.mjs";
 import { runTableChoicesSmoke } from "./browser-debug-table-choices.mjs";
 import { runTradeChoicesSmoke } from "./browser-debug-trade-choices.mjs";
 
-let optionError;
+const cliOptions = createBrowserDebugCliOptions(process.argv);
 
-function recordOptionError(message) {
-  optionError ??= new Error(message);
-}
-
-function hasFlag(name) {
-  return process.argv.includes(name);
-}
-
-function optionValue(name, fallback) {
-  const prefix = `${name}=`;
-  let value = fallback;
-  for (let index = 0; index < process.argv.length; index += 1) {
-    const arg = process.argv[index];
-    if (arg.startsWith(prefix)) {
-      const nextValue = arg.slice(prefix.length);
-      if (!nextValue || nextValue.startsWith("--")) {
-        recordOptionError(`${name} requires a value`);
-      } else {
-        value = nextValue;
-      }
-      continue;
-    }
-    if (arg === name) {
-      const nextValue = process.argv[index + 1];
-      if (!nextValue || nextValue.startsWith("--")) {
-        recordOptionError(`${name} requires a value`);
-      } else {
-        value = nextValue;
-        index += 1;
-      }
-    }
-  }
-  return value;
-}
-
-function optionNumber(name, fallback) {
-  const rawValue = optionValue(name, String(fallback));
-  const value = Number(rawValue);
-  if (Number.isFinite(value)) return value;
-  recordOptionError(`${name} requires a numeric value, got "${rawValue}"`);
-  return fallback;
-}
-
-function optionIsMissingValue(argv, index, arg) {
-  if (arg.includes("=")) {
-    const nextValue = arg.slice(arg.indexOf("=") + 1);
-    return !nextValue || nextValue.startsWith("--");
-  }
-  const nextValue = argv[index + 1];
-  return !nextValue || nextValue.startsWith("--");
-}
-
-const booleanOptions = new Set([
-  "--allow-console-errors",
-  "--allow-request-failures",
-  "--capture-smoke",
-  "--headed",
-  "--help",
-  "--keep-open",
-  "--list-scenarios",
-  "--no-trace",
-  "--preserve-out",
-]);
-const valueOptions = new Set(["--out", "--port", "--scenario", "--slow-mo"]);
-
-function validateKnownOptions(argv) {
-  for (let index = 2; index < argv.length; index += 1) {
-    const arg = argv[index];
-    if (arg === "--") continue;
-    if (!arg.startsWith("--")) {
-      recordOptionError(`Unexpected browser debug argument "${arg}"`);
-      continue;
-    }
-    const optionName = arg.includes("=") ? arg.slice(0, arg.indexOf("=")) : arg;
-    if (booleanOptions.has(optionName)) {
-      if (arg.includes("=")) recordOptionError(`${optionName} does not take a value`);
-      continue;
-    }
-    if (valueOptions.has(optionName)) {
-      if (optionIsMissingValue(argv, index, arg)) {
-        recordOptionError(`${optionName} requires a value`);
-        continue;
-      }
-      if (!arg.includes("=")) index += 1;
-      continue;
-    }
-    recordOptionError(`Unknown browser debug option "${optionName}"`);
-  }
-}
-
-validateKnownOptions(process.argv);
-
-function printUsage() {
-  console.log(`Usage: pnpm run debug:browser -- [options]
-
-Options:
-  --help                         Show this help.
-  --list-scenarios               Print supported scenario names and exit.
-  --scenario <name>              Scenario to run. Default: all.
-  --out <dir>                    Artifact directory. Default: artifacts/qa/browser-debug.
-  --port <number>                Requested starting Vite port. Default: 5178.
-  --headed                       Show Chromium instead of running headless.
-  --keep-open                    Keep browser open until Ctrl+C, then write final artifacts.
-  --capture-smoke                In manual mode, click the debug capture button and exit.
-  --no-trace                     Skip Playwright trace capture.
-  --preserve-out                 Do not clean generated artifacts before the run.
-  --slow-mo <ms>                 Delay browser actions for headed debugging.
-  --allow-console-errors         Do not fail on browser console/page errors.
-  --allow-request-failures       Do not fail on request failures or same-origin 4xx/5xx responses.
-
-Examples:
-  pnpm run debug:browser:scenarios
-  pnpm run debug:game:smoke
-  pnpm run debug:browser -- --scenario commander-reveal
-  pnpm run debug:browser:headed -- --scenario all --port 5181
-`);
-}
-
-const showHelp = hasFlag("--help");
-if (showHelp && !optionError) {
-  printUsage();
+const showHelp = cliOptions.hasFlag("--help");
+if (showHelp && !cliOptions.optionError) {
+  printBrowserDebugUsage();
   process.exit(0);
 }
 
-const listScenarios = hasFlag("--list-scenarios");
-if (listScenarios && !optionError) {
+const listScenarios = cliOptions.hasFlag("--list-scenarios");
+if (listScenarios && !cliOptions.optionError) {
   console.log(scenarioNames.join("\n"));
   process.exit(0);
 }
 
-const headed = hasFlag("--headed");
-const keepOpen = hasFlag("--keep-open");
-const traceEnabled = !hasFlag("--no-trace");
-const captureSmoke = hasFlag("--capture-smoke");
-const failOnConsoleErrors = !hasFlag("--allow-console-errors");
-const failOnRequestFailures = !hasFlag("--allow-request-failures");
-const scenario = optionValue("--scenario", "all");
-const outDir = optionValue("--out", "artifacts/qa/browser-debug");
-const port = optionNumber("--port", 5178);
-const slowMo = optionNumber("--slow-mo", 0);
+const headed = cliOptions.hasFlag("--headed");
+const keepOpen = cliOptions.hasFlag("--keep-open");
+const traceEnabled = !cliOptions.hasFlag("--no-trace");
+const captureSmoke = cliOptions.hasFlag("--capture-smoke");
+const failOnConsoleErrors = !cliOptions.hasFlag("--allow-console-errors");
+const failOnRequestFailures = !cliOptions.hasFlag("--allow-request-failures");
+const preserveOut = cliOptions.hasFlag("--preserve-out");
+const scenario = cliOptions.optionValue("--scenario", "all");
+const outDir = cliOptions.optionValue("--out", "artifacts/qa/browser-debug");
+const port = cliOptions.optionNumber("--port", 5178);
+const slowMo = cliOptions.optionNumber("--slow-mo", 0);
 
 function cloneConflict(conflict) {
   return { ...conflict, rewards: [...conflict.rewards] };
@@ -581,7 +468,7 @@ const artifactStore = createBrowserDebugArtifactStore({
   generatedArtifactNames,
   isGeneratedArtifactName,
   outDir,
-  preserveOut: hasFlag("--preserve-out"),
+  preserveOut,
 });
 const {
   artifactPath,
@@ -645,7 +532,7 @@ async function assertCaptureArtifacts(capture, label) {
 }
 
 try {
-  if (optionError) throw optionError;
+  if (cliOptions.optionError) throw cliOptions.optionError;
   assert.ok(
     scenarios.has(scenario),
     `Unknown browser debug scenario "${scenario}". Expected one of: ${[...scenarios].join(", ")}`,

@@ -57,6 +57,8 @@ try {
     false,
     "Interstellar Trade should have structured reveal persuasion instead of manual printed reveal handling",
   );
+  assert.match(interstellarTrade.play, /No Agent effect/i);
+  assert.doesNotMatch(interstellarTrade.play, /Acquire bonus|Gain one Influence|Take a face-up contract/i);
   assert.match(interstellarTrade.reveal, /completed contract/, "Interstellar Trade should describe its contract reveal text");
   assert.ok(
     interstellarTrade.effects?.some((spec) =>
@@ -349,6 +351,14 @@ try {
   assert.deepEqual(unswervingLoyalty.traits, ["Faction: Fremen"], "Unswerving Loyalty should keep its Fremen trait");
   assert.match(unswervingLoyalty.play, /No agent icons/i);
   assert.match(unswervingLoyalty.reveal, /\+1 persuasion.*Recruit 1 troop.*Fremen Bond.*deploy or retreat 1 troop/i);
+  const truthtrance = data.imperiumDeck.find((card) => card.name === "Truthtrance");
+  assert.ok(truthtrance, "Imperium deck should include Truthtrance");
+  assert.deepEqual(truthtrance.icons, ["bene", "emperor", "fremen", "spacing"], "Truthtrance should keep its Agent icons");
+  assert.equal(truthtrance.traits.includes("Faction: Bene Gesserit"), true, "Truthtrance should normalize its Bene Gesserit trait");
+  assert.equal(truthtrance.traits.includes("Faction: Bene Geserit"), false, "Truthtrance should not expose the misspelled Bene Gesserit trait");
+  assert.match(truthtrance.play, /No Agent effect/i);
+  assert.doesNotMatch(truthtrance.play, /Faction|Bene Geserit/i);
+  assert.match(truthtrance.reveal, /\+1 persuasion/i);
   const sardaukarCoordination = data.imperiumDeck.find((card) => card.name === "Sardaukar Coordination");
   assert.ok(sardaukarCoordination, "Imperium deck should include Sardaukar Coordination");
   assert.equal(sardaukarCoordination.cost, 4, "Sardaukar Coordination should cost 4 persuasion");
@@ -625,6 +635,8 @@ try {
     ),
     "Spy Network should model its acquisition spy bonus as a typed acquire effect",
   );
+  assert.match(spyNetwork.play, /No agent icons/i);
+  assert.doesNotMatch(spyNetwork.play, /Acquire bonus|Intrigue 1|Spy 1/i);
   assert.match(spyNetwork.reveal, /recall 1 spy to draw 1 Intrigue/i);
   assert.ok(
     spyNetwork.effects?.some((spec) =>

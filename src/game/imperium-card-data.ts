@@ -50,6 +50,7 @@ import {
   subversiveAdvisorSourceId,
   theacherousManeuverSourceId,
   treadInDarknessSourceId,
+  truthtranceSourceId,
   undercoverAssetSourceId,
   unswervingLoyaltySourceId,
   weirdingWomanSourceId,
@@ -798,6 +799,12 @@ function imperiumPlayText(card: HubCard) {
   }
   if (card.id === longLiveTheFightersSourceId) {
     return "If your deck has three or more cards, look at the top three cards. Draw one, discard one, and trash one.";
+  }
+  if (card.id === interstellarTradeSourceId || card.id === truthtranceSourceId) {
+    return "No Agent effect.";
+  }
+  if (card.id === spyNetworkSourceId) {
+    return "No agent icons.";
   }
   if (card.id === unswervingLoyaltySourceId) {
     return "No agent icons.";

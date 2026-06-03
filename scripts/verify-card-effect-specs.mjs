@@ -201,6 +201,7 @@ try {
   const theacherousManeuver = data.imperiumDeck.find((card) => card.name === "Theacherous Maneuver");
   const undercoverAsset = data.imperiumDeck.find((card) => card.name === "Undercover Asset");
   const unswervingLoyalty = data.imperiumDeck.find((card) => card.name === "Unswerving Loyalty");
+  const truthtrance = data.imperiumDeck.find((card) => card.name === "Truthtrance");
   const weirdingWoman = data.imperiumDeck.find((card) => card.name === "Weirding Woman");
   const guildEnvoy = data.imperiumDeck.find((card) => card.name === "Guild Envoy");
   const guildSpy = data.imperiumDeck.find((card) => card.name === "Guild Spy");
@@ -318,6 +319,7 @@ try {
     theacherousManeuver &&
     undercoverAsset &&
     unswervingLoyalty &&
+    truthtrance &&
     weirdingWoman &&
     guildEnvoy &&
     guildSpy &&
@@ -4693,6 +4695,12 @@ try {
   );
   assert.match(unswervingLoyalty.play, /No agent icons/i);
   assert.match(unswervingLoyalty.reveal, /\+1 persuasion.*Recruit 1 troop.*Fremen Bond.*deploy or retreat 1 troop/i);
+  assert.match(truthtrance.play, /No Agent effect/i);
+  assert.doesNotMatch(truthtrance.play, /Faction|Bene Geserit/i);
+  assert.equal(truthtrance.traits.includes("Faction: Bene Gesserit"), true, "Truthtrance should normalize its Bene Gesserit trait");
+  assert.equal(truthtrance.traits.includes("Faction: Bene Geserit"), false, "Truthtrance should not expose the misspelled Bene Gesserit trait");
+  assert.match(spyNetwork.play, /No agent icons/i);
+  assert.doesNotMatch(spyNetwork.play, /Acquire bonus|Intrigue 1|Spy 1/i);
   assert.ok(
     calculus.effects?.some((spec) =>
       spec.trigger === "reveal" &&
@@ -10998,6 +11006,8 @@ try {
     highCouncilSeat: false,
   }, game);
   assert.equal(interstellarReveal.persuasion, 2, "Interstellar Trade should use completed-contract amount specs");
+  assert.match(interstellarTrade.play, /No Agent effect/i);
+  assert.doesNotMatch(interstellarTrade.play, /Acquire bonus|Gain one Influence|Take a face-up contract/i);
   assert.deepEqual(
     effectResolver.resolveGainInfluenceChoices(interstellarTrade.effects, {
       trigger: "acquire",

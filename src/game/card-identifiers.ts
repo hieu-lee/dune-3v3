@@ -93,6 +93,7 @@ export const paracompassSourceId = 49;
 export const reliableInformantSourceId = 20;
 export const spacingGuildFavorSourceId = 60;
 export const spaceTimeFoldingSourceId = 12;
+export const truthtranceSourceId = 53;
 export const ecologicalTestingStationSourceId = 46;
 export const guildSpySourceId = 43;
 export const inHighPlacesSourceId = 64;

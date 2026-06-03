@@ -41,6 +41,7 @@ pnpm run debug:browser -- --scenario all --out artifacts/qa/browser-debug-all-ch
 pnpm run debug:browser -- --scenario commander-reveal --out artifacts/qa/browser-debug-commander-reveal --no-trace
 pnpm run debug:browser:headed -- --scenario all --out artifacts/qa/browser-debug-headed-all
 pnpm run debug:game
+pnpm run debug:room:online
 pnpm run debug:room:smoke
 pnpm run debug:room:complete
 pnpm run debug:room:marathon
@@ -54,6 +55,8 @@ Use `debug:game:smoke` before every gameplay/browser-debug commit. It runs the m
 Use `debug:room:smoke` when the room/session layer, hidden projection, reconnect behavior, room action dispatch, or room pending dispatch changes. It starts the private room server, verifies claim/switch/release/reconnect/offline-seat-recovery/private projection, resolves setup online, advances an online Reveal turn, resolves a server-backed pending choice, plays a Plot Intrigue online, plays and passes combat online, scores battle-icon plus conditional Endgame Intrigues before finalizing online, and writes screenshots, state JSON, console logs, request failures, and `summary.json` under `artifacts/qa/browser-room-smoke`. Use `pnpm run verify:room-server` with it when persistence changes; that verifier restarts the room server against the same storage file and checks token recovery, hidden projections, and continued legal actions.
 
 Use `debug:room:complete` when a change may affect all-seat room coordination. It opens six isolated browser contexts, claims p1-p6, verifies seat identity, hidden projections, reconnect recovery, client and server permission failures, cross-client convergence, pending ownership, Conflict VP resource and spy conversions, and six-player Endgame readiness/finalization. It writes screenshots, state JSON, console logs, request failures, and `summary.json` under `artifacts/qa/browser-room-complete-flow`.
+
+Use `debug:room:online` when a change may affect public hosting, room sync transport, reconnect over public URLs, or the `play:online` path. It requires `cloudflared` and internet access. It starts a real room server, publishes it through a real TryCloudflare quick tunnel, opens the public URL in two isolated browser contexts, verifies `sync=poll`, seat claim convergence, hidden hand projection, and reconnect-token recovery, then writes screenshots, state JSON, console logs, request failures, and `summary.json` under `artifacts/qa/browser-room-online-tunnel`.
 
 Use `debug:room:marathon` for a heavier six-browser natural room marathon. It claims p1-p6, verifies private projections, resolves setup, places legal Agents when available, buys legal cards during Reveal turns, deploys legal troops for all four Ally seats into the Conflict, resolves generated pending actions, asserts round cleanup on each natural round advance, drives Reveal/end-Reveal/combat-pass cycles until the Conflict deck naturally empties, resolves any available Endgame Intrigue scoring choices, finalizes all seats, asserts the final team-score result, and writes screenshots, state JSON, action logs, console logs, request failures, and `summary.json` under `artifacts/qa/browser-room-marathon`.
 

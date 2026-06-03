@@ -63,6 +63,56 @@ async function assertConfiguredStorageIsPrivate(storagePath, publicPaths) {
   }
 }
 
+async function assertPollHeartbeatDisconnects() {
+  const pollServer = await createRoomServer({ port: 0, log: false, pollDisconnectMs: 120, storageFile: false });
+  const pollBaseUrl = pollServer.resolvedUrls.local[0].replace(/\/$/, "");
+  async function pollJson(path, options = {}) {
+    const response = await fetch(`${pollBaseUrl}${path}`, options);
+    const body = await response.json().catch(() => undefined);
+    return { response, body };
+  }
+  try {
+    const created = await pollJson("/api/rooms", { method: "POST" });
+    assert.equal(created.response.status, 201, "Poll heartbeat room creation should succeed");
+    const roomId = created.body.roomId;
+    const claim = await pollJson(`/api/rooms/${roomId}/seats/p1/claim`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-room-sync": "poll" },
+      body: JSON.stringify({ name: "Poll Player" }),
+    });
+    assert.equal(claim.response.status, 200, "Poll-mode seat claim should succeed");
+    const token = claim.body.token;
+    await sleep(70);
+    const refreshed = await pollJson(`/api/rooms/${roomId}`, {
+      headers: { "x-room-sync": "poll", "x-room-token": token },
+    });
+    assert.equal(refreshed.response.status, 200, "Poll heartbeat refresh should succeed");
+    await sleep(70);
+    const stillConnected = await pollJson(`/api/rooms/${roomId}`);
+    assert.equal(
+      stillConnected.body.seats.find((seat) => seat.playerId === "p1")?.connected,
+      true,
+      "Fresh poll heartbeat should keep the seat connected",
+    );
+    await sleep(170);
+    const disconnected = await pollJson(`/api/rooms/${roomId}`);
+    assert.equal(
+      disconnected.body.seats.find((seat) => seat.playerId === "p1")?.connected,
+      false,
+      "Poll-mode seat should go offline after polling stops",
+    );
+    const reclaimed = await pollJson(`/api/rooms/${roomId}/seats/p1/claim`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-room-sync": "poll" },
+      body: JSON.stringify({ name: "Poll Reclaimer" }),
+    });
+    assert.equal(reclaimed.response.status, 200, "Offline poll-mode seat should be reclaimable without the old token");
+    assert.notEqual(reclaimed.body.token, token, "Offline poll-mode reclaim should issue a new reconnect token");
+  } finally {
+    await pollServer.close();
+  }
+}
+
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -299,6 +349,7 @@ try {
     "/qa-room-server-public-storage.json",
     "/public/qa-room-server-public-storage.json",
   ]);
+  await assertPollHeartbeatDisconnects();
 
   const recovered = await jsonFetch(`/api/rooms/${roomId}`, {
     headers: { "x-room-token": p1Claim.body.token },

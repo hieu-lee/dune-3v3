@@ -8,9 +8,21 @@ type StoredRoomIdentity = {
 };
 
 type RoomStatus = "idle" | "loading" | "ready" | "error";
+export type RoomSyncMode = "events" | "poll";
+
+const roomPollIntervalMs = 1500;
 
 function roomIdFromLocation() {
   return new URL(window.location.href).searchParams.get("room")?.trim().toUpperCase() || "";
+}
+
+function roomSyncModeFromLocation(): RoomSyncMode {
+  const url = new URL(window.location.href);
+  const requestedSync = url.searchParams.get("sync")?.trim().toLowerCase();
+  if (requestedSync === "events") return "events";
+  if (requestedSync === "poll") return "poll";
+  const hostname = url.hostname.toLowerCase();
+  return hostname === "trycloudflare.com" || hostname.endsWith(".trycloudflare.com") ? "poll" : "events";
 }
 
 function identityKey(roomId: string) {
@@ -52,9 +64,16 @@ function roomIdFromJoinInput(input: string) {
   }
 }
 
-async function fetchRoom(roomId: string, token?: string) {
+function roomHeaders(token: string | undefined, syncMode?: RoomSyncMode) {
+  const headers: Record<string, string> = {};
+  if (token) headers["x-room-token"] = token;
+  if (syncMode === "poll") headers["x-room-sync"] = "poll";
+  return Object.keys(headers).length ? headers : undefined;
+}
+
+async function fetchRoom(roomId: string, token?: string, syncMode?: RoomSyncMode) {
   const response = await fetch(`/api/rooms/${roomId}`, {
-    headers: token ? { "x-room-token": token } : undefined,
+    headers: roomHeaders(token, syncMode),
   });
   if (!response.ok) throw new Error((await response.json().catch(() => undefined))?.error ?? "Room not found");
   return await response.json() as RoomSnapshot;
@@ -63,43 +82,52 @@ async function fetchRoom(roomId: string, token?: string) {
 export function useRoomSession() {
   const [roomId, setRoomId] = useState(() => roomIdFromLocation());
   const [status, setStatus] = useState<RoomStatus>(() => roomIdFromLocation() ? "loading" : "idle");
+  const [syncMode, setSyncMode] = useState<RoomSyncMode>(() => roomSyncModeFromLocation());
   const [snapshot, setSnapshot] = useState<RoomSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
-  const eventSourceGenerationRef = useRef(0);
+  const syncGenerationRef = useRef(0);
   const loadGenerationRef = useRef(0);
   const [identity, setIdentity] = useState<StoredRoomIdentity | undefined>(() => {
     const initialRoomId = roomIdFromLocation();
     return initialRoomId ? readStoredIdentity(initialRoomId) : undefined;
   });
 
+  const acceptSnapshot = useCallback((snapshotRoomId: string, token: string | undefined, nextSnapshot: RoomSnapshot) => {
+    if (token && !nextSnapshot.viewerPlayerId) {
+      removeStoredIdentity(snapshotRoomId);
+      setIdentity(undefined);
+    }
+    setSnapshot(nextSnapshot);
+    setStatus("ready");
+    setError(null);
+  }, []);
+
   const loadRoom = useCallback(async (nextRoomId: string, nextIdentity = readStoredIdentity(nextRoomId)) => {
     const generation = loadGenerationRef.current + 1;
     loadGenerationRef.current = generation;
     setStatus("loading");
     setError(null);
+    const nextSyncMode = roomSyncModeFromLocation();
+    setSyncMode(nextSyncMode);
     setRoomId(nextRoomId);
     setIdentity(nextIdentity);
     try {
-      const nextSnapshot = await fetchRoom(nextRoomId, nextIdentity?.token);
+      const nextSnapshot = await fetchRoom(nextRoomId, nextIdentity?.token, nextSyncMode);
       if (loadGenerationRef.current !== generation) return;
-      if (nextIdentity?.token && !nextSnapshot.viewerPlayerId) {
-        removeStoredIdentity(nextRoomId);
-        setIdentity(undefined);
-      }
-      setSnapshot(nextSnapshot);
-      setStatus("ready");
+      acceptSnapshot(nextRoomId, nextIdentity?.token, nextSnapshot);
     } catch (loadError) {
       if (loadGenerationRef.current !== generation) return;
       setSnapshot(null);
       setStatus("error");
       setError(loadError instanceof Error ? loadError.message : "Unable to load room");
     }
-  }, []);
+  }, [acceptSnapshot]);
 
   useEffect(() => {
     const handlePopState = () => {
       const nextRoomId = roomIdFromLocation();
+      setSyncMode(roomSyncModeFromLocation());
       if (!nextRoomId) {
         loadGenerationRef.current += 1;
         setRoomId("");
@@ -119,40 +147,64 @@ export function useRoomSession() {
   }, []);
 
   useEffect(() => {
-    if (!roomId) return undefined;
+    if (!roomId || syncMode !== "events") return undefined;
     const token = identity?.token;
     const eventsUrl = `/api/rooms/${roomId}/events${token ? `?token=${encodeURIComponent(token)}` : ""}`;
     let active = true;
-    const generation = eventSourceGenerationRef.current + 1;
-    eventSourceGenerationRef.current = generation;
+    const generation = syncGenerationRef.current + 1;
+    syncGenerationRef.current = generation;
     const events = new EventSource(eventsUrl);
     eventSourceRef.current = events;
     events.addEventListener("room", (event) => {
-      if (!active || eventSourceGenerationRef.current !== generation) return;
+      if (!active || syncGenerationRef.current !== generation) return;
       const nextSnapshot = JSON.parse((event as MessageEvent).data) as RoomSnapshot;
-      if (token && !nextSnapshot.viewerPlayerId) {
-        removeStoredIdentity(roomId);
-        setIdentity(undefined);
-      }
-      setSnapshot(nextSnapshot);
-      setStatus("ready");
-      setError(null);
+      acceptSnapshot(roomId, token, nextSnapshot);
     });
     events.onerror = () => {
-      if (!active || eventSourceGenerationRef.current !== generation) return;
-      setError("Room event stream disconnected");
+      if (!active || syncGenerationRef.current !== generation) return;
+      setSyncMode("poll");
+      setError(null);
+      events.close();
     };
     return () => {
       active = false;
       events.close();
       if (eventSourceRef.current === events) eventSourceRef.current = null;
     };
-  }, [identity?.token, roomId]);
+  }, [acceptSnapshot, identity?.token, roomId, syncMode]);
+
+  useEffect(() => {
+    if (!roomId || syncMode !== "poll") return undefined;
+    const token = identity?.token;
+    let active = true;
+    const generation = syncGenerationRef.current + 1;
+    syncGenerationRef.current = generation;
+    const pollRoom = async () => {
+      try {
+        const nextSnapshot = await fetchRoom(roomId, token, "poll");
+        if (!active || syncGenerationRef.current !== generation) return;
+        acceptSnapshot(roomId, token, nextSnapshot);
+      } catch (pollError) {
+        if (!active || syncGenerationRef.current !== generation) return;
+        setStatus("error");
+        setError(pollError instanceof Error ? pollError.message : "Unable to refresh room");
+      }
+    };
+    void pollRoom();
+    const intervalId = window.setInterval(() => {
+      void pollRoom();
+    }, roomPollIntervalMs);
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+    };
+  }, [acceptSnapshot, identity?.token, roomId, syncMode]);
 
   const createRoom = useCallback(async () => {
     loadGenerationRef.current += 1;
     setStatus("loading");
     setError(null);
+    setSyncMode(roomSyncModeFromLocation());
     const response = await fetch("/api/rooms", { method: "POST" });
     if (!response.ok) {
       setStatus("error");
@@ -165,6 +217,7 @@ export function useRoomSession() {
     setSnapshot(nextSnapshot);
     setIdentity(undefined);
     setStatus("ready");
+    setError(null);
   }, []);
 
   const joinRoom = useCallback(async (code: string) => {
@@ -179,7 +232,7 @@ export function useRoomSession() {
     loadGenerationRef.current += 1;
     const response = await fetch(`/api/rooms/${roomId}/seats/${encodeURIComponent(playerId)}/claim`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", ...(syncMode === "poll" ? { "x-room-sync": "poll" } : {}) },
       body: JSON.stringify({ name, token: identity?.token }),
     });
     if (!response.ok) {
@@ -194,7 +247,7 @@ export function useRoomSession() {
     setSnapshot(body.snapshot);
     setStatus("ready");
     setError(null);
-  }, [identity?.token, roomId]);
+  }, [identity?.token, roomId, syncMode]);
 
   const releaseSeat = useCallback(async (playerId: string) => {
     if (!roomId || !identity?.token) return false;
@@ -266,5 +319,6 @@ export function useRoomSession() {
     sendAction,
     snapshot,
     status,
-  }), [claimSeat, createRoom, error, joinRoom, leaveRoom, releaseSeat, roomId, sendAction, snapshot, status]);
+    syncMode,
+  }), [claimSeat, createRoom, error, joinRoom, leaveRoom, releaseSeat, roomId, sendAction, snapshot, status, syncMode]);
 }

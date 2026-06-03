@@ -5,7 +5,7 @@ This guide is for the private six-player online table. It assumes the group alre
 ## Requirements
 
 - Node.js and `pnpm`.
-- One host computer that the other players can reach over the network.
+- One host computer that the other players can reach over the network, or `cloudflared` for a free public TryCloudflare tunnel.
 - Six players, one for each fixed 3v3 seat.
 
 Install dependencies once:
@@ -16,7 +16,15 @@ pnpm install
 
 ## Host A Room
 
-Start the private room server:
+For players on different networks, use the one-command public tunnel:
+
+```bash
+pnpm run play:online
+```
+
+It starts the room server, starts a free TryCloudflare tunnel, creates one room, and prints a public room URL. Share the printed `https://...trycloudflare.com/?sync=poll&room=...` link and keep the terminal open. See [online-play.md](online-play.md) for install steps, Cloudflare limitations, and the public-tunnel verification command.
+
+For LAN-only play, start the private room server directly:
 
 ```bash
 pnpm run room:dev
@@ -29,7 +37,7 @@ private room server ready: http://0.0.0.0:5188/
 room storage file: /Users/<you>/.dune-3v3/room-server/rooms.json
 ```
 
-On the host machine, open `http://127.0.0.1:5188/`. If other players are on different machines, give them a URL that reaches the host computer on the same port. For a home LAN this is usually the host machine's local IP address, such as `http://192.168.1.25:5188/`.
+On the host machine, open `http://127.0.0.1:5188/`. If other players are on different machines on the same LAN, give them a URL that reaches the host computer on the same port. For a home LAN this is usually the host machine's local IP address, such as `http://192.168.1.25:5188/`.
 
 Room state is saved by default outside the project tree:
 
@@ -56,7 +64,7 @@ pnpm run room:dev -- --no-storage
 3. The browser URL gains a `?room=<code>` parameter.
 4. Share that full URL with the group, or share just the room code.
 
-Players can paste either the full invite link or the code into the **Room code or link** field and click **Join**.
+Players can paste either the full invite link or the code into the **Room code or link** field and click **Join**. For TryCloudflare links, keep the `sync=poll` parameter in the shared URL so browsers use polling instead of Server-Sent Events.
 
 ## Claim Seats
 
@@ -159,6 +167,7 @@ Use these when checking that the table still works:
 ```bash
 pnpm build
 pnpm run verify:all
+pnpm run debug:room:online
 pnpm run debug:room:smoke
 pnpm run debug:room:complete
 pnpm run debug:room:marathon
@@ -177,7 +186,10 @@ Every browser run writes artifacts under `artifacts/qa/...`, including screensho
 
 ## Troubleshooting
 
+- **Friends are not on the same Wi-Fi:** use `pnpm run play:online` and share the printed TryCloudflare public room URL.
+- **`pnpm run play:online` cannot find `cloudflared`:** install `cloudflared`, then confirm `cloudflared --version` works in the same terminal.
 - **Players cannot open the host URL:** make sure they are using the host machine's reachable network address, not `127.0.0.1` from their own machine.
+- **A TryCloudflare room looks stale:** make sure the URL includes `sync=poll`, then refresh.
 - **A player sees only hidden cards:** they probably have not claimed a seat, lost their local token, or are viewing as an unclaimed spectator. Reclaim the seat or click the offline seat if it is disconnected.
 - **A button is disabled:** it is probably not that player's turn, a pending action belongs to someone else, or the move is illegal.
 - **A player chose the wrong seat:** use **Release** or click an unclaimed seat to switch.

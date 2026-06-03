@@ -12,7 +12,17 @@ Install dependencies once:
 pnpm install
 ```
 
-Host an online room server:
+Host an online room over the public Internet for friends on different networks:
+
+```bash
+pnpm run play:online
+```
+
+This starts the private room server, starts a free TryCloudflare tunnel, creates a room, and prints a public `https://...trycloudflare.com/?sync=poll&room=...` link to share. Install `cloudflared` first if the command says it is missing; on macOS with Homebrew, use `brew install cloudflared`.
+
+For the detailed setup, limitations, and public-tunnel verification workflow, see [docs/online-play.md](docs/online-play.md).
+
+Host a LAN-only room server:
 
 ```bash
 pnpm run room:dev
@@ -26,14 +36,14 @@ http://127.0.0.1:5188/
 
 Other players should use the host machine's LAN address with the same port, for example `http://192.168.1.25:5188/`.
 
-Click **Create**, claim a seat, then share the room link with the other five players. The room server also serves the web app, so you do not need to run `pnpm dev` separately for online play.
+Click **Create**, claim a seat, then share the room link with the other five players on the same network. The room server also serves the web app, so you do not need to run `pnpm dev` separately for online play.
 
 For step-by-step player instructions, see [docs/play-guide.md](docs/play-guide.md).
 
 ## How To Play Online
 
-1. The host runs `pnpm run room:dev`.
-2. The host opens the printed URL, clicks **Create**, and shares the room link or room code.
+1. The host runs `pnpm run play:online`.
+2. The host shares the printed public room link or room code.
 3. Each player opens the link, enters a player name, and claims one of the six seats.
 4. If someone picks the wrong seat, they can switch to an open seat or press **Release**.
 5. If someone closes or refreshes the browser, the local reconnect token should restore their seat.
@@ -87,6 +97,7 @@ pnpm run room:dev -- --no-storage
 pnpm build
 pnpm run verify:all
 pnpm run verify:all -- --list
+pnpm run debug:room:online
 pnpm run debug:room:smoke
 pnpm run debug:room:complete
 pnpm run debug:room:marathon
@@ -95,6 +106,7 @@ pnpm run debug:room:vp-endgame
 
 - `pnpm build` runs TypeScript and the production Vite build.
 - `pnpm run verify:all` runs every verifier script.
+- `pnpm run debug:room:online` starts a real TryCloudflare quick tunnel and verifies public two-browser room sync/reconnect over `sync=poll`.
 - `pnpm run debug:room:smoke` is the focused room/session smoke.
 - `pnpm run debug:room:complete` is the six-browser all-seat coordination smoke.
 - `pnpm run debug:room:marathon` drives a natural six-browser game through Conflict-deck Endgame and final team scoring.
@@ -124,6 +136,7 @@ The harness writes screenshots, paired state JSON, `console.json`, `request-fail
 ## Docs Map
 
 - [docs/play-guide.md](docs/play-guide.md): how to host, join, recover, and play a room.
+- [docs/online-play.md](docs/online-play.md): free Cloudflare Tunnel setup and public-tunnel verification.
 - [docs/browser-testing-pipeline.md](docs/browser-testing-pipeline.md): Playwright scenarios and artifact contract.
 - [docs/uprising-3v3-notes.md](docs/uprising-3v3-notes.md): implementation notes for six-player rules and current automation.
 - [docs/card-coverage.md](docs/card-coverage.md): card and effect coverage.

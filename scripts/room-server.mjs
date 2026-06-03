@@ -78,6 +78,22 @@ function normalizeStorageFile(storageFile) {
   return resolve(storageFile ?? defaultStorageFile());
 }
 
+function splitAllowedHosts(value) {
+  return value.split(",").map((host) => host.trim()).filter(Boolean);
+}
+
+function roomAllowedHosts(extraAllowedHosts = []) {
+  return [...new Set([
+    ".trycloudflare.com",
+    ...splitAllowedHosts(process.env.DUNE_ALLOWED_HOSTS ?? ""),
+    ...extraAllowedHosts,
+  ])];
+}
+
+function pollTimerKey(roomId, token) {
+  return `${roomId}:${token}`;
+}
+
 function isPathInside(child, parent) {
   const rel = relative(parent.toLowerCase(), child.toLowerCase());
   return rel === "" || (rel && !rel.startsWith("..") && !rel.startsWith(sep));
@@ -170,9 +186,11 @@ async function loadStoredRooms(storageFile, migrateRoom = (room) => room) {
 }
 
 export async function createRoomServer({
+  allowedHosts = roomAllowedHosts(),
   host = "127.0.0.1",
   port = 5188,
   log = true,
+  pollDisconnectMs = 15_000,
   storageFile = defaultStorageFile(),
 } = {}) {
   const server = createHttpServer();
@@ -181,7 +199,7 @@ export async function createRoomServer({
   const vite = await createViteServer({
     appType: "spa",
     logLevel: log ? "info" : "silent",
-    server: { hmr: { server }, middlewareMode: true },
+    server: { allowedHosts, hmr: { server }, middlewareMode: true },
   });
   let roomStateModule;
   let gameStateModule;
@@ -206,6 +224,7 @@ export async function createRoomServer({
 
   const rooms = await loadStoredRooms(resolvedStorageFile, migrateLoadedRoom);
   const streams = new Map();
+  const pollDisconnectTimers = new Map();
   const roomWriteChains = new Map();
 
   async function roomActions() {
@@ -285,7 +304,22 @@ export async function createRoomServer({
     return [...(streams.get(roomId) ?? [])].some((client) => client.token === token);
   }
 
+  function clearPollDisconnectTimer(roomId, token) {
+    if (!token) return;
+    const key = pollTimerKey(roomId, token);
+    const timer = pollDisconnectTimers.get(key);
+    if (!timer) return;
+    clearTimeout(timer);
+    pollDisconnectTimers.delete(key);
+  }
+
+  function clearAllPollDisconnectTimers() {
+    for (const timer of pollDisconnectTimers.values()) clearTimeout(timer);
+    pollDisconnectTimers.clear();
+  }
+
   function markDisconnected(room, token) {
+    clearPollDisconnectTimer(room.id, token);
     void enqueueRoomWrite(room.id, async () => {
       if (tokenHasOpenStream(room.id, token)) return;
       const claim = Object.values(room.seats).find((seat) => seat?.token === token);
@@ -298,6 +332,19 @@ export async function createRoomServer({
     }).catch((error) => {
       console.error(`failed to persist disconnected room ${room.id}:`, error);
     });
+  }
+
+  function schedulePollDisconnect(room, token) {
+    if (!token || tokenHasOpenStream(room.id, token)) return;
+    clearPollDisconnectTimer(room.id, token);
+    const timer = setTimeout(() => markDisconnected(room, token), pollDisconnectMs);
+    timer.unref?.();
+    pollDisconnectTimers.set(pollTimerKey(room.id, token), timer);
+  }
+
+  function requestIsPollSync(request, url) {
+    return request.headers["x-room-sync"]?.toString().toLowerCase() === "poll" ||
+      url.searchParams.get("sync")?.toLowerCase() === "poll";
   }
 
   function seatClaimForToken(room, token) {
@@ -325,10 +372,12 @@ export async function createRoomServer({
       if (!room) return sendError(response, 404, "Room not found");
       const token = tokenFromRequest(request, url);
       const claim = Object.values(room.seats).find((seat) => seat?.token === token);
-      if (claim && !claim.connected) {
+      if (claim) {
         await enqueueRoomWrite(room.id, async () => {
           const latestClaim = Object.values(room.seats).find((seat) => seat?.token === token);
-          if (!latestClaim || latestClaim.connected) return;
+          if (!latestClaim) return;
+          if (requestIsPollSync(request, url)) schedulePollDisconnect(room, token);
+          if (latestClaim.connected) return;
           latestClaim.connected = true;
           room.version += 1;
           room.updatedAt = Date.now();
@@ -362,12 +411,14 @@ export async function createRoomServer({
         const token = previousToken && (existing?.token === previousToken || existingTokenSeat)
           ? previousToken
           : reconnectToken();
+        if (existing?.token && existing.token !== token) clearPollDisconnectTimer(room.id, existing.token);
         room.seats[playerId] = {
           playerId,
           name,
           token,
           connected: true,
         };
+        if (requestIsPollSync(request, url)) schedulePollDisconnect(room, token);
         await persistAndBroadcastRoom(room);
         return sendJson(response, 200, {
           token,
@@ -388,6 +439,7 @@ export async function createRoomServer({
         if (!token || existing.token !== token) {
           return sendError(response, 403, "Only the current seat token can release that seat");
         }
+        clearPollDisconnectTimer(room.id, existing.token);
         room.seats[playerId] = undefined;
         await persistAndBroadcastRoom(room);
         return sendJson(response, 200, { snapshot: await snapshotFor(room, token) });
@@ -459,6 +511,7 @@ export async function createRoomServer({
       streams.set(room.id, roomStreams);
       const client = { response, token };
       roomStreams.add(client);
+      clearPollDisconnectTimer(room.id, token);
       const claim = Object.values(room.seats).find((seat) => seat?.token === token);
       if (claim && !claim.connected) {
         await enqueueRoomWrite(room.id, async () => {
@@ -538,6 +591,7 @@ export async function createRoomServer({
     storageFile: resolvedStorageFile,
     ssrLoadModule: (...args) => vite.ssrLoadModule(...args),
     close: async () => {
+      clearAllPollDisconnectTimers();
       for (const roomStreams of streams.values()) {
         for (const client of roomStreams) client.response.end();
       }
@@ -553,7 +607,12 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const portArg = process.argv.find((arg) => arg.startsWith("--port="));
   const hostArg = process.argv.find((arg) => arg.startsWith("--host="));
   const storageArg = process.argv.find((arg) => arg.startsWith("--storage-file="));
+  const allowedHostArgs = process.argv
+    .filter((arg) => arg.startsWith("--allowed-host="))
+    .map((arg) => arg.slice("--allowed-host=".length))
+    .filter(Boolean);
   const server = await createRoomServer({
+    allowedHosts: roomAllowedHosts(allowedHostArgs),
     host: hostArg ? hostArg.slice("--host=".length) : "0.0.0.0",
     port: portArg ? Number(portArg.slice("--port=".length)) : 5188,
     storageFile: process.argv.includes("--no-storage")

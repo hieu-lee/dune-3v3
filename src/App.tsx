@@ -72,6 +72,7 @@ declare global {
 	      getCommanderTargets: () => Record<string, string>;
 	      getGame: () => GameState;
 	      getRoomSnapshot: () => RoomSnapshot | null;
+	      getRoomSyncMode: () => "events" | "poll";
 	      setGame: (game: GameState) => void;
 	      setCommanderTarget: (commanderId: string, allyId: string) => void;
     };
@@ -117,6 +118,7 @@ export default function App() {
 	      getCommanderTargets: () => commanderTargets,
 	      getGame: () => game,
 	      getRoomSnapshot: () => roomSession.snapshot,
+	      getRoomSyncMode: () => roomSession.syncMode,
 	      setCommanderTarget: (commanderId, allyId) => setCommanderTargets((current) => ({ ...current, [commanderId]: allyId })),
 	      setGame: (nextGame) => setGame(nextGame),
 	    };
@@ -125,7 +127,7 @@ export default function App() {
       window.removeEventListener("keydown", handleDebugCaptureKeydown);
       delete window.__DUNE_DEBUG__;
     };
-	  }, [commanderTargets, game, roomSession.snapshot]);
+	  }, [commanderTargets, game, roomSession.snapshot, roomSession.syncMode]);
 
   useEffect(() => {
     if (!roomSession.snapshot) {

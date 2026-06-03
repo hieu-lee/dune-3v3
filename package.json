@@ -6,6 +6,7 @@
   "packageManager": "pnpm@11.4.0",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
+    "play:online": "node scripts/play-online.mjs",
     "room:dev": "node scripts/room-server.mjs --host=0.0.0.0",
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 0.0.0.0",
@@ -23,6 +24,7 @@
     "debug:room:smoke": "node scripts/browser-room-smoke.mjs",
     "debug:room:complete": "node scripts/browser-room-complete-flow.mjs",
     "debug:room:marathon": "node scripts/browser-room-marathon.mjs",
+    "debug:room:online": "node scripts/browser-room-online-tunnel.mjs",
     "debug:room:vp-endgame": "node scripts/browser-room-vp-endgame.mjs",
     "sync:cards": "node scripts/sync-dune-catalog.mjs",
     "sync:card-images": "node scripts/sync-dune-catalog.mjs --download-images",

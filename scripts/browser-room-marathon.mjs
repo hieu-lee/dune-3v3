@@ -26,6 +26,10 @@ const expectedSeats = {
   p5: { leader: "Lady Jessica", role: "Ally" },
   p6: { leader: "Princess Irulan", role: "Ally" },
 };
+const allySeatIds = Object.entries(expectedSeats)
+  .filter(([, seat]) => seat.role === "Ally")
+  .map(([playerId]) => playerId)
+  .sort();
 
 const consoleMessages = [];
 const requestFailures = [];
@@ -36,6 +40,7 @@ const browser = await chromium.launch({ headless: true });
 const {
   canPay,
   discardCardForDrawChoices,
+  discardCardsForRewardChoices,
   effectiveCost,
   iconCanReach,
   canMoveCardToThroneRow,
@@ -47,6 +52,7 @@ const {
   trashableCardsForPending,
 } = await server.ssrLoadModule("/src/game/state.ts");
 const { boardSpaces } = await server.ssrLoadModule("/src/game/data.ts");
+const { mainBoardInfluenceChoices } = await server.ssrLoadModule("/src/game/influence-choices.ts");
 
 function observePage(page) {
   page.on("console", (message) => {
@@ -219,7 +225,7 @@ function firstChoiceId(choices) {
 }
 
 function firstFaction(choices) {
-  return choices?.[0]?.faction ?? choices?.[0] ?? "emperor";
+  return choices?.[0]?.faction ?? choices?.[0] ?? mainBoardInfluenceChoices[0];
 }
 
 function pendingOwnerId(room, pending, command) {
@@ -308,7 +314,7 @@ function legalBuyAction(game, player) {
   };
 }
 
-function pendingCommand(room, pending) {
+function pendingCommand(room, pending, coverage) {
   switch (pending.kind) {
     case "commander-resource-split":
       return { kind: "choose-commander-resource-split", optionIndex: 0 };
@@ -343,8 +349,12 @@ function pendingCommand(room, pending) {
     }
     case "discard-card-for-influence-and-draw":
       return { kind: "skip-discard-card-for-influence-and-draw" };
-    case "discard-cards-for-reward":
-      return { kind: "skip-discard-cards-for-reward" };
+    case "discard-cards-for-reward": {
+      if (pending.optional) return { kind: "skip-discard-cards-for-reward" };
+      const owner = room.game.players.find((player) => player.id === pending.ownerId);
+      const card = owner ? discardCardsForRewardChoices(owner, pending)[0] : undefined;
+      return card ? { kind: "choose-discard-cards-for-reward", discardCardId: card.id } : undefined;
+    }
     case "discard-hand-card": {
       const owner = room.game.players.find((player) => player.id === pending.ownerId);
       const card = owner?.hand[0];
@@ -378,8 +388,20 @@ function pendingCommand(room, pending) {
       return { kind: "skip-deploy-or-retreat-troops" };
     case "recall-spy":
       return { kind: "skip-recall" };
-    case "deploy":
+    case "deploy": {
+      const owner = room.game.players.find((player) => player.id === pending.ownerId);
+      if (
+        owner &&
+        owner.garrison > 0 &&
+        pending.remaining > 0 &&
+        !pending.conflictBlocked &&
+        room.game.conflictDeploymentBlock?.ownerId !== owner.id &&
+        !coverage?.combatPlayerIds.has(owner.id)
+      ) {
+        return { kind: "deploy-one" };
+      }
       return { kind: "clear-pending-action" };
+    }
     case "spy": {
       const placeSpace = placeableSpySpaces(room.game, pending)[0];
       if (placeSpace) return { kind: "place-spy", spaceId: placeSpace.id };
@@ -451,18 +473,39 @@ function pendingCommand(room, pending) {
   }
 }
 
-async function resolvePending(roomId, tokens, clients, max = 100) {
+async function resolvePending(roomId, tokens, clients, coverage, max = 300) {
   for (let index = 0; index < max; index += 1) {
     const room = roomRecord(roomId);
     const pending = room.game.pendingAction;
     if (!pending) return;
-    const command = pendingCommand(room, pending);
+    const command = pendingCommand(room, pending, coverage);
     const ownerId = pendingOwnerId(room, pending, command);
     if (!ownerId || !command) {
       throw new Error(`Unsupported pending ${JSON.stringify(pending, null, 2)}`);
     }
-    await roomAction(roomId, ownerId, tokens, { kind: "pending", command });
+    const gameBefore = JSON.stringify(room.game);
+    const deployedOwnerId = command.kind === "deploy-one" ? pending.ownerId : undefined;
+    const deployedBefore = deployedOwnerId
+      ? room.game.players.find((player) => player.id === deployedOwnerId)?.deployedTroops ?? 0
+      : 0;
+    const snapshot = await roomAction(roomId, ownerId, tokens, { kind: "pending", command });
+    const afterRoom = roomRecord(roomId);
+    if (JSON.stringify(afterRoom.game) === gameBefore) {
+      throw new Error(`Pending command made no progress ${JSON.stringify({ pending, command })}`);
+    }
     await assertConverged(roomId, clients);
+    if (deployedOwnerId) {
+      const deployedAfter = snapshot.game.players.find((player) => player.id === deployedOwnerId)?.deployedTroops ?? 0;
+      if (deployedAfter > deployedBefore) {
+        coverage.deployActions += deployedAfter - deployedBefore;
+        coverage.combatPlayerIds.add(deployedOwnerId);
+        if (!coverage.capturedFirstDeploy) {
+          const ownerClient = clients.find((client) => client.playerId === deployedOwnerId) ?? clients[0];
+          await capture(ownerClient.page, "marathon-first-combat-participant.png");
+          coverage.capturedFirstDeploy = true;
+        }
+      }
+    }
   }
   throw new Error("Pending action loop did not finish");
 }
@@ -515,8 +558,9 @@ async function driveMarathon(roomId, tokens, clients) {
   let buyActions = 0;
   const buySourceCounts = { imperium: 0, manipulated: 0, reserve: 0, throne: 0 };
   const buyPlayerIds = new Set();
+  const combatCoverage = { capturedFirstDeploy: false, combatPlayerIds: new Set(), deployActions: 0 };
   for (let step = 1; step <= 700; step += 1) {
-    await resolvePending(roomId, tokens, clients);
+    await resolvePending(roomId, tokens, clients, combatCoverage);
     const room = roomRecord(roomId);
     const game = room.game;
     if (!capturedMidpoint && game.round >= 5 && game.phase === "playing") {
@@ -531,6 +575,8 @@ async function driveMarathon(roomId, tokens, clients) {
         buyActions,
         buyPlayerIds: [...buyPlayerIds].sort(),
         buySourceCounts,
+        combatPlayerIds: [...combatCoverage.combatPlayerIds].sort(),
+        deployActions: combatCoverage.deployActions,
       };
     }
     if (game.phase === "playing") {
@@ -635,7 +681,7 @@ try {
   await capture(firstPage, "marathon-all-seats-claimed.png");
 
   await resolveSetup(roomId, tokens, clients);
-  const { steps, agentPlacements, agentPlayerIds, buyActions, buyPlayerIds, buySourceCounts } = await driveMarathon(roomId, tokens, clients);
+  const { steps, agentPlacements, agentPlayerIds, buyActions, buyPlayerIds, buySourceCounts, combatPlayerIds, deployActions } = await driveMarathon(roomId, tokens, clients);
   await assertConverged(roomId, clients);
   const finished = roomRecord(roomId).game;
   assert.equal(finished.phase, "finished", "Marathon should finish through normal room actions");
@@ -648,6 +694,8 @@ try {
   assert.ok(buySourceCounts.imperium >= 6, "Marathon should exercise Imperium Row online card buying");
   assert.ok(buySourceCounts.reserve >= 6, "Marathon should exercise Reserve online card buying");
   assert.ok(buySourceCounts.throne >= 1, "Marathon should exercise Shaddam Throne Row online card buying");
+  assert.ok(deployActions >= allySeatIds.length, "Marathon should exercise online troop deployment for each Ally seat");
+  assert.deepEqual(combatPlayerIds, allySeatIds, "Marathon should exercise combat participation for all Ally seats");
   for (const { page, playerId } of clients) assertRoomPrivacy(await currentGame(page), playerId);
   await capture(firstPage, "marathon-finished.png");
 
@@ -669,6 +717,8 @@ try {
     buyActions,
     buyPlayerIds,
     buySourceCounts,
+    combatPlayerIds,
+    deployActions,
     actionCount: actionLog.length,
     screenshots,
     consoleErrorCount: consoleFailures.length,
@@ -688,6 +738,8 @@ try {
   console.log(`card buys: ${summary.buyActions}`);
   console.log(`buying seats: ${summary.buyPlayerIds.length}`);
   console.log(`buy sources: ${JSON.stringify(summary.buySourceCounts)}`);
+  console.log(`troop deployments: ${summary.deployActions}`);
+  console.log(`combat participant seats: ${summary.combatPlayerIds.length}`);
   console.log(`actions: ${summary.actionCount}`);
   console.log(`screenshot count: ${summary.screenshots.length}`);
   console.log(`console error count: ${summary.consoleErrorCount}`);

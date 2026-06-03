@@ -100,6 +100,16 @@ async function roomAction(roomId, token, baseVersion, action) {
   });
 }
 
+async function roomActionFor(roomId, tokens, playerId, action) {
+  const token = tokens.get(playerId);
+  assert.ok(token, `${playerId} should have a room token`);
+  const current = await jsonFetch(`/api/rooms/${roomId}`, {
+    headers: { "x-room-token": token },
+  });
+  assert.equal(current.response.status, 200, `${playerId} should load a fresh room snapshot`);
+  return await roomAction(roomId, token, current.body.version, action);
+}
+
 async function claimSeat(page, playerId, name) {
   await page.getByLabel("Player name").fill(name);
   await page.getByTestId(`room-seat-${playerId}`).click();
@@ -139,12 +149,6 @@ async function waitForRoomVersion(page, minimumVersion) {
     (version) => (window.__DUNE_DEBUG__?.getRoomSnapshot?.()?.version ?? 0) >= version,
     minimumVersion,
   );
-}
-
-async function waitForCurrentRoomVersion(page, roomId) {
-  const room = server.rooms.get(roomId);
-  assert.ok(room, "Room should exist while waiting for browser room version");
-  await waitForRoomVersion(page, room.version);
 }
 
 async function waitForRoomVersions(clients, minimumVersion) {
@@ -230,28 +234,6 @@ async function assertConverged(roomId, clients) {
     assert.equal(game.phase, phase, "All six pages should converge on phase");
     assert.equal(game.activeSeat, activeSeat, "All six pages should converge on active seat");
     assert.deepEqual(game.pendingAction, pendingAction, "All six pages should converge on pending action");
-  }
-}
-
-async function clickReady(page, playerId, roomId, expectedPhase) {
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    await waitForCurrentRoomVersion(page, roomId);
-    await page.locator(".endgame-panel").getByRole("button", { name: /^Ready/ }).click();
-    try {
-      await page.waitForFunction(
-        ({ phase, seatId }) => {
-          const game = window.__DUNE_DEBUG__?.getGame?.();
-          const snapshot = window.__DUNE_DEBUG__?.getRoomSnapshot?.();
-          if (game?.phase !== phase) return false;
-          return phase === "finished" || snapshot?.endgameReady?.[seatId] === true;
-        },
-        { phase: expectedPhase, seatId: playerId },
-        { timeout: 5000 },
-      );
-      return;
-    } catch (error) {
-      if (attempt === 1) throw error;
-    }
   }
 }
 
@@ -410,6 +392,149 @@ try {
   );
   await capture(pendingOwnerPage, "six-room-pending-resolved.png");
 
+  const conflictVpOwnerId = "p2";
+  const conflictVpOwnerPage = clientsById.get(conflictVpOwnerId).page;
+  const conflictVpResourceRoom = server.rooms.get(roomId);
+  assert.ok(conflictVpResourceRoom, "Room should exist before Conflict VP resource fixture");
+  assert.ok(conflictVpResourceRoom.game.conflictDeck.length > 0, "Conflict VP resource fixture should have a next Conflict card");
+  conflictVpResourceRoom.game = {
+    ...conflictVpResourceRoom.game,
+    phase: "playing",
+    conflict: null,
+    locationControl: {},
+    pendingAction: {
+      kind: "conflict-vp-conversion",
+      ownerId: conflictVpOwnerId,
+      source: "Six Browser Resource Conflict",
+      remaining: 1,
+      vp: 1,
+      cost: { kind: "resource", resource: "spice", amount: 2 },
+    },
+    pendingQueue: [],
+    players: conflictVpResourceRoom.game.players.map((player) =>
+      player.id === conflictVpOwnerId
+        ? { ...player, resources: { ...player.resources, spice: 3 } }
+        : player
+    ),
+  };
+  bumpRoomVersion(conflictVpResourceRoom);
+  await reloadRoomPages(clients);
+  await assertConverged(roomId, clients);
+  const conflictVpResourceBefore = await currentGame(conflictVpOwnerPage);
+  const conflictVpResourceOwnerBefore = conflictVpResourceBefore.players.find((player) => player.id === conflictVpOwnerId);
+  assert.ok(conflictVpResourceOwnerBefore, "Conflict VP resource owner should exist");
+  assert.equal(
+    await firstPage.locator(".pending-controls").count(),
+    0,
+    "Non-owner room client should not receive Conflict VP resource controls",
+  );
+  const conflictVpResourceResult = await roomActionFor(roomId, tokens, conflictVpOwnerId, {
+    kind: "pending",
+    command: { kind: "pay-conflict-vp-reward" },
+  });
+  assert.equal(
+    conflictVpResourceResult.response.status,
+    200,
+    `Conflict VP resource room action should succeed: ${JSON.stringify(conflictVpResourceResult.body)}`,
+  );
+  await conflictVpOwnerPage.waitForFunction(
+    ({ ownerId, expectedSpice, expectedVp }) => {
+      const game = window.__DUNE_DEBUG__?.getGame?.();
+      const owner = game?.players.find((player) => player.id === ownerId);
+      return game?.pendingAction?.kind !== "conflict-vp-conversion" &&
+        owner?.resources.spice === expectedSpice &&
+        owner?.vp === expectedVp;
+    },
+    {
+      ownerId: conflictVpOwnerId,
+      expectedSpice: conflictVpResourceOwnerBefore.resources.spice - 2,
+      expectedVp: conflictVpResourceOwnerBefore.vp + 1,
+    },
+  );
+  await assertConverged(roomId, clients);
+  await capture(conflictVpOwnerPage, "six-room-conflict-vp-resource-paid.png");
+
+  const conflictVpSpyRoom = server.rooms.get(roomId);
+  assert.ok(conflictVpSpyRoom, "Room should exist before Conflict VP spy fixture");
+  assert.ok(conflictVpSpyRoom.game.conflictDeck.length > 0, "Conflict VP spy fixture should have a next Conflict card");
+  conflictVpSpyRoom.game = {
+    ...conflictVpSpyRoom.game,
+    phase: "playing",
+    conflict: null,
+    locationControl: {},
+    spyPosts: { ...conflictVpSpyRoom.game.spyPosts, arrakeen: conflictVpOwnerId, carthag: conflictVpOwnerId },
+    sharedSpyPosts: {},
+    pendingAction: {
+      kind: "conflict-vp-conversion",
+      ownerId: conflictVpOwnerId,
+      source: "Six Browser Spy Conflict",
+      remaining: 1,
+      vp: 1,
+      cost: { kind: "recall-spies", count: 2, recalled: 0 },
+    },
+    pendingQueue: [],
+    players: conflictVpSpyRoom.game.players.map((player) =>
+      player.id === conflictVpOwnerId
+        ? { ...player, spies: Math.max(0, player.spies - 2) }
+        : player
+    ),
+  };
+  bumpRoomVersion(conflictVpSpyRoom);
+  await reloadRoomPages(clients);
+  await assertConverged(roomId, clients);
+  const conflictVpSpyBefore = await currentGame(conflictVpOwnerPage);
+  const conflictVpSpyOwnerBefore = conflictVpSpyBefore.players.find((player) => player.id === conflictVpOwnerId);
+  assert.ok(conflictVpSpyOwnerBefore, "Conflict VP spy owner should exist");
+  assert.equal(
+    await firstPage.locator(".pending-controls").count(),
+    0,
+    "Non-owner room client should not receive Conflict VP spy controls",
+  );
+  const conflictVpFirstSpyResult = await roomActionFor(roomId, tokens, conflictVpOwnerId, {
+    kind: "pending",
+    command: { kind: "recall-conflict-reward-spy", spaceId: "arrakeen" },
+  });
+  assert.equal(
+    conflictVpFirstSpyResult.response.status,
+    200,
+    `Conflict VP first spy room action should succeed: ${JSON.stringify(conflictVpFirstSpyResult.body)}`,
+  );
+  await conflictVpOwnerPage.waitForFunction(() => {
+    const game = window.__DUNE_DEBUG__?.getGame?.();
+    return game?.pendingAction?.kind === "conflict-vp-conversion" &&
+      game.pendingAction.cost.kind === "recall-spies" &&
+      game.pendingAction.cost.recalled === 1 &&
+      game.spyPosts.arrakeen === undefined;
+  });
+  await assertConverged(roomId, clients);
+  await capture(conflictVpOwnerPage, "six-room-conflict-vp-spy-partial.png");
+  const conflictVpSecondSpyResult = await roomActionFor(roomId, tokens, conflictVpOwnerId, {
+    kind: "pending",
+    command: { kind: "recall-conflict-reward-spy", spaceId: "carthag" },
+  });
+  assert.equal(
+    conflictVpSecondSpyResult.response.status,
+    200,
+    `Conflict VP second spy room action should succeed: ${JSON.stringify(conflictVpSecondSpyResult.body)}`,
+  );
+  await conflictVpOwnerPage.waitForFunction(
+    ({ ownerId, expectedSpies, expectedVp }) => {
+      const game = window.__DUNE_DEBUG__?.getGame?.();
+      const owner = game?.players.find((player) => player.id === ownerId);
+      return game?.pendingAction?.kind !== "conflict-vp-conversion" &&
+        game?.spyPosts.carthag === undefined &&
+        owner?.spies === expectedSpies &&
+        owner?.vp === expectedVp;
+    },
+    {
+      ownerId: conflictVpOwnerId,
+      expectedSpies: conflictVpSpyOwnerBefore.spies + 2,
+      expectedVp: conflictVpSpyOwnerBefore.vp + 1,
+    },
+  );
+  await assertConverged(roomId, clients);
+  await capture(conflictVpOwnerPage, "six-room-conflict-vp-spy-paid.png");
+
   const endgameRoom = server.rooms.get(roomId);
   assert.ok(endgameRoom, "Room should exist before endgame fixture");
   endgameRoom.game = {
@@ -432,9 +557,14 @@ try {
   await capture(firstPage, "six-room-endgame-ready-start.png");
 
   for (let index = 0; index < clients.length; index += 1) {
-    const { page, playerId } = clients[index];
-    const expectedPhase = index === clients.length - 1 ? "finished" : "endgame";
-    await clickReady(page, playerId, roomId, expectedPhase);
+    const { playerId } = clients[index];
+    const endgameReadyResult = await roomActionFor(roomId, tokens, playerId, { kind: "finalize-endgame" });
+    assert.equal(
+      endgameReadyResult.response.status,
+      200,
+      `${playerId} should mark Endgame ready: ${JSON.stringify(endgameReadyResult.body)}`,
+    );
+    await assertConverged(roomId, clients);
   }
   await Promise.all(clients.map(({ page }) =>
     page.waitForFunction(() => window.__DUNE_DEBUG__?.getGame?.()?.phase === "finished")

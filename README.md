@@ -115,6 +115,7 @@ pnpm build
 pnpm run debug:room:smoke
 pnpm run debug:room:complete
 pnpm run debug:room:marathon
+pnpm run debug:room:vp-endgame
 ```
 
 `verify:all` runs every package verifier script in order and stops on the first failure.
@@ -134,6 +135,7 @@ pnpm run debug:game:smoke
 pnpm run debug:room:smoke
 pnpm run debug:room:complete
 pnpm run debug:room:marathon
+pnpm run debug:room:vp-endgame
 ```
 
 The default debug run starts a local Vite server, drives scripted Playwright scenarios, and writes screenshots, per-capture game state, `console.json`, `request-failures.json`, `<scenario>-trace.zip`, and `summary.json` under `artifacts/qa/browser-debug`. Use the headed command to watch the scripted scenarios. When passing `--port`, treat it as the requested starting port and check the printed URL or `summary.json` for the actual port.
@@ -149,6 +151,8 @@ Use `pnpm run debug:room:smoke` after room/session changes. It starts the privat
 Use `pnpm run debug:room:complete` when room/session changes affect full-table coordination. It opens six isolated browser contexts, claims all six seats, verifies hidden projections and turn permissions, reloads a claimed seat, resolves setup, advances a room turn, resolves a server-backed pending choice, and has all six seats mark Endgame ready until the shared room finishes.
 
 Use `pnpm run debug:room:marathon` for the heavier six-browser natural room marathon. It claims all six seats, verifies private projections, resolves setup, places legal Agents when available, buys legal cards during Reveal turns, deploys legal troops for all four Ally seats into the Conflict, resolves generated pending actions, asserts round cleanup on each natural round advance, advances Reveal/combat/Endgame flow until the Conflict deck naturally empties, finalizes all seats, asserts the final team-score result, and writes screenshots, state JSON, console logs, request failures, action logs, and `summary.json` under `artifacts/qa/browser-room-marathon`.
+
+Use `pnpm run debug:room:vp-endgame` for a focused six-browser room Endgame trigger. It claims all six seats, seeds a late Recall state with an Ally at 10 VP while the Conflict deck still has cards, triggers Endgame through a normal room `end-reveal` action, finalizes all seats, asserts team scoring, and writes screenshots, state JSON, console logs, request failures, and `summary.json` under `artifacts/qa/browser-room-vp-endgame`.
 
 See [docs/browser-testing-pipeline.md](docs/browser-testing-pipeline.md) for the full IAB-free browser testing workflow, subagent instructions, artifact contract, and scenario-extension checklist.
 

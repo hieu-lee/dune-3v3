@@ -44,6 +44,7 @@ pnpm run debug:game
 pnpm run debug:room:smoke
 pnpm run debug:room:complete
 pnpm run debug:room:marathon
+pnpm run debug:room:vp-endgame
 ```
 
 `pnpm run verify:browser-debug-pipeline` is a static contract check that keeps the package scripts, scenario inventory, generated artifact names, debug globals, README, and this document aligned. It is included in `pnpm run verify`, but it does not replace a real browser smoke run when the browser pipeline itself changes.
@@ -55,6 +56,8 @@ Use `debug:room:smoke` when the room/session layer, hidden projection, reconnect
 Use `debug:room:complete` when a change may affect all-seat room coordination. It opens six isolated browser contexts, claims p1-p6, verifies seat identity, hidden projections, reconnect recovery, client and server permission failures, cross-client convergence, pending ownership, and six-player Endgame readiness/finalization. It writes screenshots, state JSON, console logs, request failures, and `summary.json` under `artifacts/qa/browser-room-complete-flow`.
 
 Use `debug:room:marathon` for a heavier six-browser natural room marathon. It claims p1-p6, verifies private projections, resolves setup, places legal Agents when available, buys legal cards during Reveal turns, deploys legal troops for all four Ally seats into the Conflict, resolves generated pending actions, asserts round cleanup on each natural round advance, drives Reveal/end-Reveal/combat-pass cycles until the Conflict deck naturally empties, resolves any available Endgame Intrigue scoring choices, finalizes all seats, asserts the final team-score result, and writes screenshots, state JSON, action logs, console logs, request failures, and `summary.json` under `artifacts/qa/browser-room-marathon`.
+
+Use `debug:room:vp-endgame` for a focused six-browser room Endgame trigger. It claims p1-p6, verifies private projections, seeds a late Recall state where an Ally has 10 VP and the Conflict deck is not empty, crosses into Endgame through a normal room `end-reveal` action, finalizes all seats, asserts the team-score result, and writes screenshots, state JSON, console logs, request failures, and `summary.json` under `artifacts/qa/browser-room-vp-endgame`.
 
 Use `debug:browser -- --scenario all` when a change may affect several pending-action surfaces. It creates many scenario screenshots under the selected `--out` directory and records a trace unless `--no-trace` is passed.
 

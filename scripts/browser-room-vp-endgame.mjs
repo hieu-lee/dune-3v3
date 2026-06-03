@@ -177,20 +177,48 @@ async function assertConverged(roomId, clients) {
     activeSeat: room.game.activeSeat,
     pendingKind: room.game.pendingAction?.kind,
   };
-  await Promise.all(clients.map(({ page }) =>
-    page.waitForFunction(
-      ({ version, phase, activeSeat, pendingKind }) => {
+  const failures = [];
+  await Promise.all(clients.map(async ({ page, playerId }) => {
+    try {
+      await page.waitForFunction(
+        ({ version, phase, activeSeat, pendingKind }) => {
+          const snapshot = window.__DUNE_DEBUG__?.getRoomSnapshot?.();
+          const game = window.__DUNE_DEBUG__?.getGame?.();
+          return snapshot?.version === version &&
+            JSON.stringify(snapshot.game) === JSON.stringify(game) &&
+            game?.phase === phase &&
+            game.activeSeat === activeSeat &&
+            game.pendingAction?.kind === pendingKind;
+        },
+        expected,
+      );
+    } catch (error) {
+      const diagnostics = await page.evaluate(() => {
         const snapshot = window.__DUNE_DEBUG__?.getRoomSnapshot?.();
         const game = window.__DUNE_DEBUG__?.getGame?.();
-        return snapshot?.version === version &&
-          JSON.stringify(snapshot.game) === JSON.stringify(game) &&
-          game?.phase === phase &&
-          game.activeSeat === activeSeat &&
-          game.pendingAction?.kind === pendingKind;
-      },
-      expected,
-    )
-  ));
+        return {
+          href: window.location.href,
+          snapshotVersion: snapshot?.version,
+          snapshotViewer: snapshot?.viewerPlayerId,
+          snapshotPhase: snapshot?.game?.phase,
+          snapshotRound: snapshot?.game?.round,
+          snapshotActiveSeat: snapshot?.game?.activeSeat,
+          snapshotPendingKind: snapshot?.game?.pendingAction?.kind,
+          gamePhase: game?.phase,
+          gameRound: game?.round,
+          gameActiveSeat: game?.activeSeat,
+          gamePendingKind: game?.pendingAction?.kind,
+          snapshotGameMatchesDebugGame: Boolean(snapshot && game) && JSON.stringify(snapshot.game) === JSON.stringify(game),
+        };
+      });
+      failures.push({
+        playerId,
+        message: error instanceof Error ? error.message : String(error),
+        diagnostics,
+      });
+    }
+  }));
+  assert.deepEqual(failures, [], `Room clients did not converge:\n${JSON.stringify({ expected, failures }, null, 2)}`);
 }
 
 function assertHiddenSharedDecks(game) {

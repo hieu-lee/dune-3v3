@@ -4,6 +4,7 @@ import { verifyStarterDeckCatalog } from "./verify-starter-decks-catalog.mjs";
 import { verifyStarterDeckCommandRespect } from "./verify-starter-decks-command-respect.mjs";
 import { verifyStarterDeckDesertCall } from "./verify-starter-decks-desert-call.mjs";
 import { verifyStarterDeckDemandAttention } from "./verify-starter-decks-demand-attention.mjs";
+import { verifyStarterDeckSeekAllies } from "./verify-starter-decks-seek-allies.mjs";
 import { verifyStarterDeckThreatenSpiceProduction } from "./verify-starter-decks-threaten-spice-production.mjs";
 import { playerById } from "./verify-starter-decks-fixtures.mjs";
 
@@ -21,6 +22,13 @@ try {
     game,
     players: { muadDib, shaddamAlly, muadDibAllyA, emperor, muadDibAllyB, shaddamAllyB },
   } = verifyStarterDeckCatalog({ data, state });
+
+  verifyStarterDeckSeekAllies({
+    data,
+    game,
+    players: { muadDib, shaddamAlly, muadDibAllyA, emperor },
+    state,
+  });
 
   verifyStarterDeckCommandRespect({
     data,

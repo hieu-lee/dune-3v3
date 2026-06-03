@@ -187,6 +187,29 @@ export async function runCardChoicesSmoke({
     "Overthrow should remain in play after the board-space Influence choice",
   );
 
+  await setDebugGameAndWait(page, states.seekAllies);
+  pendingText = await page.locator(".pending-panel").innerText();
+  assert.match(pendingText, /Seek Allies/i);
+  assert.doesNotMatch(pendingText, /Skip/i);
+  assert.doesNotMatch(pendingText, /Seek Allies Debug Other/i);
+  await screenshot(page, captures, "pending-seek-allies-trash.png");
+
+  before = await currentGame(page);
+  await page.locator(".pending-panel").getByRole("button", { name: /Seek Allies \(in play\)/ }).click();
+  await waitForNoPending(page);
+  after = await currentGame(page);
+  ownerAfter = after.players.find((player) => player.id === "p2");
+  assert.equal(
+    ownerAfter.playArea.some((card) => card.id === before.pendingAction.requiredCardId),
+    false,
+    "Seek Allies should trash the source card from play",
+  );
+  assert.equal(
+    ownerAfter.playArea.some((card) => card.id === states.seekAllies.seekAlliesOtherPlayCardId),
+    true,
+    "Seek Allies should leave other in-play cards alone",
+  );
+
   await setDebugGameAndWait(page, states.desertSurvival);
   pendingText = await page.locator(".pending-panel").innerText();
   assert.match(pendingText, /Desert Survival/i);
@@ -943,6 +966,8 @@ async function createCardChoiceStates(server, initialPlayableGame) {
   assert.ok(subversiveAdvisor, "Expected Subversive Advisor Imperium card");
   const overthrow = data.imperiumDeck.find((card) => card.sourceId === 75);
   assert.ok(overthrow, "Expected Overthrow Imperium card");
+  const seekAllies = data.allyStarterCards.find((card) => card.name === "Seek Allies");
+  assert.ok(seekAllies, "Expected Seek Allies starter card");
   const desertSurvival = data.imperiumDeck.find((card) => card.sourceId === 27);
   assert.ok(desertSurvival, "Expected Desert Survival Imperium card");
   const treadInDarkness = data.imperiumDeck.find((card) => card.sourceId === 58);
@@ -1084,6 +1109,11 @@ async function createCardChoiceStates(server, initialPlayableGame) {
     ...data.allyStarterCards[0],
     id: "browser-covert-operation-discard-card",
     name: "Covert Operation Debug Discard",
+  };
+  const seekAlliesOtherPlayCard = {
+    ...data.allyStarterCards[0],
+    id: "browser-seek-allies-other-play-card",
+    name: "Seek Allies Debug Other",
   };
   const desertSurvivalOtherPlayCard = {
     ...data.allyStarterCards[0],
@@ -1780,6 +1810,48 @@ async function createCardChoiceStates(server, initialPlayableGame) {
     "board-influence-choice",
     "Expected Overthrow board-space Influence pending action",
   );
+  const seekAlliesState = turnActions.placeAgentAction(
+    {
+      ...base,
+      spaces: {},
+      players: base.players.map((player) =>
+        player.id === ownerId
+          ? {
+              ...player,
+              agentsReady: 1,
+              garrison: 0,
+              hand: [seekAllies],
+              playArea: [seekAlliesOtherPlayCard],
+              resources: { solari: 0, spice: 0, water: 0 },
+            }
+          : player,
+      ),
+    },
+    {
+      commanderTargets: {},
+      selectedCard: seekAllies,
+      selectedSpace: corrinthCitySpace,
+    },
+  );
+  assert.equal(
+    seekAlliesState.pendingAction?.kind,
+    "trash-card",
+    "Expected Seek Allies source-trash pending action",
+  );
+  assert.equal(seekAlliesState.pendingAction.optional, false, "Seek Allies source trash should be mandatory");
+  assert.equal(seekAlliesState.pendingAction.requiredCardId, seekAllies.id);
+  assert.equal(seekAlliesState.pendingAction.requiredAgentPlacementSpaceId, corrinthCitySpace.id);
+  assert.equal(seekAlliesState.pendingAction.requiredAgentPlacementTargetOwnerId, ownerId);
+  const seekAlliesOwner = seekAlliesState.players.find((player) => player.id === ownerId);
+  assert.ok(seekAlliesOwner, "Expected Seek Allies owner in browser debug state");
+  assert.deepEqual(
+    state.trashableCardsForPending(
+      seekAlliesOwner,
+      seekAlliesState.pendingAction,
+    ).map(({ card }) => card.id),
+    [seekAllies.id],
+    "Seek Allies browser state should only offer its source card",
+  );
   const desertSurvivalState = turnActions.placeAgentAction(
     {
       ...base,
@@ -2117,6 +2189,10 @@ async function createCardChoiceStates(server, initialPlayableGame) {
     dangerousRhetoric: dangerousRhetoricState,
     subversiveAdvisor: subversiveAdvisorState,
     overthrow: overthrowState,
+    seekAllies: {
+      ...seekAlliesState,
+      seekAlliesOtherPlayCardId: seekAlliesOtherPlayCard.id,
+    },
     desertSurvival: {
       ...desertSurvivalState,
       desertSurvivalOtherPlayCardId: desertSurvivalOtherPlayCard.id,

@@ -42,7 +42,11 @@ export function verifyStarterDeckCatalog({ data, state }) {
     data.allyStarterCards.filter((card) => card.name === "Dagger").map((card) => card.icons),
     [["landsraad"], ["landsraad"]],
   );
-  assert.equal(data.allyStarterCards.find((card) => card.name === "Seek Allies")?.trashOnPlay, true);
+  assert.equal(
+    data.allyStarterCards.find((card) => card.name === "Seek Allies")?.trashOnPlay,
+    undefined,
+    "Ally Seek Allies should use typed source-card trash instead of trashOnPlay",
+  );
   assertLocalArt(data.allyStarterCards, "Ally deck");
 
   assert.equal(data.muadDibCommanderCards.length, 10, "Muad'Dib Commander deck should contain 10 cards");
@@ -67,7 +71,11 @@ export function verifyStarterDeckCatalog({ data, state }) {
       { swords: 1, revealGain: { spice: 1 } },
     ],
   );
-  assert.equal(data.muadDibCommanderCards.find((card) => card.name === "Seek Allies")?.trashOnPlay, true);
+  assert.equal(
+    data.muadDibCommanderCards.find((card) => card.name === "Seek Allies")?.trashOnPlay,
+    undefined,
+    "Muad'Dib Seek Allies should use typed source-card trash instead of trashOnPlay",
+  );
   assert.match(
     data.muadDibCommanderCards.find((card) => card.name === "Command Respect")?.play ?? "",
     /trash this card to trade/i,
@@ -111,7 +119,11 @@ export function verifyStarterDeckCatalog({ data, state }) {
       { persuasion: 1, revealGain: { solari: 1 } },
     ],
   );
-  assert.equal(data.emperorCommanderCards.find((card) => card.name === "Seek Allies")?.trashOnPlay, true);
+  assert.equal(
+    data.emperorCommanderCards.find((card) => card.name === "Seek Allies")?.trashOnPlay,
+    undefined,
+    "Emperor Seek Allies should use typed source-card trash instead of trashOnPlay",
+  );
   assertLocalArt(data.emperorCommanderCards, "Emperor Commander deck");
 
   const game = state.initialGame();

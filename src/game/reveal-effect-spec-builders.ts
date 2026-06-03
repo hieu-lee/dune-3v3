@@ -157,6 +157,28 @@ export function revealLoseInfluenceForIntrigues(
   ], conditions);
 }
 
+export function revealRecallSpyForIntrigues(
+  drawIntrigues: EffectAmountSpec,
+  options: {
+    amount?: EffectAmountSpec;
+    optional?: boolean;
+    source?: string;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return revealEffects([
+    {
+      kind: "recall-spy",
+      selector: "self",
+      amount: options.amount ?? 1,
+      drawIntrigues,
+      optional: true,
+      ...(options.source ? { source: options.source } : {}),
+      ...(options.optional !== undefined ? { optional: options.optional } : {}),
+    },
+  ], conditions);
+}
+
 export function revealPayResourceForStrength(
   resource: ResourceId,
   cost: EffectAmountSpec,

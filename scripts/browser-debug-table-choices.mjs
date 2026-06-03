@@ -159,6 +159,29 @@ export async function runTableChoicesSmoke({
   assert.equal(wheelsOwnerAfter.spies, wheelsOwnerBefore.spies - 1, "Wheels Within Wheels should spend one spy");
   assert.equal(wheelsOwnerAfter.persuasion, 1, "Wheels Within Wheels should keep its typed reveal persuasion after spy placement");
 
+  await setDebugGameAndWait(page, states.spyNetworkRevealRecall);
+  await screenshot(page, captures, "spy-network-reveal-ready.png");
+  await page.getByTestId("reveal-turn").click();
+  await page.waitForFunction(() => window.__DUNE_DEBUG__?.getGame().pendingAction?.kind === "recall-spy");
+  pendingText = await page.locator(".pending-panel").innerText();
+  assert.match(pendingText, /Spy Network/i);
+  assert.match(pendingText, /draw 1 Intrigue card/i);
+  await screenshot(page, captures, "pending-spy-network-reveal-recall.png");
+  const spyNetworkBefore = await currentGame(page);
+  const spyNetworkOwnerBefore = spyNetworkBefore.players.find((player) => player.id === "p2");
+  assert.ok(spyNetworkOwnerBefore, "Expected Feyd before Spy Network reveal recall");
+  await page.locator(".pending-panel").getByRole("button", { name: states.spyNetworkRecallSpaceName }).click();
+  await waitForNoPending(page);
+  const spyNetworkAfter = await currentGame(page);
+  const spyNetworkOwnerAfter = spyNetworkAfter.players.find((player) => player.id === "p2");
+  assert.ok(spyNetworkOwnerAfter, "Expected Feyd after Spy Network reveal recall");
+  assert.equal(spyNetworkAfter.spyPosts[states.spyNetworkRecallSpaceId], undefined, "Spy Network should remove the recalled spy post");
+  assert.equal(spyNetworkOwnerAfter.spies, spyNetworkOwnerBefore.spies + 1, "Spy Network should return the recalled spy");
+  assert.equal(spyNetworkOwnerAfter.intrigues.at(-1)?.name, states.spyNetworkRewardIntrigueName, "Spy Network should draw one Intrigue");
+  assert.equal(spyNetworkOwnerAfter.persuasion, 2, "Spy Network should keep its typed reveal persuasion after recall");
+  assert.equal(spyNetworkAfter.turnSpyRecalls.p2, (spyNetworkBefore.turnSpyRecalls.p2 ?? 0) + 1);
+  await screenshot(page, captures, "spy-network-after-recall.png");
+
   await setDebugGameAndWait(page, states.calculusTrashReveal);
   await screenshot(page, captures, "calculus-trash-ready.png");
   await page.getByTestId("reveal-turn").click();
@@ -874,6 +897,15 @@ async function createTableChoiceStates(server, initialPlayableGame) {
   assert.ok(paracompass, "Expected Paracompass for conditional reveal browser debug state");
   const wheelsWithinWheels = data.imperiumDeck.find((card) => card.name === "Wheels Within Wheels");
   assert.ok(wheelsWithinWheels, "Expected Wheels Within Wheels for reveal spy browser debug state");
+  const spyNetwork = data.imperiumDeck.find((card) => card.name === "Spy Network");
+  assert.ok(spyNetwork, "Expected Spy Network for reveal spy recall browser debug state");
+  const spyNetworkRewardIntrigue = data.intrigueCards.find((card) => card.name === "Backed by CHOAM") ?? data.intrigueCards[0];
+  assert.ok(spyNetworkRewardIntrigue, "Expected an Intrigue reward card for Spy Network browser debug state");
+  const spyNetworkRecallSpaces = ["secrets", "high-council"].map((spaceId) => {
+    const space = data.boardSpaces.find((candidate) => candidate.id === spaceId);
+    assert.ok(space, `Expected ${spaceId} for Spy Network browser debug state`);
+    return space;
+  });
   const fremenSupport = data.imperiumDeck.find((card) =>
     card.id !== chani.id && card.traits?.includes("Faction: Fremen")
   );
@@ -984,6 +1016,33 @@ async function createTableChoiceStates(server, initialPlayableGame) {
   };
   const wheelsSpySpace = state.placeableSpySpaces(wheelsRevealSpy, wheelsSpyPending)[0];
   assert.ok(wheelsSpySpace, "Expected a legal Wheels Within Wheels reveal spy post for browser debug state");
+  const spyNetworkRevealRecall = {
+    ...base,
+    activeSeat: feydSeat,
+    intrigueDeck: [cloneCard(spyNetworkRewardIntrigue)],
+    intrigueDiscard: [],
+    sharedSpyPosts: {},
+    spyPosts: Object.fromEntries(spyNetworkRecallSpaces.map((space) => [space.id, "p2"])),
+    turnSpyRecalls: {},
+    players: base.players.map((player) =>
+      player.id === "p2"
+        ? {
+            ...player,
+            agentsReady: 0,
+            conflict: 0,
+            deployedTroops: 0,
+            discard: [],
+            hand: [cloneCard(spyNetwork)],
+            highCouncilSeat: false,
+            intrigues: [],
+            persuasion: 0,
+            playArea: [],
+            revealed: false,
+            spies: 0,
+          }
+        : { ...player, conflict: 0, deployedTroops: 0, intrigues: [] }
+    ),
+  };
   const specialMissionPlaceSpy = {
     ...base,
     activeSeat: feydSeat,
@@ -1139,6 +1198,10 @@ async function createTableChoiceStates(server, initialPlayableGame) {
     wheelsWithinWheelsRevealSpy: wheelsRevealSpy,
     wheelsRevealSpySpaceId: wheelsSpySpace.id,
     wheelsRevealSpySpaceName: wheelsSpySpace.name,
+    spyNetworkRevealRecall,
+    spyNetworkRecallSpaceId: spyNetworkRecallSpaces[0].id,
+    spyNetworkRecallSpaceName: spyNetworkRecallSpaces[0].name,
+    spyNetworkRewardIntrigueName: spyNetworkRewardIntrigue.name,
     calculusTrashReveal: {
       ...base,
       activeSeat: feydSeat,

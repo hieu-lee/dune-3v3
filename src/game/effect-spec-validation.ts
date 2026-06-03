@@ -1051,7 +1051,7 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     return;
   }
   if (effect.kind === "recall-spy") {
-    if (trigger !== "plot-intrigue" && trigger !== "combat-intrigue") {
+    if (trigger !== "plot-intrigue" && trigger !== "combat-intrigue" && trigger !== "reveal") {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
     }
     if (effect.selector !== "self") {
@@ -1070,6 +1070,9 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
       if (effect.reward !== undefined) {
         throw new Error(`Unsupported recall-spy reward for ${trigger}`);
       }
+      if (effect.drawIntrigues !== undefined) {
+        throw new Error(`Unsupported recall-spy drawIntrigues for ${trigger}`);
+      }
       if (effect.removeShieldWall !== undefined) {
         throw new Error(`Unsupported recall-spy removeShieldWall for ${trigger}`);
       }
@@ -1078,11 +1081,37 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
       validateOptionalBoolean("recall-spy optional", effect.optional);
       return;
     }
+    if (trigger === "reveal") {
+      const amount = effect.amount;
+      const drawIntrigues = effect.drawIntrigues;
+      if (amount === undefined) {
+        invalidSpecField("recall-spy amount", amount);
+      }
+      if (drawIntrigues === undefined) {
+        invalidSpecField("recall-spy drawIntrigues", drawIntrigues);
+      }
+      if (effect.reward !== undefined) {
+        throw new Error(`Unsupported recall-spy reward for ${trigger}`);
+      }
+      if (effect.strengthReward !== undefined) {
+        throw new Error(`Unsupported recall-spy strengthReward for ${trigger}`);
+      }
+      if (effect.removeShieldWall !== undefined) {
+        throw new Error(`Unsupported recall-spy removeShieldWall for ${trigger}`);
+      }
+      validatePositiveFixedAmount("recall-spy amount", amount);
+      validatePositiveAmount("recall-spy drawIntrigues", drawIntrigues);
+      validateOptionalBoolean("recall-spy optional", effect.optional);
+      return;
+    }
     if (effect.amount !== undefined) {
       throw new Error(`Unsupported recall-spy amount for ${trigger}`);
     }
     if (effect.strengthReward !== undefined) {
       throw new Error(`Unsupported recall-spy strengthReward for ${trigger}`);
+    }
+    if (effect.drawIntrigues !== undefined) {
+      throw new Error(`Unsupported recall-spy drawIntrigues for ${trigger}`);
     }
     if (effect.optional !== undefined) {
       throw new Error(`Unsupported recall-spy optional for ${trigger}`);

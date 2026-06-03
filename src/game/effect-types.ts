@@ -500,6 +500,7 @@ export type GameEffectSpec =
       amount?: EffectAmountSpec;
       source?: string;
       strengthReward?: EffectAmountSpec;
+      drawIntrigues?: EffectAmountSpec;
       optional?: boolean;
       reward?: {
         resource: ResourceId;

@@ -376,6 +376,39 @@ try {
     "Only implemented acquisition reward cards should currently carry declarative Acquire specs",
   );
   assert.ok(
+    spyNetwork.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.conditions?.some((condition) => condition.kind === "has-spy-posts" && condition.count === 2) &&
+      spec.effects.some((effect) =>
+        effect.kind === "recall-spy" &&
+        effect.selector === "self" &&
+        effect.amount === 1 &&
+        effect.drawIntrigues === 1 &&
+        effect.optional === true &&
+        effect.source === "Spy Network"
+      )
+    ),
+    "Spy Network should carry a typed conditional Reveal spy-recall Intrigue spec",
+  );
+  assert.deepEqual(
+    effectResolver.resolveRevealSpyRecallForIntrigues(spyNetwork.effects, {
+      trigger: "reveal",
+      source: p2,
+      state: { ...game, spyPosts: { [secrets.id]: p2.id, [highCouncil.id]: p2.id }, sharedSpyPosts: {} },
+    }),
+    [{ selector: "self", amount: 1, drawIntrigues: 1, optional: true, source: "Spy Network" }],
+    "Spy Network Reveal spy-recall spec should resolve with two owned spy posts",
+  );
+  assert.deepEqual(
+    effectResolver.resolveRevealSpyRecallForIntrigues(spyNetwork.effects, {
+      trigger: "reveal",
+      source: p2,
+      state: { ...game, spyPosts: { [secrets.id]: p2.id }, sharedSpyPosts: {} },
+    }),
+    [],
+    "Spy Network Reveal spy-recall spec should not resolve below two owned spy posts",
+  );
+  assert.ok(
     councilorsAmbition.effects?.some((spec) =>
       spec.trigger === "plot-intrigue" &&
       spec.conditions?.some((condition) => condition.kind === "has-high-council-seat") &&
@@ -6847,7 +6880,7 @@ try {
       { trigger: "agent-play", source: p2, state: game },
     ),
     /Unsupported effect "recall-spy" for agent-play/,
-    "Recall-spy specs should stay on Plot or Combat Intrigue triggers until other trigger resolvers support them",
+    "Recall-spy specs should stay on supported Plot, Combat, or Reveal triggers",
   );
   assert.throws(
     () => effectResolver.resolveGameEffects(
@@ -6872,6 +6905,60 @@ try {
     ),
     /Invalid recall-spy removeShieldWall "yes"/,
     "Recall-spy specs should reject non-boolean Shield Wall flags",
+  );
+  assert.deepEqual(
+    effectResolver.resolveRevealSpyRecallForIntrigues(
+      [revealSpec(
+        [{ kind: "recall-spy", selector: "self", amount: 1, drawIntrigues: 1, optional: true, source: "Test" }],
+        [{ kind: "has-spy-posts", count: 2 }],
+      )],
+      {
+        trigger: "reveal",
+        source: p2,
+        state: { ...game, spyPosts: { [secrets.id]: p2.id, [highCouncil.id]: p2.id }, sharedSpyPosts: {} },
+      },
+    ),
+    [{ selector: "self", amount: 1, drawIntrigues: 1, optional: true, source: "Test" }],
+    "Reveal recall-spy specs should resolve Intrigue rewards with enough owned spy posts",
+  );
+  assert.throws(
+    () => effectResolver.resolveRevealSpyRecallForIntrigues(
+      [revealSpec([{ kind: "recall-spy", selector: "self", drawIntrigues: 1, source: "Test" }])],
+      { trigger: "reveal", source: p2, state: game },
+    ),
+    /Invalid recall-spy amount "undefined"/,
+    "Reveal recall-spy specs should require a spy count",
+  );
+  assert.throws(
+    () => effectResolver.resolveRevealSpyRecallForIntrigues(
+      [revealSpec([{ kind: "recall-spy", selector: "self", amount: 1, source: "Test" }])],
+      { trigger: "reveal", source: p2, state: game },
+    ),
+    /Invalid recall-spy drawIntrigues "undefined"/,
+    "Reveal recall-spy specs should require an Intrigue reward",
+  );
+  assert.throws(
+    () => effectResolver.resolveRevealSpyRecallForIntrigues(
+      [revealSpec([{ kind: "recall-spy", selector: "self", amount: 1, drawIntrigues: 0, source: "Test" }])],
+      { trigger: "reveal", source: p2, state: game },
+    ),
+    /Invalid recall-spy drawIntrigues "0"/,
+    "Reveal recall-spy specs should reject zero Intrigue rewards",
+  );
+  assert.throws(
+    () => effectResolver.resolveRevealSpyRecallForIntrigues(
+      [revealSpec([{
+        kind: "recall-spy",
+        selector: "self",
+        amount: 1,
+        drawIntrigues: 1,
+        strengthReward: 1,
+        source: "Test",
+      }])],
+      { trigger: "reveal", source: p2, state: game },
+    ),
+    /Unsupported recall-spy strengthReward for reveal/,
+    "Reveal recall-spy specs should reject Combat-style strength rewards",
   );
   assert.throws(
     () => effectResolver.resolveCombatSpyRecallForStrengths(
@@ -7090,6 +7177,57 @@ try {
     { influenceGains: {}, persuasion: 0, printedRevealCards: [], recruitedTroops: 0, revealGain: {}, swords: 0 },
     "Reveal spy placement specs should not alter fixed reveal totals",
   );
+  const revealSpyRecallCard = {
+    ...convincingArgument,
+    id: "effect-spec-reveal-spy-recall-card",
+    name: "Effect Spec Reveal Spy Recall",
+    effects: [
+      revealSpec(
+        [{ kind: "recall-spy", selector: "self", amount: 1, drawIntrigues: 1, source: "Reveal Spy Recall" }],
+        [{ kind: "has-spy-posts", count: 2 }],
+      ),
+    ],
+  };
+  const revealSpyRecallFixture = {
+    ...withActivePlayer(game, p2.id, () => ({
+      agentsReady: 0,
+      hand: [revealSpyRecallCard],
+      highCouncilSeat: false,
+      intrigues: [],
+      playArea: [],
+      persuasion: 0,
+      spies: 0,
+    })),
+    intrigueDeck: [backedByChoam],
+    intrigueDiscard: [],
+    sharedSpyPosts: {},
+    spyPosts: { [secrets.id]: p2.id, [highCouncil.id]: p2.id },
+  };
+  const revealSpyRecallPlan = turnActions.revealTurnPlan(
+    playerById(revealSpyRecallFixture, p2.id),
+    revealSpyRecallFixture,
+  );
+  assert.deepEqual(
+    revealSpyRecallPlan,
+    { influenceGains: {}, persuasion: 0, printedRevealCards: [], recruitedTroops: 0, revealGain: {}, swords: 0 },
+    "Reveal spy-recall specs should not alter fixed reveal totals",
+  );
+  const revealSpyRecallPending = turnActions.revealTurnAction(revealSpyRecallFixture, {
+    commanderTargets: {},
+    revealPlan: revealSpyRecallPlan,
+  });
+  assert.equal(revealSpyRecallPending.pendingAction?.kind, "recall-spy", "Reveal spy-recall specs should queue a recall pending action");
+  assert.equal(revealSpyRecallPending.pendingAction.drawIntrigues, 1);
+  assert.equal(revealSpyRecallPending.pendingAction.source, "Reveal Spy Recall");
+  const revealSpyRecallResolved = state.recallSpyForPending(
+    revealSpyRecallPending,
+    revealSpyRecallPending.pendingAction,
+    secrets.id,
+  );
+  assert.equal(revealSpyRecallResolved.pendingAction, undefined, "Reveal spy-recall resolution should clear pending");
+  assert.equal(playerById(revealSpyRecallResolved, p2.id).spies, 1);
+  assert.equal(playerById(revealSpyRecallResolved, p2.id).intrigues.at(-1)?.name, backedByChoam.name);
+  assert.equal(revealSpyRecallResolved.turnSpyRecalls[p2.id], 1);
   const agentTrashCard = {
     ...convincingArgument,
     id: "effect-spec-agent-trash-card",

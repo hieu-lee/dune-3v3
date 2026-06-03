@@ -88,6 +88,7 @@ export type PendingAction =
       strength: number;
       source: string;
       optional: boolean;
+      drawIntrigues?: number;
     }
   | {
       kind: "lose-influence";

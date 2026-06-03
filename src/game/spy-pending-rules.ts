@@ -254,11 +254,10 @@ export function recallSpyForPending(
     }
     return next;
   });
-  const strengthText = finalRecall
+  const strengthText = finalRecall && pending.strength > 0
     ? `, adding ${pending.strength} strength to ${recipient?.leader ?? "the chosen combatant"}`
     : "";
-
-  return recordTurnSpyRecall({
+  const recalledState = recordTurnSpyRecall({
     ...state,
     players,
     spyPosts,
@@ -266,6 +265,10 @@ export function recallSpyForPending(
     ...(finalRecall ? advancePendingAction(state) : { pendingAction: { ...pending, remaining } }),
     log: [`${owner.leader} recalls a spy from ${space.name} for ${pending.source}${strengthText}.`, ...state.log],
   }, owner.id);
+
+  return finalRecall && pending.drawIntrigues
+    ? drawIntrigueCards(recalledState, owner.id, pending.drawIntrigues, pending.source)
+    : recalledState;
 }
 
 export function skipRecallSpy(state: GameState, pending: RecallSpyPendingAction): GameState {

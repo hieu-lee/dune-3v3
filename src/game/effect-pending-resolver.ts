@@ -43,6 +43,7 @@ import type {
   RevealPayResourceForStrength,
   RevealPayResourceForTroops,
   RevealRetreatTroopsForStrength,
+  RevealSpyRecallForIntrigues,
   RevealTrashCardEffect,
   TakeContractsEffect,
   TrashCardEffect,
@@ -191,6 +192,31 @@ export function resolveRevealLoseInfluenceForIntrigues(
         amount: amountFor(effect.amount, context.source),
         optional: effect.optional ?? true,
       }));
+  });
+}
+
+export function resolveRevealSpyRecallForIntrigues(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): RevealSpyRecallForIntrigues[] {
+  specs?.forEach(validateSpec);
+  return (specs ?? []).flatMap((spec) => {
+    if (spec.trigger !== "reveal") return [];
+    if (!specApplies(spec, context)) return [];
+    return spec.effects
+      .filter((effect) => effect.kind === "recall-spy")
+      .map((effect) => {
+        if (effect.amount === undefined || effect.drawIntrigues === undefined) {
+          throw new Error("Unsupported Reveal recall-spy effect without amount and drawIntrigues");
+        }
+        return {
+          selector: effect.selector,
+          amount: amountFor(effect.amount, context.source),
+          drawIntrigues: amountFor(effect.drawIntrigues, context.source),
+          optional: effect.optional ?? true,
+          source: effect.source,
+        };
+      });
   });
 }
 

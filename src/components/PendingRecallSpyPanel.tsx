@@ -20,11 +20,21 @@ export function PendingRecallSpyPanel({
   onRecall,
   onSkip,
 }: PendingRecallSpyPanelProps) {
+  const spyCountText = `${pending.remaining} ${pending.remaining === 1 ? "spy" : "spies"}`;
+  const rewardParts = [
+    pending.strength > 0
+      ? `add +${pending.strength} strength${recipient ? ` to ${recipient.leader}` : ""}`
+      : undefined,
+    pending.drawIntrigues
+      ? `draw ${pending.drawIntrigues} Intrigue ${pending.drawIntrigues === 1 ? "card" : "cards"}`
+      : undefined,
+  ].filter((part): part is string => Boolean(part));
+  const rewardText = rewardParts.length > 0 ? ` to ${rewardParts.join(" and ")}` : "";
+
   return (
     <div className="pending-controls spy-grid">
       <span>
-        {owner.leader}: {pending.remaining} {pending.remaining === 1 ? "spy" : "spies"} for +{pending.strength} strength
-        {recipient ? ` to ${recipient.leader}` : ""}
+        {owner.leader}: recall {spyCountText} for {pending.source}{rewardText}
       </span>
       {choices.map((space) => (
         <button

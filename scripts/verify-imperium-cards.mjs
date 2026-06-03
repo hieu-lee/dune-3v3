@@ -31,6 +31,7 @@ function withActivePlayer(game, playerId, patch) {
     spaces: {},
     roundMakerSpaceVisits: {},
     turnSpiceGains: {},
+    turnSpyRecalls: {},
     turnReverendMotherJessicaRepeats: {},
     turnUnitDeployments: {},
     players: game.players.map((player) => player.id === playerId ? { ...player, ...patch(player) } : player),
@@ -623,6 +624,22 @@ try {
       )
     ),
     "Spy Network should model its acquisition spy bonus as a typed acquire effect",
+  );
+  assert.match(spyNetwork.reveal, /recall 1 spy to draw 1 Intrigue/i);
+  assert.ok(
+    spyNetwork.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.conditions?.some((condition) => condition.kind === "has-spy-posts" && condition.count === 2) &&
+      spec.effects.some((effect) =>
+        effect.kind === "recall-spy" &&
+        effect.selector === "self" &&
+        effect.amount === 1 &&
+        effect.drawIntrigues === 1 &&
+        effect.optional === true &&
+        effect.source === "Spy Network"
+      )
+    ),
+    "Spy Network should model its conditional Reveal spy recall Intrigue draw as a typed effect",
   );
   assert.equal(strikeFleet.cost, 5, "Strike Fleet should cost 5 persuasion");
   assert.deepEqual(strikeFleet.icons, ["spy"], "Strike Fleet should use the Spy Agent icon");
@@ -2245,6 +2262,78 @@ try {
     spyPosts: { [secrets.id]: p4.id, [highCouncil.id]: p4.id },
   });
   assert.equal(commanderOwnSpyPlan.persuasion, 3, "Commander Operative reveal should count the Commander's own spy posts");
+
+  const spyNetworkIntrigueReward = data.intrigueCards[0];
+  assert.ok(spyNetworkIntrigueReward, "Expected an Intrigue card for Spy Network reveal coverage");
+  const spyNetworkRevealFixture = {
+    ...withActivePlayer(game, p2.id, () => ({
+      agentsReady: 0,
+      discard: [],
+      hand: [spyNetwork],
+      highCouncilSeat: false,
+      intrigues: [],
+      playArea: [],
+      persuasion: 0,
+      resources: { solari: 0, spice: 0, water: 0 },
+      spies: 0,
+    })),
+    intrigueDeck: [spyNetworkIntrigueReward],
+    intrigueDiscard: [],
+    sharedSpyPosts: {},
+    spyPosts: { [secrets.id]: p2.id, [highCouncil.id]: p2.id },
+  };
+  const spyNetworkRevealPlan = turnActions.revealTurnPlan(playerById(spyNetworkRevealFixture, p2.id), spyNetworkRevealFixture);
+  assert.equal(spyNetworkRevealPlan.persuasion, 2, "Spy Network should reveal for 2 persuasion through specs");
+  assert.equal(spyNetworkRevealPlan.swords, 1, "Spy Network should reveal for 1 strength through specs");
+  assert.deepEqual(spyNetworkRevealPlan.printedRevealCards, [], "Spy Network should not need manual Reveal text");
+  const spyNetworkRevealed = turnActions.revealTurnAction(spyNetworkRevealFixture, {
+    commanderTargets: {},
+    revealPlan: spyNetworkRevealPlan,
+  });
+  assert.equal(spyNetworkRevealed.pendingAction?.kind, "recall-spy", "Spy Network should queue its conditional Reveal spy recall");
+  assert.equal(spyNetworkRevealed.pendingAction.ownerId, p2.id);
+  assert.equal(spyNetworkRevealed.pendingAction.remaining, 1);
+  assert.equal(spyNetworkRevealed.pendingAction.strength, 0);
+  assert.equal(spyNetworkRevealed.pendingAction.drawIntrigues, 1);
+  assert.equal(spyNetworkRevealed.pendingAction.optional, true);
+  assert.equal(spyNetworkRevealed.pendingAction.source, "Spy Network");
+  assert.equal(playerById(spyNetworkRevealed, p2.id).persuasion, 2);
+  assert.deepEqual(
+    state.recallableSpySpaces(spyNetworkRevealed, spyNetworkRevealed.pendingAction).map((space) => space.id).sort(),
+    [highCouncil.id, secrets.id].sort(),
+    "Spy Network should allow recalling any owned spy post",
+  );
+  const spyNetworkRecalled = state.recallSpyForPending(
+    spyNetworkRevealed,
+    spyNetworkRevealed.pendingAction,
+    highCouncil.id,
+  );
+  assert.equal(spyNetworkRecalled.pendingAction, undefined, "Resolving Spy Network recall should clear the pending action");
+  assert.equal(spyNetworkRecalled.spyPosts[highCouncil.id], undefined, "Spy Network recall should remove the chosen spy post");
+  assert.equal(playerById(spyNetworkRecalled, p2.id).spies, 1, "Spy Network recall should return the spy to supply");
+  assert.equal(
+    playerById(spyNetworkRecalled, p2.id).intrigues.at(-1)?.name,
+    spyNetworkIntrigueReward.name,
+    "Spy Network recall should draw one Intrigue",
+  );
+  assert.equal(spyNetworkRecalled.intrigueDeck.length, 0, "Spy Network recall should consume the Intrigue deck card");
+  assert.equal(spyNetworkRecalled.turnSpyRecalls[p2.id], 1, "Spy Network recall should count as a same-turn spy recall");
+  assert.match(spyNetworkRecalled.log[0], /draws an Intrigue card from Spy Network/);
+  assert.match(spyNetworkRecalled.log[1], /recalls a spy from High Council for Spy Network/);
+  assert.doesNotMatch(spyNetworkRecalled.log[1], /adding 0 strength/);
+  const spyNetworkOneSpyFixture = {
+    ...spyNetworkRevealFixture,
+    spyPosts: { [secrets.id]: p2.id },
+  };
+  const spyNetworkOneSpyPlan = turnActions.revealTurnPlan(
+    playerById(spyNetworkOneSpyFixture, p2.id),
+    spyNetworkOneSpyFixture,
+  );
+  const spyNetworkOneSpyRevealed = turnActions.revealTurnAction(spyNetworkOneSpyFixture, {
+    commanderTargets: {},
+    revealPlan: spyNetworkOneSpyPlan,
+  });
+  assert.equal(spyNetworkOneSpyRevealed.pendingAction, undefined, "Spy Network should not queue recall below two spy posts");
 
   const capturedDiscardCard = { ...dune, id: "captured-mentat-discard-card" };
   const capturedDrawCard = { ...calculusTrashTarget, id: "captured-mentat-draw-card" };

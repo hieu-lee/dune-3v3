@@ -102,6 +102,7 @@ import {
   revealGainInfluence,
   revealGainPersuasion,
   revealPlaceSpies,
+  revealRecallSpyForIntrigues,
   revealGainResource,
   revealGainStrength,
   revealLoseInfluenceForIntrigues,
@@ -176,6 +177,9 @@ function imperiumRevealText(card: HubCard, persuasion: number, swords: number, p
   }
   if (card.id === beneGesseritOperativeSourceId) {
     return "+1 persuasion. If you have two or more spies on the board, +2 persuasion.";
+  }
+  if (card.id === spyNetworkSourceId) {
+    return "+2 persuasion and +1 strength. If you have two or more spies on the board, you may recall 1 spy to draw 1 Intrigue.";
   }
   if (card.id === shishakliSourceId) {
     return "+2 strength. Fremen Bond: gain 1 Fremen Influence.";
@@ -346,6 +350,14 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
       agentPlaceSpies("self", 1, { recallForSupply: true, mustPlace: true }),
       revealGainPersuasion(1),
       revealGainPersuasion(2, [hasSpyPosts(2)]),
+    ];
+  }
+  if (card.id === spyNetworkSourceId) {
+    return [
+      revealGainPersuasion(2),
+      revealGainStrength(1),
+      revealRecallSpyForIntrigues(1, { source: "Spy Network" }, [hasSpyPosts(2)]),
+      acquirePlaceSpies(1, { recallForSupply: true, mustPlace: true }),
     ];
   }
   if (card.id === fedaykinStilltentSourceId) {

@@ -81,6 +81,9 @@ export function cloneCardEffects(effects: CardEffectSpec[] | undefined): CardEff
         ...("strengthReward" in effect && effect.strengthReward !== undefined
           ? { strengthReward: cloneAmount(effect.strengthReward) }
           : {}),
+        ...("drawIntrigues" in effect && effect.drawIntrigues !== undefined
+          ? { drawIntrigues: cloneAmount(effect.drawIntrigues) }
+          : {}),
         ...("spiceRewardCostThreshold" in effect && effect.spiceRewardCostThreshold !== undefined
           ? { spiceRewardCostThreshold: cloneAmount(effect.spiceRewardCostThreshold) }
           : {}),

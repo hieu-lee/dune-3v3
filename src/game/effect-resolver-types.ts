@@ -51,6 +51,14 @@ export type CombatSpyRecallForStrength = {
   source?: string;
 };
 
+export type RevealSpyRecallForIntrigues = {
+  selector: PlayerSelector;
+  amount: number;
+  drawIntrigues: number;
+  optional: boolean;
+  source?: string;
+};
+
 export type CombatInfluenceLossForStrength = {
   selector: PlayerSelector;
   amount: number;

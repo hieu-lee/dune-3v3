@@ -19,6 +19,7 @@ import {
   resolveRevealPayResourceForStrengths,
   resolveRevealPayResourceForTroops,
   resolveRevealRetreatTroopsForStrength,
+  resolveRevealSpyRecallForIntrigues,
   resolveRevealTrashCardEffects,
 } from "./effect-resolver";
 import {
@@ -212,6 +213,33 @@ function pendingActionsForRevealInfluenceIntrigues(
   });
 }
 
+function pendingActionsForRevealSpyRecallIntrigues(
+  card: Card,
+  source: Player,
+  state: GameState,
+  combatRecipientId: string,
+): PendingAction[] {
+  const recipient = state.players.find((player) => player.id === combatRecipientId);
+  return resolveRevealSpyRecallForIntrigues(card.effects, {
+    trigger: "reveal",
+    source,
+    target: recipient,
+    state,
+  }).flatMap((effect) => {
+    if (effect.selector !== "self" || effect.amount <= 0 || effect.drawIntrigues <= 0) return [];
+    return [{
+      kind: "recall-spy",
+      ownerId: source.id,
+      combatRecipientId: recipient?.id ?? source.id,
+      remaining: effect.amount,
+      strength: 0,
+      source: effect.source ?? card.name,
+      optional: effect.optional,
+      drawIntrigues: effect.drawIntrigues,
+    }];
+  });
+}
+
 function pendingActionsForRevealTrashCards(
   card: Card,
   source: Player,
@@ -393,6 +421,9 @@ export function pendingActionsForReveal(
   const influenceIntriguePendings = revealedCards.flatMap((card) =>
     pendingActionsForRevealInfluenceIntrigues(card, source, state, combatRecipientId)
   );
+  const spyRecallIntriguePendings = revealedCards.flatMap((card) =>
+    pendingActionsForRevealSpyRecallIntrigues(card, source, state, combatRecipientId)
+  );
   const retreatTroopStrengthPendings = revealedCards.flatMap((card) =>
     pendingActionsForRevealRetreatTroopsForStrength(card, source, state, combatRecipientId)
   );
@@ -410,6 +441,7 @@ export function pendingActionsForReveal(
     ...payResourceSandwormPendings,
     ...payResourceHighCouncilSeatPendings,
     ...influenceIntriguePendings,
+    ...spyRecallIntriguePendings,
     ...retreatTroopStrengthPendings,
     ...deployOrRetreatTroopPendings,
     ...leaderAbilityPendings,

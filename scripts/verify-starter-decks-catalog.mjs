@@ -110,14 +110,12 @@ export function verifyStarterDeckCatalog({ data, state }) {
     "Signet Ring": 1,
   });
   assert.equal(data.emperorCommanderCards.find((card) => card.name === "Corrino Might")?.swords, 1);
-  assert.equal(data.emperorCommanderCards.find((card) => card.name === "Corrino Might")?.conditionalSwords, undefined);
   assert.match(
     data.emperorCommanderCards.find((card) => card.name === "Corrino Might")?.reveal ?? "",
     /Spend 3 spice/,
     "Corrino Might should expose its automated reveal payment",
   );
   assert.equal(data.emperorCommanderCards.find((card) => card.name === "Demand Results")?.swords, 1);
-  assert.equal(data.emperorCommanderCards.find((card) => card.name === "Devastating Assault")?.conditionalSwords, undefined);
   assert.match(
     data.emperorCommanderCards.find((card) => card.name === "Devastating Assault")?.reveal ?? "",
     /spend 3 Solari/i,

@@ -26,11 +26,6 @@ export function verifyCardEffectSpecCoreValidation({
     0,
     "Fremen Bond should not trigger from Chani alone",
   );
-  assert.deepEqual(
-    chaniSoloReveal.printedRevealCards,
-    [],
-    "Chani Fremen Bond should not need manual reveal fallback",
-  );
   const chaniHandBondReveal = turnActions.revealTurnPlan({
     ...p2,
     hand: [chani, fremenSupportCard],

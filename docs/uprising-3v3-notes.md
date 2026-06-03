@@ -38,7 +38,7 @@ These notes are implementation scaffolding, not a replacement for the rulebook. 
 - Swordmaster is single-use in six-player mode and then grants reveal strength each round.
 - Spy icons require an owned spy on a connected observation post; the current board model tracks spy posts by nearby board space until scanned board coordinates are available.
 - Dune Cards Hub's generic `Spy` attribute appears in reveal text, acquire bonuses, and conditions. Do not treat it as a play-time spy placement unless grouped/detail text confirms that timing.
-- Variable printed reveal effects must pause buying/end-turn flow until the table applies the printed persuasion or strength adjustment.
+- Variable reveal effects must resolve through typed reveal specs or generated fixed reveal specs; buying/end-turn flow only pauses for explicit pending actions.
 - CHOAM module is mandatory in 6p; contracts and marked cards need first-class data support.
 - Current CHOAM implementation uses the 18 public Uprising contracts, reserves Sardaukar I and Sardaukar II for Shaddam, exposes two face-up offers, and gives contract spaces a pending take-contract choice.
 - Conflict deck uses 5 Conflict II cards over 4 Conflict III cards; no Conflict I cards.

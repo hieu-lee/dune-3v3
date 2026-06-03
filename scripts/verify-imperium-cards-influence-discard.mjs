@@ -563,11 +563,6 @@ export function verifyImperiumCardInfluenceDiscardEffects({
     1,
     "Captured Mentat should reveal for 1 persuasion",
   );
-  assert.deepEqual(
-    capturedMentatRevealPlan.printedRevealCards,
-    [],
-    "Captured Mentat reveal should use structured Influence-for-Intrigue handling",
-  );
   const capturedMentatRevealed = turnActions.revealTurnAction(
     capturedMentatRevealFixture,
     {

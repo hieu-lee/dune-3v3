@@ -37,11 +37,6 @@ try {
   const devastatingAssault = data.emperorCommanderCards.find((card) => card.name === "Devastating Assault");
   assert.ok(devastatingAssault, "Emperor Commander deck should include Devastating Assault");
   assert.equal(state.isDevastatingAssaultCommanderCard(devastatingAssault), true);
-  assert.equal(
-    devastatingAssault.conditionalSwords,
-    undefined,
-    "Devastating Assault should use structured reveal payment instead of manual printed reveal handling",
-  );
   assert.match(devastatingAssault.reveal, /spend 3 Solari/i);
   assert.ok(
     devastatingAssault.effects?.some((spec) =>
@@ -149,7 +144,6 @@ try {
   const plan = turnActions.revealTurnPlan(playerById(revealFixture, shaddam.id), revealFixture);
   assert.equal(plan.persuasion, 1, "Devastating Assault should reveal for 1 persuasion");
   assert.equal(plan.swords, 2, "Swordmaster bonus should still add its printed 2 strength");
-  assert.deepEqual(plan.printedRevealCards, [], "Devastating Assault should not require manual printed reveal adjustment");
   const revealed = turnActions.revealTurnAction(revealFixture, {
     commanderTargets: { [shaddam.id]: ally.id },
     revealPlan: plan,
@@ -199,21 +193,13 @@ try {
   assert.equal(playerById(noUnitsReveal, ally.id).conflict, 0, "Reveal swords should not apply without conflict units");
   assert.equal(noUnitsReveal.pendingAction, undefined, "Devastating Assault should not queue without conflict units");
 
-  const printedRevealCard = {
-    ...devastatingAssault,
-    id: "verifier-printed-reveal",
-    name: "Verifier printed reveal",
-    conditionalSwords: true,
-  };
   const mixedPending = state.pendingActionsForReveal(
-    { ...commander, playArea: [devastatingAssault, printedRevealCard] },
+    { ...commander, playArea: [devastatingAssault] },
     pendingFixture,
-    [devastatingAssault, printedRevealCard],
+    [devastatingAssault],
     recipient.id,
   );
-  assert.equal(mixedPending[0].kind, "reveal-adjust", "Unrelated printed reveal cards should still queue manual adjustment");
-  assert.deepEqual(mixedPending[0].cards, ["Verifier printed reveal"]);
-  assert.equal(mixedPending[1].kind, "pay-resource-for-strength");
+  assert.equal(mixedPending[0].kind, "pay-resource-for-strength");
 
   console.log("Devastating Assault starter deck verification passed");
 } finally {

@@ -195,16 +195,6 @@ export function verifyCardEffectSpecImperiumAgentReveal({
     0,
     "Unswerving Loyalty should not reveal for printed strength",
   );
-  assert.equal(
-    unswervingLoyalty.conditionalPersuasion,
-    false,
-    "Unswerving Loyalty should use typed Fremen Bond handling",
-  );
-  assert.equal(
-    unswervingLoyalty.conditionalSwords,
-    false,
-    "Unswerving Loyalty should not require manual reveal strength handling",
-  );
   assert.deepEqual(
     unswervingLoyalty.traits,
     ["Faction: Fremen"],

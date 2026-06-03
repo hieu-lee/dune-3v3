@@ -148,17 +148,6 @@ export type PendingAction =
       vpReward?: number;
     }
   | {
-      kind: "reveal-adjust";
-      ownerId: string;
-      combatRecipientId: string;
-      cards: string[];
-      persuasionAdjustment: number;
-      strengthAdjustment: number;
-      allowPersuasionAdjustment?: boolean;
-      allowStrengthAdjustment?: boolean;
-      source: string;
-    }
-  | {
       kind: "retreat-troops-for-strength";
       ownerId: string;
       combatRecipientId: string;

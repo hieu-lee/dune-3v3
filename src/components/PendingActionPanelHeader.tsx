@@ -51,8 +51,6 @@ function pendingActionTitle(game: GameState, pendingAction: PendingAction) {
       return `Trade from ${pendingAction.source}`;
     case "spy":
       return `${pendingAction.source}${pendingAction.placementIcon ? ` ${iconLabels[pendingAction.placementIcon]}` : ""} spy placement - ${pendingAction.remaining}`;
-    case "reveal-adjust":
-      return "Printed reveal adjustment";
     case "retreat-troops-for-strength":
       return `${playerLeader(playerById(game, pendingAction.ownerId))} ${pendingAction.source}`;
     case "deploy-or-retreat-troops":

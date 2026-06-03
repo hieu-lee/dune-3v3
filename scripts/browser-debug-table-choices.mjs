@@ -18,39 +18,8 @@ export async function runTableChoicesSmoke({
   const states = await createTableChoiceStates(server, initialPlayableGame);
   await writeJson("pending-table-choice-states.json", states);
 
-  await setDebugGameAndWait(page, states.revealAdjust);
-  let pendingText = await page.locator(".pending-panel").innerText();
-  assert.match(pendingText, /Printed reveal adjustment/i);
-  assert.match(pendingText, /Browser debug reveal/i);
-  await screenshot(page, captures, "pending-reveal-adjust.png");
-
-  const revealButtons = page.locator(".pending-panel .reveal-adjust button");
-  assert.equal(await revealButtons.count(), 5, "Expected reveal-adjust controls for persuasion, strength, and completion");
-  const revealBefore = await currentGame(page);
-  const revealOwnerBefore = revealBefore.players.find((player) => player.id === "p2");
-  assert.ok(revealOwnerBefore, "Expected Feyd before reveal adjustment");
-  await revealButtons.nth(1).click();
-  await page.waitForFunction(() => window.__DUNE_DEBUG__?.getGame().pendingAction?.persuasionAdjustment === 1);
-  await revealButtons.nth(3).click();
-  await page.waitForFunction(() => window.__DUNE_DEBUG__?.getGame().pendingAction?.strengthAdjustment === 1);
-  const revealAdjusted = await currentGame(page);
-  const revealOwnerAdjusted = revealAdjusted.players.find((player) => player.id === "p2");
-  assert.ok(revealOwnerAdjusted, "Expected Feyd after reveal adjustment");
-  assert.equal(
-    revealOwnerAdjusted.persuasion,
-    revealOwnerBefore.persuasion + 1,
-    "Reveal adjustment should add one persuasion",
-  );
-  assert.equal(
-    revealOwnerAdjusted.conflict,
-    revealOwnerBefore.conflict + 1,
-    "Reveal adjustment should add one strength",
-  );
-  await revealButtons.nth(4).click();
-  await waitForNoPending(page);
-
   await setDebugGameAndWait(page, states.retreatTroopsForStrength);
-  pendingText = await page.locator(".pending-panel").innerText();
+  let pendingText = await page.locator(".pending-panel").innerText();
   assert.match(pendingText, /Browser debug retreat/i);
   assert.match(pendingText, /Retreat 2: \+4/i);
   await screenshot(page, captures, "pending-retreat-troops-strength.png");
@@ -84,7 +53,7 @@ export async function runTableChoicesSmoke({
   const chaniBondPlayer = chaniBondAfter.players.find((player) => player.id === "p2");
   assert.ok(chaniBondPlayer, "Expected Feyd after Chani Fremen Bond reveal");
   assert.equal(chaniBondPlayer.persuasion, 2, "Chani should gain automated Fremen Bond persuasion in the browser flow");
-  assert.equal(chaniBondAfter.pendingAction, undefined, "Chani Fremen Bond should not create a reveal-adjust pending action");
+  assert.equal(chaniBondAfter.pendingAction, undefined, "Chani Fremen Bond should not create a manual reveal pending action");
   await screenshot(page, captures, "chani-fremen-bond-after-reveal.png");
 
   await setDebugGameAndWait(page, states.unswervingLoyaltyRevealDeployOrRetreat);
@@ -136,7 +105,7 @@ export async function runTableChoicesSmoke({
     5,
     "Paracompass should add 3 persuasion on top of the High Council reveal bonus in the browser flow",
   );
-  assert.equal(paracompassRevealAfter.pendingAction, undefined, "Paracompass should not create a reveal-adjust pending action");
+  assert.equal(paracompassRevealAfter.pendingAction, undefined, "Paracompass should not create a manual reveal pending action");
   await screenshot(page, captures, "paracompass-reveal-after.png");
 
   await setDebugGameAndWait(page, states.wheelsWithinWheelsRevealSpy);

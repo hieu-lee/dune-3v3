@@ -43,11 +43,6 @@ export function verifyImperiumCardCatalogSpecs({ data, game, state }) {
     true,
     "Interstellar Trade should be recognized",
   );
-  assert.equal(
-    interstellarTrade.conditionalPersuasion,
-    false,
-    "Interstellar Trade should have structured reveal persuasion instead of manual printed reveal handling",
-  );
   assert.match(interstellarTrade.play, /No Agent effect/i);
   assert.doesNotMatch(
     interstellarTrade.play,
@@ -100,11 +95,6 @@ export function verifyImperiumCardCatalogSpecs({ data, game, state }) {
     state.isCalculusOfPowerCard(calculus),
     true,
     "Calculus of Power should be recognized",
-  );
-  assert.equal(
-    calculus.conditionalSwords,
-    false,
-    "Calculus of Power should use structured optional trash strength instead of manual printed reveal handling",
   );
   assert.ok(
     calculus.effects?.some(
@@ -166,11 +156,6 @@ export function verifyImperiumCardCatalogSpecs({ data, game, state }) {
     capturedMentat.persuasion,
     1,
     "Captured Mentat should reveal for 1 persuasion",
-  );
-  assert.equal(
-    capturedMentat.conditionalPersuasion,
-    false,
-    "Captured Mentat should not need manual persuasion entry",
   );
   assert.ok(
     capturedMentat.effects?.some(
@@ -292,11 +277,6 @@ export function verifyImperiumCardCatalogSpecs({ data, game, state }) {
     beneGesseritOperative.persuasion,
     1,
     "Bene Gesserit Operative should reveal for 1 base persuasion",
-  );
-  assert.equal(
-    beneGesseritOperative.conditionalPersuasion,
-    false,
-    "Bene Gesserit Operative should use structured spy-count reveal handling",
   );
   assert.deepEqual(
     beneGesseritOperative.traits,
@@ -437,16 +417,6 @@ export function verifyImperiumCardCatalogSpecs({ data, game, state }) {
     0,
     "Chani's troop-retreat strength should not be granted automatically",
   );
-  assert.equal(
-    chani.conditionalPersuasion,
-    false,
-    "Chani should use automated Fremen Bond reveal handling",
-  );
-  assert.equal(
-    chani.conditionalSwords,
-    false,
-    "Chani troop-retreat strength should use automated retreat handling",
-  );
   assert.ok(
     chani.effects?.some((spec) => spec.trigger === "agent-play"),
     "Chani should use a structured Agent Intrigue draw effect",
@@ -516,11 +486,6 @@ export function verifyImperiumCardCatalogSpecs({ data, game, state }) {
     unswervingLoyalty.swords,
     0,
     "Unswerving Loyalty should not reveal for printed strength",
-  );
-  assert.equal(
-    unswervingLoyalty.conditionalPersuasion,
-    false,
-    "Unswerving Loyalty should use typed reveal handling instead of manual printed reveal handling",
   );
   assert.ok(
     unswervingLoyalty.effects?.some(

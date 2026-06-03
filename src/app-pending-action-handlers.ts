@@ -7,14 +7,12 @@ import {
   deployControlDefenseTroop,
   deployTroopToConflict,
   finishPendingAction,
-  finishRevealAdjustment as resolveRevealAdjustment,
   gainConflictInfluenceForPending,
   loseInfluenceForPending,
   maybeStartCombatPhase,
   moveImperiumCardToThroneRow,
   payConflictVpConversion,
   placeSpyForPending,
-  playerHasConflictUnits,
   recallSpyForConflictVpConversion,
   recallSpyForPending,
   recallSpyForSupplyForPending,
@@ -140,36 +138,6 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
   const recallSpyForSupply = (spaceId: string) =>
     runPending("spy", (current, pending) => recallSpyForSupplyForPending(current, pending, spaceId));
 
-  const adjustRevealReward = (persuasionDelta: number, strengthDelta: number) =>
-    runPending("reveal-adjust", (current, pending) => {
-      const owner = current.players.find((player) => player.id === pending.ownerId);
-      const recipient = current.players.find((player) => player.id === pending.combatRecipientId);
-      const appliedPersuasion = owner && pending.allowPersuasionAdjustment !== false
-        ? Math.max(-pending.persuasionAdjustment, persuasionDelta)
-        : 0;
-      const appliedStrength = recipient && pending.allowStrengthAdjustment !== false
-        ? Math.max(-pending.strengthAdjustment, playerHasConflictUnits(recipient) ? strengthDelta : Math.min(0, strengthDelta))
-        : 0;
-      if (appliedPersuasion === 0 && appliedStrength === 0) return current;
-      const players = current.players.map((player) => {
-        let next = player;
-        if (player.id === pending.ownerId) next = { ...next, persuasion: next.persuasion + appliedPersuasion };
-        if (player.id === pending.combatRecipientId) next = { ...next, conflict: next.conflict + appliedStrength };
-        return next;
-      });
-      return {
-        ...current,
-        players,
-        pendingAction: {
-          ...pending,
-          persuasionAdjustment: pending.persuasionAdjustment + appliedPersuasion,
-          strengthAdjustment: pending.strengthAdjustment + appliedStrength,
-        },
-      };
-    });
-
-  const finishRevealAdjust = () =>
-    runPending("reveal-adjust", (current, pending) => resolveRevealAdjustment(current, pending));
   const chooseRetreatTroopsForStrength = () =>
     runPending("retreat-troops-for-strength", (current, pending) =>
       maybeStartCombatPhase(resolveRetreatTroopsForStrength(current, pending))
@@ -354,7 +322,6 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
 
   return {
     acquirePendingCard,
-    adjustRevealReward,
     adjustTeamResourcePayment,
     chooseCommanderResourceSplit,
     chooseConflictInfluence,
@@ -391,7 +358,6 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     collectContractFallback,
     deployControlDefense,
     deployOne,
-    finishRevealAdjust,
     loseInfluence,
     payConflictVpReward,
     payOptionalSpacePayment,

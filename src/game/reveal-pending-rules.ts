@@ -382,24 +382,6 @@ export function pendingActionsForReveal(
   revealedCards: Card[],
   combatRecipientId: string,
 ): PendingAction[] {
-  const printedRevealCards = revealedCards
-    .filter((card) => card.conditionalPersuasion || card.conditionalSwords)
-    .map((card) => card.name);
-  const allowPersuasionAdjustment = revealedCards.some((card) => card.conditionalPersuasion);
-  const allowStrengthAdjustment = revealedCards.some((card) => card.conditionalSwords);
-  const revealAdjustPending: PendingAction | undefined = printedRevealCards.length > 0
-    ? {
-        kind: "reveal-adjust",
-        ownerId: source.id,
-        combatRecipientId,
-        cards: printedRevealCards,
-        persuasionAdjustment: 0,
-        strengthAdjustment: 0,
-        allowPersuasionAdjustment,
-        allowStrengthAdjustment,
-        source: "Printed reveal",
-      }
-    : undefined;
   const revealTrashCardPendings = revealedCards.flatMap((card) =>
     pendingActionsForRevealTrashCards(card, source, state, combatRecipientId)
   );
@@ -433,7 +415,6 @@ export function pendingActionsForReveal(
   const leaderAbilityPendings = pendingActionsForRevealLeaderAbilities(source, state, combatRecipientId);
 
   return [
-    revealAdjustPending,
     ...revealSpyPlacementPendings,
     ...revealTrashCardPendings,
     ...payResourceStrengthPendings,

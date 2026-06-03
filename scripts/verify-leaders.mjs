@@ -337,37 +337,6 @@ try {
     1,
     "The automated Gurney threshold should only apply to this six-player implementation",
   );
-  const gurneyRevealAdjustPending = {
-    kind: "reveal-adjust",
-    ownerId: muadDibAllyA.id,
-    combatRecipientId: muadDibAllyA.id,
-    cards: ["Printed strength"],
-    persuasionAdjustment: 0,
-    strengthAdjustment: 1,
-    source: "Printed reveal",
-  };
-  const gurneyBeforePrintedStrength = {
-    ...gurneyRevealBase,
-    players: gurneyRevealBase.players.map((player) =>
-      player.id === muadDibAllyA.id ? { ...player, conflict: 9 } : player,
-    ),
-  };
-  const gurneyAfterPrintedStrength = state.finishRevealAdjustment(
-    {
-      ...gurneyBeforePrintedStrength,
-      pendingAction: gurneyRevealAdjustPending,
-      pendingQueue: [],
-      players: gurneyBeforePrintedStrength.players.map((player) =>
-        player.id === muadDibAllyA.id ? { ...player, conflict: 10 } : player,
-      ),
-    },
-    gurneyRevealAdjustPending,
-  );
-  assert.equal(
-    playerById(gurneyAfterPrintedStrength, muadDibAllyA.id).vp,
-    2,
-    "Always Smiling should score after printed reveal strength adjustments make Gurney eligible",
-  );
   const deployCrossingPending = { kind: "deploy", ownerId: muadDibAllyA.id, remaining: 1, source: "Reveal-turn Detonation" };
   const gurneyAfterRevealDeployment = state.scoreGurneyAlwaysSmiling(
     state.deployTroopToConflict(

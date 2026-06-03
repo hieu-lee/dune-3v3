@@ -91,7 +91,7 @@ Private web-table implementation for a six-player `Dune: Imperium - Uprising` te
 - Detonation can be played as a Plot Intrigue to remove the Shield Wall or deploy up to four troops.
 - Unexpected Allies can be played as a Plot Intrigue to spend 2 water, optionally remove the Shield Wall, and summon a sandworm for the active Ally or activated Ally.
 - Catalog-backed board-space art on matching placement tiles.
-- Printed reveal adjustments and spy-post targeting for cards whose text is not reducible to a fixed number.
+- Typed reveal pending actions and spy-post targeting for cards whose text is not reducible to a fixed number.
 - Remaining printed edge cases are being reduced into structured card, Conflict, and reserve effects as they are modeled.
 - Multiplayer room mode supports server-authoritative Shaddam setup Throne Row, active-player Agent placement, Agent turn end, Reveal, card acquisition, Reveal turn end, Plot Intrigue dispatch, Combat Intrigue pass/play, Endgame Intrigue scoring/finalization, most generated pending choices, file-backed restart recovery, and six-browser room smokes covering all seats, reconnect, permissions, pending resolution, Endgame readiness, and a natural marathon with deterministic Agent placements, Reveal buys, Ally troop deployments, round-cleanup assertions, and asserted final team scoring through Conflict-deck exhaustion.
 - Asset pipeline conventions for owned scans or public reference images.

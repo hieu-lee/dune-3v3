@@ -62,7 +62,7 @@ import { PendingResourceSplitPanel } from "./PendingResourceSplitPanel";
 import { PendingResourcePaymentPanels } from "./PendingResourcePaymentPanels";
 import { PendingSietchTabrPanel } from "./PendingSietchTabrPanel";
 import { PendingSpyPanel } from "./PendingSpyPanel";
-import { PendingConflictTiePanel, PendingRevealAdjustPanel, PendingThroneRowPanel } from "./PendingTableChoicePanels";
+import { PendingConflictTiePanel, PendingThroneRowPanel } from "./PendingTableChoicePanels";
 import { PendingTeamResourcePaymentSection } from "./PendingTeamResourcePaymentSection";
 import { PendingTradePanel } from "./PendingTradePanel";
 import { PendingTrashIntriguePanel } from "./PendingTrashIntriguePanel";
@@ -74,7 +74,6 @@ export function PendingActionPanel({
   pendingAction,
   viewerPlayerId,
   acquirePendingCard,
-  adjustRevealReward,
   adjustTeamResourcePayment,
   chooseCommanderResourceSplit,
   chooseConflictInfluence,
@@ -111,7 +110,6 @@ export function PendingActionPanel({
   collectContractFallback,
   deployControlDefense,
   deployOne,
-  finishRevealAdjust,
   loseInfluence,
   payConflictVpReward,
   payOptionalSpacePayment,
@@ -325,12 +323,6 @@ export function PendingActionPanel({
     pendingContractOwner && pendingAction.kind === "contract" && !pendingAction.publicOnly
       ? pendingContractOwner.reservedContracts
       : [];
-  const revealAdjustOwner =
-    pendingAction.kind === "reveal-adjust" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
-  const revealAdjustRecipient =
-    pendingAction.kind === "reveal-adjust"
-      ? game.players.find((player) => player.id === pendingAction.combatRecipientId)
-      : undefined;
   const pendingRetreatStrengthOwner =
     pendingAction.kind === "retreat-troops-for-strength"
       ? game.players.find((player) => player.id === pendingAction.ownerId)
@@ -449,16 +441,6 @@ export function PendingActionPanel({
           viewerPlayerId={viewerPlayerId}
           onLoseInfluence={loseInfluence}
           onSkip={skipInfluenceLoss}
-        />
-      )}
-
-      {pendingAction.kind === "reveal-adjust" && revealAdjustOwner && revealAdjustRecipient && (
-        <PendingRevealAdjustPanel
-          owner={revealAdjustOwner}
-          pending={pendingAction}
-          recipient={revealAdjustRecipient}
-          onAdjust={adjustRevealReward}
-          onDone={finishRevealAdjust}
         />
       )}
 

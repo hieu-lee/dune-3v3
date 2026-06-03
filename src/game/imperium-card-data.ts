@@ -715,8 +715,6 @@ function toImperiumCard(card: HubCard): Card {
       icons: ["landsraad", "city"],
       persuasion: 2,
       swords: 0,
-      conditionalPersuasion: false,
-      conditionalSwords: false,
       effects: [
         agentDrawCards(1, [hasInfluence("bene", 2)]),
         revealGainPersuasion(2),
@@ -739,8 +737,6 @@ function toImperiumCard(card: HubCard): Card {
       icons: card.attributes.flatMap(([name]) => iconAttributeMap[name] ?? []),
       persuasion: 1,
       swords: 0,
-      conditionalPersuasion: false,
-      conditionalSwords: false,
       effects: imperiumCardEffects(card),
       play: "You may discard 1 card to gain 1 Influence and draw 1 card.",
       reveal: imperiumRevealText(card, 1, 0, false),
@@ -760,8 +756,6 @@ function toImperiumCard(card: HubCard): Card {
       icons: card.attributes.flatMap(([name]) => iconAttributeMap[name] ?? []),
       persuasion: 1,
       swords: 0,
-      conditionalPersuasion: false,
-      conditionalSwords: false,
       effects: imperiumCardEffects(card),
       play: "Place 1 spy.",
       reveal: imperiumRevealText(card, 1, 0, false),
@@ -781,8 +775,6 @@ function toImperiumCard(card: HubCard): Card {
       icons: card.attributes.flatMap(([name]) => iconAttributeMap[name] ?? []),
       persuasion: 0,
       swords: 0,
-      conditionalPersuasion: false,
-      conditionalSwords: false,
       effects: imperiumCardEffects(card),
       play: "If you have three or more units in the Conflict, draw 1 Intrigue.",
       reveal: imperiumRevealText(card, 0, 0, true),
@@ -806,11 +798,6 @@ function toImperiumCard(card: HubCard): Card {
           ? { solari: 2 }
           : undefined;
   const effects = imperiumCardEffects(card) ?? fixedRevealEffects(persuasion, swords, revealGain);
-  const automatedConditionalPersuasion = card.id === interstellarTradeSourceId || card.id === paracompassSourceId;
-  const automatedConditionalSwords = card.id === calculusOfPowerSourceId;
-  const conditionalPersuasion =
-    !automatedConditionalPersuasion && !card.attributes.some(([name]) => name === "Persuasion on reveal");
-  const conditionalSwords = !automatedConditionalSwords && hasConditionalAttribute(card, "Swords");
   return {
     id: `hub-${card.id}`,
     name: card.name,
@@ -818,12 +805,10 @@ function toImperiumCard(card: HubCard): Card {
     acquired: acquiredVictoryPoints(card, effects),
     persuasion,
     swords,
-    conditionalPersuasion,
-    conditionalSwords,
     revealGain,
     effects,
     play: imperiumPlayText(card),
-    reveal: imperiumRevealText(card, persuasion, swords, conditionalPersuasion || conditionalSwords),
+    reveal: imperiumRevealText(card, persuasion, swords, false),
     cost: attributeNumber(card, "Persuasion cost"),
     imagePath: card.localImagePath ?? card.fullImageUrl ?? undefined,
     thumbnailPath: card.localThumbnailPath ?? card.thumbnailImageUrl ?? undefined,

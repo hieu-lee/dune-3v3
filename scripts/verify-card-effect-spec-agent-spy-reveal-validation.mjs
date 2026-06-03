@@ -284,7 +284,6 @@ export function verifyCardEffectSpecAgentSpyRevealValidation({
   };
   const wheelsRevealPlan = turnActions.revealTurnPlan(playerById(wheelsRevealFixture, p2.id), wheelsRevealFixture);
   assert.equal(wheelsRevealPlan.persuasion, 1, "Wheels Within Wheels should reveal for 1 persuasion through specs");
-  assert.deepEqual(wheelsRevealPlan.printedRevealCards, [], "Wheels Within Wheels typed Reveal should not need manual fallback");
   const wheelsRevealed = turnActions.revealTurnAction(wheelsRevealFixture, {
     commanderTargets: {},
     revealPlan: wheelsRevealPlan,
@@ -332,26 +331,5 @@ export function verifyCardEffectSpecAgentSpyRevealValidation({
   );
   assert.equal(invalidDevastatingAssaultEffect.source.resources.solari, 0, "Routed Agent specs should not partially apply without an activated Ally");
   assert.equal(invalidDevastatingAssaultEffect.log, undefined, "Invalid routed Agent specs should not log");
-
-  const manualCard = {
-    ...convincingArgument,
-    id: "effect-spec-manual-reveal",
-    name: "Manual Reveal Fixture",
-    conditionalPersuasion: true,
-  };
-  const manualFixture = withActivePlayer(game, p2.id, () => ({
-    agentsReady: 0,
-    hand: [manualCard],
-    playArea: [],
-    persuasion: 0,
-    resources: { solari: 0, spice: 0, water: 0 },
-  }));
-  const manualPlan = turnActions.revealTurnPlan(playerById(manualFixture, p2.id), manualFixture);
-  assert.deepEqual(manualPlan.printedRevealCards, [manualCard.name], "Manual reveal fallback should still be reported");
-  const manualRevealed = turnActions.revealTurnAction(manualFixture, {
-    commanderTargets: {},
-    revealPlan: manualPlan,
-  });
-  assert.equal(manualRevealed.pendingAction?.kind, "reveal-adjust", "Manual reveal fallback should still queue reveal adjustment");
 
 }

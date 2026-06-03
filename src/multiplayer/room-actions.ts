@@ -46,7 +46,6 @@ import type {
 
 export type RoomPendingActionCommand =
   | { kind: "acquire-pending-card"; cardId: string }
-  | { kind: "adjust-reveal-reward"; persuasionDelta: number; strengthDelta: number }
   | { kind: "adjust-team-resource-payment"; contributorId: string; delta: number }
   | { kind: "choose-board-influence"; ownerId: string; faction: FactionId }
   | { kind: "choose-commander-resource-split"; optionIndex: number }
@@ -83,7 +82,6 @@ export type RoomPendingActionCommand =
   | { kind: "collect-contract-fallback" }
   | { kind: "deploy-control-defense" }
   | { kind: "deploy-one" }
-  | { kind: "finish-reveal-adjust" }
   | { kind: "lose-influence"; ownerId: string; faction: FactionId }
   | { kind: "pay-conflict-vp-reward" }
   | { kind: "pay-optional-space-payment" }
@@ -620,7 +618,6 @@ function pendingActionPlayerIds(state: GameState, pending: PendingAction): strin
     case "conflict-influence":
     case "optional-space-payment":
     case "trash-card":
-    case "reveal-adjust":
     case "retreat-troops-for-strength":
     case "deploy-or-retreat-troops":
     case "contract":
@@ -727,34 +724,6 @@ function applyRoomPendingAction(state: GameState, playerId: string, command: Roo
       }
       return maybeStartCombatPhase(gameRules.skipLoseInfluence(state, pending));
     }
-    case "adjust-reveal-reward": {
-      const pending = pendingOf(state, "reveal-adjust");
-      const owner = state.players.find((candidate) => candidate.id === pending.ownerId);
-      const recipient = state.players.find((candidate) => candidate.id === pending.combatRecipientId);
-      const appliedPersuasion = owner && pending.allowPersuasionAdjustment !== false
-        ? Math.max(-pending.persuasionAdjustment, command.persuasionDelta)
-        : 0;
-      const appliedStrength = recipient && pending.allowStrengthAdjustment !== false
-        ? Math.max(-pending.strengthAdjustment, gameRules.playerHasConflictUnits(recipient) ? command.strengthDelta : Math.min(0, command.strengthDelta))
-        : 0;
-      if (appliedPersuasion === 0 && appliedStrength === 0) return state;
-      return {
-        ...state,
-        players: state.players.map((candidate) => {
-          let next = candidate;
-          if (candidate.id === pending.ownerId) next = { ...next, persuasion: next.persuasion + appliedPersuasion };
-          if (candidate.id === pending.combatRecipientId) next = { ...next, conflict: next.conflict + appliedStrength };
-          return next;
-        }),
-        pendingAction: {
-          ...pending,
-          persuasionAdjustment: pending.persuasionAdjustment + appliedPersuasion,
-          strengthAdjustment: pending.strengthAdjustment + appliedStrength,
-        },
-      };
-    }
-    case "finish-reveal-adjust":
-      return gameRules.finishRevealAdjustment(state, pendingOf(state, "reveal-adjust"));
     case "choose-retreat-troops-for-strength":
       return maybeStartCombatPhase(gameRules.resolveRetreatTroopsForStrength(state, pendingOf(state, "retreat-troops-for-strength")));
     case "skip-retreat-troops-for-strength":

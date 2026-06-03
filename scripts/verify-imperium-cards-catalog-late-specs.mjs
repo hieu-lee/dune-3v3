@@ -269,11 +269,6 @@ export function verifyImperiumCardLateCatalogSpecs({
     2,
     "Prepare The Way should reveal for 2 persuasion",
   );
-  assert.equal(
-    prepareTheWay.conditionalPersuasion,
-    false,
-    "Prepare The Way should not require manual reveal handling",
-  );
   assert.ok(
     prepareTheWay.effects?.some((spec) => spec.trigger === "agent-play"),
     "Prepare The Way should use a structured Agent draw effect",

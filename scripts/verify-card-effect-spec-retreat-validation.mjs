@@ -17,7 +17,6 @@ export function verifyCardEffectSpecRetreatValidation({
     ...convincingArgument,
     id: "effect-spec-conditional-reveal-retreat-card",
     name: "Effect Spec Conditional Reveal Retreat",
-    conditionalPersuasion: false,
     effects: [revealSpec(
       [{ kind: "retreat-troops-for-strength", selector: "self", amount: 1, strength: 3 }],
       [{ kind: "has-conflict-units", count: 2 }],

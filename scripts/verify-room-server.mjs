@@ -445,6 +445,104 @@ try {
   assertVisibleObjectives(persistedBob.body, "p2");
   assertHiddenSharedDecks(persistedBob.body);
 
+  const staleRevealRoom = await jsonFetch("/api/rooms", { method: "POST" });
+  assert.equal(staleRevealRoom.response.status, 201, "Stale reveal-adjust room creation should succeed");
+  const staleRevealRoomId = staleRevealRoom.body.roomId;
+  const staleRevealRecord = server.rooms.get(staleRevealRoomId);
+  assert.ok(staleRevealRecord, "Stale reveal-adjust room should be stored in memory");
+  const staleRevealOwnerId = "p2";
+  const staleRevealOwnerBefore = player(staleRevealRoom.body, staleRevealOwnerId);
+  const staleRevealVersion = staleRevealRecord.version;
+  staleRevealRecord.game = {
+    ...staleRevealRecord.game,
+    pendingAction: {
+      kind: "reveal-adjust",
+      ownerId: staleRevealOwnerId,
+      combatRecipientId: staleRevealOwnerId,
+      cards: ["Verifier Legacy Reveal"],
+      persuasionAdjustment: 1,
+      strengthAdjustment: 0,
+      allowPersuasionAdjustment: true,
+      allowStrengthAdjustment: true,
+      source: "Printed reveal",
+    },
+    pendingQueue: [
+      {
+        kind: "reveal-adjust",
+        ownerId: staleRevealOwnerId,
+        combatRecipientId: staleRevealOwnerId,
+        cards: ["Verifier Queued Legacy Reveal"],
+        persuasionAdjustment: 0,
+        strengthAdjustment: 0,
+        allowPersuasionAdjustment: true,
+        allowStrengthAdjustment: true,
+        source: "Printed reveal",
+      },
+      {
+        kind: "maker-choice",
+        ownerId: staleRevealOwnerId,
+        spiceOwnerId: staleRevealOwnerId,
+        spice: 2,
+        sandworms: 0,
+        canSummonSandworms: false,
+        source: "Verifier Maker After Legacy Reveal",
+        spaceId: "hagga-basin",
+      },
+    ],
+  };
+  await restartServer();
+  const migratedStaleRevealRecord = server.rooms.get(staleRevealRoomId);
+  assert.ok(migratedStaleRevealRecord, "Stale reveal-adjust room should load after restart");
+  assert.equal(
+    migratedStaleRevealRecord.version,
+    staleRevealVersion + 1,
+    "Stale reveal-adjust migration should bump the room version",
+  );
+  assert.equal(
+    migratedStaleRevealRecord.game.pendingAction?.kind,
+    "maker-choice",
+    "Stale reveal-adjust migration should promote the next queued pending action",
+  );
+  assert.deepEqual(
+    migratedStaleRevealRecord.game.pendingQueue,
+    [],
+    "Stale reveal-adjust migration should filter obsolete queued reveal adjustments",
+  );
+  assert.equal(
+    JSON.stringify(migratedStaleRevealRecord.game).includes("\"kind\":\"reveal-adjust\""),
+    false,
+    "Migrated stored room should not retain obsolete reveal-adjust pending actions",
+  );
+  assert.match(
+    migratedStaleRevealRecord.game.log[0],
+    /Printed reveal adjustment resolved/,
+    "Stale reveal-adjust migration should preserve the resolution log",
+  );
+  const staleRevealOwnerClaim = await jsonFetch(`/api/rooms/${staleRevealRoomId}/seats/${staleRevealOwnerId}/claim`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: "Migrated Reveal Owner" }),
+  });
+  assert.equal(staleRevealOwnerClaim.response.status, 200, "Migrated stale reveal-adjust owner should be claimable");
+  const migratedMakerChoice = await roomAction(
+    staleRevealRoomId,
+    staleRevealOwnerClaim.body.token,
+    staleRevealOwnerClaim.body.snapshot.version,
+    { kind: "pending", command: { kind: "choose-maker-reward", choice: "spice" } },
+  );
+  assert.equal(migratedMakerChoice.response.status, 200, "Migrated stale reveal-adjust room should resolve promoted pending actions");
+  const migratedMakerOwnerAfter = player(migratedMakerChoice.body.snapshot, staleRevealOwnerId);
+  assert.equal(
+    migratedMakerOwnerAfter.resources.spice,
+    staleRevealOwnerBefore.resources.spice + 2,
+    "Migrated stale reveal-adjust room should continue normal pending resolution",
+  );
+  assert.equal(
+    migratedMakerChoice.body.snapshot.game.pendingAction,
+    undefined,
+    "Migrated stale reveal-adjust room should clear the promoted pending action after resolution",
+  );
+
   let persistedActionSnapshot = await jsonFetch("/api/rooms", { method: "POST" });
   assert.equal(persistedActionSnapshot.response.status, 201, "Persisted action room creation should succeed");
   const persistedActionRoomId = persistedActionSnapshot.body.roomId;

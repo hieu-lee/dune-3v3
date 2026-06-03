@@ -381,8 +381,6 @@ function pendingCommand(room, pending, coverage) {
   switch (pending.kind) {
     case "commander-resource-split":
       return { kind: "choose-commander-resource-split", optionIndex: 0 };
-    case "reveal-adjust":
-      return { kind: "finish-reveal-adjust" };
     case "paid-reward-choice":
       return { kind: "skip-paid-reward" };
     case "pending-action-choice":

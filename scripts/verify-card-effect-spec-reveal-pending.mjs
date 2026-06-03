@@ -78,11 +78,6 @@ export function verifyCardEffectSpecRevealPending({
     { solari: 2 },
     "Covert Operation should reveal for 2 Solari",
   );
-  assert.deepEqual(
-    covertOperationReveal.printedRevealCards,
-    [],
-    "Covert Operation typed Reveal should not need manual fallback",
-  );
   const covertSource = { ...p2, hand: [], playArea: [covertOperation] };
   const covertOpponents = game.players.filter(
     (player) => player.team !== covertSource.team,

@@ -639,7 +639,6 @@ export function verifyCardEffectSpecSpyRecallValidation({
     {
       influenceGains: {},
       persuasion: 0,
-      printedRevealCards: [],
       recruitedTroops: 0,
       revealGain: {},
       swords: 0,
@@ -689,7 +688,6 @@ export function verifyCardEffectSpecSpyRecallValidation({
     {
       influenceGains: {},
       persuasion: 0,
-      printedRevealCards: [],
       recruitedTroops: 0,
       revealGain: {},
       swords: 0,

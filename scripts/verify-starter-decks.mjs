@@ -386,20 +386,11 @@ try {
   assert.deepEqual(corrinoMight.icons, ["landsraad"], "Corrino Might should send Agents to Landsraad spaces");
   assert.equal(corrinoMight.persuasion, 0, "Corrino Might should not add reveal persuasion");
   assert.equal(corrinoMight.swords, 1, "Corrino Might should add its printed reveal sword");
-  assert.equal(corrinoMight.conditionalSwords, undefined, "Corrino Might should not use manual reveal sword adjustment");
   assert.equal(
     state.isCorrinoMightCommanderCard(corrinoMight),
     true,
     "Corrino Might should be recognized as its Commander starter card",
   );
-  const revealAdjustmentCard = {
-    ...corrinoMight,
-    id: "corrino-reveal-adjust-regression",
-    name: "Corrino Reveal Adjust Regression",
-    sourceId: undefined,
-    conditionalSwords: true,
-    effects: [],
-  };
   const baseCorrinoMightCommander = {
     ...emperor,
     resources: { solari: 0, spice: 3, water: 0 },
@@ -445,7 +436,7 @@ try {
   });
   const revealCorrinoMightCommander = {
     ...baseCorrinoMightCommander,
-    playArea: [revealAdjustmentCard, corrinoMight],
+    playArea: [corrinoMight],
     hand: [],
   };
   const revealCorrinoMightGame = {
@@ -458,39 +449,11 @@ try {
     state.pendingActionsForReveal(
       revealCorrinoMightCommander,
       revealCorrinoMightGame,
-      [revealAdjustmentCard, corrinoMight],
+      [corrinoMight],
       shaddamAlly.id,
     ),
-    [
-      {
-        kind: "reveal-adjust",
-        ownerId: emperor.id,
-        combatRecipientId: shaddamAlly.id,
-        cards: ["Corrino Reveal Adjust Regression"],
-        persuasionAdjustment: 0,
-        strengthAdjustment: 0,
-        allowPersuasionAdjustment: false,
-        allowStrengthAdjustment: true,
-        source: "Printed reveal",
-      },
-      corrinoMightPending,
-    ],
-    "Reveal pending actions should queue manual printed reveals before Corrino Might",
-  );
-  const afterCorrinoRevealAdjust = {
-    ...revealCorrinoMightGame,
-    pendingAction: state.pendingActionsForReveal(
-      revealCorrinoMightCommander,
-      revealCorrinoMightGame,
-      [revealAdjustmentCard, corrinoMight],
-      shaddamAlly.id,
-    )[0],
-    pendingQueue: [corrinoMightPending],
-  };
-  assert.deepEqual(
-    state.finishRevealAdjustment(afterCorrinoRevealAdjust, afterCorrinoRevealAdjust.pendingAction).pendingAction,
-    corrinoMightPending,
-    "Finishing printed reveal adjustment should expose queued Corrino Might",
+    [corrinoMightPending],
+    "Reveal pending actions should queue Corrino Might's typed Reveal payment",
   );
   assert.deepEqual(
     state.pendingActionsForRevealPayResourceForTroops(
@@ -793,11 +756,6 @@ try {
   assert.deepEqual(devastatingAssault.icons, ["spice"], "Devastating Assault should send Agents to spice spaces");
   assert.equal(devastatingAssault.persuasion, 1, "Devastating Assault should keep its printed reveal persuasion");
   assert.equal(devastatingAssault.swords, 0, "Devastating Assault should not have unconditional reveal swords");
-  assert.equal(
-    devastatingAssault.conditionalSwords,
-    undefined,
-    "Devastating Assault should use structured reveal payment instead of manual printed reveal handling",
-  );
   assert.match(devastatingAssault.reveal, /spend 3 Solari/i, "Devastating Assault should expose its automated reveal payment");
   assert.equal(
     state.isDevastatingAssaultCommanderCard(devastatingAssault),

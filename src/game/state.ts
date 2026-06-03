@@ -431,7 +431,6 @@ export {
   deployControlDefenseTroop,
   deployTroopToConflict,
   finishPendingAction,
-  finishRevealAdjustment,
   placeSpyForPending,
   reinforceTroop,
   resolveBoardInfluenceChoice,

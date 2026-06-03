@@ -525,8 +525,6 @@ try {
     swords: 0,
     revealGain: undefined,
     effects: undefined,
-    conditionalPersuasion: false,
-    conditionalSwords: false,
     traits: ["Faction: Fremen"],
   };
   verifyCardEffectSpecCoreValidation({

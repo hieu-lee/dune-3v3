@@ -36,10 +36,9 @@ export function MarketPanel({ activePlayer, game, pendingLocked, playingPhase, o
                 {cardCost} persuasion
                 {manipulatedCard ? " - Manipulate" : ""}
                 {card.acquired ? ` - ${card.acquired} VP` : ""}
-                {(card.conditionalPersuasion || card.conditionalSwords) ? " - printed reveal" : ""}
               </span>
               <strong>{card.name}</strong>
-              <p>{card.conditionalPersuasion || card.conditionalSwords ? "Resolve the printed reveal text on the card." : card.reveal}</p>
+              <p>{card.reveal}</p>
             </button>
           );
         })}
@@ -71,7 +70,7 @@ export function MarketPanel({ activePlayer, game, pendingLocked, playingPhase, o
                 {card.thumbnailPath && <img className="card-art" src={card.thumbnailPath} alt="" loading="lazy" />}
                 <span>{card.cost} persuasion</span>
                 <strong>{card.name}</strong>
-                <p>{card.conditionalPersuasion || card.conditionalSwords ? "Resolve the printed reveal text on the card." : card.reveal}</p>
+                <p>{card.reveal}</p>
               </button>
             ))}
           </div>

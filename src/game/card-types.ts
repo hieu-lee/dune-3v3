@@ -20,8 +20,6 @@ export type Card = {
   persuasion: number;
   swords: number;
   acquired?: number;
-  conditionalPersuasion?: boolean;
-  conditionalSwords?: boolean;
   revealGain?: Partial<Resources>;
   effects?: CardEffectSpec[];
   trashOnPlay?: boolean;

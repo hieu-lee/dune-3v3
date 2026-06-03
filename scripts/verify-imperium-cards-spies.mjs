@@ -199,11 +199,6 @@ export function verifyImperiumCardSpyEffects({
     3,
     "Bene Gesserit Operative should reveal for 3 persuasion with two spies",
   );
-  assert.deepEqual(
-    operativeRevealPlan.printedRevealCards,
-    [],
-    "Bene Gesserit Operative should not require a manual printed reveal adjustment",
-  );
   const operativeRevealed = turnActions.revealTurnAction(
     {
       ...operativeRevealFixture,
@@ -317,11 +312,6 @@ export function verifyImperiumCardSpyEffects({
     spyNetworkRevealPlan.swords,
     1,
     "Spy Network should reveal for 1 strength through specs",
-  );
-  assert.deepEqual(
-    spyNetworkRevealPlan.printedRevealCards,
-    [],
-    "Spy Network should not need manual Reveal text",
   );
   const spyNetworkRevealed = turnActions.revealTurnAction(
     spyNetworkRevealFixture,

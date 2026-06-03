@@ -101,7 +101,6 @@ export function ActiveHandPanel({
             <footer>
               <span><BookOpen size={13} /> {card.persuasion}</span>
               <span><Swords size={13} /> {card.swords}</span>
-              {(card.conditionalPersuasion || card.conditionalSwords) && <span>Printed</span>}
             </footer>
           </button>
         ))}

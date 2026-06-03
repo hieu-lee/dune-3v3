@@ -136,7 +136,6 @@ type ReinforcePendingAction = Extract<PendingAction, { kind: "reinforce" }>;
 type SietchTabrPendingAction = Extract<PendingAction, { kind: "sietch-tabr" }>;
 type SpyPendingAction = Extract<PendingAction, { kind: "spy" }>;
 type StabanUnseenNetworkPendingAction = Extract<PendingAction, { kind: "staban-unseen-network" }>;
-type RevealAdjustPendingAction = Extract<PendingAction, { kind: "reveal-adjust" }>;
 type RetreatTroopsForStrengthPendingAction = Extract<PendingAction, { kind: "retreat-troops-for-strength" }>;
 type DeployOrRetreatTroopsPendingAction = Extract<PendingAction, { kind: "deploy-or-retreat-troops" }>;
 type CommanderResourceSplitPendingAction = Extract<PendingAction, { kind: "commander-resource-split" }>;
@@ -412,22 +411,6 @@ export function resolveStabanUnseenNetworkChoice(
   choice: StabanUnseenNetworkChoice,
 ): GameState {
   return resolveStabanUnseenNetworkChoiceForPending(state, pending, choice, finishCombatIfNoActors);
-}
-
-function signedAdjustment(value: number) {
-  return value >= 0 ? `+${value}` : `${value}`;
-}
-
-export function finishRevealAdjustment(state: GameState, pending: RevealAdjustPendingAction): GameState {
-  const resolvedState = {
-    ...state,
-    ...advancePendingAction(state),
-    log: [
-      `Printed reveal adjustment resolved: ${signedAdjustment(pending.persuasionAdjustment)} persuasion, ${signedAdjustment(pending.strengthAdjustment)} strength.`,
-      ...state.log,
-    ],
-  };
-  return scoreGurneyAlwaysSmiling(resolvedState, pending.ownerId);
 }
 
 export function resolveRetreatTroopsForStrength(

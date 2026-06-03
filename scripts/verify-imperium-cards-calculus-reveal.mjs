@@ -39,11 +39,6 @@ export function verifyImperiumCardCalculusRevealEffects({
     0,
     "Calculus of Power optional swords should not be added before trashing",
   );
-  assert.deepEqual(
-    calculusPlan.printedRevealCards,
-    [],
-    "Calculus of Power should not require a manual printed reveal adjustment",
-  );
   const calculusRevealed = turnActions.revealTurnAction(calculusFixture, {
     commanderTargets: {},
     revealPlan: calculusPlan,

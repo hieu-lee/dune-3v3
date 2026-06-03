@@ -241,14 +241,6 @@
   overflow-wrap: anywhere;
 }
 
-.reveal-adjust {
-  align-items: center;
-}
-
-.reveal-adjust button {
-  min-width: 42px;
-}
-
 .support-target {
   display: grid;
   grid-template-columns: 1fr auto auto;

@@ -45,26 +45,6 @@ export function verifyCombatIntriguePhaseFlow({ data, state }) {
     "combat",
     "Explicit Reveal end should start Combat once the pending queue is empty",
   );
-  const revealAdjust = {
-    kind: "reveal-adjust",
-    ownerId: "p2",
-    combatRecipientId: "p2",
-    cards: ["Verifier printed reveal"],
-    persuasionAdjustment: 0,
-    strengthAdjustment: 0,
-    source: "Verifier",
-  };
-  const revealAdjustPendingCombat = { ...twoTeamConflict, pendingAction: revealAdjust };
-  assert.equal(
-    state.maybeStartCombatPhase(revealAdjustPendingCombat),
-    revealAdjustPendingCombat,
-    "Reveal-adjust pending actions should preserve the reveal/buy window until the player ends reveal",
-  );
-  const revealAdjustFinished = state.finishRevealAdjustment(revealAdjustPendingCombat, revealAdjust);
-  assert.equal(revealAdjustFinished.phase, "playing", "Finishing reveal adjustment should not enter Combat automatically");
-  assert.equal(revealAdjustFinished.pendingAction, undefined);
-  assert.match(revealAdjustFinished.log[0], /Printed reveal adjustment resolved/);
-
   const p2Pass = passCurrent(state, combat);
   assert.equal(p2Pass.players[p2Pass.activeSeat].id, "p3", "Passing should advance clockwise to the next actor");
   assert.deepEqual(p2Pass.combatPasses, ["p2"]);

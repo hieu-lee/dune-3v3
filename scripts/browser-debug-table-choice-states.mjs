@@ -42,8 +42,6 @@ export async function createTableChoiceStates(server, initialPlayableGame) {
     swords: 0,
     revealGain: undefined,
     effects: undefined,
-    conditionalPersuasion: false,
-    conditionalSwords: false,
   };
   const calculus = data.imperiumDeck.find((card) => card.name === "Calculus of Power");
   assert.ok(calculus, "Expected Calculus of Power for browser debug state");
@@ -221,24 +219,6 @@ export async function createTableChoiceStates(server, initialPlayableGame) {
   assert.ok(specialMissionRecallSpace, "Expected a legal Special Mission recall spy post for browser debug state");
 
   return {
-    revealAdjust: {
-      ...base,
-      activeSeat: feydSeat,
-      players: base.players.map((player) =>
-        player.id === "p2"
-          ? { ...player, conflict: 2, deployedTroops: 1, persuasion: 2 }
-          : { ...player, conflict: 0, deployedTroops: 0, persuasion: 0 },
-      ),
-      pendingAction: {
-        kind: "reveal-adjust",
-        ownerId: "p2",
-        combatRecipientId: "p2",
-        cards: ["Browser debug reveal"],
-        persuasionAdjustment: 0,
-        strengthAdjustment: 0,
-        source: "Browser debug reveal",
-      },
-    },
     retreatTroopsForStrength: {
       ...base,
       activeSeat: feydSeat,

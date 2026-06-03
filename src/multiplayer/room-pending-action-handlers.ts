@@ -11,8 +11,6 @@ export function createRoomPendingActionHandlers(sendAction: RoomSendAction): Pen
 
   return {
     acquirePendingCard: (cardId) => pending({ kind: "acquire-pending-card", cardId }),
-    adjustRevealReward: (persuasionDelta, strengthDelta) =>
-      pending({ kind: "adjust-reveal-reward", persuasionDelta, strengthDelta }),
     adjustTeamResourcePayment: (contributorId, delta) =>
       pending({ kind: "adjust-team-resource-payment", contributorId, delta }),
     chooseBoardInfluence: (ownerId, faction) => pending({ kind: "choose-board-influence", ownerId, faction }),
@@ -51,7 +49,6 @@ export function createRoomPendingActionHandlers(sendAction: RoomSendAction): Pen
     collectContractFallback: () => pending({ kind: "collect-contract-fallback" }),
     deployControlDefense: () => pending({ kind: "deploy-control-defense" }),
     deployOne: () => pending({ kind: "deploy-one" }),
-    finishRevealAdjust: () => pending({ kind: "finish-reveal-adjust" }),
     loseInfluence: (ownerId, faction) => pending({ kind: "lose-influence", ownerId, faction }),
     payConflictVpReward: () => pending({ kind: "pay-conflict-vp-reward" }),
     payOptionalSpacePayment: () => pending({ kind: "pay-optional-space-payment" }),

@@ -96,6 +96,48 @@ function disconnectLoadedSeats(room) {
   };
 }
 
+function isObsoleteRevealAdjustPending(action) {
+  return action?.kind === "reveal-adjust";
+}
+
+function signedAdjustment(value) {
+  const numericValue = Number.isFinite(value) ? value : 0;
+  return numericValue >= 0 ? `+${numericValue}` : `${numericValue}`;
+}
+
+function migrationTimestamp() {
+  return Date.now();
+}
+
+function migrateObsoleteRevealAdjust(room, { advancePendingAction, scoreGurneyAlwaysSmiling }) {
+  const game = room.game;
+  const pendingQueue = Array.isArray(game.pendingQueue) ? game.pendingQueue : [];
+  const filteredQueue = pendingQueue.filter((action) => !isObsoleteRevealAdjustPending(action));
+  const removedQueuedRevealAdjust = filteredQueue.length !== pendingQueue.length;
+  if (!isObsoleteRevealAdjustPending(game.pendingAction) && !removedQueuedRevealAdjust) return room;
+
+  let nextGame = removedQueuedRevealAdjust ? { ...game, pendingQueue: filteredQueue } : game;
+  if (isObsoleteRevealAdjustPending(game.pendingAction)) {
+    const pending = game.pendingAction;
+    const advancedState = {
+      ...nextGame,
+      ...advancePendingAction(nextGame),
+      log: [
+        `Printed reveal adjustment resolved: ${signedAdjustment(pending.persuasionAdjustment)} persuasion, ${signedAdjustment(pending.strengthAdjustment)} strength.`,
+        ...(Array.isArray(game.log) ? game.log : []),
+      ],
+    };
+    nextGame = scoreGurneyAlwaysSmiling(advancedState, pending.ownerId);
+  }
+
+  return {
+    ...room,
+    version: room.version + 1,
+    updatedAt: migrationTimestamp(),
+    game: nextGame,
+  };
+}
+
 function validStoredRoom(candidate) {
   return (
     candidate &&
@@ -108,7 +150,7 @@ function validStoredRoom(candidate) {
   );
 }
 
-async function loadStoredRooms(storageFile) {
+async function loadStoredRooms(storageFile, migrateRoom = (room) => room) {
   if (!storageFile) return new Map();
   let parsed;
   try {
@@ -121,7 +163,8 @@ async function loadStoredRooms(storageFile) {
   const rooms = new Map();
   for (const record of roomRecords) {
     if (!validStoredRoom(record)) continue;
-    rooms.set(record.id, disconnectLoadedSeats(record));
+    const disconnectedRoom = disconnectLoadedSeats(record);
+    rooms.set(record.id, await migrateRoom(disconnectedRoom));
   }
   return rooms;
 }
@@ -140,9 +183,6 @@ export async function createRoomServer({
     logLevel: log ? "info" : "silent",
     server: { hmr: { server }, middlewareMode: true },
   });
-  const rooms = await loadStoredRooms(resolvedStorageFile);
-  const streams = new Map();
-  const roomWriteChains = new Map();
   let roomStateModule;
   let gameStateModule;
   let roomActionsModule;
@@ -158,6 +198,15 @@ export async function createRoomServer({
     gameStateModule ??= await vite.ssrLoadModule("/src/game/state.ts");
     return gameStateModule;
   }
+
+  async function migrateLoadedRoom(room) {
+    const { advancePendingAction, scoreGurneyAlwaysSmiling } = await gameState();
+    return migrateObsoleteRevealAdjust(room, { advancePendingAction, scoreGurneyAlwaysSmiling });
+  }
+
+  const rooms = await loadStoredRooms(resolvedStorageFile, migrateLoadedRoom);
+  const streams = new Map();
+  const roomWriteChains = new Map();
 
   async function roomActions() {
     roomActionsModule ??= await vite.ssrLoadModule("/src/multiplayer/room-actions.ts");

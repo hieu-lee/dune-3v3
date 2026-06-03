@@ -26,11 +26,6 @@ export function verifyImperiumCardRevealTroopEffects({
   const chaniRevealPlan = turnActions.revealTurnPlan(playerById(chaniRevealFixture, p2.id), chaniRevealFixture);
   assert.equal(chaniRevealPlan.persuasion, 0, "Chani should not automatically grant Fremen Bond persuasion");
   assert.equal(chaniRevealPlan.swords, 0, "Chani should not automatically grant troop-retreat strength");
-  assert.deepEqual(
-    chaniRevealPlan.printedRevealCards,
-    [],
-    "Chani should not queue manual printed reveal adjustment",
-  );
   const chaniRevealed = turnActions.revealTurnAction(chaniRevealFixture, {
     commanderTargets: {},
     revealPlan: chaniRevealPlan,
@@ -44,8 +39,6 @@ export function verifyImperiumCardRevealTroopEffects({
     swords: 0,
     revealGain: undefined,
     effects: undefined,
-    conditionalPersuasion: false,
-    conditionalSwords: false,
   };
   const chaniHandBondPlan = turnActions.revealTurnPlan(
     {
@@ -214,11 +207,6 @@ export function verifyImperiumCardRevealTroopEffects({
   const unswervingSoloPlan = turnActions.revealTurnPlan(playerById(unswervingSoloFixture, p2.id), unswervingSoloFixture);
   assert.equal(unswervingSoloPlan.persuasion, 1, "Unswerving Loyalty should reveal for 1 persuasion");
   assert.equal(unswervingSoloPlan.recruitedTroops, 1, "Unswerving Loyalty should recruit 1 troop on reveal");
-  assert.deepEqual(
-    unswervingSoloPlan.printedRevealCards,
-    [],
-    "Unswerving Loyalty should not need manual printed reveal handling",
-  );
   const unswervingSoloRevealed = turnActions.revealTurnAction(unswervingSoloFixture, {
     commanderTargets: {},
     revealPlan: unswervingSoloPlan,

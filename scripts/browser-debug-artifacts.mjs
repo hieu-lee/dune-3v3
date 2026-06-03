@@ -141,7 +141,6 @@ const generatedScreenshotNames = [
   "pending-desert-call.png",
   "pending-threaten-spice-production.png",
   "pending-team-resource-payment-malformed.png",
-  "pending-reveal-adjust.png",
   "pending-retreat-troops-strength.png",
   "chani-fremen-bond-ready.png",
   "chani-fremen-bond-after-reveal.png",

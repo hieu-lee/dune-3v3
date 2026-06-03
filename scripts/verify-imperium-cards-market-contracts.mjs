@@ -153,11 +153,6 @@ export function verifyImperiumCardMarketContractEffects({
     2,
     "Interstellar Trade should reveal for 1 persuasion per completed contract",
   );
-  assert.deepEqual(
-    interstellarPlan.printedRevealCards,
-    [],
-    "Interstellar Trade should not require a manual printed reveal adjustment",
-  );
   const interstellarRevealed = turnActions.revealTurnAction(
     interstellarFixture,
     {

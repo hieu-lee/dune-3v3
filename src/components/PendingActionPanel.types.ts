@@ -12,7 +12,6 @@ export type PendingActionPanelProps = {
   pendingAction: PendingAction;
   viewerPlayerId?: string;
   acquirePendingCard: (cardId: string) => void;
-  adjustRevealReward: (persuasionDelta: number, strengthDelta: number) => void;
   adjustTeamResourcePayment: (contributorId: string, delta: number) => void;
   chooseCommanderResourceSplit: (optionIndex: number) => void;
   chooseConflictInfluence: (faction: FactionId) => void;
@@ -49,7 +48,6 @@ export type PendingActionPanelProps = {
   collectContractFallback: () => void;
   deployControlDefense: () => void;
   deployOne: () => void;
-  finishRevealAdjust: () => void;
   loseInfluence: (ownerId: string, faction: FactionId) => void;
   payConflictVpReward: () => void;
   payOptionalSpacePayment: () => void;

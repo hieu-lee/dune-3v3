@@ -464,7 +464,6 @@ export function placeAgentAction(
 type RevealTurnPlan = {
   influenceGains: Partial<Record<FactionId, number>>;
   persuasion: number;
-  printedRevealCards: string[];
   recruitedTroops: number;
   revealGain: Partial<Resources>;
   swords: number;
@@ -481,10 +480,7 @@ export function revealTurnPlan(
   const revealGain = effectResult.revealGain;
   const influenceGains = effectResult.influenceGains;
   const recruitedTroops = effectResult.recruitedTroops;
-  const printedRevealCards = activePlayer.hand
-    .filter((card) => card.conditionalPersuasion || card.conditionalSwords)
-    .map((card) => card.name);
-  return { influenceGains, persuasion, printedRevealCards, recruitedTroops, revealGain, swords };
+  return { influenceGains, persuasion, recruitedTroops, revealGain, swords };
 }
 
 type RevealTurnInput = {
@@ -530,7 +526,7 @@ export function revealTurnAction(
   current: GameState,
   { commanderTargets, revealPlan }: RevealTurnInput,
 ): GameState {
-  const { influenceGains = {}, persuasion, printedRevealCards, recruitedTroops, revealGain, swords } = revealPlan;
+  const { influenceGains = {}, persuasion, recruitedTroops, revealGain, swords } = revealPlan;
   const player = current.players[current.activeSeat];
   const targetId =
     player.role === "Commander"
@@ -570,11 +566,6 @@ export function revealTurnAction(
     conflictDeploymentBlock: undefined,
     players,
     log: [
-      ...(
-        printedRevealCards.length > 0
-          ? [`Resolve printed reveal text for ${printedRevealCards.join(", ")} before finalizing rewards.`]
-          : []
-      ),
       player.role === "Commander"
         ? `${player.leader} reveals for ${persuasion} persuasion${revealGainLabel(revealGain)}${revealInfluenceLabel(influenceGains)}${revealRecruitLabel(actualRecruitedTroops, target)} and gives ${combatSwords} strength to ${target?.leader ?? "an Ally"}.`
         : `${player.leader} reveals for ${persuasion} persuasion, ${combatSwords} strength${revealGainLabel(revealGain)}${revealInfluenceLabel(influenceGains)}${revealRecruitLabel(actualRecruitedTroops)}.`,

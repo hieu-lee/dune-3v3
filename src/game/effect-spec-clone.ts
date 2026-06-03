@@ -50,6 +50,23 @@ export function cloneCardEffects(effects: CardEffectSpec[] | undefined): CardEff
           ...(effect.gainVp !== undefined ? { gainVp: cloneAmount(effect.gainVp) } : {}),
         };
       }
+      if (effect.kind === "discard-cards-for-reward") {
+        return {
+          ...effect,
+          amount: cloneAmount(effect.amount),
+          ...(effect.cost ? { cost: cloneResourceAmountMap(effect.cost) } : {}),
+          ...(effect.gain ? { gain: cloneResourceAmountMap(effect.gain) } : {}),
+          ...(effect.gainVp !== undefined ? { gainVp: cloneAmount(effect.gainVp) } : {}),
+          ...(effect.takeContracts
+            ? {
+                takeContracts: {
+                  ...effect.takeContracts,
+                  amount: cloneAmount(effect.takeContracts.amount),
+                },
+              }
+            : {}),
+        };
+      }
       return {
         ...effect,
         ...("amount" in effect && effect.amount !== undefined

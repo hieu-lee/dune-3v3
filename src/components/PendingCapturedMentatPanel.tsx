@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { factionLabels } from "../game/data";
-import type { Card, FactionId, Player } from "../game/types";
+import type { Card, FactionId, PendingAction, Player, ResourceId, Resources } from "../game/types";
 
 type PendingDiscardInfluenceDrawPanelProps = {
   discardChoices: Card[];
@@ -204,6 +204,89 @@ export function PendingDiscardDrawPanel({
         Resolve {source}{selectedCard ? selectedDrawSuffix(totalDrawCards, selectedBonusIntrigues) : ""}
       </button>
       {optional && <button type="button" onClick={onSkip}>Skip</button>}
+    </div>
+  );
+}
+
+type PendingDiscardRewardPanelProps = {
+  discardChoices: Card[];
+  owner?: Player;
+  pending: Extract<PendingAction, { kind: "discard-cards-for-reward" }>;
+  onResolve: (discardCardId: string) => void;
+  onSkip: () => void;
+};
+
+const resourceLabels: Record<ResourceId, string> = {
+  solari: "Solari",
+  spice: "spice",
+  water: "water",
+};
+
+function resourceText(resources: Partial<Resources>, verb: "spend" | "gain") {
+  return (["solari", "spice", "water"] as const)
+    .map((resource) => {
+      const amount = resources[resource] ?? 0;
+      return amount > 0 ? `${verb} ${amount} ${resourceLabels[resource]}` : undefined;
+    })
+    .filter((part): part is string => Boolean(part));
+}
+
+function discardRewardTexts(pending: PendingDiscardRewardPanelProps["pending"]) {
+  return [
+    ...resourceText(pending.cost, "spend"),
+    ...resourceText(pending.gain, "gain"),
+    pending.gainVp > 0 ? `gain ${pending.gainVp} VP` : undefined,
+    pending.takeContracts ? "take a face-up CHOAM contract" : undefined,
+  ].filter((part): part is string => Boolean(part));
+}
+
+export function PendingDiscardRewardPanel({
+  discardChoices,
+  owner,
+  pending,
+  onResolve,
+  onSkip,
+}: PendingDiscardRewardPanelProps) {
+  const [selectedCardId, setSelectedCardId] = useState<string>();
+  const selectedCard = discardChoices.find((card) => card.id === selectedCardId);
+  const discardText = pending.total === 1 ? "Discard 1 card" : `Discard ${pending.total} cards`;
+  const remainingText = pending.remaining < pending.total ? `${pending.remaining} remaining` : undefined;
+  const rewardTexts = discardRewardTexts(pending);
+
+  return (
+    <div className="pending-controls trade-intrigue-grid">
+      <div className="trade-intrigue-column">
+        <strong>{owner?.leader ?? "Player"}</strong>
+        <span>
+          {pending.source}: {discardText}{rewardTexts.length > 0 ? ` to ${rewardTexts.join("; ")}` : ""}
+          {remainingText ? ` (${remainingText})` : ""}
+        </span>
+        {discardChoices.length === 0 && <span>No discardable cards</span>}
+        {discardChoices.map((card) => (
+          <button
+            className={selectedCardId === card.id ? "selected" : undefined}
+            type="button"
+            aria-pressed={selectedCardId === card.id}
+            key={card.id}
+            onClick={() => setSelectedCardId(card.id)}
+            title={`Discard ${card.name}`}
+          >
+            {card.thumbnailPath && <img src={card.thumbnailPath} alt="" />}
+            <span>{card.name}</span>
+          </button>
+        ))}
+      </div>
+
+      <button
+        type="button"
+        disabled={!selectedCard}
+        onClick={() => {
+          if (selectedCard) onResolve(selectedCard.id);
+        }}
+      >
+        {pending.remaining > 1 ? `Discard ${selectedCard?.name ?? "card"}` : `Resolve ${pending.source}`}
+      </button>
+      {pending.optional && <button type="button" onClick={onSkip}>Skip</button>}
     </div>
   );
 }

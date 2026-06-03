@@ -28,6 +28,10 @@ import {
   skipDiscardCardForInfluenceAndDraw as resolveSkipDiscardCardForInfluenceAndDraw,
 } from "./discard-influence-draw-rules";
 import {
+  resolveDiscardCardsForReward as resolveDiscardCardsForRewardForPending,
+  skipDiscardCardsForReward as resolveSkipDiscardCardsForReward,
+} from "./discard-reward-rules";
+import {
   resolveDiscardHandCard as resolveDiscardHandCardForPending,
 } from "./discard-hand-rules";
 import {
@@ -126,6 +130,7 @@ type CommanderResourceSplitPendingAction = Extract<PendingAction, { kind: "comma
 type TrashCardPendingAction = Extract<PendingAction, { kind: "trash-card" }>;
 type DiscardCardForInfluenceAndDrawPendingAction = Extract<PendingAction, { kind: "discard-card-for-influence-and-draw" }>;
 type DiscardCardForDrawPendingAction = Extract<PendingAction, { kind: "discard-card-for-draw" }>;
+type DiscardCardsForRewardPendingAction = Extract<PendingAction, { kind: "discard-cards-for-reward" }>;
 type TrashIntrigueForRewardPendingAction = Extract<PendingAction, { kind: "trash-intrigue-for-reward" }>;
 type TopDeckSelectionPendingAction = Extract<PendingAction, { kind: "top-deck-selection" }>;
 type DiscardHandCardPendingAction = Extract<PendingAction, { kind: "discard-hand-card" }>;
@@ -285,6 +290,23 @@ export function skipDiscardCardForDraw(
   pending: DiscardCardForDrawPendingAction,
 ): GameState {
   return continueAfterResolvedConflictReward(resolveSkipDiscardCardForDraw(state, pending));
+}
+
+export function resolveDiscardCardsForRewardChoice(
+  state: GameState,
+  pending: DiscardCardsForRewardPendingAction,
+  discardCardId: string,
+): GameState {
+  return continueAfterResolvedConflictReward(
+    resolveDiscardCardsForRewardForPending(state, pending, discardCardId),
+  );
+}
+
+export function skipDiscardCardsForReward(
+  state: GameState,
+  pending: DiscardCardsForRewardPendingAction,
+): GameState {
+  return continueAfterResolvedConflictReward(resolveSkipDiscardCardsForReward(state, pending));
 }
 
 export function resolveTopDeckSelectionChoice(

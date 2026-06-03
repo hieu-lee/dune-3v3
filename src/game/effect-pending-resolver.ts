@@ -13,6 +13,7 @@ import type {
   AgentAcquireCard,
   AgentBoardSpaceInfluence,
   AgentCommanderResourceSplit,
+  AgentDiscardCardsForReward,
   AgentDiscardCardForDraw,
   AgentDiscardCardForInfluenceAndDraw,
   AgentGainInfluenceChoice,
@@ -290,6 +291,36 @@ export function resolveAgentDiscardCardForDraws(
               },
             }
           : {}),
+      }));
+  });
+}
+
+export function resolveAgentDiscardCardsForRewards(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): AgentDiscardCardsForReward[] {
+  specs?.forEach(validateSpec);
+  return (specs ?? []).flatMap((spec) => {
+    if (spec.trigger !== "agent-play") return [];
+    if (!specApplies(spec, context)) return [];
+    return spec.effects
+      .filter((effect) => effect.kind === "discard-cards-for-reward")
+      .map((effect) => ({
+        selector: effect.selector,
+        amount: amountFor(effect.amount, context.source),
+        cost: resolvedResourceGain(effect.cost, context),
+        gain: resolvedResourceGain(effect.gain, context),
+        gainVp: effect.gainVp === undefined ? 0 : amountFor(effect.gainVp, context.source),
+        ...(effect.takeContracts
+          ? {
+              takeContracts: {
+                amount: amountFor(effect.takeContracts.amount, context.source),
+                sourcePool: effect.takeContracts.sourcePool,
+              },
+            }
+          : {}),
+        optional: effect.optional ?? false,
+        source: effect.source,
       }));
   });
 }

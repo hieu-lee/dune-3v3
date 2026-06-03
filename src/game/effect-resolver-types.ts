@@ -172,6 +172,20 @@ export type AgentDiscardCardForDraw = {
   };
 };
 
+export type AgentDiscardCardsForReward = {
+  selector: PlayerSelector;
+  amount: number;
+  cost: Partial<Resources>;
+  gain: Partial<Resources>;
+  gainVp: number;
+  takeContracts?: {
+    amount: number;
+    sourcePool: ContractEffectSourcePool;
+  };
+  optional: boolean;
+  source?: string;
+};
+
 export type AgentTopDeckSelection = {
   selector: PlayerSelector;
   lookCards: number;

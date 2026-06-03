@@ -371,6 +371,20 @@ export type GameEffectSpec =
       };
     }
   | {
+      kind: "discard-cards-for-reward";
+      selector: PlayerSelector;
+      amount: EffectAmountSpec;
+      cost?: Partial<Record<ResourceId, EffectAmountSpec>>;
+      gain?: Partial<Record<ResourceId, EffectAmountSpec>>;
+      gainVp?: EffectAmountSpec;
+      takeContracts?: {
+        amount: EffectAmountSpec;
+        sourcePool: ContractEffectSourcePool;
+      };
+      optional?: boolean;
+      source?: string;
+    }
+  | {
       kind: "select-top-deck-cards";
       selector: PlayerSelector;
       lookCards: EffectAmountSpec;

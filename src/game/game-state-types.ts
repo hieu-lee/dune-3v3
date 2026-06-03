@@ -241,6 +241,22 @@ export type PendingAction =
       };
     }
   | {
+      kind: "discard-cards-for-reward";
+      ownerId: string;
+      source: string;
+      remaining: number;
+      total: number;
+      discardedCardNames?: string[];
+      cost: Partial<Resources>;
+      gain: Partial<Resources>;
+      gainVp: number;
+      takeContracts?: {
+        amount: number;
+        sourcePool: "public-offer";
+      };
+      optional: boolean;
+    }
+  | {
       kind: "top-deck-selection";
       ownerId: string;
       source: string;

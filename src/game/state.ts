@@ -421,6 +421,7 @@ export {
   reinforceTroop,
   resolveBoardInfluenceChoice,
   resolveCommanderResourceSplitChoice,
+  resolveDiscardCardsForRewardChoice,
   resolveDiscardCardForDrawChoice,
   resolveDiscardCardForInfluenceAndDrawChoice,
   resolveDiscardHandCardChoice,
@@ -433,6 +434,7 @@ export {
   resolveStabanUnseenNetworkChoice,
   resolveTopDeckSelectionChoice,
   skipControlDefenseTroop,
+  skipDiscardCardsForReward,
   skipDiscardCardForDraw,
   skipDiscardCardForInfluenceAndDraw,
   skipLoseInfluenceForIntrigues,
@@ -444,6 +446,7 @@ export {
   takeChoamContract,
   trashPlayerCard,
 } from "./state-pending-actions";
+export { discardCardsForRewardChoices } from "./discard-reward-rules";
 export { topDeckSelectionCards } from "./top-deck-selection-rules";
 
 export type {

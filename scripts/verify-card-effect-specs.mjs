@@ -90,12 +90,14 @@ function hasRevealEffect(card, predicate) {
 
 function expectedFixedReveal(card) {
   return {
-    persuasion: card.persuasion,
+    persuasion: card.name === "Corrinth City" ? 5 : card.persuasion,
     revealGain: card.name === "Junction Headquarters"
       ? { water: 1 }
-      : card.revealGain
-        ? { ...card.revealGain }
-        : {},
+      : card.name === "Delivery Agreement"
+        ? { spice: 1 }
+        : card.revealGain
+          ? { ...card.revealGain }
+          : {},
     swords: card.swords,
   };
 }
@@ -327,7 +329,7 @@ try {
   assert.ok(commandRespect && prepareTheWay && spiceMustFlow && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
   assert.ok(backedByChoam && buyAccess && callToArms && changeAllegiances && councilorsAmbition && contingencyPlan && cunning && departForArrakis && detonation && unexpectedAllies && devour && distraction && findWeakness && goToGround && impress && imperiumPolitics && inspireAwe && intelligenceReport && leverage && manipulate && marketOpportunity && mercenaries && opportunism && questionableMethods && reachAgreement && shaddamsFavor && spiceIsPower && specialMission && springTheTrap && tacticalOption && sietchRitual && strategicStockpiling && weirdingCombat);
   assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && dutifulService && deliverSupplies && shipping && sietchTabr && militarySupport && spiceRefinery);
-  assert.equal(revealSpecCards.length, 79, "Unexpected number of cards with declarative Reveal specs");
+  assert.equal(revealSpecCards.length, 81, "Unexpected number of cards with declarative Reveal specs");
   assert.equal(
     marketAndImperiumCards.filter(hasFixedRevealReward).length,
     49,
@@ -347,8 +349,6 @@ try {
       .map((card) => card.name)
       .sort(),
     [
-      "Corrinth City",
-      "Delivery Agreement",
       "Priority Contracts",
       "The Spice Must Flow",
     ],
@@ -3570,8 +3570,48 @@ try {
   );
   assert.equal(priorityContracts.acquired, undefined, "Priority Contracts VP should not be treated as an acquire bonus");
   assert.equal(junctionHeadquarters.acquired, undefined, "Junction Headquarters VP should be modeled by its typed Agent effect");
-  assert.equal(corrinthCity.acquired, 1, "Corrinth City should retain its legacy printed-VP marker until its VP text is typed");
-  assert.equal(deliveryAgreement.acquired, 1, "Delivery Agreement should retain its legacy printed-VP marker until its VP text is typed");
+  assert.ok(
+    hasAgentEffect(
+      corrinthCity,
+      (effect) =>
+        effect.kind === "discard-cards-for-reward" &&
+        effect.selector === "self" &&
+        effect.amount === 2 &&
+        effect.cost?.solari === 5 &&
+        effect.gainVp === 1 &&
+        effect.source === "Corrinth City",
+    ),
+    "Corrinth City should use a typed Agent discard-cost VP effect",
+  );
+  assert.ok(
+    hasRevealEffect(
+      corrinthCity,
+      (effect) => effect.kind === "gain-persuasion" && effect.selector === "self" && effect.amount === 5,
+    ),
+    "Corrinth City should carry its default +5 persuasion Reveal branch as a typed effect",
+  );
+  assert.ok(
+    hasAgentEffect(
+      deliveryAgreement,
+      (effect) =>
+        effect.kind === "discard-cards-for-reward" &&
+        effect.selector === "self" &&
+        effect.amount === 1 &&
+        effect.takeContracts?.amount === 1 &&
+        effect.takeContracts?.sourcePool === "public-offer" &&
+        effect.source === "Delivery Agreement",
+    ),
+    "Delivery Agreement should use a typed Agent discard-for-public-contract effect",
+  );
+  assert.ok(
+    hasRevealEffect(
+      deliveryAgreement,
+      (effect) => effect.kind === "gain-resource" && effect.selector === "self" && effect.resource === "spice" && effect.amount === 1,
+    ),
+    "Delivery Agreement should carry its default Reveal spice reward as a typed effect",
+  );
+  assert.equal(corrinthCity.acquired, undefined, "Corrinth City VP should be modeled by its typed Agent effect");
+  assert.equal(deliveryAgreement.acquired, undefined, "Delivery Agreement's conditional Reveal VP should not be treated as an acquire bonus");
   assert.equal(smugglersHaven.acquired, undefined, "Smuggler's Haven VP should be modeled by its typed Agent effect");
   assert.deepEqual(
     marketAndImperiumCards.filter(hasAgentPlaySpec).map((card) => card.name).sort(),
@@ -3582,8 +3622,10 @@ try {
       "Captured Mentat",
       "Cargo Runner",
       "Chani, Clever Tactician",
+      "Corrinth City",
       "Covert Operation",
       "Dangerous Rhetoric",
+      "Delivery Agreement",
       "Desert Power",
       "Desert Survival",
       "Double Agent",
@@ -4837,6 +4879,60 @@ try {
       )
     ),
     "Guild Spy should carry a declarative Agent discard-for-draw spec with a Spacing Guild Intrigue bonus",
+  );
+  assert.equal(
+    corrinthCity.play,
+    "Discard 2 cards and spend 5 Solari to gain 1 VP.",
+    "Corrinth City play text should expose its Agent discard-cost VP reward",
+  );
+  assert.equal(
+    corrinthCity.reveal,
+    "+5 persuasion, or spend 5 Solari to take your High Council seat.",
+    "Corrinth City reveal text should preserve its High Council branch",
+  );
+  assert.deepEqual(
+    corrinthCity.effects?.filter((spec) => spec.trigger === "agent-play"),
+    [
+      agentSpec([
+        {
+          kind: "discard-cards-for-reward",
+          selector: "self",
+          amount: 2,
+          cost: { solari: 5 },
+          gainVp: 1,
+          source: "Corrinth City",
+        },
+      ]),
+    ],
+    "Corrinth City should model its Agent discard-cost VP reward as a typed effect",
+  );
+  assert.equal(
+    deliveryAgreement.play,
+    "Discard 1 card to take a face-up CHOAM contract.",
+    "Delivery Agreement play text should expose its Agent discard-contract reward",
+  );
+  assert.equal(
+    deliveryAgreement.reveal,
+    "Gain 1 spice. If you have completed four or more contracts, trash this card to gain 1 VP.",
+    "Delivery Agreement reveal text should preserve its conditional VP branch",
+  );
+  assert.deepEqual(
+    deliveryAgreement.effects?.filter((spec) => spec.trigger === "agent-play"),
+    [
+      agentSpec([
+        {
+          kind: "discard-cards-for-reward",
+          selector: "self",
+          amount: 1,
+          takeContracts: {
+            amount: 1,
+            sourcePool: "public-offer",
+          },
+          source: "Delivery Agreement",
+        },
+      ]),
+    ],
+    "Delivery Agreement should model its Agent discard-contract reward as a typed effect",
   );
   assert.equal(
     longLiveTheFighters.play,
@@ -9124,6 +9220,151 @@ try {
     /Invalid effect amount "-1"/,
     "Discard-for-draw specs should reject negative bonus Intrigue amounts",
   );
+  const revealDiscardRewardCard = {
+    ...convincingArgument,
+    id: "effect-spec-reveal-discard-reward-card",
+    name: "Effect Spec Reveal Discard Reward",
+    effects: [revealSpec([{
+      kind: "discard-cards-for-reward",
+      selector: "self",
+      amount: 1,
+      gain: { spice: 1 },
+    }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [revealDiscardRewardCard], highCouncilSeat: false }),
+    /Unsupported effect "discard-cards-for-reward" for reveal/,
+    "Discard-for-reward specs should stay in Agent play until other trigger resolvers support them",
+  );
+  const invalidDiscardRewardSelectorCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-discard-reward-selector-card",
+    name: "Effect Spec Invalid Discard Reward Selector",
+    effects: [agentSpec([{
+      kind: "discard-cards-for-reward",
+      selector: "activated-ally",
+      amount: 1,
+      gain: { spice: 1 },
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidDiscardRewardSelectorCard, p4, p2),
+    /Unsupported effect selector "activated-ally" for discard-cards-for-reward/,
+    "Discard-for-reward specs should reject activated Ally selectors",
+  );
+  const invalidDiscardRewardAmountCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-discard-reward-amount-card",
+    name: "Effect Spec Invalid Discard Reward Amount",
+    effects: [agentSpec([{
+      kind: "discard-cards-for-reward",
+      selector: "self",
+      amount: 0,
+      gain: { spice: 1 },
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidDiscardRewardAmountCard, p2, p2),
+    /Invalid discard-cards-for-reward amount "0"/,
+    "Discard-for-reward specs should require positive discard amounts",
+  );
+  const invalidDiscardRewardCostCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-discard-reward-cost-card",
+    name: "Effect Spec Invalid Discard Reward Cost",
+    effects: [agentSpec([{
+      kind: "discard-cards-for-reward",
+      selector: "self",
+      amount: 1,
+      cost: { solari: 0 },
+      gain: { spice: 1 },
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidDiscardRewardCostCard, p2, p2),
+    /Invalid discard-cards-for-reward cost solari "0"/,
+    "Discard-for-reward specs should reject non-positive resource costs",
+  );
+  const invalidDiscardRewardEmptyCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-discard-reward-empty-card",
+    name: "Effect Spec Invalid Discard Reward Empty",
+    effects: [agentSpec([{
+      kind: "discard-cards-for-reward",
+      selector: "self",
+      amount: 1,
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidDiscardRewardEmptyCard, p2, p2),
+    /Invalid discard-cards-for-reward reward "undefined"/,
+    "Discard-for-reward specs should require at least one reward",
+  );
+  const invalidDiscardRewardVpCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-discard-reward-vp-card",
+    name: "Effect Spec Invalid Discard Reward VP",
+    effects: [agentSpec([{
+      kind: "discard-cards-for-reward",
+      selector: "self",
+      amount: 1,
+      gainVp: 0,
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidDiscardRewardVpCard, p2, p2),
+    /Invalid discard-cards-for-reward gainVp "0"/,
+    "Discard-for-reward specs should require positive VP rewards",
+  );
+  const invalidDiscardRewardContractAmountCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-discard-reward-contract-amount-card",
+    name: "Effect Spec Invalid Discard Reward Contract Amount",
+    effects: [agentSpec([{
+      kind: "discard-cards-for-reward",
+      selector: "self",
+      amount: 1,
+      takeContracts: { amount: 2, sourcePool: "public-offer" },
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidDiscardRewardContractAmountCard, p2, p2),
+    /Invalid discard-cards-for-reward takeContracts amount "2"/,
+    "Discard-for-reward specs should only support one public contract",
+  );
+  const invalidDiscardRewardContractSourceCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-discard-reward-contract-source-card",
+    name: "Effect Spec Invalid Discard Reward Contract Source",
+    effects: [agentSpec([{
+      kind: "discard-cards-for-reward",
+      selector: "self",
+      amount: 1,
+      takeContracts: { amount: 1, sourcePool: "reserved" },
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidDiscardRewardContractSourceCard, p2, p2),
+    /Invalid discard-cards-for-reward takeContracts sourcePool "reserved"/,
+    "Discard-for-reward specs should only support public-offer contracts",
+  );
+  const invalidDiscardRewardOptionalCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-discard-reward-optional-card",
+    name: "Effect Spec Invalid Discard Reward Optional",
+    effects: [agentSpec([{
+      kind: "discard-cards-for-reward",
+      selector: "self",
+      amount: 1,
+      gain: { spice: 1 },
+      optional: "false",
+    }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidDiscardRewardOptionalCard, p2, p2),
+    /Invalid discard-cards-for-reward optional "false"/,
+    "Discard-for-reward specs should reject non-boolean optional values",
+  );
   const topDeckSelectionCard = {
     ...convincingArgument,
     id: "effect-spec-top-deck-selection-card",
@@ -10192,6 +10433,218 @@ try {
   assert.equal(priorityContractsNoOffer.pendingAction, undefined, "Priority Contracts should not queue when no public contracts remain");
   assert.equal(playerById(priorityContractsNoOffer, p2.id).resources.spice, 3, "Priority Contracts no-offer path should still grant spice");
   assert.equal(playerById(priorityContractsNoOffer, p2.id).vp, 1, "Priority Contracts no-offer path should still grant VP");
+
+  const corrinthReveal = turnActions.revealTurnPlan(
+    { ...p2, hand: [corrinthCity], highCouncilSeat: false },
+    game,
+  );
+  assert.equal(corrinthReveal.persuasion, 5, "Corrinth City should resolve its default +5 persuasion Reveal branch");
+  const deliveryReveal = turnActions.revealTurnPlan(
+    { ...p2, hand: [deliveryAgreement], highCouncilSeat: false },
+    game,
+  );
+  assert.equal(deliveryReveal.revealGain.spice, 1, "Delivery Agreement should resolve its default Reveal spice reward");
+  const corrinthAcquireReplacement = data.imperiumDeck.find((card) => card.id !== corrinthCity.id);
+  const deliveryAcquireReplacement = data.imperiumDeck.find((card) => card.id !== deliveryAgreement.id);
+  assert.ok(corrinthAcquireReplacement && deliveryAcquireReplacement, "Expected Imperium Row replacements for discard-reward acquisition coverage");
+  const corrinthAcquired = state.acquireMarketCard(
+    {
+      ...withActivePlayer(game, p2.id, () => ({
+        discard: [],
+        hand: [],
+        persuasion: corrinthCity.cost,
+        playArea: [],
+        revealed: true,
+        resources: { solari: 0, spice: 0, water: 0 },
+        vp: 0,
+      })),
+      imperiumRow: [corrinthCity],
+      marketDeck: [corrinthAcquireReplacement],
+    },
+    p2.id,
+    corrinthCity.id,
+  );
+  assert.equal(playerById(corrinthAcquired, p2.id).vp, 0, "Acquiring Corrinth City should not award its Agent VP");
+  const deliveryAcquired = state.acquireMarketCard(
+    {
+      ...withActivePlayer(game, p2.id, () => ({
+        discard: [],
+        hand: [],
+        persuasion: deliveryAgreement.cost,
+        playArea: [],
+        revealed: true,
+        resources: { solari: 0, spice: 0, water: 0 },
+        vp: 0,
+      })),
+      imperiumRow: [deliveryAgreement],
+      marketDeck: [deliveryAcquireReplacement],
+    },
+    p2.id,
+    deliveryAgreement.id,
+  );
+  assert.equal(playerById(deliveryAcquired, p2.id).vp, 0, "Acquiring Delivery Agreement should not award its conditional Reveal VP");
+
+  const corrinthCitySpace = {
+    id: "corrinth-city-test-space",
+    name: "Corrinth City Test Space",
+    zone: "Emperor",
+    icon: "emperor",
+    detail: "Verifier-only Emperor space without board pending rewards.",
+  };
+  const corrinthDiscardOne = { ...dagger, id: "corrinth-city-discard-one" };
+  const corrinthDiscardTwo = { ...convincingArgument, id: "corrinth-city-discard-two" };
+  const corrinthPlaced = turnActions.placeAgentAction(
+    {
+      ...withActivePlayer(game, p2.id, () => ({
+        agentsReady: 1,
+        discard: [],
+        hand: [corrinthCity, corrinthDiscardOne, corrinthDiscardTwo],
+        playArea: [],
+        resources: { solari: 5, spice: 0, water: 0 },
+        vp: 0,
+      })),
+    },
+    {
+      commanderTargets: {},
+      selectedCard: corrinthCity,
+      selectedSpace: corrinthCitySpace,
+    },
+  );
+  assert.deepEqual(
+    corrinthPlaced.pendingAction,
+    {
+      kind: "discard-cards-for-reward",
+      ownerId: p2.id,
+      source: "Corrinth City",
+      remaining: 2,
+      total: 2,
+      cost: { solari: 5 },
+      gain: {},
+      gainVp: 1,
+      optional: false,
+    },
+    "Corrinth City should queue a two-card discard payment after Agent placement",
+  );
+  const corrinthAfterFirstDiscard = state.resolveDiscardCardsForRewardChoice(
+    corrinthPlaced,
+    corrinthPlaced.pendingAction,
+    corrinthDiscardOne.id,
+  );
+  assert.equal(corrinthAfterFirstDiscard.pendingAction?.kind, "discard-cards-for-reward");
+  assert.equal(corrinthAfterFirstDiscard.pendingAction?.remaining, 1, "Corrinth City should require its second discard before reward");
+  assert.equal(playerById(corrinthAfterFirstDiscard, p2.id).resources.solari, 5, "Corrinth City should not spend Solari before the final discard");
+  assert.equal(playerById(corrinthAfterFirstDiscard, p2.id).vp, 0, "Corrinth City should not grant VP before the final discard");
+  const corrinthResolved = state.resolveDiscardCardsForRewardChoice(
+    corrinthAfterFirstDiscard,
+    corrinthAfterFirstDiscard.pendingAction,
+    corrinthDiscardTwo.id,
+  );
+  assert.equal(corrinthResolved.pendingAction, undefined, "Corrinth City should clear its pending action after two discards");
+  assert.equal(playerById(corrinthResolved, p2.id).resources.solari, 0, "Corrinth City should spend 5 Solari after its discards");
+  assert.equal(playerById(corrinthResolved, p2.id).vp, 1, "Corrinth City should grant 1 VP after its discards and Solari payment");
+  assert.deepEqual(
+    playerById(corrinthResolved, p2.id).discard.slice(-2).map((card) => card.id),
+    [corrinthDiscardOne.id, corrinthDiscardTwo.id],
+    "Corrinth City should discard both selected hand cards",
+  );
+  assert.match(corrinthResolved.log[0], /resolves Corrinth City: discards .* and spends 5 Solari; gains 1 VP/);
+
+  const deliveryAgreementSpace = {
+    id: "delivery-agreement-test-space",
+    name: "Delivery Agreement Test Space",
+    zone: "City",
+    icon: "city",
+    detail: "Verifier-only City space without board pending rewards.",
+  };
+  const deliveryDiscard = { ...dagger, id: "delivery-agreement-discard-card" };
+  const deliveryOffer = data.standardContracts[11];
+  const deliveryReplacement = data.standardContracts[12];
+  assert.ok(deliveryOffer && deliveryReplacement, "Expected standard contracts for Delivery Agreement coverage");
+  const deliveryPlaced = turnActions.placeAgentAction(
+    {
+      ...withActivePlayer(game, p2.id, () => ({
+        agentsReady: 1,
+        contracts: [],
+        discard: [],
+        hand: [deliveryAgreement, deliveryDiscard],
+        playArea: [],
+        resources: { solari: 0, spice: 0, water: 0 },
+        vp: 0,
+      })),
+      contractOffer: [deliveryOffer],
+      contractDeck: [deliveryReplacement],
+    },
+    {
+      commanderTargets: {},
+      selectedCard: deliveryAgreement,
+      selectedSpace: deliveryAgreementSpace,
+    },
+  );
+  assert.deepEqual(
+    deliveryPlaced.pendingAction,
+    {
+      kind: "discard-cards-for-reward",
+      ownerId: p2.id,
+      source: "Delivery Agreement",
+      remaining: 1,
+      total: 1,
+      cost: {},
+      gain: {},
+      gainVp: 0,
+      takeContracts: { amount: 1, sourcePool: "public-offer" },
+      optional: false,
+    },
+    "Delivery Agreement should queue a discard before the public contract choice",
+  );
+  const deliveryDiscarded = state.resolveDiscardCardsForRewardChoice(
+    deliveryPlaced,
+    deliveryPlaced.pendingAction,
+    deliveryDiscard.id,
+  );
+  assert.deepEqual(
+    deliveryDiscarded.pendingAction,
+    { kind: "contract", ownerId: p2.id, source: "Delivery Agreement", publicOnly: true },
+    "Delivery Agreement should queue its public CHOAM contract after the discard resolves",
+  );
+  assert.equal(playerById(deliveryDiscarded, p2.id).discard.at(-1)?.id, deliveryDiscard.id, "Delivery Agreement should discard the selected card");
+  assert.equal(playerById(deliveryDiscarded, p2.id).vp, 0, "Delivery Agreement Agent text should not grant VP");
+  const deliveryResolved = state.takeChoamContract(
+    deliveryDiscarded,
+    deliveryDiscarded.pendingAction,
+    deliveryOffer.id,
+  );
+  assert.equal(deliveryResolved.pendingAction, undefined);
+  assert.equal(playerById(deliveryResolved, p2.id).contracts.at(-1)?.card.id, deliveryOffer.id);
+  assert.deepEqual(
+    deliveryResolved.contractOffer.map((contract) => contract.id),
+    [deliveryReplacement.id],
+    "Delivery Agreement should refill the public contract offer after taking a contract",
+  );
+  const deliveryNoOfferPlaced = turnActions.placeAgentAction(
+    {
+      ...withActivePlayer(game, p2.id, () => ({
+        agentsReady: 1,
+        contracts: [],
+        discard: [],
+        hand: [deliveryAgreement, deliveryDiscard],
+        playArea: [],
+        resources: { solari: 0, spice: 0, water: 0 },
+      })),
+      contractOffer: [],
+      contractDeck: [],
+    },
+    {
+      commanderTargets: {},
+      selectedCard: deliveryAgreement,
+      selectedSpace: deliveryAgreementSpace,
+    },
+  );
+  assert.equal(deliveryNoOfferPlaced.pendingAction, undefined, "Delivery Agreement should not ask for a discard when no face-up contracts remain");
+  assert.equal(
+    playerById(deliveryNoOfferPlaced, p2.id).hand.some((card) => card.id === deliveryDiscard.id),
+    true,
+    "Delivery Agreement should leave discard choices in hand when no face-up contracts remain",
+  );
 
   const beneReveal = turnActions.revealTurnPlan(
     { ...p2, hand: [beneGesseritOperative], highCouncilSeat: false },

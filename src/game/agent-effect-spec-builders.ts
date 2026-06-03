@@ -145,6 +145,36 @@ export function agentDiscardCardForDraw(
   ], conditions);
 }
 
+export function agentDiscardCardsForReward(
+  amount: EffectAmountSpec,
+  options: {
+    cost?: Partial<Record<ResourceId, EffectAmountSpec>>;
+    gain?: Partial<Record<ResourceId, EffectAmountSpec>>;
+    gainVp?: EffectAmountSpec;
+    takeContracts?: {
+      amount: EffectAmountSpec;
+      sourcePool: "public-offer";
+    };
+    optional?: boolean;
+    source?: string;
+  },
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return agentPlayEffects([
+    {
+      kind: "discard-cards-for-reward",
+      selector: "self",
+      amount,
+      ...(options.cost ? { cost: { ...options.cost } } : {}),
+      ...(options.gain ? { gain: { ...options.gain } } : {}),
+      ...(options.gainVp !== undefined ? { gainVp: options.gainVp } : {}),
+      ...(options.takeContracts ? { takeContracts: { ...options.takeContracts } } : {}),
+      ...(options.optional !== undefined ? { optional: options.optional } : {}),
+      ...(options.source ? { source: options.source } : {}),
+    },
+  ], conditions);
+}
+
 export function agentSelectTopDeckCards(
   options: {
     lookCards: EffectAmountSpec;

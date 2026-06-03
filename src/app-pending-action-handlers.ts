@@ -21,6 +21,7 @@ import {
   reinforceTroop,
   resolveCommanderResourceSplitChoice,
   resolveConflictTie,
+  resolveDiscardCardsForRewardChoice,
   resolveDiscardCardForDrawChoice,
   resolveDiscardHandCardChoice,
   resolveDiscardCardForInfluenceAndDrawChoice,
@@ -49,6 +50,7 @@ import {
   scoreGurneyAlwaysSmiling,
   skipConflictVpConversion,
   skipControlDefenseTroop,
+  skipDiscardCardsForReward,
   skipDiscardCardForDraw,
   skipDiscardCardForInfluenceAndDraw,
   skipLoseInfluence,
@@ -277,6 +279,14 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     runPending("discard-card-for-draw", (current, pending) =>
       maybeStartCombatPhase(skipDiscardCardForDraw(current, pending))
     );
+  const chooseDiscardCardsForReward = (discardCardId: string) =>
+    runPending("discard-cards-for-reward", (current, pending) =>
+      maybeStartCombatPhase(resolveDiscardCardsForRewardChoice(current, pending, discardCardId))
+    );
+  const skipDiscardCardsForRewardChoice = () =>
+    runPending("discard-cards-for-reward", (current, pending) =>
+      maybeStartCombatPhase(skipDiscardCardsForReward(current, pending))
+    );
   const chooseTopDeckSelection = (choice: TopDeckSelectionChoice) =>
     runPending("top-deck-selection", (current, pending) =>
       maybeStartCombatPhase(resolveTopDeckSelectionChoice(current, pending, choice))
@@ -330,6 +340,7 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     chooseConflictInfluence,
     chooseBoardInfluence,
     chooseConflictTieWinner,
+    chooseDiscardCardsForReward,
     chooseDiscardCardForDraw,
     chooseDiscardHandCard,
     chooseDiscardCardForInfluenceAndDraw,
@@ -369,6 +380,7 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     reinforceOne,
     skipControlDefense,
     skipConflictVpReward,
+    skipDiscardCardsForRewardChoice,
     skipDiscardCardForDrawChoice,
     skipDiscardCardForInfluenceAndDrawChoice,
     skipInfluenceLoss,

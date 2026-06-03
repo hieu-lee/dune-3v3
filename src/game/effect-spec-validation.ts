@@ -645,6 +645,35 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     }
     return;
   }
+  if (effect.kind === "discard-cards-for-reward") {
+    if (trigger !== "agent-play") {
+      throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
+    }
+    if (effect.selector !== "self") {
+      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
+    validatePositiveAmount("discard-cards-for-reward amount", effect.amount);
+    validateResourceAmountMap("discard-cards-for-reward cost", effect.cost);
+    const hasResourceReward = validateResourceAmountMap("discard-cards-for-reward gain", effect.gain);
+    if (effect.gainVp !== undefined) validatePositiveAmount("discard-cards-for-reward gainVp", effect.gainVp);
+    let hasContractReward = false;
+    if (effect.takeContracts !== undefined) {
+      validatePositiveAmount("discard-cards-for-reward takeContracts amount", effect.takeContracts.amount);
+      if (effect.takeContracts.amount !== 1) {
+        invalidSpecField("discard-cards-for-reward takeContracts amount", effect.takeContracts.amount);
+      }
+      if (effect.takeContracts.sourcePool !== "public-offer") {
+        invalidSpecField("discard-cards-for-reward takeContracts sourcePool", effect.takeContracts.sourcePool);
+      }
+      hasContractReward = true;
+    }
+    if (!hasResourceReward && effect.gainVp === undefined && !hasContractReward) {
+      invalidSpecField("discard-cards-for-reward reward", undefined);
+    }
+    validateOptionalBoolean("discard-cards-for-reward optional", (effect as { optional?: unknown }).optional);
+    validateSourceLabel("discard-cards-for-reward source", effect.source);
+    return;
+  }
   if (effect.kind === "select-top-deck-cards") {
     if (trigger !== "agent-play") {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);

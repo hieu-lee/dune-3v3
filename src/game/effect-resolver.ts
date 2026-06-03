@@ -43,6 +43,7 @@ export type {
   AgentAcquireCard,
   AgentBoardSpaceInfluence,
   AgentCommanderResourceSplit,
+  AgentDiscardCardsForReward,
   AgentDiscardCardForDraw,
   AgentDiscardCardForInfluenceAndDraw,
   AgentGainInfluenceChoice,
@@ -374,6 +375,9 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
     return result;
   }
   if (effect.kind === "discard-card-for-draw") {
+    return result;
+  }
+  if (effect.kind === "discard-cards-for-reward") {
     return result;
   }
   if (effect.kind === "select-top-deck-cards") {

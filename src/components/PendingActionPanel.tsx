@@ -8,6 +8,7 @@ import {
   canMoveCardToThroneRow,
   canPayConflictVpConversion,
   conflictVpConversionSpyChoices,
+  discardCardsForRewardChoices,
   discardHandCardChoices,
   discardCardForDrawChoices,
   discardCardForInfluenceAndDrawChoices,
@@ -36,6 +37,7 @@ import {
   PendingDiscardDrawPanel,
   PendingDiscardHandCardPanel,
   PendingDiscardInfluenceDrawPanel,
+  PendingDiscardRewardPanel,
   PendingInfluenceIntriguePanel,
 } from "./PendingCapturedMentatPanel";
 import { PendingConflictInfluencePanel } from "./PendingConflictInfluencePanel";
@@ -84,6 +86,7 @@ type PendingActionPanelProps = {
   chooseConflictInfluence: (faction: FactionId) => void;
   chooseBoardInfluence: (ownerId: string, faction: FactionId) => void;
   chooseConflictTieWinner: (winnerId?: string) => void;
+  chooseDiscardCardsForReward: (discardCardId: string) => void;
   chooseDiscardCardForDraw: (discardCardId: string) => void;
   chooseDiscardHandCard: (discardCardId: string) => void;
   chooseDiscardCardForInfluenceAndDraw: (discardCardId: string, faction: FactionId) => void;
@@ -121,6 +124,7 @@ type PendingActionPanelProps = {
   recallSpy: (spaceId: string) => void;
   recallSpyForSupply: (spaceId: string) => void;
   reinforceOne: (playerId: string, destination: "garrison" | "conflict") => void;
+  skipDiscardCardsForRewardChoice: () => void;
   skipDiscardCardForDrawChoice: () => void;
   skipDiscardCardForInfluenceAndDrawChoice: () => void;
   skipLoseInfluenceForIntriguesChoice: () => void;
@@ -159,6 +163,7 @@ export function PendingActionPanel({
   chooseConflictInfluence,
   chooseBoardInfluence,
   chooseConflictTieWinner,
+  chooseDiscardCardsForReward,
   chooseDiscardCardForDraw,
   chooseDiscardHandCard,
   chooseDiscardCardForInfluenceAndDraw,
@@ -196,6 +201,7 @@ export function PendingActionPanel({
   recallSpy,
   recallSpyForSupply,
   reinforceOne,
+  skipDiscardCardsForRewardChoice,
   skipDiscardCardForDrawChoice,
   skipDiscardCardForInfluenceAndDrawChoice,
   skipLoseInfluenceForIntriguesChoice,
@@ -250,6 +256,12 @@ export function PendingActionPanel({
   const pendingDiscardDrawChoices =
     pendingAction.kind === "discard-card-for-draw" && pendingDiscardDrawOwner
       ? discardCardForDrawChoices(pendingDiscardDrawOwner, pendingAction)
+      : [];
+  const pendingDiscardRewardOwner =
+    pendingAction.kind === "discard-cards-for-reward" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
+  const pendingDiscardRewardChoices =
+    pendingAction.kind === "discard-cards-for-reward" && pendingDiscardRewardOwner
+      ? discardCardsForRewardChoices(pendingDiscardRewardOwner, pendingAction)
       : [];
   const pendingTrashIntrigueOwner =
     pendingAction.kind === "trash-intrigue-for-reward" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
@@ -499,6 +511,7 @@ export function PendingActionPanel({
           {pendingAction.kind === "acquire-card" && `${pendingAcquireOwner?.leader ?? "Player"} acquisition from ${pendingAction.source}`}
           {pendingAction.kind === "discard-card-for-influence-and-draw" && `${pendingDiscardInfluenceDrawOwner?.leader ?? "Player"} ${pendingAction.source}`}
           {pendingAction.kind === "discard-card-for-draw" && `${pendingDiscardDrawOwner?.leader ?? "Player"} ${pendingAction.source}`}
+          {pendingAction.kind === "discard-cards-for-reward" && `${pendingDiscardRewardOwner?.leader ?? "Player"} ${pendingAction.source}`}
           {pendingAction.kind === "top-deck-selection" && `${pendingTopDeckSelectionOwner?.leader ?? "Player"} ${pendingAction.source}`}
           {pendingAction.kind === "trash-intrigue-for-reward" && `${pendingTrashIntrigueOwner?.leader ?? "Player"} ${pendingAction.source}`}
           {pendingAction.kind === "discard-hand-card" && `${pendingDiscardHandCardOwner?.leader ?? "Player"} ${pendingAction.source}`}
@@ -905,6 +918,16 @@ export function PendingActionPanel({
           source={pendingAction.source}
           onResolve={chooseDiscardCardForDraw}
           onSkip={skipDiscardCardForDrawChoice}
+        />
+      )}
+
+      {pendingAction.kind === "discard-cards-for-reward" && (
+        <PendingDiscardRewardPanel
+          discardChoices={pendingDiscardRewardChoices}
+          owner={pendingDiscardRewardOwner}
+          pending={pendingAction}
+          onResolve={chooseDiscardCardsForReward}
+          onSkip={skipDiscardCardsForRewardChoice}
         />
       )}
 

@@ -70,6 +70,7 @@ const generatedScreenshotNames = [
   "pending-space-time-folding-discard-draw.png",
   "pending-guild-envoy-discard-draw.png",
   "pending-guild-spy-discard-draw.png",
+  "pending-corrinth-city-discard-reward.png",
   "pending-long-live-top-deck.png",
   "pending-long-live-top-deck-mobile.png",
   "pending-long-live-top-deck-selected.png",

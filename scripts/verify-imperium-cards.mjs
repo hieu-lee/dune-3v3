@@ -313,6 +313,10 @@ try {
   assert.match(longLiveTheFighters.reveal, /\+2 persuasion.*3 strength/i);
   const priorityContracts = data.imperiumDeck.find((card) => card.name === "Priority Contracts");
   assert.ok(priorityContracts, "Imperium deck should include Priority Contracts");
+  const corrinthCity = data.imperiumDeck.find((card) => card.name === "Corrinth City");
+  assert.ok(corrinthCity, "Imperium deck should include Corrinth City");
+  const deliveryAgreement = data.imperiumDeck.find((card) => card.name === "Delivery Agreement");
+  assert.ok(deliveryAgreement, "Imperium deck should include Delivery Agreement");
   assert.ok(
     priorityContracts.effects?.some((spec) =>
       spec.trigger === "agent-play" &&
@@ -350,15 +354,59 @@ try {
     undefined,
     "Junction Headquarters VP should be modeled by its typed Agent effect",
   );
-  assert.equal(
-    data.imperiumDeck.find((card) => card.name === "Corrinth City")?.acquired,
-    1,
-    "Corrinth City should retain its legacy printed-VP marker until its VP text is typed",
+  assert.deepEqual(
+    corrinthCity.effects?.filter((spec) => spec.trigger === "agent-play"),
+    [
+      {
+        trigger: "agent-play",
+        effects: [
+          {
+            kind: "discard-cards-for-reward",
+            selector: "self",
+            amount: 2,
+            cost: { solari: 5 },
+            gainVp: 1,
+            source: "Corrinth City",
+          },
+        ],
+      },
+    ],
+    "Corrinth City should model its Agent discard-cost VP reward as a typed effect",
   );
+  assert.match(corrinthCity.play, /Discard 2 cards.*spend 5 Solari.*gain 1 VP/i);
+  assert.match(corrinthCity.reveal, /\+5 persuasion.*High Council/i);
   assert.equal(
-    data.imperiumDeck.find((card) => card.name === "Delivery Agreement")?.acquired,
-    1,
-    "Delivery Agreement should retain its legacy printed-VP marker until its VP text is typed",
+    corrinthCity.acquired,
+    undefined,
+    "Corrinth City VP should be modeled by its typed Agent effect",
+  );
+  assert.deepEqual(
+    deliveryAgreement.effects?.filter((spec) => spec.trigger === "agent-play"),
+    [
+      {
+        trigger: "agent-play",
+        effects: [
+          {
+            kind: "discard-cards-for-reward",
+            selector: "self",
+            amount: 1,
+            takeContracts: {
+              amount: 1,
+              sourcePool: "public-offer",
+            },
+            source: "Delivery Agreement",
+          },
+        ],
+      },
+    ],
+    "Delivery Agreement should model its Agent discard-contract reward as a typed effect",
+  );
+  assert.match(deliveryAgreement.play, /Discard 1 card.*face-up CHOAM contract/i);
+  assert.match(deliveryAgreement.reveal, /Gain 1 spice.*four or more contracts.*gain 1 VP/i);
+  assert.equal(
+    deliveryAgreement.acquired,
+    undefined,
+    "Delivery Agreement's conditional Reveal VP should not be treated as an acquire bonus",
   );
   assert.equal(
     data.imperiumDeck.find((card) => card.name === "Smuggler's Haven")?.acquired,
@@ -615,7 +663,7 @@ try {
     ),
     "Shishakli should model its Fremen Bond Reveal Influence as a typed effect",
   );
-  for (const name of ["Bene Gesserit Operative", "Branching Path", "Calculus of Power", "Cargo Runner", "Chani, Clever Tactician", "Guild Spy", "In High Places", "Junction Headquarters", "Long Live the Fighters", "Maker Keeper", "Maula Pistol", "Northern Watermaster", "Overthrow", "Paracompass", "Price is No Object", "Priority Contracts", "Shishakli", "Steersman"]) {
+  for (const name of ["Bene Gesserit Operative", "Branching Path", "Calculus of Power", "Cargo Runner", "Chani, Clever Tactician", "Corrinth City", "Delivery Agreement", "Guild Spy", "In High Places", "Junction Headquarters", "Long Live the Fighters", "Maker Keeper", "Maula Pistol", "Northern Watermaster", "Overthrow", "Paracompass", "Price is No Object", "Priority Contracts", "Shishakli", "Steersman"]) {
     const card = data.imperiumDeck.find((candidate) => candidate.name === name);
     assert.ok(card?.effects?.some((spec) => spec.trigger === "agent-play"), `${name} should use a structured Agent effect`);
   }
@@ -2571,6 +2619,106 @@ try {
   assert.equal(priorityContractsNoOffer.pendingAction, undefined, "Priority Contracts should not queue when no public contracts remain");
   assert.equal(playerById(priorityContractsNoOffer, p2.id).resources.spice, 3, "Priority Contracts no-offer path should still grant spice");
   assert.equal(playerById(priorityContractsNoOffer, p2.id).vp, 1, "Priority Contracts no-offer path should still grant VP");
+
+  const corrinthReveal = turnActions.revealTurnPlan({ ...p2, hand: [corrinthCity], highCouncilSeat: false }, game);
+  assert.equal(corrinthReveal.persuasion, 5, "Corrinth City should resolve its typed +5 persuasion Reveal branch");
+  const deliveryReveal = turnActions.revealTurnPlan({ ...p2, hand: [deliveryAgreement], highCouncilSeat: false }, game);
+  assert.equal(deliveryReveal.revealGain.spice, 1, "Delivery Agreement should resolve its typed Reveal spice reward");
+  const discardBase = data.allyStarterCards.find((card) => card.name === "Dagger");
+  const discardBaseTwo = data.allyStarterCards.find((card) => card.name === "Convincing Argument");
+  assert.ok(discardBase && discardBaseTwo, "Expected starter discard fixtures for discard-reward coverage");
+  const corrinthCitySpace = {
+    id: "corrinth-city-test-space",
+    name: "Corrinth City Test Space",
+    zone: "Emperor",
+    icon: "emperor",
+    detail: "Verifier-only Emperor space without board pending rewards.",
+  };
+  const corrinthDiscardOne = { ...discardBase, id: "corrinth-city-discard-one" };
+  const corrinthDiscardTwo = { ...discardBaseTwo, id: "corrinth-city-discard-two" };
+  const corrinthPlaced = turnActions.placeAgentAction(
+    withActivePlayer(game, p2.id, () => ({
+      agentsReady: 1,
+      discard: [],
+      hand: [corrinthCity, corrinthDiscardOne, corrinthDiscardTwo],
+      playArea: [],
+      resources: { solari: 5, spice: 0, water: 0 },
+      vp: 0,
+    })),
+    {
+      commanderTargets: {},
+      selectedCard: corrinthCity,
+      selectedSpace: corrinthCitySpace,
+    },
+  );
+  assert.equal(corrinthPlaced.pendingAction?.kind, "discard-cards-for-reward", "Corrinth City should queue discard-for-reward");
+  assert.equal(corrinthPlaced.pendingAction?.remaining, 2);
+  const corrinthAfterFirstDiscard = state.resolveDiscardCardsForRewardChoice(
+    corrinthPlaced,
+    corrinthPlaced.pendingAction,
+    corrinthDiscardOne.id,
+  );
+  const corrinthResolved = state.resolveDiscardCardsForRewardChoice(
+    corrinthAfterFirstDiscard,
+    corrinthAfterFirstDiscard.pendingAction,
+    corrinthDiscardTwo.id,
+  );
+  assert.equal(corrinthResolved.pendingAction, undefined, "Corrinth City should resolve after two discards");
+  assert.equal(playerById(corrinthResolved, p2.id).resources.solari, 0, "Corrinth City should spend 5 Solari");
+  assert.equal(playerById(corrinthResolved, p2.id).vp, 1, "Corrinth City should grant 1 VP");
+
+  const deliveryAgreementSpace = {
+    id: "delivery-agreement-test-space",
+    name: "Delivery Agreement Test Space",
+    zone: "City",
+    icon: "city",
+    detail: "Verifier-only City space without board pending rewards.",
+  };
+  const deliveryDiscard = { ...discardBase, id: "delivery-agreement-discard-card" };
+  const deliveryOffer = data.standardContracts[11];
+  const deliveryReplacement = data.standardContracts[12];
+  assert.ok(deliveryOffer && deliveryReplacement, "Expected standard contracts for Delivery Agreement coverage");
+  const deliveryPlaced = turnActions.placeAgentAction(
+    {
+      ...withActivePlayer(game, p2.id, () => ({
+        agentsReady: 1,
+        contracts: [],
+        discard: [],
+        hand: [deliveryAgreement, deliveryDiscard],
+        playArea: [],
+        resources: { solari: 0, spice: 0, water: 0 },
+      })),
+      contractOffer: [deliveryOffer],
+      contractDeck: [deliveryReplacement],
+    },
+    {
+      commanderTargets: {},
+      selectedCard: deliveryAgreement,
+      selectedSpace: deliveryAgreementSpace,
+    },
+  );
+  assert.equal(deliveryPlaced.pendingAction?.kind, "discard-cards-for-reward", "Delivery Agreement should queue discard-for-reward");
+  const deliveryDiscarded = state.resolveDiscardCardsForRewardChoice(
+    deliveryPlaced,
+    deliveryPlaced.pendingAction,
+    deliveryDiscard.id,
+  );
+  assert.deepEqual(
+    deliveryDiscarded.pendingAction,
+    { kind: "contract", ownerId: p2.id, source: "Delivery Agreement", publicOnly: true },
+    "Delivery Agreement should queue a public contract after its discard",
+  );
+  const deliveryResolved = state.takeChoamContract(
+    deliveryDiscarded,
+    deliveryDiscarded.pendingAction,
+    deliveryOffer.id,
+  );
+  assert.equal(playerById(deliveryResolved, p2.id).contracts.at(-1)?.card.id, deliveryOffer.id);
+  assert.deepEqual(
+    deliveryResolved.contractOffer.map((contract) => contract.id),
+    [deliveryReplacement.id],
+    "Delivery Agreement should refill the public offer after taking a contract",
+  );
 
   const calculusFixture = withActivePlayer(game, p2.id, () => ({
     agentsReady: 0,

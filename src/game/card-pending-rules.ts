@@ -11,6 +11,7 @@ import { playerTroopSupply } from "./deck-utils";
 import {
   resolveAgentBoardSpaceInfluences,
   resolveAgentCommanderResourceSplits,
+  resolveAgentDiscardCardsForRewards,
   resolveAgentDiscardCardForDraws,
   resolveAgentDiscardCardForInfluenceAndDraws,
   resolveAgentGainInfluenceChoices,
@@ -33,6 +34,7 @@ import {
 } from "./effect-resolver";
 import { discardCardForDrawChoices } from "./discard-draw-rules";
 import { discardCardForInfluenceAndDrawChoices } from "./discard-influence-draw-rules";
+import { discardCardsForRewardChoices } from "./discard-reward-rules";
 import { changeAllegiancesGainChoices } from "./influence-choices";
 import { influenceEffectOwnerForChoice } from "./influence-loss-rules";
 import {
@@ -182,6 +184,51 @@ function pendingActionForAgentDiscardCardForDraw(
         ...(effect.bonusIntrigues ? { bonusIntrigues: { ...effect.bonusIntrigues } } : {}),
       };
       if (discardCardForDrawChoices(source, pending).length === 0) return undefined;
+      return pending;
+    })
+    .find((pending): pending is PendingAction => Boolean(pending));
+}
+
+function pendingActionForAgentDiscardCardsForReward(
+  card: Card,
+  source: Player,
+  state?: GameState,
+  target?: Player,
+): PendingAction | undefined {
+  if (!card.effects || !source.playArea.some((candidate) => candidate.id === card.id)) return undefined;
+  const players = state ? playersWithPendingCardEffect(state, source, target) : undefined;
+  const effectState = state && players ? { ...state, players } : undefined;
+  const effects = resolveAgentDiscardCardsForRewards(card.effects, {
+    trigger: "agent-play",
+    source,
+    target,
+    state: effectState,
+  });
+  return effects
+    .map((effect): PendingAction | undefined => {
+      if (effect.selector !== "self" || effect.amount <= 0 || effect.gainVp < 0) return undefined;
+      if (!canPayResourceCost(source.resources, effect.cost)) return undefined;
+      const pending: Extract<PendingAction, { kind: "discard-cards-for-reward" }> = {
+        kind: "discard-cards-for-reward",
+        ownerId: source.id,
+        source: effect.source ?? card.name,
+        remaining: effect.amount,
+        total: effect.amount,
+        cost: { ...effect.cost },
+        gain: { ...effect.gain },
+        gainVp: effect.gainVp,
+        ...(effect.takeContracts ? { takeContracts: { ...effect.takeContracts } } : {}),
+        optional: effect.optional,
+      };
+      if (discardCardsForRewardChoices(source, pending).length < effect.amount) return undefined;
+      if (
+        effect.takeContracts &&
+        (!state ||
+          effect.takeContracts.sourcePool !== "public-offer" ||
+          state.contractOffer.length < effect.takeContracts.amount)
+      ) {
+        return undefined;
+      }
       return pending;
     })
     .find((pending): pending is PendingAction => Boolean(pending));
@@ -1166,6 +1213,8 @@ export function pendingActionsForCard(
   if (agentDiscardInfluenceDrawPending) typedPendings.push(agentDiscardInfluenceDrawPending);
   const agentDiscardDrawPending = pendingActionForAgentDiscardCardForDraw(card, source, state, target);
   if (agentDiscardDrawPending) typedPendings.push(agentDiscardDrawPending);
+  const agentDiscardRewardPending = pendingActionForAgentDiscardCardsForReward(card, source, state, target);
+  if (agentDiscardRewardPending) typedPendings.push(agentDiscardRewardPending);
   const agentTrashIntriguePending = pendingActionForAgentTrashIntrigueForReward(card, source, state, target, space, futureIntrigues);
   if (agentTrashIntriguePending) typedPendings.push(agentTrashIntriguePending);
   const agentGainInfluencePending = pendingActionForAgentGainInfluenceChoice(card, source, state, target);

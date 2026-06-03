@@ -5,10 +5,12 @@ import {
   capturedMentatSourceId,
   chaniCleverTacticianSourceId,
   cargoRunnerSourceId,
+  corrinthCitySourceId,
   covertOperationSourceId,
   dangerousRhetoricSourceId,
   desertPowerSourceId,
   desertSurvivalSourceId,
+  deliveryAgreementSourceId,
   doubleAgentSourceId,
   ecologicalTestingStationSourceId,
   fedaykinStilltentSourceId,
@@ -60,6 +62,7 @@ import {
   agentAcquireCard,
   agentDiscardCardForDraw,
   agentDiscardCardForInfluenceAndDraw,
+  agentDiscardCardsForReward,
   agentDrawCards,
   agentDrawIntrigues,
   agentGainBoardSpaceInfluence,
@@ -197,6 +200,12 @@ function imperiumRevealText(card: HubCard, persuasion: number, swords: number, p
   }
   if (card.id === smugglersHavenSourceId) {
     return "+1 persuasion. If you are spying on a Maker board space, gain 2 spice.";
+  }
+  if (card.id === corrinthCitySourceId) {
+    return "+5 persuasion, or spend 5 Solari to take your High Council seat.";
+  }
+  if (card.id === deliveryAgreementSourceId) {
+    return "Gain 1 spice. If you have completed four or more contracts, trash this card to gain 1 VP.";
   }
   return printedReveal ? "Resolve printed reveal text." : revealText(persuasion, swords);
 }
@@ -338,6 +347,25 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
       agentPayResourceForSandworms("spice", 4, 1, { recipient: "self-or-activated-ally" }),
       revealGainPersuasion(1),
       revealGainResource("spice", 2, [hasSpyPostOnMakerSpace()]),
+    ];
+  }
+  if (card.id === corrinthCitySourceId) {
+    return [
+      agentDiscardCardsForReward(2, {
+        cost: { solari: 5 },
+        gainVp: 1,
+        source: "Corrinth City",
+      }),
+      revealGainPersuasion(5),
+    ];
+  }
+  if (card.id === deliveryAgreementSourceId) {
+    return [
+      agentDiscardCardsForReward(1, {
+        takeContracts: { amount: 1, sourcePool: "public-offer" },
+        source: "Delivery Agreement",
+      }),
+      revealGainResource("spice", 1),
     ];
   }
   if (card.id === hiddenMissiveSourceId) {
@@ -615,6 +643,7 @@ function fixedRevealEffects(
 function effectModelsVictoryPoint(effect: CardEffectSpec["effects"][number]) {
   return effect.kind === "gain-vp" ||
     effect.kind === "pay-team-resource-for-vp" ||
+    (effect.kind === "discard-cards-for-reward" && effect.gainVp !== undefined) ||
     (effect.kind === "trash-intrigue-for-reward" && effect.gainVp !== undefined);
 }
 
@@ -624,6 +653,7 @@ function effectsModelVictoryPoints(effects: CardEffectSpec[] | undefined) {
 
 function acquiredVictoryPoints(card: HubCard, effects: CardEffectSpec[] | undefined) {
   if (!hasConditionalAttribute(card, "Victory Point")) return undefined;
+  if (card.id === deliveryAgreementSourceId) return undefined;
   if (hasConditionalAttribute(card, "Acquire bonus")) return 1;
   return effectsModelVictoryPoints(effects) ? undefined : 1;
 }
@@ -652,6 +682,12 @@ function imperiumPlayText(card: HubCard) {
   }
   if (card.id === smugglersHavenSourceId) {
     return "Gain 1 VP. Pay 4 spice to summon 1 sandworm.";
+  }
+  if (card.id === corrinthCitySourceId) {
+    return "Discard 2 cards and spend 5 Solari to gain 1 VP.";
+  }
+  if (card.id === deliveryAgreementSourceId) {
+    return "Discard 1 card to take a face-up CHOAM contract.";
   }
   if (card.id === spaceTimeFoldingSourceId) {
     return "Discard 1 card to draw 1 card. If you discarded a Spacing Guild card, draw 1 more card.";

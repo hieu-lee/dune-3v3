@@ -530,6 +530,39 @@ export async function runCardChoicesSmoke({
     "Guild Spy should draw an Intrigue after discarding a Spacing Guild card",
   );
 
+  await setDebugGameAndWait(page, states.corrinthCity);
+  pendingText = await page.locator(".pending-panel").innerText();
+  const corrinthDiscardOneName = states.corrinthCity.corrinthDiscardOneName;
+  const corrinthDiscardTwoName = states.corrinthCity.corrinthDiscardTwoName;
+  const corrinthDiscardOneId = states.corrinthCity.corrinthDiscardOneId;
+  const corrinthDiscardTwoId = states.corrinthCity.corrinthDiscardTwoId;
+  assert.match(pendingText, /Corrinth City/i);
+  assert.match(pendingText, /Discard 2 cards/i);
+  assert.match(pendingText, /spend 5 Solari/i);
+  assert.match(pendingText, /gain 1 VP/i);
+  await screenshot(page, captures, "pending-corrinth-city-discard-reward.png");
+
+  before = await currentGame(page);
+  ownerBefore = before.players.find((player) => player.id === "p2");
+  await page.locator(".pending-panel").getByRole("button", { name: corrinthDiscardOneName }).click();
+  await page.locator(".pending-panel").getByRole("button", { name: `Discard ${corrinthDiscardOneName}` }).click();
+  await page.waitForFunction(() => window.__DUNE_DEBUG__?.getGame()?.pendingAction?.remaining === 1);
+  after = await currentGame(page);
+  assert.equal(after.pendingAction?.kind, "discard-cards-for-reward", "Corrinth City should remain pending after one discard");
+  assert.equal(after.pendingAction?.remaining, 1, "Corrinth City should show one remaining discard");
+  await page.locator(".pending-panel").getByRole("button", { name: corrinthDiscardTwoName }).click();
+  await page.locator(".pending-panel").getByRole("button", { name: "Resolve Corrinth City" }).click();
+  await waitForNoPending(page);
+  after = await currentGame(page);
+  ownerAfter = after.players.find((player) => player.id === "p2");
+  assert.equal(ownerAfter.resources.solari, ownerBefore.resources.solari - 5, "Corrinth City should spend 5 Solari after both discards");
+  assert.equal(ownerAfter.vp, ownerBefore.vp + 1, "Corrinth City should grant 1 VP after both discards");
+  assert.deepEqual(
+    ownerAfter.discard.slice(-2).map((card) => card.id),
+    [corrinthDiscardOneId, corrinthDiscardTwoId],
+    "Corrinth City should discard both selected cards",
+  );
+
   await setDebugGameAndWait(page, states.longLiveTheFighters);
   pendingText = await page.locator(".pending-panel").innerText();
   const longLiveDrawnName = states.longLiveTheFighters.longLiveDrawnName;
@@ -888,6 +921,8 @@ async function createCardChoiceStates(server, initialPlayableGame) {
   assert.ok(guildEnvoy, "Expected Guild Envoy Imperium card");
   const guildSpy = data.imperiumDeck.find((card) => card.sourceId === 43);
   assert.ok(guildSpy, "Expected Guild Spy Imperium card");
+  const corrinthCity = data.imperiumDeck.find((card) => card.sourceId === 69);
+  assert.ok(corrinthCity, "Expected Corrinth City Imperium card");
   const longLiveTheFighters = data.imperiumDeck.find((card) => card.sourceId === 74);
   assert.ok(longLiveTheFighters, "Expected Long Live the Fighters Imperium card");
   const branchingPath = data.imperiumDeck.find((card) => card.sourceId === 45);
@@ -947,6 +982,16 @@ async function createCardChoiceStates(server, initialPlayableGame) {
   const guildSpyDraw = { ...data.allyStarterCards[0], id: "browser-guild-spy-draw-card" };
   const guildSpyBoardIntrigue = { ...data.intrigueCards[0], id: "browser-guild-spy-board-intrigue-card" };
   const guildSpyBonusIntrigue = { ...data.intrigueCards[1], id: "browser-guild-spy-bonus-intrigue-card" };
+  const corrinthDiscardOne = {
+    ...data.allyStarterCards[0],
+    id: "browser-corrinth-city-discard-one",
+    name: "Corrinth Debug Dagger",
+  };
+  const corrinthDiscardTwo = {
+    ...data.allyStarterCards[1],
+    id: "browser-corrinth-city-discard-two",
+    name: "Corrinth Debug Argument",
+  };
   const longLiveDiscarded = {
     ...data.allyStarterCards[0],
     id: "browser-long-live-discarded-card",
@@ -1080,6 +1125,13 @@ async function createCardChoiceStates(server, initialPlayableGame) {
     zone: "Landsraad",
     icon: "landsraad",
     detail: "Browser-debug Landsraad space without board pending rewards.",
+  };
+  const corrinthCitySpace = {
+    id: "browser-corrinth-city-test-space",
+    name: "Browser Corrinth City Test Space",
+    zone: "Emperor",
+    icon: "emperor",
+    detail: "Browser-debug Emperor space without board pending rewards.",
   };
   const beneGesseritOperativeAgentBase = {
     ...base,
@@ -1255,6 +1307,31 @@ async function createCardChoiceStates(server, initialPlayableGame) {
   );
   assert.equal(guildSpyState.pendingAction?.kind, "discard-card-for-draw", "Expected Guild Spy discard-draw pending action");
   assert.equal(guildSpyState.pendingAction.bonusIntrigues?.amount, 1, "Expected Guild Spy Intrigue bonus in browser state");
+  const corrinthCityState = turnActions.placeAgentAction(
+    {
+      ...base,
+      players: base.players.map((player) =>
+        player.id === ownerId
+          ? {
+              ...player,
+              agentsReady: 1,
+              discard: [],
+              hand: [corrinthCity, corrinthDiscardOne, corrinthDiscardTwo],
+              playArea: [],
+              resources: { solari: 5, spice: 0, water: 0 },
+              vp: 0,
+            }
+          : player,
+      ),
+    },
+    {
+      commanderTargets: {},
+      selectedCard: corrinthCity,
+      selectedSpace: corrinthCitySpace,
+    },
+  );
+  assert.equal(corrinthCityState.pendingAction?.kind, "discard-cards-for-reward", "Expected Corrinth City discard-reward pending action");
+  assert.equal(corrinthCityState.pendingAction.remaining, 2, "Expected Corrinth City to require two discards");
   const longLiveTheFightersState = turnActions.placeAgentAction(
     {
       ...base,
@@ -2014,6 +2091,13 @@ async function createCardChoiceStates(server, initialPlayableGame) {
       guildSpyDiscardName: guildSpyDiscard.name,
       guildSpyDrawId: guildSpyDraw.id,
       guildSpyIntrigueId: guildSpyBonusIntrigue.id,
+    },
+    corrinthCity: {
+      ...corrinthCityState,
+      corrinthDiscardOneId: corrinthDiscardOne.id,
+      corrinthDiscardOneName: corrinthDiscardOne.name,
+      corrinthDiscardTwoId: corrinthDiscardTwo.id,
+      corrinthDiscardTwoName: corrinthDiscardTwo.name,
     },
     longLiveTheFighters: {
       ...longLiveTheFightersState,

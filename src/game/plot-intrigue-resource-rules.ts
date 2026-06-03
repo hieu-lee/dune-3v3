@@ -14,9 +14,6 @@ import {
 import { playTypedPlotIntrigue } from "./plot-intrigue-effect-rules";
 import { playerTroopSupply } from "./deck-utils";
 import { activatedAllyEffectOwner } from "./market-rules";
-import {
-  recordTurnSpiceGain,
-} from "./turn-trackers";
 import type {
   FactionId,
   GameState,
@@ -181,7 +178,7 @@ export function playMarketOpportunityPlotIntrigue(
   choice: MarketOpportunityChoice,
 ): GameState {
   if (choice !== "spice-to-solari" && choice !== "solari-to-spice") return state;
-  const nextState = playTypedPlotIntrigue(
+  return playTypedPlotIntrigue(
     state,
     playerId,
     intrigueId,
@@ -192,9 +189,6 @@ export function playMarketOpportunityPlotIntrigue(
         : `${player.leader} plays Market Opportunity, spends 5 Solari, and gains 5 spice.`,
     { choiceId: choice },
   );
-  return choice === "solari-to-spice" && nextState !== state
-    ? recordTurnSpiceGain(nextState, playerId, 5)
-    : nextState;
 }
 
 export function playBackedByChoamPlotIntrigue(

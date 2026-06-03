@@ -1,6 +1,6 @@
 import { drawIntrigueCards } from "./intrigue-deck";
 import { advancePendingAction } from "./pending-actions";
-import { recordTurnSpiceGain } from "./turn-trackers";
+import { recordTurnSpiceGainAndCompleteHarvestContracts } from "./contract-rules";
 import type { GameState, IntrigueCard, PendingAction, Resources } from "./types";
 
 type TrashIntrigueForRewardPendingAction = Extract<PendingAction, { kind: "trash-intrigue-for-reward" }>;
@@ -113,7 +113,9 @@ export function resolveTrashIntrigueForReward(
       ...intrigueState.log,
     ],
   };
-  return pending.gain.spice ? recordTurnSpiceGain(resolvedState, owner.id, pending.gain.spice) : resolvedState;
+  return pending.gain.spice
+    ? recordTurnSpiceGainAndCompleteHarvestContracts(resolvedState, owner.id, pending.gain.spice).state
+    : resolvedState;
 }
 
 export function skipTrashIntrigueForReward(

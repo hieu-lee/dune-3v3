@@ -22,7 +22,10 @@ import {
   advancePendingAction,
 } from "./pending-actions";
 import {
-  recordTurnSpiceGain,
+  completeChoamContractsForCurrentTurnHarvests,
+  recordTurnSpiceGainAndCompleteHarvestContracts,
+} from "./contract-rules";
+import {
   recordTurnUnitDeployment,
 } from "./turn-trackers";
 import type {
@@ -242,24 +245,25 @@ export function resolvePaidRewardChoice(
     .filter((text): text is string => Boolean(text))
     .join(" and ");
   if (!rewardText || rewardText.length === 0) return state;
+  const actionLog = `${owner.leader} spends ${option.cost} ${resourceLabel} for ${pending.source}: ${rewardText}.`;
   let nextState: GameState = {
     ...state,
     players,
     ...advancePendingAction(state),
-    log: [
-      `${owner.leader} spends ${option.cost} ${resourceLabel} for ${pending.source}: ${rewardText}.`,
-      ...state.log,
-    ],
+    log: [actionLog, ...state.log],
   };
   if (rewards.some((reward) => reward.kind === "gain-influence")) {
-    nextState = resolveLeaderInfluenceThresholdRewards(nextState, state.players);
+    nextState = completeChoamContractsForCurrentTurnHarvests(
+      resolveLeaderInfluenceThresholdRewards(nextState, state.players),
+      actionLog,
+    ).state;
   }
   rewards.forEach((reward) => {
     if (reward.kind === "draw-intrigues") {
       nextState = drawIntrigueCards(nextState, reward.recipientId, reward.amount, pending.source);
     }
     if (reward.kind === "gain-resource" && reward.resource === "spice") {
-      nextState = recordTurnSpiceGain(nextState, reward.recipientId, reward.amount);
+      nextState = recordTurnSpiceGainAndCompleteHarvestContracts(nextState, reward.recipientId, reward.amount).state;
     }
   });
   return nextState;
@@ -529,16 +533,17 @@ export function resolvePayResourceForInfluenceChoice(
     return next;
   });
 
+  const actionLog = `${owner.leader} spends ${pending.cost} ${resourceLabel} for ${pending.source}; ${recipient.leader} gains ${pending.amount} ${factionLabels[pending.faction]} Influence.`;
   const nextState = {
     ...state,
     players,
     ...advancePendingAction(state),
-    log: [
-      `${owner.leader} spends ${pending.cost} ${resourceLabel} for ${pending.source}; ${recipient.leader} gains ${pending.amount} ${factionLabels[pending.faction]} Influence.`,
-      ...state.log,
-    ],
+    log: [actionLog, ...state.log],
   };
-  return resolveLeaderInfluenceThresholdRewards(nextState, state.players);
+  return completeChoamContractsForCurrentTurnHarvests(
+    resolveLeaderInfluenceThresholdRewards(nextState, state.players),
+    actionLog,
+  ).state;
 }
 
 export function skipPayResourceForInfluence(state: GameState, pending: PayResourceForInfluencePendingAction): GameState {

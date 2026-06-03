@@ -1,6 +1,6 @@
 import { applyDiscardedFromHandTriggers } from "./discard-trigger-rules";
 import { advancePendingAction, prependPendingAction } from "./pending-actions";
-import { recordTurnSpiceGain } from "./turn-trackers";
+import { recordTurnSpiceGainAndCompleteHarvestContracts } from "./contract-rules";
 import type { Card, GameState, PendingAction, Player, ResourceId, Resources } from "./types";
 
 type DiscardCardsForRewardPendingAction = Extract<PendingAction, { kind: "discard-cards-for-reward" }>;
@@ -119,7 +119,7 @@ export function resolveDiscardCardsForReward(
     vp: ownerAfterDiscard.vp + pending.gainVp,
   };
   const rewardParts = rewardText(pending);
-  const resolvedState = recordTurnSpiceGain({
+  const resolvedState = recordTurnSpiceGainAndCompleteHarvestContracts({
     ...state,
     players: state.players.map((player) => player.id === owner.id ? ownerAfterReward : player),
     ...advancePendingAction(state),
@@ -127,7 +127,7 @@ export function resolveDiscardCardsForReward(
       `${owner.leader} resolves ${pending.source}: discards ${discardedCardsText(discardedCardNames)}${rewardParts.length > 0 ? ` and ${rewardParts.join("; ")}` : ""}.`,
       ...state.log,
     ],
-  }, owner.id, pending.gain.spice ?? 0);
+  }, owner.id, pending.gain.spice ?? 0).state;
   const triggeredState = applyDiscardedFromHandTriggers(
     resolvedState,
     owner.id,

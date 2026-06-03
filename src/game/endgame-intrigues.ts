@@ -6,7 +6,7 @@ import {
   spiceMustFlowSourceId,
 } from "./card-identifiers";
 import { commanderPersonalFaction } from "./commander-rules";
-import { recordTurnSpiceGain } from "./turn-trackers";
+import { recordTurnSpiceGainAndCompleteHarvestContracts } from "./contract-rules";
 import type { BattleIconId, FactionId, GameState, IntrigueCard, Player } from "./types";
 
 function faceUpBattleIconConflicts(player: Player, battleIcon: BattleIconId) {
@@ -177,10 +177,10 @@ export function playPlotBattleIconIntrigue(
         }
       : candidate,
   );
-  return recordTurnSpiceGain({
+  return recordTurnSpiceGainAndCompleteHarvestContracts({
     ...state,
     players,
     intrigueDiscard: [...state.intrigueDiscard, intrigue],
     log: [`${player.leader} plays ${intrigue.name} as a Plot Intrigue for 1 spice.`, ...state.log],
-  }, player.id, 1);
+  }, player.id, 1).state;
 }

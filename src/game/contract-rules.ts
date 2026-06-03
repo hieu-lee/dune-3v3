@@ -22,7 +22,7 @@ import {
   resolveLeaderInfluenceThresholdRewards,
 } from "./leader-rewards";
 import { advancePendingAction, prependPendingAction } from "./pending-actions";
-import { recordTurnSpiceGain } from "./turn-trackers";
+import { hasVisitedMakerSpaceThisTurn, recordTurnSpiceGain } from "./turn-trackers";
 import type {
   Card,
   ContractCard,
@@ -41,7 +41,8 @@ type FinishPendingResolution = (state: GameState) => GameState;
 type ContractCompletionCondition =
   | { kind: "immediate" }
   | { kind: "board-space"; spaceId: string }
-  | { kind: "acquire-card"; sourceId: number };
+  | { kind: "acquire-card"; sourceId: number }
+  | { kind: "harvest-spice"; amount: number };
 type ContractCompletionReward = {
   resources?: Partial<Resources>;
   drawCards?: number;
@@ -67,6 +68,8 @@ const automatedContractCompletionSpecsBySourceId: Record<number, ContractComplet
   504: { condition: { kind: "board-space", spaceId: "heighliner" }, reward: { recruitTroops: 2 } },
   505: { condition: { kind: "board-space", spaceId: "heighliner" }, reward: { resources: { water: 2 } } },
   506: { condition: { kind: "board-space", spaceId: "espionage" }, reward: { resources: { solari: 3 } } },
+  507: { condition: { kind: "harvest-spice", amount: 4 }, reward: { resources: { solari: 4 } } },
+  508: { condition: { kind: "harvest-spice", amount: 3 }, reward: { resources: { solari: 3 } } },
   509: { condition: { kind: "board-space", spaceId: "research-station" }, reward: { resources: { solari: 3 } } },
   510: { condition: { kind: "board-space", spaceId: "research-station" }, reward: { resources: { solari: 2 }, recruitTroops: 1 } },
   511: { condition: { kind: "board-space", spaceId: "arrakeen" }, reward: { resources: { solari: 1 }, recruitTroops: 1 } },
@@ -98,6 +101,9 @@ function contractCompletionMatches(spec: ContractCompletionSpec, condition: Cont
   if (spec.condition.kind === "immediate" && condition.kind === "immediate") return true;
   if (spec.condition.kind === "acquire-card" && condition.kind === "acquire-card") {
     return spec.condition.sourceId === condition.sourceId;
+  }
+  if (spec.condition.kind === "harvest-spice" && condition.kind === "harvest-spice") {
+    return condition.amount >= spec.condition.amount;
   }
   return spec.condition.kind === "board-space" &&
     condition.kind === "board-space" &&
@@ -203,12 +209,15 @@ function completeChoamContractsForCondition(
   state: GameState,
   ownerId: string,
   condition: ContractCompletionCondition,
+  eligibleContractIds?: readonly string[],
 ): ContractCompletionResult {
   let nextState = state;
   let recruitedTroops = 0;
   const completedContractIds: string[] = [];
   const owner = state.players.find((player) => player.id === ownerId);
+  const eligibleContractIdSet = eligibleContractIds ? new Set(eligibleContractIds) : undefined;
   const completableContracts = owner?.contracts.filter((contract) => {
+    if (eligibleContractIdSet && !eligibleContractIdSet.has(contract.card.id)) return false;
     if (contract.completed) return false;
     const spec = contractCompletionSpecFor(contract.card);
     return spec ? contractCompletionMatches(spec, condition) : false;
@@ -248,6 +257,61 @@ export function completeChoamContractsForAcquiredCard(
     : completeChoamContractsForCondition(state, ownerId, { kind: "acquire-card", sourceId: card.sourceId });
 }
 
+export function completeChoamContractsForHarvest(
+  state: GameState,
+  ownerId: string,
+  spiceGainedThisTurn: number,
+  primaryLog?: string,
+  eligibleContractIds?: readonly string[],
+): ContractCompletionResult {
+  const result = completeChoamContractsForCondition(
+    state,
+    ownerId,
+    { kind: "harvest-spice", amount: spiceGainedThisTurn },
+    eligibleContractIds,
+  );
+  return primaryLog
+    ? { ...result, state: withPrimaryLogBeforeCompletionLogs(result.state, primaryLog) }
+    : result;
+}
+
+export function completeChoamContractsForCurrentTurnHarvests(
+  state: GameState,
+  primaryLog?: string,
+): ContractCompletionResult {
+  let nextState = state;
+  let recruitedTroops = 0;
+  const completedContractIds: string[] = [];
+  for (const player of state.players) {
+    if (!hasVisitedMakerSpaceThisTurn(nextState, player.id)) continue;
+    const eligibleContractIds = nextState.turnHarvestContractIds?.[player.id] ?? [];
+    if (eligibleContractIds.length === 0) continue;
+    const spiceGainedThisTurn = nextState.turnSpiceGains[player.id] ?? 0;
+    if (spiceGainedThisTurn <= 0) continue;
+    const result = completeChoamContractsForHarvest(
+      nextState,
+      player.id,
+      spiceGainedThisTurn,
+      primaryLog,
+      eligibleContractIds,
+    );
+    nextState = result.state;
+    recruitedTroops += result.recruitedTroops;
+    completedContractIds.push(...result.completedContractIds);
+  }
+  return { state: nextState, recruitedTroops, completedContractIds };
+}
+
+export function recordTurnSpiceGainAndCompleteHarvestContracts(
+  state: GameState,
+  ownerId: string,
+  amount: number,
+  primaryLog?: string,
+): ContractCompletionResult {
+  const trackedState = recordTurnSpiceGain(state, ownerId, amount);
+  return completeChoamContractsForCurrentTurnHarvests(trackedState, primaryLog);
+}
+
 export function acquireMarketCard(
   state: GameState,
   buyerId: string,
@@ -264,7 +328,8 @@ export function acquireMarketCard(
   if (acquiredState === state || !buyer || !card) return acquiredState;
 
   const acquisitionLog = acquiredState.log.find((log) => log.startsWith(`${buyer.leader} acquires ${card.name}`));
-  const contractCompletion = completeChoamContractsForAcquiredCard(acquiredState, buyerId, card);
+  const harvestCompletion = completeChoamContractsForCurrentTurnHarvests(acquiredState, acquisitionLog);
+  const contractCompletion = completeChoamContractsForAcquiredCard(harvestCompletion.state, buyerId, card);
   return acquisitionLog
     ? withPrimaryLogBeforeCompletionLogs(contractCompletion.state, acquisitionLog)
     : contractCompletion.state;
@@ -645,7 +710,12 @@ export function resolveAcquireCardForPending(
       ...state.log,
     ],
   }, owner.id, acquireReward);
-  const acquiredState = drawAcquireIntrigues(acquiredStateBase, owner.id, card, acquireReward);
+  const acquiredState = drawAcquireIntrigues(
+    completeChoamContractsForCurrentTurnHarvests(acquiredStateBase, actionLog).state,
+    owner.id,
+    card,
+    acquireReward,
+  );
   const contractCompletion = completeChoamContractsForAcquiredCard(acquiredState, owner.id, card);
   const completedState = withPrimaryLogBeforeCompletionLogs(contractCompletion.state, actionLog);
   const pendingActions = pendingActionsForAcquireRewards(completedState, owner.id, card, acquiredCardId, acquireReward);

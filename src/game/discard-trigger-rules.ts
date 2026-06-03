@@ -1,5 +1,5 @@
 import { resolveCardEffects, type GameEffectResult } from "./effect-resolver";
-import { recordTurnSpiceGain } from "./turn-trackers";
+import { recordTurnSpiceGainAndCompleteHarvestContracts } from "./contract-rules";
 import type { Card, GameState, Player, Resources } from "./types";
 
 type DiscardedFromHandTriggerOptions = {
@@ -94,5 +94,7 @@ export function applyDiscardedFromHandTriggers(
     players: state.players.map((player) => player.id === owner.id ? ownerAfterTrigger : player),
     log: appendTriggerLog(state.log, triggerLog, options),
   };
-  return result.revealGain.spice ? recordTurnSpiceGain(nextState, owner.id, result.revealGain.spice) : nextState;
+  return result.revealGain.spice
+    ? recordTurnSpiceGainAndCompleteHarvestContracts(nextState, owner.id, result.revealGain.spice).state
+    : nextState;
 }

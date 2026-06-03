@@ -10,6 +10,16 @@ const agentCard = {
   reveal: "",
 };
 
+const makerAgentCard = {
+  id: "debug-contract-maker-card",
+  name: "Debug Contract Maker Card",
+  icons: ["spice"],
+  persuasion: 0,
+  swords: 0,
+  play: "",
+  reveal: "",
+};
+
 export async function runContractCompletionSmoke({
   captures,
   currentGame,
@@ -73,6 +83,40 @@ export async function runContractCompletionSmoke({
   );
   await assertContractChip(page, "Research Station I", "Done");
   await screenshot(page, captures, "contract-board-after.png");
+
+  await setDebugGameAndWait(page, states.harvest);
+  await assertContractChip(page, "Harvest 3+", "Pending");
+  await assertContractChip(page, "Harvest 4+", "Pending");
+  await screenshot(page, captures, "contract-harvest-ready.png");
+
+  before = await currentGame(page);
+  ownerBefore = playerById(before, "p2");
+  await page.getByTestId(`hand-card-${makerAgentCard.id}`).click();
+  await page.getByTestId("space-deep-desert").click();
+  const harvestPlaceAgent = page.getByTestId("place-agent");
+  assert.equal(await harvestPlaceAgent.isEnabled(), true, "Deep Desert Harvest Agent placement should be legal");
+  await harvestPlaceAgent.click();
+
+  await page.waitForFunction(() => {
+    const game = window.__DUNE_DEBUG__?.getGame();
+    const owner = game?.players.find((player) => player.id === "p2");
+    return Boolean(
+      game &&
+        owner &&
+        owner.contracts.some((contract) => contract.card.name === "Harvest 3+" && contract.completed) &&
+        owner.contracts.some((contract) => contract.card.name === "Harvest 4+" && contract.completed) &&
+        game.agentTurnComplete,
+    );
+  });
+  after = await currentGame(page);
+  ownerAfter = playerById(after, "p2");
+  assert.equal(contractByName(ownerAfter, "Harvest 3+").completed, true);
+  assert.equal(contractByName(ownerAfter, "Harvest 4+").completed, true);
+  assert.equal(ownerAfter.resources.spice, ownerBefore.resources.spice + 4);
+  assert.equal(ownerAfter.resources.solari, ownerBefore.resources.solari + 7);
+  await assertContractChip(page, "Harvest 3+", "Done");
+  await assertContractChip(page, "Harvest 4+", "Done");
+  await screenshot(page, captures, "contract-harvest-after.png");
 }
 
 async function createContractCompletionStates(server, initialPlayableGame) {
@@ -84,6 +128,7 @@ async function createContractCompletionStates(server, initialPlayableGame) {
 
   const spaces = { ...game.spaces };
   delete spaces["research-station"];
+  delete spaces["deep-desert"];
 
   const base = {
     ...game,
@@ -118,6 +163,25 @@ async function createContractCompletionStates(server, initialPlayableGame) {
       contracts: [
         {
           card: contractFixture(data, "Research Station I"),
+          completed: false,
+          takenRound: base.round,
+        },
+      ],
+    })),
+    harvest: updatePlayer(base, "p2", (player) => ({
+      ...player,
+      hand: [makerAgentCard],
+      playArea: [],
+      agentsReady: Math.max(1, player.agentsReady),
+      resources: { ...player.resources, water: player.resources.water + 3 },
+      contracts: [
+        {
+          card: contractFixture(data, "Harvest 3+"),
+          completed: false,
+          takenRound: base.round,
+        },
+        {
+          card: contractFixture(data, "Harvest 4+"),
           completed: false,
           takenRound: base.round,
         },

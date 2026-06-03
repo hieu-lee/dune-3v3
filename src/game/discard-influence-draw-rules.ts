@@ -10,6 +10,7 @@ import {
   resolveLeaderInfluenceThresholdRewards,
 } from "./leader-rewards";
 import { advancePendingAction } from "./pending-actions";
+import { completeChoamContractsForCurrentTurnHarvests } from "./contract-rules";
 import type { Card, FactionId, GameState, PendingAction, Player } from "./types";
 
 type DiscardCardForInfluenceAndDrawPendingAction = Extract<
@@ -73,19 +74,18 @@ export function resolveDiscardCardForInfluenceAndDraw(
     influenceOwner.id === owner.id
       ? `gains ${pending.influenceAmount} ${factionLabels[faction]} Influence`
       : `${influenceOwner.leader} gains ${pending.influenceAmount} ${factionLabels[faction]} Influence`;
+  const actionLog = `${owner.leader} resolves ${pending.source}: discards ${discardedCard.name}, ${influenceText}, and ${drawnCardsText(pending.drawCards, drawnCards)}.`;
   const nextState = {
     ...state,
     players,
     ...advancePendingAction(state),
-    log: [
-      `${owner.leader} resolves ${pending.source}: discards ${discardedCard.name}, ${influenceText}, and ${drawnCardsText(pending.drawCards, drawnCards)}.`,
-      ...state.log,
-    ],
+    log: [actionLog, ...state.log],
   };
-  return resolveLeaderInfluenceThresholdRewards(
+  const influenceState = resolveLeaderInfluenceThresholdRewards(
     applyDiscardedFromHandTriggers(nextState, owner.id, discardedCard, { logAfterCurrentAction: true }),
     state.players,
   );
+  return completeChoamContractsForCurrentTurnHarvests(influenceState, actionLog).state;
 }
 
 export function skipDiscardCardForInfluenceAndDraw(

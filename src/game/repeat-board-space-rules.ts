@@ -8,6 +8,9 @@ import { resolveSecretsIntriguePressure } from "./board-location-rules";
 import {
   boardSpaces,
 } from "./data";
+import {
+  recordTurnSpiceGainAndCompleteHarvestContracts,
+} from "./contract-rules";
 import { drawIntrigueCards } from "./intrigue-deck";
 import {
   reverendMotherJessicaLeaderName,
@@ -23,7 +26,6 @@ import {
 import {
   hasUsedReverendMotherJessicaRepeat,
   recordReverendMotherJessicaRepeat,
-  recordTurnSpiceGain,
 } from "./turn-trackers";
 import type {
   GameState,
@@ -125,5 +127,7 @@ export function resolveRepeatBoardSpaceChoice(
     : withPending;
   const spiceGain = boardSpaceRewardApplies(space, paidOwner) ? space.gain?.spice ?? 0 : 0;
   const secretsState = space.id === "secrets" ? resolveSecretsIntriguePressure(withIntrigue, owner.id) : withIntrigue;
-  return spiceGain > 0 ? recordTurnSpiceGain(secretsState, owner.id, spiceGain) : secretsState;
+  return spiceGain > 0
+    ? recordTurnSpiceGainAndCompleteHarvestContracts(secretsState, owner.id, spiceGain).state
+    : secretsState;
 }

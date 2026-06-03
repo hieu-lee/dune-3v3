@@ -1,7 +1,7 @@
 import { advancePendingAction } from "./pending-actions";
 import { playerHasConflictUnits } from "./conflict-rules";
 import { drawCards } from "./deck-utils";
-import { recordTurnSpiceGain } from "./turn-trackers";
+import { recordTurnSpiceGainAndCompleteHarvestContracts } from "./contract-rules";
 import type { Card, GameState, PendingAction, Player, TrashCardZone } from "./types";
 
 type TrashCardPendingAction = Extract<PendingAction, { kind: "trash-card" }>;
@@ -155,7 +155,9 @@ export function trashPlayerCard(
       ...state.log,
     ],
   };
-  return advancePastUnresolvableMandatoryTrash(recordTurnSpiceGain(nextState, owner.id, spiceReward));
+  return advancePastUnresolvableMandatoryTrash(
+    recordTurnSpiceGainAndCompleteHarvestContracts(nextState, owner.id, spiceReward).state,
+  );
 }
 
 export function skipTrashCard(state: GameState, pending: TrashCardPendingAction): GameState {

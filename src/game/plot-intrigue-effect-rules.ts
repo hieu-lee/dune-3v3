@@ -21,7 +21,10 @@ import { acquirableCardsForPending, activatedAllyEffectOwner } from "./market-ru
 import { pendingActionForSpyPlacements } from "./spy-effect-pending-rules";
 import { playerHasSpyPost, removeSpyPostOwner } from "./spy-posts";
 import { trashableCardsForPending } from "./trash-rules";
-import { recordTurnSpyRecall, recordTurnUnitDeployment } from "./turn-trackers";
+import {
+  completeChoamContractsForCurrentTurnHarvests,
+} from "./contract-rules";
+import { recordTurnSpiceGain, recordTurnSpyRecall, recordTurnUnitDeployment } from "./turn-trackers";
 import { boardSpaces } from "./data";
 import type {
   AcquireCardDestination,
@@ -501,10 +504,11 @@ export function playTypedPlotIntrigue(
   const drawnState = hasIntrigueDraw
     ? drawIntrigueCards(immediateState, player.id, resolved.intriguesToDraw, intrigue.name)
     : immediateState;
+  const actionLog = logFor(player, contractPending, activatedAlly, resolved, outcome);
   const playedState = {
     ...drawnState,
     intrigueDiscard: [...drawnState.intrigueDiscard, intrigue],
-    log: [logFor(player, contractPending, activatedAlly, resolved, outcome), ...drawnState.log],
+    log: [actionLog, ...drawnState.log],
   };
   const adjustedState = hasInfluenceAdjustment
     ? applyInfluenceAdjustments(playedState, player.id, activatedAlly?.id, resolved.influenceAdjustments)
@@ -512,7 +516,11 @@ export function playTypedPlotIntrigue(
   const spyRecallTrackedState = hasSpyRecall
     ? recordTurnSpyRecall(adjustedState, player.id)
     : adjustedState;
-  return summonEffect
-    ? recordTurnUnitDeployment(spyRecallTrackedState, player.id, summonEffect.amount)
+  const spiceTrackedState = (resolved.revealGain.spice ?? 0) > 0
+    ? recordTurnSpiceGain(spyRecallTrackedState, player.id, resolved.revealGain.spice ?? 0)
     : spyRecallTrackedState;
+  const unitTrackedState = summonEffect
+    ? recordTurnUnitDeployment(spiceTrackedState, player.id, summonEffect.amount)
+    : spiceTrackedState;
+  return completeChoamContractsForCurrentTurnHarvests(unitTrackedState, actionLog).state;
 }

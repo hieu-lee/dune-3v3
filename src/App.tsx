@@ -221,6 +221,8 @@ export default function App() {
       const advancedState = {
         ...current,
         agentTurnComplete: false,
+        turnHarvestContractIds: {},
+        turnMakerSpaceVisits: {},
         turnSpiceGains: {},
         turnReverendMotherJessicaRepeats: {},
         turnSpyRecalls: {},

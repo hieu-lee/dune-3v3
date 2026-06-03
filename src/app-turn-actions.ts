@@ -10,6 +10,7 @@ import {
   applyBoardEffect,
   applyCardAgentEffect,
   collectMakerSpice,
+  completeChoamContractsForCurrentTurnHarvests,
   completeChoamContractsForBoardSpace,
   defaultActivatedAllyId,
   drawIntrigueCards,
@@ -29,6 +30,8 @@ import {
   playerTroopSupply,
   queuePendingActions,
   recordRoundMakerSpaceVisit,
+  recordTurnMakerSpaceVisit,
+  recordTurnSpiceGainAndCompleteHarvestContracts,
   recordTurnSpiceGain,
   resolveSecretsIntriguePressure,
   resolveLeaderInfluenceThresholdRewards,
@@ -291,8 +294,20 @@ export function placeAgentAction(
   source = players.find((candidate) => candidate.id === source.id) ?? source;
   effectedTarget = players.find((candidate) => candidate.id === effectedTarget.id) ?? effectedTarget;
   deploymentOwner = player.role === "Commander" ? effectedTarget : source;
+  if (selectedSpace.maker) {
+    postEffectState = recordTurnMakerSpaceVisit(postEffectState, source.id);
+  }
+  const totalSpiceGain = spiceGain + (cardAgentEffect.sourceSpiceGained ?? 0);
+  const harvestCompletion = totalSpiceGain > 0
+    ? recordTurnSpiceGainAndCompleteHarvestContracts(postEffectState, source.id, totalSpiceGain)
+    : completeChoamContractsForCurrentTurnHarvests(postEffectState);
+  postEffectState = harvestCompletion.state;
+  players = postEffectState.players;
+  source = players.find((candidate) => candidate.id === source.id) ?? source;
+  effectedTarget = players.find((candidate) => candidate.id === effectedTarget.id) ?? effectedTarget;
+  deploymentOwner = player.role === "Commander" ? effectedTarget : source;
   const extraRecruitedTroops =
-    (cardAgentEffect.recruitedTroops ?? 0) + contractCompletion.recruitedTroops;
+    (cardAgentEffect.recruitedTroops ?? 0) + contractCompletion.recruitedTroops + harvestCompletion.recruitedTroops;
   const futureSourceIntrigues = futureSourceIntriguesBeforePendingChoice(
     postEffectState,
     selectedSpace,
@@ -398,6 +413,9 @@ export function placeAgentAction(
     stateAfterTopDeckReservations,
     topDeckReservations.pendingActions,
   );
+  const agentPlacementLog = player.role === "Commander"
+    ? `${player.leader} activates ${target.leader} at ${selectedSpace.name} with ${selectedCard.name}.`
+    : `${player.leader} sends an Agent to ${selectedSpace.name} with ${selectedCard.name}.`;
   const nextState: GameState = {
     ...stateAfterTopDeckReservations,
     agentTurnComplete: true,
@@ -415,9 +433,7 @@ export function placeAgentAction(
         ? `${player.leader} collects ${makerBonus} bonus spice from ${selectedSpace.name}.`
         : undefined,
       cardAgentEffect.log,
-      player.role === "Commander"
-        ? `${player.leader} activates ${target.leader} at ${selectedSpace.name} with ${selectedCard.name}.`
-        : `${player.leader} sends an Agent to ${selectedSpace.name} with ${selectedCard.name}.`,
+      agentPlacementLog,
       ...postEffectState.log,
     ].filter((entry): entry is string => Boolean(entry)),
   };
@@ -440,8 +456,7 @@ export function placeAgentAction(
   const makerTrackedState = selectedSpace.maker
     ? recordRoundMakerSpaceVisit(resolvedState, player.id)
     : resolvedState;
-  const totalSpiceGain = spiceGain + (cardAgentEffect.sourceSpiceGained ?? 0);
-  return totalSpiceGain > 0 ? recordTurnSpiceGain(makerTrackedState, source.id, totalSpiceGain) : makerTrackedState;
+  return completeChoamContractsForCurrentTurnHarvests(makerTrackedState, agentPlacementLog).state;
 }
 
 type RevealTurnPlan = {

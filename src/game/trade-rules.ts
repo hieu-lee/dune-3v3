@@ -2,7 +2,7 @@ import {
   resolveAgentTrashSourceForTrades,
 } from "./effect-resolver";
 import { advancePendingAction } from "./pending-actions";
-import { recordTurnSpiceGain } from "./turn-trackers";
+import { recordTurnSpiceGainAndCompleteHarvestContracts } from "./contract-rules";
 import type { GameState, PendingAction, Player, ResourceId, TradeGoodId } from "./types";
 
 type TradePendingAction = Extract<PendingAction, { kind: "trade" }>;
@@ -225,5 +225,5 @@ export function transferTradeGood(
     pendingAction,
     log: [`${from.leader} trades 1 ${resource} to ${to.leader}.`, ...state.log],
   };
-  return resource === "spice" ? recordTurnSpiceGain(nextState, toId, 1) : nextState;
+  return resource === "spice" ? recordTurnSpiceGainAndCompleteHarvestContracts(nextState, toId, 1).state : nextState;
 }

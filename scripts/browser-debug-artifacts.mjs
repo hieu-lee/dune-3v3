@@ -102,6 +102,8 @@ const generatedScreenshotNames = [
   "contract-immediate-after.png",
   "contract-board-ready.png",
   "contract-board-after.png",
+  "contract-harvest-ready.png",
+  "contract-harvest-after.png",
   "pending-deploy.png",
   "pending-reinforce.png",
   "pending-reinforce-blocked.png",

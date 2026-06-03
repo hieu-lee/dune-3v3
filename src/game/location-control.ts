@@ -4,8 +4,8 @@ import {
   criticalLocationIncome,
   criticalLocationNames,
 } from "./critical-locations";
+import { recordTurnSpiceGainAndCompleteHarvestContracts } from "./contract-rules";
 import { playerTroopSupply } from "./deck-utils";
-import { recordTurnSpiceGain } from "./turn-trackers";
 import type { BoardSpace, ConflictCard, GameState, PendingAction, Player } from "./types";
 
 type ControlDefensePendingAction = Extract<PendingAction, { kind: "control-defense" }>;
@@ -53,5 +53,7 @@ export function resolveLocationControlIncome(state: GameState, space: BoardSpace
       ...state.log,
     ],
   };
-  return income.resource === "spice" ? recordTurnSpiceGain(nextState, owner.id, income.amount) : nextState;
+  return income.resource === "spice"
+    ? recordTurnSpiceGainAndCompleteHarvestContracts(nextState, owner.id, income.amount).state
+    : nextState;
 }

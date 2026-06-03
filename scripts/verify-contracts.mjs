@@ -47,6 +47,18 @@ try {
     return card;
   }
 
+  function intrigueByName(name) {
+    const card = data.intrigueCards.find((candidate) => candidate.name === name);
+    assert.ok(card, `Missing Intrigue fixture: ${name}`);
+    return card;
+  }
+
+  function imperiumCardByName(name) {
+    const card = data.imperiumDeck.find((candidate) => candidate.name === name);
+    assert.ok(card, `Missing Imperium card fixture: ${name}`);
+    return card;
+  }
+
   function playerById(gameState, playerId) {
     const player = gameState.players.find((candidate) => candidate.id === playerId);
     assert.ok(player, `Missing player fixture: ${playerId}`);
@@ -111,6 +123,8 @@ try {
       "Deliver Supplies",
       "Espionage I",
       "Espionage II",
+      "Harvest 3+",
+      "Harvest 4+",
       "Heighliner I",
       "Heighliner II",
       "High Council I",
@@ -126,7 +140,9 @@ try {
     "Only fully modeled CHOAM contracts should leave the manual fallback path",
   );
   assert.equal(state.contractHasAutomatedCompletion(contractByName("Acquire")), true);
-  assert.equal(state.contractHasAutomatedCompletion(contractByName("Harvest 3+")), false);
+  assert.equal(state.contractHasAutomatedCompletion(contractByName("Harvest 3+")), true);
+  assert.equal(state.contractHasAutomatedCompletion(contractByName("Harvest 4+")), true);
+  assert.equal(state.contractHasAutomatedCompletion(contractByName("Sardaukar II")), false);
   assert.equal(game.contractOffer.length, 2, "Initial game should reveal two public CHOAM contracts");
   assert.equal(game.contractDeck.length, 16, "Initial public CHOAM deck should hold the remaining sixteen contracts");
   assert.equal(
@@ -357,6 +373,393 @@ try {
     "A board-space contract taken at that same space should wait for a later board-space visit",
   );
   assert.equal(playerById(arrakeenTaken, ally.id).resources.water, ally.resources.water);
+
+  const makerAgentCard = {
+    id: "verify-contract-maker-card",
+    name: "Verify Contract Maker Card",
+    icons: ["spice"],
+    persuasion: 0,
+    swords: 0,
+    play: "",
+    reveal: "",
+  };
+  const makerInfluenceChoiceCard = {
+    id: "verify-contract-maker-influence-choice-card",
+    name: "Verify Contract Maker Influence Choice Card",
+    icons: ["spice"],
+    persuasion: 0,
+    swords: 0,
+    play: "",
+    reveal: "",
+    effects: [{
+      trigger: "agent-play",
+      effects: [{ kind: "gain-influence-choice", selector: "self", amount: 1 }],
+    }],
+  };
+  const harvestActiveSeat = game.players.findIndex((player) => player.id === ally.id);
+  const harvestHeld = withHeldContracts(
+    updatePlayer(
+      {
+        ...game,
+        activeSeat: harvestActiveSeat,
+        pendingAction: undefined,
+        pendingQueue: [],
+        spaces: {},
+      },
+      ally.id,
+      (player) => ({
+        ...player,
+        hand: [makerAgentCard],
+        playArea: [],
+        agentsReady: Math.max(1, player.agentsReady),
+        resources: { ...player.resources, water: player.resources.water + 3 },
+      }),
+    ),
+    ally.id,
+    ["Harvest 3+", "Harvest 4+"],
+  );
+  const harvestBefore = playerById(harvestHeld, ally.id);
+  const harvestCompleted = turnActions.placeAgentAction(harvestHeld, {
+    commanderTargets: {},
+    selectedCard: makerAgentCard,
+    selectedSpace: boardSpaceById("deep-desert"),
+  });
+  const harvestOwner = playerById(harvestCompleted, ally.id);
+  assertCompleted(harvestCompleted, ally.id, "Harvest 3+");
+  assertCompleted(harvestCompleted, ally.id, "Harvest 4+");
+  assert.equal(harvestOwner.resources.spice, harvestBefore.resources.spice + 4);
+  assert.equal(harvestOwner.resources.solari, harvestBefore.resources.solari + 7);
+  assert.equal(harvestCompleted.turnSpiceGains[ally.id], (harvestHeld.turnSpiceGains[ally.id] ?? 0) + 4);
+
+  const lowHarvestHeld = withHeldContracts(
+    updatePlayer(
+      {
+        ...game,
+        activeSeat: harvestActiveSeat,
+        pendingAction: undefined,
+        pendingQueue: [],
+        spaces: {},
+      },
+      ally.id,
+      (player) => ({
+        ...player,
+        hand: [makerAgentCard],
+        playArea: [],
+        agentsReady: Math.max(1, player.agentsReady),
+      }),
+    ),
+    ally.id,
+    ["Harvest 3+"],
+  );
+  const lowHarvest = turnActions.placeAgentAction(lowHarvestHeld, {
+    commanderTargets: {},
+    selectedCard: makerAgentCard,
+    selectedSpace: boardSpaceById("imperial-basin"),
+  });
+  assert.equal(playerContract(lowHarvest, ally.id, "Harvest 3+").completed, false);
+
+  const cumulativeHarvestHeld = state.recordTurnSpiceGain(
+    withHeldContracts(
+      updatePlayer(
+        {
+          ...game,
+          activeSeat: harvestActiveSeat,
+          pendingAction: undefined,
+          pendingQueue: [],
+          spaces: {},
+        },
+        ally.id,
+        (player) => ({
+          ...player,
+          hand: [makerAgentCard],
+          playArea: [],
+          agentsReady: Math.max(1, player.agentsReady),
+        }),
+      ),
+      ally.id,
+      ["Harvest 3+"],
+    ),
+    ally.id,
+    2,
+  );
+  const cumulativeHarvestCompleted = turnActions.placeAgentAction(cumulativeHarvestHeld, {
+    commanderTargets: {},
+    selectedCard: makerAgentCard,
+    selectedSpace: boardSpaceById("imperial-basin"),
+  });
+  assertCompleted(cumulativeHarvestCompleted, ally.id, "Harvest 3+");
+
+  const priorityContracts = imperiumCardByName("Priority Contracts");
+  const cardSpiceHarvestHeld = withHeldContracts(
+    updatePlayer(
+      {
+        ...game,
+        activeSeat: harvestActiveSeat,
+        pendingAction: undefined,
+        pendingQueue: [],
+        spaces: {},
+        contractOffer: [contractByName("Secrets")],
+      },
+      ally.id,
+      (player) => ({
+        ...player,
+        hand: [priorityContracts],
+        playArea: [],
+        agentsReady: Math.max(1, player.agentsReady),
+        resources: { ...player.resources, water: player.resources.water + 1 },
+      }),
+    ),
+    ally.id,
+    ["Harvest 4+"],
+  );
+  const cardSpiceHarvestCompleted = turnActions.placeAgentAction(cardSpiceHarvestHeld, {
+    commanderTargets: {},
+    selectedCard: priorityContracts,
+    selectedSpace: boardSpaceById("hagga-basin"),
+  });
+  assertCompleted(cardSpiceHarvestCompleted, ally.id, "Harvest 4+");
+
+  const marketOpportunity = intrigueByName("Market Opportunity");
+  const retroactiveHarvestContract = contractByName("Harvest 4+");
+  const retroactiveHarvestOffer = updatePlayer(
+    {
+      ...game,
+      activeSeat: harvestActiveSeat,
+      pendingAction: undefined,
+      pendingQueue: [],
+      spaces: {},
+      contractOffer: [retroactiveHarvestContract],
+      contractDeck: [],
+    },
+    ally.id,
+    (player) => ({
+      ...player,
+      hand: [priorityContracts],
+      playArea: [],
+      agentsReady: Math.max(1, player.agentsReady),
+      garrison: 0,
+      intrigues: [marketOpportunity],
+      resources: { ...player.resources, solari: player.resources.solari + 5, water: player.resources.water + 1 },
+    }),
+  );
+  const retroactiveHarvestPending = turnActions.placeAgentAction(retroactiveHarvestOffer, {
+    commanderTargets: {},
+    selectedCard: priorityContracts,
+    selectedSpace: boardSpaceById("hagga-basin"),
+  });
+  assert.equal(retroactiveHarvestPending.pendingAction?.kind, "contract");
+  const retroactiveHarvestTaken = state.takeChoamContract(
+    retroactiveHarvestPending,
+    retroactiveHarvestPending.pendingAction,
+    retroactiveHarvestContract.id,
+  );
+  assert.equal(
+    playerContract(retroactiveHarvestTaken, ally.id, "Harvest 4+").completed,
+    false,
+    "Harvest contracts taken after the same-turn Maker spice trigger should wait for a later trigger",
+  );
+  const retroactiveHarvestAfterPlot = state.playMarketOpportunityPlotIntrigue(
+    retroactiveHarvestTaken,
+    ally.id,
+    marketOpportunity.id,
+    "solari-to-spice",
+  );
+  assert.equal(
+    playerContract(retroactiveHarvestAfterPlot, ally.id, "Harvest 4+").completed,
+    false,
+    "Harvest contracts taken after the same-turn Maker trigger should not complete from later same-turn spice",
+  );
+
+  const plotSpiceHarvestHeld = withHeldContracts(
+    updatePlayer(
+      {
+        ...game,
+        activeSeat: harvestActiveSeat,
+        pendingAction: undefined,
+        pendingQueue: [],
+        spaces: {},
+      },
+      ally.id,
+      (player) => ({
+        ...player,
+        hand: [makerAgentCard],
+        playArea: [],
+        agentsReady: Math.max(1, player.agentsReady),
+        garrison: 0,
+        intrigues: [marketOpportunity],
+        resources: { ...player.resources, solari: player.resources.solari + 5 },
+      }),
+    ),
+    ally.id,
+    ["Harvest 4+"],
+  );
+  const plotSpiceMakerPlaced = turnActions.placeAgentAction(plotSpiceHarvestHeld, {
+    commanderTargets: {},
+    selectedCard: makerAgentCard,
+    selectedSpace: boardSpaceById("imperial-basin"),
+  });
+  assert.equal(playerContract(plotSpiceMakerPlaced, ally.id, "Harvest 4+").completed, false);
+  const plotSpiceHarvestCompleted = state.playMarketOpportunityPlotIntrigue(
+    plotSpiceMakerPlaced,
+    ally.id,
+    marketOpportunity.id,
+    "solari-to-spice",
+  );
+  assertCompleted(plotSpiceHarvestCompleted, ally.id, "Harvest 4+");
+  assert.equal(
+    plotSpiceHarvestCompleted.turnSpiceGains[ally.id],
+    (plotSpiceHarvestHeld.turnSpiceGains[ally.id] ?? 0) + 6,
+    "Harvest should count Maker spice plus later same-Agent-turn Plot spice once",
+  );
+
+  const margotHarvestHeld = withHeldContracts(
+    updatePlayer(
+      {
+        ...game,
+        activeSeat: harvestActiveSeat,
+        pendingAction: undefined,
+        pendingQueue: [],
+        spaces: {},
+      },
+      ally.id,
+      (player) => ({
+        ...player,
+        leader: "Lady Margot Fenring",
+        leaderCard: data.leaderCardByName("Lady Margot Fenring"),
+        influence: { ...player.influence, bene: 1 },
+        hand: [makerInfluenceChoiceCard],
+        playArea: [],
+        agentsReady: Math.max(1, player.agentsReady),
+        garrison: 0,
+        resources: { ...player.resources, water: player.resources.water + 1 },
+      }),
+    ),
+    ally.id,
+    ["Harvest 4+"],
+  );
+  const margotBefore = playerById(margotHarvestHeld, ally.id);
+  const margotHarvestPending = turnActions.placeAgentAction(margotHarvestHeld, {
+    commanderTargets: {},
+    selectedCard: makerInfluenceChoiceCard,
+    selectedSpace: boardSpaceById("hagga-basin"),
+  });
+  assert.equal(margotHarvestPending.pendingAction?.kind, "board-influence-choice");
+  assert.equal(playerContract(margotHarvestPending, ally.id, "Harvest 4+").completed, false);
+  assert.equal(margotHarvestPending.turnSpiceGains[ally.id], (margotHarvestHeld.turnSpiceGains[ally.id] ?? 0) + 2);
+  const margotHarvestCompleted = state.resolveBoardInfluenceChoice(
+    margotHarvestPending,
+    margotHarvestPending.pendingAction,
+    ally.id,
+    "bene",
+  );
+  assertCompleted(margotHarvestCompleted, ally.id, "Harvest 4+");
+  assert.equal(playerById(margotHarvestCompleted, ally.id).resources.spice, margotBefore.resources.spice + 4);
+  assert.equal(playerById(margotHarvestCompleted, ally.id).resources.solari, margotBefore.resources.solari + 4);
+  assert.equal(margotHarvestCompleted.turnSpiceGains[ally.id], (margotHarvestHeld.turnSpiceGains[ally.id] ?? 0) + 4);
+
+  const margotPaymentHarvestHeld = withHeldContracts(
+    updatePlayer(
+      {
+        ...game,
+        activeSeat: harvestActiveSeat,
+        pendingAction: undefined,
+        pendingQueue: [],
+        spaces: {},
+      },
+      ally.id,
+      (player) => ({
+        ...player,
+        leader: "Lady Margot Fenring",
+        leaderCard: data.leaderCardByName("Lady Margot Fenring"),
+        influence: { ...player.influence, bene: 1 },
+        hand: [makerAgentCard],
+        playArea: [],
+        agentsReady: Math.max(1, player.agentsReady),
+        garrison: 0,
+        resources: { ...player.resources, solari: player.resources.solari + 1, water: player.resources.water + 1 },
+      }),
+    ),
+    ally.id,
+    ["Harvest 4+"],
+  );
+  const margotPaymentBefore = playerById(margotPaymentHarvestHeld, ally.id);
+  const margotPaymentMakerPlaced = turnActions.placeAgentAction(margotPaymentHarvestHeld, {
+    commanderTargets: {},
+    selectedCard: makerAgentCard,
+    selectedSpace: boardSpaceById("hagga-basin"),
+  });
+  assert.equal(playerContract(margotPaymentMakerPlaced, ally.id, "Harvest 4+").completed, false);
+  assert.equal(margotPaymentMakerPlaced.turnSpiceGains[ally.id], (margotPaymentHarvestHeld.turnSpiceGains[ally.id] ?? 0) + 2);
+  const margotPaymentPending = {
+    kind: "pay-resource-for-influence",
+    ownerId: ally.id,
+    influenceOwnerId: ally.id,
+    resource: "solari",
+    cost: 1,
+    faction: "bene",
+    amount: 1,
+    optional: true,
+    source: "Verifier Influence Payment",
+  };
+  const margotPaymentHarvestCompleted = state.resolvePayResourceForInfluenceChoice(
+    { ...margotPaymentMakerPlaced, pendingAction: margotPaymentPending, pendingQueue: [] },
+    margotPaymentPending,
+  );
+  assertCompleted(margotPaymentHarvestCompleted, ally.id, "Harvest 4+");
+  assert.equal(playerById(margotPaymentHarvestCompleted, ally.id).resources.spice, margotPaymentBefore.resources.spice + 4);
+  assert.equal(playerById(margotPaymentHarvestCompleted, ally.id).resources.solari, margotPaymentBefore.resources.solari + 3);
+  assert.equal(margotPaymentHarvestCompleted.turnSpiceGains[ally.id], (margotPaymentHarvestHeld.turnSpiceGains[ally.id] ?? 0) + 4);
+
+  const trackedSpiceOnly = state.recordTurnSpiceGain(
+    withHeldContracts(game, ally.id, ["Harvest 3+"]),
+    ally.id,
+    3,
+  );
+  assert.equal(
+    playerContract(trackedSpiceOnly, ally.id, "Harvest 3+").completed,
+    false,
+    "Harvest contracts should require a Maker-space Agent visit, not only a tracked spice gain",
+  );
+
+  const makerHookAlly = playerById(game, "p3");
+  const makerHookActiveSeat = game.players.findIndex((player) => player.id === makerHookAlly.id);
+  const deferredHarvestHeld = withHeldContracts(
+    updatePlayer(
+      {
+        ...game,
+        activeSeat: makerHookActiveSeat,
+        pendingAction: undefined,
+        pendingQueue: [],
+        spaces: {},
+        shieldWall: false,
+      },
+      makerHookAlly.id,
+      (player) => ({
+        ...player,
+        hand: [makerAgentCard],
+        playArea: [],
+        agentsReady: Math.max(1, player.agentsReady),
+        makerHooks: true,
+        resources: { ...player.resources, water: player.resources.water + 3 },
+      }),
+    ),
+    makerHookAlly.id,
+    ["Harvest 3+", "Harvest 4+"],
+  );
+  const deferredHarvestPending = turnActions.placeAgentAction(deferredHarvestHeld, {
+    commanderTargets: {},
+    selectedCard: makerAgentCard,
+    selectedSpace: boardSpaceById("deep-desert"),
+  });
+  assert.equal(deferredHarvestPending.pendingAction?.kind, "maker-choice");
+  assert.equal(playerContract(deferredHarvestPending, makerHookAlly.id, "Harvest 3+").completed, false);
+  const deferredHarvestCompleted = state.resolveMakerChoice(
+    deferredHarvestPending,
+    deferredHarvestPending.pendingAction,
+    "spice",
+  );
+  assertCompleted(deferredHarvestCompleted, makerHookAlly.id, "Harvest 3+");
+  assertCompleted(deferredHarvestCompleted, makerHookAlly.id, "Harvest 4+");
 
   const arrakeenHeld = withHeldContracts(game, ally.id, ["Arrakeen I", "Arrakeen II"]);
   const arrakeenCompleted = state.completeChoamContractsForBoardSpace(arrakeenHeld, ally.id, "arrakeen");

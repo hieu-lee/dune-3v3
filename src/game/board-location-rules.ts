@@ -5,7 +5,10 @@ import { boardSpaces, factionIds, factionLabels } from "./data";
 import { resolveAgentBoardSpaceInfluences, resolveGainInfluenceChoices } from "./effect-resolver";
 import { adjustInfluenceAndResolveThresholdRewards } from "./leader-rewards";
 import { pendingActionForBoardInfluenceChoice } from "./placement-rules";
-import { recordTurnSpiceGain } from "./turn-trackers";
+import {
+  completeChoamContractsForCurrentTurnHarvests,
+  recordTurnSpiceGainAndCompleteHarvestContracts,
+} from "./contract-rules";
 import { changeAllegiancesGainChoices } from "./influence-choices";
 import { influenceEffectOwnerForChoice } from "./influence-loss-rules";
 import type { GameEffectTrigger } from "./types";
@@ -243,6 +246,7 @@ export function resolveBoardInfluenceChoice(
   const owner = state.players.find((player) => player.id === choice.ownerId);
   if (!owner) return state;
 
+  const actionLog = `${owner.leader} gains ${amount} ${factionLabels[choice.faction]} Influence from ${pending.source}.`;
   const advancedState = {
     ...state,
     players: state.players.map((player) => {
@@ -251,11 +255,14 @@ export function resolveBoardInfluenceChoice(
     }),
     ...advancePendingAction(state),
     log: [
-      `${owner.leader} gains ${amount} ${factionLabels[choice.faction]} Influence from ${pending.source}.`,
+      actionLog,
       ...state.log,
     ],
   };
-  return adjustInfluenceAndResolveThresholdRewards(advancedState, owner.id, choice.faction, amount);
+  return completeChoamContractsForCurrentTurnHarvests(
+    adjustInfluenceAndResolveThresholdRewards(advancedState, owner.id, choice.faction, amount),
+    actionLog,
+  ).state;
 }
 
 export function resolveOptionalSpacePayment(
@@ -285,7 +292,7 @@ export function resolveOptionalSpacePayment(
     ],
   };
   const spiceGain = pending.gain.spice ?? 0;
-  if (spiceGain > 0) nextState = recordTurnSpiceGain(nextState, owner.id, spiceGain);
+  if (spiceGain > 0) nextState = recordTurnSpiceGainAndCompleteHarvestContracts(nextState, owner.id, spiceGain).state;
   return nextState;
 }
 

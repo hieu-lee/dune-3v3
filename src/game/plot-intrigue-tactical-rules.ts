@@ -9,9 +9,6 @@ import {
   canPlaySpecialMissionPlaceSpy,
   specialMissionRecallSpySpaces,
 } from "./spy-pending-rules";
-import {
-  recordTurnSpiceGain,
-} from "./turn-trackers";
 import type {
   GameState,
 } from "./types";
@@ -47,7 +44,7 @@ export function playSpecialMissionPlotIntrigue(
   if (choice.kind === "recall-spy") {
     const space = specialMissionRecallSpySpaces(state, player).find((candidate) => candidate.id === choice.spaceId);
     if (!space) return state;
-    const nextState = playTypedPlotIntrigue(
+    return playTypedPlotIntrigue(
       state,
       playerId,
       intrigueId,
@@ -58,7 +55,6 @@ export function playSpecialMissionPlotIntrigue(
       },
       { choiceId: "recall-spy", targetSpaceId: space.id },
     );
-    return nextState !== state ? recordTurnSpiceGain(nextState, player.id, 2) : nextState;
   }
 
   return state;

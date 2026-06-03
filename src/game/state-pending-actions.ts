@@ -12,6 +12,7 @@ import {
   playerConflictUnitCount,
 } from "./conflict-rules";
 import {
+  recordTurnSpiceGainAndCompleteHarvestContracts,
   resolveAcquireCardForPending,
   resolveChoamContractFallback,
   resolveTakeChoamContract,
@@ -75,7 +76,6 @@ import {
   resolveStabanUnseenNetworkChoiceForPending,
 } from "./spy-pending-rules";
 import {
-  recordTurnSpiceGain,
   recordTurnUnitDeployment,
 } from "./turn-trackers";
 import {
@@ -530,10 +530,10 @@ export function resolveCommanderResourceSplitChoice(
     ],
   };
   if (option.commanderResource === "spice") {
-    nextState = recordTurnSpiceGain(nextState, commander.id, option.commanderAmount);
+    nextState = recordTurnSpiceGainAndCompleteHarvestContracts(nextState, commander.id, option.commanderAmount).state;
   }
   if (option.allyResource === "spice") {
-    nextState = recordTurnSpiceGain(nextState, ally.id, option.allyAmount);
+    nextState = recordTurnSpiceGainAndCompleteHarvestContracts(nextState, ally.id, option.allyAmount).state;
   }
   return nextState;
 }
@@ -566,16 +566,14 @@ export function resolveMakerChoice(
     };
   });
 
+  const actionLog = summon
+    ? `${owner.leader} summons ${pending.sandworms} sandworm${pending.sandworms === 1 ? "" : "s"} from ${pending.source}.`
+    : `${spiceRecipient.leader} gains ${pending.spice} spice from ${pending.source}.`;
   const nextState = {
     ...state,
     players,
     ...advancePendingAction(state),
-    log: [
-      summon
-        ? `${owner.leader} summons ${pending.sandworms} sandworm${pending.sandworms === 1 ? "" : "s"} from ${pending.source}.`
-        : `${spiceRecipient.leader} gains ${pending.spice} spice from ${pending.source}.`,
-      ...state.log,
-    ],
+    log: [actionLog, ...state.log],
   };
   const postChoiceState = summon
     ? resolvePostDeployIntrigueDraw(nextState, pending.postDeployIntrigueDraw)
@@ -584,7 +582,7 @@ export function resolveMakerChoice(
     const actor = state.players[state.activeSeat];
     return actor ? recordTurnUnitDeployment(postChoiceState, actor.id, pending.sandworms) : postChoiceState;
   }
-  return recordTurnSpiceGain(postChoiceState, spiceRecipient.id, pending.spice);
+  return recordTurnSpiceGainAndCompleteHarvestContracts(postChoiceState, spiceRecipient.id, pending.spice, actionLog).state;
 }
 
 export function resolveSietchTabrChoice(

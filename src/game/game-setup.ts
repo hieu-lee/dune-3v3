@@ -51,6 +51,8 @@ export function initialGame(): GameState {
     firstSeat,
     agentTurnComplete: false,
     roundMakerSpaceVisits: {},
+    turnHarvestContractIds: {},
+    turnMakerSpaceVisits: {},
     turnSpiceGains: {},
     turnReverendMotherJessicaRepeats: {},
     turnSpyRecalls: {},

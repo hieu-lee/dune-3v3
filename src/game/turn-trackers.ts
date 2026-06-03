@@ -19,6 +19,35 @@ export function recordRoundMakerSpaceVisit(state: GameState, playerId: string): 
   };
 }
 
+export function hasVisitedMakerSpaceThisTurn(state: Pick<GameState, "turnMakerSpaceVisits">, playerId: string) {
+  return Boolean(state.turnMakerSpaceVisits?.[playerId]);
+}
+
+export function recordTurnMakerSpaceVisit(state: GameState, playerId: string): GameState {
+  if (state.phase !== "playing") return state;
+  const owner = state.players.find((player) => player.id === playerId);
+  const heldContractIds = owner?.contracts
+    .filter((contract) => !contract.completed)
+    .map((contract) => contract.card.id) ?? [];
+  const eligibleContractIds = [
+    ...new Set([
+      ...(state.turnHarvestContractIds?.[playerId] ?? []),
+      ...heldContractIds,
+    ]),
+  ];
+  return {
+    ...state,
+    turnHarvestContractIds: {
+      ...state.turnHarvestContractIds,
+      [playerId]: eligibleContractIds,
+    },
+    turnMakerSpaceVisits: {
+      ...state.turnMakerSpaceVisits,
+      [playerId]: true,
+    },
+  };
+}
+
 export function recordTurnSpiceGain(state: GameState, playerId: string, amount: number): GameState {
   if (state.phase !== "playing" || amount <= 0) return state;
   return {

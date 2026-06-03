@@ -311,6 +311,8 @@ function applyEndAgent(state: GameState, playerId: string) {
   const advancedState = {
     ...state,
     agentTurnComplete: false,
+    turnHarvestContractIds: {},
+    turnMakerSpaceVisits: {},
     turnSpiceGains: {},
     turnReverendMotherJessicaRepeats: {},
     turnSpyRecalls: {},

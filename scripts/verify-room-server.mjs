@@ -28,6 +28,7 @@ const {
   intrigueCards,
   muadDibCommanderCards,
   reserveMarket,
+  shaddamReservedContracts,
   standardContracts,
 } = await server.ssrLoadModule("/src/game/data.ts");
 
@@ -192,7 +193,7 @@ function intrigueBySourceId(sourceId) {
 }
 
 function contractByName(name) {
-  const contract = standardContracts.find((candidate) => candidate.name === name);
+  const contract = [...standardContracts, ...shaddamReservedContracts].find((candidate) => candidate.name === name);
   assert.ok(contract, `Expected CHOAM contract ${name}`);
   return { ...contract };
 }
@@ -1139,8 +1140,8 @@ try {
   assert.equal(contractRoom.response.status, 201, "Contract fallback room creation should succeed");
   const contractRoomRecord = server.rooms.get(contractRoom.body.roomId);
   assert.ok(contractRoomRecord, "Contract fallback room should be stored in memory");
-  const fallbackContractOwnerId = "p2";
-  const fallbackContract = contractByName("Harvest 3+");
+  const fallbackContractOwnerId = "p4";
+  const fallbackContract = contractByName("Sardaukar II");
   const automatedContract = contractByName("Immediate");
   contractRoomRecord.game = {
     ...contractRoomRecord.game,

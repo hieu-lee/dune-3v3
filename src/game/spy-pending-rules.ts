@@ -18,9 +18,11 @@ import {
   spyPostOwnerIds,
 } from "./spy-posts";
 import {
+  recordTurnSpiceGainAndCompleteHarvestContracts,
+} from "./contract-rules";
+import {
   hasDeployedThreeOrMoreUnitsThisTurn,
   recordTurnSpyRecall,
-  recordTurnSpiceGain,
 } from "./turn-trackers";
 import type {
   BoardSpace,
@@ -170,7 +172,7 @@ export function resolveStabanSmuggleSpice(state: GameState, actorId: string, spa
       ),
       log: [`${owner.leader} resolves Smuggle Spice from ${space.name}: gains 1 spice.`, ...nextState.log],
     };
-    return recordTurnSpiceGain(rewardedState, owner.id, 1);
+    return recordTurnSpiceGainAndCompleteHarvestContracts(rewardedState, owner.id, 1).state;
   }, state);
 }
 

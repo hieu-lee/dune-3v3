@@ -42,10 +42,13 @@ export {
 
 export {
   acquireMarketCard,
+  completeChoamContractsForCurrentTurnHarvests,
   completeChoamContractsForBoardSpace,
   completeChoamContractsForAcquiredCard,
+  completeChoamContractsForHarvest,
   completeImmediateChoamContracts,
   contractHasAutomatedCompletion,
+  recordTurnSpiceGainAndCompleteHarvestContracts,
   resolvePayResourceForContractsChoice,
   setChoamContractCompleted,
   skipPayResourceForContracts,
@@ -324,7 +327,9 @@ export {
   hasDeployedThreeOrMoreUnitsThisTurn,
   hasGainedSpiceThisTurn,
   hasVisitedMakerSpaceThisRound,
+  hasVisitedMakerSpaceThisTurn,
   recordRoundMakerSpaceVisit,
+  recordTurnMakerSpaceVisit,
   hasUsedReverendMotherJessicaRepeat,
   recordTurnSpiceGain,
   recordTurnUnitDeployment,

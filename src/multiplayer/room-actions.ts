@@ -194,12 +194,6 @@ export type RoomActionCommand =
       kind: "finalize-endgame";
     }
   | {
-      kind: "set-contract-completed";
-      playerId: string;
-      contractId: string;
-      completed: boolean;
-    }
-  | {
       kind: "plot-intrigue";
       command: RoomPlotActionCommand;
       commanderTargets?: Record<string, string>;
@@ -547,33 +541,6 @@ function applyScoreEndgameConditional(
   if (state.phase !== "endgame") throw new RoomActionError(409, "The table is not in endgame scoring");
   if (command.playerId !== playerId) throw new RoomActionError(403, "Only the Intrigue owner can score that Endgame card");
   const nextState = gameRules.scoreEndgameConditionalIntrigue(state, command.playerId, command.intrigueId);
-  return nextState === state ? sameStateError() : nextState;
-}
-
-function applySetContractCompleted(
-  state: GameState,
-  playerId: string,
-  command: Extract<RoomActionCommand, { kind: "set-contract-completed" }>,
-) {
-  if (command.playerId !== playerId) {
-    throw new RoomActionError(403, "Only the contract owner can mark that CHOAM contract");
-  }
-  if (typeof command.completed !== "boolean") {
-    throw new RoomActionError(400, "Contract completion state must be boolean");
-  }
-  if (state.phase === "finished") {
-    throw new RoomActionError(409, "Finished games cannot change CHOAM contract completion");
-  }
-  if (tableStateLockedByPendingActions(state)) {
-    throw new RoomActionError(409, "Resolve the pending table action first");
-  }
-  const owner = state.players.find((candidate) => candidate.id === playerId);
-  const contract = owner?.contracts.find((candidate) => candidate.card.id === command.contractId);
-  if (!owner || !contract) throw new RoomActionError(404, "CHOAM contract not found");
-  if (gameRules.contractHasAutomatedCompletion(contract.card)) {
-    throw new RoomActionError(409, "Automated CHOAM contracts are completed by their printed trigger");
-  }
-  const nextState = gameRules.setChoamContractCompleted(state, playerId, command.contractId, command.completed);
   return nextState === state ? sameStateError() : nextState;
 }
 
@@ -989,8 +956,6 @@ export function applyRoomAction(state: GameState, playerId: string, command: Roo
       return applyScoreEndgameIcon(state, playerId, command);
     case "score-endgame-conditional":
       return applyScoreEndgameConditional(state, playerId, command);
-    case "set-contract-completed":
-      return applySetContractCompleted(state, playerId, command);
     case "finalize-endgame":
       throw new RoomActionError(400, "Endgame finalization must be handled by the room server");
     case "choose-throne-row-card":

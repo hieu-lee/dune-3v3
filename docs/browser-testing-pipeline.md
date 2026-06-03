@@ -130,7 +130,7 @@ Current scenarios:
 | `combat-intrigues` | Combat Intrigue targeting/play flow, Go To Ground retreat plus optional spy placement, Spice is Power spend branch, Impress pending acquisition, Find Weakness optional spy recall, Spring The Trap required spy recall, Devour optional trash, Questionable Methods optional Influence loss, Reach Agreement retreat plus contract pending, Tactical Option dynamic retreat and strength branches, plus a mobile layout screenshot. |
 | `commander-reveal` | Commander reveal targeting, Call to Arms, and acquire follow-up. |
 | `control-defense` | Critical-location control defense on desktop/mobile. |
-| `contract-completion` | Immediate CHOAM completion on take, modeled board-space CHOAM completion from Agent placement, and automated contract chips. |
+| `contract-completion` | Immediate CHOAM completion on take, board-space and Harvest CHOAM completion from Agent placement, and read-only automated contract chips with no manual completion checkboxes. |
 | `conflict-vp` | Conflict VP conversion resource and spy branches. |
 | `military-choices` | Deploy, reinforce, and blocked reinforce surfaces. |
 | `pending-choices` | Recall spy, lose Influence, conflict Influence, and fixed-choice conflict Influence surfaces. |

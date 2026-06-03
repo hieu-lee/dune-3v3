@@ -844,7 +844,6 @@ h2 {
   opacity: 0.54;
 }
 
-.contract-status-row label,
 .contract-status-chip {
   min-width: 0;
   display: flex;
@@ -854,20 +853,11 @@ h2 {
   border-radius: 8px;
   background: rgba(91, 192, 190, 0.1);
   color: #c9f0ed;
-  cursor: pointer;
+  cursor: default;
   font-size: 0.74rem;
   font-weight: 800;
   padding: 6px 8px;
-}
-
-.contract-status-chip {
-  cursor: default;
   justify-content: space-between;
-}
-
-.contract-status-row input {
-  flex: 0 0 auto;
-  accent-color: #5bc0be;
 }
 
 .contract-status-row span {
@@ -883,7 +873,6 @@ h2 {
   text-transform: uppercase;
 }
 
-.contract-status-row label.completed,
 .contract-status-chip.completed {
   border-style: dashed;
   opacity: 0.68;

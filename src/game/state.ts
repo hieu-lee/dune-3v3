@@ -50,7 +50,6 @@ export {
   contractHasAutomatedCompletion,
   recordTurnSpiceGainAndCompleteHarvestContracts,
   resolvePayResourceForContractsChoice,
-  setChoamContractCompleted,
   skipPayResourceForContracts,
 } from "./contract-rules";
 

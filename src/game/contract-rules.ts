@@ -777,33 +777,3 @@ export function resolveChoamContractFallback(
     log: [`${owner.leader} gains 2 Solari from ${pending.source}; no CHOAM contracts remain.`, ...state.log],
   });
 }
-
-export function setChoamContractCompleted(
-  state: GameState,
-  playerId: string,
-  contractId: string,
-  completed: boolean,
-): GameState {
-  const owner = state.players.find((player) => player.id === playerId);
-  const contract = owner?.contracts.find((candidate) => candidate.card.id === contractId);
-  if (!owner || !contract || contract.completed === completed) return state;
-
-  const players = state.players.map((player) =>
-    player.id === owner.id
-      ? {
-          ...player,
-          contracts: player.contracts.map((candidate) =>
-            candidate.card.id === contractId ? { ...candidate, completed } : candidate,
-          ),
-        }
-      : player,
-  );
-  return {
-    ...state,
-    players,
-    log: [
-      `${owner.leader} ${completed ? "completes" : "marks incomplete"} the ${contract.card.name} CHOAM contract.`,
-      ...state.log,
-    ],
-  };
-}

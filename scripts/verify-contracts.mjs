@@ -110,35 +110,15 @@ try {
   assertLocalArt(data.shaddamReservedContracts, "Shaddam reserve");
 
   const game = state.initialGame();
-  const automatedContracts = [...data.standardContracts, ...data.shaddamReservedContracts]
+  const playableContracts = [...data.standardContracts, ...data.shaddamReservedContracts];
+  const automatedContracts = playableContracts
     .filter((contract) => state.contractHasAutomatedCompletion(contract))
     .map((contract) => contract.name)
     .sort();
   assert.deepEqual(
     automatedContracts,
-    [
-      "Acquire",
-      "Arrakeen I",
-      "Arrakeen II",
-      "Deliver Supplies",
-      "Espionage I",
-      "Espionage II",
-      "Harvest 3+",
-      "Harvest 4+",
-      "Heighliner I",
-      "Heighliner II",
-      "High Council I",
-      "High Council II",
-      "Immediate",
-      "Research Station I",
-      "Research Station II",
-      "Sardaukar I",
-      "Sardaukar II",
-      "Secrets",
-      "Spice Refinery I",
-      "Spice Refinery II",
-    ].sort(),
-    "Only fully modeled CHOAM contracts should leave the manual fallback path",
+    playableContracts.map((contract) => contract.name).sort(),
+    "Every playable 6p CHOAM contract should complete automatically",
   );
   assert.equal(state.contractHasAutomatedCompletion(contractByName("Acquire")), true);
   assert.equal(state.contractHasAutomatedCompletion(contractByName("Harvest 3+")), true);
@@ -906,34 +886,6 @@ try {
     researchDeployPending.remaining,
     Math.min(researchAfter.garrison, 5),
     "Contract-recruited troops should be deployable during the same combat-space Agent turn",
-  );
-
-  const manualContract = { id: "contract-verifier-manual", name: "Verifier Manual Contract" };
-  const manualHeld = updatePlayer(next, shaddam.id, (player) => ({
-    ...player,
-    contracts: [
-      ...player.contracts,
-      { card: manualContract, completed: false, takenRound: next.round },
-    ],
-  }));
-  const completed = state.setChoamContractCompleted(manualHeld, shaddam.id, manualContract.id, true);
-  assert.equal(
-    playerContract(completed, shaddam.id, manualContract.name).completed,
-    true,
-    "Contract completion should be tracked on the player contract",
-  );
-  assert.match(completed.log[0], /completes the Verifier Manual Contract CHOAM contract/);
-  assert.equal(
-    state.setChoamContractCompleted(completed, shaddam.id, manualContract.id, true),
-    completed,
-    "Completing an already complete contract should be a no-op",
-  );
-
-  const reopened = state.setChoamContractCompleted(completed, shaddam.id, manualContract.id, false);
-  assert.equal(
-    playerContract(reopened, shaddam.id, manualContract.name).completed,
-    false,
-    "Contract completion should be reversible for table corrections",
   );
 
   const illegal = state.takeChoamContract(

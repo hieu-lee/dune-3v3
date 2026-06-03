@@ -5,29 +5,21 @@ import {
   resources,
 } from "../app-helpers";
 import { battleIconLabels, factionIds, factionLabels, teams } from "../game/data";
-import { canHaveMakerHooks, contractHasAutomatedCompletion, playerDoublesConflictRewards } from "../game/state";
+import { canHaveMakerHooks, playerDoublesConflictRewards } from "../game/state";
 import type { GameState } from "../game/types";
 
 type PlayerColumnProps = {
-  claimedPlayerId?: string;
-  contractCompletionLocked: boolean;
   game: GameState;
-  roomMode?: boolean;
   tableStateLockedByPending: boolean;
   onOpenLeaderReference: (playerId: string, opener: HTMLButtonElement) => void;
   onMakerHooksChange: (playerId: string, hasHooks: boolean) => void;
-  onContractCompletedChange: (playerId: string, contractId: string, completed: boolean) => void;
 };
 
 export function PlayerColumn({
-  claimedPlayerId,
-  contractCompletionLocked,
   game,
-  roomMode = false,
   tableStateLockedByPending,
   onOpenLeaderReference,
   onMakerHooksChange,
-  onContractCompletedChange,
 }: PlayerColumnProps) {
   return (
     <aside className="player-column">
@@ -143,42 +135,16 @@ export function PlayerColumn({
           )}
           {player.contracts.length > 0 && (
             <div className="contract-status-row">
-              {player.contracts.map((contract) => {
-                const automatedCompletion = contractHasAutomatedCompletion(contract.card);
-                const canToggleFallbackCompletion =
-                  !contractCompletionLocked && (!roomMode || claimedPlayerId === player.id);
-                return automatedCompletion
-                  ? (
-                      <div
-                        className={`contract-status-chip ${contract.completed ? "completed" : ""}`}
-                        key={contract.card.id}
-                        title={contract.card.name}
-                      >
-                        <span>{contract.card.name}</span>
-                        <small>{contract.completed ? "Done" : "Pending"}</small>
-                      </div>
-                    )
-                  : (
-                      <label
-                        className={[
-                          contract.completed ? "completed" : "",
-                          canToggleFallbackCompletion ? "" : "disabled",
-                        ].filter(Boolean).join(" ")}
-                        key={contract.card.id}
-                        title={contract.card.name}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={contract.completed}
-                          disabled={!canToggleFallbackCompletion}
-                          onChange={(event) =>
-                            onContractCompletedChange(player.id, contract.card.id, event.currentTarget.checked)
-                          }
-                        />
-                        <span>{contract.card.name}</span>
-                      </label>
-                    );
-              })}
+              {player.contracts.map((contract) => (
+                <div
+                  className={`contract-status-chip ${contract.completed ? "completed" : ""}`}
+                  key={contract.card.id}
+                  title={contract.card.name}
+                >
+                  <span>{contract.card.name}</span>
+                  <small>{contract.completed ? "Done" : "Pending"}</small>
+                </div>
+              ))}
             </div>
           )}
         </article>

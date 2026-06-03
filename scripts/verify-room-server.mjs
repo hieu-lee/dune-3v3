@@ -1137,147 +1137,22 @@ try {
   );
 
   const contractRoom = await jsonFetch("/api/rooms", { method: "POST" });
-  assert.equal(contractRoom.response.status, 201, "Contract fallback room creation should succeed");
+  assert.equal(contractRoom.response.status, 201, "Contract selection room creation should succeed");
   const contractRoomRecord = server.rooms.get(contractRoom.body.roomId);
-  assert.ok(contractRoomRecord, "Contract fallback room should be stored in memory");
+  assert.ok(contractRoomRecord, "Contract selection room should be stored in memory");
   const fallbackContractOwnerId = "p4";
-  const fallbackContract = { id: "contract-room-verifier-manual", name: "Verifier Manual Contract" };
-  const automatedContract = contractByName("Sardaukar II");
+  const fallbackContract = { id: "contract-room-verifier-offer", name: "Verifier Contract" };
   contractRoomRecord.game = {
     ...contractRoomRecord.game,
     pendingAction: undefined,
     pendingQueue: [],
-    players: contractRoomRecord.game.players.map((candidate) =>
-      candidate.id === fallbackContractOwnerId
-        ? {
-            ...candidate,
-            contracts: [
-              { card: fallbackContract, completed: false, takenRound: contractRoomRecord.game.round },
-              { card: automatedContract, completed: false, takenRound: contractRoomRecord.game.round },
-            ],
-          }
-        : { ...candidate, contracts: [] }
-    ),
   };
   const contractOwnerClaim = await jsonFetch(`/api/rooms/${contractRoom.body.roomId}/seats/${fallbackContractOwnerId}/claim`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ name: "Contract Owner" }),
   });
-  assert.equal(contractOwnerClaim.response.status, 200, "Fallback contract owner should be claimable");
-  const contractWrongClaim = await jsonFetch(`/api/rooms/${contractRoom.body.roomId}/seats/p1/claim`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ name: "Wrong Contract Player" }),
-  });
-  assert.equal(contractWrongClaim.response.status, 200, "Wrong fallback contract player should be claimable");
-  const wrongContractCompletion = await roomAction(
-    contractRoom.body.roomId,
-    contractWrongClaim.body.token,
-    contractWrongClaim.body.snapshot.version,
-    {
-      kind: "set-contract-completed",
-      playerId: fallbackContractOwnerId,
-      contractId: fallbackContract.id,
-      completed: true,
-    },
-  );
-  assert.equal(wrongContractCompletion.response.status, 403, "Only the contract owner should mark fallback completion");
-  const automatedContractCompletion = await roomAction(
-    contractRoom.body.roomId,
-    contractOwnerClaim.body.token,
-    contractWrongClaim.body.snapshot.version,
-    {
-      kind: "set-contract-completed",
-      playerId: fallbackContractOwnerId,
-      contractId: automatedContract.id,
-      completed: true,
-    },
-  );
-  assert.equal(automatedContractCompletion.response.status, 409, "Automated CHOAM contracts should not be manually marked online");
-  contractRoomRecord.version += 1;
-  contractRoomRecord.game = {
-    ...contractRoomRecord.game,
-    pendingAction: { kind: "maker-choice", ownerId: fallbackContractOwnerId, source: "Verifier Maker Choice" },
-    pendingQueue: [],
-  };
-  const lockedContractCompletion = await roomAction(
-    contractRoom.body.roomId,
-    contractOwnerClaim.body.token,
-    contractRoomRecord.version,
-    {
-      kind: "set-contract-completed",
-      playerId: fallbackContractOwnerId,
-      contractId: fallbackContract.id,
-      completed: true,
-    },
-  );
-  assert.equal(lockedContractCompletion.response.status, 409, "Fallback CHOAM completion should wait for table-locking pending actions");
-  contractRoomRecord.version += 1;
-  contractRoomRecord.game = {
-    ...contractRoomRecord.game,
-    pendingAction: undefined,
-    pendingQueue: [],
-  };
-  const fallbackContractCompletion = await roomAction(
-    contractRoom.body.roomId,
-    contractOwnerClaim.body.token,
-    contractRoomRecord.version,
-    {
-      kind: "set-contract-completed",
-      playerId: fallbackContractOwnerId,
-      contractId: fallbackContract.id,
-      completed: true,
-    },
-  );
-  assert.equal(fallbackContractCompletion.response.status, 200, "Fallback CHOAM completion should resolve through room actions");
-  assert.equal(
-    player(fallbackContractCompletion.body.snapshot, fallbackContractOwnerId).contracts
-      .find((contract) => contract.card.id === fallbackContract.id)?.completed,
-    true,
-    "Room fallback CHOAM completion should update authoritative contract state",
-  );
-  const fallbackContractReopen = await roomAction(
-    contractRoom.body.roomId,
-    contractOwnerClaim.body.token,
-    fallbackContractCompletion.body.snapshot.version,
-    {
-      kind: "set-contract-completed",
-      playerId: fallbackContractOwnerId,
-      contractId: fallbackContract.id,
-      completed: false,
-    },
-  );
-  assert.equal(fallbackContractReopen.response.status, 200, "Fallback CHOAM completion should be correctable online");
-  assert.equal(
-    player(fallbackContractReopen.body.snapshot, fallbackContractOwnerId).contracts
-      .find((contract) => contract.card.id === fallbackContract.id)?.completed,
-    false,
-    "Room fallback CHOAM correction should reopen the contract",
-  );
-  contractRoomRecord.version += 1;
-  contractRoomRecord.game = {
-    ...contractRoomRecord.game,
-    phase: "finished",
-  };
-  const finishedContractVersion = contractRoomRecord.version;
-  const finishedContractCompletion = await roomAction(
-    contractRoom.body.roomId,
-    contractOwnerClaim.body.token,
-    finishedContractVersion,
-    {
-      kind: "set-contract-completed",
-      playerId: fallbackContractOwnerId,
-      contractId: fallbackContract.id,
-      completed: true,
-    },
-  );
-  assert.equal(finishedContractCompletion.response.status, 409, "Finished rooms should not allow CHOAM completion edits");
-  assert.equal(
-    contractRoomRecord.version,
-    finishedContractVersion,
-    "Rejected finished-room CHOAM completion should not advance the room version",
-  );
+  assert.equal(contractOwnerClaim.response.status, 200, "Contract pending owner should be claimable");
   contractRoomRecord.version += 1;
   contractRoomRecord.game = {
     ...contractRoomRecord.game,

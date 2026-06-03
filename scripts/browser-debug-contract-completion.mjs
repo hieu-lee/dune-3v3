@@ -38,6 +38,7 @@ export async function runContractCompletionSmoke({
   await writeJson("contract-completion-states.json", states);
 
   await setDebugGameAndWait(page, states.immediate);
+  await assertNoContractCompletionCheckboxes(page);
   let pendingText = await page.locator(".pending-panel").innerText();
   assert.match(pendingText, /CHOAM contract/i);
   assert.match(pendingText, /Immediate/i);
@@ -52,10 +53,12 @@ export async function runContractCompletionSmoke({
   assert.equal(ownerAfter.resources.solari, ownerBefore.resources.solari + 2, "Immediate should pay 2 Solari");
   assert.equal(contractByName(ownerAfter, "Immediate").completed, true, "Immediate should complete when taken");
   await assertContractChip(page, "Immediate", "Done");
+  await assertNoContractCompletionCheckboxes(page);
   await screenshot(page, captures, "contract-immediate-after.png");
 
   await setDebugGameAndWait(page, states.researchStation);
   await assertContractChip(page, "Research Station I", "Pending");
+  await assertNoContractCompletionCheckboxes(page);
   await screenshot(page, captures, "contract-board-ready.png");
 
   await page.getByTestId(`hand-card-${agentCard.id}`).click();
@@ -82,11 +85,13 @@ export async function runContractCompletionSmoke({
     "Research Station I troop reward should be available to the same Agent-turn deployment sequence",
   );
   await assertContractChip(page, "Research Station I", "Done");
+  await assertNoContractCompletionCheckboxes(page);
   await screenshot(page, captures, "contract-board-after.png");
 
   await setDebugGameAndWait(page, states.harvest);
   await assertContractChip(page, "Harvest 3+", "Pending");
   await assertContractChip(page, "Harvest 4+", "Pending");
+  await assertNoContractCompletionCheckboxes(page);
   await screenshot(page, captures, "contract-harvest-ready.png");
 
   before = await currentGame(page);
@@ -116,6 +121,7 @@ export async function runContractCompletionSmoke({
   assert.equal(ownerAfter.resources.solari, ownerBefore.resources.solari + 7);
   await assertContractChip(page, "Harvest 3+", "Done");
   await assertContractChip(page, "Harvest 4+", "Done");
+  await assertNoContractCompletionCheckboxes(page);
   await screenshot(page, captures, "contract-harvest-after.png");
 }
 
@@ -221,4 +227,12 @@ async function assertContractChip(page, contractName, stateLabel) {
   assert.equal(await chip.count(), 1, `Expected one automated contract chip for ${contractName}`);
   assert.equal(await chip.locator("input").count(), 0, `${contractName} should not render as a manual checkbox`);
   assert.match(await chip.innerText(), new RegExp(stateLabel, "i"));
+}
+
+async function assertNoContractCompletionCheckboxes(page) {
+  assert.equal(
+    await page.locator(".contract-status-row input").count(),
+    0,
+    "Playable CHOAM contract status should not expose manual completion checkboxes",
+  );
 }

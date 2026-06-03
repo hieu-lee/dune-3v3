@@ -16,7 +16,7 @@ Private web-table implementation for a six-player `Dune: Imperium - Uprising` te
 - Catalog-backed Uprising leader roster with local leader card art.
 - Full leader-card reference modal from each seat.
 - Catalog-backed six-player Conflict deck display with printed battle icons.
-- CHOAM contract bank with two face-up offers, contract-space pickup flow, Shaddam's reserved Sardaukar contracts, and automatic completion for Immediate plus modeled board-space contracts.
+- CHOAM contract bank with two face-up offers, contract-space pickup flow, Shaddam's reserved Sardaukar contracts, and automatic completion for every playable six-player public/reserved contract.
 - Catalog-backed Intrigue deck with physical card draws and active-player references.
 - Team trade flow supports spice, water, Solari, and chosen Intrigue-card transfers.
 - Shaddam Throne Row support for Emperor-board setup, Imperial Tent movement, and Shaddam-team acquisition.
@@ -51,7 +51,7 @@ Private web-table implementation for a six-player `Dune: Imperium - Uprising` te
 - Combat phase opens before Conflict resolution and sequences Combat Intrigue pass/play timing.
 - Endgame phase triggers at 10 VP or an empty Conflict deck and scores battle-icon Endgame Intrigues against matching or wild Conflict cards.
 - Endgame scores Secure Spice Trade, CHOAM Profits, and Shadow Alliance rewards when their printed conditions are met.
-- Modeled CHOAM contracts complete automatically for their printed rewards; remaining unmodeled completion triggers stay available as table-correction checkboxes for contract-based Endgame scoring.
+- Playable CHOAM contracts complete automatically for their printed rewards, and the player panel shows read-only completion chips instead of manual completion checkboxes.
 - Alliance tokens are claimed, transferred, returned, and scored automatically from Faction Influence changes.
 - Reaching or dropping below 2 Influence automatically adds or removes the faction-track VP.
 - Active players can play the Plot side of battle-icon Intrigues for 1 spice during normal play.

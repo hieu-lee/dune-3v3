@@ -59,8 +59,7 @@ function clearEndgameReadyForAction(room, action, actorId, previousPhase) {
   }
   if (
     action?.kind === "score-endgame-icon" ||
-    action?.kind === "score-endgame-conditional" ||
-    action?.kind === "set-contract-completed"
+    action?.kind === "score-endgame-conditional"
   ) {
     room.endgameReady = { ...room.endgameReady, [actorId]: undefined };
   }

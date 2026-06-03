@@ -46,7 +46,6 @@ import {
   scoreEndgameConditionalIntrigue,
   setMakerHooks,
   setShieldWall,
-  setChoamContractCompleted,
 } from "./game/state";
 import type {
   Card,
@@ -287,14 +286,6 @@ export default function App() {
     setSelectedSpaceId(null);
   }
 
-  function updateContractCompleted(playerId: string, contractId: string, completed: boolean) {
-    if (roomSession.inRoom) {
-      void roomSession.sendAction({ kind: "set-contract-completed", playerId, contractId, completed });
-      return;
-    }
-    setGame((current) => setChoamContractCompleted(current, playerId, contractId, completed));
-  }
-
   function updateMakerHooks(playerId: string, hasHooks: boolean) {
     if (roomSession.inRoom) return;
     setGame((current) => {
@@ -444,14 +435,10 @@ export default function App() {
         />
 
         <PlayerColumn
-          claimedPlayerId={roomSession.claimedPlayerId}
-          contractCompletionLocked={tableStateLockedByPendingActions(game) || game.phase === "finished"}
           game={game}
-          roomMode={roomSession.inRoom}
           tableStateLockedByPending={tableStateLockedByPending}
           onOpenLeaderReference={openLeaderReference}
           onMakerHooksChange={updateMakerHooks}
-          onContractCompletedChange={updateContractCompleted}
         />
       </section>
 

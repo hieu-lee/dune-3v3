@@ -38,10 +38,6 @@ import type {
   PlotSummonSandworms,
   RevealDeployOrRetreatTroops,
   RevealLoseInfluenceForIntrigues,
-  RevealPayResourceForHighCouncilSeat,
-  RevealPayResourceForSandworms,
-  RevealPayResourceForStrength,
-  RevealPayResourceForTroops,
   RevealRetreatTroopsForStrength,
   RevealRetreatTroops,
   RevealSpyRecallForIntrigues,
@@ -56,6 +52,13 @@ import type {
   ResourceId,
   Resources,
 } from "./types";
+
+export {
+  resolveRevealPayResourceForHighCouncilSeats,
+  resolveRevealPayResourceForSandworms,
+  resolveRevealPayResourceForStrengths,
+  resolveRevealPayResourceForTroops,
+} from "./effect-reveal-payment-resolver";
 
 function resolvedResourceGain(
   gain: Partial<Record<ResourceId, EffectAmountSpec>> | undefined,
@@ -282,98 +285,6 @@ export function resolveRevealSpyRecallForStrengths(
           source: effect.source,
         };
       });
-  });
-}
-
-export function resolveRevealPayResourceForStrengths(
-  specs: CardEffectSpec[] | undefined,
-  context: GameEffectContext,
-): RevealPayResourceForStrength[] {
-  specs?.forEach(validateSpec);
-  return (specs ?? []).flatMap((spec) => {
-    if (spec.trigger !== "reveal") return [];
-    if (!specApplies(spec, context)) return [];
-    return spec.effects
-      .filter((effect) => effect.kind === "pay-resource-for-strength")
-      .map((effect) => ({
-        selector: effect.selector,
-        resource: effect.resource,
-        cost: amountFor(effect.cost, context.source),
-        strength: amountFor(effect.strength, context.source),
-        optional: true,
-        source: effect.source,
-      }));
-  });
-}
-
-export function resolveRevealPayResourceForTroops(
-  specs: CardEffectSpec[] | undefined,
-  context: GameEffectContext,
-): RevealPayResourceForTroops[] {
-  specs?.forEach(validateSpec);
-  return (specs ?? []).flatMap((spec) => {
-    if (spec.trigger !== "reveal") return [];
-    if (!specApplies(spec, context)) return [];
-    return spec.effects
-      .filter((effect) => effect.kind === "pay-resource-for-troops")
-      .map((effect) => ({
-        selector: effect.selector,
-        resource: effect.resource,
-        cost: amountFor(effect.cost, context.source),
-        troops: amountFor(effect.troops, context.source),
-        recipient: effect.recipient,
-        destination: effect.destination,
-        optional: true,
-        trashSource: effect.trashSource ?? false,
-        source: effect.source,
-      }));
-  });
-}
-
-export function resolveRevealPayResourceForSandworms(
-  specs: CardEffectSpec[] | undefined,
-  context: GameEffectContext,
-): RevealPayResourceForSandworms[] {
-  specs?.forEach(validateSpec);
-  return (specs ?? []).flatMap((spec) => {
-    if (spec.trigger !== "reveal") return [];
-    if (!specApplies(spec, context)) return [];
-    return spec.effects
-      .filter((effect) => effect.kind === "pay-resource-for-sandworms")
-      .map((effect) => ({
-        selector: effect.selector,
-        resource: effect.resource,
-        cost: amountFor(effect.cost, context.source),
-        sandworms: amountFor(effect.sandworms, context.source),
-        recipient: effect.recipient,
-        destination: effect.destination,
-        optional: true,
-        trashSource: effect.trashSource ?? false,
-        persuasionCost: effect.persuasionCost !== undefined ? amountFor(effect.persuasionCost, context.source) : 0,
-        source: effect.source,
-      }));
-  });
-}
-
-export function resolveRevealPayResourceForHighCouncilSeats(
-  specs: CardEffectSpec[] | undefined,
-  context: GameEffectContext,
-): RevealPayResourceForHighCouncilSeat[] {
-  specs?.forEach(validateSpec);
-  return (specs ?? []).flatMap((spec) => {
-    if (spec.trigger !== "reveal") return [];
-    if (!specApplies(spec, context)) return [];
-    return spec.effects
-      .filter((effect) => effect.kind === "pay-resource-for-high-council-seat")
-      .map((effect) => ({
-        selector: effect.selector,
-        resource: effect.resource,
-        cost: amountFor(effect.cost, context.source),
-        optional: true,
-        persuasionCost: effect.persuasionCost === undefined ? 0 : amountFor(effect.persuasionCost, context.source),
-        persuasionReward: effect.persuasionReward === undefined ? 0 : amountFor(effect.persuasionReward, context.source),
-        source: effect.source,
-      }));
   });
 }
 

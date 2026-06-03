@@ -426,6 +426,15 @@ export function agentTrashSourceForTrade(
   ], conditions);
 }
 
+export function agentReturnSourceToHand(
+  options: {
+    source?: string;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return agentPlayEffects([{ kind: "return-source-to-hand", selector: "self", ...options }], conditions);
+}
+
 export function agentTrashSource(
   options: {
     optional?: boolean;

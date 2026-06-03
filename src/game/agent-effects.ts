@@ -87,6 +87,7 @@ export function applyCardAgentEffect(
   sourceIntriguesToDraw?: number;
   targetIntriguesToDraw?: number;
   recalledAgents?: number;
+  returnedSourceToHand?: boolean;
 } {
   const genericEffect = applyGenericCardAgentEffect(card, sourcePlayer, targetPlayer, state, space);
   if (genericEffect) return genericEffect;
@@ -111,6 +112,7 @@ function applyGenericCardAgentEffect(
   sourceIntriguesToDraw?: number;
   targetIntriguesToDraw?: number;
   recalledAgents?: number;
+  returnedSourceToHand?: boolean;
 } | undefined {
   if (!card.effects) return undefined;
   const players = state?.players.map((player) => {
@@ -138,12 +140,15 @@ function applyGenericCardAgentEffect(
   const blocksDeploymentsThisTurn = result.blocksDeploymentsThisTurn;
   const hasSourceResourceGain = hasResourceGain(result.revealGain);
   const hasTargetResourceGain = hasResourceGain(result.activatedAlly.revealGain);
+  const canReturnSourceToHand =
+    result.returnSourceToHand && sourceCardIndexForCurrentAgent(card, sourcePlayer, targetPlayer, space) >= 0;
   if (
     result.cardsToDraw === 0 &&
     result.recalledAgents === 0 &&
     recruitedTroops === 0 &&
     intriguesToDraw === 0 &&
     result.vp === 0 &&
+    !canReturnSourceToHand &&
     !blocksDeploymentsThisTurn &&
     !hasSourceResourceGain &&
     !hasTargetResourceGain
@@ -167,23 +172,65 @@ function applyGenericCardAgentEffect(
   if (result.cardsToDraw > 0) {
     source = drawCards(source, source.hand.length + result.cardsToDraw);
   }
-  if (target.id === source.id) target = source;
   const cardsDrawn = source.hand.length - handBeforeDraw;
+  const sourceCardIndex = sourceCardIndexForCurrentAgent(card, source, targetPlayer, space);
+  const sourceCardInPlay = sourceCardIndex >= 0 ? source.playArea[sourceCardIndex] : undefined;
+  const returnedSourceToHand = result.returnSourceToHand && sourceCardInPlay !== undefined;
+  if (returnedSourceToHand && sourceCardInPlay) {
+    const returnedCard = { ...sourceCardInPlay };
+    delete returnedCard.agentPlacementSpaceId;
+    delete returnedCard.agentPlacementTargetOwnerId;
+    source = {
+      ...source,
+      hand: [...source.hand, returnedCard],
+      playArea: source.playArea.filter((_, index) => index !== sourceCardIndex),
+    };
+  }
+  if (target.id === source.id) target = source;
+  const logResult = returnedSourceToHand ? result : { ...result, returnSourceToHand: false };
   return {
     source,
     target,
-    log: agentEffectLog(card, sourcePlayer, targetPlayer, result, cardsDrawn, sourceRecruitedTroops, targetRecruitedTroops),
+    log: agentEffectLog(card, sourcePlayer, targetPlayer, logResult, cardsDrawn, sourceRecruitedTroops, targetRecruitedTroops),
     recruitedTroops,
     blocksDeploymentsThisTurn,
     sourceSpiceGained: result.revealGain.spice ?? 0,
     sourceIntriguesToDraw: result.intriguesToDraw,
     targetIntriguesToDraw: result.activatedAlly.intriguesToDraw,
     recalledAgents: result.recalledAgents,
+    returnedSourceToHand,
   };
 }
 
 function hasResourceGain(gain: Partial<Resources>) {
   return Object.values(gain).some((amount) => (amount ?? 0) > 0);
+}
+
+function sourceCardIndexForCurrentAgent(
+  card: Card,
+  source: Player,
+  target: Player,
+  space?: Pick<BoardSpace, "id">,
+) {
+  const sameIdMatches = source.playArea
+    .map((candidate, index) => ({ candidate, index }))
+    .filter(({ candidate }) => candidate.id === card.id);
+  if (sameIdMatches.length === 0) return -1;
+
+  const contextualMatches = sameIdMatches.filter(({ candidate }) =>
+    space !== undefined &&
+    candidate.agentPlacementSpaceId === space.id &&
+    candidate.agentPlacementTargetOwnerId === target.id
+  );
+  if (contextualMatches.length === 1) return contextualMatches[0].index;
+
+  if (sameIdMatches.length === 1) {
+    const [match] = sameIdMatches;
+    if (!match.candidate.agentPlacementSpaceId && !match.candidate.agentPlacementTargetOwnerId) {
+      return match.index;
+    }
+  }
+  return -1;
 }
 
 function addResources(resources: Resources, gain: Partial<Resources>): Resources {
@@ -210,6 +257,7 @@ function agentEffectLog(
     recruitText(undefined, sourceRecruitedTroops),
     drawText(result.cardsToDraw, cardsDrawn),
     recallAgentText(result.recalledAgents),
+    returnSourceToHandText(result.returnSourceToHand),
     deploymentBlockText(result.blocksDeploymentsThisTurn),
     playerResourceGainText(targetPlayer, result.activatedAlly.revealGain),
     recruitText(targetPlayer.leader, targetRecruitedTroops),
@@ -225,6 +273,9 @@ function agentEffectSourceLabel(card: Card, result: GameEffectResult, partCount:
     return result.recruitedTroopsSource;
   }
   if (partCount === 1 && result.drawCardsSource && result.cardsToDraw > 0) return result.drawCardsSource;
+  if (partCount === 1 && result.returnSourceToHand) {
+    return result.returnSourceToHandSource ?? card.name;
+  }
   if (partCount === 1 && result.blocksDeploymentsThisTurn && result.deploymentBlockSource) {
     return result.deploymentBlockSource;
   }
@@ -242,6 +293,10 @@ function drawText(cardsToDraw: number, cardsDrawn: number) {
 function recallAgentText(recalledAgents: number) {
   if (recalledAgents === 0) return undefined;
   return `recalls ${recalledAgents === 1 ? "the Agent" : `${recalledAgents} Agents`}`;
+}
+
+function returnSourceToHandText(returnSourceToHand: boolean) {
+  return returnSourceToHand ? "returns this card to hand" : undefined;
 }
 
 function deploymentBlockText(blocksDeploymentsThisTurn: boolean) {

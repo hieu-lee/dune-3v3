@@ -989,6 +989,16 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     validateSourceLabel("trash-source-for-trade source", effect.source);
     return;
   }
+  if (effect.kind === "return-source-to-hand") {
+    if (trigger !== "agent-play") {
+      throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
+    }
+    if (effect.selector !== "self") {
+      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
+    validateSourceLabel("return-source-to-hand source", effect.source);
+    return;
+  }
   if (effect.kind === "block-conflict-deployment") {
     if (trigger !== "agent-play") {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);

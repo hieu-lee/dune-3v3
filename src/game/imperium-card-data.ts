@@ -51,6 +51,7 @@ import {
   treadInDarknessSourceId,
   undercoverAssetSourceId,
   unswervingLoyaltySourceId,
+  weirdingWomanSourceId,
   wheelsWithinWheelsSourceId,
 } from "./card-identifiers";
 import {
@@ -76,6 +77,7 @@ import {
   agentPlaceSpies,
   agentRecallAgent,
   agentRecruitTroops,
+  agentReturnSourceToHand,
   agentSelectTopDeckCards,
   agentTakeContracts,
   agentTrashCards,
@@ -232,6 +234,13 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
       revealGainPersuasion(1),
       revealRecruitTroops(1),
       revealDeployOrRetreatTroops(1, {}, [hasCardTraitInPlay("Faction: Fremen", 2)]),
+    ];
+  }
+  if (card.id === weirdingWomanSourceId) {
+    return [
+      agentReturnSourceToHand({}, [hasCardTraitInPlay("Faction: Bene Gesserit", 2)]),
+      revealGainPersuasion(1),
+      revealGainStrength(1),
     ];
   }
   if (card.id === interstellarTradeSourceId) {
@@ -766,6 +775,9 @@ function imperiumPlayText(card: HubCard) {
   }
   if (card.id === unswervingLoyaltySourceId) {
     return "No agent icons.";
+  }
+  if (card.id === weirdingWomanSourceId) {
+    return "If you have another Bene Gesserit card in play, return this card from play to your hand.";
   }
   return summarizeAttributes(card);
 }

@@ -487,6 +487,7 @@ export type GameEffectSpec =
       partnerLocked?: boolean;
       source?: string;
     }
+  | { kind: "return-source-to-hand"; selector: PlayerSelector; source?: string }
   | { kind: "block-conflict-deployment"; selector: PlayerSelector; source?: string }
   | { kind: "move-card-to-throne-row"; selector: PlayerSelector; source?: string }
   | { kind: "recall-agent"; selector: PlayerSelector; source?: string }

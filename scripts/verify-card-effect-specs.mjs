@@ -200,6 +200,7 @@ try {
   const theacherousManeuver = data.imperiumDeck.find((card) => card.name === "Theacherous Maneuver");
   const undercoverAsset = data.imperiumDeck.find((card) => card.name === "Undercover Asset");
   const unswervingLoyalty = data.imperiumDeck.find((card) => card.name === "Unswerving Loyalty");
+  const weirdingWoman = data.imperiumDeck.find((card) => card.name === "Weirding Woman");
   const guildEnvoy = data.imperiumDeck.find((card) => card.name === "Guild Envoy");
   const guildSpy = data.imperiumDeck.find((card) => card.name === "Guild Spy");
   const branchingPath = data.imperiumDeck.find((card) => card.name === "Branching Path");
@@ -315,6 +316,7 @@ try {
     theacherousManeuver &&
     undercoverAsset &&
     unswervingLoyalty &&
+    weirdingWoman &&
     guildEnvoy &&
     guildSpy &&
     branchingPath &&
@@ -3496,6 +3498,28 @@ try {
     "In High Places play text should expose its conditional Agent draw and spy placement",
   );
   assert.ok(
+    weirdingWoman.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.conditions?.some((condition) =>
+        condition.kind === "has-card-trait-in-play" &&
+        condition.trait === "Faction: Bene Gesserit" &&
+        condition.count === 2
+      ) &&
+      spec.effects.some((effect) => effect.kind === "return-source-to-hand" && effect.selector === "self")
+    ),
+    "Weirding Woman should use a typed another-Bene-Gesserit Agent source return spec",
+  );
+  assert.ok(
+    hasRevealEffect(weirdingWoman, (effect) => effect.kind === "gain-persuasion" && effect.selector === "self" && effect.amount === 1) &&
+      hasRevealEffect(weirdingWoman, (effect) => effect.kind === "gain-strength" && effect.selector === "self" && effect.amount === 1),
+    "Weirding Woman should carry typed Reveal persuasion and strength specs",
+  );
+  assert.equal(
+    weirdingWoman.play,
+    "If you have another Bene Gesserit card in play, return this card from play to your hand.",
+    "Weirding Woman play text should expose its conditional Agent return",
+  );
+  assert.ok(
     spiceMustFlow.effects?.some((spec) =>
       spec.trigger === "acquire" &&
       spec.effects.some((effect) => effect.kind === "gain-vp" && effect.selector === "self" && effect.amount === 1)
@@ -3713,6 +3737,7 @@ try {
       "Theacherous Maneuver",
       "Tread in Darkness",
       "Undercover Asset",
+      "Weirding Woman",
       "Wheels Within Wheels",
     ],
     "Unexpected cards with declarative Agent-play specs",
@@ -3756,6 +3781,7 @@ try {
     publicSpectacle,
     theacherousManeuver,
     undercoverAsset,
+    weirdingWoman,
   ]) {
     assert.ok(
       card.effects?.some((spec) => spec.trigger === "reveal"),
@@ -10081,6 +10107,90 @@ try {
     /Invalid opponents-discard-cards source ""/,
     "Opponent-discard specs should reject empty source labels",
   );
+  const returnSourceToHandEffectCard = {
+    ...convincingArgument,
+    id: "effect-spec-return-source-to-hand-card",
+    name: "Effect Spec Return Source To Hand",
+    effects: [agentSpec([{ kind: "return-source-to-hand", selector: "self", source: "Return Test" }])],
+  };
+  const returnSourceToHandApplied = state.applyCardAgentEffect(
+    returnSourceToHandEffectCard,
+    {
+      ...p2,
+      hand: [],
+      playArea: [{ ...returnSourceToHandEffectCard, agentPlacementSpaceId: arrakeen.id, agentPlacementTargetOwnerId: p2.id }],
+    },
+    p2,
+    undefined,
+    arrakeen,
+  );
+  assert.equal(returnSourceToHandApplied.returnedSourceToHand, true, "Return-source specs should expose the moved source card");
+  assert.equal(returnSourceToHandApplied.source.hand.at(-1)?.id, returnSourceToHandEffectCard.id);
+  assert.equal(
+    returnSourceToHandApplied.source.hand.at(-1)?.agentPlacementSpaceId,
+    undefined,
+    "Returned source cards should not keep stale Agent placement metadata in hand",
+  );
+  assert.equal(
+    returnSourceToHandApplied.source.playArea.some((card) => card.id === returnSourceToHandEffectCard.id),
+    false,
+    "Return-source specs should remove the card from play",
+  );
+  assert.match(returnSourceToHandApplied.log ?? "", /Return Test: returns this card to hand/);
+  const mismatchedReturnSourceToHandApplied = state.applyCardAgentEffect(
+    returnSourceToHandEffectCard,
+    {
+      ...p2,
+      hand: [],
+      playArea: [{ ...returnSourceToHandEffectCard, agentPlacementSpaceId: shipping.id, agentPlacementTargetOwnerId: p2.id }],
+    },
+    p2,
+    undefined,
+    arrakeen,
+  );
+  assert.equal(
+    mismatchedReturnSourceToHandApplied.returnedSourceToHand,
+    undefined,
+    "Return-source specs should not move a sole same-id card from a different Agent placement",
+  );
+  assert.equal(
+    mismatchedReturnSourceToHandApplied.source.playArea.some((card) => card.id === returnSourceToHandEffectCard.id),
+    true,
+    "Return-source specs should leave mismatched placement cards in play",
+  );
+  const revealReturnSourceToHandCard = {
+    ...convincingArgument,
+    id: "effect-spec-reveal-return-source-to-hand-card",
+    name: "Effect Spec Reveal Return Source To Hand",
+    effects: [revealSpec([{ kind: "return-source-to-hand", selector: "self" }])],
+  };
+  assert.throws(
+    () => turnActions.revealTurnPlan({ ...p2, hand: [revealReturnSourceToHandCard], highCouncilSeat: false }),
+    /Unsupported effect "return-source-to-hand" for reveal/,
+    "Return-source specs should stay in Agent play",
+  );
+  const invalidReturnSourceToHandSelectorCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-return-source-to-hand-selector-card",
+    name: "Effect Spec Invalid Return Source To Hand Selector",
+    effects: [agentSpec([{ kind: "return-source-to-hand", selector: "activated-ally" }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidReturnSourceToHandSelectorCard, p4, p2),
+    /Unsupported effect selector "activated-ally" for return-source-to-hand/,
+    "Return-source specs should reject activated Ally selectors",
+  );
+  const invalidReturnSourceToHandSourceCard = {
+    ...convincingArgument,
+    id: "effect-spec-invalid-return-source-to-hand-source-card",
+    name: "Effect Spec Invalid Return Source To Hand Source",
+    effects: [agentSpec([{ kind: "return-source-to-hand", selector: "self", source: "" }])],
+  };
+  assert.throws(
+    () => state.applyCardAgentEffect(invalidReturnSourceToHandSourceCard, p2, p2),
+    /Invalid return-source-to-hand source ""/,
+    "Return-source specs should reject empty source labels",
+  );
   const revealDeploymentBlockCard = {
     ...convincingArgument,
     id: "effect-spec-reveal-deployment-block-card",
@@ -11303,6 +11413,180 @@ try {
     { ...game, spyPosts: { [secrets.id]: p4.id, [highCouncil.id]: "p6" }, sharedSpyPosts: {} },
   );
   assert.equal(teammateSpyReveal.persuasion, 1, "Teammate spy posts should not count for owner-scoped reveal specs");
+
+  const weirdingReturnFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 1,
+    deck: [],
+    discard: [],
+    garrison: 0,
+    hand: [weirdingWoman],
+    playArea: [beneGesseritOperative],
+    resources: { solari: 0, spice: 0, water: 0 },
+  }));
+  const weirdingReturned = turnActions.placeAgentAction(weirdingReturnFixture, {
+    commanderTargets: {},
+    selectedCard: weirdingWoman,
+    selectedSpace: imperialBasin,
+  });
+  const weirdingReturnOwner = playerById(weirdingReturned, p2.id);
+  assert.equal(
+    weirdingReturnOwner.hand.some((card) => card.id === weirdingWoman.id),
+    true,
+    "Weirding Woman should return to hand with another Bene Gesserit card in play",
+  );
+  assert.equal(
+    weirdingReturnOwner.hand.find((card) => card.id === weirdingWoman.id)?.agentPlacementSpaceId,
+    undefined,
+    "Returned Weirding Woman should not keep stale Agent placement metadata in hand",
+  );
+  assert.equal(
+    weirdingReturnOwner.playArea.some((card) => card.id === weirdingWoman.id),
+    false,
+    "Weirding Woman should leave play after its typed return resolves",
+  );
+  assert.equal(
+    weirdingReturnOwner.playArea.some((card) => card.id === beneGesseritOperative.id),
+    true,
+    "Weirding Woman should not move the supporting Bene Gesserit card",
+  );
+  assert.equal(weirdingReturned.spaces[imperialBasin.id], p2.id, "Returning Weirding Woman should leave the sent Agent on the board space");
+  assert.match(weirdingReturned.log.join("\n"), /Weirding Woman: returns this card to hand/);
+
+  const duplicateHandWeirdingWoman = { ...weirdingWoman };
+  const weirdingDuplicateHandFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 1,
+    deck: [],
+    discard: [],
+    garrison: 0,
+    hand: [weirdingWoman, duplicateHandWeirdingWoman],
+    playArea: [beneGesseritOperative],
+    resources: { solari: 0, spice: 0, water: 0 },
+  }));
+  const weirdingDuplicateHandReturned = turnActions.placeAgentAction(weirdingDuplicateHandFixture, {
+    commanderTargets: {},
+    selectedCard: weirdingWoman,
+    selectedSpace: imperialBasin,
+  });
+  const weirdingDuplicateHandOwner = playerById(weirdingDuplicateHandReturned, p2.id);
+  assert.equal(
+    weirdingDuplicateHandOwner.hand.filter((card) => card.id === weirdingWoman.id).length,
+    2,
+    "Agent placement should remove only the selected Weirding Woman hand copy before returning the played copy",
+  );
+  assert.equal(
+    weirdingDuplicateHandOwner.playArea.some((card) => card.id === weirdingWoman.id),
+    false,
+    "Duplicate hand Weirding Woman placement should still return the played copy from play",
+  );
+
+  const olderWeirdingWomanInPlay = {
+    ...weirdingWoman,
+    agentPlacementSpaceId: shipping.id,
+    agentPlacementTargetOwnerId: p2.id,
+  };
+  const weirdingDuplicateFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 1,
+    deck: [],
+    discard: [],
+    garrison: 0,
+    hand: [weirdingWoman],
+    playArea: [olderWeirdingWomanInPlay, beneGesseritOperative],
+    resources: { solari: 0, spice: 0, water: 0 },
+  }));
+  const weirdingDuplicateReturned = turnActions.placeAgentAction(weirdingDuplicateFixture, {
+    commanderTargets: {},
+    selectedCard: weirdingWoman,
+    selectedSpace: imperialBasin,
+  });
+  const weirdingDuplicateOwner = playerById(weirdingDuplicateReturned, p2.id);
+  assert.equal(
+    weirdingDuplicateOwner.hand.filter((card) => card.id === weirdingWoman.id).length,
+    1,
+    "Weirding Woman should return the newly played source card when another same-id copy is already in play",
+  );
+  assert.equal(
+    weirdingDuplicateOwner.playArea.some((card) => card.id === weirdingWoman.id && card.agentPlacementSpaceId === shipping.id),
+    true,
+    "Return-source-to-hand should leave older same-id play-area cards in play",
+  );
+  assert.equal(
+    weirdingDuplicateOwner.playArea.some((card) => card.id === weirdingWoman.id && card.agentPlacementSpaceId === imperialBasin.id),
+    false,
+    "Return-source-to-hand should remove the current Agent placement copy, not an older same-id copy",
+  );
+
+  const commanderOlderWeirdingWomanInPlay = {
+    ...weirdingWoman,
+    agentPlacementSpaceId: shipping.id,
+    agentPlacementTargetOwnerId: p6.id,
+  };
+  const commanderWeirdingFixture = withActivePlayer(game, p4.id, () => ({
+    agentsReady: 1,
+    deck: [],
+    discard: [],
+    garrison: 0,
+    hand: [weirdingWoman],
+    playArea: [commanderOlderWeirdingWomanInPlay, beneGesseritOperative],
+    resources: { solari: 0, spice: 0, water: 0 },
+  }));
+  const commanderWeirdingReturned = turnActions.placeAgentAction(commanderWeirdingFixture, {
+    commanderTargets: { [p4.id]: p2.id },
+    selectedCard: weirdingWoman,
+    selectedSpace: imperialBasin,
+  });
+  const commanderWeirdingOwner = playerById(commanderWeirdingReturned, p4.id);
+  assert.equal(
+    commanderWeirdingOwner.hand.filter((card) => card.id === weirdingWoman.id).length,
+    1,
+    "Commander Weirding Woman should return the newly played source card to the Commander hand",
+  );
+  assert.equal(
+    commanderWeirdingOwner.hand.find((card) => card.id === weirdingWoman.id)?.agentPlacementTargetOwnerId,
+    undefined,
+    "Commander returned Weirding Woman should clear activated-Ally placement metadata",
+  );
+  assert.equal(
+    commanderWeirdingOwner.playArea.some((card) => card.id === weirdingWoman.id && card.agentPlacementTargetOwnerId === p6.id),
+    true,
+    "Commander return-source-to-hand should leave older same-id cards with different target metadata in play",
+  );
+  assert.equal(
+    commanderWeirdingOwner.playArea.some((card) => card.id === weirdingWoman.id && card.agentPlacementTargetOwnerId === p2.id),
+    false,
+    "Commander return-source-to-hand should remove the current activated-Ally target copy",
+  );
+  assert.equal(
+    commanderWeirdingReturned.spaces[imperialBasin.id],
+    p2.id,
+    "Commander Weirding Woman should leave the sent Agent assigned to the activated Ally's board space",
+  );
+
+  const weirdingUnqualifiedFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 1,
+    deck: [],
+    discard: [],
+    garrison: 0,
+    hand: [weirdingWoman],
+    playArea: [],
+    resources: { solari: 0, spice: 0, water: 0 },
+  }));
+  const weirdingUnqualified = turnActions.placeAgentAction(weirdingUnqualifiedFixture, {
+    commanderTargets: {},
+    selectedCard: weirdingWoman,
+    selectedSpace: imperialBasin,
+  });
+  const weirdingUnqualifiedOwner = playerById(weirdingUnqualified, p2.id);
+  assert.equal(
+    weirdingUnqualifiedOwner.hand.some((card) => card.id === weirdingWoman.id),
+    false,
+    "Weirding Woman should leave hand when the Bene Gesserit condition is not met",
+  );
+  assert.equal(
+    weirdingUnqualifiedOwner.playArea.some((card) => card.id === weirdingWoman.id),
+    true,
+    "Weirding Woman should remain in play when the Bene Gesserit condition is not met",
+  );
+  assert.doesNotMatch(weirdingUnqualified.log.join("\n"), /Weirding Woman: returns this card to hand/);
 
   const prepareDrawSource = {
     ...p2,

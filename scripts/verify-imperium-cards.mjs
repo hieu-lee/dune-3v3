@@ -206,6 +206,40 @@ try {
   );
   assert.match(beneGesseritOperative.play, /place 1 spy/i);
   assert.match(beneGesseritOperative.reveal, /two or more spies.*\+2 persuasion/i);
+  const weirdingWoman = data.imperiumDeck.find((card) => card.name === "Weirding Woman");
+  assert.ok(weirdingWoman, "Imperium deck should include Weirding Woman");
+  assert.equal(weirdingWoman.cost, 1, "Weirding Woman should cost 1 persuasion");
+  assert.deepEqual(weirdingWoman.icons, ["city", "spice"], "Weirding Woman should reach City and Spice Trade spaces");
+  assert.equal(
+    weirdingWoman.traits.includes("Faction: Bene Gesserit"),
+    true,
+    "Weirding Woman should normalize its Bene Gesserit trait",
+  );
+  assert.ok(
+    weirdingWoman.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.conditions?.some((condition) =>
+        condition.kind === "has-card-trait-in-play" &&
+        condition.trait === "Faction: Bene Gesserit" &&
+        condition.count === 2
+      ) &&
+      spec.effects.some((effect) => effect.kind === "return-source-to-hand" && effect.selector === "self")
+    ),
+    "Weirding Woman should use a structured another-Bene-Gesserit Agent return effect",
+  );
+  assert.ok(
+    weirdingWoman.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.effects.some((effect) => effect.kind === "gain-persuasion" && effect.amount === 1)
+    ) &&
+    weirdingWoman.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.effects.some((effect) => effect.kind === "gain-strength" && effect.amount === 1)
+    ),
+    "Weirding Woman should carry typed Reveal persuasion and strength effects",
+  );
+  assert.match(weirdingWoman.play, /another Bene Gesserit card.*return this card/i);
+  assert.equal(weirdingWoman.reveal, "+1 persuasion and +1 strength.");
   const inHighPlaces = data.imperiumDeck.find((card) => card.name === "In High Places");
   assert.ok(inHighPlaces, "Imperium deck should include In High Places");
   assert.ok(

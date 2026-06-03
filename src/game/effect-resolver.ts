@@ -418,6 +418,16 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
   if (effect.kind === "trash-source-for-trade") {
     return result;
   }
+  if (effect.kind === "return-source-to-hand") {
+    if (effect.selector !== "self") {
+      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
+    return {
+      ...result,
+      returnSourceToHand: true,
+      returnSourceToHandSource: effect.source ?? result.returnSourceToHandSource,
+    };
+  }
   if (effect.kind === "block-conflict-deployment") {
     return {
       ...result,
@@ -533,6 +543,8 @@ function mergeEffectResult(result: GameEffectResult, next: GameEffectResult): Ga
       next.recalledAgents > 0,
       next.recalledAgentSource,
     ),
+    returnSourceToHand: result.returnSourceToHand || next.returnSourceToHand,
+    returnSourceToHandSource: result.returnSourceToHandSource ?? next.returnSourceToHandSource,
     removeShieldWall: result.removeShieldWall || next.removeShieldWall,
     revealGain: Object.entries(next.revealGain).reduce(
       (gain, [resource, amount]) => addRevealGain(gain, resource as ResourceId, amount ?? 0),
@@ -613,6 +625,7 @@ function legacyRevealResult(card: Card): GameEffectResult {
     recruitedTroops: 0,
     persuasion: card.persuasion,
     recalledAgents: 0,
+    returnSourceToHand: false,
     removeShieldWall: false,
     revealGain: card.revealGain ? { ...card.revealGain } : {},
     spentResources: {},
@@ -654,6 +667,7 @@ function legacyAcquireResult(card: Card): GameEffectResult {
     recruitedTroops: 0,
     persuasion: 0,
     recalledAgents: 0,
+    returnSourceToHand: false,
     removeShieldWall: false,
     revealGain: {},
     spentResources: {},

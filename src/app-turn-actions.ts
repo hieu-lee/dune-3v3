@@ -209,7 +209,13 @@ export function placeAgentAction(
       ? activatedAllyIdFor(player, current.players, commanderTargets)
       : player.id;
   const target = current.players.find((candidate) => candidate.id === targetId) ?? player;
-  const hand = player.hand.filter((card) => card.id !== selectedCard.id);
+  const selectedCardIndexByReference = player.hand.findIndex((card) => card === selectedCard);
+  const selectedCardIndex = selectedCardIndexByReference >= 0
+    ? selectedCardIndexByReference
+    : player.hand.findIndex((card) => card.id === selectedCard.id);
+  const hand = selectedCardIndex >= 0
+    ? player.hand.filter((_, index) => index !== selectedCardIndex)
+    : player.hand;
   const playedCard = {
     ...selectedCard,
     agentPlacementSpaceId: selectedSpace.id,

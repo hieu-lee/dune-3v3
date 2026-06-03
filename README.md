@@ -93,7 +93,7 @@ Private web-table implementation for a six-player `Dune: Imperium - Uprising` te
 - Catalog-backed board-space art on matching placement tiles.
 - Printed reveal adjustments and spy-post targeting for cards whose text is not reducible to a fixed number.
 - Remaining printed edge cases are being reduced into structured card, Conflict, and reserve effects as they are modeled.
-- Multiplayer room mode supports server-authoritative Shaddam setup Throne Row, active-player Agent placement, Agent turn end, Reveal, card acquisition, Reveal turn end, Plot Intrigue dispatch, Combat Intrigue pass/play, Endgame Intrigue scoring/finalization, most generated pending choices, file-backed restart recovery, and six-browser room smokes covering all seats, reconnect, permissions, pending resolution, Endgame readiness, and a natural marathon with deterministic Agent placements, Reveal buys, and Ally troop deployments through Conflict-deck exhaustion.
+- Multiplayer room mode supports server-authoritative Shaddam setup Throne Row, active-player Agent placement, Agent turn end, Reveal, card acquisition, Reveal turn end, Plot Intrigue dispatch, Combat Intrigue pass/play, Endgame Intrigue scoring/finalization, most generated pending choices, file-backed restart recovery, and six-browser room smokes covering all seats, reconnect, permissions, pending resolution, Endgame readiness, and a natural marathon with deterministic Agent placements, Reveal buys, Ally troop deployments, and asserted final team scoring through Conflict-deck exhaustion.
 - Asset pipeline conventions for owned scans or public reference images.
 
 ## Run
@@ -148,7 +148,7 @@ Use `pnpm run debug:room:smoke` after room/session changes. It starts the privat
 
 Use `pnpm run debug:room:complete` when room/session changes affect full-table coordination. It opens six isolated browser contexts, claims all six seats, verifies hidden projections and turn permissions, reloads a claimed seat, resolves setup, advances a room turn, resolves a server-backed pending choice, and has all six seats mark Endgame ready until the shared room finishes.
 
-Use `pnpm run debug:room:marathon` for the heavier six-browser natural room marathon. It claims all six seats, verifies private projections, resolves setup, places legal Agents when available, buys legal cards during Reveal turns, deploys legal troops for all four Ally seats into the Conflict, resolves generated pending actions, advances Reveal/combat/Endgame flow until the Conflict deck naturally empties, finalizes all seats, and writes screenshots, state JSON, console logs, request failures, action logs, and `summary.json` under `artifacts/qa/browser-room-marathon`.
+Use `pnpm run debug:room:marathon` for the heavier six-browser natural room marathon. It claims all six seats, verifies private projections, resolves setup, places legal Agents when available, buys legal cards during Reveal turns, deploys legal troops for all four Ally seats into the Conflict, resolves generated pending actions, advances Reveal/combat/Endgame flow until the Conflict deck naturally empties, finalizes all seats, asserts the final team-score result, and writes screenshots, state JSON, console logs, request failures, action logs, and `summary.json` under `artifacts/qa/browser-room-marathon`.
 
 See [docs/browser-testing-pipeline.md](docs/browser-testing-pipeline.md) for the full IAB-free browser testing workflow, subagent instructions, artifact contract, and scenario-extension checklist.
 

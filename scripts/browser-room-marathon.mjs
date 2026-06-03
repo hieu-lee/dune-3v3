@@ -51,7 +51,7 @@ const {
   recallableSpySupplySpaces,
   trashableCardsForPending,
 } = await server.ssrLoadModule("/src/game/state.ts");
-const { boardSpaces } = await server.ssrLoadModule("/src/game/data.ts");
+const { boardSpaces, teams } = await server.ssrLoadModule("/src/game/data.ts");
 const { mainBoardInfluenceChoices } = await server.ssrLoadModule("/src/game/influence-choices.ts");
 
 function observePage(page) {
@@ -226,6 +226,27 @@ function firstChoiceId(choices) {
 
 function firstFaction(choices) {
   return choices?.[0]?.faction ?? choices?.[0] ?? mainBoardInfluenceChoices[0];
+}
+
+function finalTeamScores(game) {
+  return {
+    muaddib: game.players
+      .filter((player) => player.team === "muaddib")
+      .reduce((sum, player) => sum + player.vp, 0),
+    shaddam: game.players
+      .filter((player) => player.team === "shaddam")
+      .reduce((sum, player) => sum + player.vp, 0),
+  };
+}
+
+function expectedWinningTeam(teamScores) {
+  if (teamScores.muaddib === teamScores.shaddam) return undefined;
+  return teamScores.muaddib > teamScores.shaddam ? "muaddib" : "shaddam";
+}
+
+function expectedFinalScoreLog(teamScores, winningTeam) {
+  if (!winningTeam) return `The game ends tied at ${teamScores.muaddib}-${teamScores.shaddam}.`;
+  return `${teams[winningTeam].name} wins ${Math.max(teamScores.muaddib, teamScores.shaddam)}-${Math.min(teamScores.muaddib, teamScores.shaddam)}.`;
 }
 
 function pendingOwnerId(room, pending, command) {
@@ -687,6 +708,11 @@ try {
   assert.equal(finished.phase, "finished", "Marathon should finish through normal room actions");
   assert.equal(finished.conflictDeck.length, 0, "Marathon should naturally empty the Conflict deck");
   assert.ok(finished.round >= 9, "Marathon should reach the late-game round count");
+  const teamScores = finalTeamScores(finished);
+  const winningTeam = expectedWinningTeam(teamScores);
+  const finalScoreLog = expectedFinalScoreLog(teamScores, winningTeam);
+  assert.equal(finished.winningTeam, winningTeam, "Marathon should finish with a winner derived from summed team VP");
+  assert.equal(finished.log[0], finalScoreLog, "Marathon should write the final team-score result to the game log");
   assert.ok(agentPlacements >= 6, "Marathon should exercise repeated online Agent placement");
   assert.equal(agentPlayerIds.length, seats.length, "Marathon should exercise online Agent placement for all six seats");
   assert.ok(buyActions >= 6, "Marathon should exercise repeated online card buying");
@@ -711,6 +737,9 @@ try {
     finalPhase: finished.phase,
     finalRound: finished.round,
     finalConflictDeckCount: finished.conflictDeck.length,
+    finalTeamScores: teamScores,
+    finalWinningTeam: finished.winningTeam ?? null,
+    finalScoreLog,
     steps,
     agentPlacements,
     agentPlayerIds,
@@ -733,6 +762,8 @@ try {
   console.log("browser room marathon passed");
   console.log(`claimed seats: ${summary.claimedSeats.length}`);
   console.log(`final round: ${summary.finalRound}`);
+  console.log(`final team scores: ${JSON.stringify(summary.finalTeamScores)}`);
+  console.log(`final winning team: ${summary.finalWinningTeam ?? "tie"}`);
   console.log(`agent placements: ${summary.agentPlacements}`);
   console.log(`agent placement seats: ${summary.agentPlayerIds.length}`);
   console.log(`card buys: ${summary.buyActions}`);

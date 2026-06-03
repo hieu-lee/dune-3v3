@@ -35,12 +35,15 @@ const server = await createRoomServer({ port: 0, log: false, storageFile: join(o
 const browser = await chromium.launch({ headless: true });
 const {
   canPay,
+  discardCardForDrawChoices,
   effectiveCost,
   iconCanReach,
   canMoveCardToThroneRow,
   endgameBattleIconChoices,
   endgameConditionalIntrigueChoices,
+  placeableSpySpaces,
   playerTroopSupply,
+  recallableSpySupplySpaces,
   trashableCardsForPending,
 } = await server.ssrLoadModule("/src/game/state.ts");
 const { boardSpaces } = await server.ssrLoadModule("/src/game/data.ts");
@@ -188,6 +191,7 @@ function assertRoomPrivacy(game, viewerId) {
 async function assertConverged(roomId, clients) {
   const room = roomRecord(roomId);
   const expected = {
+    version: room.version,
     phase: room.game.phase,
     round: room.game.round,
     activeSeat: room.game.activeSeat,
@@ -195,9 +199,12 @@ async function assertConverged(roomId, clients) {
   };
   await Promise.all(clients.map(({ page }) =>
     page.waitForFunction(
-      ({ phase, round, activeSeat, pendingKind }) => {
+      ({ version, phase, round, activeSeat, pendingKind }) => {
+        const snapshot = window.__DUNE_DEBUG__?.getRoomSnapshot?.();
         const game = window.__DUNE_DEBUG__?.getGame?.();
-        return game?.phase === phase &&
+        return snapshot?.version === version &&
+          JSON.stringify(snapshot.game) === JSON.stringify(game) &&
+          game?.phase === phase &&
           game.round === round &&
           game.activeSeat === activeSeat &&
           game.pendingAction?.kind === pendingKind;
@@ -265,6 +272,42 @@ function legalAgentPlacement(game, player) {
   return undefined;
 }
 
+function acquisitionCost(player, card, source) {
+  const baseCost = card.cost ?? 0;
+  return source === "manipulated" ? Math.max(0, baseCost - 1) : baseCost;
+}
+
+function legalBuyAction(game, player) {
+  if (!player.revealed || game.pendingAction || game.pendingQueue.length > 0) return undefined;
+  const candidates = [
+    ...player.manipulatedCards.map((card) => ({ card, source: "manipulated" })),
+    ...(player.team === "shaddam" ? game.throneRow.map((card) => ({ card, source: "throne" })) : []),
+    ...game.imperiumRow.map((card) => ({ card, source: "imperium" })),
+    ...game.reserveMarket.map((card) => ({ card, source: "reserve" })),
+  ];
+  const sourcePriority = { manipulated: 0, throne: 1, imperium: 2, reserve: 3 };
+  const legal = candidates
+    .map((candidate) => ({ ...candidate, cost: acquisitionCost(player, candidate.card, candidate.source) }))
+    .filter((candidate) => candidate.cost <= player.persuasion);
+  const nonSpiceMustFlow = legal.filter((candidate) => candidate.card.name !== "The Spice Must Flow");
+  const preferred = nonSpiceMustFlow.length > 0 ? nonSpiceMustFlow : legal;
+  const choice = preferred.sort((first, second) =>
+    sourcePriority[first.source] - sourcePriority[second.source] ||
+    first.cost - second.cost ||
+    first.card.name.localeCompare(second.card.name)
+  )[0];
+  if (!choice) return undefined;
+  const commanderTargets = commanderTargetsFor(player, game.players);
+  return {
+    action: {
+      kind: "buy-card",
+      cardId: choice.card.id,
+      ...(commanderTargets ? { commanderTargets } : {}),
+    },
+    source: choice.source,
+  };
+}
+
 function pendingCommand(room, pending) {
   switch (pending.kind) {
     case "commander-resource-split":
@@ -292,8 +335,12 @@ function pendingCommand(room, pending) {
       return { kind: "skip-trash-intrigue-for-reward" };
     case "trash-source-for-trade":
       return { kind: "skip-trash-source-for-trade" };
-    case "discard-card-for-draw":
-      return { kind: "skip-discard-card-for-draw" };
+    case "discard-card-for-draw": {
+      if (pending.optional) return { kind: "skip-discard-card-for-draw" };
+      const owner = room.game.players.find((player) => player.id === pending.ownerId);
+      const card = owner ? discardCardForDrawChoices(owner, pending)[0] : undefined;
+      return card ? { kind: "choose-discard-card-for-draw", discardCardId: card.id } : undefined;
+    }
     case "discard-card-for-influence-and-draw":
       return { kind: "skip-discard-card-for-influence-and-draw" };
     case "discard-cards-for-reward":
@@ -332,8 +379,14 @@ function pendingCommand(room, pending) {
     case "recall-spy":
       return { kind: "skip-recall" };
     case "deploy":
-    case "spy":
       return { kind: "clear-pending-action" };
+    case "spy": {
+      const placeSpace = placeableSpySpaces(room.game, pending)[0];
+      if (placeSpace) return { kind: "place-spy", spaceId: placeSpace.id };
+      const recallSpace = recallableSpySupplySpaces(room.game, pending)[0];
+      if (recallSpace) return { kind: "recall-spy-for-supply", spaceId: recallSpace.id };
+      return pending.mustPlaceSpy ? undefined : { kind: "clear-pending-action" };
+    }
     case "control-defense":
       return { kind: "skip-control-defense" };
     case "maker-choice":
@@ -456,7 +509,12 @@ async function resolveEndgameChoices(roomId, tokens, clients) {
 async function driveMarathon(roomId, tokens, clients) {
   let capturedMidpoint = false;
   let capturedAgentPlacement = false;
+  let capturedBuy = false;
   let agentPlacements = 0;
+  const agentPlayerIds = new Set();
+  let buyActions = 0;
+  const buySourceCounts = { imperium: 0, manipulated: 0, reserve: 0, throne: 0 };
+  const buyPlayerIds = new Set();
   for (let step = 1; step <= 700; step += 1) {
     await resolvePending(roomId, tokens, clients);
     const room = roomRecord(roomId);
@@ -465,7 +523,16 @@ async function driveMarathon(roomId, tokens, clients) {
       await capture(clients[0].page, "marathon-round-five.png");
       capturedMidpoint = true;
     }
-    if (game.phase === "finished") return { steps: step, agentPlacements };
+    if (game.phase === "finished") {
+      return {
+        steps: step,
+        agentPlacements,
+        agentPlayerIds: [...agentPlayerIds].sort(),
+        buyActions,
+        buyPlayerIds: [...buyPlayerIds].sort(),
+        buySourceCounts,
+      };
+    }
     if (game.phase === "playing") {
       const active = game.players[game.activeSeat];
       if (game.agentTurnComplete) {
@@ -477,6 +544,7 @@ async function driveMarathon(roomId, tokens, clients) {
       if (placement) {
         await roomAction(roomId, active.id, tokens, placement.action);
         agentPlacements += 1;
+        agentPlayerIds.add(active.id);
         await assertConverged(roomId, clients);
         if (!capturedAgentPlacement) {
           await capture(clients[0].page, "marathon-first-agent-placement.png");
@@ -487,6 +555,20 @@ async function driveMarathon(roomId, tokens, clients) {
       if (!active.revealed) {
         await roomAction(roomId, active.id, tokens, { kind: "reveal-turn" });
         await assertConverged(roomId, clients);
+        continue;
+      }
+      const buySelection = legalBuyAction(game, active);
+      if (buySelection) {
+        await roomAction(roomId, active.id, tokens, buySelection.action);
+        buyActions += 1;
+        buySourceCounts[buySelection.source] += 1;
+        buyPlayerIds.add(active.id);
+        await assertConverged(roomId, clients);
+        if (!capturedBuy) {
+          const buyerClient = clients.find((client) => client.playerId === active.id) ?? clients[0];
+          await capture(buyerClient.page, "marathon-first-buy-card.png");
+          capturedBuy = true;
+        }
         continue;
       }
       await roomAction(roomId, active.id, tokens, { kind: "end-reveal" });
@@ -553,13 +635,19 @@ try {
   await capture(firstPage, "marathon-all-seats-claimed.png");
 
   await resolveSetup(roomId, tokens, clients);
-  const { steps, agentPlacements } = await driveMarathon(roomId, tokens, clients);
+  const { steps, agentPlacements, agentPlayerIds, buyActions, buyPlayerIds, buySourceCounts } = await driveMarathon(roomId, tokens, clients);
   await assertConverged(roomId, clients);
   const finished = roomRecord(roomId).game;
   assert.equal(finished.phase, "finished", "Marathon should finish through normal room actions");
   assert.equal(finished.conflictDeck.length, 0, "Marathon should naturally empty the Conflict deck");
   assert.ok(finished.round >= 9, "Marathon should reach the late-game round count");
-  assert.ok(agentPlacements >= 6, "Marathon should exercise online Agent placement for all six seats");
+  assert.ok(agentPlacements >= 6, "Marathon should exercise repeated online Agent placement");
+  assert.equal(agentPlayerIds.length, seats.length, "Marathon should exercise online Agent placement for all six seats");
+  assert.ok(buyActions >= 6, "Marathon should exercise repeated online card buying");
+  assert.equal(buyPlayerIds.length, seats.length, "Marathon should exercise online card buying for all six seats");
+  assert.ok(buySourceCounts.imperium >= 6, "Marathon should exercise Imperium Row online card buying");
+  assert.ok(buySourceCounts.reserve >= 6, "Marathon should exercise Reserve online card buying");
+  assert.ok(buySourceCounts.throne >= 1, "Marathon should exercise Shaddam Throne Row online card buying");
   for (const { page, playerId } of clients) assertRoomPrivacy(await currentGame(page), playerId);
   await capture(firstPage, "marathon-finished.png");
 
@@ -577,6 +665,10 @@ try {
     finalConflictDeckCount: finished.conflictDeck.length,
     steps,
     agentPlacements,
+    agentPlayerIds,
+    buyActions,
+    buyPlayerIds,
+    buySourceCounts,
     actionCount: actionLog.length,
     screenshots,
     consoleErrorCount: consoleFailures.length,
@@ -592,6 +684,10 @@ try {
   console.log(`claimed seats: ${summary.claimedSeats.length}`);
   console.log(`final round: ${summary.finalRound}`);
   console.log(`agent placements: ${summary.agentPlacements}`);
+  console.log(`agent placement seats: ${summary.agentPlayerIds.length}`);
+  console.log(`card buys: ${summary.buyActions}`);
+  console.log(`buying seats: ${summary.buyPlayerIds.length}`);
+  console.log(`buy sources: ${JSON.stringify(summary.buySourceCounts)}`);
   console.log(`actions: ${summary.actionCount}`);
   console.log(`screenshot count: ${summary.screenshots.length}`);
   console.log(`console error count: ${summary.consoleErrorCount}`);

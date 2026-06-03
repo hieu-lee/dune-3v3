@@ -73,6 +73,7 @@ export const leadershipSourceId = 63;
 export const longLiveTheFightersSourceId = 74;
 export const publicSpectacleSourceId = 55;
 export const rebelSupplierSourceId = 40;
+export const sardaukarCoordinationSourceId = 51;
 export const sardaukarSoldierSourceId = 15;
 export const shishakliSourceId = 48;
 export const southernEldersSourceId = 56;

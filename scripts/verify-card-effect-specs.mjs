@@ -189,6 +189,7 @@ try {
   const publicSpectacle = data.imperiumDeck.find((card) => card.name === "Public Spectacle");
   const rebelSupplier = data.imperiumDeck.find((card) => card.name === "Rebel Supplier");
   const reliableInformant = data.imperiumDeck.find((card) => card.name === "Reliable Informant");
+  const sardaukarCoordination = data.imperiumDeck.find((card) => card.name === "Sardaukar Coordination");
   const sardaukarSoldier = data.imperiumDeck.find((card) => card.name === "Sardaukar Soldier");
   const shishakli = data.imperiumDeck.find((card) => card.name === "Shishakli");
   const smugglersHaven = data.imperiumDeck.find((card) => card.name === "Smuggler's Haven");
@@ -306,6 +307,7 @@ try {
     publicSpectacle &&
     rebelSupplier &&
     reliableInformant &&
+    sardaukarCoordination &&
     sardaukarSoldier &&
     shishakli &&
     smugglersHaven &&
@@ -3520,6 +3522,26 @@ try {
     "Weirding Woman play text should expose its conditional Agent return",
   );
   assert.ok(
+    hasAgentEffect(
+      sardaukarCoordination,
+      (effect) =>
+        effect.kind === "deploy-recruited-troops" &&
+        effect.selector === "self" &&
+        effect.source === "Sardaukar Coordination",
+    ),
+    "Sardaukar Coordination should use a typed Agent same-turn recruited-troop deployment spec",
+  );
+  assert.ok(
+    hasRevealEffect(sardaukarCoordination, (effect) => effect.kind === "gain-persuasion" && effect.selector === "self" && effect.amount === 2) &&
+      hasRevealEffect(sardaukarCoordination, (effect) => effect.kind === "gain-strength" && effect.selector === "self" && effect.amount === 1),
+    "Sardaukar Coordination should carry typed Reveal persuasion and strength specs",
+  );
+  assert.equal(
+    sardaukarCoordination.play,
+    "You may deploy any troops you recruit this turn to the Conflict.",
+    "Sardaukar Coordination play text should expose its typed Agent deployment modifier",
+  );
+  assert.ok(
     spiceMustFlow.effects?.some((spec) =>
       spec.trigger === "acquire" &&
       spec.effects.some((effect) => effect.kind === "gain-vp" && effect.selector === "self" && effect.amount === 1)
@@ -3724,6 +3746,7 @@ try {
       "Public Spectacle",
       "Rebel Supplier",
       "Reliable Informant",
+      "Sardaukar Coordination",
       "Sardaukar Soldier",
       "Shishakli",
       "Smuggler's Harvester",
@@ -3762,6 +3785,7 @@ try {
     northernWatermaster,
     paracompass,
     reliableInformant,
+    sardaukarCoordination,
     smugglersHaven,
     spacingGuildFavor,
     spaceTimeFolding,
@@ -6034,6 +6058,40 @@ try {
     ),
     /Invalid remove-shield-wall source ""/,
     "Shield Wall removal specs should reject empty source labels",
+  );
+  const deployRecruitedTroopsResult = effectResolver.resolveGameEffects(
+    [agentSpec([{ kind: "deploy-recruited-troops", selector: "self", source: "Deploy Recruits Test" }])],
+    { trigger: "agent-play", source: p2, state: game },
+  );
+  assert.equal(deployRecruitedTroopsResult.deployRecruitedTroops, true, "Deploy-recruited-troops specs should resolve their Agent modifier");
+  assert.equal(
+    deployRecruitedTroopsResult.deployRecruitedTroopsSource,
+    "Deploy Recruits Test",
+    "Deploy-recruited-troops specs should preserve source labels",
+  );
+  assert.throws(
+    () => effectResolver.resolveGameEffects(
+      [revealSpec([{ kind: "deploy-recruited-troops", selector: "self", source: "Test" }])],
+      { trigger: "reveal", source: p2, state: game },
+    ),
+    /Unsupported effect "deploy-recruited-troops" for reveal/,
+    "Deploy-recruited-troops specs should stay on Agent play",
+  );
+  assert.throws(
+    () => effectResolver.resolveGameEffects(
+      [agentSpec([{ kind: "deploy-recruited-troops", selector: "activated-ally", source: "Test" }])],
+      { trigger: "agent-play", source: p4, target: p2, state: game },
+    ),
+    /Unsupported effect selector "activated-ally" for deploy-recruited-troops/,
+    "Deploy-recruited-troops specs should reject activated Ally selectors",
+  );
+  assert.throws(
+    () => effectResolver.resolveGameEffects(
+      [agentSpec([{ kind: "deploy-recruited-troops", selector: "self", source: "" }])],
+      { trigger: "agent-play", source: p2, state: game },
+    ),
+    /Invalid deploy-recruited-troops source ""/,
+    "Deploy-recruited-troops specs should reject empty source labels",
   );
   assert.throws(
     () => effectResolver.resolvePlotDeployTroops(
@@ -15703,6 +15761,103 @@ try {
   );
   assert.equal(fedaykinPlaced.pendingAction?.kind, "deploy", "Fedaykin Stilltent's recruited troop should be deployable");
   assert.match(fedaykinPlaced.log.join("\n"), /Fedaykin Stilltent: recruits 1 troop/);
+  const sardaukarPlacementFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 1,
+    deployedTroops: 0,
+    discard: [],
+    garrison: 0,
+    hand: [sardaukarCoordination],
+    highCouncilSeat: true,
+    playArea: [],
+    resources: { solari: 5, spice: 0, water: 0 },
+  }));
+  const sardaukarPlaced = turnActions.placeAgentAction(sardaukarPlacementFixture, {
+    commanderTargets: {},
+    selectedCard: sardaukarCoordination,
+    selectedSpace: highCouncil,
+  });
+  assert.equal(
+    playerById(sardaukarPlaced, p2.id).garrison,
+    3,
+    "Sardaukar Coordination should see High Council's recruited troops in the deployment owner garrison",
+  );
+  assert.deepEqual(
+    sardaukarPlaced.pendingAction,
+    {
+      kind: "deploy",
+      ownerId: p2.id,
+      remaining: 3,
+      source: "Sardaukar Coordination",
+    },
+    "Sardaukar Coordination should let same-turn recruits deploy from a non-combat Landsraad space",
+  );
+  const sardaukarDeployed = state.deployTroopToConflict(sardaukarPlaced, sardaukarPlaced.pendingAction);
+  assert.equal(playerById(sardaukarDeployed, p2.id).garrison, 2, "Sardaukar Coordination deployment should spend a recruited garrison troop");
+  assert.equal(playerById(sardaukarDeployed, p2.id).deployedTroops, 1, "Sardaukar Coordination deployment should add one deployed troop");
+  assert.equal(playerById(sardaukarDeployed, p2.id).conflict, 2, "Sardaukar Coordination deployment should add troop strength");
+  assert.equal(sardaukarDeployed.turnUnitDeployments[p2.id], 1, "Sardaukar Coordination deployment should count on the active player's turn");
+  const sardaukarNoSupplyPlaced = turnActions.placeAgentAction(
+    withActivePlayer(game, p2.id, () => ({
+      agentsReady: 1,
+      deployedTroops: 0,
+      discard: [],
+      garrison: 12,
+      hand: [sardaukarCoordination],
+      highCouncilSeat: true,
+      jessicaMemories: 0,
+      playArea: [],
+      resources: { solari: 5, spice: 0, water: 0 },
+    })),
+    { commanderTargets: {}, selectedCard: sardaukarCoordination, selectedSpace: highCouncil },
+  );
+  assert.equal(
+    sardaukarNoSupplyPlaced.pendingAction,
+    undefined,
+    "Sardaukar Coordination should not deploy existing garrison troops when no troops were recruited",
+  );
+  const commanderSardaukarPlacementBase = withActivePlayer(game, p4.id, () => ({
+    agentsReady: 1,
+    deployedTroops: 0,
+    discard: [],
+    garrison: 0,
+    hand: [sardaukarCoordination],
+    highCouncilSeat: true,
+    playArea: [],
+    resources: { solari: 5, spice: 0, water: 0 },
+  }));
+  const commanderSardaukarPlacementFixture = {
+    ...commanderSardaukarPlacementBase,
+    players: commanderSardaukarPlacementBase.players.map((player) =>
+      player.id === p2.id
+        ? { ...player, deployedTroops: 0, garrison: 0, jessicaMemories: 0 }
+        : player
+    ),
+  };
+  const commanderSardaukarPlaced = turnActions.placeAgentAction(commanderSardaukarPlacementFixture, {
+    commanderTargets: { [p4.id]: p2.id },
+    selectedCard: sardaukarCoordination,
+    selectedSpace: highCouncil,
+  });
+  assert.equal(playerById(commanderSardaukarPlaced, p4.id).garrison, 0, "Commander Sardaukar should not recruit troops to the Commander");
+  assert.equal(playerById(commanderSardaukarPlaced, p2.id).garrison, 3, "Commander Sardaukar should recruit High Council troops to the activated Ally");
+  assert.deepEqual(
+    commanderSardaukarPlaced.pendingAction,
+    {
+      kind: "deploy",
+      ownerId: p2.id,
+      remaining: 3,
+      source: "Sardaukar Coordination",
+    },
+    "Commander Sardaukar should let the activated Ally deploy same-turn recruited troops",
+  );
+  assert.equal(commanderSardaukarPlaced.spaces[highCouncil.id], p2.id, "Commander Sardaukar should occupy High Council for the activated Ally");
+  const commanderSardaukarDeployed = state.deployTroopToConflict(commanderSardaukarPlaced, commanderSardaukarPlaced.pendingAction);
+  assert.equal(playerById(commanderSardaukarDeployed, p2.id).garrison, 2, "Commander Sardaukar deployment should spend the Ally's recruited troop");
+  assert.equal(
+    commanderSardaukarDeployed.turnUnitDeployments[p4.id],
+    1,
+    "Commander Sardaukar deployment should count on the active Commander's turn",
+  );
   const arrakeenNoSupplyBoardEffect = state.applyBoardEffect(
     { ...p2, deployedTroops: 0, garrison: 12, jessicaMemories: 0 },
     p2,

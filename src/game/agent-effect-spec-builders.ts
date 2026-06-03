@@ -435,6 +435,15 @@ export function agentReturnSourceToHand(
   return agentPlayEffects([{ kind: "return-source-to-hand", selector: "self", ...options }], conditions);
 }
 
+export function agentDeployRecruitedTroops(
+  options: {
+    source?: string;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return agentPlayEffects([{ kind: "deploy-recruited-troops", selector: "self", ...options }], conditions);
+}
+
 export function agentTrashSource(
   options: {
     optional?: boolean;

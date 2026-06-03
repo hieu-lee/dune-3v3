@@ -500,6 +500,8 @@ export type GameEffectResult = PlayerEffectResult & {
   recalledAgentSource?: string;
   returnSourceToHand: boolean;
   returnSourceToHandSource?: string;
+  deployRecruitedTroops: boolean;
+  deployRecruitedTroopsSource?: string;
   removeShieldWall: boolean;
   spyRecalls: SpyRecallEffectResult[];
   swords: number;
@@ -529,6 +531,7 @@ export const emptyEffectResult: GameEffectResult = {
   persuasion: 0,
   recalledAgents: 0,
   returnSourceToHand: false,
+  deployRecruitedTroops: false,
   removeShieldWall: false,
   revealGain: {},
   spentResources: {},

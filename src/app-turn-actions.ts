@@ -120,6 +120,17 @@ function withPostDeployIntrigueDraw(
   return { ...pending, postDeployIntrigueDraw: draw };
 }
 
+function pendingActionForRecruitedTroopDeployment(
+  owner: Player,
+  recruitedTroops: number,
+  source: string,
+): PendingAction | undefined {
+  const deployable = Math.min(owner.garrison, Math.max(0, recruitedTroops));
+  return deployable > 0
+    ? { kind: "deploy", ownerId: owner.id, remaining: deployable, source }
+    : undefined;
+}
+
 function paidRewardResourceGain(pending: PendingAction | undefined, ownerId: string, resource: ResourceId) {
   if (pending?.kind !== "paid-reward-choice") return 0;
   return pending.options.reduce((total, option) => {
@@ -292,8 +303,16 @@ export function placeAgentAction(
       Boolean(cardAgentEffect.blocksDeploymentsThisTurn),
       boardRecruitedTroops,
     );
+  const recruitedTroopDeploymentPending =
+    !baseSpacePending && cardAgentEffect.deployRecruitedTroops && !cardAgentEffect.blocksDeploymentsThisTurn
+      ? pendingActionForRecruitedTroopDeployment(
+        deploymentOwner,
+        boardRecruitedTroops + (cardAgentEffect.recruitedTroops ?? 0),
+        cardAgentEffect.deployRecruitedTroopsSource ?? selectedCard.name,
+      )
+      : undefined;
   const spacePending = withPostDeployIntrigueDraw(
-    baseSpacePending,
+    baseSpacePending ?? recruitedTroopDeploymentPending,
     postDeployIntrigueDraw,
   );
   const cardPendings = pendingActionsForCard(

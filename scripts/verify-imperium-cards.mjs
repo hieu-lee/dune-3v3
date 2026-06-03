@@ -348,6 +348,39 @@ try {
   assert.deepEqual(unswervingLoyalty.traits, ["Faction: Fremen"], "Unswerving Loyalty should keep its Fremen trait");
   assert.match(unswervingLoyalty.play, /No agent icons/i);
   assert.match(unswervingLoyalty.reveal, /\+1 persuasion.*Recruit 1 troop.*Fremen Bond.*deploy or retreat 1 troop/i);
+  const sardaukarCoordination = data.imperiumDeck.find((card) => card.name === "Sardaukar Coordination");
+  assert.ok(sardaukarCoordination, "Imperium deck should include Sardaukar Coordination");
+  assert.equal(sardaukarCoordination.cost, 4, "Sardaukar Coordination should cost 4 persuasion");
+  assert.deepEqual(sardaukarCoordination.icons, ["emperor", "landsraad"], "Sardaukar Coordination should reach Emperor and Landsraad spaces");
+  assert.equal(
+    sardaukarCoordination.traits.includes("Faction: Emperor"),
+    true,
+    "Sardaukar Coordination should normalize its Emperor trait",
+  );
+  assert.ok(
+    sardaukarCoordination.effects?.some((spec) =>
+      spec.trigger === "agent-play" &&
+      spec.effects.some((effect) =>
+        effect.kind === "deploy-recruited-troops" &&
+        effect.selector === "self" &&
+        effect.source === "Sardaukar Coordination"
+      )
+    ),
+    "Sardaukar Coordination should use a structured Agent recruited-troop deployment modifier",
+  );
+  assert.ok(
+    sardaukarCoordination.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.effects.some((effect) => effect.kind === "gain-persuasion" && effect.amount === 2)
+    ) &&
+    sardaukarCoordination.effects?.some((spec) =>
+      spec.trigger === "reveal" &&
+      spec.effects.some((effect) => effect.kind === "gain-strength" && effect.amount === 1)
+    ),
+    "Sardaukar Coordination should preserve typed Reveal persuasion and strength effects",
+  );
+  assert.match(sardaukarCoordination.play, /deploy any troops you recruit this turn/i);
+  assert.equal(sardaukarCoordination.reveal, "+2 persuasion and +1 strength.");
   const longLiveTheFighters = data.imperiumDeck.find((card) => card.name === "Long Live the Fighters");
   assert.ok(longLiveTheFighters, "Imperium deck should include Long Live the Fighters");
   assert.deepEqual(

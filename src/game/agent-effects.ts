@@ -88,6 +88,8 @@ export function applyCardAgentEffect(
   targetIntriguesToDraw?: number;
   recalledAgents?: number;
   returnedSourceToHand?: boolean;
+  deployRecruitedTroops?: boolean;
+  deployRecruitedTroopsSource?: string;
 } {
   const genericEffect = applyGenericCardAgentEffect(card, sourcePlayer, targetPlayer, state, space);
   if (genericEffect) return genericEffect;
@@ -113,6 +115,8 @@ function applyGenericCardAgentEffect(
   targetIntriguesToDraw?: number;
   recalledAgents?: number;
   returnedSourceToHand?: boolean;
+  deployRecruitedTroops?: boolean;
+  deployRecruitedTroopsSource?: string;
 } | undefined {
   if (!card.effects) return undefined;
   const players = state?.players.map((player) => {
@@ -149,6 +153,7 @@ function applyGenericCardAgentEffect(
     intriguesToDraw === 0 &&
     result.vp === 0 &&
     !canReturnSourceToHand &&
+    !result.deployRecruitedTroops &&
     !blocksDeploymentsThisTurn &&
     !hasSourceResourceGain &&
     !hasTargetResourceGain
@@ -199,6 +204,8 @@ function applyGenericCardAgentEffect(
     targetIntriguesToDraw: result.activatedAlly.intriguesToDraw,
     recalledAgents: result.recalledAgents,
     returnedSourceToHand,
+    deployRecruitedTroops: result.deployRecruitedTroops,
+    deployRecruitedTroopsSource: result.deployRecruitedTroopsSource,
   };
 }
 

@@ -380,6 +380,16 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     validateAmount(effect.amount);
     return;
   }
+  if (effect.kind === "deploy-recruited-troops") {
+    if (trigger !== "agent-play") {
+      throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
+    }
+    if (effect.selector !== "self") {
+      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
+    validateSourceLabel("deploy-recruited-troops source", effect.source);
+    return;
+  }
   if (effect.kind === "deploy-troops") {
     if (trigger !== "plot-intrigue") {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);

@@ -34,6 +34,7 @@ import {
   publicSpectacleSourceId,
   rebelSupplierSourceId,
   reliableInformantSourceId,
+  sardaukarCoordinationSourceId,
   sardaukarSoldierSourceId,
   shishakliSourceId,
   smugglersHavenSourceId,
@@ -65,6 +66,7 @@ import {
   agentDiscardCardForDraw,
   agentDiscardCardForInfluenceAndDraw,
   agentDiscardCardsForReward,
+  agentDeployRecruitedTroops,
   agentDrawCards,
   agentDrawIntrigues,
   agentGainBoardSpaceInfluence,
@@ -240,6 +242,13 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
     return [
       agentReturnSourceToHand({}, [hasCardTraitInPlay("Faction: Bene Gesserit", 2)]),
       revealGainPersuasion(1),
+      revealGainStrength(1),
+    ];
+  }
+  if (card.id === sardaukarCoordinationSourceId) {
+    return [
+      agentDeployRecruitedTroops({ source: "Sardaukar Coordination" }),
+      revealGainPersuasion(2),
       revealGainStrength(1),
     ];
   }
@@ -778,6 +787,9 @@ function imperiumPlayText(card: HubCard) {
   }
   if (card.id === weirdingWomanSourceId) {
     return "If you have another Bene Gesserit card in play, return this card from play to your hand.";
+  }
+  if (card.id === sardaukarCoordinationSourceId) {
+    return "You may deploy any troops you recruit this turn to the Conflict.";
   }
   return summarizeAttributes(card);
 }

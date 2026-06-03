@@ -343,6 +343,16 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
     const amount = amountFor(effect.amount, context.source);
     return addSelectedRecruitedTroops(result, effect.selector, amount, effect.source);
   }
+  if (effect.kind === "deploy-recruited-troops") {
+    if (effect.selector !== "self") {
+      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
+    return {
+      ...result,
+      deployRecruitedTroops: true,
+      deployRecruitedTroopsSource: effect.source ?? result.deployRecruitedTroopsSource,
+    };
+  }
   if (effect.kind === "deploy-troops") {
     return result;
   }
@@ -545,6 +555,8 @@ function mergeEffectResult(result: GameEffectResult, next: GameEffectResult): Ga
     ),
     returnSourceToHand: result.returnSourceToHand || next.returnSourceToHand,
     returnSourceToHandSource: result.returnSourceToHandSource ?? next.returnSourceToHandSource,
+    deployRecruitedTroops: result.deployRecruitedTroops || next.deployRecruitedTroops,
+    deployRecruitedTroopsSource: result.deployRecruitedTroopsSource ?? next.deployRecruitedTroopsSource,
     removeShieldWall: result.removeShieldWall || next.removeShieldWall,
     revealGain: Object.entries(next.revealGain).reduce(
       (gain, [resource, amount]) => addRevealGain(gain, resource as ResourceId, amount ?? 0),
@@ -626,6 +638,7 @@ function legacyRevealResult(card: Card): GameEffectResult {
     persuasion: card.persuasion,
     recalledAgents: 0,
     returnSourceToHand: false,
+    deployRecruitedTroops: false,
     removeShieldWall: false,
     revealGain: card.revealGain ? { ...card.revealGain } : {},
     spentResources: {},
@@ -668,6 +681,7 @@ function legacyAcquireResult(card: Card): GameEffectResult {
     persuasion: 0,
     recalledAgents: 0,
     returnSourceToHand: false,
+    deployRecruitedTroops: false,
     removeShieldWall: false,
     revealGain: {},
     spentResources: {},

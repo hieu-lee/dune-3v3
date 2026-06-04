@@ -77,6 +77,9 @@
 .board-commander-dock,
 .board-region,
 .board-region-spaces,
+.influence-track,
+.influence-track-header,
+.influence-track-markers,
 .space-tile,
 .space-rewards,
 .space-footer,
@@ -195,6 +198,158 @@
   font-size: 0.72rem;
   line-height: 1.1;
   overflow-wrap: anywhere;
+}
+
+.influence-track {
+  display: grid;
+  gap: 4px;
+  border: 1px solid color-mix(in srgb, var(--region-color), transparent 58%);
+  border-radius: 7px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--region-color), transparent 88%), rgba(8, 7, 6, 0.22)),
+    rgba(8, 7, 6, 0.24);
+  padding: 5px;
+}
+
+.influence-track-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px;
+}
+
+.influence-track-header > span {
+  display: inline-grid;
+  place-items: center;
+  min-width: 24px;
+  min-height: 18px;
+  border: 1px solid color-mix(in srgb, var(--region-color), transparent 42%);
+  border-radius: 999px;
+  background: rgba(8, 7, 6, 0.26);
+  color: #fff5df;
+  font-size: 0.5rem;
+  font-weight: 950;
+}
+
+.influence-track-header strong {
+  color: #fff6e6;
+  font-size: 0.56rem;
+  font-weight: 950;
+  line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.influence-track-header small {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: 0;
+  max-width: 100%;
+  border: 1px solid rgba(255, 246, 230, 0.12);
+  border-radius: 999px;
+  background: rgba(8, 7, 6, 0.24);
+  color: #cbbda5;
+  font-size: 0.48rem;
+  font-weight: 900;
+  line-height: 1;
+  overflow: hidden;
+  padding: 2px 4px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.influence-track-alliance {
+  border-color: rgba(242, 184, 75, 0.38) !important;
+  background: rgba(242, 184, 75, 0.14) !important;
+  color: #ffe1a8 !important;
+}
+
+.influence-track-scale {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 2px;
+}
+
+.influence-track-scale span {
+  border-top: 2px solid color-mix(in srgb, var(--region-color), transparent 28%);
+  color: rgba(255, 246, 230, 0.58);
+  font-size: 0.48rem;
+  font-weight: 900;
+  line-height: 1;
+  text-align: center;
+}
+
+.influence-track-markers {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.influence-track-marker {
+  --player-color: #f2b84b;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  max-width: 100%;
+  border: 1px solid color-mix(in srgb, var(--player-color), transparent 32%);
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--player-color), transparent 76%), rgba(8, 7, 6, 0.34)),
+    rgba(8, 7, 6, 0.3);
+  color: #fff8e8;
+  font-size: 0.5rem;
+  font-weight: 950;
+  line-height: 1;
+  overflow: hidden;
+  padding: 2px 4px;
+}
+
+.influence-track-marker.holds-alliance {
+  box-shadow: inset 0 0 0 1px rgba(242, 184, 75, 0.22);
+}
+
+.influence-track-cube {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: var(--player-color);
+  box-shadow: 0 0 0 1px rgba(255, 246, 230, 0.24);
+}
+
+.influence-track-leader {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.influence-track-marker b {
+  flex: 0 0 auto;
+  color: #f7d790;
+}
+
+.influence-track-empty {
+  color: #a99b84;
+  font-size: 0.5rem;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.board-region--faction .influence-track-header {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.board-region--faction .influence-track-header strong {
+  display: none;
+}
+
+.board-region--faction .influence-track-header small {
+  justify-self: start;
 }
 
 .board-region-spaces {

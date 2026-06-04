@@ -39,6 +39,33 @@ const makerSpice = {
   "deep-desert": 4,
 };
 
+const influenceByPlayerId = {
+  p1: { fremen: 4, fringeWorlds: 2 },
+  p2: { greatHouses: 4, spacing: 2 },
+  p3: { fremen: 2, fringeWorlds: 4, spacing: 2 },
+  p4: { bene: 2, emperor: 4 },
+  p5: { bene: 4, greatHouses: 2 },
+  p6: { fremen: 2, spacing: 4 },
+};
+
+const allianceOwners = {
+  bene: "p5",
+  emperor: "p4",
+  fremen: "p1",
+  fringeWorlds: "p3",
+  greatHouses: "p2",
+  spacing: "p6",
+};
+
+const expectedAllianceLabels = {
+  bene: "Lady Jessica: 4 Bene Gesserit Influence, holds the Alliance",
+  emperor: "Shaddam Corrino IV: 4 Emperor Influence, holds the Alliance",
+  fremen: "Muad'Dib: 4 Fremen Influence, holds the Alliance",
+  fringeWorlds: "Gurney Halleck: 4 Fringe Worlds Influence, holds the Alliance",
+  greatHouses: "Feyd-Rautha Harkonnen: 4 Great Houses Influence, holds the Alliance",
+  spacing: "Princess Irulan: 4 Spacing Guild Influence, holds the Alliance",
+};
+
 const vpByPlayerId = {
   p1: 4,
   p2: 3,
@@ -76,6 +103,8 @@ export async function runBoardStatesSmoke({
     selectedCard: fixture.cardName,
     occupiedSpaces,
     agentPlacementOwners,
+    allianceOwners,
+    influenceByPlayerId,
     spyPosts,
     sharedSpyPosts,
     locationControl,
@@ -93,6 +122,8 @@ export async function runBoardStatesSmoke({
           document.querySelectorAll(".agent-marker").length === occupiedSpaceIds.length &&
           document.querySelectorAll(".spy-marker").length >= 3 &&
           document.querySelectorAll(".control-marker").length >= 3 &&
+          document.querySelectorAll(".influence-track").length === 6 &&
+          document.querySelectorAll(".influence-track-marker.holds-alliance").length === 6 &&
           document.querySelectorAll(".maker-marker").length >= 4 &&
           document.querySelectorAll(".space-tile.personal.occupied").length >= 2,
       );
@@ -112,6 +143,26 @@ export async function runBoardStatesSmoke({
   assert.ok(denseStats.personalOccupied >= 2, "Dense board state should include occupied Commander personal spaces");
   assert.ok(denseStats.spyMarkers >= 3, "Dense board state should include spy markers");
   assert.ok(denseStats.controlMarkers >= 3, "Dense board state should include critical-location control markers");
+  assert.equal(denseStats.influenceTracks, 6, "Dense board state should render all board-side influence tracks");
+  assert.deepEqual(
+    denseStats.influenceFactions,
+    ["bene", "emperor", "fremen", "fringeWorlds", "greatHouses", "spacing"],
+    "Dense board state should render the four main faction tracks and two Commander personal tracks",
+  );
+  assert.equal(denseStats.allianceMarkers, 6, "Dense board state should render every held Alliance on its influence track");
+  assert.deepEqual(
+    denseStats.allianceHolderLabels,
+    expectedAllianceLabels,
+    "Each influence track should expose the exact public Alliance holder in accessible marker text",
+  );
+  assert.ok(
+    denseStats.influenceTrackLabels.some((label) => label.includes("Great Houses") && label.includes("Feyd-Rautha")),
+    "Influence tracks should show live public influence markers",
+  );
+  assert.ok(
+    denseStats.influenceTrackLabels.some((label) => label.includes("Fremen") && label.includes("Muad'Dib")),
+    "Commander personal influence tracks should render in the Commander dock",
+  );
   assert.ok(denseStats.makerMarkers >= 4, "Dense board state should include all Maker space markers");
   await screenshot(page, captures, "board-states-dense-ready.png");
 
@@ -238,6 +289,7 @@ async function createBoardStatesFixture(server, initialPlayableGame) {
     [
       ...Object.values(occupiedSpaces),
       ...Object.values(agentPlacementOwners),
+      ...Object.values(allianceOwners),
       ...Object.values(spyPosts),
       ...Object.values(sharedSpyPosts).flat(),
       ...Object.values(locationControl),
@@ -249,6 +301,10 @@ async function createBoardStatesFixture(server, initialPlayableGame) {
   const players = game.players.map((player, index) => {
     const visiblePlayer = {
       ...player,
+      influence: {
+        ...player.influence,
+        ...(influenceByPlayerId[player.id] ?? {}),
+      },
       vp: vpByPlayerId[player.id] ?? player.vp,
       revealed: false,
     };
@@ -276,6 +332,7 @@ async function createBoardStatesFixture(server, initialPlayableGame) {
     activeSeat,
     agentPlacementOwners: { ...agentPlacementOwners },
     agentTurnComplete: false,
+    alliances: { ...allianceOwners },
     locationControl: { ...locationControl },
     makerSpice: { ...game.makerSpice, ...makerSpice },
     pendingAction: undefined,
@@ -327,8 +384,18 @@ async function boardMarkerStats(page) {
   return page.evaluate(() => ({
     agentMarkerLabels: Array.from(document.querySelectorAll(".agent-marker")).map((marker) => marker.textContent ?? ""),
     agentMarkers: document.querySelectorAll(".agent-marker").length,
+    allianceHolderLabels: Object.fromEntries(Array.from(document.querySelectorAll(".influence-track")).map((track) => [
+      track.getAttribute("data-faction-id") ?? "",
+      track.querySelector(".influence-track-marker.holds-alliance")?.getAttribute("aria-label") ?? "",
+    ])),
+    allianceMarkers: document.querySelectorAll(".influence-track-marker.holds-alliance").length,
     controlMarkers: document.querySelectorAll(".control-marker").length,
     highCouncilAgentMarker: document.querySelector('[data-testid="space-high-council"] .agent-marker')?.textContent ?? "",
+    influenceFactions: Array.from(document.querySelectorAll(".influence-track"))
+      .map((track) => track.getAttribute("data-faction-id") ?? "")
+      .sort(),
+    influenceTrackLabels: Array.from(document.querySelectorAll(".influence-track")).map((track) => track.textContent ?? ""),
+    influenceTracks: document.querySelectorAll(".influence-track").length,
     makerMarkers: document.querySelectorAll(".maker-marker").length,
     occupied: document.querySelectorAll(".space-tile.occupied").length,
     personalOccupied: document.querySelectorAll(".space-tile.personal.occupied").length,

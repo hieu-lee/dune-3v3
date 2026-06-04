@@ -1,8 +1,8 @@
 import type { CSSProperties } from "react";
 import { Crown, FileText, Hexagon, Sparkles, Swords, Users } from "lucide-react";
-import { costLabel } from "../app-helpers";
+import { costLabel, factionShortLabels } from "../app-helpers";
 import { locationControlOwnerId } from "../game/critical-locations";
-import { boardSpaces, iconLabels, teams } from "../game/data";
+import { boardSpaces, factionLabels as factionFullLabels, iconLabels, teams } from "../game/data";
 import { effectiveCost, spyPostOwnerIds } from "../game/state";
 import type { BoardSpace, FactionId, GameState, Player, ResourceId, TeamId } from "../game/types";
 import {
@@ -23,15 +23,6 @@ type BoardPanelProps = {
   onSelectSpace: (spaceId: string) => void;
 };
 
-const factionLabels: Record<FactionId, string> = {
-  bene: "BG",
-  emperor: "EMP",
-  fremen: "FRE",
-  fringeWorlds: "FW",
-  greatHouses: "GH",
-  spacing: "SG",
-};
-
 const resourceLabels: Record<ResourceId, string> = {
   solari: "solari",
   spice: "spice",
@@ -49,6 +40,15 @@ const unplacedSpaces = boardSpaces.filter((space) => !layoutSpaceIds.has(space.i
 const scoreTrackMaximum = Math.max(...scoreTrackValues);
 const scoreTrackMinimum = Math.min(...scoreTrackValues);
 const scoreTeams = ["muaddib", "shaddam"] as const;
+const influenceTrackByRegionId: Partial<Record<string, FactionId>> = {
+  "great-houses": "greatHouses",
+  "spacing-guild": "spacing",
+  "bene-gesserit": "bene",
+  "fringe-worlds": "fringeWorlds",
+  "muaddib-command": "fremen",
+  "shaddam-command": "emperor",
+};
+const influenceTrackSteps = [0, 1, 2, 3, 4] as const;
 
 function classToken(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -60,8 +60,8 @@ function plural(value: number, singular: string) {
 
 function rewardBadges(space: BoardSpace) {
   const badges: string[] = [];
-  if (space.requirement) badges.push(`${space.requirement.amount}+ ${factionLabels[space.requirement.faction]}`);
-  if (space.influence) badges.push(`+${factionLabels[space.influence]}`);
+  if (space.requirement) badges.push(`${space.requirement.amount}+ ${factionShortLabels[space.requirement.faction]}`);
+  if (space.influence) badges.push(`+${factionShortLabels[space.influence]}`);
   (["solari", "spice", "water"] as const).forEach((resource) => {
     const amount = space.gain?.[resource];
     if (amount) badges.push(`+${amount} ${resourceLabels[resource]}`);
@@ -75,6 +75,10 @@ function rewardBadges(space: BoardSpace) {
   if (space.makerWorms) badges.push(`${plural(space.makerWorms, "worm")}`);
   if (space.personal) badges.push(personalLabels[space.personal]);
   return badges;
+}
+
+function shortLeaderName(leader: string) {
+  return leader.split(" ")[0] || leader;
 }
 
 function teamVictoryPoints(players: readonly Player[], team: TeamId) {
@@ -213,10 +217,69 @@ export function BoardPanel({
     );
   }
 
+  function renderInfluenceTrack(faction: FactionId) {
+    const allianceHolderId = game.alliances[faction];
+    const allianceHolder = allianceHolderId ? game.players.find((player) => player.id === allianceHolderId) : undefined;
+    const entries = game.players
+      .map((player, seat) => ({
+        player,
+        seat,
+        amount: player.influence[faction] ?? 0,
+        holdsAlliance: game.alliances[faction] === player.id,
+      }))
+      .filter((entry) => entry.amount > 0 || entry.holdsAlliance)
+      .sort((a, b) =>
+        b.amount - a.amount ||
+        Number(b.holdsAlliance) - Number(a.holdsAlliance) ||
+        a.seat - b.seat
+      );
+    const fullLabel = factionFullLabels[faction];
+
+    return (
+      <div className="influence-track" data-faction-id={faction}>
+        <div className="influence-track-header">
+          <span>{factionShortLabels[faction]}</span>
+          <strong>{fullLabel}</strong>
+          <small className={allianceHolder ? "influence-track-alliance" : ""}>
+            {allianceHolder ? (
+              <>
+                <Crown size={11} />
+                {shortLeaderName(allianceHolder.leader)}
+              </>
+            ) : "Alliance open"}
+          </small>
+        </div>
+        <div className="influence-track-scale" aria-hidden="true">
+          {influenceTrackSteps.map((step) => <span key={step}>{step === 4 ? "4+" : step}</span>)}
+        </div>
+        <div className="influence-track-markers" role="list" aria-label={`${fullLabel} influence markers`}>
+          {entries.length > 0 ? entries.map(({ player, amount, holdsAlliance }) => (
+            <span
+              className={`influence-track-marker ${holdsAlliance ? "holds-alliance" : ""}`}
+              key={player.id}
+              aria-label={`${player.leader}: ${amount} ${fullLabel} Influence${holdsAlliance ? ", holds the Alliance" : ""}`}
+              role="listitem"
+              style={{ "--player-color": player.color } as CSSProperties}
+              title={`${player.leader}: ${amount} ${fullLabel} Influence${holdsAlliance ? ", holds the Alliance" : ""}`}
+            >
+              <span className="influence-track-cube" aria-hidden="true" />
+              <span className="influence-track-leader">{shortLeaderName(player.leader)}</span>
+              <b>{amount}</b>
+              {holdsAlliance && <Crown size={10} aria-hidden="true" />}
+            </span>
+          )) : (
+            <span className="influence-track-empty">No influence</span>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   function renderRegion(region: BoardRegionSpec, variant: "faction" | "board" | "commander" = "board") {
     const spaces = region.spaceIds
       .map((spaceId) => boardSpaceById.get(spaceId))
       .filter((space): space is BoardSpace => Boolean(space));
+    const influenceTrackFaction = influenceTrackByRegionId[region.id];
 
     return (
       <section
@@ -229,6 +292,7 @@ export function BoardPanel({
           <span>{region.subtitle}</span>
           <strong>{region.title}</strong>
         </header>
+        {influenceTrackFaction && renderInfluenceTrack(influenceTrackFaction)}
         <div className="board-region-spaces">
           {spaces.map(renderSpaceTile)}
         </div>

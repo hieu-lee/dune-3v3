@@ -1,0 +1,718 @@
+.board-panel {
+  align-self: start;
+  min-height: 690px;
+  border: 1px solid rgba(255, 246, 230, 0.13);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(27, 22, 18, 0.88), rgba(18, 15, 13, 0.94)),
+    repeating-linear-gradient(30deg, rgba(211, 166, 87, 0.08) 0 2px, transparent 2px 18px);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(16px);
+  overflow-x: auto;
+  padding: 14px;
+}
+
+.board-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.legend {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  color: #ccbca3;
+  font-size: 0.78rem;
+}
+
+.legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.board-stage {
+  isolation: isolate;
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(136px, 0.55fr) minmax(0, 2.2fr) 44px;
+  gap: 10px;
+  min-width: 720px;
+  border: 1px solid rgba(255, 246, 230, 0.16);
+  border-radius: 8px;
+  background: #161411;
+  overflow: hidden;
+  padding: 10px;
+}
+
+.board-stage::before,
+.board-stage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.board-stage::before {
+  z-index: -2;
+  background: url("/assets/dune-cards-hub/full-board-image.png") center / cover no-repeat;
+  opacity: 0.22;
+}
+
+.board-stage::after {
+  z-index: -1;
+  background:
+    linear-gradient(90deg, rgba(18, 15, 13, 0.74), rgba(21, 17, 14, 0.38) 34%, rgba(18, 15, 13, 0.78)),
+    linear-gradient(180deg, rgba(18, 15, 13, 0.18), rgba(18, 15, 13, 0.66));
+}
+
+.board-faction-rail,
+.board-map,
+.board-top-band,
+.board-center-band,
+.board-commander-dock,
+.board-region,
+.board-region-spaces,
+.space-tile,
+.space-rewards,
+.space-footer,
+.space-footer > span {
+  min-width: 0;
+}
+
+.board-faction-rail,
+.board-map,
+.board-region,
+.board-region-spaces {
+  display: grid;
+}
+
+.board-faction-rail {
+  align-content: start;
+  grid-template-rows: repeat(4, auto);
+  gap: 8px;
+}
+
+.board-map {
+  grid-template-rows: auto auto auto;
+  gap: 10px;
+}
+
+.board-top-band {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(150px, 0.55fr);
+  gap: 8px;
+}
+
+.board-center-band {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto auto;
+  gap: 8px;
+}
+
+.board-commander-dock {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.board-region {
+  --region-color: #c8a766;
+  position: relative;
+  align-content: start;
+  gap: 6px;
+  border-radius: 8px;
+  padding: 7px;
+}
+
+.board-region::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border: 1px solid color-mix(in srgb, var(--region-color), transparent 52%);
+  border-left-width: 3px;
+  border-radius: inherit;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--region-color), transparent 86%), rgba(16, 14, 12, 0.64)),
+    rgba(16, 14, 12, 0.46);
+}
+
+.board-region--emperor {
+  --region-color: #d5b44b;
+}
+
+.board-region--spacing {
+  --region-color: #cb564a;
+}
+
+.board-region--bene {
+  --region-color: #9172dd;
+}
+
+.board-region--fremen,
+.board-region--muaddib {
+  --region-color: #58b8ac;
+}
+
+.board-region--landsraad {
+  --region-color: #7ba766;
+}
+
+.board-region--choam,
+.board-region--shaddam {
+  --region-color: #c88b45;
+}
+
+.board-region--city {
+  --region-color: #6e8ebf;
+}
+
+.board-region--desert {
+  --region-color: #d09742;
+}
+
+.board-region-header {
+  display: grid;
+  gap: 1px;
+}
+
+.board-region-header span {
+  color: color-mix(in srgb, var(--region-color), #fff6e6 35%);
+  font-size: 0.58rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.board-region-header strong {
+  color: #fff5df;
+  font-size: 0.72rem;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.board-region-spaces {
+  gap: 6px;
+}
+
+.board-region--faction .board-region-spaces,
+[data-region-id="choam"] .board-region-spaces {
+  grid-template-columns: 1fr;
+}
+
+[data-region-id="landsraad"] .board-region-spaces,
+[data-region-id="desert"] .board-region-spaces,
+.board-region--commander .board-region-spaces {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+[data-region-id="cities"] {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+[data-region-id="cities"] .board-region-spaces {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+[data-region-id="desert"] {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+[data-region-id="desert"] .board-region-spaces {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.board-region--fallback {
+  margin-top: 2px;
+}
+
+.board-region--fallback .board-region-spaces {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.board-conflict-field {
+  grid-column: 1;
+  grid-row: 3;
+  display: grid;
+  align-content: center;
+  gap: 14px;
+  min-height: 210px;
+  border: 1px solid rgba(255, 246, 230, 0.14);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(117, 73, 38, 0.24), rgba(29, 22, 17, 0.56)),
+    repeating-linear-gradient(90deg, rgba(255, 246, 230, 0.05) 0 1px, transparent 1px 46px);
+  overflow: hidden;
+  padding: 12px;
+}
+
+.conflict-emblem {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  color: rgba(255, 236, 202, 0.78);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.conflict-emblem svg {
+  color: #e5bd78;
+}
+
+.conflict-slots {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.conflict-slots span {
+  min-height: 46px;
+  border: 1px solid rgba(255, 246, 230, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 246, 230, 0.045);
+}
+
+.conflict-strength-track {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 3px;
+}
+
+.conflict-strength-track span {
+  border-top: 2px solid rgba(177, 55, 45, 0.78);
+  color: rgba(255, 236, 202, 0.78);
+  font-size: 0.58rem;
+  font-weight: 900;
+  text-align: center;
+}
+
+.board-score-rail {
+  display: grid;
+  align-content: stretch;
+  justify-items: center;
+  gap: 2px;
+  border-left: 1px solid rgba(255, 246, 230, 0.18);
+  padding-left: 7px;
+}
+
+.board-score-rail strong,
+.board-score-rail span {
+  display: grid;
+  place-items: center;
+  width: 100%;
+}
+
+.board-score-rail strong {
+  color: #f7d790;
+  font-size: 0.66rem;
+  font-weight: 900;
+}
+
+.board-score-rail span {
+  min-height: 34px;
+  border-bottom: 1px solid rgba(255, 246, 230, 0.2);
+  color: #fff5df;
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.space-tile {
+  --space-color: #c8a766;
+  display: grid;
+  grid-template-columns: 1fr;
+  align-content: start;
+  gap: 4px;
+  min-height: 112px;
+  border: 1px solid color-mix(in srgb, var(--space-color), transparent 54%);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--space-color), transparent 86%), rgba(22, 18, 15, 0.82)),
+    rgba(22, 18, 15, 0.78);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
+  color: #fff3df;
+  cursor: pointer;
+  padding: 6px;
+  text-align: left;
+  transition:
+    border-color 160ms ease,
+    transform 160ms ease,
+    background 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.space-tile--emperor {
+  --space-color: #d5b44b;
+}
+
+.space-tile--spacing {
+  --space-color: #cb564a;
+}
+
+.space-tile--bene {
+  --space-color: #9172dd;
+}
+
+.space-tile--fremen {
+  --space-color: #58b8ac;
+}
+
+.space-tile--landsraad {
+  --space-color: #7ba766;
+}
+
+.space-tile--city {
+  --space-color: #6e8ebf;
+}
+
+.space-tile--spice {
+  --space-color: #d09742;
+}
+
+.space-tile:hover,
+.space-tile.selected {
+  transform: translateY(-1px);
+  border-color: rgba(255, 246, 230, 0.46);
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.26);
+}
+
+.space-tile.legal {
+  border-color: rgba(91, 192, 190, 0.86);
+  background:
+    linear-gradient(180deg, rgba(47, 100, 94, 0.78), rgba(20, 48, 45, 0.84)),
+    rgba(20, 48, 45, 0.72);
+}
+
+.space-tile.selected {
+  outline: 2px solid #f2d69f;
+  outline-offset: 1px;
+}
+
+.space-tile.occupied {
+  opacity: 0.62;
+}
+
+.space-tile:disabled {
+  cursor: default;
+}
+
+.space-zone,
+.space-tile small {
+  color: #cbbda5;
+  font-size: 0.52rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.space-art {
+  display: block;
+  width: 100%;
+  max-height: 38px;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border: 1px solid rgba(255, 246, 230, 0.14);
+  border-radius: 6px;
+  background: rgba(8, 7, 6, 0.64);
+}
+
+.space-tile strong {
+  display: block;
+  color: #fff6e6;
+  font-size: 0.68rem;
+  line-height: 1.12;
+  overflow-wrap: anywhere;
+}
+
+.space-rewards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.space-rewards span,
+.spy-marker,
+.maker-marker,
+.control-marker {
+  width: fit-content;
+  max-width: 100%;
+  border-radius: 999px;
+  font-size: 0.55rem;
+  font-weight: 900;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+  padding: 2px 5px;
+}
+
+.space-rewards span {
+  border: 1px solid color-mix(in srgb, var(--space-color), transparent 48%);
+  background: color-mix(in srgb, var(--space-color), transparent 84%);
+  color: #fff0cf;
+}
+
+.space-detail {
+  display: -webkit-box;
+  overflow: hidden;
+  color: #d6cab8;
+  font-size: 0.6rem;
+  line-height: 1.2;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+}
+
+.board-region--faction .space-tile {
+  grid-template-columns: 42px minmax(0, 1fr);
+  column-gap: 6px;
+  min-height: 76px;
+}
+
+.board-region--faction .space-art {
+  grid-column: 1;
+  grid-row: 1 / span 4;
+  width: 42px;
+  max-height: 40px;
+}
+
+.board-region--faction .space-zone,
+.board-region--faction .space-tile strong,
+.board-region--faction .space-tile small,
+.board-region--faction .space-rewards {
+  grid-column: 2;
+}
+
+.board-region--faction .space-detail,
+.board-region--faction .space-footer,
+.board-region--faction .spy-marker,
+.board-region--faction .control-marker,
+.board-region--faction .maker-marker {
+  grid-column: 1 / -1;
+}
+
+.board-region--faction .space-tile:not(.legal):not(.selected) .space-detail {
+  display: none;
+}
+
+.spy-marker,
+.maker-marker,
+.control-marker {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.spy-marker {
+  border: 1px solid rgba(91, 192, 190, 0.36);
+  background: rgba(91, 192, 190, 0.14);
+  color: #c7fffa;
+}
+
+.maker-marker {
+  border: 1px solid rgba(242, 184, 75, 0.38);
+  background: rgba(242, 184, 75, 0.14);
+  color: #f7d790;
+}
+
+.control-marker {
+  border: 1px solid rgba(239, 180, 71, 0.4);
+  background: rgba(239, 180, 71, 0.13);
+  color: #ffe1a8;
+}
+
+.space-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-top: auto;
+  color: #f2d69f;
+  font-size: 0.6rem;
+  font-weight: 900;
+}
+
+.space-footer > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 1280px) {
+  .board-stage {
+    min-width: 0;
+  }
+
+  .board-top-band {
+    grid-template-columns: minmax(0, 1fr) minmax(170px, 0.45fr);
+  }
+
+  [data-region-id="landsraad"] .board-region-spaces,
+  [data-region-id="cities"] .board-region-spaces {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .board-stage {
+    grid-template-columns: 1fr;
+  }
+
+  .board-faction-rail {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: none;
+  }
+
+  .board-score-rail {
+    grid-template-columns: repeat(14, minmax(0, 1fr));
+    border-left: 0;
+    border-top: 1px solid rgba(255, 246, 230, 0.18);
+    padding: 7px 0 0;
+  }
+
+  .board-score-rail span {
+    min-height: 26px;
+  }
+}
+
+@media (max-width: 760px) {
+  .board-panel {
+    padding: 10px;
+  }
+
+  .board-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .board-stage {
+    gap: 8px;
+    min-height: 0;
+    padding: 8px;
+  }
+
+  .board-faction-rail,
+  .board-top-band,
+  .board-center-band,
+  .board-commander-dock {
+    grid-template-columns: 1fr;
+  }
+
+  .board-center-band {
+    grid-template-rows: none;
+  }
+
+  [data-region-id="cities"],
+  [data-region-id="desert"],
+  .board-conflict-field {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .board-region {
+    padding: 6px;
+  }
+
+  .board-region--faction .board-region-spaces,
+  [data-region-id="landsraad"] .board-region-spaces,
+  [data-region-id="choam"] .board-region-spaces,
+  [data-region-id="cities"] .board-region-spaces,
+  [data-region-id="desert"] .board-region-spaces,
+  .board-region--commander .board-region-spaces,
+  .board-region--fallback .board-region-spaces {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .board-conflict-field {
+    min-height: 140px;
+  }
+
+  .conflict-slots {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .conflict-slots span {
+    min-height: 30px;
+  }
+
+  .space-tile {
+    min-height: 0;
+    grid-template-columns: 52px minmax(0, 1fr);
+    column-gap: 6px;
+    align-items: start;
+    padding: 6px;
+  }
+
+  .space-art {
+    grid-column: 1;
+    grid-row: 1 / span 4;
+    width: 52px;
+    max-height: 48px;
+  }
+
+  .space-zone,
+  .space-tile strong,
+  .space-tile small,
+  .space-rewards {
+    grid-column: 2;
+  }
+
+  .space-tile strong {
+    font-size: 0.66rem;
+  }
+
+  .space-tile small,
+  .space-zone,
+  .space-rewards span {
+    font-size: 0.5rem;
+  }
+
+  .space-detail,
+  .spy-marker,
+  .control-marker,
+  .maker-marker,
+  .space-footer {
+    grid-column: 1 / -1;
+  }
+
+  .space-detail {
+    font-size: 0.56rem;
+    -webkit-line-clamp: 1;
+  }
+
+  .space-tile:not(.legal):not(.selected) .space-detail {
+    display: none;
+  }
+
+  .space-tile.legal .space-detail,
+  .space-tile.selected .space-detail {
+    -webkit-line-clamp: 2;
+  }
+
+  .spy-marker,
+  .control-marker,
+  .maker-marker,
+  .space-footer {
+    font-size: 0.55rem;
+  }
+}
+
+@media (max-width: 430px) {
+  .board-region--faction .board-region-spaces,
+  [data-region-id="landsraad"] .board-region-spaces,
+  [data-region-id="choam"] .board-region-spaces,
+  [data-region-id="cities"] .board-region-spaces,
+  [data-region-id="desert"] .board-region-spaces,
+  .board-region--commander .board-region-spaces,
+  .board-region--fallback .board-region-spaces {
+    grid-template-columns: 1fr;
+  }
+}

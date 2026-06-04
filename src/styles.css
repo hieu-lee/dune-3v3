@@ -49,21 +49,18 @@ button {
 .command-bar,
 .command-actions,
 .panel-heading,
-.board-header,
 .team-heading,
 .player-topline,
 .turn-actions,
 .activation-strip,
 .pending-controls,
 .resource-picker,
-.legend,
 .team-metrics,
 .resource-row,
 .mini-stats,
 .objective-row,
 .conflict-meta,
-.shield-state,
-.space-footer {
+.shield-state {
   display: flex;
   align-items: center;
 }
@@ -405,14 +402,12 @@ h2 {
 .conflict-card,
 .choam-card,
 .intrigue-deck-card,
-.board-panel,
 .player-card,
 .hand-panel,
 .room-private-panel,
 .room-pending-panel,
 .market-panel,
 .log-panel,
-.space-tile,
 .hand-card,
 .market-card {
   border: 1px solid rgba(255, 246, 230, 0.13);
@@ -616,7 +611,6 @@ h2 {
 .team-heading p,
 .conflict-card p,
 .player-topline small,
-.space-detail,
 .hand-card p,
 .market-card p,
 .log-panel li {
@@ -675,82 +669,12 @@ h2 {
   accent-color: #f2b84b;
 }
 
-.board-panel {
-  min-height: 690px;
-  border-radius: 8px;
-  padding: 16px;
-  background:
-    linear-gradient(rgba(30, 24, 20, 0.74), rgba(30, 24, 20, 0.88)),
-    repeating-linear-gradient(30deg, rgba(211, 166, 87, 0.08) 0 2px, transparent 2px 18px);
-}
-
-.board-header,
 .panel-heading {
   justify-content: space-between;
   gap: 14px;
   margin-bottom: 14px;
 }
 
-.legend {
-  gap: 10px;
-  color: #ccbca3;
-  font-size: 0.78rem;
-}
-
-.legend span {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.space-grid {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(140px, 1fr));
-  gap: 10px;
-}
-
-.space-tile {
-  min-height: 206px;
-  padding: 12px;
-  border-radius: 8px;
-  color: #fff3df;
-  text-align: left;
-  cursor: pointer;
-  transition:
-    border-color 160ms ease,
-    transform 160ms ease,
-    background 160ms ease;
-}
-
-.space-tile:hover,
-.space-tile.selected {
-  transform: translateY(-1px);
-  border-color: rgba(255, 246, 230, 0.42);
-}
-
-.space-tile.legal {
-  border-color: rgba(91, 192, 190, 0.75);
-  background: rgba(32, 67, 63, 0.72);
-}
-
-.space-tile.occupied {
-  opacity: 0.58;
-}
-
-.space-art {
-  display: block;
-  width: 100%;
-  max-height: 74px;
-  aspect-ratio: 4 / 3;
-  object-fit: cover;
-  border: 1px solid rgba(255, 246, 230, 0.13);
-  border-radius: 6px;
-  background: rgba(8, 7, 6, 0.64);
-  margin: 8px 0;
-}
-
-.space-zone,
-.space-tile small,
 .hand-card span,
 .market-card span {
   color: #baa98e;
@@ -760,70 +684,11 @@ h2 {
   text-transform: uppercase;
 }
 
-.space-tile strong,
 .hand-card strong,
 .market-card strong {
   display: block;
   margin-top: 5px;
   font-size: 0.95rem;
-}
-
-.space-detail {
-  display: block;
-  min-height: 42px;
-  margin-top: 8px;
-}
-
-.spy-marker {
-  display: inline-flex;
-  width: fit-content;
-  border: 1px solid rgba(91, 192, 190, 0.34);
-  border-radius: 999px;
-  background: rgba(91, 192, 190, 0.14);
-  color: #c7fffa;
-  font-size: 0.72rem;
-  font-weight: 900;
-  margin-top: 8px;
-  padding: 3px 7px;
-}
-
-.maker-marker {
-  display: inline-flex;
-  align-items: center;
-  width: fit-content;
-  gap: 4px;
-  border: 1px solid rgba(242, 184, 75, 0.36);
-  border-radius: 999px;
-  background: rgba(242, 184, 75, 0.14);
-  color: #f7d790;
-  font-size: 0.72rem;
-  font-weight: 900;
-  margin-top: 8px;
-  padding: 3px 7px;
-}
-
-.control-marker {
-  display: inline-flex;
-  align-items: center;
-  width: fit-content;
-  gap: 4px;
-  border: 1px solid rgba(239, 180, 71, 0.38);
-  border-radius: 999px;
-  background: rgba(239, 180, 71, 0.13);
-  color: #ffe1a8;
-  font-size: 0.72rem;
-  font-weight: 900;
-  margin-top: 8px;
-  padding: 3px 7px;
-}
-
-.space-footer {
-  justify-content: space-between;
-  gap: 6px;
-  margin-top: 10px;
-  color: #f2d69f;
-  font-size: 0.75rem;
-  font-weight: 800;
 }
 
 .player-card {
@@ -1094,9 +959,6 @@ h2 {
     grid-template-columns: repeat(2, minmax(220px, 1fr));
   }
 
-  .space-grid {
-    grid-template-columns: repeat(3, minmax(150px, 1fr));
-  }
 }
 
 @media (max-width: 760px) {
@@ -1112,7 +974,6 @@ h2 {
 
   .command-bar,
   .panel-heading,
-  .board-header,
   .leader-modal header {
     align-items: stretch;
     flex-direction: column;
@@ -1158,99 +1019,8 @@ h2 {
 
   .team-column,
   .player-column,
-  .room-seat-grid,
-  .space-grid {
+  .room-seat-grid {
     grid-template-columns: 1fr;
-  }
-
-  .board-panel {
-    padding: 10px;
-  }
-
-  .space-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 6px;
-  }
-
-  .space-tile {
-    min-height: 0;
-    display: grid;
-    grid-template-columns: 52px minmax(0, 1fr);
-    column-gap: 6px;
-    align-items: start;
-    padding: 6px;
-  }
-
-  .space-art {
-    grid-column: 1;
-    grid-row: 1 / span 3;
-    width: 52px;
-    max-height: 48px;
-    margin: 0;
-  }
-
-  .space-zone,
-  .space-tile strong,
-  .space-tile small {
-    grid-column: 2;
-    min-width: 0;
-  }
-
-  .space-tile strong {
-    margin-top: 2px;
-    font-size: 0.66rem;
-    line-height: 1.14;
-    overflow-wrap: anywhere;
-  }
-
-  .space-tile small {
-    margin-top: 2px;
-    font-size: 0.54rem;
-  }
-
-  .space-zone {
-    font-size: 0.5rem;
-  }
-
-  .space-detail,
-  .spy-marker,
-  .control-marker,
-  .maker-marker,
-  .space-footer {
-    grid-column: 1 / -1;
-  }
-
-  .space-detail {
-    display: -webkit-box;
-    overflow: hidden;
-    min-height: 0;
-    margin-top: 4px;
-    font-size: 0.58rem;
-    line-height: 1.18;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 1;
-  }
-
-  .space-tile:not(.legal):not(.selected) .space-detail {
-    display: none;
-  }
-
-  .space-tile.legal .space-detail,
-  .space-tile.selected .space-detail {
-    -webkit-line-clamp: 2;
-  }
-
-  .spy-marker,
-  .control-marker,
-  .maker-marker {
-    margin-top: 3px;
-    font-size: 0.55rem;
-    padding: 2px 4px;
-  }
-
-  .space-footer {
-    margin-top: 4px;
-    font-size: 0.58rem;
   }
 
   .team-column {

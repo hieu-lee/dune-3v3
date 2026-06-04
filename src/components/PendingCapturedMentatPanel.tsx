@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { Handshake } from "lucide-react";
+import { factionShortLabels } from "../app-helpers";
 import { factionLabels } from "../game/data";
 import type { Card, FactionId, PendingAction, Player, ResourceId, Resources } from "../game/types";
 
@@ -31,53 +33,85 @@ export function PendingDiscardInfluenceDrawPanel({
   const canResolve = Boolean(selectedCard && selectedFaction);
   const cardText = `${drawCards} card${drawCards === 1 ? "" : "s"}`;
   const influenceText = `${influenceAmount} Influence`;
+  const actionText = `Discard 1 card to gain ${influenceText} and draw ${cardText}`;
 
   return (
-    <div className="pending-controls trade-intrigue-grid">
-      <div className="trade-intrigue-column">
+    <div className="pending-controls discard-choice-grid discard-influence-draw-grid">
+      <div className="discard-choice-summary">
+        <span>{source}</span>
         <strong>{owner?.leader ?? "Player"}</strong>
-        <span>Discard 1 card to gain {influenceText} and draw {cardText}</span>
-        {discardChoices.length === 0 && <span>No discardable cards</span>}
-        {discardChoices.map((card) => (
-          <button
-            className={selectedCardId === card.id ? "selected" : undefined}
-            type="button"
-            aria-pressed={selectedCardId === card.id}
-            key={card.id}
-            onClick={() => setSelectedCardId(card.id)}
-            title={`Discard ${card.name}`}
-          >
-            {card.thumbnailPath && <img src={card.thumbnailPath} alt="" />}
-            <span>{card.name}</span>
-          </button>
-        ))}
+        <small>{actionText}</small>
       </div>
 
-      <div className="trade-intrigue-column discard-influence-column">
-        <strong>Influence</strong>
-        {influenceChoices.map((faction) => (
-          <button
-            className={selectedFaction === faction ? "selected" : undefined}
-            type="button"
-            aria-pressed={selectedFaction === faction}
-            key={faction}
-            onClick={() => setSelectedFaction(faction)}
-          >
-            <span>{factionLabels[faction]}</span>
-          </button>
-        ))}
+      <div className="discard-choice-section">
+        <div className="discard-choice-section-heading">
+          <strong>Discard card</strong>
+          <span>{discardChoices.length > 0 ? discardableCountText(discardChoices.length) : "No discardable cards"}</span>
+        </div>
+        {discardChoices.length > 0 ? (
+          <div className="discard-choice-cards">
+            {discardChoices.map((card) => (
+              <button
+                className={`discard-choice-card${selectedCardId === card.id ? " selected" : ""}`}
+                type="button"
+                aria-label={card.name}
+                aria-pressed={selectedCardId === card.id}
+                key={card.id}
+                onClick={() => setSelectedCardId(card.id)}
+                title={`Discard ${card.name}`}
+              >
+                {card.thumbnailPath && <img src={card.thumbnailPath} alt="" />}
+                <span className="discard-choice-badge">Discard</span>
+                <strong>{card.name}</strong>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="discard-choice-empty">No discardable cards</div>
+        )}
       </div>
 
-      <button
-        type="button"
-        disabled={!canResolve}
-        onClick={() => {
-          if (selectedCard && selectedFaction) onResolve(selectedCard.id, selectedFaction);
-        }}
-      >
-        Resolve {source}
-      </button>
-      {optional && <button type="button" onClick={onSkip}>Skip</button>}
+      <div className="discard-choice-section discard-influence-section">
+        <div className="discard-choice-section-heading">
+          <strong>Influence</strong>
+          <span>Choose one faction.</span>
+        </div>
+        <div className="discard-choice-options">
+          {influenceChoices.map((faction) => (
+            <button
+              className={`discard-choice-option-card${selectedFaction === faction ? " selected" : ""}`}
+              type="button"
+              aria-pressed={selectedFaction === faction}
+              key={faction}
+              onClick={() => setSelectedFaction(faction)}
+            >
+              <span>{factionLabels[faction]}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="discard-choice-actions">
+        <button
+          type="button"
+          className="discard-choice-action-card"
+          disabled={!canResolve}
+          onClick={() => {
+            if (selectedCard && selectedFaction) onResolve(selectedCard.id, selectedFaction);
+          }}
+        >
+          <span className="discard-choice-badge">Resolve</span>
+          <strong>Resolve {source}</strong>
+          <small>{canResolve ? `Discard ${selectedCard?.name}.` : "Choose a card and faction first."}</small>
+        </button>
+        {optional && (
+          <button type="button" className="discard-choice-action-card" onClick={onSkip}>
+            <span className="discard-choice-badge">Optional</span>
+            <strong>Skip</strong>
+            <small>Leave cards undiscarded.</small>
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -149,6 +183,10 @@ function selectedDrawSuffix(totalDrawCards: number, totalIntrigues: number) {
   return parts.length > 0 ? ` (${parts.join(", ")})` : " (no cards)";
 }
 
+function discardableCountText(count: number) {
+  return count === 1 ? "1 card available" : `${count} cards available`;
+}
+
 export function PendingDiscardDrawPanel({
   discardChoices,
   drawCards,
@@ -171,39 +209,71 @@ export function PendingDiscardDrawPanel({
       : 0;
   const totalDrawCards = drawCards + selectedBonusDraw;
   const bonusTexts = bonusRewardTexts(bonusDraw, bonusIntrigues, drawCards);
+  const summaryText = [baseDrawText(drawCards), ...bonusTexts].join(". ");
+  const resolveLabel = `Resolve ${source}${selectedCard ? selectedDrawSuffix(totalDrawCards, selectedBonusIntrigues) : ""}`;
 
   return (
-    <div className="pending-controls trade-intrigue-grid">
-      <div className="trade-intrigue-column">
+    <div className="pending-controls discard-choice-grid">
+      <div className="discard-choice-summary">
+        <span>{source}</span>
         <strong>{owner?.leader ?? "Player"}</strong>
-        <span>{baseDrawText(drawCards)}</span>
-        {bonusTexts.map((bonusText) => <span key={bonusText}>{bonusText}</span>)}
-        {discardChoices.length === 0 && <span>No discardable cards</span>}
-        {discardChoices.map((card) => (
-          <button
-            className={selectedCardId === card.id ? "selected" : undefined}
-            type="button"
-            aria-pressed={selectedCardId === card.id}
-            key={card.id}
-            onClick={() => setSelectedCardId(card.id)}
-            title={`Discard ${card.name}`}
-          >
-            {card.thumbnailPath && <img src={card.thumbnailPath} alt="" />}
-            <span>{card.name}</span>
-          </button>
-        ))}
+        <small>{summaryText}</small>
       </div>
 
-      <button
-        type="button"
-        disabled={!selectedCard}
-        onClick={() => {
-          if (selectedCard) onResolve(selectedCard.id);
-        }}
-      >
-        Resolve {source}{selectedCard ? selectedDrawSuffix(totalDrawCards, selectedBonusIntrigues) : ""}
-      </button>
-      {optional && <button type="button" onClick={onSkip}>Skip</button>}
+      <div className="discard-choice-section">
+        <div className="discard-choice-section-heading">
+          <strong>Discard card</strong>
+          <span>{discardChoices.length > 0 ? discardableCountText(discardChoices.length) : "No discardable cards"}</span>
+        </div>
+        {discardChoices.length > 0 ? (
+          <div className="discard-choice-cards">
+            {discardChoices.map((card) => (
+              <button
+                className={`discard-choice-card${selectedCardId === card.id ? " selected" : ""}`}
+                type="button"
+                aria-label={card.name}
+                aria-pressed={selectedCardId === card.id}
+                key={card.id}
+                onClick={() => setSelectedCardId(card.id)}
+                title={`Discard ${card.name}`}
+              >
+                {card.thumbnailPath && <img src={card.thumbnailPath} alt="" />}
+                <span className="discard-choice-badge">Discard</span>
+                <strong>{card.name}</strong>
+                <small>
+                  {selectedCardId === card.id
+                    ? selectedDrawSuffix(totalDrawCards, selectedBonusIntrigues).replace(/[()]/g, "")
+                    : "Select to preview reward."}
+                </small>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="discard-choice-empty">No discardable cards</div>
+        )}
+      </div>
+
+      <div className="discard-choice-actions">
+        <button
+          type="button"
+          className="discard-choice-action-card"
+          disabled={!selectedCard}
+          onClick={() => {
+            if (selectedCard) onResolve(selectedCard.id);
+          }}
+        >
+          <span className="discard-choice-badge">Resolve</span>
+          <strong>{resolveLabel}</strong>
+          <small>{selectedCard ? `Discard ${selectedCard.name}.` : "Select a card first."}</small>
+        </button>
+        {optional && (
+          <button type="button" className="discard-choice-action-card" onClick={onSkip}>
+            <span className="discard-choice-badge">Optional</span>
+            <strong>Skip</strong>
+            <small>Leave cards undiscarded.</small>
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -252,41 +322,66 @@ export function PendingDiscardRewardPanel({
   const discardText = pending.total === 1 ? "Discard 1 card" : `Discard ${pending.total} cards`;
   const remainingText = pending.remaining < pending.total ? `${pending.remaining} remaining` : undefined;
   const rewardTexts = discardRewardTexts(pending);
+  const actionText = `${discardText}${rewardTexts.length > 0 ? ` to ${rewardTexts.join("; ")}` : ""}${remainingText ? ` (${remainingText})` : ""}`;
+  const resolveLabel = pending.remaining > 1 ? `Discard ${selectedCard?.name ?? "card"}` : `Resolve ${pending.source}`;
 
   return (
-    <div className="pending-controls trade-intrigue-grid">
-      <div className="trade-intrigue-column">
+    <div className="pending-controls discard-choice-grid">
+      <div className="discard-choice-summary">
+        <span>{pending.source}</span>
         <strong>{owner?.leader ?? "Player"}</strong>
-        <span>
-          {pending.source}: {discardText}{rewardTexts.length > 0 ? ` to ${rewardTexts.join("; ")}` : ""}
-          {remainingText ? ` (${remainingText})` : ""}
-        </span>
-        {discardChoices.length === 0 && <span>No discardable cards</span>}
-        {discardChoices.map((card) => (
-          <button
-            className={selectedCardId === card.id ? "selected" : undefined}
-            type="button"
-            aria-pressed={selectedCardId === card.id}
-            key={card.id}
-            onClick={() => setSelectedCardId(card.id)}
-            title={`Discard ${card.name}`}
-          >
-            {card.thumbnailPath && <img src={card.thumbnailPath} alt="" />}
-            <span>{card.name}</span>
-          </button>
-        ))}
+        <small>{actionText}</small>
       </div>
 
-      <button
-        type="button"
-        disabled={!selectedCard}
-        onClick={() => {
-          if (selectedCard) onResolve(selectedCard.id);
-        }}
-      >
-        {pending.remaining > 1 ? `Discard ${selectedCard?.name ?? "card"}` : `Resolve ${pending.source}`}
-      </button>
-      {pending.optional && <button type="button" onClick={onSkip}>Skip</button>}
+      <div className="discard-choice-section">
+        <div className="discard-choice-section-heading">
+          <strong>Discard card</strong>
+          <span>{discardChoices.length > 0 ? discardableCountText(discardChoices.length) : "No discardable cards"}</span>
+        </div>
+        {discardChoices.length > 0 ? (
+          <div className="discard-choice-cards">
+            {discardChoices.map((card) => (
+              <button
+                className={`discard-choice-card${selectedCardId === card.id ? " selected" : ""}`}
+                type="button"
+                aria-label={card.name}
+                aria-pressed={selectedCardId === card.id}
+                key={card.id}
+                onClick={() => setSelectedCardId(card.id)}
+                title={`Discard ${card.name}`}
+              >
+                {card.thumbnailPath && <img src={card.thumbnailPath} alt="" />}
+                <span className="discard-choice-badge">Discard</span>
+                <strong>{card.name}</strong>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="discard-choice-empty">No discardable cards</div>
+        )}
+      </div>
+
+      <div className="discard-choice-actions">
+        <button
+          type="button"
+          className="discard-choice-action-card"
+          disabled={!selectedCard}
+          onClick={() => {
+            if (selectedCard) onResolve(selectedCard.id);
+          }}
+        >
+          <span className="discard-choice-badge">Resolve</span>
+          <strong>{resolveLabel}</strong>
+          <small>{selectedCard ? `Discard ${selectedCard.name}.` : "Select a card first."}</small>
+        </button>
+        {pending.optional && (
+          <button type="button" className="discard-choice-action-card" onClick={onSkip}>
+            <span className="discard-choice-badge">Optional</span>
+            <strong>Skip</strong>
+            <small>Leave cards undiscarded.</small>
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -309,37 +404,59 @@ export function PendingDiscardHandCardPanel({
   const [selectedCardId, setSelectedCardId] = useState<string>();
   const selectedCard = discardChoices.find((card) => card.id === selectedCardId);
   const remainingText = remaining === 1 ? "Discard 1 card" : `Discard ${remaining} cards`;
+  const resolveLabel = `Discard ${selectedCard?.name ?? "card"}`;
 
   return (
-    <div className="pending-controls trade-intrigue-grid">
-      <div className="trade-intrigue-column">
+    <div className="pending-controls discard-choice-grid">
+      <div className="discard-choice-summary">
+        <span>{source}</span>
         <strong>{owner?.leader ?? "Player"}</strong>
-        <span>{source}: {remainingText}</span>
-        {discardChoices.length === 0 && <span>No discardable cards</span>}
-        {discardChoices.map((card) => (
-          <button
-            className={selectedCardId === card.id ? "selected" : undefined}
-            type="button"
-            aria-pressed={selectedCardId === card.id}
-            key={card.id}
-            onClick={() => setSelectedCardId(card.id)}
-            title={`Discard ${card.name}`}
-          >
-            {card.thumbnailPath && <img src={card.thumbnailPath} alt="" />}
-            <span>{card.name}</span>
-          </button>
-        ))}
+        <small>{remainingText} from this opponent's hand.</small>
       </div>
 
-      <button
-        type="button"
-        disabled={!selectedCard}
-        onClick={() => {
-          if (selectedCard) onResolve(selectedCard.id);
-        }}
-      >
-        Discard {selectedCard?.name ?? "card"}
-      </button>
+      <div className="discard-choice-section">
+        <div className="discard-choice-section-heading">
+          <strong>Opponent hand</strong>
+          <span>{discardChoices.length > 0 ? discardableCountText(discardChoices.length) : "No discardable cards"}</span>
+        </div>
+        {discardChoices.length > 0 ? (
+          <div className="discard-choice-cards">
+            {discardChoices.map((card) => (
+              <button
+                className={`discard-choice-card${selectedCardId === card.id ? " selected" : ""}`}
+                type="button"
+                aria-label={card.name}
+                aria-pressed={selectedCardId === card.id}
+                key={card.id}
+                onClick={() => setSelectedCardId(card.id)}
+                title={`Discard ${card.name}`}
+              >
+                {card.thumbnailPath && <img src={card.thumbnailPath} alt="" />}
+                <span className="discard-choice-badge">Discard</span>
+                <strong>{card.name}</strong>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="discard-choice-empty">No discardable cards</div>
+        )}
+      </div>
+
+      <div className="discard-choice-actions">
+        <button
+          type="button"
+          className="discard-choice-action-card"
+          aria-label={resolveLabel}
+          disabled={!selectedCard}
+          onClick={() => {
+            if (selectedCard) onResolve(selectedCard.id);
+          }}
+        >
+          <span className="discard-choice-badge">Resolve</span>
+          <strong>{resolveLabel}</strong>
+          <small>{selectedCard ? `Move ${selectedCard.name} to discard.` : "Select a card first."}</small>
+        </button>
+      </div>
     </div>
   );
 }
@@ -363,20 +480,35 @@ export function PendingInfluenceIntriguePanel({
   onChoose,
   onSkip,
 }: PendingInfluenceIntriguePanelProps) {
+  const intrigueText = `${amount} Intrigue${amount === 1 ? "" : "s"}`;
   return (
-    <div className="pending-controls">
-      <strong>{owner?.leader ?? "Player"}</strong>
-      <span>{source}: lose 1 Influence to draw {amount} Intrigue{amount === 1 ? "" : "s"}</span>
+    <div className="pending-controls support-grid influence-choice-grid">
+      <div className="influence-choice-summary">
+        <span>{source}</span>
+        <strong>{owner?.leader ?? "Player"}</strong>
+        <small>Lose 1 Influence to draw {intrigueText}.</small>
+      </div>
       {influenceChoices.map((faction) => (
         <button
           type="button"
+          className="influence-choice-card"
+          aria-label={factionLabels[faction]}
           key={faction}
           onClick={() => onChoose(faction)}
+          title={`Lose 1 ${factionLabels[faction]} Influence`}
         >
-          {factionLabels[faction]}
+          <span className="influence-choice-badge">
+            <Handshake size={14} /> {factionShortLabels[faction]}
+          </span>
+          <strong>{factionLabels[faction]}</strong>
+          <small>Lose 1 Influence to draw {intrigueText}</small>
         </button>
       ))}
-      {optional && <button type="button" onClick={onSkip}>Skip</button>}
+      {optional && (
+        <button type="button" className="influence-choice-skip" aria-label="Skip" onClick={onSkip}>
+          Skip
+        </button>
+      )}
     </div>
   );
 }

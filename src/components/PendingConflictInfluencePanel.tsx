@@ -20,22 +20,26 @@ export function PendingConflictInfluencePanel({
   const choices = pending.choices ?? mainBoardInfluenceChoices;
 
   return (
-    <div className="pending-controls support-grid">
+    <div className="pending-controls support-grid influence-choice-grid">
       {owner ? (
         <>
-          <span>
-            {owner.leader}: choose {pending.remaining} Influence reward{pending.remaining === 1 ? "" : "s"} from {pending.source}
-          </span>
+          <div className="influence-choice-summary">
+            <span>{owner.leader}: choose from {pending.source}</span>
+            <strong>{pending.remaining} Influence reward{pending.remaining === 1 ? "" : "s"}</strong>
+          </div>
           {choices.map((faction) => (
             <button
               type="button"
+              className="influence-choice-card"
               key={faction}
               onClick={() => onChoose(faction)}
               title={`Gain 1 ${factionLabels[faction]} Influence`}
             >
-              <Handshake size={14} />
-              <span>{factionShortLabels[faction]}</span>
-              {factionLabels[faction]}
+              <span className="influence-choice-badge">
+                <Handshake size={14} /> {factionShortLabels[faction]}
+              </span>
+              <strong>{factionLabels[faction]}</strong>
+              <small>Gain 1 Influence</small>
             </button>
           ))}
         </>

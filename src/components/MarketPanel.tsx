@@ -3,15 +3,29 @@ import type { Card, GameState, Player } from "../game/types";
 
 type MarketPanelProps = {
   activePlayer: Player;
+  combatContext: boolean;
+  compactForActionContext: boolean;
   game: GameState;
   pendingLocked: boolean;
   playingPhase: boolean;
   onBuyCard: (card: Card) => void;
 };
 
-export function MarketPanel({ activePlayer, game, pendingLocked, playingPhase, onBuyCard }: MarketPanelProps) {
+export function MarketPanel({
+  activePlayer,
+  combatContext,
+  compactForActionContext,
+  game,
+  pendingLocked,
+  playingPhase,
+  onBuyCard,
+}: MarketPanelProps) {
   return (
-    <div className="market-panel">
+    <div className={[
+      "market-panel",
+      compactForActionContext ? "market-panel-compact" : "",
+      combatContext ? "market-panel-combat" : "",
+    ].filter(Boolean).join(" ")}>
       <div className="panel-heading">
         <div>
           <p className="eyebrow">Imperium row</p>

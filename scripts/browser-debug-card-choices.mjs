@@ -24,6 +24,15 @@ export async function runCardChoicesSmoke({
   assert.match(pendingText, /CHOAM contract/i);
   assert.match(pendingText, new RegExp(escapeRegExp(contractName)));
   await screenshot(page, captures, "pending-contract-public.png");
+  const contractMobileViewport = { width: 390, height: 900 };
+  await page.setViewportSize(contractMobileViewport);
+  const contractMobileScrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+  assert.ok(
+    contractMobileScrollWidth <= contractMobileViewport.width,
+    `Contract choice mobile pending panel should not overflow horizontally (${contractMobileScrollWidth}px)`,
+  );
+  await screenshot(page, captures, "pending-contract-public-mobile-390.png");
+  await page.setViewportSize({ width: 1440, height: 1100 });
 
   let before = await currentGame(page);
   let ownerBefore = before.players.find((player) => player.id === "p2");
@@ -75,6 +84,15 @@ export async function runCardChoicesSmoke({
   assert.match(pendingText, /acquisition/i);
   assert.match(pendingText, new RegExp(escapeRegExp(acquireName)));
   await screenshot(page, captures, "pending-acquire-card.png");
+  const acquireMobileViewport = { width: 390, height: 900 };
+  await page.setViewportSize(acquireMobileViewport);
+  const acquireMobileScrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+  assert.ok(
+    acquireMobileScrollWidth <= acquireMobileViewport.width,
+    `Acquire card mobile pending panel should not overflow horizontally (${acquireMobileScrollWidth}px)`,
+  );
+  await screenshot(page, captures, "pending-acquire-card-mobile-390.png");
+  await page.setViewportSize({ width: 1440, height: 1100 });
 
   before = await currentGame(page);
   ownerBefore = before.players.find((player) => player.id === "p2");
@@ -241,6 +259,15 @@ export async function runCardChoicesSmoke({
   assert.match(pendingText, /Skip/i);
   assert.doesNotMatch(pendingText, /Tread in Darkness Debug Other Bene/i);
   await screenshot(page, captures, "pending-tread-in-darkness-trash-draw.png");
+  const trashCardMobileViewport = { width: 390, height: 900 };
+  await page.setViewportSize(trashCardMobileViewport);
+  const trashCardMobileScrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+  assert.ok(
+    trashCardMobileScrollWidth <= trashCardMobileViewport.width,
+    `Trash card mobile pending panel should not overflow horizontally (${trashCardMobileScrollWidth}px)`,
+  );
+  await screenshot(page, captures, "pending-tread-in-darkness-trash-draw-mobile-390.png");
+  await page.setViewportSize({ width: 1440, height: 1100 });
 
   before = await currentGame(page);
   await page.locator(".pending-panel").getByRole("button", { name: /Tread in Darkness \(in play\)/ }).click();
@@ -305,7 +332,7 @@ export async function runCardChoicesSmoke({
   await setDebugGameAndWait(page, states.acquireSpyNetwork);
   pendingText = await page.locator(".pending-panel").innerText();
   assert.match(pendingText, /Spy Network/i);
-  assert.match(pendingText, /spies ready/i);
+  assert.match(pendingText, /(?:spy|spies) ready/i);
   assert.equal(await page.locator(".pending-panel").getByRole("button", { name: "Done" }).isDisabled(), true);
   await screenshot(page, captures, "pending-acquire-spy-network-spy.png");
 
@@ -382,7 +409,7 @@ export async function runCardChoicesSmoke({
   await setDebugGameAndWait(page, states.inHighPlaces);
   pendingText = await page.locator(".pending-panel").innerText();
   assert.match(pendingText, /In High Places/i);
-  assert.match(pendingText, /spies ready/i);
+  assert.match(pendingText, /(?:spy|spies) ready/i);
   assert.equal(await page.locator(".pending-panel").getByRole("button", { name: "Done" }).isDisabled(), true);
   before = await currentGame(page);
   ownerBefore = before.players.find((player) => player.id === "p2");
@@ -392,6 +419,15 @@ export async function runCardChoicesSmoke({
     "In High Places should draw its card before the queued spy placement",
   );
   await screenshot(page, captures, "pending-in-high-places-spy.png");
+  const spyPlacementMobileViewport = { width: 390, height: 900 };
+  await page.setViewportSize(spyPlacementMobileViewport);
+  const spyPlacementMobileScrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+  assert.ok(
+    spyPlacementMobileScrollWidth <= spyPlacementMobileViewport.width,
+    `Spy placement mobile pending panel should not overflow horizontally (${spyPlacementMobileScrollWidth}px)`,
+  );
+  await screenshot(page, captures, "pending-in-high-places-spy-mobile-390.png");
+  await page.setViewportSize({ width: 1440, height: 1100 });
 
   await page.locator(".pending-panel").getByRole("button", { name: states.inHighPlaces.spySpaceName }).click();
   await waitForNoPending(page);
@@ -403,7 +439,7 @@ export async function runCardChoicesSmoke({
   await setDebugGameAndWait(page, states.beneGesseritOperativeSpy);
   pendingText = await page.locator(".pending-panel").innerText();
   assert.match(pendingText, /Bene Gesserit Operative/i);
-  assert.match(pendingText, /spies ready/i);
+  assert.match(pendingText, /(?:spy|spies) ready/i);
   assert.equal(await page.locator(".pending-panel").getByRole("button", { name: "Done" }).isDisabled(), true);
   await screenshot(page, captures, "pending-bene-gesserit-operative-spy.png");
 
@@ -442,7 +478,7 @@ export async function runCardChoicesSmoke({
 
   await page.locator(".pending-panel").getByRole("button", { name: states.beneGesseritOperativeRecallSpy.spyRecallSpaceName }).click();
   pendingText = await page.locator(".pending-panel").innerText();
-  assert.match(pendingText, /1 spies ready/i);
+  assert.match(pendingText, /1 spy ready/i);
   assert.match(pendingText, new RegExp(escapeRegExp(states.beneGesseritOperativeRecallSpy.spyPlaceAfterRecallSpaceName)));
   await page.locator(".pending-panel").getByRole("button", { name: states.beneGesseritOperativeRecallSpy.spyPlaceAfterRecallSpaceName }).click();
   await waitForNoPending(page);
@@ -465,6 +501,15 @@ export async function runCardChoicesSmoke({
   assert.match(pendingText, new RegExp(escapeRegExp(capturedMentatDiscardName)));
   assert.match(pendingText, /Bene Gesserit/i);
   await screenshot(page, captures, "pending-captured-mentat.png");
+  const capturedMentatMobileViewport = { width: 390, height: 900 };
+  await page.setViewportSize(capturedMentatMobileViewport);
+  const capturedMentatMobileScrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+  assert.ok(
+    capturedMentatMobileScrollWidth <= capturedMentatMobileViewport.width,
+    `Captured Mentat mobile pending panel should not overflow horizontally (${capturedMentatMobileScrollWidth}px)`,
+  );
+  await screenshot(page, captures, "pending-captured-mentat-mobile-390.png");
+  await page.setViewportSize({ width: 1440, height: 1100 });
 
   before = await currentGame(page);
   ownerBefore = before.players.find((player) => player.id === "p2");
@@ -746,6 +791,15 @@ export async function runCardChoicesSmoke({
     "Branching Path should expose a Skip button",
   );
   await screenshot(page, captures, "pending-branching-path-trash-intrigue.png");
+  const trashIntrigueMobileViewport = { width: 390, height: 900 };
+  await page.setViewportSize(trashIntrigueMobileViewport);
+  const trashIntrigueMobileScrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+  assert.ok(
+    trashIntrigueMobileScrollWidth <= trashIntrigueMobileViewport.width,
+    `Trash Intrigue mobile pending panel should not overflow horizontally (${trashIntrigueMobileScrollWidth}px)`,
+  );
+  await screenshot(page, captures, "pending-branching-path-trash-intrigue-mobile-390.png");
+  await page.setViewportSize({ width: 1440, height: 1100 });
 
   before = await currentGame(page);
   ownerBefore = before.players.find((player) => player.id === "p2");
@@ -899,6 +953,15 @@ export async function runCardChoicesSmoke({
   assert.match(pendingText, /Covert Operation/i);
   assert.match(pendingText, new RegExp(escapeRegExp(covertOperationDiscardName)));
   await screenshot(page, captures, "pending-covert-operation-opponent-discard.png");
+  const covertOperationMobileViewport = { width: 390, height: 900 };
+  await page.setViewportSize(covertOperationMobileViewport);
+  const covertOperationMobileScrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+  assert.ok(
+    covertOperationMobileScrollWidth <= covertOperationMobileViewport.width,
+    `Covert Operation mobile pending panel should not overflow horizontally (${covertOperationMobileScrollWidth}px)`,
+  );
+  await screenshot(page, captures, "pending-covert-operation-opponent-discard-mobile-390.png");
+  await page.setViewportSize({ width: 1440, height: 1100 });
 
   await page.locator(".pending-panel").getByRole("button", { name: covertOperationDiscardName }).click();
   await page.locator(".pending-panel").getByRole("button", { name: `Discard ${covertOperationDiscardName}` }).click();
@@ -938,6 +1001,15 @@ export async function runCardChoicesSmoke({
   assert.match(pendingText, /Captured Mentat reveal/i);
   assert.match(pendingText, /Bene Gesserit/i);
   await screenshot(page, captures, "pending-captured-mentat-reveal.png");
+  const capturedMentatRevealMobileViewport = { width: 390, height: 900 };
+  await page.setViewportSize(capturedMentatRevealMobileViewport);
+  const capturedMentatRevealMobileScrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+  assert.ok(
+    capturedMentatRevealMobileScrollWidth <= capturedMentatRevealMobileViewport.width,
+    `Captured Mentat reveal mobile pending panel should not overflow horizontally (${capturedMentatRevealMobileScrollWidth}px)`,
+  );
+  await screenshot(page, captures, "pending-captured-mentat-reveal-mobile-390.png");
+  await page.setViewportSize({ width: 1440, height: 1100 });
 
   before = await currentGame(page);
   ownerBefore = before.players.find((player) => player.id === "p2");

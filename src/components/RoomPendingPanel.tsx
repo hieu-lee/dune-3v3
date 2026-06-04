@@ -1,3 +1,4 @@
+import { Clock, Crown } from "lucide-react";
 import { canMoveCardToThroneRow } from "../game/state";
 import type { GameState } from "../game/types";
 
@@ -14,9 +15,18 @@ export function RoomPendingPanel({ claimedPlayerId, game, onChooseThroneRowCard 
   if (pending.kind !== "throne-row") {
     const owner = "ownerId" in pending ? game.players.find((player) => player.id === pending.ownerId) : undefined;
     return (
-      <section className="room-pending-panel" aria-label="Room pending action">
-        <p className="eyebrow">Pending online action</p>
-        <strong>{owner ? owner.leader : "Table"} must resolve {pending.kind}</strong>
+      <section className="room-pending-panel room-pending-generic" aria-label="Room pending action">
+        <div className="room-pending-summary">
+          <div>
+            <p className="eyebrow">Pending online action</p>
+            <h2>{owner ? owner.leader : "Table"} must resolve</h2>
+            <small>{pending.kind.replaceAll("-", " ")}</small>
+          </div>
+          <span className="room-pending-status waiting">
+            <Clock size={14} />
+            Waiting
+          </span>
+        </div>
       </section>
     );
   }
@@ -24,14 +34,23 @@ export function RoomPendingPanel({ claimedPlayerId, game, onChooseThroneRowCard 
   const owner = game.players.find((player) => player.id === pending.ownerId);
   const canChoose = claimedPlayerId === pending.ownerId;
   const eligibleCards = game.imperiumRow.filter(canMoveCardToThroneRow);
+  const actorName = owner?.leader ?? "Shaddam";
   return (
-    <section className="room-pending-panel" aria-label="Room Throne Row choice">
-      <div className="panel-heading">
+    <section className="room-pending-panel room-pending-throne" aria-label="Room Throne Row choice">
+      <div className="room-pending-summary">
         <div>
           <p className="eyebrow">Pending online action</p>
-          <h2>{owner?.leader ?? "Shaddam"} Throne Row</h2>
+          <h2>{actorName} Throne Row</h2>
+          <small>
+            {canChoose
+              ? "Choose one eligible Imperium Row card to move into the team Throne Row."
+              : `Waiting for ${actorName} to choose one eligible Imperium Row card.`}
+          </small>
         </div>
-        <span>{canChoose ? "Your choice" : "Waiting"}</span>
+        <span className={`room-pending-status ${canChoose ? "ready" : "waiting"}`}>
+          {canChoose ? <Crown size={14} /> : <Clock size={14} />}
+          {canChoose ? "Your choice" : "Waiting"}
+        </span>
       </div>
       <div className="room-throne-row">
         {eligibleCards.map((card) => (

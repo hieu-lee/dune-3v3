@@ -75,6 +75,15 @@ export async function runLeaderCharacterChoicesSmoke({
   const noSupplySpiceAgonyButton = page.locator(".pending-panel").getByRole("button", { name: /Spend 1 spice: Intrigue \+ memory/ });
   assert.equal(await noSupplySpiceAgonyButton.isDisabled(), true, "Spice Agony pay button should disable when the memory has no troop supply");
   await screenshot(page, captures, "pending-jessica-spice-agony-no-supply.png");
+  const spiceAgonyNoSupplyMobileViewport = { width: 390, height: 900 };
+  await page.setViewportSize(spiceAgonyNoSupplyMobileViewport);
+  const spiceAgonyNoSupplyMobileScrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+  assert.ok(
+    spiceAgonyNoSupplyMobileScrollWidth <= spiceAgonyNoSupplyMobileViewport.width,
+    `Spice Agony no-supply mobile pending panel should not overflow horizontally (${spiceAgonyNoSupplyMobileScrollWidth}px)`,
+  );
+  await screenshot(page, captures, "pending-jessica-spice-agony-no-supply-mobile-390.png");
+  await page.setViewportSize({ width: 1440, height: 1100 });
 
   await setDebugGameAndWait(page, states.jessicaWaterOfLife);
   pendingText = await page.locator(".pending-panel").innerText();
@@ -124,6 +133,15 @@ export async function runLeaderCharacterChoicesSmoke({
   assert.match(pendingText, /Command Respect/i);
   assert.match(pendingText, /Trade with Gurney Halleck/i);
   await screenshot(page, captures, "pending-command-respect.png");
+  const commandRespectMobileViewport = { width: 390, height: 900 };
+  await page.setViewportSize(commandRespectMobileViewport);
+  const commandRespectMobileScrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+  assert.ok(
+    commandRespectMobileScrollWidth <= commandRespectMobileViewport.width,
+    `Command Respect mobile pending panel should not overflow horizontally (${commandRespectMobileScrollWidth}px)`,
+  );
+  await screenshot(page, captures, "pending-command-respect-mobile-390.png");
+  await page.setViewportSize({ width: 1440, height: 1100 });
   before = await currentGame(page);
   const commandRespectCommanderBefore = before.players.find((player) => player.id === "p1");
   const commandRespectCardId = before.pendingAction.cardId;
@@ -298,6 +316,19 @@ export async function runLeaderCharacterChoicesSmoke({
   assert.match(pendingText, /0\/7 spice committed/i);
   assert.match(pendingText, /Gurney Halleck/i);
   await screenshot(page, captures, "pending-threaten-spice-production.png");
+
+  const threatenMobileViewport = { width: 390, height: 900 };
+  await page.setViewportSize(threatenMobileViewport);
+  await setDebugGameAndWait(page, states.threatenSpiceProduction);
+  const threatenMobileScrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+  assert.ok(
+    threatenMobileScrollWidth <= threatenMobileViewport.width,
+    `Threaten Spice Production mobile pending panel should not overflow horizontally (${threatenMobileScrollWidth}px)`,
+  );
+  await screenshot(page, captures, "pending-threaten-spice-production-mobile-390.png");
+  await page.setViewportSize({ width: 1440, height: 1100 });
+  await setDebugGameAndWait(page, states.threatenSpiceProduction);
+
   before = await currentGame(page);
   const threatenCommanderBefore = before.players.find((player) => player.id === "p1");
   const threatenFirstAllyBefore = before.players.find((player) => player.id === "p3");

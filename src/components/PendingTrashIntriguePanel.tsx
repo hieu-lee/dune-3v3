@@ -54,42 +54,77 @@ export function PendingTrashIntriguePanel({
 }: PendingTrashIntriguePanelProps) {
   const [selectedIntrigueId, setSelectedIntrigueId] = useState<string>();
   const selectedIntrigue = choices.find((card) => card.id === selectedIntrigueId);
+  const ownerLabel = owner?.leader ?? "Player";
+  const actionText = `Trash 1 Intrigue${resourceCostText(pending.cost)} to ${rewardText(pending)}`;
 
   return (
-    <div className="pending-controls trade-intrigue-grid">
-      <div className="trade-intrigue-column">
-        <strong>{owner?.leader ?? "Player"}</strong>
-        <span>Trash 1 Intrigue{resourceCostText(pending.cost)} to {rewardText(pending)}</span>
-        {choices.length === 0 && <span>No Intrigues</span>}
-        {choices.map((card) => (
-          <button
-            className={selectedIntrigueId === card.id ? "selected" : undefined}
-            type="button"
-            aria-pressed={selectedIntrigueId === card.id}
-            key={card.id}
-            onClick={() => setSelectedIntrigueId(card.id)}
-            title={`Trash ${card.name}`}
-          >
-            {card.thumbnailPath && <img src={card.thumbnailPath} alt="" />}
-            <span>{card.name}</span>
-          </button>
-        ))}
+    <div className="pending-controls trash-choice-grid trash-intrigue-choice-grid">
+      <div className="trash-choice-summary">
+        <span>{pending.source}</span>
+        <strong>{ownerLabel}: Intrigue trash</strong>
+        <small>{actionText}</small>
       </div>
 
-      <button
-        type="button"
-        disabled={!selectedIntrigue || !canPay}
-        onClick={() => {
-          if (selectedIntrigue && canPay) onResolve(selectedIntrigue.id);
-        }}
-        title={canPay ? `Resolve ${pending.source}` : `Cannot pay ${pending.source} cost`}
-      >
-        Resolve {pending.source}
-      </button>
+      <div className="trash-choice-section">
+        <div className="trash-choice-section-heading">
+          <strong>Choose Intrigue</strong>
+          <span>{choices.length > 0 ? `${choices.length} ${choices.length === 1 ? "card" : "cards"} available` : "No Intrigues"}</span>
+        </div>
+        {choices.length > 0 ? (
+          <div className="trash-choice-cards">
+            {choices.map((card) => (
+              <button
+                className={`trash-choice-card${selectedIntrigueId === card.id ? " selected" : ""}`}
+                type="button"
+                aria-label={card.name}
+                aria-pressed={selectedIntrigueId === card.id}
+                key={card.id}
+                onClick={() => setSelectedIntrigueId(card.id)}
+                title={`Trash ${card.name}`}
+              >
+                {card.thumbnailPath && <img src={card.thumbnailPath} alt="" />}
+                <span className="trash-choice-badge">Select</span>
+                <strong>{card.name}</strong>
+                <small>Intrigue</small>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="trash-choice-empty">No Intrigues</div>
+        )}
+      </div>
 
-      {(pending.optional || choices.length === 0 || !canPay) && (
-        <button type="button" onClick={onSkip}>{pending.optional ? "Skip" : "Continue"}</button>
-      )}
+      <div className="trash-choice-actions">
+        <button
+          type="button"
+          className="trash-choice-action-card trash-choice-resolve"
+          aria-label={`Resolve ${pending.source}`}
+          disabled={!selectedIntrigue || !canPay}
+          onClick={() => {
+            if (selectedIntrigue && canPay) onResolve(selectedIntrigue.id);
+          }}
+          title={canPay ? `Resolve ${pending.source}` : `Cannot pay ${pending.source} cost`}
+        >
+          <span className="trash-choice-badge">Resolve</span>
+          <strong>Resolve {pending.source}</strong>
+          <small>
+            {!canPay ? "Cost cannot be paid." : selectedIntrigue ? `Trash ${selectedIntrigue.name}.` : "Select an Intrigue first."}
+          </small>
+        </button>
+
+        {(pending.optional || choices.length === 0 || !canPay) && (
+          <button
+            type="button"
+            className="trash-choice-action-card"
+            aria-label={pending.optional ? "Skip" : "Continue"}
+            onClick={onSkip}
+          >
+            <span className="trash-choice-badge">{pending.optional ? "Optional" : "Blocked"}</span>
+            <strong>{pending.optional ? "Skip" : "Continue"}</strong>
+            <small>{pending.optional ? "Leave Intrigues untrashed." : "Cannot resolve this trash effect."}</small>
+          </button>
+        )}
+      </div>
     </div>
   );
 }

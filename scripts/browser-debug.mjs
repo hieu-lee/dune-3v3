@@ -226,6 +226,15 @@ async function runAgentPlacementSmoke(page, url, server, captures) {
   );
 
   await screenshot(page, captures, "agent-placement-ready.png");
+  const agentPlacementMobileViewport = { width: 390, height: 900 };
+  await page.setViewportSize(agentPlacementMobileViewport);
+  const agentPlacementMobileScrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+  assert(
+    agentPlacementMobileScrollWidth <= agentPlacementMobileViewport.width,
+    `Agent placement mobile view should not overflow horizontally (${agentPlacementMobileScrollWidth}px)`,
+  );
+  await screenshot(page, captures, "agent-placement-ready-mobile-390.png");
+  await page.setViewportSize({ width: 1440, height: 1100 });
 
   const cardButton = page.getByTestId(`hand-card-${plan.cardId}`);
   assert.equal(await cardButton.count(), 1, `Expected one hand card button for ${plan.cardName}`);

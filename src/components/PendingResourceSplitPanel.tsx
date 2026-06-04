@@ -11,6 +11,10 @@ type PendingResourceSplitPanelProps = {
   onChoose: (optionIndex: number) => void;
 };
 
+function resourceIcon(resourceId: CommanderResourceSplitPendingAction["options"][number]["commanderResource"]) {
+  return resources.find((resource) => resource.id === resourceId)?.Icon ?? Sparkles;
+}
+
 export function PendingResourceSplitPanel({
   ally,
   commander,
@@ -18,21 +22,38 @@ export function PendingResourceSplitPanel({
   onChoose,
 }: PendingResourceSplitPanelProps) {
   return (
-    <div className="pending-controls">
-      <span>{commander.leader} / {ally.leader}</span>
-      {pending.options.map((option, index) => {
-        const Icon = resources.find((resource) => resource.id === option.commanderResource)?.Icon ?? Sparkles;
-        return (
-          <button
-            type="button"
-            key={`${option.commanderResource}-${option.allyResource}`}
-            onClick={() => onChoose(index)}
-          >
-            <Icon size={15} />
-            Commander {resourceChoiceLabel(option.commanderAmount, option.commanderResource)} / Ally {resourceChoiceLabel(option.allyAmount, option.allyResource)}
-          </button>
-        );
-      })}
+    <div className="pending-controls resource-split-choice">
+      <div className="resource-split-participants">
+        <span>Commander / Ally</span>
+        <strong>{commander.leader} / {ally.leader}</strong>
+      </div>
+      <div className="resource-split-options">
+        {pending.options.map((option, index) => {
+          const CommanderIcon = resourceIcon(option.commanderResource);
+          const AllyIcon = resourceIcon(option.allyResource);
+          const commanderLabel = resourceChoiceLabel(option.commanderAmount, option.commanderResource);
+          const allyLabel = resourceChoiceLabel(option.allyAmount, option.allyResource);
+          return (
+            <button
+              type="button"
+              key={`${option.commanderResource}-${option.allyResource}`}
+              className="resource-split-option"
+              aria-label={`Commander ${commanderLabel} / Ally ${allyLabel}`}
+              onClick={() => onChoose(index)}
+            >
+              <span className="resource-split-lane">
+                <span>Commander</span>
+                <strong><CommanderIcon size={15} />{commanderLabel}</strong>
+              </span>
+              <span className="resource-split-divider">/</span>
+              <span className="resource-split-lane">
+                <span>Ally</span>
+                <strong><AllyIcon size={15} />{allyLabel}</strong>
+              </span>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

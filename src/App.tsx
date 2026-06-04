@@ -406,7 +406,13 @@ export default function App() {
         onLeaveRoom={roomSession.leaveRoom}
         onReleaseSeat={roomSession.releaseSeat}
       />
-      {roomSession.inRoom && <RoomPrivatePanel player={claimedPlayer} />}
+      {roomSession.inRoom && (
+        <RoomPrivatePanel
+          compactForPending={game.pendingAction?.kind === "team-resource-payment"}
+          phase={game.phase}
+          player={claimedPlayer}
+        />
+      )}
       {roomSession.inRoom && !canResolveRoomPending && (
         <RoomPendingPanel
           claimedPlayerId={roomSession.claimedPlayerId}
@@ -486,6 +492,7 @@ export default function App() {
           activatedAlly={activatedAlly}
           agentTurnComplete={game.agentTurnComplete}
           canPlayAgent={canPlayAgent}
+          phase={game.phase}
           pendingActionActive={Boolean(game.pendingAction)}
           pendingLocked={pendingLocked}
           playingPhase={playingPhase && !roomActionLocked}
@@ -514,6 +521,8 @@ export default function App() {
 
         <MarketPanel
           activePlayer={activePlayer}
+          combatContext={game.phase === "combat"}
+          compactForActionContext={Boolean(game.pendingAction) || game.phase === "combat"}
           game={game}
           pendingLocked={pendingLocked}
           playingPhase={playingPhase && !roomActionLocked}

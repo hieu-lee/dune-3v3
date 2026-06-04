@@ -39,6 +39,15 @@ export async function runPendingChoicesSmoke({
   assert.match(pendingText, /influence choice/i);
   assert.match(pendingText, /lose 1 Influence/i);
   await screenshot(page, captures, "pending-lose-influence.png");
+  const influenceLossMobileViewport = { width: 390, height: 900 };
+  await page.setViewportSize(influenceLossMobileViewport);
+  const influenceLossMobileScrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+  assert(
+    influenceLossMobileScrollWidth <= influenceLossMobileViewport.width,
+    `Influence loss mobile pending panel should not overflow horizontally (${influenceLossMobileScrollWidth}px)`,
+  );
+  await screenshot(page, captures, "pending-lose-influence-mobile-390.png");
+  await page.setViewportSize({ width: 1440, height: 1100 });
 
   const influenceBefore = await currentGame(page);
   const influenceOwnerBefore = influenceBefore.players.find((player) => player.id === "p2");

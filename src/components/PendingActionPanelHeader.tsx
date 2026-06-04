@@ -132,7 +132,7 @@ function pendingActionTitle(game: GameState, pendingAction: PendingAction) {
 
 export function PendingActionPanelHeader({ game, pendingAction }: PendingActionPanelHeaderProps) {
   return (
-    <div>
+    <div className="pending-panel-header">
       <p className="eyebrow">Pending table choice</p>
       <h2>{pendingActionTitle(game, pendingAction)}</h2>
     </div>

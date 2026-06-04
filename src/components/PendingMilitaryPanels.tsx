@@ -22,13 +22,36 @@ export function PendingDeployPanel({
   onDone,
 }: PendingDeployPanelProps) {
   return (
-    <div className="pending-controls">
-      <span>{pending.remaining} deployable</span>
-      <button type="button" onClick={onDeploy} disabled={!owner || owner.garrison <= 0}>
-        <Swords size={15} />
-        Deploy 1
+    <div className="pending-controls military-choice-grid">
+      <div className="military-choice-summary">
+        <span>Deployment</span>
+        <strong>{pending.remaining} deployable</strong>
+        <small>{owner ? `${owner.garrison} in garrison` : "Owner unavailable"}</small>
+      </div>
+      <button
+        type="button"
+        className="military-choice-card military-choice-primary"
+        onClick={onDeploy}
+        disabled={!owner || owner.garrison <= 0}
+        aria-label="Deploy 1"
+      >
+        <span className="military-choice-badge">
+          <Swords size={13} />
+          Combat
+        </span>
+        <strong>Deploy 1</strong>
+        <small>Move one garrison troop into the conflict.</small>
       </button>
-      <button type="button" onClick={onDone}>Done</button>
+      <button
+        type="button"
+        className="military-choice-card"
+        onClick={onDone}
+        aria-label="Done"
+      >
+        <span className="military-choice-badge">Finish</span>
+        <strong>Done</strong>
+        <small>Keep the remaining troops in garrison.</small>
+      </button>
     </div>
   );
 }
@@ -83,22 +106,48 @@ export function PendingReinforcePanel({
   onReinforce,
 }: PendingReinforcePanelProps) {
   return (
-    <div className="pending-controls support-grid">
+    <div className="pending-controls support-grid military-choice-grid military-reinforce-grid">
+      <div className="military-choice-summary">
+        <span>Reinforce</span>
+        <strong>{pending.remaining} {pending.remaining === 1 ? "troop" : "troops"} to assign</strong>
+        <small>{pending.conflictBlocked ? "Conflict is blocked this turn" : "Choose each troop destination"}</small>
+      </div>
       {allies.map((ally) => (
-        <div className="support-target" key={ally.id}>
-          <strong>{ally.leader}</strong>
-          <button type="button" onClick={() => onReinforce(ally.id, "garrison")}>Garrison</button>
+        <div className="support-target military-support-target" key={ally.id}>
+          <div className="military-support-heading">
+            <strong>{ally.leader}</strong>
+            <span>{ally.garrison} garrison / {ally.deployedTroops} deployed</span>
+          </div>
           <button
             type="button"
+            className="military-choice-card"
+            onClick={() => onReinforce(ally.id, "garrison")}
+            aria-label="Garrison"
+          >
+            <span className="military-choice-badge">Reserve</span>
+            <strong>Garrison</strong>
+            <small>Add the troop to this ally's reserve.</small>
+          </button>
+          <button
+            type="button"
+            className="military-choice-card military-choice-primary"
             onClick={() => onReinforce(ally.id, "conflict")}
             disabled={pending.conflictBlocked}
             title={pending.conflictBlocked ? "Conflict deployment is blocked this turn." : undefined}
+            aria-label="Conflict"
           >
-            Conflict
+            <span className="military-choice-badge">
+              <Swords size={13} />
+              Combat
+            </span>
+            <strong>Conflict</strong>
+            <small>Deploy now for conflict strength.</small>
           </button>
         </div>
       ))}
-      {pending.conflictBlocked && <span>Conflict deployment is blocked this turn.</span>}
+      {pending.conflictBlocked && (
+        <div className="military-choice-warning">Conflict deployment is blocked this turn.</div>
+      )}
     </div>
   );
 }
@@ -121,21 +170,44 @@ export function PendingRetreatTroopsForStrengthPanel({
   onSkip,
 }: PendingRetreatTroopsForStrengthPanelProps) {
   return (
-    <div className="pending-controls">
+    <div className="pending-controls military-choice-grid">
       {owner && recipient ? (
         <>
-          <span>
-            {recipient.leader}: {recipient.deployedTroops} deployed
-          </span>
-          <button type="button" onClick={onRetreat} disabled={!canResolve}>
-            <RotateCcw size={15} />
-            Retreat {pending.troopCount}: +{pending.strength}
+          <div className="military-choice-summary">
+            <span>{pending.source}</span>
+            <strong>{recipient.leader}</strong>
+            <small>{recipient.deployedTroops} deployed / {recipient.garrison} garrison</small>
+          </div>
+          <button
+            type="button"
+            className="military-choice-card military-choice-primary"
+            onClick={onRetreat}
+            disabled={!canResolve}
+            aria-label={`Retreat ${pending.troopCount}: +${pending.strength}`}
+          >
+            <span className="military-choice-badge">
+              <RotateCcw size={13} />
+              Retreat
+            </span>
+            <strong>Retreat {pending.troopCount}: +{pending.strength}</strong>
+            <small>Return troops to garrison and keep the printed strength bonus.</small>
           </button>
         </>
       ) : (
         <span>{pending.source} can no longer resolve with the current table state.</span>
       )}
-      {pending.optional && <button type="button" onClick={onSkip}>Skip</button>}
+      {pending.optional && (
+        <button
+          type="button"
+          className="military-choice-card"
+          onClick={onSkip}
+          aria-label="Skip"
+        >
+          <span className="military-choice-badge">Pass</span>
+          <strong>Skip</strong>
+          <small>Leave deployed troops in the conflict.</small>
+        </button>
+      )}
     </div>
   );
 }
@@ -160,25 +232,58 @@ export function PendingDeployOrRetreatTroopsPanel({
   onSkip,
 }: PendingDeployOrRetreatTroopsPanelProps) {
   return (
-    <div className="pending-controls">
+    <div className="pending-controls military-choice-grid">
       {owner && recipient ? (
         <>
-          <span>
-            {recipient.leader}: {recipient.garrison} garrison / {recipient.deployedTroops} deployed
-          </span>
-          <button type="button" onClick={() => onChoose("deploy")} disabled={!canDeploy}>
-            <Swords size={15} />
-            Deploy {pending.troopCount}
+          <div className="military-choice-summary">
+            <span>{pending.source}</span>
+            <strong>{recipient.leader}</strong>
+            <small>{recipient.garrison} garrison / {recipient.deployedTroops} deployed</small>
+          </div>
+          <button
+            type="button"
+            className="military-choice-card military-choice-primary"
+            onClick={() => onChoose("deploy")}
+            disabled={!canDeploy}
+            aria-label={`Deploy ${pending.troopCount}`}
+          >
+            <span className="military-choice-badge">
+              <Swords size={13} />
+              Deploy
+            </span>
+            <strong>Deploy {pending.troopCount}</strong>
+            <small>Move troops from garrison into the conflict.</small>
           </button>
-          <button type="button" onClick={() => onChoose("retreat")} disabled={!canRetreat}>
-            <RotateCcw size={15} />
-            Retreat {pending.troopCount}
+          <button
+            type="button"
+            className="military-choice-card"
+            onClick={() => onChoose("retreat")}
+            disabled={!canRetreat}
+            aria-label={`Retreat ${pending.troopCount}`}
+          >
+            <span className="military-choice-badge">
+              <RotateCcw size={13} />
+              Retreat
+            </span>
+            <strong>Retreat {pending.troopCount}</strong>
+            <small>Pull deployed troops back to garrison.</small>
           </button>
         </>
       ) : (
         <span>{pending.source} can no longer resolve with the current table state.</span>
       )}
-      {pending.optional && <button type="button" onClick={onSkip}>Skip</button>}
+      {pending.optional && (
+        <button
+          type="button"
+          className="military-choice-card"
+          onClick={onSkip}
+          aria-label="Skip"
+        >
+          <span className="military-choice-badge">Pass</span>
+          <strong>Skip</strong>
+          <small>Do not move troops.</small>
+        </button>
+      )}
     </div>
   );
 }

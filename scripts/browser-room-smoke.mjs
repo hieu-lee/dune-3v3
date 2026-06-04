@@ -170,6 +170,15 @@ try {
     roomId,
   );
   await capture(alicePage, "room-joined-by-invite-link.png");
+  const joinedRoomMobileViewport = { width: 390, height: 900 };
+  await alicePage.setViewportSize(joinedRoomMobileViewport);
+  const joinedRoomMobileScrollWidth = await alicePage.evaluate(() => document.documentElement.scrollWidth);
+  assert(
+    joinedRoomMobileScrollWidth <= joinedRoomMobileViewport.width,
+    `Joined room mobile view should not overflow horizontally (${joinedRoomMobileScrollWidth}px)`,
+  );
+  await capture(alicePage, "room-joined-by-invite-link-mobile-390.png");
+  await alicePage.setViewportSize({ width: 1440, height: 1100 });
   await alicePage.getByLabel("Player name").fill("Alice");
   await alicePage.getByTestId("room-seat-p1").click();
   await alicePage.waitForFunction(() => document.querySelector(".room-seat.selected")?.textContent?.includes("Muad'Dib"));
@@ -530,6 +539,14 @@ try {
     "Room team-resource contributors should not get the owner's skip control",
   );
   await capture(teamPaymentPage, "room-team-payment-scoped.png");
+  const teamPaymentMobileViewport = { width: 390, height: 900 };
+  await teamPaymentPage.setViewportSize(teamPaymentMobileViewport);
+  const teamPaymentMobileScrollWidth = await teamPaymentPage.evaluate(() => document.documentElement.scrollWidth);
+  assert.ok(
+    teamPaymentMobileScrollWidth <= teamPaymentMobileViewport.width,
+    `Room team-resource payment mobile view should not overflow horizontally (${teamPaymentMobileScrollWidth}px)`,
+  );
+  await capture(teamPaymentPage, "room-team-payment-scoped-mobile-390.png");
   await teamPaymentContext.close();
 
   const influenceLossRoomResponse = await fetch(`${server.resolvedUrls.local[0]}api/rooms`, { method: "POST" });
@@ -616,12 +633,12 @@ try {
     "Room trade actors should be able to change the trade resource before transfers start",
   );
   assert.equal(
-    await actorTradeControls.getByRole("button", { name: /Muad'Dib gives 1/ }).isDisabled(),
+    await actorTradeControls.getByRole("button", { name: /Muad'Dib to Gurney Halleck\s+Give 1 Spice\s+0\/1 sent/i }).isDisabled(),
     false,
     "Room trade actors should get their own transfer button",
   );
   assert.equal(
-    await actorTradeControls.getByRole("button", { name: /Gurney Halleck gives 1/ }).isDisabled(),
+    await actorTradeControls.getByRole("button", { name: /Gurney Halleck to Muad'Dib\s+Give 1 Spice\s+0\/1 sent/i }).isDisabled(),
     true,
     "Room trade actors should not get the partner's transfer button",
   );
@@ -644,12 +661,12 @@ try {
     "Room trade partners should not get the actor's resource-selection control",
   );
   assert.equal(
-    await partnerTradeControls.getByRole("button", { name: /Muad'Dib gives 1/ }).isDisabled(),
+    await partnerTradeControls.getByRole("button", { name: /Muad'Dib to Gurney Halleck\s+Give 1 Spice\s+0\/1 sent/i }).isDisabled(),
     true,
     "Room trade partners should not get the actor's transfer button",
   );
   assert.equal(
-    await partnerTradeControls.getByRole("button", { name: /Gurney Halleck gives 1/ }).isDisabled(),
+    await partnerTradeControls.getByRole("button", { name: /Gurney Halleck to Muad'Dib\s+Give 1 Spice\s+0\/1 sent/i }).isDisabled(),
     false,
     "Room trade partners should get their own transfer button",
   );
@@ -833,6 +850,16 @@ try {
   await endgamePage.goto(`${server.resolvedUrls.local[0]}?room=${endgameRoom.roomId}`, { waitUntil: "domcontentloaded" });
   await claimSeat(endgamePage, "p2", "Endgame");
   await endgamePage.locator(".endgame-panel").waitFor({ state: "visible" });
+  await capture(endgamePage, "room-endgame-score-choices.png");
+  const endgameMobileViewport = { width: 390, height: 900 };
+  await endgamePage.setViewportSize(endgameMobileViewport);
+  const endgameMobileScrollWidth = await endgamePage.evaluate(() => document.documentElement.scrollWidth);
+  assert.ok(
+    endgameMobileScrollWidth <= endgameMobileViewport.width,
+    `Endgame scoring mobile view should not overflow horizontally (${endgameMobileScrollWidth}px)`,
+  );
+  await capture(endgamePage, "room-endgame-score-choices-mobile-390.png");
+  await endgamePage.setViewportSize({ width: 1440, height: 1100 });
   await endgamePage.getByRole("button", { name: /Score Crysknife/i }).click();
   await endgamePage.waitForFunction(
     ({ ownerId, expectedVp }) => {

@@ -299,7 +299,7 @@ export function IntrigueCardArticle({
                 : "Intrigue"}
       </span>
       <strong>{card.name}</strong>
-      <p>{card.summary}</p>
+      <p title={card.summary}>{card.summary}</p>
       {card.battleIcon && (
         <button
           type="button"

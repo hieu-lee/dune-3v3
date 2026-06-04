@@ -1,3 +1,4 @@
+import { Handshake } from "lucide-react";
 import { factionShortLabels } from "../app-helpers";
 import { factionLabels } from "../game/data";
 import type { FactionId, PendingAction, Player } from "../game/types";
@@ -36,11 +37,14 @@ export function PendingInfluenceLossPanel({
   const canSkip = pending.optional && (!viewerPlayerId || viewerPlayerId === pending.ownerId);
 
   return (
-    <div className="pending-controls support-grid">
-      <span>
-        {payerLabel}: lose 1 Influence for +{pending.strength} strength
-        {recipient ? ` to ${recipient.leader}` : ""}
-      </span>
+    <div className="pending-controls support-grid influence-choice-grid">
+      <div className="influence-choice-summary">
+        <span>
+          {payerLabel}: lose 1 Influence for +{pending.strength} strength
+          {recipient ? ` to ${recipient.leader}` : ""}
+        </span>
+        <strong>{pending.optional ? "Optional combat strength" : "Influence loss required"}</strong>
+      </div>
       {visibleChoices.map(({ ownerId, faction }) => {
         const owner = players.find((player) => player.id === ownerId);
         const showOwner = owner && (choiceOwnerIds.length > 1 || owner.id !== pending.ownerId);
@@ -51,17 +55,25 @@ export function PendingInfluenceLossPanel({
         return (
           <button
             type="button"
+            className="influence-choice-card"
             key={`${ownerId}-${faction}`}
             onClick={() => onLoseInfluence(ownerId, faction)}
             title={`${owner?.leader ?? "Player"} loses 1 ${factionLabels[faction]} Influence`}
           >
-            <span>{factionShortLabels[faction]}</span>
-            {label}
+            <span className="influence-choice-badge">
+              <Handshake size={14} /> {factionShortLabels[faction]}
+            </span>
+            <strong>{label}</strong>
+            <small>{owner?.leader ?? "Player"} loses 1 Influence</small>
           </button>
         );
       })}
       {visibleChoices.length === 0 && <span>No Influence to lose</span>}
-      {canSkip && <button type="button" onClick={onSkip}>Skip</button>}
+      {canSkip && (
+        <button type="button" className="influence-choice-skip" onClick={onSkip}>
+          Skip
+        </button>
+      )}
     </div>
   );
 }

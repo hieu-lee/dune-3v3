@@ -15,8 +15,13 @@ type PendingActionChoicePanelProps = {
 };
 
 function optionIcon(kind: PendingActionChoicePendingAction["options"][number]["pending"]["kind"]) {
-  if (kind === "trash-card") return <X size={15} />;
-  return <BookOpen size={15} />;
+  if (kind === "trash-card") return <X size={13} />;
+  return <BookOpen size={13} />;
+}
+
+function optionKindLabel(kind: PendingActionChoicePendingAction["options"][number]["pending"]["kind"]) {
+  if (kind === "trash-card") return "Trash";
+  return "Acquire";
 }
 
 export function PendingActionChoicePanel({
@@ -26,24 +31,56 @@ export function PendingActionChoicePanel({
   onChoose,
   onSkip,
 }: PendingActionChoicePanelProps) {
+  const resolvableOptions = pending.options.filter((option) =>
+    pendingActionChoiceOptionIsResolvable(game, option)
+  ).length;
   return (
-    <div className="pending-controls">
+    <div className="pending-controls leader-choice-grid action-choice-grid">
       {owner && pending.options.length > 0 ? (
-        pending.options.map((option) => (
-          <button
-            type="button"
-            key={option.id}
-            onClick={() => onChoose(option.id)}
-            disabled={!pendingActionChoiceOptionIsResolvable(game, option)}
-          >
-            {optionIcon(option.pending.kind)}
-            {option.label}
-          </button>
-        ))
+        <>
+          <div className="leader-choice-summary action-choice-summary">
+            <span>{pending.source}</span>
+            <strong>{resolvableOptions}/{pending.options.length} available</strong>
+            <small>Choose the follow-up action to resolve.</small>
+          </div>
+          {pending.options.map((option) => {
+            const isResolvable = pendingActionChoiceOptionIsResolvable(game, option);
+            return (
+              <button
+                type="button"
+                className={[
+                  "leader-choice-card",
+                  "action-choice-card",
+                  isResolvable ? "leader-choice-primary" : "",
+                ].filter(Boolean).join(" ")}
+                key={option.id}
+                onClick={() => onChoose(option.id)}
+                disabled={!isResolvable}
+                aria-label={option.label}
+              >
+                <span className="leader-choice-badge action-choice-badge">
+                  {optionIcon(option.pending.kind)}
+                  {optionKindLabel(option.pending.kind)}
+                </span>
+                <strong>{option.label}</strong>
+                <small>{isResolvable ? "Available now." : "No valid target or resource available."}</small>
+              </button>
+            );
+          })}
+        </>
       ) : (
         <span>{pending.source} can no longer resolve with the current table state.</span>
       )}
-      <button type="button" onClick={onSkip}>Skip</button>
+      <button
+        type="button"
+        className="leader-choice-card action-choice-card"
+        onClick={onSkip}
+        aria-label="Skip"
+      >
+        <span className="leader-choice-badge action-choice-badge">Pass</span>
+        <strong>Skip</strong>
+        <small>Decline this follow-up action.</small>
+      </button>
     </div>
   );
 }

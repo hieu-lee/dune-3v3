@@ -21,13 +21,25 @@ export async function runTradeChoicesSmoke({
   let pendingText = await page.locator(".pending-panel").innerText();
   assert.match(pendingText, /Trade from Browser debug trade/i);
   assert.match(pendingText, /Spice/i);
-  assert.match(pendingText, /Feyd-Rautha Harkonnen gives 1 \(0\)/i);
+  assert.match(pendingText, /Feyd-Rautha Harkonnen to Shaddam Corrino IV\s+Give 1 Spice\s+0\/1 SENT/i);
   await screenshot(page, captures, "pending-trade-resource.png");
+
+  const mobileViewport = { width: 390, height: 900 };
+  await page.setViewportSize(mobileViewport);
+  await setDebugGameAndWait(page, states.resource);
+  const mobileScrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+  assert.ok(
+    mobileScrollWidth <= mobileViewport.width,
+    `Trade resource mobile pending panel should not overflow horizontally (${mobileScrollWidth}px)`,
+  );
+  await screenshot(page, captures, "pending-trade-resource-mobile-390.png");
+  await page.setViewportSize({ width: 1440, height: 1100 });
+  await setDebugGameAndWait(page, states.resource);
 
   let before = await currentGame(page);
   let actorBefore = before.players.find((player) => player.id === "p2");
   let partnerBefore = before.players.find((player) => player.id === "p4");
-  await page.locator(".pending-panel").getByRole("button", { name: "Feyd-Rautha Harkonnen gives 1 (0)" }).click();
+  await page.locator(".pending-panel").getByRole("button", { name: /Feyd-Rautha Harkonnen to Shaddam Corrino IV\s+Give 1 Spice\s+0\/1 sent/i }).click();
   let after = await currentGame(page);
   let actorAfter = after.players.find((player) => player.id === "p2");
   let partnerAfter = after.players.find((player) => player.id === "p4");

@@ -22,6 +22,15 @@ export async function runSpaceChoicesSmoke({
   assert.match(pendingText, /Maker space/i);
   assert.match(pendingText, /spice \/ Gurney Halleck worms/i);
   await screenshot(page, captures, "pending-maker-choice.png");
+  const makerChoiceMobileViewport = { width: 390, height: 900 };
+  await page.setViewportSize(makerChoiceMobileViewport);
+  const makerChoiceMobileScrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+  assert(
+    makerChoiceMobileScrollWidth <= makerChoiceMobileViewport.width,
+    `Maker choice mobile pending panel should not overflow horizontally (${makerChoiceMobileScrollWidth}px)`,
+  );
+  await screenshot(page, captures, "pending-maker-choice-mobile-390.png");
+  await page.setViewportSize({ width: 1440, height: 1100 });
 
   const makerBefore = await currentGame(page);
   const makerSpiceOwnerBefore = makerBefore.players.find((player) => player.id === "p1");

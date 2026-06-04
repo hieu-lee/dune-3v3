@@ -1,3 +1,4 @@
+import { ShieldOff, Sparkles, Waves } from "lucide-react";
 import type { PendingAction } from "../game/types";
 
 type SietchTabrPendingAction = Extract<PendingAction, { kind: "sietch-tabr" }>;
@@ -24,14 +25,39 @@ export function PendingSietchTabrPanel({
     canRecruitTroop ? "troop" : undefined,
     "water",
   ].filter((part): part is string => Boolean(part));
+  const hooksLabel = hooksChoiceParts.join(" + ");
+  const waterLabel = `Water${pending.canRemoveShieldWall ? " + remove Shield Wall" : ""}`;
+
   return (
-    <div className="pending-controls">
-      <span>{label}</span>
-      <button type="button" onClick={() => onChoose("hooks")} disabled={!canChooseHooks}>
-        {hooksChoiceParts.join(" + ")}
+    <div className="pending-controls support-grid split-choice-grid">
+      <div className="split-choice-summary">
+        <span>Sietch Tabr</span>
+        <strong>{label}</strong>
+      </div>
+      <button
+        type="button"
+        className="split-choice-card"
+        onClick={() => onChoose("hooks")}
+        disabled={!canChooseHooks}
+      >
+        <span className="split-choice-badge">
+          <Sparkles size={14} /> Units
+        </span>
+        <strong>{hooksLabel}</strong>
+        <small>Take the Fremen-side Sietch reward</small>
       </button>
-      <button type="button" onClick={() => onChoose("shield-wall")} disabled={!canChooseShieldWall}>
-        Water{pending.canRemoveShieldWall ? " + remove Shield Wall" : ""}
+      <button
+        type="button"
+        className="split-choice-card"
+        onClick={() => onChoose("shield-wall")}
+        disabled={!canChooseShieldWall}
+      >
+        <span className="split-choice-badge">
+          {pending.canRemoveShieldWall ? <ShieldOff size={14} /> : <Waves size={14} />}
+          Water
+        </span>
+        <strong>{waterLabel}</strong>
+        <small>{pending.canRemoveShieldWall ? "Take water and remove the Shield Wall" : "Take the water reward"}</small>
       </button>
     </div>
   );

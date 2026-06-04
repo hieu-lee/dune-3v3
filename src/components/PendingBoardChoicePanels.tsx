@@ -24,20 +24,26 @@ export function PendingBoardInfluenceChoicePanel({
     ? pending.choices.filter((choice) => choice.ownerId === viewerPlayerId)
     : pending.choices;
   return (
-    <div className="pending-controls support-grid">
-      <span>Choose Influence from {pending.source}</span>
+    <div className="pending-controls support-grid influence-choice-grid">
+      <div className="influence-choice-summary">
+        <span>Choose Influence from {pending.source}</span>
+        <strong>{amount} Influence</strong>
+      </div>
       {choices.map((choice) => {
         const owner = game.players.find((player) => player.id === choice.ownerId);
         return (
           <button
             type="button"
+            className="influence-choice-card"
             key={`${choice.ownerId}-${choice.faction}`}
             onClick={() => onChoose(choice.ownerId, choice.faction)}
             title={`${owner?.leader ?? "Player"} gains ${amount} ${factionLabels[choice.faction]} Influence`}
           >
-            <Handshake size={14} />
-            <span>{factionShortLabels[choice.faction]}</span>
-            {owner?.leader ?? "Player"}
+            <span className="influence-choice-badge">
+              <Handshake size={14} /> {factionShortLabels[choice.faction]}
+            </span>
+            <strong>{factionLabels[choice.faction]}</strong>
+            <small>{owner?.leader ?? "Player"} gains {amount}</small>
           </button>
         );
       })}
@@ -59,14 +65,30 @@ export function PendingOptionalSpacePaymentPanel({
   onPay,
   onSkip,
 }: PendingOptionalSpacePaymentPanelProps) {
+  const payLabel = `Pay ${costLabel(pending.cost)}`;
   return (
-    <div className="pending-controls support-grid">
-      <span>{ownerName}: optional payment at {pending.source}</span>
-      <button type="button" onClick={onPay} title={`Pay ${costLabel(pending.cost)} for ${costLabel(pending.gain)}`}>
-        <WalletCards size={14} />
-        Pay {costLabel(pending.cost)}
+    <div className="pending-controls support-grid split-choice-grid">
+      <div className="split-choice-summary">
+        <span>Optional payment</span>
+        <strong>{ownerName}: {pending.source}</strong>
+      </div>
+      <button
+        type="button"
+        className="split-choice-card"
+        onClick={onPay}
+        title={`${payLabel} for ${costLabel(pending.gain)}`}
+      >
+        <span className="split-choice-badge">
+          <WalletCards size={14} /> Pay
+        </span>
+        <strong>{payLabel}</strong>
+        <small>Gain {costLabel(pending.gain)}</small>
       </button>
-      <button type="button" onClick={onSkip}>Skip</button>
+      <button type="button" className="split-choice-card split-choice-skip" onClick={onSkip}>
+        <span className="split-choice-badge">Skip</span>
+        <strong>Skip</strong>
+        <small>Decline this optional space payment</small>
+      </button>
     </div>
   );
 }

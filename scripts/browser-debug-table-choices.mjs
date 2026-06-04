@@ -69,6 +69,15 @@ export async function runTableChoicesSmoke({
   assert.match(pendingText, /Deploy 1/i);
   assert.match(pendingText, /Retreat 1/i);
   await screenshot(page, captures, "pending-unswerving-loyalty-deploy-or-retreat.png");
+  const unswervingMobileViewport = { width: 390, height: 900 };
+  await page.setViewportSize(unswervingMobileViewport);
+  const unswervingMobileScrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+  assert.ok(
+    unswervingMobileScrollWidth <= unswervingMobileViewport.width,
+    `Unswerving Loyalty deploy-or-retreat mobile pending panel should not overflow horizontally (${unswervingMobileScrollWidth}px)`,
+  );
+  await screenshot(page, captures, "pending-unswerving-loyalty-deploy-or-retreat-mobile-390.png");
+  await page.setViewportSize({ width: 1440, height: 1100 });
   const unswervingBefore = await currentGame(page);
   const unswervingOwnerBefore = unswervingBefore.players.find((player) => player.id === "p2");
   assert.ok(unswervingOwnerBefore, "Expected Feyd before Unswerving deploy-or-retreat");
@@ -117,6 +126,15 @@ export async function runTableChoicesSmoke({
   assert.match(pendingText, /spy placement/i);
   assert.equal(await page.locator(".pending-panel").getByRole("button", { name: "Done" }).isDisabled(), true);
   await screenshot(page, captures, "pending-wheels-within-wheels-reveal-spy.png");
+  const wheelsSpyMobileViewport = { width: 390, height: 900 };
+  await page.setViewportSize(wheelsSpyMobileViewport);
+  const wheelsSpyMobileScrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+  assert.ok(
+    wheelsSpyMobileScrollWidth <= wheelsSpyMobileViewport.width,
+    `Wheels Within Wheels spy placement mobile pending panel should not overflow horizontally (${wheelsSpyMobileScrollWidth}px)`,
+  );
+  await screenshot(page, captures, "pending-wheels-within-wheels-reveal-spy-mobile-390.png");
+  await page.setViewportSize({ width: 1440, height: 1100 });
   const wheelsBefore = await currentGame(page);
   const wheelsOwnerBefore = wheelsBefore.players.find((player) => player.id === "p2");
   assert.ok(wheelsOwnerBefore, "Expected Feyd before Wheels Within Wheels reveal spy placement");
@@ -779,6 +797,15 @@ export async function runTableChoicesSmoke({
   assert.match(pendingText, /Throne Row/i);
   assert.match(pendingText, new RegExp(escapeRegExp(states.throneRowCardName)));
   await screenshot(page, captures, "pending-throne-row.png");
+  const throneRowMobileViewport = { width: 390, height: 900 };
+  await page.setViewportSize(throneRowMobileViewport);
+  const throneRowMobileScrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+  assert.ok(
+    throneRowMobileScrollWidth <= throneRowMobileViewport.width,
+    `Throne Row mobile pending panel should not overflow horizontally (${throneRowMobileScrollWidth}px)`,
+  );
+  await screenshot(page, captures, "pending-throne-row-mobile-390.png");
+  await page.setViewportSize({ width: 1440, height: 1100 });
 
   await page.locator(".pending-panel").getByRole("button", { name: states.throneRowCardName }).click();
   await waitForNoPending(page);
@@ -831,16 +858,39 @@ export async function runTableChoicesSmoke({
   assert.match(pendingText, /Gurney Halleck/i);
   assert.match(pendingText, /Lady Jessica/i);
   await screenshot(page, captures, "pending-conflict-tie.png");
+  const conflictTieMobileViewport = { width: 390, height: 900 };
+  await page.setViewportSize(conflictTieMobileViewport);
+  const conflictTieMobileScrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+  assert.ok(
+    conflictTieMobileScrollWidth <= conflictTieMobileViewport.width,
+    `Conflict tie mobile pending panel should not overflow horizontally (${conflictTieMobileScrollWidth}px)`,
+  );
+  await screenshot(page, captures, "pending-conflict-tie-mobile-390.png");
+  await page.setViewportSize({ width: 1440, height: 1100 });
 
   const tieBefore = await currentGame(page);
   assert.ok(tieBefore.conflict, "Expected a tied conflict before choosing concession");
-  const tiedConflictId = tieBefore.conflict.id;
+  const concessionButton = page.locator(".pending-panel").getByRole("button", { name: /Gurney Halleck Takes first/i });
+  assert.equal(
+    await concessionButton.count(),
+    1,
+    "Conflict tie concession button should expose the ally identity in its accessible name",
+  );
+  await concessionButton.click();
+  await waitForNoPending(page);
+  const tieConcessionAfter = await currentGame(page);
+  assert.equal(tieConcessionAfter.round, tieBefore.round + 1, "Ally concession should advance to the next round");
+
+  await setDebugGameAndWait(page, states.conflictTie);
+  const tieNoConcessionBefore = await currentGame(page);
+  assert.ok(tieNoConcessionBefore.conflict, "Expected a tied conflict before choosing no concession");
+  const noConcessionConflictId = tieNoConcessionBefore.conflict.id;
   await page.locator(".pending-panel").getByRole("button", { name: "No concession" }).click();
   await waitForNoPending(page);
   const tieAfter = await currentGame(page);
-  assert.equal(tieAfter.round, tieBefore.round + 1, "No concession should advance to the next round");
+  assert.equal(tieAfter.round, tieNoConcessionBefore.round + 1, "No concession should advance to the next round");
   assert.equal(
-    tieAfter.conflictDiscard.some((conflict) => conflict.id === tiedConflictId),
+    tieAfter.conflictDiscard.some((conflict) => conflict.id === noConcessionConflictId),
     true,
     "No concession should discard the tied conflict",
   );

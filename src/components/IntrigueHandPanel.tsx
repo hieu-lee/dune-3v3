@@ -3,12 +3,15 @@ import { IntrigueCardArticle } from "./IntrigueCardArticle";
 import type { IntrigueHandPanelProps } from "./IntrigueHandPanel.types";
 
 export function IntrigueHandPanel(props: IntrigueHandPanelProps) {
-  const { activePlayer } = props;
+  const { activePlayer, game } = props;
 
   if (activePlayer.intrigues.length === 0) return null;
 
   return (
-    <section className="intrigue-hand" aria-label={`${activePlayer.leader} Intrigue cards`}>
+    <section
+      className={`intrigue-hand${game.phase === "combat" ? " intrigue-hand-combat" : ""}`}
+      aria-label={`${activePlayer.leader} Intrigue cards`}
+    >
       <div className="intrigue-heading">
         <Eye size={15} />
         <span>{activePlayer.intrigues.length} Intrigue</span>

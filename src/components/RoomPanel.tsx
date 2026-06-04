@@ -34,7 +34,14 @@ export function RoomPanel({
   const [playerName, setPlayerName] = useState("");
   const claimedSeat = snapshot?.seats.find((seat) => seat.playerId === claimedPlayerId);
   return (
-    <section className="room-panel" aria-label="Private room">
+    <section
+      className={[
+        "room-panel",
+        inRoom ? "room-panel-online" : "room-panel-local",
+        snapshot ? "room-panel-with-seats" : "",
+      ].filter(Boolean).join(" ")}
+      aria-label="Private room"
+    >
       <div className="room-panel-main">
         <div>
           <p className="eyebrow">Private room</p>
@@ -45,7 +52,7 @@ export function RoomPanel({
           <div className="room-inline-form">
             <button type="button" className="primary-action" onClick={onCreateRoom}>
               <PlugZap size={16} />
-              Create
+              Create room
             </button>
             <input
               aria-label="Room code"
@@ -55,7 +62,7 @@ export function RoomPanel({
             />
             <button type="button" onClick={() => onJoinRoom(joinCode)}>
               <Link size={16} />
-              Join
+              Join room
             </button>
           </div>
         )}
@@ -93,10 +100,27 @@ export function RoomPanel({
             const unavailable = !mine && !canRecoverOffline && !canSwitch && claimed;
             const pendingName = playerName.trim();
             const canUpdateName = mine && pendingName && pendingName !== seat.claimedBy;
+            const seatAction = mine
+              ? canUpdateName ? "Update name" : "Your seat"
+              : seat.claimedBy
+                ? seat.connected
+                  ? seat.claimedBy
+                  : `${seat.claimedBy} offline - reclaim`
+                : canSwitch
+                  ? "Switch"
+                  : "Claim";
             return (
               <button
                 type="button"
-                className={["room-seat", mine ? "selected" : "", unavailable ? "claimed" : "", canSwitch ? "switchable" : "", canRecoverOffline ? "recoverable" : ""]
+                className={[
+                  "room-seat",
+                  `team-${seat.team}`,
+                  mine ? "selected" : "",
+                  unavailable ? "claimed" : "",
+                  canSwitch ? "switchable" : "",
+                  canRecoverOffline ? "recoverable" : "",
+                  !claimed ? "open" : "",
+                ]
                   .filter(Boolean)
                   .join(" ")}
                 data-testid={`room-seat-${seat.playerId}`}
@@ -109,17 +133,7 @@ export function RoomPanel({
               >
                 <span>{seat.role} - {teams[seat.team].name}</span>
                 <strong>{seat.leader}</strong>
-                <small>
-                  {mine
-                    ? canUpdateName ? "Update name" : "Your seat"
-                    : seat.claimedBy
-                      ? seat.connected
-                        ? seat.claimedBy
-                        : `${seat.claimedBy} offline - reclaim`
-                      : canSwitch
-                        ? "Switch"
-                        : "Claim"}
-                </small>
+                <small>{seatAction}</small>
                 {mine && <UserCheck size={15} />}
               </button>
             );

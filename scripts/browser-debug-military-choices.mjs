@@ -38,6 +38,15 @@ export async function runMilitaryChoicesSmoke({
   assert.match(pendingText, /Military Support - 1 troops/i);
   assert.match(pendingText, /Gurney Halleck/i);
   await screenshot(page, captures, "pending-reinforce.png");
+  const reinforceMobileViewport = { width: 390, height: 900 };
+  await page.setViewportSize(reinforceMobileViewport);
+  const reinforceMobileScrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+  assert(
+    reinforceMobileScrollWidth <= reinforceMobileViewport.width,
+    `Reinforce mobile pending panel should not overflow horizontally (${reinforceMobileScrollWidth}px)`,
+  );
+  await screenshot(page, captures, "pending-reinforce-mobile-390.png");
+  await page.setViewportSize({ width: 1440, height: 1100 });
 
   before = await currentGame(page);
   ownerBefore = before.players.find((player) => player.id === "p3");

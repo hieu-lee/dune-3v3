@@ -33,6 +33,7 @@ export function CombatIntriguePanel({
   const targets = combatIntrigueTargets(game, actor.id)
     .map((playerId) => game.players.find((player) => player.id === playerId))
     .filter((player): player is Player => Boolean(player));
+  const targetSummary = targets.map((target) => target.leader).join(", ");
   const cards = actor.intrigues.filter((card) =>
     card.combatSwords ||
     combatIntrigueStrength(game, actor, card) ||
@@ -46,6 +47,7 @@ export function CombatIntriguePanel({
       <div>
         <p className="eyebrow">Combat Intrigues</p>
         <h2>{actor.leader}</h2>
+        {targetSummary && <small className="combat-target-summary">Targets: {targetSummary}</small>}
       </div>
       <div className="pending-controls support-grid combat-grid">
         {cards.map((card) => (
@@ -102,7 +104,7 @@ function CombatIntrigueTarget({
   return (
     <div className="support-target combat-target">
       <strong>{card.name}</strong>
-      <span title={combatCardSummaryTitle({
+      <span className="combat-target-strength" title={combatCardSummaryTitle({
         goToGroundCard,
         impressCard,
         questionableMethodsCard,
@@ -130,10 +132,11 @@ function CombatIntrigueTarget({
             <button
               type="button"
               key={target.id}
+              aria-label={actor.role === "Commander" ? `${target.leader}: +2 + acquire` : "+2 + acquire"}
               onClick={() => onPlay(card.id, target.id)}
               title={`Add 2 strength to ${target.leader}; ${target.leader} acquires a card that costs 3 or less`}
             >
-              {actor.role === "Commander" ? `${target.leader}: +2 + acquire` : "+2 + acquire"}
+              {actor.role === "Commander" ? `${combatTargetLabel(target)}: +2 + acquire` : "+2 + acquire"}
             </button>
           ))
       : goToGroundCard
@@ -147,11 +150,16 @@ function CombatIntrigueTarget({
                         <button
                           type="button"
                           key={`${target.id}-ground-retreat-${count}`}
+                          aria-label={
+                            actor.role === "Commander"
+                              ? `${target.leader}: retreat ${count}${targetCanPlaceSpy ? " + spy" : ""}`
+                              : `Retreat ${count}${targetCanPlaceSpy ? " + spy" : ""}`
+                          }
                           onClick={() => onPlay(card.id, target.id, { kind: "retreat-troops", count })}
                           title={`Retreat ${count} ${count === 1 ? "troop" : "troops"} from ${target.leader}${targetCanPlaceSpy ? ", then optionally place a spy" : ""}`}
                         >
                           {actor.role === "Commander"
-                            ? `${target.leader}: retreat ${count}${targetCanPlaceSpy ? " + spy" : ""}`
+                            ? `${combatTargetLabel(target)}: retreat ${count}${targetCanPlaceSpy ? " + spy" : ""}`
                             : `Retreat ${count}${targetCanPlaceSpy ? " + spy" : ""}`}
                         </button>
                       );
@@ -159,7 +167,7 @@ function CombatIntrigueTarget({
                   : (
                       <span>
                         {actor.role === "Commander"
-                          ? `${target.leader}: requires deployed troops.`
+                          ? `${combatTargetLabel(target)}: requires deployed troops.`
                           : "Requires 1 or 2 deployed troops."}
                       </span>
                     )}
@@ -175,18 +183,23 @@ function CombatIntrigueTarget({
                       <button
                         type="button"
                         key={`${target.id}-contract-retreat-${count}`}
+                        aria-label={
+                          actor.role === "Commander"
+                            ? `${target.leader}: retreat ${count} + contract`
+                            : `Retreat ${count} + contract`
+                        }
                         onClick={() => onPlay(card.id, target.id, { kind: "retreat-troops", count })}
                         title={`Retreat ${count} ${count === 1 ? "troop" : "troops"} from ${target.leader}, then take a CHOAM contract`}
                       >
                         {actor.role === "Commander"
-                          ? `${target.leader}: retreat ${count} + contract`
+                          ? `${combatTargetLabel(target)}: retreat ${count} + contract`
                           : `Retreat ${count} + contract`}
                       </button>
                     ))
                   : (
                       <span>
                         {actor.role === "Commander"
-                          ? `${target.leader}: requires deployed troops.`
+                          ? `${combatTargetLabel(target)}: requires deployed troops.`
                           : "Requires 1 or 2 deployed troops."}
                       </span>
                     )}
@@ -198,19 +211,21 @@ function CombatIntrigueTarget({
             <Fragment key={target.id}>
               <button
                 type="button"
+                aria-label={actor.role === "Commander" ? `${target.leader}: +2` : "Add +2"}
                 onClick={() => onPlay(card.id, target.id, "add-strength")}
                 title={`Play ${card.name} for ${target.leader}`}
               >
-                {actor.role === "Commander" ? `${target.leader}: +2` : "Add +2"}
+                {actor.role === "Commander" ? `${combatTargetLabel(target)}: +2` : "Add +2"}
               </button>
               {Array.from({ length: target.deployedTroops }, (_, index) => index + 1).map((count) => (
                 <button
                   type="button"
                   key={`${target.id}-retreat-${count}`}
+                  aria-label={actor.role === "Commander" ? `${target.leader}: retreat ${count}` : `Retreat ${count}`}
                   onClick={() => onPlay(card.id, target.id, { kind: "retreat-troops", count })}
                   title={`Retreat ${count} ${count === 1 ? "troop" : "troops"} from ${target.leader}`}
                 >
-                  {actor.role === "Commander" ? `${target.leader}: retreat ${count}` : `Retreat ${count}`}
+                  {actor.role === "Commander" ? `${combatTargetLabel(target)}: retreat ${count}` : `Retreat ${count}`}
                 </button>
               ))}
             </Fragment>
@@ -222,19 +237,21 @@ function CombatIntrigueTarget({
                 {target.resources.spice >= 3 && (
                   <button
                     type="button"
+                    aria-label={actor.role === "Commander" ? `${target.leader}: spend 3 (+6)` : "Spend 3 spice (+6)"}
                     onClick={() => onPlay(card.id, target.id, "spend-spice")}
                     title={`Spend 3 spice from ${target.leader} for 6 strength`}
                   >
-                    {actor.role === "Commander" ? `${target.leader}: spend 3 (+6)` : "Spend 3 spice (+6)"}
+                    {actor.role === "Commander" ? `${combatTargetLabel(target)}: spend 3 (+6)` : "Spend 3 spice (+6)"}
                   </button>
                 )}
                 {target.deployedTroops >= 3 && (
                   <button
                     type="button"
+                    aria-label={actor.role === "Commander" ? `${target.leader}: retreat 3` : "Retreat 3 troops (+3 spice)"}
                     onClick={() => onPlay(card.id, target.id, { kind: "retreat-troops", count: 3 })}
                     title={`Retreat 3 troops from ${target.leader} to gain 3 spice`}
                   >
-                    {actor.role === "Commander" ? `${target.leader}: retreat 3` : "Retreat 3 troops (+3 spice)"}
+                    {actor.role === "Commander" ? `${combatTargetLabel(target)}: retreat 3` : "Retreat 3 troops (+3 spice)"}
                   </button>
                 )}
               </Fragment>
@@ -248,11 +265,16 @@ function CombatIntrigueTarget({
               <button
                 type="button"
                 key={target.id}
+                aria-label={
+                  actor.role === "Commander"
+                    ? `${target.leader}${devourCard || findWeaknessCard || questionableMethodsCard || springTheTrapCard ? ` (+${targetStrength})` : ""}`
+                    : "Play"
+                }
                 onClick={() => onPlay(card.id, target.id)}
                 title={`Play ${card.name} for ${target.leader}`}
               >
                 {actor.role === "Commander"
-                  ? `${target.leader}${devourCard || findWeaknessCard || questionableMethodsCard || springTheTrapCard ? ` (+${targetStrength})` : ""}`
+                  ? `${combatTargetLabel(target)}${devourCard || findWeaknessCard || questionableMethodsCard || springTheTrapCard ? ` (+${targetStrength})` : ""}`
                   : "Play"}
               </button>
             );
@@ -266,6 +288,12 @@ function CombatIntrigueTarget({
           </span>}
     </div>
   );
+}
+
+function combatTargetLabel(target: Player) {
+  const [first, second] = target.leader.split(" ");
+  if ((first === "Lady" || first === "Princess") && second) return second;
+  return first || target.leader;
 }
 
 type CombatCardTitleFlags = {

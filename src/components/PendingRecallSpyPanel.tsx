@@ -33,22 +33,53 @@ export function PendingRecallSpyPanel({
 
   return (
     <div className="pending-controls spy-grid">
-      <span>
-        {owner.leader}: recall {spyCountText} for {pending.source}{rewardText}
-      </span>
-      {choices.map((space) => (
+      <div className="spy-choice-summary">
+        <span>{pending.source}</span>
+        <strong>{owner.leader}: recall {spyCountText}</strong>
+        <small>{rewardParts.length > 0 ? rewardParts.join(" and ") : "Return posted spies to supply."}</small>
+      </div>
+
+      <div className="spy-choice-actions">
+        <div className="spy-choice-section">
+          <div className="spy-choice-section-heading">
+            <strong>Spy recall</strong>
+            <span>{rewardText ? `Recall from a post${rewardText}.` : "Choose a posted spy to recall."}</span>
+          </div>
+          {choices.length > 0 ? (
+            <div className="spy-space-grid">
+              {choices.map((space) => (
+                <button
+                  type="button"
+                  key={space.id}
+                  className="spy-choice-card spy-choice-secondary"
+                  aria-label={space.name}
+                  onClick={() => onRecall(space.id)}
+                  title={`Recall spy from ${space.name}`}
+                >
+                  <span className="spy-choice-badge"><RotateCcw size={13} /> Recall</span>
+                  <strong>{space.name}</strong>
+                  <small>Return this spy to supply.</small>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="spy-choice-empty">No spy posts</div>
+          )}
+        </div>
+      </div>
+
+      {pending.optional && (
         <button
           type="button"
-          key={space.id}
-          onClick={() => onRecall(space.id)}
-          title={`Recall spy from ${space.name}`}
+          className="spy-choice-card spy-choice-done"
+          aria-label="Skip"
+          onClick={onSkip}
         >
-          <RotateCcw size={14} />
-          {space.name}
+          <span className="spy-choice-badge">Optional</span>
+          <strong>Skip</strong>
+          <small>Leave spies posted.</small>
         </button>
-      ))}
-      {choices.length === 0 && <span>No spy posts</span>}
-      {pending.optional && <button type="button" onClick={onSkip}>Skip</button>}
+      )}
     </div>
   );
 }

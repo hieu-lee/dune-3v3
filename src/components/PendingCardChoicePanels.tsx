@@ -2,6 +2,7 @@ import { CircleDollarSign } from "lucide-react";
 import type { Card, ContractCard, PendingAction, Player, ResourceId } from "../game/types";
 
 type AcquireCardPendingAction = Extract<PendingAction, { kind: "acquire-card" }>;
+type ContractPendingAction = Extract<PendingAction, { kind: "contract" }>;
 
 const resourceLabels: Record<ResourceId, string> = {
   solari: "Solari",
@@ -9,10 +10,22 @@ const resourceLabels: Record<ResourceId, string> = {
   water: "water",
 };
 
+function acquireDestinationLabel(destination: AcquireCardPendingAction["destination"]) {
+  return destination === "hand" ? "hand" : "discard";
+}
+
+function acquireCostLabel(card: Card, paymentResource?: ResourceId) {
+  const cost = card.cost ?? 0;
+  if (paymentResource) return `${cost} ${resourceLabels[paymentResource]}`;
+  return `${cost} persuasion`;
+}
+
 type PendingContractPanelProps = {
   contractOffer: ContractCard[];
   allowFallback?: boolean;
+  owner: Player;
   optional?: boolean;
+  pending: ContractPendingAction;
   publicOnly?: boolean;
   reservedContracts: ContractCard[];
   onCollectFallback: () => void;
@@ -23,7 +36,9 @@ type PendingContractPanelProps = {
 export function PendingContractPanel({
   contractOffer,
   allowFallback,
+  owner,
   optional,
+  pending,
   publicOnly,
   reservedContracts,
   onCollectFallback,
@@ -31,29 +46,97 @@ export function PendingContractPanel({
   onTakeContract,
 }: PendingContractPanelProps) {
   const noContractsAvailable = contractOffer.length === 0 && reservedContracts.length === 0;
+  const availableCount = contractOffer.length + reservedContracts.length;
+  const availabilityText = noContractsAvailable
+    ? allowFallback
+      ? "No contracts available; collect fallback Solari."
+      : "No contracts available."
+    : `${availableCount} ${availableCount === 1 ? "contract" : "contracts"} available`;
+  const scopeText = publicOnly ? "Public offer only" : "Public and reserved offers";
   return (
-    <div className="pending-controls contract-choice">
-      {contractOffer.length > 0 && <span className="choice-divider">Public</span>}
-      {contractOffer.map((contract) => (
-        <button type="button" key={contract.id} onClick={() => onTakeContract(contract.id)}>
-          {contract.thumbnailPath && <img src={contract.thumbnailPath} alt="" />}
-          <span>{contract.name}</span>
-        </button>
-      ))}
-      {reservedContracts.length > 0 && <span className="choice-divider">Reserved</span>}
-      {reservedContracts.map((contract) => (
-        <button type="button" key={contract.id} onClick={() => onTakeContract(contract.id)}>
-          {contract.thumbnailPath && <img src={contract.thumbnailPath} alt="" />}
-          <span>{contract.name}</span>
-        </button>
-      ))}
-      {noContractsAvailable && (!publicOnly || allowFallback) && (
-        <button type="button" onClick={onCollectFallback}>
-          <CircleDollarSign size={15} />
-          Collect 2 Solari
-        </button>
-      )}
-      {optional && onSkip && <button type="button" onClick={onSkip}>Skip</button>}
+    <div className="pending-controls contract-choice contract-choice-grid">
+      <div className="contract-choice-summary">
+        <span>{pending.source}</span>
+        <strong>{owner.leader}: CHOAM contract</strong>
+        <small>{availabilityText} - {optional ? "optional" : scopeText}</small>
+      </div>
+
+      <div className="contract-choice-body">
+        {contractOffer.length > 0 && (
+          <div className="contract-choice-section">
+            <div className="contract-choice-section-heading">
+              <strong>Public offer</strong>
+              <span>Choose a visible CHOAM contract.</span>
+            </div>
+            <div className="contract-choice-cards">
+              {contractOffer.map((contract) => (
+                <button
+                  type="button"
+                  className="contract-choice-card"
+                  key={contract.id}
+                  aria-label={contract.name}
+                  onClick={() => onTakeContract(contract.id)}
+                >
+                  {contract.thumbnailPath && <img src={contract.thumbnailPath} alt="" />}
+                  <span>{contract.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {reservedContracts.length > 0 && (
+          <div className="contract-choice-section">
+            <div className="contract-choice-section-heading">
+              <strong>Reserved contracts</strong>
+              <span>Choose from {owner.leader}'s reserved contracts.</span>
+            </div>
+            <div className="contract-choice-cards">
+              {reservedContracts.map((contract) => (
+                <button
+                  type="button"
+                  className="contract-choice-card"
+                  key={contract.id}
+                  aria-label={contract.name}
+                  onClick={() => onTakeContract(contract.id)}
+                >
+                  {contract.thumbnailPath && <img src={contract.thumbnailPath} alt="" />}
+                  <span>{contract.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {(noContractsAvailable && (!publicOnly || allowFallback)) || (optional && onSkip) ? (
+          <div className="contract-choice-actions">
+            {noContractsAvailable && (!publicOnly || allowFallback) && (
+              <button
+                type="button"
+                className="contract-choice-action-card"
+                aria-label="Collect 2 Solari"
+                onClick={onCollectFallback}
+              >
+                <span className="contract-choice-badge"><CircleDollarSign size={13} /> Fallback</span>
+                <strong>Collect 2 Solari</strong>
+                <small>No CHOAM contract can be taken.</small>
+              </button>
+            )}
+            {optional && onSkip && (
+              <button
+                type="button"
+                className="contract-choice-action-card"
+                aria-label="Skip"
+                onClick={onSkip}
+              >
+                <span className="contract-choice-badge">Optional</span>
+                <strong>Skip</strong>
+                <small>Leave the contract offer unchanged.</small>
+              </button>
+            )}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -90,30 +173,69 @@ export function PendingAcquireCardPanel({
       ? `can be acquired with ${owner.resources[pending.paymentResource]} ${resourceLabels[pending.paymentResource]}`
       : undefined,
   ].filter((part): part is string => Boolean(part)).join(" ") + ".";
+  const destinationText = `To ${acquireDestinationLabel(pending.destination)}`;
+  const availabilityText = cards.length === 0
+    ? noEligibleText
+    : `${cards.length} eligible ${cards.length === 1 ? "card" : "cards"} available`;
+  const paymentText = pending.paymentResource
+    ? `${owner.resources[pending.paymentResource]} ${resourceLabels[pending.paymentResource]} available`
+    : costBoundsText ?? "Choose one card";
   return (
-    <div className="pending-controls contract-choice">
-      {cards.map((card) => (
-        <button
-          type="button"
-          key={card.id}
-          onClick={() => onAcquireCard(card.id)}
-          title={
-            pending.paymentResource
-              ? `Acquire ${card.name} for ${card.cost ?? 0} ${resourceLabels[pending.paymentResource]} for ${owner.leader}`
-              : `Acquire ${card.name} for ${owner.leader}`
-          }
-        >
-          {card.thumbnailPath && <img src={card.thumbnailPath} alt="" />}
-          <span>{card.name}</span>
-          {pending.paymentResource && (
-            <span>{card.cost ?? 0} {resourceLabels[pending.paymentResource]}</span>
+    <div className="pending-controls contract-choice contract-choice-grid acquire-card-choice">
+      <div className="contract-choice-summary">
+        <span>{pending.source}</span>
+        <strong>{owner.leader}: acquisition</strong>
+        <small>{availabilityText} - {destinationText}. {paymentText}.</small>
+      </div>
+
+      <div className="contract-choice-body">
+        <div className="contract-choice-section">
+          <div className="contract-choice-section-heading">
+            <strong>Acquire card</strong>
+            <span>{cards.length > 0 ? "Choose one eligible card." : "No matching card can be acquired."}</span>
+          </div>
+          {cards.length > 0 ? (
+            <div className="contract-choice-cards acquire-card-choice-cards">
+              {cards.map((card) => (
+                <button
+                  type="button"
+                  key={card.id}
+                  className="contract-choice-card acquire-card-choice-card"
+                  aria-label={card.name}
+                  onClick={() => onAcquireCard(card.id)}
+                  title={
+                    pending.paymentResource
+                      ? `Acquire ${card.name} for ${card.cost ?? 0} ${resourceLabels[pending.paymentResource]} for ${owner.leader}`
+                      : `Acquire ${card.name} for ${owner.leader}`
+                  }
+                >
+                  {card.thumbnailPath && <img src={card.thumbnailPath} alt="" />}
+                  <span className="acquire-card-choice-name">{card.name}</span>
+                  <small className="acquire-card-choice-meta">{acquireCostLabel(card, pending.paymentResource)}</small>
+                  <small className="acquire-card-choice-destination">{destinationText}</small>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <span className="contract-choice-empty acquire-card-choice-empty">{noEligibleText}</span>
           )}
-        </button>
-      ))}
-      {cards.length === 0 && (
-        <span>{noEligibleText}</span>
-      )}
-      {pending.optional === true && <button type="button" onClick={onSkip}>Skip</button>}
+        </div>
+
+        {pending.optional === true && (
+          <div className="contract-choice-actions">
+            <button
+              type="button"
+              className="contract-choice-action-card acquire-card-choice-skip"
+              aria-label="Skip"
+              onClick={onSkip}
+            >
+              <span className="contract-choice-badge">Optional</span>
+              <strong>Skip</strong>
+              <small>Do not acquire a card from this effect.</small>
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

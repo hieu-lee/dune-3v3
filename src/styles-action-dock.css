@@ -3288,8 +3288,23 @@
     min-height: 44px;
   }
   .pending-panel > .pending-controls.spy-grid {
-    gap: 8px;
+    gap: 6px;
     grid-template-columns: 1fr;
+  }
+  .spy-choice-summary {
+    gap: 2px;
+    padding: 8px 10px;
+  }
+  .spy-choice-summary span {
+    font-size: 0.62rem;
+  }
+  .spy-choice-summary strong {
+    font-size: 0.78rem;
+    line-height: 1.12;
+  }
+  .spy-choice-summary small {
+    font-size: 0.62rem;
+    line-height: 1.12;
   }
   .spy-space-grid {
     grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
@@ -3301,6 +3316,21 @@
   .spy-choice-section {
     gap: 6px;
     padding: 8px;
+  }
+  .spy-choice-section-heading {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: baseline;
+    column-gap: 8px;
+    row-gap: 2px;
+  }
+  .spy-choice-section-heading strong {
+    font-size: 0.78rem;
+    line-height: 1.12;
+  }
+  .spy-choice-section-heading span {
+    font-size: 0.58rem;
+    line-height: 1.1;
+    text-align: right;
   }
   .pending-panel .pending-controls .spy-space-grid .spy-choice-card {
     min-height: 44px;
@@ -3322,8 +3352,23 @@
     line-height: 1.1;
   }
   .pending-panel .pending-controls .spy-choice-done {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    justify-content: start;
+    column-gap: 8px;
     min-height: 0;
-    padding: 8px 10px;
+    padding: 7px 10px;
+  }
+  .spy-choice-done .spy-choice-badge {
+    font-size: 0.58rem;
+    padding: 3px 6px;
+  }
+  .spy-choice-done strong {
+    font-size: 0.72rem;
+    line-height: 1.1;
+  }
+  .spy-choice-done small {
+    display: none;
   }
   .combat-panel .combat-grid {
     grid-template-columns: repeat(auto-fit, minmax(82px, 1fr));

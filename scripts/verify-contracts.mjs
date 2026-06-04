@@ -839,6 +839,62 @@ try {
     ),
     "Sardaukar II completion should log its Agent recall reward",
   );
+  const overthrow = imperiumCardByName("Overthrow");
+  const sardaukarOverthrowHeld = withHeldContracts(
+    updatePlayer(
+      {
+        ...game,
+        activeSeat: shaddamActiveSeat,
+        pendingAction: undefined,
+        pendingQueue: [],
+        spaces: {},
+      },
+      shaddam.id,
+      (player) => ({
+        ...player,
+        hand: [overthrow],
+        playArea: [],
+        agentsReady: Math.max(1, player.agentsReady),
+        reservedContracts: [],
+        resources: { ...player.resources, spice: player.resources.spice + 3 },
+      }),
+    ),
+    shaddam.id,
+    ["Sardaukar II"],
+  );
+  const sardaukarOverthrowPlaced = turnActions.placeAgentAction(sardaukarOverthrowHeld, {
+    commanderTargets: {},
+    selectedCard: overthrow,
+    selectedSpace: boardSpaceById("sardaukar"),
+  });
+  assertCompleted(sardaukarOverthrowPlaced, shaddam.id, "Sardaukar II");
+  assert.equal(sardaukarOverthrowPlaced.spaces.sardaukar, undefined);
+  assert.equal(
+    sardaukarOverthrowPlaced.agentPlacementOwners?.sardaukar,
+    undefined,
+    "Sardaukar II contract recall should clear the recalled Agent owner",
+  );
+  assert.equal(
+    playerById(sardaukarOverthrowPlaced, shaddam.id).playArea.find((card) => card.id === overthrow.id)?.agentPlacementSpaceId,
+    "sardaukar",
+    "Sardaukar II contract recall should preserve source-card placement metadata for pending validation",
+  );
+  assert.equal(sardaukarOverthrowPlaced.pendingAction?.kind, "board-influence-choice");
+  assert.equal(sardaukarOverthrowPlaced.pendingAction.source, "Overthrow");
+  const [sardaukarOverthrowChoice] = sardaukarOverthrowPlaced.pendingAction.choices;
+  assert.ok(sardaukarOverthrowChoice, "Overthrow on Sardaukar should expose a pending Influence choice");
+  const sardaukarOverthrowResolved = state.resolveBoardInfluenceChoice(
+    sardaukarOverthrowPlaced,
+    sardaukarOverthrowPlaced.pendingAction,
+    sardaukarOverthrowChoice.ownerId,
+    sardaukarOverthrowChoice.faction,
+  );
+  assert.notEqual(
+    sardaukarOverthrowResolved,
+    sardaukarOverthrowPlaced,
+    "Sardaukar II contract recall should leave Overthrow's pending Influence choice resolvable",
+  );
+  assert.equal(sardaukarOverthrowResolved.pendingAction, undefined);
 
   const agentCard = {
     id: "verify-contract-city-card",

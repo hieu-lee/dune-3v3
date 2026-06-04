@@ -21,7 +21,7 @@ This report tracks the private-play visual assets currently wired into the game.
 | Intrigue cards | 39 | 39 / 39 | Dune Cards Hub `intrigue` images. |
 | Conflict cards | 16 | 16 / 16 | Dune Cards Hub `conflict` images. |
 | Leader cards | 10 | 10 / 10 | Dune Cards Hub `leader` images. |
-| Board spaces | 27 | 27 / 27 | Catalog art plus six-player official overrides. |
+| Board spaces | 28 | 28 / 28 | Catalog art plus six-player official overrides. |
 | CHOAM contracts | 20 | 20 / 20 | `Spice Refinery I` uses the Dune Cards Hub card-page image override. |
 
 ## Board-Space Overrides

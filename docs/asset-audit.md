@@ -41,7 +41,7 @@ Manual override:
 
 `pnpm run verify:board-spaces` loads `src/game/data.ts` through Vite and verifies:
 
-- the six-player model exposes 27 placement spaces;
+- the six-player model exposes 28 placement spaces;
 - catalog-backed spaces keep catalog source metadata;
 - six-player-only spaces use the expected override filenames;
 - every board space has a local `/assets/...` image path that exists on disk.

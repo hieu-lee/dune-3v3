@@ -93,6 +93,7 @@ export function startNextRound(state: GameState): GameState {
     activeSeat: firstSeat,
     players,
     spaces: {},
+    agentPlacementOwners: {},
     makerSpice: advanceMakerSpice(resolvedState),
     pendingAction: controlDefensePending,
     pendingQueue: [],

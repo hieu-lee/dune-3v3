@@ -1,6 +1,7 @@
 import {
   addResources,
   boardSpaceIntrigueGainFor,
+  boardSpaceRevealPersuasionFor,
   boardSpaceSpiceGainFor,
   revealGainLabel,
 } from "./app-helpers";
@@ -196,6 +197,17 @@ function agentPlacementSpaces(
   if (!recalledAgents) return { ...currentSpaces, [selectedSpace.id]: target.id };
   const { [selectedSpace.id]: _recalledSpace, ...spaces } = currentSpaces;
   return spaces;
+}
+
+function agentPlacementOwners(
+  currentOwners: NonNullable<GameState["agentPlacementOwners"]>,
+  selectedSpace: BoardSpace,
+  source: Player,
+  recalledAgents: number | undefined,
+) {
+  if (!recalledAgents) return { ...currentOwners, [selectedSpace.id]: source.id };
+  const { [selectedSpace.id]: _recalledSpace, ...owners } = currentOwners;
+  return owners;
 }
 
 function futureSourceIntriguesBeforePendingChoice(
@@ -423,6 +435,12 @@ export function placeAgentAction(
     agentTurnComplete: true,
     players,
     spaces: agentPlacementSpaces(current.spaces, selectedSpace, target, totalRecalledAgents),
+    agentPlacementOwners: agentPlacementOwners(
+      current.agentPlacementOwners ?? {},
+      selectedSpace,
+      player,
+      totalRecalledAgents,
+    ),
     makerSpice: collectMakerSpice(current, selectedSpace),
     swordmasterClaimed: current.swordmasterClaimed || selectedSpace.id === "swordmaster",
     conflictDeploymentBlock,
@@ -471,11 +489,11 @@ type RevealTurnPlan = {
 
 export function revealTurnPlan(
   activePlayer: Player,
-  state?: Pick<GameState, "roundMakerSpaceVisits" | "spyPosts" | "sharedSpyPosts">,
+  state?: Pick<GameState, "agentPlacementOwners" | "roundMakerSpaceVisits" | "spaces" | "spyPosts" | "sharedSpyPosts">,
 ): RevealTurnPlan {
   const effectResult = resolveCardRevealEffects(activePlayer.hand, activePlayer, state);
   const highCouncilPersuasion = activePlayer.highCouncilSeat ? 2 : 0;
-  const persuasion = effectResult.persuasion + highCouncilPersuasion;
+  const persuasion = effectResult.persuasion + highCouncilPersuasion + boardSpaceRevealPersuasionFor(activePlayer, state);
   const swords = effectResult.swords + (activePlayer.swordmasterBonus ? 2 : 0);
   const revealGain = effectResult.revealGain;
   const influenceGains = effectResult.influenceGains;

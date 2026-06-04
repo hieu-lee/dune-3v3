@@ -494,6 +494,7 @@ export type GameState = {
   turnSpyRecalls: Record<string, number>;
   players: Player[];
   spaces: Record<string, string>;
+  agentPlacementOwners?: Record<string, string>;
   spyPosts: Record<string, string>;
   sharedSpyPosts: Record<string, string[]>;
   alliances: AllianceOwners;

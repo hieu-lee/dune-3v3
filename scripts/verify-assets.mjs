@@ -104,7 +104,7 @@ try {
   assertLocalAssets("Intrigue cards", data.intrigueCards, 39);
   assertLocalAssets("Conflict cards", data.conflictCards, 16);
   assertLocalAssets("Leader cards", data.leaderCards, 10);
-  assertLocalAssets("Board spaces", data.boardSpaces, 27);
+  assertLocalAssets("Board spaces", data.boardSpaces, 28);
   assertLocalAssets("Contracts", [...data.standardContracts, ...data.shaddamReservedContracts], 20);
   assertKnownMissingAssetsSeen();
 

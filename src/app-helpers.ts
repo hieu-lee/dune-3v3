@@ -1,4 +1,5 @@
 import { CircleDollarSign, Droplets, Eye, Sparkles, type LucideIcon } from "lucide-react";
+import { boardSpaces } from "./game/data";
 import { resolveCardRevealEffects } from "./game/effect-resolver";
 import { boardSpaceRewardApplies } from "./game/state";
 import type {
@@ -50,9 +51,26 @@ export function selectedFactionChoice(selected: FactionId | undefined, choices: 
   return selected && choices.includes(selected) ? selected : choices[0];
 }
 
-export function revealPersuasionFor(player: Player, state?: Pick<GameState, "roundMakerSpaceVisits" | "sharedSpyPosts" | "spyPosts">) {
+export function boardSpaceRevealPersuasionFor(player: Player, state?: Pick<GameState, "agentPlacementOwners" | "spaces">) {
+  if (!state) return 0;
+  return boardSpaces.reduce(
+    (total, space) => {
+      const revealPersuasion = space.revealPersuasion ?? 0;
+      if (revealPersuasion <= 0 || !state.spaces[space.id]) return total;
+      return state.agentPlacementOwners?.[space.id] === player.id ? total + revealPersuasion : total;
+    },
+    0,
+  );
+}
+
+export function revealPersuasionFor(
+  player: Player,
+  state?: Pick<GameState, "agentPlacementOwners" | "roundMakerSpaceVisits" | "sharedSpyPosts" | "spaces" | "spyPosts">,
+) {
   const highCouncilPersuasion = player.highCouncilSeat ? 2 : 0;
-  return resolveCardRevealEffects(player.hand, player, state).persuasion + highCouncilPersuasion;
+  return resolveCardRevealEffects(player.hand, player, state).persuasion +
+    highCouncilPersuasion +
+    boardSpaceRevealPersuasionFor(player, state);
 }
 
 export function boardSpaceIntrigueGainFor(space: BoardSpace, player: Player) {

@@ -60,6 +60,7 @@ import { useRoomSession } from "./multiplayer/useRoomSession";
 
 export {
   boardSpaceIntrigueGainFor,
+  boardSpaceRevealPersuasionFor,
   pendingLocksTableState,
   revealPersuasionFor,
   tableStateLockedByPendingActions,

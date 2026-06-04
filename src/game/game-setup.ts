@@ -59,6 +59,7 @@ export function initialGame(): GameState {
     turnUnitDeployments: {},
     players,
     spaces: {},
+    agentPlacementOwners: {},
     spyPosts: {},
     sharedSpyPosts: {},
     alliances: {},

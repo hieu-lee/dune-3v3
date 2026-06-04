@@ -41,6 +41,32 @@ try {
     2,
     "High Council reveal persuasion should apply even with an empty hand",
   );
+  const assemblyRevealPlayer = {
+    ...baseRevealPlayer,
+    hand: [],
+    playArea: [],
+  };
+  const assemblyRevealState = { ...game, spaces: { "assembly-hall": feyd.id }, agentPlacementOwners: { "assembly-hall": feyd.id } };
+  assert.equal(
+    app.boardSpaceRevealPersuasionFor(assemblyRevealPlayer, assemblyRevealState),
+    1,
+    "Assembly Hall should expose one board-space Reveal persuasion while the Agent remains there",
+  );
+  assert.equal(
+    app.revealPersuasionFor(assemblyRevealPlayer, assemblyRevealState),
+    1,
+    "Assembly Hall should add to the active player's Reveal persuasion",
+  );
+  assert.equal(
+    app.boardSpaceRevealPersuasionFor(assemblyRevealPlayer, { ...game, spaces: {}, agentPlacementOwners: {} }),
+    0,
+    "Assembly Hall should not add Reveal persuasion after the Agent leaves the space",
+  );
+  assert.equal(
+    app.boardSpaceRevealPersuasionFor(assemblyRevealPlayer, { ...game, spaces: { "assembly-hall": feyd.id }, agentPlacementOwners: {} }),
+    0,
+    "Assembly Hall should not add Reveal persuasion without a matching Agent owner",
+  );
 
   assert.equal(
     app.boardSpaceIntrigueGainFor(highCouncil, { ...feyd, highCouncilSeat: false }),

@@ -223,6 +223,15 @@ const boardSpaceSpecs: BoardSpace[] = [
     detail: "High-value draw and deployment point.",
   },
   {
+    id: "assembly-hall",
+    name: "Assembly Hall",
+    zone: "Landsraad",
+    icon: "landsraad",
+    gain: { intrigue: 1 },
+    revealPersuasion: 1,
+    detail: "Draw an Intrigue, then +1 reveal persuasion while your Agent remains here.",
+  },
+  {
     id: "swordmaster",
     name: "Swordmaster",
     zone: "Landsraad",

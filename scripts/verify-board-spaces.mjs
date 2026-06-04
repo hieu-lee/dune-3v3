@@ -8,6 +8,7 @@ const projectRoot = new URL("..", import.meta.url);
 const expectedCatalogArtSpaces = [
   "Accept Contract",
   "Arrakeen",
+  "Assembly Hall",
   "Deep Desert",
   "Deliver Supplies",
   "Dutiful Service",
@@ -56,7 +57,7 @@ const server = await createServer({
 
 try {
   const data = await server.ssrLoadModule("/src/game/data.ts");
-  assert.equal(data.boardSpaces.length, 27, "Six-player board model should expose 27 placement spaces");
+  assert.equal(data.boardSpaces.length, 28, "Six-player board model should expose 28 placement spaces");
 
   const names = data.boardSpaces.map((space) => space.name);
   assert.equal(new Set(names).size, names.length, "Board-space names should be unique");

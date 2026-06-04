@@ -85,6 +85,7 @@ try {
 
   const spaces = {
     arrakeen: spaceById(data, "arrakeen"),
+    assemblyHall: spaceById(data, "assembly-hall"),
     carthag: spaceById(data, "carthag"),
     controversialTech: spaceById(data, "controversial-tech"),
     dutifulService: spaceById(data, "dutiful-service"),
@@ -102,6 +103,8 @@ try {
   assert.equal(spaces.expedition.contract, true, "Expedition should take a CHOAM contract");
   assert.equal(spaces.expedition.gain?.solari, undefined, "Expedition should not pay fallback Solari while contracts remain");
   assert.equal(spaces.gatherSupport.cost, undefined, "Gather Support should be free unless the optional Solari cost is chosen");
+  assert.equal(spaces.assemblyHall.gain?.intrigue, 1, "Assembly Hall should draw one Intrigue on placement");
+  assert.equal(spaces.assemblyHall.revealPersuasion, 1, "Assembly Hall should mark its Reveal-turn persuasion bonus");
   assert.deepEqual(spaces.spiceRefinery.gain, { solari: 2 }, "Spice Refinery should pay 2 Solari before its optional spice payment");
   assert.equal(spaces.shipping.influence, undefined, "Shipping should choose any one Influence instead of fixed Guild influence");
 
@@ -110,9 +113,13 @@ try {
   const beneCard = testCard("test-bene", "bene");
   const landsraadCard = testCard("test-landsraad", "landsraad");
   const spiceCard = testCard("test-spice", "spice");
+  const dangerousRhetoric = data.imperiumDeck.find((card) => card.name === "Dangerous Rhetoric");
   const makerKeeper = data.imperiumDeck.find((card) => card.name === "Maker Keeper");
+  const steersman = data.imperiumDeck.find((card) => card.name === "Steersman");
   const demandAttention = data.commanderStarterDecks.muaddib.find((card) => card.name === "Demand Attention");
+  assert.ok(dangerousRhetoric, "Dangerous Rhetoric should exist for Assembly Hall source-trash tests");
   assert.ok(makerKeeper, "Maker Keeper should exist for optional-payment timing tests");
+  assert.ok(steersman, "Steersman should exist for Assembly Hall Recall Agent tests");
   assert.ok(demandAttention, "Demand Attention should exist for Controversial Technology timing tests");
 
   const arrakeenNoControl = place(
@@ -138,6 +145,207 @@ try {
   );
   assert.equal(playerById(arrakeenControlled, "p3").resources.solari, 1, "Arrakeen controller should gain 1 Solari");
   assert.equal(playerById(arrakeenControlled, "p2").resources.solari, 0, "Arrakeen visitor should still gain no Solari");
+
+  const assemblyBase = {
+    ...playableGame(state, "p2", landsraadCard),
+    intrigueDeck: [testIntrigue("assembly")],
+    intrigueDiscard: [],
+  };
+  const assemblyHall = place(turnActions, assemblyBase, landsraadCard, spaces.assemblyHall);
+  assert.equal(playerById(assemblyHall, "p2").intrigues.at(-1)?.id, "assembly", "Assembly Hall should draw an Intrigue");
+  assert.equal(
+    playerById(assemblyHall, "p2").playArea[0]?.agentPlacementSpaceId,
+    "assembly-hall",
+    "Assembly Hall should preserve the active player's Agent-placement context",
+  );
+  assert.equal(
+    assemblyHall.agentPlacementOwners?.["assembly-hall"],
+    "p2",
+    "Assembly Hall should record the player whose Agent occupies the space",
+  );
+  assert.equal(
+    turnActions.revealTurnPlan(playerById(assemblyHall, "p2"), assemblyHall).persuasion,
+    1,
+    "Assembly Hall should add 1 persuasion during the owner's Reveal turn",
+  );
+  const assemblyRevealed = turnActions.revealTurnAction(
+    { ...assemblyHall, agentTurnComplete: false },
+    {
+      commanderTargets: {},
+      revealPlan: turnActions.revealTurnPlan(playerById(assemblyHall, "p2"), assemblyHall),
+    },
+  );
+  assert.equal(playerById(assemblyRevealed, "p2").persuasion, 1, "Assembly Hall Reveal bonus should resolve into spendable persuasion");
+
+  const rhetoricAssemblyBase = {
+    ...playableGame(state, "p2", dangerousRhetoric),
+    intrigueDeck: [testIntrigue("rhetoric-assembly")],
+    intrigueDiscard: [],
+  };
+  const rhetoricAssembly = place(turnActions, rhetoricAssemblyBase, dangerousRhetoric, spaces.assemblyHall);
+  assert.equal(rhetoricAssembly.pendingAction?.kind, "board-influence-choice");
+  assert.equal(rhetoricAssembly.pendingAction.source, "Dangerous Rhetoric");
+  const [rhetoricChoice] = rhetoricAssembly.pendingAction.choices;
+  assert.ok(rhetoricChoice, "Dangerous Rhetoric should expose an Influence choice after Assembly Hall placement");
+  const rhetoricResolved = state.resolveBoardInfluenceChoice(
+    rhetoricAssembly,
+    rhetoricAssembly.pendingAction,
+    rhetoricChoice.ownerId,
+    rhetoricChoice.faction,
+  );
+  assert.equal(
+    rhetoricResolved.spaces["assembly-hall"],
+    "p2",
+    "Dangerous Rhetoric should leave the Agent on Assembly Hall after trashing itself",
+  );
+  assert.equal(
+    rhetoricResolved.agentPlacementOwners?.["assembly-hall"],
+    "p2",
+    "Assembly Hall should keep the source Agent owner after the source card is trashed",
+  );
+  assert.equal(
+    playerById(rhetoricResolved, "p2").playArea.some((card) => card.id === dangerousRhetoric.id),
+    false,
+    "Dangerous Rhetoric should trash itself from play",
+  );
+  assert.equal(
+    turnActions.revealTurnPlan(playerById(rhetoricResolved, "p2"), rhetoricResolved).persuasion,
+    1,
+    "Assembly Hall should still add Reveal persuasion after the placement source card leaves play",
+  );
+
+  const steersmanAssemblyBase = {
+    ...playableGame(state, "p2", steersman, (player) => ({
+      ...player,
+      deck: [testCard("steersman-draw-target", "city")],
+      discard: [],
+    })),
+    intrigueDeck: [testIntrigue("steersman-assembly")],
+    intrigueDiscard: [],
+  };
+  const steersmanAssembly = place(turnActions, steersmanAssemblyBase, steersman, spaces.assemblyHall);
+  assert.equal(
+    playerById(steersmanAssembly, "p2").agentsReady,
+    playerById(steersmanAssemblyBase, "p2").agentsReady,
+    "Steersman should recall the Assembly Hall Agent to ready supply",
+  );
+  assert.equal(
+    steersmanAssembly.spaces["assembly-hall"],
+    undefined,
+    "Steersman should leave Assembly Hall unoccupied after recalling its Agent",
+  );
+  assert.equal(
+    steersmanAssembly.agentPlacementOwners?.["assembly-hall"],
+    undefined,
+    "Steersman should clear Assembly Hall's Agent owner after recalling its Agent",
+  );
+  assert.equal(
+    playerById(steersmanAssembly, "p2").intrigues.at(-1)?.id,
+    "steersman-assembly",
+    "Steersman should still receive the Assembly Hall placement Intrigue",
+  );
+  assert.equal(
+    playerById(steersmanAssembly, "p2").playArea.find((card) => card.id === steersman.id)?.agentPlacementSpaceId,
+    "assembly-hall",
+    "Steersman should preserve its historical Assembly Hall placement metadata after recalling the Agent",
+  );
+  assert.equal(
+    turnActions.revealTurnPlan(playerById(steersmanAssembly, "p2"), steersmanAssembly).persuasion,
+    0,
+    "Assembly Hall should not add Reveal persuasion after Steersman recalls the Agent",
+  );
+  const reoccupiedAssemblyCard = testCard("test-landsraad-reoccupied", "landsraad");
+  const reoccupiedAssemblyBase = {
+    ...steersmanAssembly,
+    agentTurnComplete: false,
+    intrigueDeck: [testIntrigue("reoccupied-assembly")],
+    players: steersmanAssembly.players.map((player) =>
+      player.id === "p2" ? { ...player, hand: [reoccupiedAssemblyCard] } : player
+    ),
+  };
+  const reoccupiedAssembly = place(turnActions, reoccupiedAssemblyBase, reoccupiedAssemblyCard, spaces.assemblyHall);
+  assert.equal(
+    reoccupiedAssembly.agentPlacementOwners?.["assembly-hall"],
+    "p2",
+    "Reoccupying Assembly Hall should record the current Agent owner",
+  );
+  assert.equal(
+    turnActions.revealTurnPlan(playerById(reoccupiedAssembly, "p2"), reoccupiedAssembly).persuasion,
+    1,
+    "Assembly Hall should not double-count a previously recalled Steersman marker after reoccupation",
+  );
+  const recycledAssemblyCard = {
+    ...testCard("test-recycled-landsraad", "landsraad"),
+    agentPlacementSpaceId: "sardaukar",
+    agentPlacementTargetOwnerId: "p2",
+  };
+  const recycledAssembly = place(
+    turnActions,
+    {
+      ...playableGame(state, "p2", recycledAssemblyCard),
+      intrigueDeck: [testIntrigue("recycled-assembly")],
+      intrigueDiscard: [],
+    },
+    recycledAssemblyCard,
+    spaces.assemblyHall,
+  );
+  assert.equal(
+    playerById(recycledAssembly, "p2").playArea[0]?.agentPlacementSpaceId,
+    "assembly-hall",
+    "Playing a recycled card should overwrite stale placement metadata",
+  );
+  assert.equal(
+    recycledAssembly.agentPlacementOwners?.["assembly-hall"],
+    "p2",
+    "A recycled card should record the current Assembly Hall Agent owner",
+  );
+  assert.equal(
+    turnActions.revealTurnPlan(playerById(recycledAssembly, "p2"), recycledAssembly).persuasion,
+    1,
+    "A recycled card should score Assembly Hall when its new Agent remains there",
+  );
+
+  const commanderAssemblyCard = testCard("test-commander-landsraad", "landsraad");
+  const commanderAssemblyBase = {
+    ...playableGame(state, "p4", commanderAssemblyCard),
+    intrigueDeck: [testIntrigue("commander-assembly")],
+    intrigueDiscard: [],
+  };
+  commanderAssemblyBase.players = commanderAssemblyBase.players.map((player) =>
+    player.id === "p2" ? { ...player, hand: [], playArea: [], highCouncilSeat: false } : player
+  );
+  const commanderAssembly = place(
+    turnActions,
+    commanderAssemblyBase,
+    commanderAssemblyCard,
+    spaces.assemblyHall,
+    { p4: "p2" },
+  );
+  assert.equal(
+    commanderAssembly.spaces["assembly-hall"],
+    "p2",
+    "Commander Assembly Hall placement should keep the existing activated-Ally occupancy model",
+  );
+  assert.equal(
+    commanderAssembly.agentPlacementOwners?.["assembly-hall"],
+    "p4",
+    "Commander Assembly Hall placement should record the Commander as the Agent owner",
+  );
+  assert.equal(
+    playerById(commanderAssembly, "p4").intrigues.at(-1)?.id,
+    "commander-assembly",
+    "Commander should draw the Assembly Hall Intrigue directly",
+  );
+  assert.equal(
+    turnActions.revealTurnPlan(playerById(commanderAssembly, "p4"), commanderAssembly).persuasion,
+    1,
+    "Commander should receive Assembly Hall persuasion from their own Agent-placement card",
+  );
+  assert.equal(
+    turnActions.revealTurnPlan(playerById(commanderAssembly, "p2"), commanderAssembly).persuasion,
+    0,
+    "Activated Ally occupancy should not steal the Commander's Assembly Hall Reveal bonus",
+  );
 
   const expedition = place(turnActions, playableGame(state, "p3", fremenCard), fremenCard, spaces.expedition);
   assert.equal(playerById(expedition, "p3").resources.solari, 2, "Expedition should not add fallback Solari while contracts exist");

@@ -87,6 +87,20 @@ function scoreTrackSlot(score: number) {
   return Math.min(scoreTrackMaximum, Math.max(scoreTrackMinimum, score));
 }
 
+function conflictUnitCount(player: Player) {
+  return player.deployedTroops + player.deployedSandworms;
+}
+
+function conflictDeploymentOrder(players: readonly Player[]) {
+  return players
+    .map((player, seat) => ({ player, seat }))
+    .sort((a, b) =>
+      b.player.conflict - a.player.conflict ||
+      conflictUnitCount(b.player) - conflictUnitCount(a.player) ||
+      a.seat - b.seat
+    );
+}
+
 export function BoardPanel({
   game,
   legalSpaceIds,
@@ -105,6 +119,12 @@ export function BoardPanel({
       accent: teams[team].accent,
     };
   });
+  const conflictSlots = conflictDeploymentOrder(game.players);
+  const conflictSummary = conflictSlots
+    .map(({ player }) => (
+      `${player.leader}: ${player.conflict} strength, ${plural(player.deployedTroops, "troop")}, ${plural(player.deployedSandworms, "worm")}`
+    ))
+    .join("; ");
 
   function renderSpaceTile(space: BoardSpace) {
     const occupant = game.players.find((player) => player.id === game.spaces[space.id]);
@@ -237,10 +257,41 @@ export function BoardPanel({
             <div className="board-conflict-field" aria-label="Conflict deployment area">
               <div className="conflict-emblem">
                 <Swords size={28} />
-                <span>Conflict</span>
+                <span>{game.conflict ? `Conflict ${game.conflict.level}` : "Conflict"}</span>
+                <strong>{game.conflict?.name ?? "No active conflict"}</strong>
+                <small>{game.phase === "combat" ? "Combat phase" : game.shieldWall ? "Shield Wall standing" : "Shield Wall down"}</small>
               </div>
-              <div className="conflict-slots" aria-hidden="true">
-                {Array.from({ length: 6 }, (_, index) => <span key={index} />)}
+              <span className="conflict-summary">
+                {conflictSummary}
+              </span>
+              <div className="conflict-slots" role="list">
+                {conflictSlots.map(({ player }) => {
+                  const units = conflictUnitCount(player);
+                  const activeCombatant = game.phase === "combat" && game.players[game.activeSeat]?.id === player.id;
+                  return (
+                    <article
+                      className={[
+                        "conflict-slot",
+                        units === 0 && player.conflict === 0 ? "is-empty" : "",
+                        player.deployedSandworms > 0 ? "has-worms" : "",
+                        activeCombatant ? "is-active" : "",
+                      ].filter(Boolean).join(" ")}
+                      data-testid={`conflict-slot-${player.id}`}
+                      data-player-id={player.id}
+                      key={player.id}
+                      role="listitem"
+                      style={{ "--player-color": player.color } as CSSProperties}
+                    >
+                      <span>{teams[player.team].name}</span>
+                      <strong>{player.leader}</strong>
+                      <div className="conflict-slot-stats">
+                        <span><Swords size={12} /> {player.conflict}</span>
+                        <span>{player.deployedTroops}T</span>
+                        <span>{player.deployedSandworms}W</span>
+                      </div>
+                    </article>
+                  );
+                })}
               </div>
               <div className="conflict-strength-track" aria-hidden="true">
                 {Array.from({ length: 10 }, (_, index) => <span key={index}>{index + 1}</span>)}

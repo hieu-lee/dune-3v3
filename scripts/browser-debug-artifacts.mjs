@@ -36,6 +36,8 @@ const generatedScreenshotNames = [
   "board-states-dense-ready.png",
   "board-states-legal-unavailable.png",
   "board-states-legal-unavailable-mobile-390.png",
+  "board-states-combat-deployment.png",
+  "board-states-combat-deployment-mobile-390.png",
   "combat-intrigues-commander.png",
   "combat-intrigues-mobile.png",
   "combat-intrigues-go-to-ground-pending.png",

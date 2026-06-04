@@ -43,6 +43,15 @@ const vpByPlayerId = {
   p6: 3,
 };
 
+const combatByPlayerId = {
+  p1: { strength: 4, troops: 2, worms: 0 },
+  p2: { strength: 7, troops: 3, worms: 0 },
+  p3: { strength: 9, troops: 2, worms: 1 },
+  p4: { strength: 6, troops: 1, worms: 1 },
+  p5: { strength: 2, troops: 1, worms: 0 },
+  p6: { strength: 0, troops: 0, worms: 0 },
+};
+
 export async function runBoardStatesSmoke({
   captures,
   initialPlayableGame,
@@ -161,6 +170,32 @@ export async function runBoardStatesSmoke({
   assert.ok(mobilePlacementStats.legal >= 3, "Mobile board should preserve legal placement markers");
   assert.ok(mobilePlacementStats.unavailable >= 10, "Mobile board should preserve unavailable placement markers");
   await screenshot(page, captures, "board-states-legal-unavailable-mobile-390.png");
+
+  await page.setViewportSize({ width: 1440, height: 1100 });
+  await setDebugGameAndWait(page, fixture.combatGame);
+  await page.waitForFunction(() =>
+    Boolean(
+      document.querySelectorAll(".conflict-slot").length === 6 &&
+        document.querySelectorAll(".conflict-slot:not(.is-empty)").length >= 5 &&
+        document.querySelectorAll(".conflict-slot.has-worms").length >= 2 &&
+        document.querySelectorAll(".conflict-slot.is-active").length === 1,
+    )
+  );
+  const combatStats = await boardCombatStats(page);
+  assert.equal(combatStats.slots, 6, "Combat board should render all six player deployment slots");
+  assert.equal(combatStats.activeSlots, 1, "Combat board should highlight one active combatant");
+  assert.ok(combatStats.nonEmptySlots >= 5, "Combat board should show deployed players distinctly");
+  assert.ok(combatStats.wormSlots >= 2, "Combat board should show sandworm deployment slots");
+  assert.equal(combatStats.gurneyStrength, "9", "Combat board should expose Gurney's live strength");
+  await screenshot(page, captures, "board-states-combat-deployment.png");
+
+  await page.setViewportSize(mobileViewport);
+  const combatMobileScrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+  assert.ok(
+    combatMobileScrollWidth <= mobileViewport.width,
+    `Combat deployment mobile view should not overflow horizontally (${combatMobileScrollWidth}px)`,
+  );
+  await screenshot(page, captures, "board-states-combat-deployment-mobile-390.png");
 }
 
 async function createBoardStatesFixture(server, initialPlayableGame) {
@@ -221,24 +256,42 @@ async function createBoardStatesFixture(server, initialPlayableGame) {
     };
   });
 
+  const placementGame = {
+    ...game,
+    activeSeat,
+    agentPlacementOwners: { ...occupiedSpaces },
+    agentTurnComplete: false,
+    locationControl: { ...locationControl },
+    makerSpice: { ...game.makerSpice, ...makerSpice },
+    pendingAction: undefined,
+    pendingQueue: [],
+    phase: "playing",
+    players,
+    sharedSpyPosts: Object.fromEntries(Object.entries(sharedSpyPosts).map(([spaceId, owners]) => [spaceId, [...owners]])),
+    spaces: { ...occupiedSpaces },
+    spyPosts: { ...spyPosts },
+  };
+
   return {
     activePlayerName: activePlayer.leader,
     cardId: selectedCard.id,
     cardName: selectedCard.name,
-    game: {
-      ...game,
-      activeSeat,
-      agentPlacementOwners: { ...occupiedSpaces },
-      agentTurnComplete: false,
-      locationControl: { ...locationControl },
-      makerSpice: { ...game.makerSpice, ...makerSpice },
-      pendingAction: undefined,
-      pendingQueue: [],
-      phase: "playing",
-      players,
-      sharedSpyPosts: Object.fromEntries(Object.entries(sharedSpyPosts).map(([spaceId, owners]) => [spaceId, [...owners]])),
-      spaces: { ...occupiedSpaces },
-      spyPosts: { ...spyPosts },
+    game: placementGame,
+    combatGame: {
+      ...placementGame,
+      activeSeat: placementGame.players.findIndex((player) => player.id === "p4"),
+      combatPasses: [],
+      phase: "combat",
+      players: placementGame.players.map((player) => {
+        const combat = combatByPlayerId[player.id] ?? { strength: 0, troops: 0, worms: 0 };
+        return {
+          ...player,
+          conflict: combat.strength,
+          deployedTroops: combat.troops,
+          deployedSandworms: combat.worms,
+          garrison: Math.max(0, player.garrison - combat.troops),
+        };
+      }),
     },
   };
 }
@@ -275,4 +328,18 @@ async function boardPlacementStats(page) {
     unavailableStatuses: Array.from(document.querySelectorAll(".space-tile.unavailable .space-placement-status"))
       .map((status) => status.textContent ?? ""),
   }));
+}
+
+async function boardCombatStats(page) {
+  return page.evaluate(() => {
+    const gurneySlot = document.querySelector('[data-testid="conflict-slot-p3"]');
+    const gurneyStrength = gurneySlot?.querySelector(".conflict-slot-stats span")?.textContent?.trim().replace(/\D+/g, "") ?? "";
+    return {
+      activeSlots: document.querySelectorAll(".conflict-slot.is-active").length,
+      gurneyStrength,
+      nonEmptySlots: document.querySelectorAll(".conflict-slot:not(.is-empty)").length,
+      slots: document.querySelectorAll(".conflict-slot").length,
+      wormSlots: document.querySelectorAll(".conflict-slot.has-worms").length,
+    };
+  });
 }

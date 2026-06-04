@@ -3,6 +3,7 @@ import { criticalLocationNames } from "../game/critical-locations";
 import { boardSpaces } from "../game/data";
 import {
   acquirableCardsForPending,
+  boardAgentRecallSpacesForPending,
   canPayTrashIntrigueForReward,
   canDeployForDeployOrRetreatTroops,
   canResolveRetreatTroopsForStrength,
@@ -28,8 +29,10 @@ import {
 import type { Player } from "../game/types";
 import { PendingActionPanelHeader } from "./PendingActionPanelHeader";
 import type { PendingActionPanelProps } from "./PendingActionPanel.types";
+import { PendingBoardAgentRecallPanel } from "./PendingBoardAgentRecallPanel";
 import { PendingBoardInfluenceChoicePanel, PendingOptionalSpacePaymentPanel } from "./PendingBoardChoicePanels";
 import { PendingAcquireCardPanel, PendingContractPanel } from "./PendingCardChoicePanels";
+import { PendingDrawCardsPanel } from "./PendingDrawCardsPanel";
 import {
   PendingDiscardDrawPanel,
   PendingDiscardHandCardPanel,
@@ -78,6 +81,7 @@ export function PendingActionPanel({
   chooseCommanderResourceSplit,
   chooseConflictInfluence,
   chooseBoardInfluence,
+  chooseBoardAgentRecall,
   chooseConflictTieWinner,
   chooseDiscardCardsForReward,
   chooseDiscardCardForDraw,
@@ -192,6 +196,16 @@ export function PendingActionPanel({
     pendingAction.kind === "trash-intrigue-for-reward"
       ? canPayTrashIntrigueForReward(pendingTrashIntrigueOwner, pendingAction)
       : true;
+  const pendingBoardAgentRecallOwner =
+    pendingAction.kind === "recall-agent-from-board" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
+  const pendingBoardAgentRecallSpaces =
+    pendingAction.kind === "recall-agent-from-board"
+      ? boardAgentRecallSpacesForPending(game, pendingAction)
+        .map((spaceId) => boardSpaces.find((space) => space.id === spaceId))
+        .filter((space): space is (typeof boardSpaces)[number] => Boolean(space))
+      : [];
+  const pendingDrawCardsOwner =
+    pendingAction.kind === "draw-cards" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingTopDeckSelectionOwner =
     pendingAction.kind === "top-deck-selection" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingTopDeckSelectionCards =
@@ -730,6 +744,23 @@ export function PendingActionPanel({
           pending={pendingAction}
           onResolve={chooseTrashIntrigueForReward}
           onSkip={skipTrashIntrigueForRewardChoice}
+        />
+      )}
+
+      {pendingAction.kind === "recall-agent-from-board" && (
+        <PendingBoardAgentRecallPanel
+          owner={pendingBoardAgentRecallOwner}
+          pending={pendingAction}
+          spaces={pendingBoardAgentRecallSpaces}
+          onRecall={chooseBoardAgentRecall}
+        />
+      )}
+
+      {pendingAction.kind === "draw-cards" && (
+        <PendingDrawCardsPanel
+          owner={pendingDrawCardsOwner}
+          pending={pendingAction}
+          onDraw={clearPendingAction}
         />
       )}
 

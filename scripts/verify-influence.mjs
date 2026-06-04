@@ -46,7 +46,7 @@ try {
   assert.equal(flooredFeyd.vp, droppedFeyd.vp, "Dropping further below the threshold should not lose more VP");
 
   const secrets = spaceById(data, "secrets");
-  const dutifulService = spaceById(data, "dutiful-service");
+  const economicSupport = spaceById(data, "economic-support");
   const allyEffect = state.applyBoardEffect(oneInfluenceFeyd, oneInfluenceFeyd, secrets);
   assert.equal(allyEffect.source.influence.bene, 2, "Faction board spaces should move the acting Ally's cube");
   assert.equal(allyEffect.source.vp, oneInfluenceFeyd.vp + 1, "Board-space Influence should score at the threshold");
@@ -66,47 +66,38 @@ try {
     ...feyd,
     influence: { ...feyd.influence, greatHouses: 1, emperor: 1 },
   };
-  const allyOnEmperorIcon = state.applyBoardEffect(oneGreatHouseFeyd, oneGreatHouseFeyd, dutifulService);
+  const allyOnGreatHousesSpace = state.applyBoardEffect(oneGreatHouseFeyd, oneGreatHouseFeyd, economicSupport);
   assert.equal(
-    allyOnEmperorIcon.source.influence.greatHouses,
+    allyOnGreatHousesSpace.source.influence.greatHouses,
     2,
-    "Non-personal Emperor-icon spaces should use the six-player Great Houses track for Allies",
+    "Great Houses spaces should move the acting Ally on the six-player Great Houses track",
   );
   assert.equal(
-    allyOnEmperorIcon.source.influence.emperor,
+    allyOnGreatHousesSpace.source.influence.emperor,
     1,
-    "Non-personal Emperor-icon spaces should not move an Ally on Shaddam's personal Emperor track",
+    "Great Houses spaces should not move an Ally on Shaddam's personal Emperor track",
   );
-  assert.equal(allyOnEmperorIcon.source.vp, oneGreatHouseFeyd.vp + 1);
+  assert.equal(allyOnGreatHousesSpace.source.vp, oneGreatHouseFeyd.vp + 1);
 
-  const shaddamOnEmperorIcon = state.applyBoardEffect(shaddam, oneGreatHouseFeyd, dutifulService);
+  const shaddamOnGreatHousesSpace = state.applyBoardEffect(shaddam, oneGreatHouseFeyd, economicSupport);
   assert.equal(
-    shaddamOnEmperorIcon.target.influence.greatHouses,
-    1,
-    "Shaddam should not auto-apply mapped Emperor-icon Influence before choosing a track",
+    shaddamOnGreatHousesSpace.target.influence.greatHouses,
+    2,
+    "Shaddam should delegate Great Houses board Influence to the activated Ally",
   );
   assert.equal(
-    shaddamOnEmperorIcon.target.influence.emperor,
+    shaddamOnGreatHousesSpace.target.influence.emperor,
     1,
-    "Shaddam's mapped Emperor-icon choice should not move an Ally before it is resolved",
+    "Shaddam should not move an activated Ally on his personal Emperor track",
   );
-  assert.equal(shaddamOnEmperorIcon.target.vp, oneGreatHouseFeyd.vp);
-  assert.equal(shaddamOnEmperorIcon.source.influence.emperor, shaddam.influence.emperor);
+  assert.equal(shaddamOnGreatHousesSpace.target.vp, oneGreatHouseFeyd.vp + 1);
+  assert.equal(shaddamOnGreatHousesSpace.source.influence.emperor, shaddam.influence.emperor);
 
-  const shaddamDutifulChoice = state.pendingActionForBoardInfluenceChoice(dutifulService, shaddam, oneGreatHouseFeyd);
+  const shaddamGreatHousesChoice = state.pendingActionForBoardInfluenceChoice(economicSupport, shaddam, oneGreatHouseFeyd);
   assert.deepEqual(
-    shaddamDutifulChoice,
-    {
-      kind: "board-influence-choice",
-      source: "Dutiful Service",
-      spaceId: "dutiful-service",
-      targetOwnerId: oneGreatHouseFeyd.id,
-      choices: [
-        { faction: "greatHouses", ownerId: oneGreatHouseFeyd.id },
-        { faction: "emperor", ownerId: shaddam.id },
-      ],
-    },
-    "Shaddam should choose between Great Houses and personal Emperor Influence on mapped Emperor spaces",
+    shaddamGreatHousesChoice,
+    undefined,
+    "Great Houses support spaces should not queue Shaddam's old Emperor mapped-choice flow",
   );
 
   const vastWealth = spaceById(data, "vast-wealth");

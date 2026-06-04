@@ -148,6 +148,18 @@ export type PendingAction =
       vpReward?: number;
     }
   | {
+      kind: "recall-agent-from-board";
+      ownerId: string;
+      source: string;
+      spaceIds: string[];
+    }
+  | {
+      kind: "draw-cards";
+      ownerId: string;
+      source: string;
+      amount: number;
+    }
+  | {
       kind: "retreat-troops-for-strength";
       ownerId: string;
       combatRecipientId: string;
@@ -285,6 +297,7 @@ export type PendingAction =
       gain: Partial<Resources>;
       gainVp: number;
       optional: boolean;
+      discard?: boolean;
     }
   | {
       kind: "lose-influence-for-intrigues";

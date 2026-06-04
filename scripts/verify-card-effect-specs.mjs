@@ -206,7 +206,8 @@ try {
   const imperialBasin = data.boardSpaces.find((space) => space.id === "imperial-basin");
   const secrets = data.boardSpaces.find((space) => space.id === "secrets");
   const highCouncil = data.boardSpaces.find((space) => space.id === "high-council");
-  const dutifulService = data.boardSpaces.find((space) => space.id === "dutiful-service");
+  const imperialPrivilege = data.boardSpaces.find((space) => space.id === "imperial-privilege");
+  const economicSupport = data.boardSpaces.find((space) => space.id === "economic-support");
   const deliverSupplies = data.boardSpaces.find((space) => space.id === "deliver-supplies");
   const shipping = data.boardSpaces.find((space) => space.id === "shipping");
   const sietchTabr = data.boardSpaces.find((space) => space.id === "sietch-tabr");
@@ -272,7 +273,7 @@ try {
   );
   assert.ok(commandRespect && prepareTheWay && spiceMustFlow && limitedLandsraadAccess && demandAttention && desertCall && threatenSpiceProduction && muadDibSignet && usul && corrinoMight && criticalShipments && demandResults && devastatingAssault && imperialTent && emperorSignet && imperialOrnithopter);
   assert.ok(backedByChoam && buyAccess && callToArms && changeAllegiances && councilorsAmbition && contingencyPlan && cunning && departForArrakis && detonation && unexpectedAllies && devour && distraction && findWeakness && goToGround && impress && imperiumPolitics && inspireAwe && intelligenceReport && leverage && manipulate && marketOpportunity && mercenaries && opportunism && questionableMethods && reachAgreement && shaddamsFavor && spiceIsPower && specialMission && springTheTrap && tacticalOption && sietchRitual && strategicStockpiling && weirdingCombat);
-  assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && dutifulService && deliverSupplies && shipping && sietchTabr && militarySupport && spiceRefinery);
+  assert.ok(arrakeen && acceptContract && haggaBasin && imperialBasin && secrets && highCouncil && imperialPrivilege && economicSupport && deliverSupplies && shipping && sietchTabr && militarySupport && spiceRefinery);
   verifyCardEffectSpecCatalogIntrigues({
     cards: {
       contingencyPlan,
@@ -714,7 +715,7 @@ try {
     withActivePlayer,
   });
   verifyCardEffectSpecMakerFremenValidation({
-    boardSpaces: { deliverSupplies, dutifulService, highCouncil, secrets },
+    boardSpaces: { deliverSupplies, economicSupport, highCouncil, secrets },
     cards: { capturedMentat, makerKeeper, northernWatermaster, paracompass, reliableInformant, shishakli },
     fixtures: { fremenSupportCard },
     game,
@@ -805,7 +806,7 @@ try {
     withActivePlayer,
   });
   verifyCardEffectSpecBoardInfluenceValidation({
-    boardSpaces: { dutifulService, highCouncil, secrets, shipping },
+    boardSpaces: { highCouncil, secrets, shipping },
     cards: { dangerousRhetoric, overthrow, subversiveAdvisor },
     game,
     players: { p2, p4 },

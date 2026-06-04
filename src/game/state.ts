@@ -286,8 +286,11 @@ export {
 export {
   defaultActivatedAllyId,
   iconCanReach,
+  pendingActionForBoardAgentRecall,
+  pendingActionForBoardCardDraw,
   pendingActionForMakerChoice,
   pendingActionForBoardInfluenceChoice,
+  pendingActionForBoardIntrigueSwap,
   pendingActionForBoardTrash,
   pendingActionForOptionalSpacePayment,
   pendingActionForSietchTabr,
@@ -427,6 +430,7 @@ export {
 
 export {
   acquireCardForPending,
+  boardAgentRecallSpacesForPending,
   collectChoamContractFallback,
   deployControlDefenseTroop,
   deployTroopToConflict,
@@ -434,6 +438,7 @@ export {
   placeSpyForPending,
   reinforceTroop,
   resolveBoardInfluenceChoice,
+  resolveBoardAgentRecallChoice,
   resolveCommanderResourceSplitChoice,
   resolveDiscardCardsForRewardChoice,
   resolveDiscardCardForDrawChoice,

@@ -16,6 +16,7 @@ export type PendingActionPanelProps = {
   chooseCommanderResourceSplit: (optionIndex: number) => void;
   chooseConflictInfluence: (faction: FactionId) => void;
   chooseBoardInfluence: (ownerId: string, faction: FactionId) => void;
+  chooseBoardAgentRecall: (spaceId: string) => void;
   chooseConflictTieWinner: (winnerId?: string) => void;
   chooseDiscardCardsForReward: (discardCardId: string) => void;
   chooseDiscardCardForDraw: (discardCardId: string) => void;

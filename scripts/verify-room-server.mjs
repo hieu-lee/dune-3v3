@@ -1341,6 +1341,146 @@ try {
     "Room board influence choice should grant Influence only to the claimed owner",
   );
 
+  const boardAgentRecallRoom = await jsonFetch("/api/rooms", { method: "POST" });
+  assert.equal(boardAgentRecallRoom.response.status, 201, "Board Agent recall room creation should succeed");
+  const boardAgentRecallRoomId = boardAgentRecallRoom.body.roomId;
+  const boardAgentRecallRecord = server.rooms.get(boardAgentRecallRoomId);
+  assert.ok(boardAgentRecallRecord, "Board Agent recall room should be stored in memory");
+  const boardAgentRecallOwnerId = "p2";
+  const boardAgentRecallWrongId = "p1";
+  const boardAgentRecallDrawCard = { ...imperiumDeck[0], id: "room-imperial-privilege-draw-card" };
+  boardAgentRecallRecord.game = {
+    ...boardAgentRecallRecord.game,
+    spaces: {
+      ...boardAgentRecallRecord.game.spaces,
+      "imperial-privilege": boardAgentRecallOwnerId,
+      "assembly-hall": boardAgentRecallOwnerId,
+      "high-council": boardAgentRecallOwnerId,
+    },
+    agentPlacementOwners: {
+      ...boardAgentRecallRecord.game.agentPlacementOwners,
+      "imperial-privilege": boardAgentRecallOwnerId,
+      "assembly-hall": boardAgentRecallOwnerId,
+      "high-council": boardAgentRecallOwnerId,
+    },
+    pendingAction: {
+      kind: "recall-agent-from-board",
+      ownerId: boardAgentRecallOwnerId,
+      source: "Imperial Privilege",
+      spaceIds: ["assembly-hall", "high-council"],
+    },
+    pendingQueue: [{
+      kind: "draw-cards",
+      ownerId: boardAgentRecallOwnerId,
+      source: "Imperial Privilege",
+      amount: 1,
+    }],
+    players: boardAgentRecallRecord.game.players.map((candidate) =>
+      candidate.id === boardAgentRecallOwnerId
+        ? {
+            ...candidate,
+            agentsReady: 0,
+            agentsTotal: Math.max(candidate.agentsTotal, 3),
+            deck: [boardAgentRecallDrawCard],
+            discard: [],
+            hand: [],
+          }
+        : candidate
+    ),
+  };
+  const boardAgentRecallWrongClaim = await jsonFetch(`/api/rooms/${boardAgentRecallRoomId}/seats/${boardAgentRecallWrongId}/claim`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: "Board Recall Wrong Seat" }),
+  });
+  assert.equal(boardAgentRecallWrongClaim.response.status, 200, "Wrong board Agent recall seat should be claimable");
+  const boardAgentRecallOwnerClaim = await jsonFetch(`/api/rooms/${boardAgentRecallRoomId}/seats/${boardAgentRecallOwnerId}/claim`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: "Board Recall Owner" }),
+  });
+  assert.equal(boardAgentRecallOwnerClaim.response.status, 200, "Board Agent recall owner should be claimable");
+  await restartServer();
+  const recoveredBoardAgentRecallWrong = await jsonFetch(`/api/rooms/${boardAgentRecallRoomId}`, {
+    headers: { "x-room-token": boardAgentRecallWrongClaim.body.token },
+  });
+  assert.equal(recoveredBoardAgentRecallWrong.response.status, 200, "Wrong board Agent recall seat should reconnect after restart");
+  const recoveredBoardAgentRecallOwner = await jsonFetch(`/api/rooms/${boardAgentRecallRoomId}`, {
+    headers: { "x-room-token": boardAgentRecallOwnerClaim.body.token },
+  });
+  assert.equal(recoveredBoardAgentRecallOwner.response.status, 200, "Board Agent recall owner should reconnect after restart");
+  const refreshedBoardAgentRecallWrong = await jsonFetch(`/api/rooms/${boardAgentRecallRoomId}`, {
+    headers: { "x-room-token": boardAgentRecallWrongClaim.body.token },
+  });
+  assert.equal(refreshedBoardAgentRecallWrong.response.status, 200, "Wrong board Agent recall seat should refresh after the owner reconnects");
+  assert.equal(
+    recoveredBoardAgentRecallOwner.body.game.pendingAction?.kind,
+    "recall-agent-from-board",
+    "Persisted board Agent recall pending action should survive restart",
+  );
+  const wrongBoardAgentRecall = await roomAction(
+    boardAgentRecallRoomId,
+    boardAgentRecallWrongClaim.body.token,
+    refreshedBoardAgentRecallWrong.body.version,
+    {
+      kind: "pending",
+      command: { kind: "choose-board-agent-recall", spaceId: "assembly-hall" },
+    },
+  );
+  assert.equal(wrongBoardAgentRecall.response.status, 403, "Only the board Agent recall owner should resolve the recall");
+  const invalidBoardAgentRecallVersion = server.rooms.get(boardAgentRecallRoomId).version;
+  const invalidBoardAgentRecall = await roomAction(
+    boardAgentRecallRoomId,
+    boardAgentRecallOwnerClaim.body.token,
+    recoveredBoardAgentRecallOwner.body.version,
+    {
+      kind: "pending",
+      command: { kind: "choose-board-agent-recall", spaceId: "shipping" },
+    },
+  );
+  assert.equal(invalidBoardAgentRecall.response.status, 409, "Room board Agent recall should reject unavailable spaces");
+  assert.equal(
+    server.rooms.get(boardAgentRecallRoomId).version,
+    invalidBoardAgentRecallVersion,
+    "Rejected board Agent recall should not advance the room version",
+  );
+  const validBoardAgentRecall = await roomAction(
+    boardAgentRecallRoomId,
+    boardAgentRecallOwnerClaim.body.token,
+    invalidBoardAgentRecallVersion,
+    {
+      kind: "pending",
+      command: { kind: "choose-board-agent-recall", spaceId: "assembly-hall" },
+    },
+  );
+  assert.equal(validBoardAgentRecall.response.status, 200, "Room board Agent recall should resolve through room pending actions");
+  assert.equal(validBoardAgentRecall.body.snapshot.game.spaces["assembly-hall"], undefined, "Room board Agent recall should clear the recalled space");
+  assert.equal(
+    validBoardAgentRecall.body.snapshot.game.agentPlacementOwners?.["assembly-hall"],
+    undefined,
+    "Room board Agent recall should clear the recalled Agent owner",
+  );
+  assert.equal(
+    validBoardAgentRecall.body.snapshot.game.pendingAction?.kind,
+    "draw-cards",
+    "Room board Agent recall should advance to Imperial Privilege's delayed draw",
+  );
+  assert.equal(player(validBoardAgentRecall.body.snapshot, boardAgentRecallOwnerId).agentsReady, 1);
+  assert.equal(player(validBoardAgentRecall.body.snapshot, boardAgentRecallOwnerId).hand.length, 0);
+  const delayedBoardDraw = await roomAction(
+    boardAgentRecallRoomId,
+    boardAgentRecallOwnerClaim.body.token,
+    validBoardAgentRecall.body.snapshot.version,
+    { kind: "pending", command: { kind: "clear-pending-action" } },
+  );
+  assert.equal(delayedBoardDraw.response.status, 200, "Room delayed board draw should resolve through clear-pending-action");
+  assert.equal(delayedBoardDraw.body.snapshot.game.pendingAction, undefined, "Room delayed board draw should finish the pending sequence");
+  assert.ok(
+    player(delayedBoardDraw.body.snapshot, boardAgentRecallOwnerId).hand.some((card) => card.id === boardAgentRecallDrawCard.id),
+    "Room delayed board draw should draw the Imperial Privilege card for the owner after recall",
+  );
+  assertHiddenSharedDecks(delayedBoardDraw.body.snapshot);
+
   const contractRoom = await jsonFetch("/api/rooms", { method: "POST" });
   assert.equal(contractRoom.response.status, 201, "Contract selection room creation should succeed");
   const contractRoomRecord = server.rooms.get(contractRoom.body.roomId);

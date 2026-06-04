@@ -25,7 +25,9 @@ try {
 
   const game = state.initialGame();
   const shipping = spaceById(data, "shipping");
+  const imperialPrivilege = spaceById(data, "imperial-privilege");
   const spiceCard = { icons: ["spice"] };
+  const landsraadCard = { icons: ["landsraad"] };
   assert.deepEqual(
     shipping.requirement,
     { faction: "spacing", amount: 2 },
@@ -84,6 +86,46 @@ try {
     state.iconCanReach({ icons: ["bene"] }, secrets, feyd, false, {}, game.players),
     true,
     "Spaces without requirements should keep their normal icon reachability",
+  );
+
+  assert.deepEqual(
+    imperialPrivilege.requirement,
+    { faction: "emperor", amount: 2 },
+    "Imperial Privilege should require two Emperor Influence",
+  );
+  assert.equal(
+    state.canMeetInfluenceRequirement(imperialPrivilege, feyd, game.players),
+    false,
+    "An Ally below the Great Houses/Emperor threshold should not meet Imperial Privilege's requirement",
+  );
+  const feydGreatHousesQualified = {
+    ...feyd,
+    influence: { ...feyd.influence, greatHouses: 2 },
+  };
+  const feydGreatHousesQualifiedPlayers = game.players.map((player) =>
+    player.id === feydGreatHousesQualified.id ? feydGreatHousesQualified : player,
+  );
+  assert.equal(
+    state.canMeetInfluenceRequirement(imperialPrivilege, feydGreatHousesQualified, feydGreatHousesQualifiedPlayers),
+    true,
+    "An Ally with two Great Houses Influence should meet Imperial Privilege's Emperor-icon requirement",
+  );
+  assert.equal(
+    state.iconCanReach(landsraadCard, imperialPrivilege, feydGreatHousesQualified, false, {}, feydGreatHousesQualifiedPlayers),
+    true,
+    "A qualified Ally with a Landsraad icon should be able to reach Imperial Privilege",
+  );
+  const shaddamQualified = {
+    ...shaddam,
+    influence: { ...shaddam.influence, emperor: 2 },
+  };
+  const shaddamQualifiedPlayers = game.players.map((player) =>
+    player.id === shaddamQualified.id ? shaddamQualified : player,
+  );
+  assert.equal(
+    state.canMeetInfluenceRequirement(imperialPrivilege, shaddamQualified, shaddamQualifiedPlayers),
+    true,
+    "Shaddam should meet Imperial Privilege's Emperor-icon requirement with personal Emperor Influence",
   );
 
   console.log("board requirement verification passed");

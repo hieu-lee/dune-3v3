@@ -103,7 +103,10 @@ export type BoardSpace = {
   gain?: BoardGain;
   troops?: number;
   draw?: number;
+  deferDraw?: boolean;
   revealPersuasion?: number;
+  recallAgent?: boolean;
+  intrigueSwap?: boolean;
   combat?: boolean;
   maker?: boolean;
   makerWorms?: number;

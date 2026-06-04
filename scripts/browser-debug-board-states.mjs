@@ -132,7 +132,14 @@ export async function runBoardStatesSmoke({
   );
 
   const denseStats = await boardMarkerStats(page);
+  const landsraadText = await page.locator('[data-region-id="landsraad"]').innerText();
+  const imperialPrivilegeText = await page.getByTestId("space-imperial-privilege").innerText();
   assert.equal(denseStats.occupied, Object.keys(occupiedSpaces).length, "Dense board state should render all occupied spaces");
+  assert.match(landsraadText, /Imperial Privilege/, "Landsraad browser board should render Imperial Privilege");
+  assert.doesNotMatch(landsraadText, /Dutiful\s+Service/, "Landsraad browser board should not render the old board-space name");
+  assert.match(imperialPrivilegeText, /2\+ EMP\/GH/, "Imperial Privilege should show its mapped Emperor/Great Houses requirement badge");
+  assert.match(imperialPrivilegeText, /recall Agent/, "Imperial Privilege should expose the Agent recall badge");
+  assert.match(imperialPrivilegeText, /cycle Intrigue/, "Imperial Privilege should expose the Intrigue cycle badge");
   assert.equal(denseStats.agentMarkers, denseStats.occupied, "Occupied spaces should render one visible Agent owner marker each");
   assert.ok(denseStats.agentMarkerLabels.some((label) => label.includes("Feyd-Rautha")), "Agent markers should include occupying leader names");
   assert.match(

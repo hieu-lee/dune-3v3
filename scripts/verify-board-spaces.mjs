@@ -11,7 +11,7 @@ const expectedCatalogArtSpaces = [
   "Assembly Hall",
   "Deep Desert",
   "Deliver Supplies",
-  "Dutiful Service",
+  "Imperial Privilege",
   "Espionage",
   "Gather Support",
   "Hagga Basin",
@@ -86,6 +86,14 @@ try {
   assert.equal(sietch.combat, true);
   assert.equal(sietch.sietchTabr, true);
   assert.deepEqual(sietch.requirement, { faction: "fringeWorlds", amount: 2 });
+
+  const imperialPrivilege = data.boardSpaces.find((space) => space.id === "imperial-privilege");
+  assert.ok(imperialPrivilege, "Imperial Privilege should be present in the board-space model");
+  assert.equal(
+    imperialPrivilege.detail.includes("Emperor/Great Houses Influence"),
+    true,
+    "Imperial Privilege should describe its mapped Emperor/Great Houses requirement",
+  );
 
   for (const space of data.boardSpaces) {
     assertLocalArt(space);

@@ -64,6 +64,12 @@ export function effectiveFremenIconInfluence(player: Player, players: Player[]) 
 
 export function canMeetInfluenceRequirement(space: BoardSpace, player: Player, players: Player[]) {
   if (!space.requirement) return true;
+  if (space.requirement.faction === "emperor") {
+    return effectiveEmperorIconInfluence(player, players) >= space.requirement.amount;
+  }
+  if (space.requirement.faction === "fremen") {
+    return effectiveFremenIconInfluence(player, players) >= space.requirement.amount;
+  }
   if (space.id === "sietch-tabr" && player.team === "muaddib" && player.role === "Commander") {
     return Math.max(
       player.influence.fremen,

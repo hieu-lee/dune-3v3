@@ -88,7 +88,7 @@ try {
     assemblyHall: spaceById(data, "assembly-hall"),
     carthag: spaceById(data, "carthag"),
     controversialTech: spaceById(data, "controversial-tech"),
-    dutifulService: spaceById(data, "dutiful-service"),
+    imperialPrivilege: spaceById(data, "imperial-privilege"),
     espionage: spaceById(data, "espionage"),
     expedition: spaceById(data, "expedition"),
     gatherSupport: spaceById(data, "gather-support"),
@@ -105,6 +105,19 @@ try {
   assert.equal(spaces.gatherSupport.cost, undefined, "Gather Support should be free unless the optional Solari cost is chosen");
   assert.equal(spaces.assemblyHall.gain?.intrigue, 1, "Assembly Hall should draw one Intrigue on placement");
   assert.equal(spaces.assemblyHall.revealPersuasion, 1, "Assembly Hall should mark its Reveal-turn persuasion bonus");
+  assert.deepEqual(spaces.imperialPrivilege.cost, { solari: 3 }, "Imperial Privilege should cost 3 Solari");
+  assert.deepEqual(
+    spaces.imperialPrivilege.requirement,
+    { faction: "emperor", amount: 2 },
+    "Imperial Privilege should require 2 Emperor Influence",
+  );
+  assert.equal(spaces.imperialPrivilege.icon, "landsraad", "Imperial Privilege should use the Landsraad icon");
+  assert.equal(spaces.imperialPrivilege.draw, 1, "Imperial Privilege should draw one card");
+  assert.equal(spaces.imperialPrivilege.deferDraw, true, "Imperial Privilege should defer its card draw until after its choices");
+  assert.equal(spaces.imperialPrivilege.recallAgent, true, "Imperial Privilege should recall another Agent");
+  assert.equal(spaces.imperialPrivilege.intrigueSwap, true, "Imperial Privilege should optionally cycle an Intrigue");
+  assert.equal(spaces.imperialPrivilege.influence, undefined, "Imperial Privilege should not grant board Influence");
+  assert.equal(spaces.imperialPrivilege.contract, undefined, "Imperial Privilege should not take a CHOAM contract");
   assert.deepEqual(spaces.spiceRefinery.gain, { solari: 2 }, "Spice Refinery should pay 2 Solari before its optional spice payment");
   assert.equal(spaces.shipping.influence, undefined, "Shipping should choose any one Influence instead of fixed Guild influence");
 
@@ -502,19 +515,113 @@ try {
   const shippingInfluence = state.resolveBoardInfluenceChoice(shipping, shipping.pendingAction, "p4", "emperor");
   assert.equal(playerById(shippingInfluence, "p4").influence.emperor, 1, "Shaddam should be able to choose personal Emperor Influence from Shipping");
 
-  const dutifulChoice = place(
+  const imperialPrivilegeDrawCard = testCard("imperial-privilege-draw", "city");
+  const imperialPrivilegeOldIntrigue = testIntrigue("imperial-privilege-old");
+  const imperialPrivilegeNewIntrigue = testIntrigue("imperial-privilege-new");
+  const imperialPrivilege = place(
     turnActions,
-    playableGame(state, "p4", testCard("test-emperor", "emperor")),
-    testCard("test-emperor", "emperor"),
-    spaces.dutifulService,
-    { p4: "p2" },
+    {
+      ...playableGame(state, "p2", landsraadCard, (player) => ({
+        ...player,
+        deck: [imperialPrivilegeDrawCard],
+        discard: [],
+        influence: { ...player.influence, greatHouses: 2 },
+        intrigues: [imperialPrivilegeOldIntrigue],
+        resources: { ...player.resources, solari: 3 },
+      })),
+      agentPlacementOwners: { "assembly-hall": "p2" },
+      intrigueDeck: [imperialPrivilegeNewIntrigue],
+      intrigueDiscard: [],
+      spaces: { "assembly-hall": "p2" },
+    },
+    landsraadCard,
+    spaces.imperialPrivilege,
   );
-  assert.equal(dutifulChoice.pendingAction?.kind, "board-influence-choice", "Shaddam should choose Great Houses or Emperor on Dutiful Service");
-  assert.equal(dutifulChoice.pendingAction.spaceId, "dutiful-service", "Mapped board Influence choices should carry their board space id");
-  assert.deepEqual(dutifulChoice.pendingAction.choices, [
-    { faction: "greatHouses", ownerId: "p2" },
-    { faction: "emperor", ownerId: "p4" },
-  ]);
+  assert.equal(playerById(imperialPrivilege, "p2").resources.solari, 0, "Imperial Privilege should spend 3 Solari");
+  assert.deepEqual(
+    playerById(imperialPrivilege, "p2").hand.map((card) => card.id),
+    [],
+    "Imperial Privilege should not draw its card before the Intrigue discard and Agent recall choices resolve",
+  );
+  assert.equal(imperialPrivilege.spaces["imperial-privilege"], "p2", "Imperial Privilege should keep the newly placed Agent on its space");
+  assert.equal(
+    imperialPrivilege.agentPlacementOwners?.["imperial-privilege"],
+    "p2",
+    "Imperial Privilege should record the newly placed Agent owner",
+  );
+  assert.equal(imperialPrivilege.pendingAction?.kind, "trash-intrigue-for-reward", "Imperial Privilege should first offer the optional Intrigue discard");
+  assert.equal(imperialPrivilege.pendingAction?.source, "Imperial Privilege");
+  assert.equal(imperialPrivilege.pendingAction?.discard, true, "Imperial Privilege should discard, not trash, the chosen Intrigue");
+  assert.equal(imperialPrivilege.pendingAction?.optional, true, "Imperial Privilege Intrigue cycling should be optional");
+  assert.equal(imperialPrivilege.pendingAction?.drawIntrigues, 1, "Imperial Privilege should draw one replacement Intrigue");
+  assert.equal(
+    imperialPrivilege.pendingQueue[0]?.kind,
+    "recall-agent-from-board",
+    "Imperial Privilege should then require an Agent recall choice when another Agent is on the board",
+  );
+  assert.deepEqual(
+    imperialPrivilege.pendingQueue[0]?.spaceIds,
+    ["assembly-hall"],
+    "Imperial Privilege should only recall other Agents owned by the acting player",
+  );
+  assert.deepEqual(
+    imperialPrivilege.pendingQueue[1],
+    {
+      kind: "draw-cards",
+      ownerId: "p2",
+      source: "Imperial Privilege",
+      amount: 1,
+    },
+    "Imperial Privilege should queue its card draw after the Agent recall",
+  );
+  assert.equal(
+    imperialPrivilege.pendingQueue.some((pending) => pending.kind === "contract" || pending.kind === "board-influence-choice"),
+    false,
+    "Imperial Privilege should not leave the old contract or Influence behavior behind",
+  );
+  const imperialPrivilegeCycled = state.resolveTrashIntrigueForRewardChoice(
+    imperialPrivilege,
+    imperialPrivilege.pendingAction,
+    imperialPrivilegeOldIntrigue.id,
+  );
+  assert.equal(imperialPrivilegeCycled.pendingAction?.kind, "recall-agent-from-board", "Imperial Privilege should advance to the Agent recall");
+  assert.equal(imperialPrivilegeCycled.pendingQueue[0]?.kind, "draw-cards", "Imperial Privilege should still defer its card draw after discarding an Intrigue");
+  assert.deepEqual(
+    playerById(imperialPrivilegeCycled, "p2").intrigues.map((card) => card.id),
+    [imperialPrivilegeNewIntrigue.id],
+    "Imperial Privilege should replace the discarded Intrigue with a new one",
+  );
+  assert.deepEqual(
+    imperialPrivilegeCycled.intrigueDiscard.map((card) => card.id),
+    [imperialPrivilegeOldIntrigue.id],
+    "Imperial Privilege should move the discarded Intrigue to the Intrigue discard pile",
+  );
+  const imperialPrivilegeRecalled = state.resolveBoardAgentRecallChoice(
+    imperialPrivilegeCycled,
+    imperialPrivilegeCycled.pendingAction,
+    "assembly-hall",
+  );
+  assert.equal(imperialPrivilegeRecalled.spaces["assembly-hall"], undefined, "Imperial Privilege should clear the recalled Agent's old space");
+  assert.equal(
+    imperialPrivilegeRecalled.agentPlacementOwners?.["assembly-hall"],
+    undefined,
+    "Imperial Privilege should clear the recalled Agent owner marker",
+  );
+  assert.equal(imperialPrivilegeRecalled.spaces["imperial-privilege"], "p2", "Imperial Privilege should not recall its newly placed Agent");
+  assert.equal(playerById(imperialPrivilegeRecalled, "p2").agentsReady, 2, "Imperial Privilege should ready the recalled Agent");
+  assert.equal(imperialPrivilegeRecalled.pendingAction?.kind, "draw-cards", "Imperial Privilege should draw its card after recalling an Agent");
+  assert.deepEqual(
+    playerById(imperialPrivilegeRecalled, "p2").hand.map((card) => card.id),
+    [],
+    "Imperial Privilege should not reveal the drawn card until the draw pending resolves",
+  );
+  const imperialPrivilegeDrawn = state.finishPendingAction(imperialPrivilegeRecalled);
+  assert.equal(imperialPrivilegeDrawn.pendingAction, undefined, "Imperial Privilege should finish after resolving its delayed card draw");
+  assert.deepEqual(
+    playerById(imperialPrivilegeDrawn, "p2").hand.map((card) => card.id),
+    [imperialPrivilegeDrawCard.id],
+    "Imperial Privilege should draw one card only after the discard and recall choices",
+  );
 
   const espionage = place(
     turnActions,

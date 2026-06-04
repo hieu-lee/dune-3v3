@@ -13,6 +13,7 @@ export function createRoomPendingActionHandlers(sendAction: RoomSendAction): Pen
     acquirePendingCard: (cardId) => pending({ kind: "acquire-pending-card", cardId }),
     adjustTeamResourcePayment: (contributorId, delta) =>
       pending({ kind: "adjust-team-resource-payment", contributorId, delta }),
+    chooseBoardAgentRecall: (spaceId) => pending({ kind: "choose-board-agent-recall", spaceId }),
     chooseBoardInfluence: (ownerId, faction) => pending({ kind: "choose-board-influence", ownerId, faction }),
     chooseCommanderResourceSplit: (optionIndex) => pending({ kind: "choose-commander-resource-split", optionIndex }),
     chooseConflictInfluence: (faction) => pending({ kind: "choose-conflict-influence", faction }),

@@ -44,6 +44,10 @@ function rewardText(pending: TrashIntrigueForRewardPendingAction) {
   return parts.length > 0 ? parts.join(" and ") : "no reward";
 }
 
+function actionVerb(pending: TrashIntrigueForRewardPendingAction) {
+  return pending.discard ? "Discard" : "Trash";
+}
+
 export function PendingTrashIntriguePanel({
   canPay,
   choices,
@@ -55,13 +59,14 @@ export function PendingTrashIntriguePanel({
   const [selectedIntrigueId, setSelectedIntrigueId] = useState<string>();
   const selectedIntrigue = choices.find((card) => card.id === selectedIntrigueId);
   const ownerLabel = owner?.leader ?? "Player";
-  const actionText = `Trash 1 Intrigue${resourceCostText(pending.cost)} to ${rewardText(pending)}`;
+  const verb = actionVerb(pending);
+  const actionText = `${verb} 1 Intrigue${resourceCostText(pending.cost)} to ${rewardText(pending)}`;
 
   return (
     <div className="pending-controls trash-choice-grid trash-intrigue-choice-grid">
       <div className="trash-choice-summary">
         <span>{pending.source}</span>
-        <strong>{ownerLabel}: Intrigue trash</strong>
+        <strong>{ownerLabel}: Intrigue {pending.discard ? "discard" : "trash"}</strong>
         <small>{actionText}</small>
       </div>
 
@@ -80,7 +85,7 @@ export function PendingTrashIntriguePanel({
                 aria-pressed={selectedIntrigueId === card.id}
                 key={card.id}
                 onClick={() => setSelectedIntrigueId(card.id)}
-                title={`Trash ${card.name}`}
+                title={`${verb} ${card.name}`}
               >
                 {card.thumbnailPath && <img src={card.thumbnailPath} alt="" />}
                 <span className="trash-choice-badge">Select</span>
@@ -108,7 +113,7 @@ export function PendingTrashIntriguePanel({
           <span className="trash-choice-badge">Resolve</span>
           <strong>Resolve {pending.source}</strong>
           <small>
-            {!canPay ? "Cost cannot be paid." : selectedIntrigue ? `Trash ${selectedIntrigue.name}.` : "Select an Intrigue first."}
+            {!canPay ? "Cost cannot be paid." : selectedIntrigue ? `${verb} ${selectedIntrigue.name}.` : "Select an Intrigue first."}
           </small>
         </button>
 
@@ -121,7 +126,7 @@ export function PendingTrashIntriguePanel({
           >
             <span className="trash-choice-badge">{pending.optional ? "Optional" : "Blocked"}</span>
             <strong>{pending.optional ? "Skip" : "Continue"}</strong>
-            <small>{pending.optional ? "Leave Intrigues untrashed." : "Cannot resolve this trash effect."}</small>
+            <small>{pending.optional ? `Leave Intrigues un${pending.discard ? "discarded" : "trashed"}.` : "Cannot resolve this effect."}</small>
           </button>
         )}
       </div>

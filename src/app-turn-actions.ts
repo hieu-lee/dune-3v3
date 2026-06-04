@@ -17,6 +17,9 @@ import {
   drawIntrigueCards,
   effectiveCost,
   pendingActionForBoardInfluenceChoice,
+  pendingActionForBoardAgentRecall,
+  pendingActionForBoardCardDraw,
+  pendingActionForBoardIntrigueSwap,
   pendingActionForBoardTrash,
   pendingActionsForLeaderPlacementEffects,
   pendingActionForMakerChoice,
@@ -365,10 +368,16 @@ export function placeAgentAction(
   const optionalSpacePaymentPending = pendingActionForOptionalSpacePayment(selectedSpace, source);
   const boardInfluencePending = pendingActionForBoardInfluenceChoice(selectedSpace, source, effectedTarget);
   const combinedBoardInfluence = combinedBoardInfluenceChoicePending(boardInfluencePending, firstCardPending);
+  const boardIntrigueSwapPending = pendingActionForBoardIntrigueSwap(selectedSpace, source, futureSourceIntrigues);
+  const boardAgentRecallPending = pendingActionForBoardAgentRecall(current, selectedSpace, source);
+  const boardCardDrawPending = pendingActionForBoardCardDraw(selectedSpace, source);
   const boardTrashPending = pendingActionForBoardTrash(selectedSpace, source);
   const boardChoicePendings = [
     optionalSpacePaymentPending,
     combinedBoardInfluence.boardPending,
+    boardIntrigueSwapPending,
+    boardAgentRecallPending,
+    boardCardDrawPending,
   ].filter((action): action is PendingAction => Boolean(action));
   const [leaderPlacementPending, ...remainingLeaderPlacementPendings] = pendingActionsForLeaderPlacementEffects(postEffectState, source, selectedSpace);
   const paidRewardWater = paidRewardResourceGain(combinedBoardInfluence.cardPending, source.id, "water");

@@ -39,6 +39,7 @@ const server = await createRoomServer({ port: 0, log: false, storageFile: join(o
 const browser = await chromium.launch({ headless: true });
 const {
   canPay,
+  boardAgentRecallSpacesForPending,
   discardCardForDrawChoices,
   discardCardsForRewardChoices,
   effectiveCost,
@@ -400,6 +401,12 @@ function pendingCommand(room, pending, coverage) {
     }
     case "trash-intrigue-for-reward":
       return { kind: "skip-trash-intrigue-for-reward" };
+    case "recall-agent-from-board": {
+      const spaceId = boardAgentRecallSpacesForPending(room.game, pending)[0];
+      return spaceId ? { kind: "choose-board-agent-recall", spaceId } : undefined;
+    }
+    case "draw-cards":
+      return { kind: "clear-pending-action" };
     case "trash-source-for-trade":
       return { kind: "skip-trash-source-for-trade" };
     case "discard-card-for-draw": {

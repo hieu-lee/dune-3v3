@@ -11,7 +11,7 @@ export function verifyCardEffectSpecMakerFremenValidation({
   turnActions,
   withActivePlayer,
 }) {
-  const { deliverSupplies, dutifulService, highCouncil, secrets } = boardSpaces;
+  const { deliverSupplies, economicSupport, highCouncil, secrets } = boardSpaces;
   const { capturedMentat, makerKeeper, northernWatermaster, paracompass, reliableInformant, shishakli } = cards;
   const { fremenSupportCard } = fixtures;
   const { p2 } = players;
@@ -200,7 +200,7 @@ export function verifyCardEffectSpecMakerFremenValidation({
     "Paracompass should add 3 card persuasion with High Council and Swordmaster",
   );
   for (const [space, label] of [
-    [dutifulService, "Emperor"],
+    [economicSupport, "Great Houses"],
     [secrets, "Bene Gesserit"],
     [deliverSupplies, "Spacing Guild"],
   ]) {

@@ -121,6 +121,10 @@ function pendingActionTitle(game: GameState, pendingAction: PendingAction) {
       return `${playerLeader(playerById(game, pendingAction.ownerId), "Shaddam")} Throne Row`;
     case "trash-card":
       return `${playerLeader(playerById(game, pendingAction.ownerId))} ${pendingAction.optional ? "optional " : ""}trash from ${pendingAction.source}`;
+    case "recall-agent-from-board":
+      return `${playerLeader(playerById(game, pendingAction.ownerId))} ${pendingAction.source} Agent recall`;
+    case "draw-cards":
+      return `${playerLeader(playerById(game, pendingAction.ownerId))} ${pendingAction.source} draw`;
     case "recall-spy":
       return `${playerLeader(playerById(game, pendingAction.ownerId))} recall spy`;
     case "lose-influence":

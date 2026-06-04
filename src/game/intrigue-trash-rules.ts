@@ -74,6 +74,10 @@ function intrigueRewardText(requested: number, actual: number) {
   return ` to draw ${actual} of ${requested} Intrigue cards`;
 }
 
+function intrigueActionText(pending: TrashIntrigueForRewardPendingAction) {
+  return pending.discard ? "discards" : "trashes";
+}
+
 export function resolveTrashIntrigueForReward(
   state: GameState,
   pending: TrashIntrigueForRewardPendingAction,
@@ -95,6 +99,7 @@ export function resolveTrashIntrigueForReward(
   const advancedState: GameState = {
     ...state,
     players: state.players.map((player) => player.id === owner.id ? ownerAfterTrash : player),
+    intrigueDiscard: pending.discard ? [trashedIntrigue, ...state.intrigueDiscard] : state.intrigueDiscard,
     ...advancePendingAction(state),
     log: state.log,
   };
@@ -109,7 +114,7 @@ export function resolveTrashIntrigueForReward(
   const resolvedState = {
     ...intrigueState,
     log: [
-      `${owner.leader} resolves ${pending.source}: trashes ${trashedIntrigue.name}${resourceCostText(pending.cost)}${intrigueRewardText(pending.drawIntrigues, drawnIntrigues)}${resourceRewardText(pending.gain)}${vpRewardText(pending.gainVp)}.`,
+      `${owner.leader} resolves ${pending.source}: ${intrigueActionText(pending)} ${trashedIntrigue.name}${resourceCostText(pending.cost)}${intrigueRewardText(pending.drawIntrigues, drawnIntrigues)}${resourceRewardText(pending.gain)}${vpRewardText(pending.gainVp)}.`,
       ...intrigueState.log,
     ],
   };
@@ -133,9 +138,9 @@ export function skipTrashIntrigueForReward(
     ...advancePendingAction(state),
     log: [
       pending.optional
-        ? `${owner?.leader ?? "Player"} declines to trash an Intrigue for ${pending.source}.`
+        ? `${owner?.leader ?? "Player"} declines to ${pending.discard ? "discard" : "trash"} an Intrigue for ${pending.source}.`
         : canPayTrashIntrigueForReward(owner, pending)
-          ? `${owner?.leader ?? "Player"} has no Intrigues to trash for ${pending.source}.`
+          ? `${owner?.leader ?? "Player"} has no Intrigues to ${pending.discard ? "discard" : "trash"} for ${pending.source}.`
           : `${owner?.leader ?? "Player"} cannot pay for ${pending.source}.`,
       ...state.log,
     ],

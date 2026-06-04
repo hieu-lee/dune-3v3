@@ -117,6 +117,83 @@ export async function runSpaceChoicesSmoke({
   const influenceAfter = await currentGame(page);
   const shaddamAfter = influenceAfter.players.find((player) => player.id === "p4");
   assert.equal(shaddamAfter.influence.emperor, shaddamBefore.influence.emperor + 1, "Board influence choice should apply to the selected owner and track");
+
+  await setDebugGameAndWait(page, states.imperialPrivilegeIntrigueDiscard);
+  pendingText = await page.locator(".pending-panel").innerText();
+  assert.match(pendingText, /Imperial Privilege/i);
+  assert.match(pendingText, /Intrigue discard/i);
+  assert.match(pendingText, /Discard 1 Intrigue to draw 1 Intrigue card/i);
+  await screenshot(page, captures, "pending-imperial-privilege-intrigue-discard.png");
+
+  const intrigueDiscardBefore = await currentGame(page);
+  const intrigueDiscardOwnerBefore = intrigueDiscardBefore.players.find((player) => player.id === "p2");
+  const discardedIntrigue = intrigueDiscardOwnerBefore.intrigues[0];
+  const replacementIntrigue = intrigueDiscardBefore.intrigueDeck[0];
+  await page.locator(".pending-panel").getByRole("button", { name: discardedIntrigue.name }).click();
+  await page.locator(".pending-panel").getByRole("button", { name: /Resolve Imperial Privilege/i }).click();
+  await waitForNoPending(page);
+  const intrigueDiscardAfter = await currentGame(page);
+  const intrigueDiscardOwnerAfter = intrigueDiscardAfter.players.find((player) => player.id === "p2");
+  assert.ok(
+    intrigueDiscardAfter.intrigueDiscard.some((card) => card.id === discardedIntrigue.id),
+    "Imperial Privilege should discard the selected Intrigue instead of trashing it",
+  );
+  assert.ok(
+    intrigueDiscardOwnerAfter.intrigues.some((card) => card.id === replacementIntrigue.id),
+    "Imperial Privilege should draw a replacement Intrigue after discarding one",
+  );
+
+  await setDebugGameAndWait(page, states.imperialPrivilegeAgentRecall);
+  pendingText = await page.locator(".pending-panel").innerText();
+  assert.match(pendingText, /Imperial Privilege/i);
+  assert.match(pendingText, /recall Agent/i);
+  assert.match(pendingText, /Assembly Hall/i);
+  await screenshot(page, captures, "pending-imperial-privilege-agent-recall.png");
+  const recallMobileViewport = { width: 390, height: 900 };
+  await page.setViewportSize(recallMobileViewport);
+  const recallMobileScrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+  assert(
+    recallMobileScrollWidth <= recallMobileViewport.width,
+    `Imperial Privilege recall mobile pending panel should not overflow horizontally (${recallMobileScrollWidth}px)`,
+  );
+  await screenshot(page, captures, "pending-imperial-privilege-agent-recall-mobile-390.png");
+  await page.setViewportSize({ width: 1440, height: 1100 });
+
+  const recallBefore = await currentGame(page);
+  const recallOwnerBefore = recallBefore.players.find((player) => player.id === "p2");
+  const delayedDrawCard = recallOwnerBefore.deck[0];
+  await page.locator(".pending-panel").getByRole("button", { name: "Recall Agent from Assembly Hall" }).click();
+  const recallAfter = await currentGame(page);
+  const recallOwnerAfter = recallAfter.players.find((player) => player.id === "p2");
+  assert.equal(recallAfter.spaces["assembly-hall"], undefined, "Imperial Privilege recall should clear the selected board space");
+  assert.equal(
+    recallAfter.agentPlacementOwners?.["assembly-hall"],
+    undefined,
+    "Imperial Privilege recall should clear the selected Agent owner",
+  );
+  assert.equal(
+    recallAfter.spaces["imperial-privilege"],
+    "p2",
+    "Imperial Privilege recall should not remove the newly placed Agent",
+  );
+  assert.equal(
+    recallOwnerAfter.agentsReady,
+    recallOwnerBefore.agentsReady + 1,
+    "Imperial Privilege recall should return one Agent to the owner",
+  );
+  assert.equal(recallAfter.pendingAction?.kind, "draw-cards", "Imperial Privilege recall should advance to the delayed card draw");
+  pendingText = await page.locator(".pending-panel").innerText();
+  assert.match(pendingText, /Imperial Privilege/i);
+  assert.match(pendingText, /draw 1 card/i);
+  await screenshot(page, captures, "pending-imperial-privilege-card-draw.png");
+  await page.locator(".pending-panel").getByRole("button", { name: "Draw 1 card" }).click();
+  await waitForNoPending(page);
+  const delayedDrawAfter = await currentGame(page);
+  const delayedDrawOwnerAfter = delayedDrawAfter.players.find((player) => player.id === "p2");
+  assert.ok(
+    delayedDrawOwnerAfter.hand.some((card) => card.id === delayedDrawCard.id),
+    "Imperial Privilege should draw its card after the recall panel resolves",
+  );
 }
 
 async function createSpaceChoiceStates(server, initialPlayableGame) {
@@ -236,6 +313,66 @@ async function createSpaceChoiceStates(server, initialPlayableGame) {
           { ownerId: "p2", faction: "fringeWorlds" },
         ],
       },
+    },
+    imperialPrivilegeIntrigueDiscard: {
+      ...base,
+      players: game.players.map((player) =>
+        player.id === "p2"
+          ? { ...player, intrigues: [data.intrigueCards[0], data.intrigueCards[1]] }
+          : player,
+      ),
+      intrigueDeck: [data.intrigueCards[2], ...base.intrigueDeck],
+      intrigueDiscard: [],
+      pendingAction: {
+        kind: "trash-intrigue-for-reward",
+        ownerId: "p2",
+        source: "Imperial Privilege",
+        cost: {},
+        drawIntrigues: 1,
+        gain: {},
+        gainVp: 0,
+        optional: true,
+        discard: true,
+      },
+    },
+    imperialPrivilegeAgentRecall: {
+      ...base,
+      spaces: {
+        ...base.spaces,
+        "imperial-privilege": "p2",
+        "assembly-hall": "p2",
+        "high-council": "p2",
+      },
+      agentPlacementOwners: {
+        ...base.agentPlacementOwners,
+        "imperial-privilege": "p2",
+        "assembly-hall": "p2",
+        "high-council": "p2",
+      },
+      players: game.players.map((player) =>
+        player.id === "p2"
+          ? {
+              ...player,
+              agentsReady: 0,
+              agentsTotal: Math.max(player.agentsTotal, 3),
+              deck: [{ ...data.imperiumDeck[0], id: "browser-imperial-privilege-delayed-draw-card" }],
+              discard: [],
+              hand: [],
+            }
+          : player,
+      ),
+      pendingAction: {
+        kind: "recall-agent-from-board",
+        ownerId: "p2",
+        source: "Imperial Privilege",
+        spaceIds: ["assembly-hall", "high-council"],
+      },
+      pendingQueue: [{
+        kind: "draw-cards",
+        ownerId: "p2",
+        source: "Imperial Privilege",
+        amount: 1,
+      }],
     },
   };
 }

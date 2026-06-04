@@ -82,15 +82,6 @@ function withBoardSpaceArt(space: BoardSpace): BoardSpace {
 
 const boardSpaceSpecs: BoardSpace[] = [
   {
-    id: "dutiful-service",
-    name: "Dutiful Service",
-    zone: "Faction",
-    icon: "emperor",
-    influence: "emperor",
-    contract: true,
-    detail: "Emperor influence and a face-up CHOAM contract.",
-  },
-  {
     id: "economic-support",
     name: "Economic Support",
     zone: "Faction",
@@ -221,6 +212,19 @@ const boardSpaceSpecs: BoardSpace[] = [
     draw: 2,
     combat: true,
     detail: "High-value draw and deployment point.",
+  },
+  {
+    id: "imperial-privilege",
+    name: "Imperial Privilege",
+    zone: "Landsraad",
+    icon: "landsraad",
+    cost: { solari: 3 },
+    requirement: { faction: "emperor", amount: 2 },
+    draw: 1,
+    deferDraw: true,
+    recallAgent: true,
+    intrigueSwap: true,
+    detail: "Requires 2 Emperor/Great Houses Influence and 3 Solari; optionally discard an Intrigue for a new one, recall another Agent, and draw a card.",
   },
   {
     id: "assembly-hall",

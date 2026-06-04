@@ -50,7 +50,7 @@ export function applyBoardEffect(
     }
   }
 
-  if (rewardsApply && space.draw) source = drawCards(source, source.hand.length + space.draw);
+  if (rewardsApply && space.draw && !space.deferDraw) source = drawCards(source, source.hand.length + space.draw);
 
   if (rewardsApply && space.troops && space.team !== "reinforce") {
     const troopOwner = sourcePlayer.role === "Commander" ? target : source;

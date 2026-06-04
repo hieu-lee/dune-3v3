@@ -60,7 +60,7 @@ function plural(value: number, singular: string) {
 
 function rewardBadges(space: BoardSpace) {
   const badges: string[] = [];
-  if (space.requirement) badges.push(`${space.requirement.amount}+ ${factionShortLabels[space.requirement.faction]}`);
+  if (space.requirement) badges.push(`${space.requirement.amount}+ ${requirementShortLabel(space.requirement.faction)}`);
   if (space.influence) badges.push(`+${factionShortLabels[space.influence]}`);
   (["solari", "spice", "water"] as const).forEach((resource) => {
     const amount = space.gain?.[resource];
@@ -69,12 +69,20 @@ function rewardBadges(space: BoardSpace) {
   if (space.gain?.intrigue) badges.push(`+${plural(space.gain.intrigue, "Intrigue")}`);
   if (space.troops) badges.push(`+${plural(space.troops, "troop")}`);
   if (space.draw) badges.push(`+${plural(space.draw, "card")}`);
+  if (space.recallAgent) badges.push("recall Agent");
+  if (space.intrigueSwap) badges.push("cycle Intrigue");
   if (space.spy) badges.push(`+${plural(space.spy, "spy")}`);
   if (space.revealPersuasion) badges.push(`+${space.revealPersuasion} reveal`);
   if (space.contract) badges.push("contract");
   if (space.makerWorms) badges.push(`${plural(space.makerWorms, "worm")}`);
   if (space.personal) badges.push(personalLabels[space.personal]);
   return badges;
+}
+
+function requirementShortLabel(faction: FactionId) {
+  if (faction === "emperor") return "EMP/GH";
+  if (faction === "fremen" || faction === "fringeWorlds") return "FRE/FW";
+  return factionShortLabels[faction];
 }
 
 function shortLeaderName(leader: string) {

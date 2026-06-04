@@ -10,7 +10,7 @@ export function verifyCardEffectSpecBoardInfluenceValidation({
   turnActions,
   withActivePlayer,
 }) {
-  const { dutifulService, highCouncil, secrets, shipping } = boardSpaces;
+  const { highCouncil, secrets, shipping } = boardSpaces;
   const { dangerousRhetoric, overthrow, subversiveAdvisor } = cards;
   const { p2, p4 } = players;
 
@@ -342,51 +342,44 @@ export function verifyCardEffectSpecBoardInfluenceValidation({
         resources: { solari: 0, spice: 0, water: 0 },
       })),
       sharedSpyPosts: {},
-      spyPosts: { [dutifulService.id]: p4.id },
+      spyPosts: { [secrets.id]: p4.id },
     },
     {
       commanderTargets: { [p4.id]: p2.id },
       selectedCard: overthrow,
-      selectedSpace: dutifulService,
+      selectedSpace: secrets,
     },
   );
   assert.equal(
     overthrowCommanderPlaced.pendingAction?.kind,
     "board-influence-choice",
-    "Commander Overthrow should combine with the mapped board Influence choice",
+    "Commander Overthrow should queue a delegated board-space Influence choice",
   );
   assert.equal(overthrowCommanderPlaced.pendingAction.source, "Overthrow");
   assert.equal(overthrowCommanderPlaced.pendingAction.sourceEffect, "gain-board-space-influence");
-  assert.equal(overthrowCommanderPlaced.pendingAction.amount, 2);
+  assert.equal(overthrowCommanderPlaced.pendingAction.amount, 1);
   assert.equal(overthrowCommanderPlaced.pendingAction.trashSource, undefined);
   assert.equal(overthrowCommanderPlaced.pendingAction.targetOwnerId, p2.id);
   assert.deepEqual(
     overthrowCommanderPlaced.pendingAction.choices,
     [
-      { ownerId: p2.id, faction: "greatHouses" },
-      { ownerId: p4.id, faction: "emperor" },
+      { ownerId: p2.id, faction: "bene" },
     ],
-    "Commander Overthrow should keep the normal mapped board-space choices but make the chosen one worth 2",
+    "Commander Overthrow should route main-board Influence to the activated Ally",
   );
-  assert.equal(
-    overthrowCommanderPlaced.pendingQueue.find((pending) =>
-      pending.kind === "board-influence-choice" && pending.source === "Dutiful Service"
-    ),
-    undefined,
-    "Overthrow should not leave the original 1-Influence board choice queued separately",
-  );
+  assert.equal(playerById(overthrowCommanderPlaced, p2.id).influence.bene, 1, "Secrets should delegate its board Influence before Overthrow resolves");
   const overthrowCommanderResolved = state.resolveBoardInfluenceChoice(
     overthrowCommanderPlaced,
     overthrowCommanderPlaced.pendingAction,
-    p4.id,
-    "emperor",
+    p2.id,
+    "bene",
   );
-  assert.equal(playerById(overthrowCommanderResolved, p4.id).influence.emperor, 2);
-  assert.equal(playerById(overthrowCommanderResolved, p2.id).influence.greatHouses, 0);
+  assert.equal(playerById(overthrowCommanderResolved, p2.id).influence.bene, 2);
+  assert.equal(playerById(overthrowCommanderResolved, p4.id).influence.bene, 0);
   assert.equal(
     playerById(overthrowCommanderResolved, p4.id).playArea.some((card) => card.id === overthrow.id),
     true,
-    "Commander Overthrow should remain in play after resolving the combined Influence choice",
+    "Commander Overthrow should remain in play after resolving the delegated Influence choice",
   );
   const subversiveNonFactionPlaced = turnActions.placeAgentAction(
     {
@@ -497,50 +490,43 @@ export function verifyCardEffectSpecBoardInfluenceValidation({
         resources: { solari: 0, spice: 0, water: 0 },
       })),
       sharedSpyPosts: {},
-      spyPosts: { [dutifulService.id]: p4.id },
+      spyPosts: { [secrets.id]: p4.id },
     },
     {
       commanderTargets: { [p4.id]: p2.id },
       selectedCard: subversiveAdvisor,
-      selectedSpace: dutifulService,
+      selectedSpace: secrets,
     },
   );
   assert.equal(
     subversiveCommanderPlaced.pendingAction?.kind,
     "board-influence-choice",
-    "Commander Subversive Advisor should combine with the mapped board Influence choice",
+    "Commander Subversive Advisor should queue a delegated board-space Influence choice",
   );
   assert.equal(subversiveCommanderPlaced.pendingAction.source, "Subversive Advisor");
   assert.equal(subversiveCommanderPlaced.pendingAction.sourceEffect, "gain-board-space-influence");
-  assert.equal(subversiveCommanderPlaced.pendingAction.amount, 2);
+  assert.equal(subversiveCommanderPlaced.pendingAction.amount, 1);
   assert.equal(subversiveCommanderPlaced.pendingAction.trashSource, true);
   assert.equal(subversiveCommanderPlaced.pendingAction.targetOwnerId, p2.id);
   assert.deepEqual(
     subversiveCommanderPlaced.pendingAction.choices,
     [
-      { ownerId: p2.id, faction: "greatHouses" },
-      { ownerId: p4.id, faction: "emperor" },
+      { ownerId: p2.id, faction: "bene" },
     ],
-    "Commander Subversive Advisor should keep the normal mapped board-space choices but make the chosen one worth 2",
+    "Commander Subversive Advisor should route main-board Influence to the activated Ally",
   );
-  assert.equal(
-    subversiveCommanderPlaced.pendingQueue.find((pending) =>
-      pending.kind === "board-influence-choice" && pending.source === "Dutiful Service"
-    ),
-    undefined,
-    "Subversive Advisor should not leave the original 1-Influence board choice queued separately",
-  );
+  assert.equal(playerById(subversiveCommanderPlaced, p2.id).influence.bene, 1, "Secrets should delegate its board Influence before Subversive Advisor resolves");
   const subversiveCommanderResolved = state.resolveBoardInfluenceChoice(
     subversiveCommanderPlaced,
     subversiveCommanderPlaced.pendingAction,
-    p4.id,
-    "emperor",
+    p2.id,
+    "bene",
   );
-  assert.equal(playerById(subversiveCommanderResolved, p4.id).influence.emperor, 2);
-  assert.equal(playerById(subversiveCommanderResolved, p2.id).influence.greatHouses, 0);
+  assert.equal(playerById(subversiveCommanderResolved, p2.id).influence.bene, 2);
+  assert.equal(playerById(subversiveCommanderResolved, p4.id).influence.bene, 0);
   assert.equal(
     playerById(subversiveCommanderResolved, p4.id).playArea.some((card) => card.id === subversiveAdvisor.id),
     false,
-    "Commander Subversive Advisor should trash itself after resolving the combined Influence choice",
+    "Commander Subversive Advisor should trash itself after resolving the delegated Influence choice",
   );
 }

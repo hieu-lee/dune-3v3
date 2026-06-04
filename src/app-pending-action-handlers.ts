@@ -24,6 +24,7 @@ import {
   resolveDiscardHandCardChoice,
   resolveDiscardCardForInfluenceAndDrawChoice,
   resolveBoardInfluenceChoice,
+  resolveBoardAgentRecallChoice,
   resolveLeaderTransitionChoice,
   resolveLadyAmberDesertScoutsChoice,
   resolveLoseInfluenceForIntriguesChoice,
@@ -315,6 +316,10 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     runPending("conflict-influence", (current, pending) => startNextRound(gainConflictInfluenceForPending(current, pending, faction)));
   const chooseBoardInfluence = (ownerId: string, faction: FactionId) =>
     runPending("board-influence-choice", (current, pending) => maybeStartCombatPhase(resolveBoardInfluenceChoice(current, pending, ownerId, faction)));
+  const chooseBoardAgentRecall = (spaceId: string) =>
+    runPending("recall-agent-from-board", (current, pending) =>
+      maybeStartCombatPhase(resolveBoardAgentRecallChoice(current, pending, spaceId))
+    );
   const payOptionalSpacePayment = () =>
     runPending("optional-space-payment", (current, pending) => maybeStartCombatPhase(resolveOptionalSpacePayment(current, pending)));
   const skipOptionalSpacePaymentChoice = () =>
@@ -326,6 +331,7 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     chooseCommanderResourceSplit,
     chooseConflictInfluence,
     chooseBoardInfluence,
+    chooseBoardAgentRecall,
     chooseConflictTieWinner,
     chooseDiscardCardsForReward,
     chooseDiscardCardForDraw,

@@ -12,7 +12,7 @@ export const factionRegions: readonly BoardRegionSpec[] = [
     title: "Great Houses",
     subtitle: "Imperial pressure",
     tone: "emperor",
-    spaceIds: ["dutiful-service", "economic-support", "military-support"],
+    spaceIds: ["economic-support", "military-support"],
   },
   {
     id: "spacing-guild",
@@ -43,7 +43,7 @@ export const boardRegions: readonly BoardRegionSpec[] = [
     title: "Landsraad Council",
     subtitle: "Council chambers",
     tone: "landsraad",
-    spaceIds: ["high-council", "assembly-hall", "swordmaster", "gather-support"],
+    spaceIds: ["high-council", "imperial-privilege", "assembly-hall", "swordmaster", "gather-support"],
   },
   {
     id: "choam",

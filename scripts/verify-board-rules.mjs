@@ -30,6 +30,7 @@ try {
   const muaddib = playerById(game, "p1");
   const highCouncil = spaceById(data, "high-council");
   const shipping = spaceById(data, "shipping");
+  const imperialPrivilege = spaceById(data, "imperial-privilege");
   const sietchTabr = spaceById(data, "sietch-tabr");
   const swordmaster = spaceById(data, "swordmaster");
   const vastWealth = spaceById(data, "vast-wealth");
@@ -87,6 +88,21 @@ try {
     "Commanders should use the best same-team Ally Influence for requirements",
   );
   assert.equal(rules.canMeetInfluenceRequirement(shipping, shaddam, shaddamPlayers), true);
+
+  const feydWithGreatHouses = { ...feyd, influence: { ...feyd.influence, greatHouses: 2 } };
+  const greatHousesPlayers = game.players.map((player) => (player.id === feyd.id ? feydWithGreatHouses : player));
+  assert.equal(
+    rules.canMeetInfluenceRequirement(imperialPrivilege, feydWithGreatHouses, greatHousesPlayers),
+    true,
+    "Imperial Privilege should accept Great Houses Influence for an Ally's Emperor-icon requirement",
+  );
+  const shaddamWithEmperor = { ...shaddam, influence: { ...shaddam.influence, emperor: 2 } };
+  const emperorPlayers = game.players.map((player) => (player.id === shaddam.id ? shaddamWithEmperor : player));
+  assert.equal(
+    rules.canMeetInfluenceRequirement(imperialPrivilege, shaddamWithEmperor, emperorPlayers),
+    true,
+    "Imperial Privilege should accept Shaddam's personal Emperor Influence",
+  );
 
   const muaddibWithFremen = { ...muaddib, influence: { ...muaddib.influence, fremen: 2, fringeWorlds: 0 } };
   const muaddibPlayers = game.players.map((player) => (player.id === muaddib.id ? muaddibWithFremen : player));

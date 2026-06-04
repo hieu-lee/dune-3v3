@@ -111,6 +111,68 @@ export function pendingActionForBoardTrash(space: BoardSpace, source: Player): P
   return trashableCardsForPending(source, pending).length > 0 ? pending : undefined;
 }
 
+export function pendingActionForBoardIntrigueSwap(
+  space: BoardSpace,
+  source: Player,
+  futureIntrigues = 0,
+): PendingAction | undefined {
+  if (!space.intrigueSwap || source.intrigues.length + futureIntrigues <= 0) return undefined;
+  return {
+    kind: "trash-intrigue-for-reward",
+    ownerId: source.id,
+    source: space.name,
+    cost: {},
+    drawIntrigues: 1,
+    gain: {},
+    gainVp: 0,
+    optional: true,
+    discard: true,
+  };
+}
+
+export function pendingActionForBoardCardDraw(
+  space: BoardSpace,
+  source: Player,
+): PendingAction | undefined {
+  if (!space.deferDraw || !space.draw || space.draw <= 0) return undefined;
+  return {
+    kind: "draw-cards",
+    ownerId: source.id,
+    source: space.name,
+    amount: space.draw,
+  };
+}
+
+export function boardAgentRecallSpaceIds(
+  state: Pick<GameState, "agentPlacementOwners" | "spaces">,
+  pending: Pick<Extract<PendingAction, { kind: "recall-agent-from-board" }>, "ownerId" | "spaceIds">,
+) {
+  return pending.spaceIds.filter((spaceId) =>
+    state.spaces[spaceId] !== undefined &&
+    state.agentPlacementOwners?.[spaceId] === pending.ownerId
+  );
+}
+
+export function pendingActionForBoardAgentRecall(
+  state: Pick<GameState, "agentPlacementOwners" | "spaces">,
+  space: BoardSpace,
+  source: Player,
+): PendingAction | undefined {
+  if (!space.recallAgent) return undefined;
+  const spaceIds = Object.keys(state.agentPlacementOwners ?? {}).filter((spaceId) =>
+    spaceId !== space.id &&
+    state.spaces[spaceId] !== undefined &&
+    state.agentPlacementOwners?.[spaceId] === source.id
+  );
+  if (spaceIds.length === 0) return undefined;
+  return {
+    kind: "recall-agent-from-board",
+    ownerId: source.id,
+    source: space.name,
+    spaceIds,
+  };
+}
+
 export function pendingActionForSpace(
   space: BoardSpace,
   source: Player,

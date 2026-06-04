@@ -47,6 +47,7 @@ import type {
 export type RoomPendingActionCommand =
   | { kind: "acquire-pending-card"; cardId: string }
   | { kind: "adjust-team-resource-payment"; contributorId: string; delta: number }
+  | { kind: "choose-board-agent-recall"; spaceId: string }
   | { kind: "choose-board-influence"; ownerId: string; faction: FactionId }
   | { kind: "choose-commander-resource-split"; optionIndex: number }
   | { kind: "choose-conflict-influence"; faction: FactionId }
@@ -618,6 +619,8 @@ function pendingActionPlayerIds(state: GameState, pending: PendingAction): strin
     case "conflict-influence":
     case "optional-space-payment":
     case "trash-card":
+    case "recall-agent-from-board":
+    case "draw-cards":
     case "retreat-troops-for-strength":
     case "deploy-or-retreat-troops":
     case "contract":
@@ -676,6 +679,7 @@ function clearPendingIsAllowed(state: GameState) {
   const pending = state.pendingAction;
   if (!pending) return false;
   if (pending.kind === "deploy" || pending.kind === "spy" || pending.kind === "trade") return true;
+  if (pending.kind === "draw-cards") return true;
   if (pending.kind === "contract") return pending.optional === true;
   if (pending.kind === "acquire-card") return pending.optional === true;
   if (pending.kind === "throne-row") return !state.imperiumRow.some(canMoveCardToThroneRow);
@@ -891,6 +895,13 @@ function applyRoomPendingAction(state: GameState, playerId: string, command: Roo
         throw new RoomActionError(403, "You can only choose Influence for your own seat");
       }
       return maybeStartCombatPhase(gameRules.resolveBoardInfluenceChoice(state, pendingOf(state, "board-influence-choice"), command.ownerId, command.faction));
+    case "choose-board-agent-recall": {
+      const pending = pendingOf(state, "recall-agent-from-board");
+      if (!gameRules.boardAgentRecallSpacesForPending(state, pending).includes(command.spaceId)) {
+        throw new RoomActionError(409, "That Agent cannot be recalled");
+      }
+      return maybeStartCombatPhase(gameRules.resolveBoardAgentRecallChoice(state, pending, command.spaceId));
+    }
     case "pay-optional-space-payment":
       return maybeStartCombatPhase(gameRules.resolveOptionalSpacePayment(state, pendingOf(state, "optional-space-payment")));
     case "skip-optional-space-payment":

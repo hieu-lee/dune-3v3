@@ -18,6 +18,7 @@ import {
   resolveTakeChoamContract,
 } from "./contract-rules";
 import {
+  drawCards,
   playerTroopSupply,
 } from "./deck-utils";
 import {
@@ -62,11 +63,17 @@ import {
   drawIntrigueCards,
 } from "./intrigue-deck";
 import {
+  boardSpaces,
+} from "./data";
+import {
   scoreGurneyAlwaysSmiling,
 } from "./leader-rewards";
 import {
   advancePendingAction,
 } from "./pending-actions";
+import {
+  boardAgentRecallSpaceIds,
+} from "./placement-rules";
 import {
   finishCombatIfNoActors,
   startNextRound,
@@ -101,6 +108,8 @@ export type CunningPlotChoice = "draw" | "paid-trash";
 export type StabanUnseenNetworkChoice = "pay" | "skip";
 
 type ControlDefensePendingAction = Extract<PendingAction, { kind: "control-defense" }>;
+type BoardAgentRecallPendingAction = Extract<PendingAction, { kind: "recall-agent-from-board" }>;
+type DrawCardsPendingAction = Extract<PendingAction, { kind: "draw-cards" }>;
 
 function continueAfterResolvedConflictReward(state: GameState): GameState {
   if (
@@ -120,6 +129,7 @@ export function finishPendingAction(state: GameState): GameState {
   if (state.pendingAction?.kind === "acquire-card" && state.pendingAction.optional !== true) return state;
   if (state.pendingAction?.kind === "contract" && state.pendingAction.optional !== true) return state;
   if (state.pendingAction?.kind === "discard-hand-card") return state;
+  if (state.pendingAction?.kind === "draw-cards") return resolveDrawCardsForPending(state, state.pendingAction);
   const resolvedState = state.pendingAction?.kind === "deploy"
     ? resolvePostDeployIntrigueDraw(state, state.pendingAction.postDeployIntrigueDraw)
     : state;
@@ -352,6 +362,64 @@ export function skipTrashIntrigueForReward(
   pending: TrashIntrigueForRewardPendingAction,
 ): GameState {
   return continueAfterResolvedConflictReward(resolveSkipTrashIntrigueForReward(state, pending));
+}
+
+export function boardAgentRecallSpacesForPending(
+  state: GameState,
+  pending: BoardAgentRecallPendingAction,
+) {
+  return boardAgentRecallSpaceIds(state, pending);
+}
+
+export function resolveBoardAgentRecallChoice(
+  state: GameState,
+  pending: BoardAgentRecallPendingAction,
+  spaceId: string,
+): GameState {
+  if (state.pendingAction !== pending) return state;
+  if (!boardAgentRecallSpaceIds(state, pending).includes(spaceId)) return state;
+  const owner = state.players.find((player) => player.id === pending.ownerId);
+  if (!owner) return state;
+  const { [spaceId]: _recalledOccupant, ...spaces } = state.spaces;
+  const { [spaceId]: _recalledOwner, ...agentPlacementOwners } = state.agentPlacementOwners ?? {};
+  const recalledSpaceName = boardSpaces.find((space) => space.id === spaceId)?.name ??
+    criticalLocationNames[spaceId as keyof typeof criticalLocationNames] ??
+    spaceId;
+  return continueAfterResolvedConflictReward({
+    ...state,
+    players: state.players.map((player) =>
+      player.id === owner.id
+        ? { ...player, agentsReady: Math.min(player.agentsTotal, player.agentsReady + 1) }
+        : player
+    ),
+    spaces,
+    agentPlacementOwners,
+    ...advancePendingAction(state),
+    log: [
+      `${owner.leader} recalls an Agent from ${recalledSpaceName} for ${pending.source}.`,
+      ...state.log,
+    ],
+  });
+}
+
+export function resolveDrawCardsForPending(
+  state: GameState,
+  pending: DrawCardsPendingAction,
+): GameState {
+  if (state.pendingAction !== pending || pending.amount <= 0) return state;
+  const owner = state.players.find((player) => player.id === pending.ownerId);
+  if (!owner) return state;
+  const ownerAfterDraw = drawCards(owner, owner.hand.length + pending.amount);
+  const drawnCards = ownerAfterDraw.hand.length - owner.hand.length;
+  return continueAfterResolvedConflictReward({
+    ...state,
+    players: state.players.map((player) => player.id === owner.id ? ownerAfterDraw : player),
+    ...advancePendingAction(state),
+    log: [
+      `${owner.leader} resolves ${pending.source}: draws ${drawnCards} of ${pending.amount} cards.`,
+      ...state.log,
+    ],
+  });
 }
 
 export function resolveDiscardHandCardChoice(

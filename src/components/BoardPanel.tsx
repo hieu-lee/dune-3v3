@@ -128,6 +128,8 @@ export function BoardPanel({
 
   function renderSpaceTile(space: BoardSpace) {
     const occupant = game.players.find((player) => player.id === game.spaces[space.id]);
+    const agentOwnerId = game.agentPlacementOwners?.[space.id] ?? game.spaces[space.id];
+    const agentOwner = agentOwnerId ? game.players.find((player) => player.id === agentOwnerId) ?? occupant : undefined;
     const spyOwners = spyPostOwnerIds(game, space.id)
       .map((ownerId) => game.players.find((player) => player.id === ownerId))
       .filter((player): player is Player => Boolean(player));
@@ -160,11 +162,18 @@ export function BoardPanel({
         aria-pressed={selected}
         onClick={() => playingPhase && onSelectSpace(space.id)}
         disabled={!playingPhase}
+        style={agentOwner ? { "--occupant-color": agentOwner.color } as CSSProperties : undefined}
         title={space.detail}
       >
         {(legal || unavailable) && (
           <span className="space-placement-status">
             {legal ? "Legal placement" : "Unavailable placement"}
+          </span>
+        )}
+        {agentOwner && (
+          <span className="agent-marker">
+            <span className="agent-marker-piece" aria-hidden="true" />
+            {agentOwner.leader}
           </span>
         )}
         <span className="space-zone">{space.zone}</span>
@@ -198,7 +207,7 @@ export function BoardPanel({
             {space.team && <Users size={14} />}
             {space.contract && <FileText size={14} />}
           </span>
-          <span>{occupant ? occupant.leader : costLabel(effectiveCost(space, game.players))}</span>
+          <span>{occupant ? "Occupied" : costLabel(effectiveCost(space, game.players))}</span>
         </span>
       </button>
     );

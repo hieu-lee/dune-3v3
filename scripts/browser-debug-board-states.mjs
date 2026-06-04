@@ -10,6 +10,11 @@ const occupiedSpaces = {
   "habbanya-erg": "p6",
 };
 
+const agentPlacementOwners = {
+  ...occupiedSpaces,
+  "high-council": "p1",
+};
+
 const spyPosts = {
   arrakeen: "p2",
   espionage: "p4",
@@ -70,6 +75,7 @@ export async function runBoardStatesSmoke({
     activePlayer: fixture.activePlayerName,
     selectedCard: fixture.cardName,
     occupiedSpaces,
+    agentPlacementOwners,
     spyPosts,
     sharedSpyPosts,
     locationControl,
@@ -84,6 +90,7 @@ export async function runBoardStatesSmoke({
       );
       return Boolean(
         occupiedReady &&
+          document.querySelectorAll(".agent-marker").length === occupiedSpaceIds.length &&
           document.querySelectorAll(".spy-marker").length >= 3 &&
           document.querySelectorAll(".control-marker").length >= 3 &&
           document.querySelectorAll(".maker-marker").length >= 4 &&
@@ -95,6 +102,13 @@ export async function runBoardStatesSmoke({
 
   const denseStats = await boardMarkerStats(page);
   assert.equal(denseStats.occupied, Object.keys(occupiedSpaces).length, "Dense board state should render all occupied spaces");
+  assert.equal(denseStats.agentMarkers, denseStats.occupied, "Occupied spaces should render one visible Agent owner marker each");
+  assert.ok(denseStats.agentMarkerLabels.some((label) => label.includes("Feyd-Rautha")), "Agent markers should include occupying leader names");
+  assert.match(
+    denseStats.highCouncilAgentMarker,
+    /Muad'Dib/,
+    "Agent markers should prefer the actual Agent owner over the activated Ally occupying owner",
+  );
   assert.ok(denseStats.personalOccupied >= 2, "Dense board state should include occupied Commander personal spaces");
   assert.ok(denseStats.spyMarkers >= 3, "Dense board state should include spy markers");
   assert.ok(denseStats.controlMarkers >= 3, "Dense board state should include critical-location control markers");
@@ -223,6 +237,7 @@ async function createBoardStatesFixture(server, initialPlayableGame) {
   assert.deepEqual(
     [
       ...Object.values(occupiedSpaces),
+      ...Object.values(agentPlacementOwners),
       ...Object.values(spyPosts),
       ...Object.values(sharedSpyPosts).flat(),
       ...Object.values(locationControl),
@@ -259,7 +274,7 @@ async function createBoardStatesFixture(server, initialPlayableGame) {
   const placementGame = {
     ...game,
     activeSeat,
-    agentPlacementOwners: { ...occupiedSpaces },
+    agentPlacementOwners: { ...agentPlacementOwners },
     agentTurnComplete: false,
     locationControl: { ...locationControl },
     makerSpice: { ...game.makerSpice, ...makerSpice },
@@ -310,7 +325,10 @@ function preferredDuneSeat(game) {
 
 async function boardMarkerStats(page) {
   return page.evaluate(() => ({
+    agentMarkerLabels: Array.from(document.querySelectorAll(".agent-marker")).map((marker) => marker.textContent ?? ""),
+    agentMarkers: document.querySelectorAll(".agent-marker").length,
     controlMarkers: document.querySelectorAll(".control-marker").length,
+    highCouncilAgentMarker: document.querySelector('[data-testid="space-high-council"] .agent-marker')?.textContent ?? "",
     makerMarkers: document.querySelectorAll(".maker-marker").length,
     occupied: document.querySelectorAll(".space-tile.occupied").length,
     personalOccupied: document.querySelectorAll(".space-tile.personal.occupied").length,

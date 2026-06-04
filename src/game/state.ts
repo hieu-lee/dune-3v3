@@ -303,8 +303,13 @@ export {
 
 export {
   canPlaceSpyPost,
+  normalizeSpyObservationPosts,
+  spyObservationPostDetailForSpace,
+  spyObservationPostIdForSpace,
+  spyObservationPostLabelForSpace,
   spyPostCount,
   spyPostOwnerIds,
+  spyPostRecallCountForOwner,
 } from "./spy-posts";
 
 export {

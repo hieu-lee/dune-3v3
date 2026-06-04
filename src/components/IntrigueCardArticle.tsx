@@ -72,6 +72,7 @@ import {
   sietchRitualFactionChoices,
   specialMissionCitySpySpaces,
   specialMissionRecallSpySpaces,
+  spyObservationPostLabelForSpace,
   spyPostCount,
 } from "../game/state";
 import type { FactionId, Player } from "../game/types";
@@ -589,10 +590,10 @@ export function IntrigueCardArticle({
               key={space.id}
               onClick={() => playSpecialMissionPlot(card.id, { kind: "recall-spy", spaceId: space.id })}
               disabled={plotIntrigueLocked}
-              title={`Recall a spy from ${space.name}, remove the Shield Wall, and gain 2 spice`}
+              title={`Recall a spy from ${spyObservationPostLabelForSpace(space.id)}, remove the Shield Wall, and gain 2 spice`}
             >
               <RotateCcw size={14} />
-              {space.name} -&gt; Wall + 2 Spice
+              {spyObservationPostLabelForSpace(space.id)} -&gt; Wall + 2 Spice
             </button>
           ))}
           {specialMissionRecallSpaces.length === 0 && <span>Recall branch requires one of your spies on the board.</span>}

@@ -185,9 +185,14 @@ export async function createTableChoiceStates(server, initialPlayableGame) {
   };
   const specialMissionPlayer = specialMissionPlaceSpy.players.find((player) => player.id === "p2");
   assert.ok(specialMissionPlayer, "Expected Feyd for Special Mission browser debug state");
-  const specialMissionSpySpace = state.specialMissionCitySpySpaces(specialMissionPlaceSpy, specialMissionPlayer)[0];
+  const specialMissionSpySpaces = state.specialMissionCitySpySpaces(specialMissionPlaceSpy, specialMissionPlayer);
+  const specialMissionSpySpace = specialMissionSpySpaces.find((space) =>
+    state.spyObservationPostLabelForSpace(space.id).includes(" / ")
+  ) ?? specialMissionSpySpaces[0];
   assert.ok(specialMissionSpySpace, "Expected a legal Special Mission City spy post for browser debug state");
-  const specialMissionRecallSeedSpace = data.boardSpaces.find((space) => space.icon !== "city");
+  const specialMissionRecallSeedSpace =
+    data.boardSpaces.find((space) => space.id === "deliver-supplies") ??
+    data.boardSpaces.find((space) => space.icon !== "city");
   assert.ok(specialMissionRecallSeedSpace, "Expected a non-City space for Special Mission recall browser debug state");
   const specialMissionRecallSpy = {
     ...base,
@@ -426,11 +431,11 @@ export async function createTableChoiceStates(server, initialPlayableGame) {
     sietchRitualDiscardCardId: sietchRitualDiscardCard.id,
     sietchRitualDiscardCardName: sietchRitualDiscardCard.name,
     specialMissionPlaceSpy,
-    specialMissionSpySpaceId: specialMissionSpySpace.id,
-    specialMissionSpySpaceName: specialMissionSpySpace.name,
+    specialMissionSpySpaceId: state.spyObservationPostIdForSpace(specialMissionSpySpace.id),
+    specialMissionSpySpaceName: state.spyObservationPostLabelForSpace(specialMissionSpySpace.id),
     specialMissionRecallSpy,
-    specialMissionRecallSpaceId: specialMissionRecallSpace.id,
-    specialMissionRecallSpaceName: specialMissionRecallSpace.name,
+    specialMissionRecallSpaceId: specialMissionRecallSeedSpace.id,
+    specialMissionRecallSpaceName: state.spyObservationPostLabelForSpace(specialMissionRecallSpace.id),
     changeAllegiancesAlly: {
       ...base,
       activeSeat: feydSeat,

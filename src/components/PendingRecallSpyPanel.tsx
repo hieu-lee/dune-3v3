@@ -1,4 +1,8 @@
 import { RotateCcw } from "lucide-react";
+import {
+  spyObservationPostDetailForSpace,
+  spyObservationPostLabelForSpace,
+} from "../game/state";
 import type { BoardSpace, PendingAction, Player } from "../game/types";
 
 type RecallSpyPendingAction = Extract<PendingAction, { kind: "recall-spy" }>;
@@ -52,13 +56,13 @@ export function PendingRecallSpyPanel({
                   type="button"
                   key={space.id}
                   className="spy-choice-card spy-choice-secondary"
-                  aria-label={space.name}
+                  aria-label={spyObservationPostLabelForSpace(space.id)}
                   onClick={() => onRecall(space.id)}
-                  title={`Recall spy from ${space.name}`}
+                  title={`Recall spy from ${spyObservationPostLabelForSpace(space.id)}`}
                 >
                   <span className="spy-choice-badge"><RotateCcw size={13} /> Recall</span>
-                  <strong>{space.name}</strong>
-                  <small>Return this spy to supply.</small>
+                  <strong>{spyObservationPostLabelForSpace(space.id)}</strong>
+                  <small>{spyObservationPostDetailForSpace(space.id)}</small>
                 </button>
               ))}
             </div>

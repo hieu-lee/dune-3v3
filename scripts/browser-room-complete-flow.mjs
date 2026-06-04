@@ -500,14 +500,14 @@ try {
   );
   const conflictVpArrakeenButton = conflictVpOwnerPage
     .locator(".pending-panel")
-    .getByRole("button", { name: "Arrakeen", exact: true });
+    .getByRole("button", { name: "Arrakeen / Spice Refinery", exact: true });
   const conflictVpCarthagButton = conflictVpOwnerPage
     .locator(".pending-panel")
     .getByRole("button", { name: "Carthag", exact: true });
   assert.equal(
     await conflictVpArrakeenButton.isDisabled(),
     false,
-    "Conflict VP spy owner should receive an enabled Arrakeen recall control",
+    "Conflict VP spy owner should receive an enabled Arrakeen / Spice Refinery recall control",
   );
   assert.equal(
     await conflictVpCarthagButton.isDisabled(),

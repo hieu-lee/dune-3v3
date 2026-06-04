@@ -1,4 +1,8 @@
 import { RotateCcw } from "lucide-react";
+import {
+  spyObservationPostDetailForSpace,
+  spyObservationPostLabelForSpace,
+} from "../game/state";
 import type { BoardSpace, PendingAction, Player } from "../game/types";
 
 type SpyPendingAction = Extract<PendingAction, { kind: "spy" }>;
@@ -52,13 +56,13 @@ export function PendingSpyPanel({
                   type="button"
                   key={`recall-${space.id}`}
                   className="spy-choice-card spy-choice-secondary"
-                  aria-label={space.name}
+                  aria-label={spyObservationPostLabelForSpace(space.id)}
                   onClick={() => onRecallSupplySpy(space.id)}
-                  title={`Recall spy from ${space.name} for no effect`}
+                  title={`Recall spy from ${spyObservationPostLabelForSpace(space.id)} for no effect`}
                 >
                   <span className="spy-choice-badge"><RotateCcw size={13} /> Recall</span>
-                  <strong>{space.name}</strong>
-                  <small>Return this spy to supply.</small>
+                  <strong>{spyObservationPostLabelForSpace(space.id)}</strong>
+                  <small>{spyObservationPostDetailForSpace(space.id)}</small>
                 </button>
               ))}
             </div>
@@ -77,12 +81,12 @@ export function PendingSpyPanel({
                   type="button"
                   key={space.id}
                   className="spy-choice-card spy-choice-primary"
-                  aria-label={space.name}
+                  aria-label={spyObservationPostLabelForSpace(space.id)}
                   onClick={() => onPlaceSpy(space.id)}
                 >
                   <span className="spy-choice-badge">Place</span>
-                  <strong>{space.name}</strong>
-                  <small>Commit one spy here.</small>
+                  <strong>{spyObservationPostLabelForSpace(space.id)}</strong>
+                  <small>{spyObservationPostDetailForSpace(space.id)}</small>
                 </button>
               ))}
             </div>

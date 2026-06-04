@@ -31,11 +31,15 @@ import {
 } from "./conflict-rules";
 import { advancePendingAction, queuePendingActions } from "./pending-actions";
 import {
-  playerHasSpyPost,
   removeSpyPostOwner,
+  normalizeSpyObservationPosts,
+  spyObservationPostLabelForSpace,
+  spyPostCount,
+  spyPostRecallCountForOwner,
 } from "./spy-posts";
 import {
   placeableSpySpaces,
+  recallableSpySpaces,
   recallableSpySupplySpaces,
 } from "./spy-choices";
 import { playerTroopSupply } from "./deck-utils";
@@ -76,7 +80,7 @@ function canPayConflictConversion(
 ) {
   if (!conversion) return false;
   if (conversion.kind === "resource") return owner.resources[conversion.resource] >= conversion.amount;
-  return boardSpaces.filter((space) => playerHasSpyPost(state, space.id, owner.id)).length >= conversion.count;
+  return spyPostCount(state, owner.id) >= conversion.count;
 }
 
 function pendingActionsForConflictInfluence(
@@ -559,9 +563,21 @@ export function conflictVpConversionSpyChoices(
   pending: ConflictVpConversionPendingAction,
 ) {
   if (pending.cost.kind !== "recall-spies") return [];
-  const choices = boardSpaces.filter((space) => playerHasSpyPost(state, space.id, pending.ownerId));
+  const choices = recallableSpySpaces(state, {
+    kind: "recall-spy",
+    ownerId: pending.ownerId,
+    combatRecipientId: pending.ownerId,
+    remaining: 1,
+    strength: 0,
+    source: pending.source,
+    optional: false,
+  });
   const needed = pending.cost.count - pending.cost.recalled;
-  return choices.length >= needed ? choices : [];
+  const recallCredit = choices.reduce(
+    (total, choice) => total + spyPostRecallCountForOwner(state, choice.id, pending.ownerId),
+    0,
+  );
+  return recallCredit >= needed ? choices : [];
 }
 
 export function canPayConflictVpConversion(
@@ -573,7 +589,8 @@ export function canPayConflictVpConversion(
   if (pending.cost.kind === "resource") {
     return owner.resources[pending.cost.resource] >= pending.cost.amount;
   }
-  return conflictVpConversionSpyChoices(state, pending).length >= pending.cost.count - pending.cost.recalled;
+  const needed = pending.cost.count - pending.cost.recalled;
+  return needed <= 0 || conflictVpConversionSpyChoices(state, pending).length > 0;
 }
 
 export function payConflictVpConversion(
@@ -620,27 +637,54 @@ export function recallSpyForConflictVpConversion(
   const choices = conflictVpConversionSpyChoices(state, pending);
   if (!space || !choices.some((choice) => choice.id === space.id)) return state;
 
-  const { spyPosts, sharedSpyPosts } = removeSpyPostOwner(state, space.id, owner.id);
-  const recalled = pending.cost.recalled + 1;
-  const conversionComplete = recalled >= pending.cost.count;
-  const remaining = conversionComplete ? pending.remaining - 1 : pending.remaining;
+  const { spyPosts, sharedSpyPosts, removedSpyCount } = removeSpyPostOwner(state, space.id, owner.id);
+  const recalled = pending.cost.recalled + Math.max(1, removedSpyCount);
+  const completedConversions = Math.min(pending.remaining, Math.floor(recalled / pending.cost.count));
+  const conversionComplete = completedConversions > 0;
+  const remaining = pending.remaining - completedConversions;
+  const remainingRecallCredit = remaining > 0
+    ? recallableSpySpaces(
+        {
+          ...state,
+          spyPosts,
+          sharedSpyPosts,
+        },
+        {
+          kind: "recall-spy",
+          ownerId: pending.ownerId,
+          combatRecipientId: pending.ownerId,
+          remaining: 1,
+          strength: 0,
+          source: pending.source,
+          optional: false,
+        },
+      ).reduce(
+        (total, choice) => total + spyPostRecallCountForOwner({ spyPosts, sharedSpyPosts }, choice.id, pending.ownerId),
+        0,
+      )
+    : 0;
+  const surplusRecalled = recalled % pending.cost.count;
+  const carriedRecalled = remaining > 0 && surplusRecalled + remainingRecallCredit >= pending.cost.count
+    ? surplusRecalled
+    : 0;
+  const scoredVp = pending.vp * completedConversions;
   const nextPending: ConflictVpConversionPendingAction = {
     ...pending,
     remaining,
     cost: {
       ...pending.cost,
-      recalled: conversionComplete ? 0 : recalled,
+      recalled: conversionComplete ? carriedRecalled : recalled,
     },
   };
 
-  return recordTurnSpyRecall({
+  const recalledState = recordTurnSpyRecall({
     ...state,
     players: state.players.map((player) => {
       if (player.id !== owner.id) return player;
       return {
         ...player,
-        spies: player.spies + 1,
-        vp: conversionComplete ? player.vp + pending.vp : player.vp,
+        spies: player.spies + removedSpyCount,
+        vp: conversionComplete ? player.vp + scoredVp : player.vp,
       };
     }),
     spyPosts,
@@ -652,11 +696,12 @@ export function recallSpyForConflictVpConversion(
       : { pendingAction: nextPending }),
     log: [
       conversionComplete
-        ? `${owner.leader} recalls a spy from ${space.name} and completes ${pending.source} for ${pending.vp} VP.`
-        : `${owner.leader} recalls a spy from ${space.name} for ${pending.source} (${recalled}/${pending.cost.count}).`,
+        ? `${owner.leader} recalls a spy from ${spyObservationPostLabelForSpace(space.id)} and completes ${pending.source} for ${scoredVp} VP.`
+        : `${owner.leader} recalls a spy from ${spyObservationPostLabelForSpace(space.id)} for ${pending.source} (${recalled}/${pending.cost.count}).`,
       ...state.log,
     ],
-  }, owner.id);
+  }, owner.id, Math.max(1, removedSpyCount));
+  return conversionComplete ? normalizeSpyObservationPosts(recalledState) : recalledState;
 }
 
 export function skipConflictVpConversion(
@@ -665,11 +710,11 @@ export function skipConflictVpConversion(
 ): GameState {
   if (pending.cost.kind === "recall-spies" && pending.cost.recalled > 0) return state;
   const owner = state.players.find((player) => player.id === pending.ownerId);
-  return {
+  return normalizeSpyObservationPosts({
     ...state,
     ...advancePendingAction(state),
     log: [`${owner?.leader ?? "Player"} declines the remaining VP conversion from ${pending.source}.`, ...state.log],
-  };
+  });
 }
 
 export function resolveCurrentConflict(state: GameState): GameState {

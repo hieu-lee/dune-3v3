@@ -219,7 +219,12 @@ function selectedSpyRecallFor(
   state: GameState,
   player: Player,
   recalls: ReturnType<typeof resolveGameEffects>["spyRecalls"],
-): { space: BoardSpace; spyPosts: GameState["spyPosts"]; sharedSpyPosts: GameState["sharedSpyPosts"] } | undefined {
+): {
+  space: BoardSpace;
+  spyPosts: GameState["spyPosts"];
+  sharedSpyPosts: GameState["sharedSpyPosts"];
+  removedSpyCount: number;
+} | undefined {
   if (recalls.length === 0) return undefined;
   if (recalls.length > 1) throw new Error("Unsupported multiple Plot Intrigue spy recall effects");
   const [recall] = recalls;
@@ -369,6 +374,7 @@ export function playTypedPlotIntrigue(
   const hasResourceSpend = hasResourceSpends(resolved.spentResources);
   const hasInfluenceAdjustment = hasInfluenceAdjustments(resolved.influenceAdjustments);
   const hasSpyRecall = Boolean(spyRecall);
+  const recalledSpyCount = spyRecall?.removedSpyCount ?? 0;
   const hasVpGain = resolved.vp > 0;
   const hasAcquireRecruitBonus = resolved.acquireRecruitBonus > 0;
   if (resolved.acquireRecruitBonus > 1) {
@@ -422,7 +428,7 @@ export function playTypedPlotIntrigue(
         manipulatedCards: rowManipulation
           ? [...candidate.manipulatedCards, rowManipulation.card]
           : candidate.manipulatedCards,
-        spies: candidate.spies + (hasSpyRecall ? 1 : 0),
+        spies: candidate.spies + recalledSpyCount,
         intrigues: candidate.intrigues.filter((card) => card.id !== intrigue.id),
       };
       if (resolved.vp > 0) {
@@ -514,7 +520,7 @@ export function playTypedPlotIntrigue(
     ? applyInfluenceAdjustments(playedState, player.id, activatedAlly?.id, resolved.influenceAdjustments)
     : playedState;
   const spyRecallTrackedState = hasSpyRecall
-    ? recordTurnSpyRecall(adjustedState, player.id)
+    ? recordTurnSpyRecall(adjustedState, player.id, recalledSpyCount)
     : adjustedState;
   const spiceTrackedState = (resolved.revealGain.spice ?? 0) > 0
     ? recordTurnSpiceGain(spyRecallTrackedState, player.id, resolved.revealGain.spice ?? 0)

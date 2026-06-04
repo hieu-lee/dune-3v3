@@ -8,13 +8,17 @@ import { advancePendingAction } from "./pending-actions";
 import { stabanTuekLeaderName } from "./player-setup";
 import {
   placeableSpySpaces,
+  recallableSpySpaces,
   recallableSpySupplySpaces,
 } from "./spy-choices";
 import {
   canPlaceSharedSpyPost,
   canPlaceSpyPost,
+  normalizeSpyObservationPosts,
   playerHasSpyPost,
   removeSpyPostOwner,
+  spyObservationPostIdForSpace,
+  spyObservationPostLabelForSpace,
   spyPostOwnerIds,
 } from "./spy-posts";
 import {
@@ -81,18 +85,20 @@ export function resolvePlaceSpyForPending(
   }
 
   const nextSpies = owner.spies - 1;
+  const postId = spyObservationPostIdForSpace(space.id);
+  const postLabel = spyObservationPostLabelForSpace(space.id);
   const players = state.players.map((player) =>
     player.id === owner.id ? { ...player, spies: nextSpies } : player,
   );
   const remaining = pending.recallForSupply
     ? pending.remaining - 1
     : Math.min(pending.remaining - 1, nextSpies);
-  const sharedOwners = state.sharedSpyPosts[space.id] ?? [];
+  const sharedOwners = state.sharedSpyPosts[postId] ?? [];
   const spyPosts = pending.allowSharedPost
     ? state.spyPosts
-    : { ...state.spyPosts, [space.id]: owner.id };
+    : { ...state.spyPosts, [postId]: owner.id };
   const sharedSpyPosts = pending.allowSharedPost
-    ? { ...state.sharedSpyPosts, [space.id]: [...sharedOwners, owner.id] }
+    ? { ...state.sharedSpyPosts, [postId]: [...sharedOwners, owner.id] }
     : state.sharedSpyPosts;
   const advanced = advancePendingAction(state);
   const stabanPending =
@@ -121,7 +127,7 @@ export function resolvePlaceSpyForPending(
             pendingQueue: advanced.pendingAction ? [advanced.pendingAction, ...advanced.pendingQueue] : advanced.pendingQueue,
           }
         : advanced),
-    log: [`${owner.leader} places a spy near ${space.name} from ${pending.source}.`, ...state.log],
+    log: [`${owner.leader} places a spy near ${postLabel} from ${pending.source}.`, ...state.log],
   });
 }
 
@@ -137,17 +143,18 @@ export function recallSpyForSupplyForPending(
   if (!space || !playerHasSpyPost(state, space.id, owner.id)) return state;
   if (!recallableSpySupplySpaces(state, pending).some((candidate) => candidate.id === space.id)) return state;
 
-  const { spyPosts, sharedSpyPosts } = removeSpyPostOwner(state, space.id, owner.id);
+  const { spyPosts, sharedSpyPosts, removedSpyCount } = removeSpyPostOwner(state, space.id, owner.id);
+  const recalledSpyCount = Math.max(1, removedSpyCount);
   return recordTurnSpyRecall({
     ...state,
     players: state.players.map((player) =>
-      player.id === owner.id ? { ...player, spies: player.spies + 1 } : player,
+      player.id === owner.id ? { ...player, spies: player.spies + removedSpyCount } : player,
     ),
     spyPosts,
     sharedSpyPosts,
     pendingAction: { ...pending, recallForSupply: pending.remaining > 1, mustPlaceSpy: true },
-    log: [`${owner.leader} recalls a spy from ${space.name} for ${pending.source}.`, ...state.log],
-  }, owner.id);
+    log: [`${owner.leader} recalls a spy from ${spyObservationPostLabelForSpace(space.id)} for ${pending.source}.`, ...state.log],
+  }, owner.id, recalledSpyCount);
 }
 
 export function resolveStabanSmuggleSpice(state: GameState, actorId: string, spaceId: string): GameState {
@@ -244,13 +251,14 @@ export function recallSpyForPending(
   const space = boardSpaces.find((candidate) => candidate.id === spaceId);
   if (!space || !playerHasSpyPost(state, space.id, owner.id) || pending.remaining <= 0) return state;
 
-  const { spyPosts, sharedSpyPosts } = removeSpyPostOwner(state, space.id, owner.id);
-  const remaining = pending.remaining - 1;
+  const { spyPosts, sharedSpyPosts, removedSpyCount } = removeSpyPostOwner(state, space.id, owner.id);
+  const recalledSpyCount = Math.max(1, removedSpyCount);
+  const remaining = pending.remaining - recalledSpyCount;
   const finalRecall = remaining <= 0;
   const recipient = state.players.find((player) => player.id === pending.combatRecipientId);
   const players = state.players.map((player) => {
     let next = player;
-    if (player.id === owner.id) next = { ...next, spies: next.spies + 1 };
+    if (player.id === owner.id) next = { ...next, spies: next.spies + removedSpyCount };
     if (finalRecall && player.id === pending.combatRecipientId) {
       next = { ...next, conflict: next.conflict + pending.strength };
     }
@@ -259,14 +267,15 @@ export function recallSpyForPending(
   const strengthText = finalRecall && pending.strength > 0
     ? `, adding ${pending.strength} strength to ${recipient?.leader ?? "the chosen combatant"}`
     : "";
-  const recalledState = recordTurnSpyRecall({
+  let recalledState = recordTurnSpyRecall({
     ...state,
     players,
     spyPosts,
     sharedSpyPosts,
     ...(finalRecall ? advancePendingAction(state) : { pendingAction: { ...pending, remaining } }),
-    log: [`${owner.leader} recalls a spy from ${space.name} for ${pending.source}${strengthText}.`, ...state.log],
-  }, owner.id);
+    log: [`${owner.leader} recalls a spy from ${spyObservationPostLabelForSpace(space.id)} for ${pending.source}${strengthText}.`, ...state.log],
+  }, owner.id, recalledSpyCount);
+  if (finalRecall) recalledState = normalizeSpyObservationPosts(recalledState);
 
   return finalRecall && pending.drawIntrigues
     ? drawIntrigueCards(recalledState, owner.id, pending.drawIntrigues, pending.source)
@@ -276,11 +285,11 @@ export function recallSpyForPending(
 export function skipRecallSpy(state: GameState, pending: RecallSpyPendingAction): GameState {
   if (!pending.optional) return state;
   const owner = state.players.find((player) => player.id === pending.ownerId);
-  return {
+  return normalizeSpyObservationPosts({
     ...state,
     ...advancePendingAction(state),
     log: [`${owner?.leader ?? "Player"} declines to recall a spy for ${pending.source}.`, ...state.log],
-  };
+  });
 }
 
 export function specialMissionSpyPending(player: Player): SpyPendingAction {
@@ -296,14 +305,19 @@ export function specialMissionSpyPending(player: Player): SpyPendingAction {
 }
 
 export function specialMissionCitySpySpaces(state: GameState, player: Player) {
-  return boardSpaces.filter((space) =>
-    space.icon === "city" &&
-    canPlaceSpyPost(state, space, player)
-  );
+  return placeableSpySpaces(state, specialMissionSpyPending(player));
 }
 
 export function specialMissionRecallSpySpaces(state: GameState, player: Player) {
-  return boardSpaces.filter((space) => playerHasSpyPost(state, space.id, player.id));
+  return recallableSpySpaces(state, {
+    kind: "recall-spy",
+    ownerId: player.id,
+    combatRecipientId: player.id,
+    remaining: 1,
+    strength: 0,
+    source: "Special Mission",
+    optional: false,
+  });
 }
 
 export function canPlaySpecialMissionPlaceSpy(state: GameState, player: Player) {
@@ -324,7 +338,7 @@ export function distractionSpyPending(player: Player): SpyPendingAction {
 }
 
 export function distractionSpySpaces(state: GameState, player: Player) {
-  return boardSpaces.filter((space) => canPlaceSharedSpyPost(state, space, player));
+  return placeableSpySpaces(state, distractionSpyPending(player));
 }
 
 export function canPlayDistractionPlotIntrigue(state: GameState, player: Player) {

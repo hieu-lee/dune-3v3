@@ -154,6 +154,17 @@ function migrateObsoleteRevealAdjust(room, { advancePendingAction, scoreGurneyAl
   };
 }
 
+function migrateSpyObservationPosts(room, { normalizeSpyObservationPosts }) {
+  const game = normalizeSpyObservationPosts(room.game);
+  if (game === room.game) return room;
+  return {
+    ...room,
+    version: room.version + 1,
+    updatedAt: migrationTimestamp(),
+    game,
+  };
+}
+
 function validStoredRoom(candidate) {
   return (
     candidate &&
@@ -218,8 +229,15 @@ export async function createRoomServer({
   }
 
   async function migrateLoadedRoom(room) {
-    const { advancePendingAction, scoreGurneyAlwaysSmiling } = await gameState();
-    return migrateObsoleteRevealAdjust(room, { advancePendingAction, scoreGurneyAlwaysSmiling });
+    const {
+      advancePendingAction,
+      normalizeSpyObservationPosts,
+      scoreGurneyAlwaysSmiling,
+    } = await gameState();
+    return migrateObsoleteRevealAdjust(
+      migrateSpyObservationPosts(room, { normalizeSpyObservationPosts }),
+      { advancePendingAction, scoreGurneyAlwaysSmiling },
+    );
   }
 
   const rooms = await loadStoredRooms(resolvedStorageFile, migrateLoadedRoom);

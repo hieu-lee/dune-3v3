@@ -19,6 +19,8 @@ const {
   canPay,
   effectiveCost,
   iconCanReach,
+  spyObservationPostIdForSpace,
+  spyPostCount,
   startCombatPhase,
 } = await server.ssrLoadModule("/src/game/state.ts");
 const {
@@ -649,6 +651,132 @@ try {
     undefined,
     "Migrated stale reveal-adjust room should clear the promoted pending action after resolution",
   );
+
+  const legacySpyRoom = await jsonFetch("/api/rooms", { method: "POST" });
+  assert.equal(legacySpyRoom.response.status, 201, "Legacy spy-post room creation should succeed");
+  const legacySpyRoomId = legacySpyRoom.body.roomId;
+  const legacySpyRecord = server.rooms.get(legacySpyRoomId);
+  assert.ok(legacySpyRecord, "Legacy spy-post room should be stored in memory");
+  const legacySpyVersion = legacySpyRecord.version;
+  legacySpyRecord.game = {
+    ...legacySpyRecord.game,
+    spyPosts: {
+      ...legacySpyRecord.game.spyPosts,
+      arrakeen: "p2",
+      "spice-refinery": "p2",
+      "deliver-supplies": "p2",
+      heighliner: "p2",
+    },
+    sharedSpyPosts: {},
+    players: legacySpyRecord.game.players.map((candidate) =>
+      candidate.id === "p2" ? { ...candidate, spies: 0 } : candidate
+    ),
+  };
+  await restartServer();
+  const migratedLegacySpyRecord = server.rooms.get(legacySpyRoomId);
+  assert.ok(migratedLegacySpyRecord, "Legacy spy-post room should load after restart");
+  assert.equal(
+    migratedLegacySpyRecord.version,
+    legacySpyVersion + 1,
+    "Legacy spy-post migration should bump the room version",
+  );
+  assert.equal(
+    migratedLegacySpyRecord.game.spyPosts[spyObservationPostIdForSpace("arrakeen")],
+    "p2",
+    "Legacy Arrakeen / Spice Refinery storage should migrate to the canonical post id",
+  );
+  assert.equal(migratedLegacySpyRecord.game.spyPosts.arrakeen, undefined);
+  assert.equal(migratedLegacySpyRecord.game.spyPosts["spice-refinery"], undefined);
+  assert.equal(
+    migratedLegacySpyRecord.game.spyPosts[spyObservationPostIdForSpace("heighliner")],
+    "p2",
+    "Legacy Deliver Supplies / Heighliner storage should migrate to the canonical post id",
+  );
+  assert.equal(migratedLegacySpyRecord.game.spyPosts["deliver-supplies"], undefined);
+  assert.equal(migratedLegacySpyRecord.game.spyPosts.heighliner, undefined);
+  assert.equal(
+    player({ game: migratedLegacySpyRecord.game }, "p2").spies,
+    2,
+    "Legacy spy-post migration should refund duplicate same-owner stored tokens",
+  );
+  assert.equal(
+    spyPostCount(migratedLegacySpyRecord.game, "p2"),
+    2,
+    "Legacy spy-post migration should preserve one physical post per shared observation site",
+  );
+  const migratedLegacySpyVersion = migratedLegacySpyRecord.version;
+  await restartServer();
+  assert.equal(
+    server.rooms.get(legacySpyRoomId)?.version,
+    migratedLegacySpyVersion,
+    "Canonical spy-post rooms should not be remigrated on the next restart",
+  );
+
+  const activeLegacySpyRoom = await jsonFetch("/api/rooms", { method: "POST" });
+  assert.equal(activeLegacySpyRoom.response.status, 201, "Active legacy spy-recall room creation should succeed");
+  const activeLegacySpyRoomId = activeLegacySpyRoom.body.roomId;
+  const activeLegacySpyRecord = server.rooms.get(activeLegacySpyRoomId);
+  assert.ok(activeLegacySpyRecord, "Active legacy spy-recall room should be stored in memory");
+  const activeLegacySpyVersion = activeLegacySpyRecord.version;
+  activeLegacySpyRecord.game = {
+    ...activeLegacySpyRecord.game,
+    spyPosts: {
+      ...activeLegacySpyRecord.game.spyPosts,
+      arrakeen: "p2",
+      "spice-refinery": "p2",
+    },
+    sharedSpyPosts: {},
+    pendingAction: {
+      kind: "recall-spy",
+      ownerId: "p2",
+      combatRecipientId: "p2",
+      remaining: 2,
+      strength: 7,
+      source: "Verifier Legacy Recall",
+      optional: false,
+    },
+    pendingQueue: [],
+    players: activeLegacySpyRecord.game.players.map((candidate) =>
+      candidate.id === "p2" ? { ...candidate, conflict: 0, spies: 0 } : candidate
+    ),
+  };
+  await restartServer();
+  const reloadedActiveLegacySpyRecord = server.rooms.get(activeLegacySpyRoomId);
+  assert.ok(reloadedActiveLegacySpyRecord, "Active legacy spy-recall room should load after restart");
+  assert.equal(
+    reloadedActiveLegacySpyRecord.version,
+    activeLegacySpyVersion + 1,
+    "Active legacy spy-recall migration should canonicalize preserved duplicate recall credit and bump the room version",
+  );
+  assert.equal(reloadedActiveLegacySpyRecord.game.spyPosts[spyObservationPostIdForSpace("arrakeen")], "p2");
+  assert.deepEqual(reloadedActiveLegacySpyRecord.game.sharedSpyPosts[spyObservationPostIdForSpace("arrakeen")], ["p2"]);
+  assert.equal(reloadedActiveLegacySpyRecord.game.spyPosts.arrakeen, undefined);
+  assert.equal(reloadedActiveLegacySpyRecord.game.spyPosts["spice-refinery"], undefined);
+  assert.equal(player({ game: reloadedActiveLegacySpyRecord.game }, "p2").spies, 0);
+  const activeLegacySpyClaim = await jsonFetch(`/api/rooms/${activeLegacySpyRoomId}/seats/p2/claim`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: "Legacy Spy Owner" }),
+  });
+  assert.equal(activeLegacySpyClaim.response.status, 200, "Active legacy spy-recall owner should be claimable");
+  const resolvedActiveLegacySpyRecall = await roomAction(
+    activeLegacySpyRoomId,
+    activeLegacySpyClaim.body.token,
+    activeLegacySpyClaim.body.snapshot.version,
+    { kind: "pending", command: { kind: "recall-spy", spaceId: "arrakeen" } },
+  );
+  assert.equal(
+    resolvedActiveLegacySpyRecall.response.status,
+    200,
+    `Active legacy spy-recall action should succeed: ${JSON.stringify(resolvedActiveLegacySpyRecall.body)}`,
+  );
+  assert.equal(
+    resolvedActiveLegacySpyRecall.body.snapshot.game.pendingAction,
+    undefined,
+    "Active legacy spy-recall action should clear the two-spy pending action",
+  );
+  assert.equal(player(resolvedActiveLegacySpyRecall.body.snapshot, "p2").spies, 2);
+  assert.equal(player(resolvedActiveLegacySpyRecall.body.snapshot, "p2").conflict, 7);
 
   let persistedActionSnapshot = await jsonFetch("/api/rooms", { method: "POST" });
   assert.equal(persistedActionSnapshot.response.status, 201, "Persisted action room creation should succeed");

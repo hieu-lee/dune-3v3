@@ -82,7 +82,11 @@ export function verifySpecialMissionPlotIntrigue({ cards, data, game, state }) {
     citySpySpace.id,
   );
   assert.equal(playerById(specialMissionSpyPlaced, "p2").spies, 0, "Special Mission should spend the actor's spy");
-  assert.equal(specialMissionSpyPlaced.spyPosts[citySpySpace.id], "p2", "Special Mission should place the actor's spy on the chosen City post");
+  assert.equal(
+    specialMissionSpyPlaced.spyPosts[state.spyObservationPostIdForSpace(citySpySpace.id)],
+    "p2",
+    "Special Mission should place the actor's spy on the chosen City post",
+  );
   assert.equal(specialMissionSpyPlaced.pendingAction, undefined);
   assert.match(specialMissionSpyPlaced.log[0], /places a spy near .* from Special Mission/);
 
@@ -149,7 +153,7 @@ export function verifySpecialMissionPlotIntrigue({ cards, data, game, state }) {
   );
   const noSupplyPlaced = state.placeSpyForPending(noSupplyRecalled, noSupplyRecalled.pendingAction, citySpySpace.id);
   assert.equal(playerById(noSupplyPlaced, "p2").spies, 0);
-  assert.equal(noSupplyPlaced.spyPosts[citySpySpace.id], "p2");
+  assert.equal(noSupplyPlaced.spyPosts[state.spyObservationPostIdForSpace(citySpySpace.id)], "p2");
 
   const occupiedCitySpecialMission = {
     ...specialMissionFixture,
@@ -290,5 +294,8 @@ export function verifySpecialMissionPlotIntrigue({ cards, data, game, state }) {
   );
   assert.equal(playerById(commanderSpecialMissionPlaced, "p4").spies, 1);
   assert.equal(playerById(commanderSpecialMissionPlaced, "p6").spies, 3);
-  assert.equal(commanderSpecialMissionPlaced.spyPosts[secondCitySpySpace.id], "p4");
+  assert.equal(
+    commanderSpecialMissionPlaced.spyPosts[state.spyObservationPostIdForSpace(secondCitySpySpace.id)],
+    "p4",
+  );
 }

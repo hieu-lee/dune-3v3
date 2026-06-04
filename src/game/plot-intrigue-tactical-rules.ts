@@ -9,6 +9,9 @@ import {
   canPlaySpecialMissionPlaceSpy,
   specialMissionRecallSpySpaces,
 } from "./spy-pending-rules";
+import {
+  spyObservationPostLabelForSpace,
+} from "./spy-posts";
 import type {
   GameState,
 } from "./types";
@@ -51,7 +54,7 @@ export function playSpecialMissionPlotIntrigue(
       isSpecialMissionIntrigue,
       (actor, _contractPending, _activatedAlly, resolved, outcome) => {
         const shieldWallText = state.shieldWall && resolved.removeShieldWall ? ", removes the Shield Wall," : "";
-        return `${actor.leader} plays Special Mission, recalls a spy from ${outcome.recalledSpySpace?.name ?? space.name}${shieldWallText} and gains 2 spice.`;
+        return `${actor.leader} plays Special Mission, recalls a spy from ${spyObservationPostLabelForSpace((outcome.recalledSpySpace ?? space).id)}${shieldWallText} and gains 2 spice.`;
       },
       { choiceId: "recall-spy", targetSpaceId: space.id },
     );

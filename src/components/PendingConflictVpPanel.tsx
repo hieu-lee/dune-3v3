@@ -1,4 +1,5 @@
 import { CircleDollarSign, RotateCcw, Sparkles } from "lucide-react";
+import { spyObservationPostLabelForSpace } from "../game/state";
 import type { BoardSpace, PendingAction, Player } from "../game/types";
 
 type ConflictVpPendingAction = Extract<PendingAction, { kind: "conflict-vp-conversion" }>;
@@ -39,17 +40,20 @@ export function PendingConflictVpPanel({
               <span>
                 Recall {pending.cost.count - pending.cost.recalled} more {pending.cost.count - pending.cost.recalled === 1 ? "spy" : "spies"}.
               </span>
-              {spyChoices.map((space) => (
-                <button
-                  type="button"
-                  key={space.id}
-                  onClick={() => onRecallSpy(space.id)}
-                  title={`Recall spy from ${space.name}`}
-                >
-                  <RotateCcw size={14} />
-                  {space.name}
-                </button>
-              ))}
+              {spyChoices.map((space) => {
+                const spyPostLabel = spyObservationPostLabelForSpace(space.id);
+                return (
+                  <button
+                    type="button"
+                    key={space.id}
+                    onClick={() => onRecallSpy(space.id)}
+                    title={`Recall spy from ${spyPostLabel}`}
+                  >
+                    <RotateCcw size={14} />
+                    {spyPostLabel}
+                  </button>
+                );
+              })}
               {spyChoices.length === 0 && <span>No spy posts to recall</span>}
             </>
           )}

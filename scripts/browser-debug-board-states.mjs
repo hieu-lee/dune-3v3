@@ -133,9 +133,17 @@ export async function runBoardStatesSmoke({
 
   const denseStats = await boardMarkerStats(page);
   const compactStats = await compactBoardStats(page);
+  const assetStats = await boardAssetFitStats(page);
+  const groupSizingStats = await boardGroupSizingStats(page);
   const landsraadText = await page.locator('[data-region-id="landsraad"]').innerText();
   const imperialPrivilegeText = await page.getByTestId("space-imperial-privilege").innerText();
   assert.equal(denseStats.occupied, Object.keys(occupiedSpaces).length, "Dense board state should render all occupied spaces");
+  assertBoardAssetFitStats(assetStats, fixture.boardSpaceCount, "Idle board");
+  assert.equal(groupSizingStats.unequalGroupCount, 0, "Board locations in the same group should have equal tile sizes, except High Council");
+  assert.ok(
+    groupSizingStats.highCouncilWidthRatio >= 1.8,
+    `High Council should be wider than the other Landsraad locations (${groupSizingStats.highCouncilWidthRatio})`,
+  );
   assert.equal(compactStats.scoreRails, 0, "Board should not render the old vertical VP rail");
   assert.equal(compactStats.conflictStrengthTracks, 0, "Board should not render the unused conflict strength number rail");
   assert.equal(compactStats.logOpen, false, "Table log should start collapsed by default");
@@ -188,13 +196,26 @@ export async function runBoardStatesSmoke({
     return details && Number.parseFloat(getComputedStyle(details).opacity) > 0.9;
   });
   const hoverStats = await compactBoardStats(page);
+  const hoverAssetStats = await boardAssetFitStats(page);
   assert.equal(hoverStats.imperialPrivilegeDetailVisible, true, "Board location hover should reveal the full detail text overlay");
+  assertBoardAssetFitStats(hoverAssetStats, fixture.boardSpaceCount, "Hovered board");
   assert.match(
     hoverStats.imperialPrivilegeVisibleDetail,
     /optionally discard an Intrigue for a new one, recall another Agent, and draw a card/,
     "Board location hover should reveal the full Imperial Privilege detail text",
   );
   await screenshot(page, captures, "board-states-hover-location.png");
+  await page.getByTestId("space-imperial-privilege").click();
+  await page.mouse.move(20, 20);
+  await page.waitForFunction(() => {
+    const details = document.querySelector('[data-testid="space-imperial-privilege"] .space-hover-details');
+    return details && Number.parseFloat(getComputedStyle(details).opacity) < 0.1;
+  });
+  const postClickHoverStats = await compactBoardStats(page);
+  const postClickAssetStats = await boardAssetFitStats(page);
+  assert.equal(postClickHoverStats.imperialPrivilegeSelected, true, "Clicked location should remain selected after pointer leaves");
+  assert.equal(postClickHoverStats.imperialPrivilegeDetailVisible, false, "Clicked location should not keep the hover detail visible after pointer leaves");
+  assertBoardAssetFitStats(postClickAssetStats, fixture.boardSpaceCount, "Clicked board after pointer leaves");
 
   const cardButton = page.getByTestId(`hand-card-${fixture.cardId}`);
   assert.equal(await cardButton.count(), 1, `Expected one hand card button for ${fixture.cardName}`);
@@ -264,17 +285,17 @@ export async function runBoardStatesSmoke({
   const mobilePlacementStats = await boardPlacementStats(page);
   assert.ok(mobilePlacementStats.legal >= 3, "Mobile board should preserve legal placement markers");
   assert.ok(mobilePlacementStats.unavailable >= 10, "Mobile board should preserve unavailable placement markers");
+  await page.mouse.move(20, 20);
   await page.waitForFunction(
     ({ spaceId }) => {
       const details = document.querySelector(`[data-testid="space-${spaceId}"] .space-hover-details`);
-      return details && Number.parseFloat(getComputedStyle(details).opacity) > 0.9;
+      return details && Number.parseFloat(getComputedStyle(details).opacity) < 0.1;
     },
     { spaceId: selectedUnavailableSpaceId },
   );
   const mobileSelectedStats = await selectedBoardSpaceStats(page, selectedUnavailableSpaceId);
-  assert.equal(mobileSelectedStats.detailVisible, true, "Mobile selected board space should reveal its detail overlay");
-  assert.equal(mobileSelectedStats.detailClamped, false, "Mobile selected board space detail should not be line-clamped");
-  assert.ok(mobileSelectedStats.detailLength > 20, "Mobile selected board space should expose readable detail text");
+  assert.equal(mobileSelectedStats.detailVisible, false, "Mobile selected board space should not keep a sticky hover overlay");
+  assert.ok(mobileSelectedStats.detailLength > 20, "Mobile selected board space should keep detail text available in the DOM");
   await screenshot(page, captures, "board-states-selected-mobile-390.png");
   await screenshot(page, captures, "board-states-legal-unavailable-mobile-390.png");
 
@@ -388,6 +409,7 @@ async function createBoardStatesFixture(server, initialPlayableGame) {
 
   return {
     activePlayerName: activePlayer.leader,
+    boardSpaceCount: data.boardSpaces.length,
     cardId: selectedCard.id,
     cardName: selectedCard.name,
     game: placementGame,
@@ -474,11 +496,137 @@ async function compactBoardStats(page) {
         ? Number.parseFloat(getComputedStyle(details).opacity) > 0.9
         : false,
       imperialPrivilegeOccupancy: tile?.querySelector(".space-occupancy")?.textContent?.trim() ?? "",
+      imperialPrivilegeSelected: tile?.classList.contains("selected") ?? false,
       imperialPrivilegeVisibleDetail: tile?.querySelector(".space-detail")?.textContent?.trim() ?? "",
       logOpen: document.querySelector(".log-panel")?.hasAttribute("open") ?? false,
       scoreRails: document.querySelectorAll(".board-score-rail").length,
       vpChipLabels: Array.from(document.querySelectorAll(".player-card .vp-resource")).map((chip) => chip.textContent?.trim() ?? ""),
       vpChips: document.querySelectorAll(".player-card .vp-resource").length,
+    };
+  });
+}
+
+async function boardAssetFitStats(page) {
+  return page.evaluate(() => {
+    const tiles = Array.from(document.querySelectorAll(".space-tile"));
+    return tiles.reduce(
+      (stats, tile) => {
+        const tileRect = tile.getBoundingClientRect();
+        const images = Array.from(tile.querySelectorAll(".space-art"));
+        stats.tileCount += 1;
+        if (images.length === 0) {
+          stats.missingArtTileCount += 1;
+          return stats;
+        }
+        if (images.length > 1) stats.multipleArtTileCount += 1;
+        for (const art of images) {
+          const style = getComputedStyle(art);
+          const artRect = art.getBoundingClientRect();
+          if (style.objectFit !== "contain") stats.croppedArtCount += 1;
+          if (style.transform !== "none") stats.transformedArtCount += 1;
+          if (
+            artRect.left < tileRect.left - 1 ||
+            artRect.right > tileRect.right + 1 ||
+            artRect.top < tileRect.top - 1 ||
+            artRect.bottom > tileRect.bottom + 1
+          ) {
+            stats.artOverflowTileCount += 1;
+          }
+          if (!(art instanceof HTMLImageElement) || art.naturalWidth <= 0 || art.naturalHeight <= 0) {
+            stats.missingNaturalSizeCount += 1;
+          }
+          stats.imageCount += 1;
+        }
+        return stats;
+      },
+      {
+        artOverflowTileCount: 0,
+        croppedArtCount: 0,
+        imageCount: 0,
+        missingArtTileCount: 0,
+        missingNaturalSizeCount: 0,
+        multipleArtTileCount: 0,
+        tileCount: 0,
+        transformedArtCount: 0,
+      },
+    );
+  });
+}
+
+function assertBoardAssetFitStats(stats, expectedBoardSpaceCount, phaseLabel) {
+  assert.equal(
+    stats.tileCount,
+    expectedBoardSpaceCount,
+    `${phaseLabel} should render every board-space tile`,
+  );
+  assert.equal(
+    stats.imageCount,
+    expectedBoardSpaceCount,
+    `${phaseLabel} should render exactly one location art image for every board space`,
+  );
+  assert.equal(
+    stats.missingArtTileCount,
+    0,
+    `${phaseLabel} should not have board spaces without location art`,
+  );
+  assert.equal(
+    stats.multipleArtTileCount,
+    0,
+    `${phaseLabel} should not render duplicate location art images in a board space`,
+  );
+  assert.equal(
+    stats.croppedArtCount,
+    0,
+    `${phaseLabel} location art should use contain-fit so symbols, costs, and rewards are not cropped`,
+  );
+  assert.equal(
+    stats.transformedArtCount,
+    0,
+    `${phaseLabel} location art should not use a transform that can crop edges`,
+  );
+  assert.equal(
+    stats.artOverflowTileCount,
+    0,
+    `${phaseLabel} location art should stay inside the visible tile bounds`,
+  );
+  assert.equal(
+    stats.missingNaturalSizeCount,
+    0,
+    `${phaseLabel} location art should load before asset-fit assertions run`,
+  );
+}
+
+async function boardGroupSizingStats(page) {
+  return page.evaluate(() => {
+    const sizing = Array.from(document.querySelectorAll(".board-region")).map((region) => {
+      const regionId = region.getAttribute("data-region-id") ?? "";
+      const tiles = Array.from(region.querySelectorAll(".space-tile"))
+        .filter((tile) => tile.getAttribute("data-space-id") !== "high-council")
+        .map((tile) => {
+          const rect = tile.getBoundingClientRect();
+          return { height: Math.round(rect.height), width: Math.round(rect.width) };
+        });
+      const widths = tiles.map((tile) => tile.width);
+      const heights = tiles.map((tile) => tile.height);
+      return {
+        heightRange: heights.length > 0 ? Math.max(...heights) - Math.min(...heights) : 0,
+        regionId,
+        widthRange: widths.length > 0 ? Math.max(...widths) - Math.min(...widths) : 0,
+      };
+    });
+    const highCouncilRect = document.querySelector('[data-testid="space-high-council"]')?.getBoundingClientRect();
+    const landsraadPeers = Array.from(document.querySelectorAll('[data-region-id="landsraad"] .space-tile'))
+      .filter((tile) => tile.getAttribute("data-space-id") !== "high-council")
+      .map((tile) => tile.getBoundingClientRect().width);
+    const landsraadPeerWidth = landsraadPeers.length > 0
+      ? landsraadPeers.reduce((sum, width) => sum + width, 0) / landsraadPeers.length
+      : 0;
+    return {
+      highCouncilWidthRatio: highCouncilRect && landsraadPeerWidth > 0
+        ? highCouncilRect.width / landsraadPeerWidth
+        : 0,
+      regions: sizing,
+      unequalGroupCount: sizing.filter((region) => region.widthRange > 1 || region.heightRange > 1).length,
     };
   });
 }

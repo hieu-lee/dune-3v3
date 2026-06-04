@@ -39,7 +39,7 @@
   isolation: isolate;
   position: relative;
   display: grid;
-  grid-template-columns: minmax(136px, 0.5fr) minmax(0, 2.55fr);
+  grid-template-columns: minmax(128px, 0.46fr) minmax(0, 2.7fr);
   gap: 10px;
   min-width: 690px;
   border: 1px solid rgba(255, 246, 230, 0.16);
@@ -107,7 +107,7 @@
 
 .board-top-band {
   display: grid;
-  grid-template-columns: minmax(0, 1.45fr) minmax(150px, 0.55fr);
+  grid-template-columns: minmax(0, 1.58fr) minmax(126px, 0.42fr);
   gap: 8px;
 }
 
@@ -398,6 +398,11 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.space-tile[data-space-id="high-council"] {
+  grid-column: span 2;
+  min-height: 112px;
+}
+
 .board-region--fallback {
   margin-top: 2px;
 }
@@ -619,8 +624,7 @@
 }
 
 .space-tile:hover,
-.space-tile:focus-visible,
-.space-tile.selected {
+.space-tile:focus-visible {
   z-index: 20;
   transform: translateY(-4px) scale(1.055);
   border-color: rgba(255, 246, 230, 0.46);
@@ -725,7 +729,8 @@
   width: calc(100% - 8px);
   height: calc(100% - 8px);
   max-height: none;
-  object-fit: cover;
+  object-fit: contain;
+  object-position: center;
   border: 1px solid rgba(255, 246, 230, 0.14);
   border-radius: 6px;
   background: rgba(8, 7, 6, 0.64);
@@ -742,11 +747,9 @@
 }
 
 .space-tile:hover .space-art,
-.space-tile:focus-visible .space-art,
-.space-tile.selected .space-art {
+.space-tile:focus-visible .space-art {
   filter: saturate(0.88) brightness(0.72);
   opacity: 0.58;
-  transform: scale(1.08);
 }
 
 .space-occupancy {
@@ -776,8 +779,7 @@
 }
 
 .space-tile:hover .space-occupancy,
-.space-tile:focus-visible .space-occupancy,
-.space-tile.selected .space-occupancy {
+.space-tile:focus-visible .space-occupancy {
   opacity: 0;
 }
 
@@ -806,15 +808,13 @@
 }
 
 .space-tile:hover .space-hover-details,
-.space-tile:focus-visible .space-hover-details,
-.space-tile.selected .space-hover-details {
+.space-tile:focus-visible .space-hover-details {
   opacity: 1;
   transform: translateY(0);
 }
 
 .space-tile:hover .space-detail,
-.space-tile:focus-visible .space-detail,
-.space-tile.selected .space-detail {
+.space-tile:focus-visible .space-detail {
   display: block;
   overflow: visible;
   -webkit-line-clamp: unset;
@@ -914,7 +914,7 @@
   }
 
   .board-top-band {
-    grid-template-columns: minmax(0, 1fr) minmax(170px, 0.45fr);
+    grid-template-columns: minmax(0, 1fr) minmax(132px, 0.38fr);
   }
 
   [data-region-id="landsraad"] .board-region-spaces,
@@ -982,6 +982,10 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .space-tile[data-space-id="high-council"] {
+    grid-column: span 2;
+  }
+
   .board-conflict-field {
     min-height: 140px;
   }
@@ -1030,5 +1034,9 @@
   .board-region--commander .board-region-spaces,
   .board-region--fallback .board-region-spaces {
     grid-template-columns: 1fr;
+  }
+
+  .space-tile[data-space-id="high-council"] {
+    grid-column: 1;
   }
 }

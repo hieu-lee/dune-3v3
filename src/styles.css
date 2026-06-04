@@ -29,7 +29,7 @@ button {
 .app-shell {
   display: flex;
   flex-direction: column;
-  width: min(1760px, 100%);
+  width: min(1840px, 100%);
   margin: 0 auto;
   padding: 24px;
 }
@@ -448,8 +448,8 @@ h2 {
 
 .table-grid {
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr) 310px;
-  gap: 16px;
+  grid-template-columns: 238px minmax(0, 1fr) 284px;
+  gap: 12px;
 }
 
 .team-column,

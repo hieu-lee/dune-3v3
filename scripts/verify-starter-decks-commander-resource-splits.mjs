@@ -250,6 +250,10 @@ export function verifyStarterDeckCommanderResourceSplits({ data, game, players, 
     criticalShipmentsPending,
     "Resolving the spice-space contract choice should expose Critical Shipments next",
   );
+  const queuedCriticalShipmentsCommanderSolari =
+    playerById(resolvedContractState, emperor.id).resources.solari;
+  const queuedCriticalShipmentsAllyWater =
+    playerById(resolvedContractState, shaddamAlly.id).resources.water;
   const queuedCriticalShipmentsSplit = state.resolveCommanderResourceSplitChoice(
     resolvedContractState,
     criticalShipmentsPending,
@@ -257,12 +261,12 @@ export function verifyStarterDeckCommanderResourceSplits({ data, game, players, 
   );
   assert.equal(
     playerById(queuedCriticalShipmentsSplit, emperor.id).resources.solari,
-    2,
+    queuedCriticalShipmentsCommanderSolari + 2,
     "Queued Critical Shipments gives Commander 2 Solari",
   );
   assert.equal(
     playerById(queuedCriticalShipmentsSplit, shaddamAlly.id).resources.water,
-    1,
+    queuedCriticalShipmentsAllyWater + 1,
     "Queued Critical Shipments gives Ally water",
   );
   assert.equal(

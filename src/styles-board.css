@@ -369,6 +369,7 @@
 
 .space-tile {
   --space-color: #c8a766;
+  position: relative;
   display: grid;
   grid-template-columns: 1fr;
   align-content: start;
@@ -389,6 +390,16 @@
     transform 160ms ease,
     background 160ms ease,
     box-shadow 160ms ease;
+}
+
+.space-placement-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .space-tile--emperor {
@@ -433,9 +444,35 @@
     rgba(20, 48, 45, 0.72);
 }
 
+.space-tile.unavailable:not(.selected) {
+  border-color: rgba(176, 102, 77, 0.42);
+  background:
+    linear-gradient(180deg, rgba(94, 53, 41, 0.36), rgba(18, 15, 13, 0.86)),
+    rgba(18, 15, 13, 0.78);
+  box-shadow:
+    inset 0 0 0 1px rgba(176, 102, 77, 0.12),
+    0 8px 18px rgba(0, 0, 0, 0.18);
+}
+
+.space-tile.unavailable:not(.selected):not(.occupied) {
+  opacity: 0.78;
+}
+
+.space-tile.unavailable:not(.selected) .space-footer {
+  color: #d8bfa2;
+}
+
 .space-tile.selected {
   outline: 2px solid #f2d69f;
   outline-offset: 1px;
+}
+
+.space-tile.unavailable.selected {
+  border-color: rgba(218, 127, 95, 0.76);
+  background:
+    linear-gradient(180deg, rgba(101, 55, 43, 0.62), rgba(26, 18, 15, 0.9)),
+    rgba(26, 18, 15, 0.82);
+  outline-color: #e8ad8c;
 }
 
 .space-tile.occupied {

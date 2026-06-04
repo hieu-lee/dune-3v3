@@ -17,6 +17,7 @@ import {
   printBrowserDebugUsage,
 } from "./browser-debug-cli-options.mjs";
 import { runCardChoicesSmoke } from "./browser-debug-card-choices.mjs";
+import { runBoardStatesSmoke } from "./browser-debug-board-states.mjs";
 import { runCombatIntriguesSmoke } from "./browser-debug-combat-intrigues.mjs";
 import { runCommanderRevealSmoke } from "./browser-debug-commander-reveal.mjs";
 import { runContractCompletionSmoke } from "./browser-debug-contract-completion.mjs";
@@ -616,6 +617,19 @@ try {
     if (scenario === "home" || scenario === "all") await interruptible(runHomeSmoke(page, url, server, captures));
     if (scenario === "agent-placement" || scenario === "all") {
       await interruptible(runAgentPlacementSmoke(page, url, server, captures));
+    }
+    if (scenario === "board-states" || scenario === "all") {
+      await interruptible(runBoardStatesSmoke({
+        captures,
+        initialPlayableGame,
+        openApp,
+        page,
+        screenshot,
+        server,
+        setDebugGameAndWait,
+        url,
+        writeJson,
+      }));
     }
     if (scenario === "card-choices" || scenario === "all") {
       await interruptible(runCardChoicesSmoke({

@@ -17,6 +17,7 @@ import {
 type BoardPanelProps = {
   game: GameState;
   legalSpaceIds: ReadonlySet<string>;
+  placementDecisionActive: boolean;
   playingPhase: boolean;
   selectedSpaceId: string | null;
   onSelectSpace: (spaceId: string) => void;
@@ -86,7 +87,14 @@ function scoreTrackSlot(score: number) {
   return Math.min(scoreTrackMaximum, Math.max(scoreTrackMinimum, score));
 }
 
-export function BoardPanel({ game, legalSpaceIds, playingPhase, selectedSpaceId, onSelectSpace }: BoardPanelProps) {
+export function BoardPanel({
+  game,
+  legalSpaceIds,
+  placementDecisionActive,
+  playingPhase,
+  selectedSpaceId,
+  onSelectSpace,
+}: BoardPanelProps) {
   const scoreMarkers = scoreTeams.map((team) => {
     const score = teamVictoryPoints(game.players, team);
     return {
@@ -107,12 +115,14 @@ export function BoardPanel({ game, legalSpaceIds, playingPhase, selectedSpaceId,
     const controlOwner = controlOwnerId ? game.players.find((player) => player.id === controlOwnerId) : undefined;
     const legal = legalSpaceIds.has(space.id);
     const selected = playingPhase && selectedSpaceId === space.id;
+    const unavailable = placementDecisionActive && !legal;
     const badges = rewardBadges(space);
     const spaceClass = [
       "space-tile",
       `space-tile--${space.icon}`,
       `space-tile--${classToken(space.zone)}`,
       legal ? "legal" : "",
+      unavailable ? "unavailable" : "",
       selected ? "selected" : "",
       occupant ? "occupied" : "",
       space.personal ? "personal" : "",
@@ -132,6 +142,11 @@ export function BoardPanel({ game, legalSpaceIds, playingPhase, selectedSpaceId,
         disabled={!playingPhase}
         title={space.detail}
       >
+        {(legal || unavailable) && (
+          <span className="space-placement-status">
+            {legal ? "Legal placement" : "Unavailable placement"}
+          </span>
+        )}
         <span className="space-zone">{space.zone}</span>
         {space.thumbnailPath && <img className="space-art" src={space.thumbnailPath} alt="" loading="lazy" />}
         <strong>{space.name}</strong>

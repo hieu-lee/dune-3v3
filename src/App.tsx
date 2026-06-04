@@ -372,6 +372,16 @@ export default function App() {
   const playingPhase = game.phase === "playing";
   const roomActionLocked = roomSession.inRoom && !canControlActivePlayer;
   const pendingLocked = Boolean(game.pendingAction) || game.pendingQueue.length > 0 || roomActionLocked;
+  const placementDecisionActive = Boolean(
+    selectedCard &&
+      canControlActivePlayer &&
+      playingPhase &&
+      !game.agentTurnComplete &&
+      activePlayer.agentsReady > 0 &&
+      !game.pendingAction &&
+      game.pendingQueue.length === 0 &&
+      !roomActionLocked,
+  );
   const plotIntrigueLocked = !playingPhase || pendingLocked;
   const debugCaptureAvailable = browserDebugEnabled && typeof window.__DUNE_DEBUG_CAPTURE__ === "function";
   const canResolveRoomPending = roomSession.inRoom && roomPendingActionCanResolve(game, roomSession.claimedPlayerId);
@@ -439,6 +449,7 @@ export default function App() {
         <BoardPanel
           game={game}
           legalSpaceIds={legalSpaces}
+          placementDecisionActive={placementDecisionActive}
           playingPhase={playingPhase && !roomActionLocked}
           selectedSpaceId={selectedSpaceId}
           onSelectSpace={setSelectedSpaceId}

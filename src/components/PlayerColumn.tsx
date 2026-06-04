@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { Trophy } from "lucide-react";
 import {
   factionShortLabels,
   memoryCountLabel,
@@ -62,6 +63,10 @@ export function PlayerColumn({
               </div>
             </div>
             <div className="resource-row">
+              <span className="vp-resource" title="Victory Points">
+                <Trophy size={14} />
+                {player.vp} VP
+              </span>
               {resources.map(({ id, label, Icon }) => (
                 <span key={id} title={label}>
                   <Icon size={14} />

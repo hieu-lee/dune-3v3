@@ -539,5 +539,5 @@
   display: grid;
   gap: 10px;
   margin: 0;
-  padding-left: 18px;
+  padding: 0 18px 0 32px;
 }

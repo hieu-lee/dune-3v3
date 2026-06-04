@@ -10,7 +10,6 @@ import {
   boardRegions,
   commanderRegions,
   factionRegions,
-  scoreTrackValues,
   type BoardRegionSpec,
 } from "./board-layout";
 
@@ -37,9 +36,6 @@ const personalLabels: Record<TeamId, string> = {
 const boardSpaceById = new Map(boardSpaces.map((space) => [space.id, space]));
 const layoutSpaceIds = new Set(boardLayoutSpaceIds);
 const unplacedSpaces = boardSpaces.filter((space) => !layoutSpaceIds.has(space.id));
-const scoreTrackMaximum = Math.max(...scoreTrackValues);
-const scoreTrackMinimum = Math.min(...scoreTrackValues);
-const scoreTeams = ["muaddib", "shaddam"] as const;
 const influenceTrackByRegionId: Partial<Record<string, FactionId>> = {
   "great-houses": "greatHouses",
   "spacing-guild": "spacing",
@@ -89,16 +85,6 @@ function shortLeaderName(leader: string) {
   return leader.split(" ")[0] || leader;
 }
 
-function teamVictoryPoints(players: readonly Player[], team: TeamId) {
-  return players
-    .filter((player) => player.team === team)
-    .reduce((sum, player) => sum + player.vp, 0);
-}
-
-function scoreTrackSlot(score: number) {
-  return Math.min(scoreTrackMaximum, Math.max(scoreTrackMinimum, score));
-}
-
 function conflictUnitCount(player: Player) {
   return player.deployedTroops + player.deployedSandworms;
 }
@@ -121,16 +107,6 @@ export function BoardPanel({
   selectedSpaceId,
   onSelectSpace,
 }: BoardPanelProps) {
-  const scoreMarkers = scoreTeams.map((team) => {
-    const score = teamVictoryPoints(game.players, team);
-    return {
-      team,
-      score,
-      slot: scoreTrackSlot(score),
-      label: teams[team].name,
-      accent: teams[team].accent,
-    };
-  });
   const conflictSlots = conflictDeploymentOrder(game.players);
   const conflictSummary = conflictSlots
     .map(({ player }) => (
@@ -182,44 +158,49 @@ export function BoardPanel({
             {legal ? "Legal placement" : "Unavailable placement"}
           </span>
         )}
-        {agentOwner && (
-          <span className="agent-marker">
-            <span className="agent-marker-piece" aria-hidden="true" />
-            {agentOwner.leader}
-          </span>
-        )}
-        <span className="space-zone">{space.zone}</span>
         {space.thumbnailPath && <img className="space-art" src={space.thumbnailPath} alt="" loading="lazy" />}
-        <strong>{space.name}</strong>
-        <small>{iconLabels[space.icon]}</small>
-        <span className="space-rewards" aria-hidden="true">
-          {badges.map((badge) => <span key={badge}>{badge}</span>)}
+        <span className="space-occupancy" aria-hidden="true">
+          {occupant ? "Occupied" : "Open"}
         </span>
-        <span className="space-detail">{space.detail}</span>
-        {spyOwners.length > 0 && (
-          <span className="spy-marker">
-            {spyOwners.map((owner) => owner.leader).join(" + ")} spy{spyOwners.length === 1 ? "" : "s"}
+        <span className="space-hover-details">
+          {agentOwner && (
+            <span className="agent-marker">
+              <span className="agent-marker-piece" aria-hidden="true" />
+              {agentOwner.leader}
+            </span>
+          )}
+          <span className="space-zone">{space.zone}</span>
+          <strong>{space.name}</strong>
+          <small>{iconLabels[space.icon]}</small>
+          <span className="space-rewards" aria-hidden="true">
+            {badges.map((badge) => <span key={badge}>{badge}</span>)}
           </span>
-        )}
-        {controlOwner && (
-          <span className="control-marker">
-            <Crown size={12} />
-            {controlOwner.leader}
+          <span className="space-detail">{space.detail}</span>
+          {spyOwners.length > 0 && (
+            <span className="spy-marker">
+              {spyOwners.map((owner) => owner.leader).join(" + ")} spy{spyOwners.length === 1 ? "" : "s"}
+            </span>
+          )}
+          {controlOwner && (
+            <span className="control-marker">
+              <Crown size={12} />
+              {controlOwner.leader}
+            </span>
+          )}
+          {space.maker && (
+            <span className="maker-marker">
+              <Sparkles size={12} />
+              {game.makerSpice[space.id] ?? 0} bonus
+            </span>
+          )}
+          <span className="space-footer">
+            <span>
+              {space.combat && <Swords size={14} />}
+              {space.team && <Users size={14} />}
+              {space.contract && <FileText size={14} />}
+            </span>
+            <span>{occupant ? "Occupied" : costLabel(effectiveCost(space, game.players))}</span>
           </span>
-        )}
-        {space.maker && (
-          <span className="maker-marker">
-            <Sparkles size={12} />
-            {game.makerSpice[space.id] ?? 0} bonus
-          </span>
-        )}
-        <span className="space-footer">
-          <span>
-            {space.combat && <Swords size={14} />}
-            {space.team && <Users size={14} />}
-            {space.contract && <FileText size={14} />}
-          </span>
-          <span>{occupant ? "Occupied" : costLabel(effectiveCost(space, game.players))}</span>
         </span>
       </button>
     );
@@ -374,9 +355,6 @@ export function BoardPanel({
                   );
                 })}
               </div>
-              <div className="conflict-strength-track" aria-hidden="true">
-                {Array.from({ length: 10 }, (_, index) => <span key={index}>{index + 1}</span>)}
-              </div>
             </div>
             {renderRegion(boardRegions[3])}
           </div>
@@ -398,35 +376,6 @@ export function BoardPanel({
           )}
         </div>
 
-        <aside className="board-score-rail" aria-label="Score track">
-          <strong>VP</strong>
-          <span className="board-score-summary">
-            {scoreMarkers.map((marker) => `${marker.label}: ${marker.score} VP`).join("; ")}
-          </span>
-          {scoreTrackValues.map((score) => {
-            const slotMarkers = scoreMarkers.filter((marker) => marker.slot === score);
-            return (
-              <div className={`board-score-row ${slotMarkers.length > 0 ? "board-score-row--marked" : ""}`} key={score}>
-                <span className="board-score-value">{score}</span>
-                {slotMarkers.length > 0 && (
-                  <span className="board-score-markers" aria-hidden="true">
-                    {slotMarkers.map((marker) => (
-                      <span
-                        className="board-score-marker"
-                        key={marker.team}
-                        style={{ "--score-marker": marker.accent } as CSSProperties}
-                        title={`${marker.label}: ${marker.score} VP`}
-                        aria-label={`${marker.label}: ${marker.score} VP`}
-                      >
-                        {marker.score}
-                      </span>
-                    ))}
-                  </span>
-                )}
-              </div>
-            );
-          })}
-        </aside>
       </div>
     </section>
   );

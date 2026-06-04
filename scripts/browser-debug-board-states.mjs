@@ -132,9 +132,18 @@ export async function runBoardStatesSmoke({
   );
 
   const denseStats = await boardMarkerStats(page);
+  const compactStats = await compactBoardStats(page);
   const landsraadText = await page.locator('[data-region-id="landsraad"]').innerText();
   const imperialPrivilegeText = await page.getByTestId("space-imperial-privilege").innerText();
   assert.equal(denseStats.occupied, Object.keys(occupiedSpaces).length, "Dense board state should render all occupied spaces");
+  assert.equal(compactStats.scoreRails, 0, "Board should not render the old vertical VP rail");
+  assert.equal(compactStats.conflictStrengthTracks, 0, "Board should not render the unused conflict strength number rail");
+  assert.equal(compactStats.logOpen, false, "Table log should start collapsed by default");
+  assert.equal(compactStats.vpChips, 6, "Each player seat should render a VP chip");
+  assert.ok(compactStats.vpChipLabels.some((label) => label.includes("4 VP")), "Seat VP chips should expose player VP values");
+  assert.equal(compactStats.imperialPrivilegeDetailVisible, false, "Board location text details should be hidden before hover");
+  assert.match(compactStats.imperialPrivilegeOccupancy, /Open|Occupied/, "Board locations should keep only occupancy text visible by default");
+  assert.ok(compactStats.imperialPrivilegeArtRatio > 0.72, "Board location art should occupy most of the tile");
   assert.match(landsraadText, /Imperial Privilege/, "Landsraad browser board should render Imperial Privilege");
   assert.doesNotMatch(landsraadText, /Dutiful\s+Service/, "Landsraad browser board should not render the old board-space name");
   assert.match(imperialPrivilegeText, /2\+ EMP\/GH/, "Imperial Privilege should show its mapped Emperor/Great Houses requirement badge");
@@ -172,6 +181,20 @@ export async function runBoardStatesSmoke({
   );
   assert.ok(denseStats.makerMarkers >= 4, "Dense board state should include all Maker space markers");
   await screenshot(page, captures, "board-states-dense-ready.png");
+
+  await page.getByTestId("space-imperial-privilege").hover();
+  await page.waitForFunction(() => {
+    const details = document.querySelector('[data-testid="space-imperial-privilege"] .space-hover-details');
+    return details && Number.parseFloat(getComputedStyle(details).opacity) > 0.9;
+  });
+  const hoverStats = await compactBoardStats(page);
+  assert.equal(hoverStats.imperialPrivilegeDetailVisible, true, "Board location hover should reveal the full detail text overlay");
+  assert.match(
+    hoverStats.imperialPrivilegeVisibleDetail,
+    /optionally discard an Intrigue for a new one, recall another Agent, and draw a card/,
+    "Board location hover should reveal the full Imperial Privilege detail text",
+  );
+  await screenshot(page, captures, "board-states-hover-location.png");
 
   const cardButton = page.getByTestId(`hand-card-${fixture.cardId}`);
   assert.equal(await cardButton.count(), 1, `Expected one hand card button for ${fixture.cardName}`);
@@ -241,6 +264,18 @@ export async function runBoardStatesSmoke({
   const mobilePlacementStats = await boardPlacementStats(page);
   assert.ok(mobilePlacementStats.legal >= 3, "Mobile board should preserve legal placement markers");
   assert.ok(mobilePlacementStats.unavailable >= 10, "Mobile board should preserve unavailable placement markers");
+  await page.waitForFunction(
+    ({ spaceId }) => {
+      const details = document.querySelector(`[data-testid="space-${spaceId}"] .space-hover-details`);
+      return details && Number.parseFloat(getComputedStyle(details).opacity) > 0.9;
+    },
+    { spaceId: selectedUnavailableSpaceId },
+  );
+  const mobileSelectedStats = await selectedBoardSpaceStats(page, selectedUnavailableSpaceId);
+  assert.equal(mobileSelectedStats.detailVisible, true, "Mobile selected board space should reveal its detail overlay");
+  assert.equal(mobileSelectedStats.detailClamped, false, "Mobile selected board space detail should not be line-clamped");
+  assert.ok(mobileSelectedStats.detailLength > 20, "Mobile selected board space should expose readable detail text");
+  await screenshot(page, captures, "board-states-selected-mobile-390.png");
   await screenshot(page, captures, "board-states-legal-unavailable-mobile-390.png");
 
   await page.setViewportSize({ width: 1440, height: 1100 });
@@ -420,6 +455,46 @@ async function boardPlacementStats(page) {
     unavailableStatuses: Array.from(document.querySelectorAll(".space-tile.unavailable .space-placement-status"))
       .map((status) => status.textContent ?? ""),
   }));
+}
+
+async function compactBoardStats(page) {
+  return page.evaluate(() => {
+    const tile = document.querySelector('[data-testid="space-imperial-privilege"]');
+    const details = tile?.querySelector(".space-hover-details");
+    const art = tile?.querySelector(".space-art");
+    const tileRect = tile?.getBoundingClientRect();
+    const artRect = art?.getBoundingClientRect();
+    const artRatio = tileRect && artRect
+      ? (artRect.width * artRect.height) / Math.max(1, tileRect.width * tileRect.height)
+      : 0;
+    return {
+      conflictStrengthTracks: document.querySelectorAll(".conflict-strength-track").length,
+      imperialPrivilegeArtRatio: artRatio,
+      imperialPrivilegeDetailVisible: details
+        ? Number.parseFloat(getComputedStyle(details).opacity) > 0.9
+        : false,
+      imperialPrivilegeOccupancy: tile?.querySelector(".space-occupancy")?.textContent?.trim() ?? "",
+      imperialPrivilegeVisibleDetail: tile?.querySelector(".space-detail")?.textContent?.trim() ?? "",
+      logOpen: document.querySelector(".log-panel")?.hasAttribute("open") ?? false,
+      scoreRails: document.querySelectorAll(".board-score-rail").length,
+      vpChipLabels: Array.from(document.querySelectorAll(".player-card .vp-resource")).map((chip) => chip.textContent?.trim() ?? ""),
+      vpChips: document.querySelectorAll(".player-card .vp-resource").length,
+    };
+  });
+}
+
+async function selectedBoardSpaceStats(page, spaceId) {
+  return page.evaluate(({ targetSpaceId }) => {
+    const tile = document.querySelector(`[data-testid="space-${targetSpaceId}"]`);
+    const details = tile?.querySelector(".space-hover-details");
+    const detail = tile?.querySelector(".space-detail");
+    const detailStyle = detail ? getComputedStyle(detail) : undefined;
+    return {
+      detailClamped: detailStyle ? detailStyle.webkitLineClamp !== "none" : true,
+      detailLength: detail?.textContent?.trim().length ?? 0,
+      detailVisible: details ? Number.parseFloat(getComputedStyle(details).opacity) > 0.9 : false,
+    };
+  }, { targetSpaceId: spaceId });
 }
 
 async function boardCombatStats(page) {

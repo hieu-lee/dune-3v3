@@ -417,7 +417,7 @@ try {
   const feydDeviousStrengthBase = {
     ...game,
     activeSeat: game.players.findIndex((player) => player.id === feyd.id),
-    spyPosts: { secrets: feyd.id },
+    spyPosts: { [state.spyObservationPostIdForSpace("secrets")]: feyd.id },
     sharedSpyPosts: {},
     players: game.players.map((player) =>
       player.id === feyd.id
@@ -447,7 +447,7 @@ try {
   const feydDeviousStrengthResolved = state.recallSpyForPending(
     { ...feydDeviousStrengthBase, pendingAction: feydDeviousStrengthPending[0], pendingQueue: [] },
     feydDeviousStrengthPending[0],
-    "secrets",
+    "espionage",
   );
   assert.equal(
     playerById(feydDeviousStrengthResolved, feyd.id).conflict,
@@ -459,7 +459,11 @@ try {
     3,
     "Devious Strength should return the recalled spy to Feyd's supply",
   );
-  assert.equal(feydDeviousStrengthResolved.spyPosts.secrets, undefined, "Devious Strength should remove the recalled spy post");
+  assert.equal(
+    feydDeviousStrengthResolved.spyPosts[state.spyObservationPostIdForSpace("secrets")],
+    undefined,
+    "Devious Strength should remove the recalled spy post",
+  );
   assert.equal(
     state.pendingActionsForReveal(
       playerById({ ...feydDeviousStrengthBase, spyPosts: {} }, feyd.id),

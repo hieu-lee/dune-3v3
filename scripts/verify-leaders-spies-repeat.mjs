@@ -23,13 +23,16 @@ export function verifyLeaderSpiesAndReverendRepeat({ cards, data, game, players,
   const controversialTech = data.boardSpaces.find((space) => space.id === "controversial-tech");
   const deliverSupplies = data.boardSpaces.find((space) => space.id === "deliver-supplies");
   const hardyWarriors = data.boardSpaces.find((space) => space.id === "hardy-warriors");
+  const highCouncil = data.boardSpaces.find((space) => space.id === "high-council");
   const swordmaster = data.boardSpaces.find((space) => space.id === "swordmaster");
   assert.ok(espionage, "Espionage should exist for Reverend Mother repeat tests");
   assert.ok(expedition, "Expedition should exist for Reverend Mother repeat tests");
   assert.ok(controversialTech, "Controversial Technology should exist for Reverend Mother repeat tests");
   assert.ok(deliverSupplies, "Deliver Supplies should exist for Reverend Mother repeat negative tests");
   assert.ok(hardyWarriors, "Hardy Warriors should exist for Reverend Mother personal-space negative tests");
+  assert.ok(highCouncil, "High Council should exist for Staban Unseen Network tests");
   assert.ok(swordmaster, "Swordmaster should exist for Staban Unseen Network tests");
+  const benePostId = state.spyObservationPostIdForSpace(secrets.id);
   const stabanStarterDeck = state.leaderStarterDeckCards("Staban Tuek", "muaddib", "Ally");
   assert.equal(stabanStarterDeck.length, 9, "Staban's Limited Allies should start with a nine-card Ally deck");
   assert.equal(
@@ -72,8 +75,8 @@ export function verifyLeaderSpiesAndReverendRepeat({ cards, data, game, players,
     postPlacementAction: "staban-unseen-network",
   });
   const stabanSignetSpaces = state.placeableSpySpaces(stabanSignetState, stabanSignetPending).map((space) => space.id);
-  assert.ok(stabanSignetSpaces.includes(swordmaster.id), "Unseen Network should place on Landsraad observation posts");
-  assert.ok(stabanSignetSpaces.includes(secrets.id), "Unseen Network should place on Faction observation posts");
+  assert.ok(stabanSignetSpaces.includes(highCouncil.id), "Unseen Network should place on Landsraad observation posts");
+  assert.ok(stabanSignetSpaces.includes(espionage.id), "Unseen Network should place on Faction observation posts");
   assert.ok(stabanSignetSpaces.includes(imperialBasin.id), "Unseen Network should place on Maker observation posts");
   assert.equal(stabanSignetSpaces.includes(hardyWarriors.id), false, "Unseen Network should not place on another team's personal board");
   const stabanLandsraadPlacement = state.placeSpyForPending(
@@ -86,14 +89,14 @@ export function verifyLeaderSpiesAndReverendRepeat({ cards, data, game, players,
       ),
     },
     stabanSignetPending,
-    swordmaster.id,
+    highCouncil.id,
   );
   assert.deepEqual(
     stabanLandsraadPlacement.pendingAction,
     {
       kind: "staban-unseen-network",
       ownerId: staban.id,
-      spaceId: swordmaster.id,
+      spaceId: highCouncil.id,
       reward: "landsraad",
       source: "Unseen Network",
     },
@@ -114,7 +117,7 @@ export function verifyLeaderSpiesAndReverendRepeat({ cards, data, game, players,
       pendingQueue: [],
     },
     stabanSignetPending,
-    secrets.id,
+    espionage.id,
   );
   assert.equal(stabanFactionPlacement.pendingAction?.kind, "staban-unseen-network", "Unseen Network should queue a Faction spend after placing on a Faction post");
   const stabanFactionReward = state.resolveStabanUnseenNetworkChoice(
@@ -145,7 +148,7 @@ export function verifyLeaderSpiesAndReverendRepeat({ cards, data, game, players,
       ),
     },
     stabanSignetPending,
-    swordmaster.id,
+    highCouncil.id,
   );
   assert.equal(stabanNoPaymentPlacement.pendingAction, undefined, "Unseen Network should not queue an unaffordable paid reward");
   const stabanSmuggleBase = {
@@ -205,7 +208,7 @@ export function verifyLeaderSpiesAndReverendRepeat({ cards, data, game, players,
   });
   assert.deepEqual(
     state.placeableSpySpaces(margotSignetState, margotSignetPending).map((space) => space.id).sort(),
-    ["espionage", "secrets"],
+    ["espionage"],
     "Arrakis Informant should place spies only on Bene Gesserit observation posts",
   );
   assert.equal(
@@ -216,10 +219,10 @@ export function verifyLeaderSpiesAndReverendRepeat({ cards, data, game, players,
   const margotPlacedSpy = state.placeSpyForPending(
     { ...margotSignetState, pendingAction: margotSignetPending, pendingQueue: [] },
     margotSignetPending,
-    secrets.id,
+    espionage.id,
   );
   assert.equal(playerById(margotPlacedSpy, ladyMargot.id).spies, ladyMargot.spies - 1, "Arrakis Informant should spend one Margot spy");
-  assert.equal(margotPlacedSpy.spyPosts.secrets, ladyMargot.id, "Arrakis Informant should place Margot's spy on the chosen Bene post");
+  assert.equal(margotPlacedSpy.spyPosts[benePostId], ladyMargot.id, "Arrakis Informant should place Margot's spy on the chosen Bene post");
   const margotNoSupplyState = {
     ...margotSignetState,
     spyPosts: { [deliverSupplies.id]: ladyMargot.id },
@@ -249,7 +252,7 @@ export function verifyLeaderSpiesAndReverendRepeat({ cards, data, game, players,
     playerById(margotNoSupplyState, ladyMargot.id),
     {
       ...margotNoSupplyState,
-      spyPosts: { [secrets.id]: irulan.id, [espionage.id]: ladyJessica.id },
+      spyPosts: { [benePostId]: irulan.id },
     },
     playerById(margotNoSupplyState, ladyMargot.id),
     arrakeen,

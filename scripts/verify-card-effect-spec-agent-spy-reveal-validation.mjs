@@ -13,6 +13,10 @@ export function verifyCardEffectSpecAgentSpyRevealValidation({
   const { highCouncil, secrets } = boardSpaces;
   const { convincingArgument, dagger, devastatingAssault, doubleAgent, hiddenMissive, wheelsWithinWheels } = cards;
   const { p2, p3, p4 } = players;
+  const beneSpySpace = state.spyObservationPostChoiceSpaces().find((space) => space.id === "espionage");
+  assert.ok(beneSpySpace, "Espionage should be the Bene spy-post representative");
+  const highCouncilPostId = state.spyObservationPostIdForSpace(highCouncil.id);
+  const benePostId = state.spyObservationPostIdForSpace(secrets.id);
 
   const doubleAgentFixture = withActivePlayer(game, p2.id, () => ({
     agentsReady: 1,
@@ -23,7 +27,7 @@ export function verifyCardEffectSpecAgentSpyRevealValidation({
   const doubleAgentSpiedSpace = turnActions.placeAgentAction(
     {
       ...doubleAgentFixture,
-      spyPosts: { [highCouncil.id]: p2.id, [secrets.id]: p3.id },
+      spyPosts: { [highCouncilPostId]: p2.id, [benePostId]: p3.id },
       sharedSpyPosts: {},
       spaces: {},
     },
@@ -36,22 +40,22 @@ export function verifyCardEffectSpecAgentSpyRevealValidation({
   assert.equal(doubleAgentSpiedSpace.pendingAction?.source, "Double Agent");
   assert.deepEqual(
     state.placeableSpySpaces(doubleAgentSpiedSpace, doubleAgentSpiedSpace.pendingAction).map((space) => space.id),
-    [secrets.id],
+    [beneSpySpace.id],
     "Double Agent should only allow sharing another player's observation post",
   );
   const doubleAgentSkipped = state.finishPendingAction(doubleAgentSpiedSpace);
   assert.equal(doubleAgentSkipped.pendingAction, undefined, "Double Agent optional spy placement should be skippable");
   assert.equal(playerById(doubleAgentSkipped, p2.id).spies, playerById(doubleAgentSpiedSpace, p2.id).spies);
-  const doubleAgentPlacedSpy = state.placeSpyForPending(doubleAgentSpiedSpace, doubleAgentSpiedSpace.pendingAction, secrets.id);
+  const doubleAgentPlacedSpy = state.placeSpyForPending(doubleAgentSpiedSpace, doubleAgentSpiedSpace.pendingAction, beneSpySpace.id);
   assert.equal(doubleAgentPlacedSpy.pendingAction, undefined, "Placing Double Agent's spy should clear the pending action");
-  assert.equal(doubleAgentPlacedSpy.spyPosts[secrets.id], p3.id, "Double Agent should leave the original spy owner in place");
-  assert.deepEqual(doubleAgentPlacedSpy.sharedSpyPosts[secrets.id], [p2.id], "Double Agent should share the chosen spy post");
+  assert.equal(doubleAgentPlacedSpy.spyPosts[benePostId], p3.id, "Double Agent should leave the original spy owner in place");
+  assert.deepEqual(doubleAgentPlacedSpy.sharedSpyPosts[benePostId], [p2.id], "Double Agent should share the chosen spy post");
   assert.equal(playerById(doubleAgentPlacedSpy, p2.id).spies, playerById(doubleAgentSpiedSpace, p2.id).spies - 1);
-  assert.match(doubleAgentPlacedSpy.log[0], /places a spy near Secrets from Double Agent/);
+  assert.match(doubleAgentPlacedSpy.log[0], /places a spy near Espionage \/ Secrets from Double Agent/);
   const doubleAgentUnspiedSpace = turnActions.placeAgentAction(
     {
       ...doubleAgentFixture,
-      spyPosts: { [secrets.id]: p3.id },
+      spyPosts: { [benePostId]: p3.id },
       sharedSpyPosts: {},
       spaces: {},
     },
@@ -65,7 +69,7 @@ export function verifyCardEffectSpecAgentSpyRevealValidation({
   const doubleAgentNoSharedTarget = turnActions.placeAgentAction(
     {
       ...doubleAgentFixture,
-      spyPosts: { [highCouncil.id]: p2.id },
+      spyPosts: { [highCouncilPostId]: p2.id },
       sharedSpyPosts: {},
       spaces: {},
     },
@@ -298,7 +302,11 @@ export function verifyCardEffectSpecAgentSpyRevealValidation({
   assert.ok(wheelsRevealSpySpace, "Wheels Within Wheels Reveal should have a legal spy placement space");
   const wheelsPlacedSpy = state.placeSpyForPending(wheelsRevealed, wheelsRevealed.pendingAction, wheelsRevealSpySpace.id);
   assert.equal(wheelsPlacedSpy.pendingAction, undefined, "Placing the Wheels Within Wheels reveal spy should clear pending");
-  assert.equal(wheelsPlacedSpy.spyPosts[wheelsRevealSpySpace.id], p2.id, "Wheels Within Wheels should place the chosen spy");
+  assert.equal(
+    wheelsPlacedSpy.spyPosts[state.spyObservationPostIdForSpace(wheelsRevealSpySpace.id)],
+    p2.id,
+    "Wheels Within Wheels should place the chosen spy",
+  );
   assert.equal(playerById(wheelsPlacedSpy, p2.id).spies, 0, "Wheels Within Wheels should spend the reveal spy");
   assert.match(wheelsPlacedSpy.log[0], /places a spy near .* from Wheels Within Wheels/);
   const wheelsRevealNoSpyFixture = {

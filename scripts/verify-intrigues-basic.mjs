@@ -534,7 +534,10 @@ export function verifyBasicCardEffectIntrigues({ cards, data, game, state }) {
     "Inspire Awe should only resolve during normal play",
   );
 
-  const [firstSpySpace, secondSpySpace, opposingSpySpace] = data.boardSpaces.map((space) => space.id);
+  const [firstSpySpace, secondSpySpace, opposingSpySpace] = state
+    .spyObservationPostChoiceSpaces()
+    .filter((space) => !space.personal)
+    .map((space) => state.spyObservationPostIdForSpace(space.id));
   assert.ok(firstSpySpace && secondSpySpace && opposingSpySpace, "Expected at least three board spaces for spy fixtures");
   const intelligenceFixture = {
     ...game,

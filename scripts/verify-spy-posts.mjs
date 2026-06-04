@@ -44,16 +44,45 @@ try {
     spies.spyPostRecallCountForOwner,
     "state.ts should preserve the public spyPostRecallCountForOwner export",
   );
+  assert.equal(
+    state.spyObservationPostChoiceSpaces,
+    spies.spyObservationPostChoiceSpaces,
+    "state.ts should preserve the public spyObservationPostChoiceSpaces export",
+  );
+  assert.equal(
+    state.spyObservationPostOwnerIds,
+    spies.spyObservationPostOwnerIds,
+    "state.ts should preserve the public spyObservationPostOwnerIds export",
+  );
 
   const game = state.initialGame();
   const feyd = playerById(game, "p2");
   const shaddam = playerById(game, "p4");
   const muaddib = playerById(game, "p1");
+  const highCouncil = spaceById(data, "high-council");
+  const imperialPrivilege = spaceById(data, "imperial-privilege");
+  const assemblyHall = spaceById(data, "assembly-hall");
+  const gatherSupport = spaceById(data, "gather-support");
+  const shipping = spaceById(data, "shipping");
+  const acceptContract = spaceById(data, "accept-contract");
+  const militarySupport = spaceById(data, "military-support");
+  const economicSupport = spaceById(data, "economic-support");
+  const espionage = spaceById(data, "espionage");
+  const secrets = spaceById(data, "secrets");
+  const controversialTech = spaceById(data, "controversial-tech");
+  const expedition = spaceById(data, "expedition");
+  const sietchTabr = spaceById(data, "sietch-tabr");
   const arrakeen = spaceById(data, "arrakeen");
+  const carthag = spaceById(data, "carthag");
+  const researchStation = spaceById(data, "research-station");
   const spiceRefinery = spaceById(data, "spice-refinery");
   const deliverSupplies = spaceById(data, "deliver-supplies");
   const heighliner = spaceById(data, "heighliner");
   const swordmaster = spaceById(data, "swordmaster");
+  const imperialBasin = spaceById(data, "imperial-basin");
+  const habbanyaErg = spaceById(data, "habbanya-erg");
+  const haggaBasin = spaceById(data, "hagga-basin");
+  const deepDesert = spaceById(data, "deep-desert");
   const vastWealth = spaceById(data, "vast-wealth");
 
   const sharedState = {
@@ -80,6 +109,96 @@ try {
     spies.spyObservationPostIdForSpace(arrakeen.id),
     "arrakeen-spice-refinery",
     "Arrakeen should use the shared Arrakeen / Spice Refinery observation post",
+  );
+  const observationPostExpectations = [
+    {
+      space: highCouncil,
+      postId: "high-council-imperial-privilege-swordmaster",
+      spaceIds: [highCouncil.id, imperialPrivilege.id, swordmaster.id],
+      label: "High Council / Imperial Privilege / Swordmaster",
+    },
+    {
+      space: assemblyHall,
+      postId: "assembly-hall-gather-support",
+      spaceIds: [assemblyHall.id, gatherSupport.id],
+      label: "Assembly Hall / Gather Support",
+    },
+    {
+      space: shipping,
+      postId: "shipping-accept-contract",
+      spaceIds: [shipping.id, acceptContract.id],
+      label: "Shipping / Accept Contract",
+    },
+    {
+      space: militarySupport,
+      postId: "military-support-economic-support",
+      spaceIds: [militarySupport.id, economicSupport.id],
+      label: "Military Support / Economic Support",
+    },
+    {
+      space: espionage,
+      postId: "espionage-secrets",
+      spaceIds: [espionage.id, secrets.id],
+      label: "Espionage / Secrets",
+    },
+    {
+      space: controversialTech,
+      postId: "controversial-tech-expedition",
+      spaceIds: [controversialTech.id, expedition.id],
+      label: "Controversial Technology / Expedition",
+    },
+    {
+      space: sietchTabr,
+      postId: "sietch-tabr-research-station",
+      spaceIds: [sietchTabr.id, researchStation.id],
+      label: "Sietch Tabr / Research Station",
+    },
+    {
+      space: researchStation,
+      postId: "research-station-spice-refinery",
+      spaceIds: [researchStation.id, spiceRefinery.id],
+      label: "Research Station / Spice Refinery",
+    },
+    { space: carthag, postId: "carthag", spaceIds: [carthag.id], label: "Carthag" },
+    { space: deepDesert, postId: "deep-desert", spaceIds: [deepDesert.id], label: "Deep Desert" },
+    { space: habbanyaErg, postId: "habbanya-erg", spaceIds: [habbanyaErg.id], label: "Habbanya Erg" },
+    { space: haggaBasin, postId: "hagga-basin", spaceIds: [haggaBasin.id], label: "Hagga Basin" },
+    { space: imperialBasin, postId: "imperial-basin", spaceIds: [imperialBasin.id], label: "Imperial Basin" },
+  ];
+  for (const expected of observationPostExpectations) {
+    assert.equal(
+      spies.spyObservationPostIdForSpace(expected.space.id),
+      expected.postId,
+      `${expected.space.name} should use the expected physical observation post`,
+    );
+    assert.deepEqual(
+      spies.spyObservationPostSpaceIdsForSpace(expected.space.id),
+      expected.spaceIds,
+      `${expected.space.name} should observe the expected board spaces`,
+    );
+    assert.equal(
+      spies.spyObservationPostLabelForSpace(expected.space.id),
+      expected.label,
+      `${expected.space.name} should render the expected spy-post label`,
+    );
+  }
+  const observationChoiceSpaceIds = state.spyObservationPostChoiceSpaces().map((space) => space.id);
+  assert.deepEqual(
+    observationPostExpectations
+      .map((expected) => expected.space.id)
+      .filter((spaceId) => !observationChoiceSpaceIds.includes(spaceId)),
+    [],
+    "Every physical observation post should expose its representative board space as a choice",
+  );
+  assert.equal(
+    observationChoiceSpaceIds.includes(spiceRefinery.id),
+    false,
+    "Spice Refinery should stay folded under Arrakeen for default physical-post choices",
+  );
+  assert.equal(
+    observationChoiceSpaceIds.includes(imperialPrivilege.id),
+    false,
+    "Non-representative observed board spaces should not appear as separate spy-post choices",
   );
   assert.deepEqual(
     spies.spyObservationPostSpaceIdsForSpace(spiceRefinery.id),
@@ -569,6 +688,28 @@ try {
     [arrakeen.id],
     "Shared observation posts should appear once in recall choices",
   );
+  const hiddenRecallPending = {
+    kind: "recall-spy",
+    ownerId: feyd.id,
+    combatRecipientId: feyd.id,
+    remaining: 1,
+    strength: 0,
+    source: "test",
+    optional: false,
+  };
+  assert.equal(
+    state.recallSpyForPending(
+      {
+        ...sharedArrakeenPostState,
+        pendingAction: hiddenRecallPending,
+        pendingQueue: [],
+      },
+      hiddenRecallPending,
+      spiceRefinery.id,
+    ).spyPosts[spies.spyObservationPostIdForSpace(arrakeen.id)],
+    feyd.id,
+    "Pending spy recall should reject folded non-choice board-space ids",
+  );
   assert.equal(
     state.iconCanReach({ icons: ["spy"] }, spiceRefinery, feyd, false, sharedArrakeenPostState.spyPosts, game.players, {}),
     true,
@@ -598,6 +739,109 @@ try {
     spies.playerHasSpyPost(sharedSpacingPostState, heighliner.id, feyd.id),
     true,
     "A spy on the shared Deliver Supplies / Heighliner post should observe Heighliner",
+  );
+
+  const sietchPostId = spies.spyObservationPostIdForSpace(sietchTabr.id);
+  const researchPostId = spies.spyObservationPostIdForSpace(researchStation.id);
+  const arrakeenPostId = spies.spyObservationPostIdForSpace(arrakeen.id);
+  const overlappingResearchState = {
+    ...game,
+    spyPosts: {
+      [sietchPostId]: feyd.id,
+      [researchPostId]: shaddam.id,
+      [arrakeenPostId]: "p3",
+    },
+    sharedSpyPosts: {},
+  };
+  assert.equal(
+    spies.playerHasSpyPost(overlappingResearchState, researchStation.id, feyd.id),
+    true,
+    "A spy near Sietch Tabr should observe Research Station",
+  );
+  assert.equal(
+    spies.playerHasSpyPost(overlappingResearchState, researchStation.id, shaddam.id),
+    true,
+    "A spy near Research Station should observe Research Station",
+  );
+  assert.deepEqual(
+    spies.spyPostOwnerIds(overlappingResearchState, researchStation.id),
+    [feyd.id, shaddam.id],
+    "Research Station should collect owners from both physical posts that observe it",
+  );
+  assert.deepEqual(
+    spies.spyPostOwnerIds(overlappingResearchState, spiceRefinery.id),
+    ["p3", shaddam.id],
+    "Spice Refinery should collect owners from Arrakeen / Spice Refinery and Research Station / Spice Refinery",
+  );
+  assert.deepEqual(
+    spies.spyObservationPostOwnerIds(overlappingResearchState, sietchTabr.id),
+    [feyd.id],
+    "Sietch Tabr should report only the chosen Sietch Tabr / Research Station physical post owners",
+  );
+  assert.deepEqual(
+    spies.spyObservationPostOwnerIds(overlappingResearchState, researchStation.id),
+    [shaddam.id],
+    "Research Station should report only the chosen Research Station / Spice Refinery physical post owners",
+  );
+  assert.deepEqual(
+    spies.spyObservationPostOwnerIds(overlappingResearchState, spiceRefinery.id),
+    ["p3"],
+    "Spice Refinery should default to the chosen Arrakeen / Spice Refinery physical post owners",
+  );
+
+  const occupiedSietchOnly = {
+    ...game,
+    spyPosts: { [sietchPostId]: feyd.id },
+    sharedSpyPosts: {},
+  };
+  assert.equal(
+    spies.canPlaceSpyPost(occupiedSietchOnly, researchStation, shaddam),
+    true,
+    "An occupied Sietch Tabr / Research Station post should not block the separate Research Station / Spice Refinery post",
+  );
+  assert.equal(
+    spies.canPlaceSpyPost(occupiedSietchOnly, sietchTabr, shaddam),
+    false,
+    "The occupied Sietch Tabr / Research Station physical post should block normal placement through Sietch Tabr",
+  );
+  assert.equal(
+    spies.canPlaceSharedSpyPost(occupiedSietchOnly, researchStation, shaddam),
+    false,
+    "Shared placement should not treat a different physical post observing Research Station as shareable",
+  );
+  assert.equal(
+    spies.canPlaceSharedSpyPost(occupiedSietchOnly, sietchTabr, shaddam),
+    true,
+    "Shared placement should allow joining the occupied selected physical post",
+  );
+  assert.deepEqual(
+    state.recallableSpySpaces(occupiedSietchOnly, {
+      kind: "recall-spy",
+      ownerId: feyd.id,
+      combatRecipientId: feyd.id,
+      remaining: 1,
+      strength: 0,
+      source: "test",
+      optional: false,
+    }).map((space) => space.id),
+    [sietchTabr.id],
+    "Recall choices should expose the representative of the owned physical post",
+  );
+
+  const occupiedArrakeenOnly = {
+    ...game,
+    spyPosts: { [arrakeenPostId]: feyd.id },
+    sharedSpyPosts: {},
+  };
+  assert.equal(
+    spies.canPlaceSpyPost(occupiedArrakeenOnly, spiceRefinery, shaddam),
+    false,
+    "Occupying Arrakeen / Spice Refinery should block placement through Spice Refinery's default physical post",
+  );
+  assert.equal(
+    spies.canPlaceSpyPost(occupiedArrakeenOnly, researchStation, shaddam),
+    true,
+    "Occupying Arrakeen / Spice Refinery should not block the separate Research Station / Spice Refinery post",
   );
 
   assert.equal(spies.canPlaceSpyPost(game, arrakeen, feyd), true);
@@ -641,40 +885,57 @@ try {
     placementIcon: "city",
   };
   const citySpyChoices = state.placeableSpySpaces(game, citySpyPending).map((space) => space.id);
+  assert.deepEqual(
+    citySpyChoices.filter((spaceId) =>
+      [arrakeen.id, sietchTabr.id, carthag.id, researchStation.id, spiceRefinery.id].includes(spaceId)
+    ),
+    [sietchTabr.id, arrakeen.id, carthag.id, researchStation.id],
+    "City spy placement choices should expose each physical city post representative once",
+  );
   assert.equal(
     citySpyChoices.filter((spaceId) => spaceId === arrakeen.id || spaceId === spiceRefinery.id).length,
     1,
     "Shared Arrakeen / Spice Refinery post should appear once in spy placement choices",
   );
-  const placedOnSpiceRefinery = state.placeSpyForPending(
-    {
-      ...game,
-      pendingAction: citySpyPending,
-      pendingQueue: [],
-      players: game.players.map((player) =>
-        player.id === feyd.id ? { ...player, spies: 1 } : player
-      ),
-    },
+  const pendingCitySpyState = {
+    ...game,
+    pendingAction: citySpyPending,
+    pendingQueue: [],
+    players: game.players.map((player) =>
+      player.id === feyd.id ? { ...player, spies: 1 } : player
+    ),
+  };
+  assert.equal(
+    state.placeSpyForPending(
+      pendingCitySpyState,
+      citySpyPending,
+      spiceRefinery.id,
+    ),
+    pendingCitySpyState,
+    "Pending spy placement should reject folded non-choice board-space ids",
+  );
+  const placedOnArrakeenPost = state.placeSpyForPending(
+    pendingCitySpyState,
     citySpyPending,
-    spiceRefinery.id,
+    arrakeen.id,
   );
   assert.equal(
-    placedOnSpiceRefinery.spyPosts[spies.spyObservationPostIdForSpace(spiceRefinery.id)],
+    placedOnArrakeenPost.spyPosts[spies.spyObservationPostIdForSpace(arrakeen.id)],
     feyd.id,
-    "Placing through Spice Refinery should store the canonical shared post id",
+    "Placing through the Arrakeen representative should store the canonical shared post id",
   );
   assert.equal(
-    placedOnSpiceRefinery.spyPosts[spiceRefinery.id],
+    placedOnArrakeenPost.spyPosts[arrakeen.id],
     undefined,
     "New shared-post placements should not store the representative board-space id",
   );
   assert.equal(
-    spies.playerHasSpyPost(placedOnSpiceRefinery, arrakeen.id, feyd.id),
+    spies.playerHasSpyPost(placedOnArrakeenPost, spiceRefinery.id, feyd.id),
     true,
-    "A spy placed through Spice Refinery should also observe Arrakeen",
+    "A spy placed through Arrakeen should also observe Spice Refinery",
   );
   assert.match(
-    placedOnSpiceRefinery.log[0],
+    placedOnArrakeenPost.log[0],
     /Arrakeen \/ Spice Refinery/,
     "Shared-post placement logs should name every observed space",
   );

@@ -5,31 +5,94 @@ export type SpyPostState = Pick<GameState, "spyPosts" | "sharedSpyPosts">;
 
 export type SpyObservationPost = {
   id: string;
+  representativeSpaceId?: string;
   spaceIds: readonly string[];
 };
 
 export const spyObservationPosts: readonly SpyObservationPost[] = [
   { id: "arrakeen-spice-refinery", spaceIds: ["arrakeen", "spice-refinery"] },
+  {
+    id: "high-council-imperial-privilege-swordmaster",
+    spaceIds: ["high-council", "imperial-privilege", "swordmaster"],
+  },
+  { id: "assembly-hall-gather-support", spaceIds: ["assembly-hall", "gather-support"] },
+  { id: "shipping-accept-contract", spaceIds: ["shipping", "accept-contract"] },
+  { id: "military-support-economic-support", spaceIds: ["military-support", "economic-support"] },
+  { id: "espionage-secrets", spaceIds: ["espionage", "secrets"] },
+  { id: "controversial-tech-expedition", spaceIds: ["controversial-tech", "expedition"] },
+  { id: "sietch-tabr-research-station", spaceIds: ["sietch-tabr", "research-station"] },
+  { id: "research-station-spice-refinery", spaceIds: ["research-station", "spice-refinery"] },
   { id: "deliver-supplies-heighliner", spaceIds: ["deliver-supplies", "heighliner"] },
+  { id: "carthag", spaceIds: ["carthag"] },
+  { id: "deep-desert", spaceIds: ["deep-desert"] },
+  { id: "habbanya-erg", spaceIds: ["habbanya-erg"] },
+  { id: "hagga-basin", spaceIds: ["hagga-basin"] },
+  { id: "imperial-basin", spaceIds: ["imperial-basin"] },
 ];
 
-const sharedObservationPostBySpaceId = new Map(
-  spyObservationPosts.flatMap((post) => post.spaceIds.map((spaceId) => [spaceId, post] as const)),
+function spyObservationPostRepresentativeSpaceId(post: SpyObservationPost) {
+  return post.representativeSpaceId ?? post.spaceIds[0] ?? post.id;
+}
+
+const observationPostById = new Map(spyObservationPosts.map((post) => [post.id, post]));
+const observationPostByRepresentativeSpaceId = new Map(
+  spyObservationPosts.map((post) => [spyObservationPostRepresentativeSpaceId(post), post] as const),
 );
+const observationPostsByObservedSpaceId = spyObservationPosts.reduce((postsBySpaceId, post) => {
+  for (const spaceId of post.spaceIds) {
+    const posts = postsBySpaceId.get(spaceId) ?? [];
+    posts.push(post);
+    postsBySpaceId.set(spaceId, posts);
+  }
+  return postsBySpaceId;
+}, new Map<string, SpyObservationPost[]>());
+const defaultObservationPostBySpaceId = new Map<string, SpyObservationPost>();
+for (const post of spyObservationPosts) {
+  defaultObservationPostBySpaceId.set(spyObservationPostRepresentativeSpaceId(post), post);
+}
+for (const post of spyObservationPosts) {
+  for (const spaceId of post.spaceIds) {
+    if (!defaultObservationPostBySpaceId.has(spaceId)) defaultObservationPostBySpaceId.set(spaceId, post);
+  }
+}
+const observedSpaceIds = new Set(spyObservationPosts.flatMap((post) => post.spaceIds));
 const boardSpaceNameById = new Map(boardSpaces.map((space) => [space.id, space.name]));
 
+function uniqueValues<T>(values: readonly T[]) {
+  return Array.from(new Set(values));
+}
+
+function spyObservationPostForSpace(spaceId: string) {
+  return (
+    observationPostByRepresentativeSpaceId.get(spaceId) ??
+    defaultObservationPostBySpaceId.get(spaceId) ??
+    observationPostById.get(spaceId)
+  );
+}
+
 export function spyObservationPostIdForSpace(spaceId: string) {
-  return sharedObservationPostBySpaceId.get(spaceId)?.id ?? spaceId;
+  return spyObservationPostForSpace(spaceId)?.id ?? spaceId;
 }
 
 export function spyObservationPostSpaceIdsForSpace(spaceId: string) {
-  return sharedObservationPostBySpaceId.get(spaceId)?.spaceIds ?? [spaceId];
+  return spyObservationPostForSpace(spaceId)?.spaceIds ?? [spaceId];
+}
+
+function spyObservationPostStorageIdsForPost(post: SpyObservationPost) {
+  return uniqueValues([
+    post.id,
+    ...post.spaceIds.filter((spaceId) => defaultObservationPostBySpaceId.get(spaceId)?.id === post.id),
+  ]);
 }
 
 function spyObservationPostStorageIdsForSpace(spaceId: string) {
-  const post = sharedObservationPostBySpaceId.get(spaceId);
-  if (!post) return [spaceId];
-  return [post.id, ...post.spaceIds];
+  const post = spyObservationPostForSpace(spaceId);
+  return post ? spyObservationPostStorageIdsForPost(post) : [spaceId];
+}
+
+export function spyObservationPostChoiceSpaces() {
+  const representativeSpaceIds = new Set(spyObservationPosts.map(spyObservationPostRepresentativeSpaceId));
+  return boardSpaces.filter((space) => representativeSpaceIds.has(space.id) || !observedSpaceIds.has(space.id));
 }
 
 function arraysEqual(first: readonly string[], second: readonly string[]) {
@@ -74,14 +137,28 @@ export function spyPostOwnerIds(
   state: SpyPostState,
   spaceId: string,
 ) {
-  return Array.from(new Set(spyObservationPostStorageIdsForSpace(spaceId).flatMap((postId) => [
+  const posts = observationPostsByObservedSpaceId.get(spaceId);
+  const storageIds = posts
+    ? posts.flatMap(spyObservationPostStorageIdsForPost)
+    : [spaceId];
+  return uniqueValues(storageIds.flatMap((postId) => [
     state.spyPosts[postId],
     ...(state.sharedSpyPosts[postId] ?? []),
-  ]).filter((ownerId): ownerId is string => Boolean(ownerId))));
+  ]).filter((ownerId): ownerId is string => Boolean(ownerId)));
+}
+
+export function spyObservationPostOwnerIds(
+  state: SpyPostState,
+  spaceId: string,
+) {
+  return uniqueValues(spyObservationPostStorageIdsForSpace(spaceId).flatMap((postId) => [
+    state.spyPosts[postId],
+    ...(state.sharedSpyPosts[postId] ?? []),
+  ]).filter((ownerId): ownerId is string => Boolean(ownerId)));
 }
 
 export function spyPostOccupied(state: SpyPostState, spaceId: string) {
-  return spyPostOwnerIds(state, spaceId).length > 0;
+  return spyObservationPostOwnerIds(state, spaceId).length > 0;
 }
 
 export function playerHasSpyPost(state: SpyPostState, spaceId: string, playerId: string) {
@@ -89,11 +166,9 @@ export function playerHasSpyPost(state: SpyPostState, spaceId: string, playerId:
 }
 
 export function spyPostCount(state: SpyPostState, ownerId: string) {
-  return new Set(
-    boardSpaces
-      .filter((space) => playerHasSpyPost(state, space.id, ownerId))
-      .map((space) => spyObservationPostIdForSpace(space.id)),
-  ).size;
+  return spyObservationPostChoiceSpaces()
+    .filter((space) => spyObservationPostOwnerIds(state, space.id).includes(ownerId))
+    .length;
 }
 
 export function spyPostRecallCountForOwner(
@@ -116,7 +191,7 @@ export function normalizeSpyObservationPosts(state: GameState): GameState {
   let changed = false;
 
   for (const post of spyObservationPosts) {
-    const storageIds = [post.id, ...post.spaceIds];
+    const storageIds = spyObservationPostStorageIdsForPost(post);
     const ownerCounts = new Map<string, number>();
     const ownerOrder: string[] = [];
 
@@ -129,8 +204,8 @@ export function normalizeSpyObservationPosts(state: GameState): GameState {
 
     if (ownerOrder.length === 0) continue;
 
-    const legacyStoragePresent = post.spaceIds.some((spaceId) =>
-      state.spyPosts[spaceId] !== undefined || state.sharedSpyPosts[spaceId] !== undefined
+    const legacyStoragePresent = storageIds.some((storageId) =>
+      storageId !== post.id && (state.spyPosts[storageId] !== undefined || state.sharedSpyPosts[storageId] !== undefined)
     );
     const finalOwnerEntries = ownerOrder.flatMap((ownerId) => {
       const count = ownerCounts.get(ownerId) ?? 0;
@@ -156,8 +231,9 @@ export function normalizeSpyObservationPosts(state: GameState): GameState {
       delete spyPosts[storageId];
       delete sharedSpyPosts[storageId];
     }
-    spyPosts[post.id] = finalOwnerEntries[0];
-    const finalSharedOwners = finalOwnerEntries.slice(1);
+    const [primaryOwner, ...finalSharedOwners] = finalOwnerEntries;
+    if (!primaryOwner) continue;
+    spyPosts[post.id] = primaryOwner;
     if (finalSharedOwners.length > 0) sharedSpyPosts[post.id] = finalSharedOwners;
   }
 
@@ -223,6 +299,6 @@ export function canPlaceSharedSpyPost(
   owner: Player,
 ) {
   if (!canUseSpyPost(state, space, owner)) return false;
-  const owners = spyPostOwnerIds(state, space.id);
+  const owners = spyObservationPostOwnerIds(state, space.id);
   return owners.length > 0 && owners.some((ownerId) => ownerId !== owner.id) && !owners.includes(owner.id);
 }

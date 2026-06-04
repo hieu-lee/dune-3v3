@@ -304,9 +304,11 @@ export {
 export {
   canPlaceSpyPost,
   normalizeSpyObservationPosts,
+  spyObservationPostChoiceSpaces,
   spyObservationPostDetailForSpace,
   spyObservationPostIdForSpace,
   spyObservationPostLabelForSpace,
+  spyObservationPostOwnerIds,
   spyPostCount,
   spyPostOwnerIds,
   spyPostRecallCountForOwner,

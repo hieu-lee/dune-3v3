@@ -20,6 +20,10 @@ export function verifyCardEffectSpecSpyRecallValidation({
   const { highCouncil, secrets } = boardSpaces;
   const { backedByChoam, convincingArgument } = cards;
   const { p2, p4, p6 } = players;
+  const beneSpySpace = state.spyObservationPostChoiceSpaces().find((space) => space.id === "espionage");
+  assert.ok(beneSpySpace, "Espionage should be the Bene spy-post representative");
+  const highCouncilPostId = state.spyObservationPostIdForSpace(highCouncil.id);
+  const benePostId = state.spyObservationPostIdForSpace(secrets.id);
   const invalidSpyPlacementAmountCard = {
     ...convincingArgument,
     id: "effect-spec-invalid-spy-placement-amount-card",
@@ -163,7 +167,7 @@ export function verifyCardEffectSpecSpyRecallValidation({
         source: p2,
         state: {
           ...game,
-          spyPosts: { [secrets.id]: p2.id, [highCouncil.id]: p2.id },
+          spyPosts: { [benePostId]: p2.id, [highCouncilPostId]: p2.id },
           sharedSpyPosts: {},
         },
       },
@@ -232,7 +236,7 @@ export function verifyCardEffectSpecSpyRecallValidation({
         source: p2,
         state: {
           ...game,
-          spyPosts: { [secrets.id]: p2.id },
+          spyPosts: { [benePostId]: p2.id },
           sharedSpyPosts: {},
         },
       },
@@ -677,7 +681,7 @@ export function verifyCardEffectSpecSpyRecallValidation({
     intrigueDeck: [backedByChoam],
     intrigueDiscard: [],
     sharedSpyPosts: {},
-    spyPosts: { [secrets.id]: p2.id, [highCouncil.id]: p2.id },
+    spyPosts: { [benePostId]: p2.id, [highCouncilPostId]: p2.id },
   };
   const revealSpyRecallPlan = turnActions.revealTurnPlan(
     playerById(revealSpyRecallFixture, p2.id),
@@ -714,7 +718,7 @@ export function verifyCardEffectSpecSpyRecallValidation({
   const revealSpyRecallResolved = state.recallSpyForPending(
     revealSpyRecallPending,
     revealSpyRecallPending.pendingAction,
-    secrets.id,
+    beneSpySpace.id,
   );
   assert.equal(
     revealSpyRecallResolved.pendingAction,

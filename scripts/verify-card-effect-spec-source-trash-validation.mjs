@@ -561,8 +561,12 @@ export function verifyCardEffectSpecSourceTrashValidation({
   );
   assert.equal(inHighPlacesSpyPlaced.pendingAction, undefined);
   assert.equal(playerById(inHighPlacesSpyPlaced, p2.id).spies, 1, "In High Places should spend one spy from supply");
-  assert.equal(inHighPlacesSpyPlaced.spyPosts[highCouncil.id], p2.id, "In High Places should place the selected spy");
-  assert.match(inHighPlacesSpyPlaced.log[0], /places a spy near High Council from In High Places/);
+  assert.equal(
+    inHighPlacesSpyPlaced.spyPosts[state.spyObservationPostIdForSpace(highCouncil.id)],
+    p2.id,
+    "In High Places should place the selected spy",
+  );
+  assert.match(inHighPlacesSpyPlaced.log[0], /places a spy near High Council \/ Imperial Privilege \/ Swordmaster from In High Places/);
   const inHighPlacesUnqualified = turnActions.placeAgentAction(
     withActivePlayer(game, p2.id, () => ({
       agentsReady: 1,

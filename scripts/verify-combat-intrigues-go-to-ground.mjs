@@ -7,6 +7,9 @@ export function verifyCombatIntrigueGoToGround({
   spaces: { secretsSpace, vastWealthSpace },
   state,
 }) {
+  const beneSpySpace = data.boardSpaces.find((space) => space.id === "espionage");
+  assert.ok(beneSpySpace, "Espionage should be the Bene spy-post representative");
+  const beneSpyPostId = state.spyObservationPostIdForSpace(secretsSpace.id);
   const goToGroundFixture = combatFixture(state, data, (players) =>
     players.map((player) =>
       player.id === "p2"
@@ -86,17 +89,17 @@ export function verifyCombatIntrigueGoToGround({
   assert.equal(goToGroundSkippedSpy.phase, "combat", "Skipping the Go To Ground spy should resume Combat when actors remain");
   assert.equal(goToGroundSkippedSpy.players[goToGroundSkippedSpy.activeSeat].id, "p3");
   assert.equal(playerById(goToGroundSkippedSpy, "p2").spies, playerById(goToGroundPlayed, "p2").spies);
-  assert.equal(goToGroundSkippedSpy.spyPosts[secretsSpace.id], undefined);
+  assert.equal(goToGroundSkippedSpy.spyPosts[beneSpyPostId], undefined);
   assert.ok(
-    state.placeableSpySpaces(goToGroundPlayed, goToGroundPlayed.pendingAction).some((space) => space.id === secretsSpace.id),
+    state.placeableSpySpaces(goToGroundPlayed, goToGroundPlayed.pendingAction).some((space) => space.id === beneSpySpace.id),
     "Go To Ground should offer legal spy posts to the recipient",
   );
   const goToGroundOccupiedSpyPost = {
     ...goToGroundPlayed,
-    spyPosts: { ...goToGroundPlayed.spyPosts, [secretsSpace.id]: "p3" },
+    spyPosts: { ...goToGroundPlayed.spyPosts, [beneSpyPostId]: "p3" },
   };
   assert.equal(
-    state.placeSpyForPending(goToGroundOccupiedSpyPost, goToGroundOccupiedSpyPost.pendingAction, secretsSpace.id),
+    state.placeSpyForPending(goToGroundOccupiedSpyPost, goToGroundOccupiedSpyPost.pendingAction, beneSpySpace.id),
     goToGroundOccupiedSpyPost,
     "Go To Ground spy placement should reject occupied spy posts",
   );
@@ -105,13 +108,13 @@ export function verifyCombatIntrigueGoToGround({
     goToGroundPlayed,
     "Go To Ground spy placement should reject personal Commander-board posts for an Ally",
   );
-  const goToGroundSpyPlaced = state.placeSpyForPending(goToGroundPlayed, goToGroundPlayed.pendingAction, secretsSpace.id);
+  const goToGroundSpyPlaced = state.placeSpyForPending(goToGroundPlayed, goToGroundPlayed.pendingAction, beneSpySpace.id);
   assert.equal(goToGroundSpyPlaced.pendingAction, undefined, "Placing the Go To Ground spy should clear the pending action");
   assert.equal(goToGroundSpyPlaced.phase, "combat", "Combat should resume after Go To Ground if actors remain");
   assert.equal(goToGroundSpyPlaced.players[goToGroundSpyPlaced.activeSeat].id, "p3");
   assert.equal(playerById(goToGroundSpyPlaced, "p2").spies, playerById(goToGroundPlayed, "p2").spies - 1);
-  assert.equal(goToGroundSpyPlaced.spyPosts[secretsSpace.id], "p2");
-  assert.match(goToGroundSpyPlaced.log[0], /places a spy near Secrets from Go To Ground/);
+  assert.equal(goToGroundSpyPlaced.spyPosts[beneSpyPostId], "p2");
+  assert.match(goToGroundSpyPlaced.log[0], /places a spy near Espionage \/ Secrets from Go To Ground/);
 
   const goToGroundOneTroopFixture = combatFixture(state, data, (players) =>
     players.map((player) =>
@@ -318,11 +321,11 @@ export function verifyCombatIntrigueGoToGround({
   const goToGroundLastActorSpyPlaced = state.placeSpyForPending(
     goToGroundLastActorPlayed,
     goToGroundLastActorPlayed.pendingAction,
-    secretsSpace.id,
+    beneSpySpace.id,
   );
   assert.equal(goToGroundLastActorSpyPlaced.phase, "playing", "Placing the pending spy should then resolve empty Combat");
   assert.equal(goToGroundLastActorSpyPlaced.round, goToGroundLastActorFixture.round + 1);
-  assert.equal(goToGroundLastActorSpyPlaced.spyPosts[secretsSpace.id], "p2");
+  assert.equal(goToGroundLastActorSpyPlaced.spyPosts[beneSpyPostId], "p2");
   assert.ok(
     goToGroundLastActorSpyPlaced.log.some((entry) => entry.includes("resolves with no winner")),
     "Go To Ground should resolve the Conflict with no winner after the last units retreat and the spy resolves",
@@ -330,5 +333,5 @@ export function verifyCombatIntrigueGoToGround({
   const goToGroundLastActorSkippedSpy = state.finishPendingAction(goToGroundLastActorPlayed);
   assert.equal(goToGroundLastActorSkippedSpy.phase, "playing", "Skipping the pending spy should also resolve empty Combat");
   assert.equal(goToGroundLastActorSkippedSpy.round, goToGroundLastActorFixture.round + 1);
-  assert.equal(goToGroundLastActorSkippedSpy.spyPosts[secretsSpace.id], undefined);
+  assert.equal(goToGroundLastActorSkippedSpy.spyPosts[beneSpyPostId], undefined);
 }

@@ -59,7 +59,11 @@ export function verifyTestOfLoyaltyConflictAwards({
     testOfLoyaltyResult.pendingAction,
     testSpySpace.id,
   );
-  assert.equal(testSpyPlaced.spyPosts[testSpySpace.id], "p2", "Test Of Loyalty should place the rewarded spy");
+  assert.equal(
+    testSpyPlaced.spyPosts[state.spyObservationPostIdForSpace(testSpySpace.id)],
+    "p2",
+    "Test Of Loyalty should place the rewarded spy",
+  );
   assert.equal(testSpyPlaced.pendingAction, undefined, "Placed Test Of Loyalty spy should clear the reward pending action");
   assert.equal(testSpyPlaced.round, testOfLoyaltyResult.round + 1, "Placed Test Of Loyalty spy should advance to the next round");
   assert.equal(testSpyPlaced.conflict?.sourceId, 454, "Placed Test Of Loyalty spy should reveal the next Conflict");

@@ -18,6 +18,10 @@ export function verifyCombatIntrigueCommanderEffects({
   spaces: { espionageSpace, secretsSpace },
   state,
 }) {
+  const arrakeenSpace = data.boardSpaces.find((space) => space.id === "arrakeen");
+  assert.ok(arrakeenSpace, "Arrakeen should exist for Commander spy fixtures");
+  const arrakeenPostId = state.spyObservationPostIdForSpace(arrakeenSpace.id);
+  const benePostId = state.spyObservationPostIdForSpace(secretsSpace.id);
   const commanderSpiceSpendFixture = combatFixture(
     state,
     data,
@@ -283,8 +287,8 @@ export function verifyCombatIntrigueCommanderEffects({
   assert.equal(commanderGoToGroundSpyPlaced.players[commanderGoToGroundSpyPlaced.activeSeat].id, "p2");
   assert.equal(playerById(commanderGoToGroundSpyPlaced, "p6").spies, playerById(commanderGoToGroundPlayed, "p6").spies - 1);
   assert.equal(playerById(commanderGoToGroundSpyPlaced, "p4").spies, playerById(commanderGoToGroundPlayed, "p4").spies, "Commander Go To Ground should not spend a Commander spy");
-  assert.equal(commanderGoToGroundSpyPlaced.spyPosts[espionageSpace.id], "p6", "Commander Go To Ground should place the target Ally's spy");
-  assert.match(commanderGoToGroundSpyPlaced.log[0], /Princess Irulan places a spy near Espionage from Go To Ground/);
+  assert.equal(commanderGoToGroundSpyPlaced.spyPosts[benePostId], "p6", "Commander Go To Ground should place the target Ally's spy");
+  assert.match(commanderGoToGroundSpyPlaced.log[0], /Princess Irulan places a spy near Espionage \/ Secrets from Go To Ground/);
 
   const commanderFindWeaknessFixture = {
     ...combatFixture(
@@ -299,7 +303,7 @@ export function verifyCombatIntrigueCommanderEffects({
         }),
       3,
     ),
-    spyPosts: { [secretsSpace.id]: "p4" },
+    spyPosts: { [benePostId]: "p4" },
   };
   const commanderFindWeakness = state.startCombatPhase(commanderFindWeaknessFixture);
   assert.equal(
@@ -322,11 +326,11 @@ export function verifyCombatIntrigueCommanderEffects({
   const commanderFindWeaknessRecalled = state.recallSpyForPending(
     commanderFindWeaknessPlayed,
     commanderFindWeaknessPlayed.pendingAction,
-    secretsSpace.id,
+    espionageSpace.id,
   );
   assert.equal(playerById(commanderFindWeaknessRecalled, "p4").spies, 3, "Commander Find Weakness should recall the Commander's own spy");
   assert.equal(playerById(commanderFindWeaknessRecalled, "p6").conflict, 6, "Commander Find Weakness recall should add bonus strength to the target Ally");
-  assert.equal(commanderFindWeaknessRecalled.spyPosts[secretsSpace.id], undefined);
+  assert.equal(commanderFindWeaknessRecalled.spyPosts[benePostId], undefined);
 
   const commanderFindWeaknessAllySpyFixture = {
     ...combatFixture(
@@ -341,7 +345,7 @@ export function verifyCombatIntrigueCommanderEffects({
         }),
       3,
     ),
-    spyPosts: { [secretsSpace.id]: "p6" },
+    spyPosts: { [benePostId]: "p6" },
   };
   const commanderFindWeaknessAllySpy = state.startCombatPhase(commanderFindWeaknessAllySpyFixture);
   const commanderFindWeaknessAllySpyPlayed = state.playCombatIntrigue(
@@ -356,7 +360,7 @@ export function verifyCombatIntrigueCommanderEffects({
     "Commander Find Weakness should not recall a target Ally's spy",
   );
   assert.equal(playerById(commanderFindWeaknessAllySpyPlayed, "p6").conflict, 3);
-  assert.equal(commanderFindWeaknessAllySpyPlayed.spyPosts[secretsSpace.id], "p6");
+  assert.equal(commanderFindWeaknessAllySpyPlayed.spyPosts[benePostId], "p6");
 
   const commanderQuestionableMethodsFixture = combatFixture(
     state,
@@ -643,7 +647,7 @@ export function verifyCombatIntrigueCommanderEffects({
         }),
       3,
     ),
-    spyPosts: { [secretsSpace.id]: "p4", [espionageSpace.id]: "p4" },
+    spyPosts: { [benePostId]: "p4", [arrakeenPostId]: "p4" },
   };
   const commanderSpring = state.startCombatPhase(commanderSpringFixture);
   assert.equal(
@@ -670,17 +674,17 @@ export function verifyCombatIntrigueCommanderEffects({
     source: "Spring The Trap",
     optional: false,
   });
-  const commanderSpringFirstRecall = state.recallSpyForPending(commanderSpringPlayed, commanderSpringPlayed.pendingAction, secretsSpace.id);
+  const commanderSpringFirstRecall = state.recallSpyForPending(commanderSpringPlayed, commanderSpringPlayed.pendingAction, espionageSpace.id);
   const commanderSpringSecondRecall = state.recallSpyForPending(
     commanderSpringFirstRecall,
     commanderSpringFirstRecall.pendingAction,
-    espionageSpace.id,
+    arrakeenSpace.id,
   );
   assert.equal(playerById(commanderSpringSecondRecall, "p4").spies, 3, "Commander Spring The Trap should recall the Commander's own spies");
   assert.equal(playerById(commanderSpringSecondRecall, "p6").conflict, 8, "Commander Spring The Trap should add strength to the target Ally");
   assert.equal(playerById(commanderSpringSecondRecall, "p2").conflict, 5);
-  assert.equal(commanderSpringSecondRecall.spyPosts[secretsSpace.id], undefined);
-  assert.equal(commanderSpringSecondRecall.spyPosts[espionageSpace.id], undefined);
+  assert.equal(commanderSpringSecondRecall.spyPosts[benePostId], undefined);
+  assert.equal(commanderSpringSecondRecall.spyPosts[arrakeenPostId], undefined);
 
   const commanderSpringAllySpyFixture = {
     ...combatFixture(
@@ -695,7 +699,7 @@ export function verifyCombatIntrigueCommanderEffects({
         }),
       3,
     ),
-    spyPosts: { [secretsSpace.id]: "p6", [espionageSpace.id]: "p6" },
+    spyPosts: { [benePostId]: "p6", [arrakeenPostId]: "p6" },
   };
   const commanderSpringAllySpy = state.startCombatPhase(commanderSpringAllySpyFixture);
   assert.equal(

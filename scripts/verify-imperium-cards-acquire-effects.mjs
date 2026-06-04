@@ -14,6 +14,8 @@ export function verifyImperiumCardAcquireEffects({
 }) {
   const { beneGesseritOperative, overthrow, prepareTheWay, priceIsNoObject, spiceMustFlow, spyNetwork } = cards;
   const { highCouncil, secrets } = spaces;
+  const beneSpySpace = state.spyObservationPostChoiceSpaces().find((space) => space.id === "espionage");
+  assert.ok(beneSpySpace, "Espionage should be the Bene spy-post representative");
   const p2 = playerById(game, playerId);
 
   const prepareBuyFixture = withActivePlayer(game, p2.id, () => ({
@@ -413,8 +415,12 @@ export function verifyImperiumCardAcquireEffects({
   );
   assert.equal(spyNetworkSpyPlaced.pendingAction, undefined);
   assert.equal(playerById(spyNetworkSpyPlaced, p2.id).spies, 0, "Spy Network acquire bonus should spend one spy");
-  assert.equal(spyNetworkSpyPlaced.spyPosts[highCouncil.id], p2.id, "Spy Network acquire bonus should place the selected spy");
-  assert.match(spyNetworkSpyPlaced.log[0], /places a spy near High Council from Spy Network/);
+  assert.equal(
+    spyNetworkSpyPlaced.spyPosts[state.spyObservationPostIdForSpace(highCouncil.id)],
+    p2.id,
+    "Spy Network acquire bonus should place the selected spy",
+  );
+  assert.match(spyNetworkSpyPlaced.log[0], /places a spy near High Council \/ Imperial Privilege \/ Swordmaster from Spy Network/);
 
   const spiceAcquirePending = {
     kind: "acquire-card",
@@ -558,7 +564,7 @@ export function verifyImperiumCardAcquireEffects({
   const spyPendingRecallPlaced = state.placeSpyForPending(
     spyPendingRecallResolved,
     spyPendingRecallResolved.pendingAction,
-    secrets.id,
+    beneSpySpace.id,
   );
   assert.equal(
     spyPendingRecallPlaced.pendingAction?.remaining,

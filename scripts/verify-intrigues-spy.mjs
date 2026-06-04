@@ -9,11 +9,14 @@ function playerById(game, playerId) {
 export function verifyDistractionPlotIntrigue({ cards, data, game, state }) {
   const { distraction, mercenaries } = cards;
 
-  const distractionSpySpace = data.boardSpaces.find((space) => !space.personal);
-  const distractionOwnSpySpace = data.boardSpaces.find((space) => !space.personal && space.id !== distractionSpySpace?.id);
+  const spyChoiceSpaces = state.spyObservationPostChoiceSpaces();
+  const distractionSpySpace = spyChoiceSpaces.find((space) => !space.personal);
+  const distractionOwnSpySpace = spyChoiceSpaces.find((space) => !space.personal && space.id !== distractionSpySpace?.id);
   const personalSpySpace = data.boardSpaces.find((space) => space.personal);
   const swordmasterSpace = data.boardSpaces.find((space) => space.id === "swordmaster");
   assert.ok(distractionSpySpace && distractionOwnSpySpace && personalSpySpace && swordmasterSpace, "Expected spy post fixtures for Distraction");
+  const distractionPostId = state.spyObservationPostIdForSpace(distractionSpySpace.id);
+  const distractionOwnPostId = state.spyObservationPostIdForSpace(distractionOwnSpySpace.id);
   const spyIconCard = data.imperiumDeck.find((card) => card.icons.includes("spy"));
   assert.ok(spyIconCard, "Distraction verifier needs a card with a spy Agent icon");
   const distractionFixture = {
@@ -22,7 +25,7 @@ export function verifyDistractionPlotIntrigue({ cards, data, game, state }) {
     pendingAction: undefined,
     pendingQueue: [],
     turnUnitDeployments: { p2: 3 },
-    spyPosts: { [distractionSpySpace.id]: "p3" },
+    spyPosts: { [distractionPostId]: "p3" },
     sharedSpyPosts: {},
     intrigueDiscard: [],
     players: game.players.map((candidate) =>
@@ -69,8 +72,8 @@ export function verifyDistractionPlotIntrigue({ cards, data, game, state }) {
   );
   const distractionPlaced = state.placeSpyForPending(distractionPlayed, distractionPlayed.pendingAction, distractionSpySpace.id);
   assert.equal(playerById(distractionPlaced, "p2").spies, 0, "Distraction should spend one spy from supply");
-  assert.equal(distractionPlaced.spyPosts[distractionSpySpace.id], "p3", "Distraction should preserve the original spy owner");
-  assert.deepEqual(distractionPlaced.sharedSpyPosts[distractionSpySpace.id], ["p2"]);
+  assert.equal(distractionPlaced.spyPosts[distractionPostId], "p3", "Distraction should preserve the original spy owner");
+  assert.deepEqual(distractionPlaced.sharedSpyPosts[distractionPostId], ["p2"]);
   assert.deepEqual(
     state.spyPostOwnerIds(distractionPlaced, distractionSpySpace.id).sort(),
     ["p2", "p3"],
@@ -95,8 +98,8 @@ export function verifyDistractionPlotIntrigue({ cards, data, game, state }) {
     pendingAction: { kind: "recall-spy", ownerId: "p2", combatRecipientId: "p2", remaining: 1, strength: 0, source: "Test", optional: true },
   };
   const distractionRecalled = state.recallSpyForPending(distractionRecall, distractionRecall.pendingAction, distractionSpySpace.id);
-  assert.equal(distractionRecalled.spyPosts[distractionSpySpace.id], "p3", "Recalling the shared spy should preserve the original spy");
-  assert.equal(distractionRecalled.sharedSpyPosts[distractionSpySpace.id], undefined);
+  assert.equal(distractionRecalled.spyPosts[distractionPostId], "p3", "Recalling the shared spy should preserve the original spy");
+  assert.equal(distractionRecalled.sharedSpyPosts[distractionPostId], undefined);
   assert.equal(playerById(distractionRecalled, "p2").spies, 1, "Recalling the shared spy should return it to supply");
   const primaryRecall = {
     ...distractionPlaced,
@@ -104,8 +107,8 @@ export function verifyDistractionPlotIntrigue({ cards, data, game, state }) {
     pendingAction: { kind: "recall-spy", ownerId: "p3", combatRecipientId: "p3", remaining: 1, strength: 0, source: "Test", optional: true },
   };
   const primaryRecalled = state.recallSpyForPending(primaryRecall, primaryRecall.pendingAction, distractionSpySpace.id);
-  assert.equal(primaryRecalled.spyPosts[distractionSpySpace.id], undefined, "Recalling the original spy should clear the primary post owner");
-  assert.deepEqual(primaryRecalled.sharedSpyPosts[distractionSpySpace.id], ["p2"], "Recalling the original spy should preserve the shared spy");
+  assert.equal(primaryRecalled.spyPosts[distractionPostId], undefined, "Recalling the original spy should clear the primary post owner");
+  assert.deepEqual(primaryRecalled.sharedSpyPosts[distractionPostId], ["p2"], "Recalling the original spy should preserve the shared spy");
   assert.equal(playerById(primaryRecalled, "p3").spies, 3);
   const distractionNeedsDeployments = { ...distractionFixture, turnUnitDeployments: { p2: 2 } };
   assert.equal(
@@ -119,7 +122,7 @@ export function verifyDistractionPlotIntrigue({ cards, data, game, state }) {
     false,
     "Distraction should require another player's spy post",
   );
-  const distractionOwnOnly = { ...distractionFixture, spyPosts: { [distractionSpySpace.id]: "p2" }, sharedSpyPosts: {} };
+  const distractionOwnOnly = { ...distractionFixture, spyPosts: { [distractionPostId]: "p2" }, sharedSpyPosts: {} };
   assert.equal(
     state.canPlayDistractionPlotIntrigue(distractionOwnOnly, playerById(distractionOwnOnly, "p2")),
     false,
@@ -145,8 +148,8 @@ export function verifyDistractionPlotIntrigue({ cards, data, game, state }) {
   const noSupplyDistraction = {
     ...distractionFixture,
     spyPosts: {
-      [distractionSpySpace.id]: "p3",
-      [distractionOwnSpySpace.id]: "p2",
+      [distractionPostId]: "p3",
+      [distractionOwnPostId]: "p2",
     },
     players: distractionFixture.players.map((candidate) =>
       candidate.id === "p2" ? { ...candidate, spies: 0, intrigues: [distraction] } : candidate,
@@ -169,7 +172,7 @@ export function verifyDistractionPlotIntrigue({ cards, data, game, state }) {
     distractionNoSupplyRecalled.pendingAction,
     distractionSpySpace.id,
   );
-  assert.deepEqual(distractionNoSupplyPlaced.sharedSpyPosts[distractionSpySpace.id], ["p2"]);
+  assert.deepEqual(distractionNoSupplyPlaced.sharedSpyPosts[distractionPostId], ["p2"]);
   const pendingDistraction = {
     ...distractionFixture,
     pendingAction: { kind: "spy", ownerId: "p2", remaining: 1, source: "Test" },

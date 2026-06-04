@@ -19,7 +19,7 @@ import {
 } from "./leader-rewards";
 import { acquirableCardsForPending, activatedAllyEffectOwner } from "./market-rules";
 import { pendingActionForSpyPlacements } from "./spy-effect-pending-rules";
-import { playerHasSpyPost, removeSpyPostOwner } from "./spy-posts";
+import { removeSpyPostOwner, spyObservationPostChoiceSpaces, spyPostRecallCountForOwner } from "./spy-posts";
 import { trashableCardsForPending } from "./trash-rules";
 import {
   completeChoamContractsForCurrentTurnHarvests,
@@ -229,7 +229,13 @@ function selectedSpyRecallFor(
   if (recalls.length > 1) throw new Error("Unsupported multiple Plot Intrigue spy recall effects");
   const [recall] = recalls;
   const space = boardSpaces.find((candidate) => candidate.id === recall.spaceId);
-  if (!space || !playerHasSpyPost(state, space.id, player.id)) return undefined;
+  if (
+    !space ||
+    !spyObservationPostChoiceSpaces().some((candidate) => candidate.id === space.id) ||
+    spyPostRecallCountForOwner(state, space.id, player.id) <= 0
+  ) {
+    return undefined;
+  }
   return {
     space,
     ...removeSpyPostOwner(state, space.id, player.id),

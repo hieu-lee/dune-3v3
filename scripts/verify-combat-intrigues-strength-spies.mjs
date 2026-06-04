@@ -12,6 +12,9 @@ export function verifyCombatIntrigueStrengthAndSpies({
   spaces: { arrakeenSpace, secretsSpace },
   state,
 }) {
+  const beneSpySpace = data.boardSpaces.find((space) => space.id === "espionage");
+  assert.ok(beneSpySpace, "Espionage should be the Bene spy-post representative");
+  const beneSpyPostId = state.spyObservationPostIdForSpace(secretsSpace.id);
   const weirdingFixture = combatFixture(state, data, (players) =>
     players.map((player) =>
       player.id === "p2"
@@ -152,7 +155,7 @@ export function verifyCombatIntrigueStrengthAndSpies({
             : player,
       ),
     ),
-    spyPosts: { [secretsSpace.id]: "p2" },
+    spyPosts: { [beneSpyPostId]: "p2" },
   };
   const findWeaknessSpy = state.startCombatPhase(findWeaknessSpyFixture);
   const findWeaknessSpyPlayed = state.playCombatIntrigue(findWeaknessSpy, "p2", findWeakness.id);
@@ -168,7 +171,7 @@ export function verifyCombatIntrigueStrengthAndSpies({
   });
   assert.deepEqual(
     state.recallableSpySpaces(findWeaknessSpyPlayed, findWeaknessSpyPlayed.pendingAction).map((space) => space.name),
-    ["Secrets"],
+    ["Espionage"],
     "Find Weakness should list only the actor's spy posts for recall",
   );
   assert.equal(
@@ -191,19 +194,19 @@ export function verifyCombatIntrigueStrengthAndSpies({
   assert.equal(findWeaknessSkipped.pendingAction, undefined, "Skipping Find Weakness recall should clear the pending action");
   assert.equal(findWeaknessSkipped.activeSeat, findWeaknessActiveSeatAfterPlay, "Skipping Find Weakness recall should not advance Combat again");
   assert.equal(playerById(findWeaknessSkipped, "p2").spies, 2, "Skipping Find Weakness recall should keep the spy supply unchanged");
-  assert.equal(findWeaknessSkipped.spyPosts[secretsSpace.id], "p2", "Skipping Find Weakness recall should leave the spy post in place");
+  assert.equal(findWeaknessSkipped.spyPosts[beneSpyPostId], "p2", "Skipping Find Weakness recall should leave the spy post in place");
   assert.equal(playerById(findWeaknessSkipped, "p2").conflict, 4, "Skipping Find Weakness recall should keep only the base strength");
   assert.match(findWeaknessSkipped.log[0], /declines to recall a spy for Find Weakness/);
   const findWeaknessRecalled = state.recallSpyForPending(
     findWeaknessSpyPlayed,
     findWeaknessSpyPlayed.pendingAction,
-    secretsSpace.id,
+    beneSpySpace.id,
   );
   assert.equal(findWeaknessRecalled.pendingAction, undefined, "Resolving Find Weakness recall should clear the pending action");
   assert.equal(findWeaknessRecalled.activeSeat, findWeaknessActiveSeatAfterPlay, "Resolving Find Weakness recall should not advance Combat again");
   assert.equal(playerById(findWeaknessRecalled, "p2").spies, 3, "Find Weakness should return the recalled spy to supply");
-  assert.equal(findWeaknessRecalled.spyPosts[secretsSpace.id], undefined, "Find Weakness should remove the recalled spy post");
+  assert.equal(findWeaknessRecalled.spyPosts[beneSpyPostId], undefined, "Find Weakness should remove the recalled spy post");
   assert.equal(playerById(findWeaknessRecalled, "p2").conflict, 7, "Find Weakness recall should add the 3 strength bonus");
-  assert.match(findWeaknessRecalled.log[0], /recalls a spy from Secrets for Find Weakness, adding 3 strength/);
+  assert.match(findWeaknessRecalled.log[0], /recalls a spy from Espionage \/ Secrets for Find Weakness, adding 3 strength/);
 
 }

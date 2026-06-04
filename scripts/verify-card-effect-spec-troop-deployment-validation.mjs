@@ -13,6 +13,10 @@ export function verifyCardEffectSpecTroopDeploymentValidation({
   const { acceptContract, arrakeen, highCouncil, imperialBasin, militarySupport, secrets } = boardSpaces;
   const { fedaykinStilltent, reconnaissance, sardaukarCoordination, strikeFleet } = cards;
   const { p2, p4, p6 } = players;
+  const beneSpySpace = state.spyObservationPostChoiceSpaces().find((space) => space.id === "espionage");
+  assert.ok(beneSpySpace, "Espionage should be the Bene spy-post representative");
+  const arrakeenPostId = state.spyObservationPostIdForSpace(arrakeen.id);
+  const benePostId = state.spyObservationPostIdForSpace(secrets.id);
 
   const fedaykinMakerEffect = state.applyCardAgentEffect(
     fedaykinStilltent,
@@ -119,15 +123,15 @@ export function verifyCardEffectSpecTroopDeploymentValidation({
     pendingAction: strikeFleetRecallPending,
     pendingQueue: [],
     spyPosts: {
-      [arrakeen.id]: p2.id,
-      [secrets.id]: p2.id,
+      [arrakeenPostId]: p2.id,
+      [benePostId]: p2.id,
     },
     sharedSpyPosts: {},
   };
   const strikeFleetSpyRecalled = state.recallSpyForPending(
     strikeFleetSpyRecallFixture,
     strikeFleetRecallPending,
-    secrets.id,
+    beneSpySpace.id,
   );
   assert.equal(strikeFleetSpyRecalled.turnSpyRecalls[p2.id], 1, "Spy recall pending resolution should mark same-turn spy recalls");
   const strikeFleetPlaced = turnActions.placeAgentAction(strikeFleetSpyRecalled, {

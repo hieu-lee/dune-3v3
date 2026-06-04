@@ -9,11 +9,13 @@ function playerById(game, playerId) {
 export function verifySpecialMissionPlotIntrigue({ cards, data, game, state }) {
   const { mercenaries, specialMission } = cards;
 
-  const citySpySpaces = data.boardSpaces.filter((space) => space.icon === "city");
+  const spyChoiceSpaces = state.spyObservationPostChoiceSpaces();
+  const citySpySpaces = spyChoiceSpaces.filter((space) => space.icon === "city");
   const citySpySpace = citySpySpaces[0];
   const secondCitySpySpace = citySpySpaces[1];
-  const nonCitySpySpace = data.boardSpaces.find((space) => space.icon !== "city" && !space.personal);
+  const nonCitySpySpace = spyChoiceSpaces.find((space) => space.icon !== "city" && !space.personal);
   assert.ok(citySpySpace && secondCitySpySpace && nonCitySpySpace, "Expected City and non-City spy post fixtures");
+  const nonCitySpyPostId = state.spyObservationPostIdForSpace(nonCitySpySpace.id);
   const specialMissionFixture = {
     ...game,
     activeSeat: game.players.findIndex((candidate) => candidate.id === "p2"),
@@ -92,7 +94,7 @@ export function verifySpecialMissionPlotIntrigue({ cards, data, game, state }) {
 
   const specialMissionRecallFixture = {
     ...specialMissionFixture,
-    spyPosts: { [nonCitySpySpace.id]: "p2" },
+    spyPosts: { [nonCitySpyPostId]: "p2" },
     players: specialMissionFixture.players.map((candidate) =>
       candidate.id === "p2"
         ? { ...candidate, spies: 2, resources: { ...candidate.resources, spice: 1 }, intrigues: [specialMission] }
@@ -105,7 +107,7 @@ export function verifySpecialMissionPlotIntrigue({ cards, data, game, state }) {
     specialMission.id,
     { kind: "recall-spy", spaceId: nonCitySpySpace.id },
   );
-  assert.equal(specialMissionRecalled.spyPosts[nonCitySpySpace.id], undefined, "Special Mission should recall the chosen spy");
+  assert.equal(specialMissionRecalled.spyPosts[nonCitySpyPostId], undefined, "Special Mission should recall the chosen spy");
   assert.equal(playerById(specialMissionRecalled, "p2").spies, 3, "Special Mission should return the recalled spy to supply");
   assert.equal(playerById(specialMissionRecalled, "p2").resources.spice, 3, "Special Mission should gain 2 spice");
   assert.equal(specialMissionRecalled.shieldWall, false, "Special Mission should remove the Shield Wall");
@@ -123,7 +125,7 @@ export function verifySpecialMissionPlotIntrigue({ cards, data, game, state }) {
 
   const noSupplySpecialMission = {
     ...specialMissionFixture,
-    spyPosts: { [nonCitySpySpace.id]: "p2" },
+    spyPosts: { [nonCitySpyPostId]: "p2" },
     players: specialMissionFixture.players.map((candidate) =>
       candidate.id === "p2" ? { ...candidate, spies: 0, intrigues: [specialMission] } : candidate,
     ),
@@ -145,7 +147,7 @@ export function verifySpecialMissionPlotIntrigue({ cards, data, game, state }) {
     nonCitySpySpace.id,
   );
   assert.equal(playerById(noSupplyRecalled, "p2").spies, 1, "Special Mission supply recall should return one spy");
-  assert.equal(noSupplyRecalled.spyPosts[nonCitySpySpace.id], undefined);
+  assert.equal(noSupplyRecalled.spyPosts[nonCitySpyPostId], undefined);
   assert.equal(
     state.finishPendingAction(noSupplyRecalled),
     noSupplyRecalled,
@@ -252,7 +254,7 @@ export function verifySpecialMissionPlotIntrigue({ cards, data, game, state }) {
   const commanderSpecialMissionFixture = {
     ...specialMissionFixture,
     activeSeat: game.players.findIndex((candidate) => candidate.id === "p4"),
-    spyPosts: { [nonCitySpySpace.id]: "p4" },
+    spyPosts: { [nonCitySpyPostId]: "p4" },
     players: game.players.map((candidate) => {
       if (candidate.id === "p4") {
         return {

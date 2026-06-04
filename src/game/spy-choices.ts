@@ -1,10 +1,10 @@
-import { boardSpaces } from "./data";
 import {
   canPlaceSharedSpyPost,
   canPlaceSpyPost,
-  playerHasSpyPost,
   removeSpyPostOwner,
   spyObservationPostIdForSpace,
+  spyObservationPostChoiceSpaces,
+  spyObservationPostOwnerIds,
 } from "./spy-posts";
 import type { GameState, PendingAction } from "./types";
 
@@ -12,13 +12,15 @@ type RecallSpyPendingAction = Extract<PendingAction, { kind: "recall-spy" }>;
 type SpyPendingAction = Extract<PendingAction, { kind: "spy" }>;
 
 export function recallableSpySpaces(state: GameState, pending: RecallSpyPendingAction) {
-  return uniqueSpyPostSpaces(boardSpaces.filter((space) => playerHasSpyPost(state, space.id, pending.ownerId)));
+  return uniqueSpyPostSpaces(spyObservationPostChoiceSpaces().filter((space) =>
+    spyObservationPostOwnerIds(state, space.id).includes(pending.ownerId)
+  ));
 }
 
 export function placeableSpySpaces(state: GameState, pending: SpyPendingAction) {
   const owner = state.players.find((player) => player.id === pending.ownerId);
   if (!owner || owner.spies <= 0) return [];
-  return uniqueSpyPostSpaces(boardSpaces.filter((space) =>
+  return uniqueSpyPostSpaces(spyObservationPostChoiceSpaces().filter((space) =>
     (pending.allowSharedPost ? canPlaceSharedSpyPost(state, space, owner) : canPlaceSpyPost(state, space, owner)) &&
     (!pending.placementIcon || space.icon === pending.placementIcon)
   ));
@@ -59,7 +61,7 @@ export function recallableSpySupplySpaces(state: GameState, pending: SpyPendingA
   }));
 }
 
-function uniqueSpyPostSpaces(spaces: readonly (typeof boardSpaces)[number][]) {
+function uniqueSpyPostSpaces(spaces: ReturnType<typeof spyObservationPostChoiceSpaces>) {
   const seenPostIds = new Set<string>();
   return spaces.filter((space) => {
     const postId = spyObservationPostIdForSpace(space.id);

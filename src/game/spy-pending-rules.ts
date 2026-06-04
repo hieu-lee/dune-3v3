@@ -12,14 +12,12 @@ import {
   recallableSpySupplySpaces,
 } from "./spy-choices";
 import {
-  canPlaceSharedSpyPost,
-  canPlaceSpyPost,
   normalizeSpyObservationPosts,
-  playerHasSpyPost,
   removeSpyPostOwner,
   spyObservationPostIdForSpace,
   spyObservationPostLabelForSpace,
   spyPostOwnerIds,
+  spyPostRecallCountForOwner,
 } from "./spy-posts";
 import {
   recordTurnSpiceGainAndCompleteHarvestContracts,
@@ -78,8 +76,7 @@ export function resolvePlaceSpyForPending(
     !space ||
     owner.spies <= 0 ||
     pending.remaining <= 0 ||
-    !(pending.allowSharedPost ? canPlaceSharedSpyPost(state, space, owner) : canPlaceSpyPost(state, space, owner)) ||
-    (pending.placementIcon && space.icon !== pending.placementIcon)
+    !placeableSpySpaces(state, pending).some((candidate) => candidate.id === space.id)
   ) {
     return state;
   }
@@ -140,7 +137,7 @@ export function recallSpyForSupplyForPending(
   const owner = state.players.find((player) => player.id === pending.ownerId);
   if (!owner || owner.spies > 0 || pending.remaining <= 0) return state;
   const space = boardSpaces.find((candidate) => candidate.id === spaceId);
-  if (!space || !playerHasSpyPost(state, space.id, owner.id)) return state;
+  if (!space || spyPostRecallCountForOwner(state, space.id, owner.id) <= 0) return state;
   if (!recallableSpySupplySpaces(state, pending).some((candidate) => candidate.id === space.id)) return state;
 
   const { spyPosts, sharedSpyPosts, removedSpyCount } = removeSpyPostOwner(state, space.id, owner.id);
@@ -249,7 +246,14 @@ export function recallSpyForPending(
   const owner = state.players.find((player) => player.id === pending.ownerId);
   if (!owner) return { ...state, ...advancePendingAction(state) };
   const space = boardSpaces.find((candidate) => candidate.id === spaceId);
-  if (!space || !playerHasSpyPost(state, space.id, owner.id) || pending.remaining <= 0) return state;
+  if (
+    !space ||
+    spyPostRecallCountForOwner(state, space.id, owner.id) <= 0 ||
+    pending.remaining <= 0 ||
+    !recallableSpySpaces(state, pending).some((candidate) => candidate.id === space.id)
+  ) {
+    return state;
+  }
 
   const { spyPosts, sharedSpyPosts, removedSpyCount } = removeSpyPostOwner(state, space.id, owner.id);
   const recalledSpyCount = Math.max(1, removedSpyCount);

@@ -13,6 +13,10 @@ export function verifyImperiumCardSpyEffects({
   const { beneGesseritOperative, spyNetwork } = cards;
   const { allyId, commanderId, teammateId } = playerIds;
   const { highCouncil, secrets } = spaces;
+  const beneSpySpace = data.boardSpaces.find((space) => space.id === "espionage");
+  assert.ok(beneSpySpace, "Espionage should be the Bene spy-post representative");
+  const highCouncilPostId = state.spyObservationPostIdForSpace(highCouncil.id);
+  const benePostId = state.spyObservationPostIdForSpace(secrets.id);
   const p2 = playerById(game, allyId);
   const p4 = playerById(game, commanderId);
   const p6 = playerById(game, teammateId);
@@ -55,13 +59,13 @@ export function verifyImperiumCardSpyEffects({
     "Bene Gesserit Operative should spend one spy from supply",
   );
   assert.equal(
-    operativeSpyPlaced.spyPosts[highCouncil.id],
+    operativeSpyPlaced.spyPosts[highCouncilPostId],
     p2.id,
     "Bene Gesserit Operative should place the selected spy",
   );
   assert.match(
     operativeSpyPlaced.log[0],
-    /places a spy near High Council from Bene Gesserit Operative/,
+    /places a spy near High Council \/ Imperial Privilege \/ Swordmaster from Bene Gesserit Operative/,
   );
   const operativeNoSupplyBase = withActivePlayer(game, p2.id, () => ({
     agentsReady: 1,
@@ -74,7 +78,7 @@ export function verifyImperiumCardSpyEffects({
   const operativeNoSupplyPlayed = turnActions.placeAgentAction(
     {
       ...operativeNoSupplyBase,
-      spyPosts: { [highCouncil.id]: p2.id },
+      spyPosts: { [highCouncilPostId]: p2.id },
     },
     {
       commanderTargets: {},
@@ -104,15 +108,15 @@ export function verifyImperiumCardSpyEffects({
     highCouncil.id,
   );
   assert.equal(playerById(operativeSupplyRecalled, p2.id).spies, 1);
-  assert.equal(operativeSupplyRecalled.spyPosts[highCouncil.id], undefined);
+  assert.equal(operativeSupplyRecalled.spyPosts[highCouncilPostId], undefined);
   assert.equal(operativeSupplyRecalled.pendingAction.mustPlaceSpy, true);
   const operativeAfterSupplyRecallPlaced = state.placeSpyForPending(
     operativeSupplyRecalled,
     operativeSupplyRecalled.pendingAction,
-    secrets.id,
+    beneSpySpace.id,
   );
   assert.equal(playerById(operativeAfterSupplyRecallPlaced, p2.id).spies, 0);
-  assert.equal(operativeAfterSupplyRecallPlaced.spyPosts[secrets.id], p2.id);
+  assert.equal(operativeAfterSupplyRecallPlaced.spyPosts[benePostId], p2.id);
   const operativeNoSpy = turnActions.placeAgentAction(
     withActivePlayer(game, p2.id, () => ({
       agentsReady: 1,
@@ -178,7 +182,7 @@ export function verifyImperiumCardSpyEffects({
     playerById(commanderOperativePlayed, p2.id).spies,
     "Commander Operative should not spend the activated Ally's spy",
   );
-  assert.equal(commanderOperativeSpyPlaced.spyPosts[highCouncil.id], p4.id);
+  assert.equal(commanderOperativeSpyPlaced.spyPosts[highCouncilPostId], p4.id);
   const operativeRevealFixture = withActivePlayer(game, p2.id, () => ({
     agentsReady: 0,
     discard: [],
@@ -191,7 +195,7 @@ export function verifyImperiumCardSpyEffects({
     playerById(operativeRevealFixture, p2.id),
     {
       ...operativeRevealFixture,
-      spyPosts: { [secrets.id]: p2.id, [highCouncil.id]: p2.id },
+      spyPosts: { [benePostId]: p2.id, [highCouncilPostId]: p2.id },
     },
   );
   assert.equal(
@@ -202,7 +206,7 @@ export function verifyImperiumCardSpyEffects({
   const operativeRevealed = turnActions.revealTurnAction(
     {
       ...operativeRevealFixture,
-      spyPosts: { [secrets.id]: p2.id, [highCouncil.id]: p2.id },
+      spyPosts: { [benePostId]: p2.id, [highCouncilPostId]: p2.id },
     },
     { commanderTargets: {}, revealPlan: operativeRevealPlan },
   );
@@ -212,7 +216,7 @@ export function verifyImperiumCardSpyEffects({
     playerById(operativeRevealFixture, p2.id),
     {
       ...operativeRevealFixture,
-      spyPosts: { [secrets.id]: p2.id },
+      spyPosts: { [benePostId]: p2.id },
     },
   );
   assert.equal(
@@ -224,7 +228,7 @@ export function verifyImperiumCardSpyEffects({
     playerById(operativeRevealFixture, p2.id),
     {
       ...operativeRevealFixture,
-      spyPosts: { [secrets.id]: p4.id, [highCouncil.id]: p6.id },
+      spyPosts: { [benePostId]: p4.id, [highCouncilPostId]: p6.id },
     },
   );
   assert.equal(
@@ -236,8 +240,8 @@ export function verifyImperiumCardSpyEffects({
     playerById(operativeRevealFixture, p2.id),
     {
       ...operativeRevealFixture,
-      spyPosts: { [secrets.id]: p4.id, [highCouncil.id]: p2.id },
-      sharedSpyPosts: { [secrets.id]: [p2.id] },
+      spyPosts: { [benePostId]: p4.id, [highCouncilPostId]: p2.id },
+      sharedSpyPosts: { [benePostId]: [p2.id] },
     },
   );
   assert.equal(
@@ -257,7 +261,7 @@ export function verifyImperiumCardSpyEffects({
     playerById(commanderOperativeRevealFixture, p4.id),
     {
       ...commanderOperativeRevealFixture,
-      spyPosts: { [secrets.id]: p2.id, [highCouncil.id]: p2.id },
+      spyPosts: { [benePostId]: p2.id, [highCouncilPostId]: p2.id },
     },
   );
   assert.equal(
@@ -269,7 +273,7 @@ export function verifyImperiumCardSpyEffects({
     playerById(commanderOperativeRevealFixture, p4.id),
     {
       ...commanderOperativeRevealFixture,
-      spyPosts: { [secrets.id]: p4.id, [highCouncil.id]: p4.id },
+      spyPosts: { [benePostId]: p4.id, [highCouncilPostId]: p4.id },
     },
   );
   assert.equal(
@@ -297,7 +301,7 @@ export function verifyImperiumCardSpyEffects({
     intrigueDeck: [spyNetworkIntrigueReward],
     intrigueDiscard: [],
     sharedSpyPosts: {},
-    spyPosts: { [secrets.id]: p2.id, [highCouncil.id]: p2.id },
+    spyPosts: { [benePostId]: p2.id, [highCouncilPostId]: p2.id },
   };
   const spyNetworkRevealPlan = turnActions.revealTurnPlan(
     playerById(spyNetworkRevealFixture, p2.id),
@@ -337,7 +341,7 @@ export function verifyImperiumCardSpyEffects({
       .recallableSpySpaces(spyNetworkRevealed, spyNetworkRevealed.pendingAction)
       .map((space) => space.id)
       .sort(),
-    [highCouncil.id, secrets.id].sort(),
+    [highCouncil.id, beneSpySpace.id].sort(),
     "Spy Network should allow recalling any owned spy post",
   );
   const spyNetworkRecalled = state.recallSpyForPending(
@@ -351,7 +355,7 @@ export function verifyImperiumCardSpyEffects({
     "Resolving Spy Network recall should clear the pending action",
   );
   assert.equal(
-    spyNetworkRecalled.spyPosts[highCouncil.id],
+    spyNetworkRecalled.spyPosts[highCouncilPostId],
     undefined,
     "Spy Network recall should remove the chosen spy post",
   );
@@ -381,12 +385,12 @@ export function verifyImperiumCardSpyEffects({
   );
   assert.match(
     spyNetworkRecalled.log[1],
-    /recalls a spy from High Council for Spy Network/,
+    /recalls a spy from High Council \/ Imperial Privilege \/ Swordmaster for Spy Network/,
   );
   assert.doesNotMatch(spyNetworkRecalled.log[1], /adding 0 strength/);
   const spyNetworkOneSpyFixture = {
     ...spyNetworkRevealFixture,
-    spyPosts: { [secrets.id]: p2.id },
+    spyPosts: { [benePostId]: p2.id },
   };
   const spyNetworkOneSpyPlan = turnActions.revealTurnPlan(
     playerById(spyNetworkOneSpyFixture, p2.id),

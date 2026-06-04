@@ -7,6 +7,9 @@ export function verifySeizeSpiceRefineryConflictAwards({
   conflictBySourceId,
   playerById,
 }) {
+  const arrakeenPostId = state.spyObservationPostIdForSpace("arrakeen");
+  const benePostId = state.spyObservationPostIdForSpace("secrets");
+  const highCouncilPostId = state.spyObservationPostIdForSpace("high-council");
   const seizeSpiceRefineryReward = {
     ...fixture(state, data, (players) =>
       players.map((player) =>
@@ -53,7 +56,11 @@ export function verifySeizeSpiceRefineryConflictAwards({
     seizeSpiceRefineryResult.pendingAction,
     seizeSpySpace.id,
   );
-  assert.equal(seizeSpyPlaced.spyPosts[seizeSpySpace.id], "p2", "Seize Spice Refinery should place the rewarded spy");
+  assert.equal(
+    seizeSpyPlaced.spyPosts[state.spyObservationPostIdForSpace(seizeSpySpace.id)],
+    "p2",
+    "Seize Spice Refinery should place the rewarded spy",
+  );
   assert.equal(playerById(seizeSpyPlaced, "p2").spies, playerById(seizeSpiceRefineryResult, "p2").spies - 1);
   assert.equal(seizeSpyPlaced.pendingAction, undefined, "Placed Seize Spice Refinery spy should clear the reward pending action");
   assert.equal(seizeSpyPlaced.round, seizeSpiceRefineryResult.round + 1, "Placed Seize Spice Refinery spy should advance to the next round");
@@ -154,7 +161,7 @@ export function verifySeizeSpiceRefineryConflictAwards({
           : player,
       ), 457),
     conflictDeck: [conflictBySourceId(data, 454)],
-    spyPosts: { arrakeen: "p3", espionage: "p3", secrets: "p3" },
+    spyPosts: { [arrakeenPostId]: "p3", [benePostId]: "p3", [highCouncilPostId]: "p3" },
   };
   const doubledSeizeSupplyRecallPending = state.startNextRound(doubledSeizeWithSupplyRecall);
   assert.equal(
@@ -165,7 +172,7 @@ export function verifySeizeSpiceRefineryConflictAwards({
   const doubledSeizeFirstRecallChoice = state.recallableSpySupplySpaces(
     doubledSeizeSupplyRecallPending,
     doubledSeizeSupplyRecallPending.pendingAction,
-  ).find((space) => space.id === "secrets");
+  ).find((space) => space.id === "espionage");
   assert.ok(doubledSeizeFirstRecallChoice, "Doubled Seize Spice Refinery should allow recalling a spy for supply");
   const doubledSeizeFirstSupplyRecalled = state.recallSpyForSupplyForPending(
     doubledSeizeSupplyRecallPending,

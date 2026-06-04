@@ -1,7 +1,8 @@
+import type { CSSProperties } from "react";
 import { Crown, FileText, Hexagon, Sparkles, Swords, Users } from "lucide-react";
 import { costLabel } from "../app-helpers";
 import { locationControlOwnerId } from "../game/critical-locations";
-import { boardSpaces, iconLabels } from "../game/data";
+import { boardSpaces, iconLabels, teams } from "../game/data";
 import { effectiveCost, spyPostOwnerIds } from "../game/state";
 import type { BoardSpace, FactionId, GameState, Player, ResourceId, TeamId } from "../game/types";
 import {
@@ -44,6 +45,9 @@ const personalLabels: Record<TeamId, string> = {
 const boardSpaceById = new Map(boardSpaces.map((space) => [space.id, space]));
 const layoutSpaceIds = new Set(boardLayoutSpaceIds);
 const unplacedSpaces = boardSpaces.filter((space) => !layoutSpaceIds.has(space.id));
+const scoreTrackMaximum = Math.max(...scoreTrackValues);
+const scoreTrackMinimum = Math.min(...scoreTrackValues);
+const scoreTeams = ["muaddib", "shaddam"] as const;
 
 function classToken(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -72,7 +76,28 @@ function rewardBadges(space: BoardSpace) {
   return badges;
 }
 
+function teamVictoryPoints(players: readonly Player[], team: TeamId) {
+  return players
+    .filter((player) => player.team === team)
+    .reduce((sum, player) => sum + player.vp, 0);
+}
+
+function scoreTrackSlot(score: number) {
+  return Math.min(scoreTrackMaximum, Math.max(scoreTrackMinimum, score));
+}
+
 export function BoardPanel({ game, legalSpaceIds, playingPhase, selectedSpaceId, onSelectSpace }: BoardPanelProps) {
+  const scoreMarkers = scoreTeams.map((team) => {
+    const score = teamVictoryPoints(game.players, team);
+    return {
+      team,
+      score,
+      slot: scoreTrackSlot(score),
+      label: teams[team].name,
+      accent: teams[team].accent,
+    };
+  });
+
   function renderSpaceTile(space: BoardSpace) {
     const occupant = game.players.find((player) => player.id === game.spaces[space.id]);
     const spyOwners = spyPostOwnerIds(game, space.id)
@@ -228,7 +253,32 @@ export function BoardPanel({ game, legalSpaceIds, playingPhase, selectedSpaceId,
 
         <aside className="board-score-rail" aria-label="Score track">
           <strong>VP</strong>
-          {scoreTrackValues.map((score) => <span key={score}>{score}</span>)}
+          <span className="board-score-summary">
+            {scoreMarkers.map((marker) => `${marker.label}: ${marker.score} VP`).join("; ")}
+          </span>
+          {scoreTrackValues.map((score) => {
+            const slotMarkers = scoreMarkers.filter((marker) => marker.slot === score);
+            return (
+              <div className={`board-score-row ${slotMarkers.length > 0 ? "board-score-row--marked" : ""}`} key={score}>
+                <span className="board-score-value">{score}</span>
+                {slotMarkers.length > 0 && (
+                  <span className="board-score-markers" aria-hidden="true">
+                    {slotMarkers.map((marker) => (
+                      <span
+                        className="board-score-marker"
+                        key={marker.team}
+                        style={{ "--score-marker": marker.accent } as CSSProperties}
+                        title={`${marker.label}: ${marker.score} VP`}
+                        aria-label={`${marker.label}: ${marker.score} VP`}
+                      >
+                        {marker.score}
+                      </span>
+                    ))}
+                  </span>
+                )}
+              </div>
+            );
+          })}
         </aside>
       </div>
     </section>

@@ -306,7 +306,7 @@
 }
 
 .board-score-rail strong,
-.board-score-rail span {
+.board-score-row {
   display: grid;
   place-items: center;
   width: 100%;
@@ -318,12 +318,53 @@
   font-weight: 900;
 }
 
-.board-score-rail span {
+.board-score-summary {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.board-score-row {
+  position: relative;
   min-height: 34px;
   border-bottom: 1px solid rgba(255, 246, 230, 0.2);
+}
+
+.board-score-row--marked {
+  background: rgba(255, 246, 230, 0.055);
+  box-shadow: inset 0 0 0 1px rgba(255, 246, 230, 0.1);
+}
+
+.board-score-value {
   color: #fff5df;
   font-size: 0.82rem;
   font-weight: 900;
+}
+
+.board-score-markers {
+  position: absolute;
+  right: -2px;
+  display: grid;
+  gap: 2px;
+}
+
+.board-score-marker {
+  --score-marker: #f2b84b;
+  display: grid;
+  place-items: center;
+  min-width: 20px;
+  min-height: 16px;
+  border: 1px solid color-mix(in srgb, var(--score-marker), transparent 30%);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--score-marker), rgba(8, 7, 6, 0.52) 58%);
+  color: #fff8e8;
+  font-size: 0.56rem;
+  font-weight: 950;
+  line-height: 1;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.26);
 }
 
 .space-tile {
@@ -578,8 +619,31 @@
     padding: 7px 0 0;
   }
 
-  .board-score-rail span {
-    min-height: 26px;
+  .board-score-row {
+    min-height: 32px;
+    align-content: start;
+    padding-top: 2px;
+  }
+
+  .board-score-row--marked {
+    background: linear-gradient(180deg, rgba(242, 184, 75, 0.08), rgba(91, 192, 190, 0.08));
+  }
+
+  .board-score-markers {
+    inset: auto 0 3px;
+    grid-auto-flow: column;
+    justify-items: center;
+    justify-content: center;
+  }
+
+  .board-score-marker {
+    width: 6px;
+    min-width: 0;
+    height: 6px;
+    min-height: 0;
+    border-radius: 999px;
+    font-size: 0;
+    padding: 0;
   }
 }
 

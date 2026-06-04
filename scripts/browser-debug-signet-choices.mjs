@@ -18,8 +18,12 @@ export async function runSignetChoicesSmoke({
   await writeJson("pending-signet-choice-states.json", states);
 
   await setDebugGameAndWait(page, states.muadDib);
-  await page.getByText(/Muad'Dib resolves Lead the Way: draws 1 card/i).first().waitFor();
   const muadDibAfter = await currentGame(page);
+  assert.match(
+    muadDibAfter.log[0] ?? "",
+    /Muad'Dib resolves Lead the Way: draws 1 card/i,
+    "Muad'Dib Signet should log Lead the Way",
+  );
   const muadDibCommander = muadDibAfter.players.find((player) => player.id === "p1");
   assert.ok(muadDibCommander, "Expected Muad'Dib commander after Signet draw");
   assert.equal(
@@ -30,16 +34,24 @@ export async function runSignetChoicesSmoke({
   await screenshot(page, captures, "muaddib-signet-draw.png");
 
   await setDebugGameAndWait(page, states.gurney);
-  await page.getByText(/Gurney Halleck resolves Warmaster: recruits 1 troop/i).first().waitFor();
   const gurneyAfter = await currentGame(page);
+  assert.match(
+    gurneyAfter.log[0] ?? "",
+    /Gurney Halleck resolves Warmaster: recruits 1 troop/i,
+    "Gurney Signet should log Warmaster",
+  );
   const gurney = gurneyAfter.players.find((player) => player.id === "p3");
   assert.ok(gurney, "Expected Gurney after Signet recruit");
   assert.equal(gurney.garrison, 1, "Gurney Signet should recruit the scripted troop");
   await screenshot(page, captures, "gurney-signet-warmaster.png");
 
   await setDebugGameAndWait(page, states.amber);
-  await page.getByText(/Lady Amber Metulli resolves Fill Coffers: gains 1 Solari and 1 spice/i).first().waitFor();
   const amberAfter = await currentGame(page);
+  assert.match(
+    amberAfter.log[0] ?? "",
+    /Lady Amber Metulli resolves Fill Coffers: gains 1 Solari and 1 spice/i,
+    "Amber Signet should log Fill Coffers",
+  );
   const amber = amberAfter.players.find((player) => player.id === "p3");
   assert.ok(amber, "Expected Lady Amber after Signet resource gain");
   assert.equal(amber.resources.solari, 3, "Amber Signet should gain the scripted Solari");

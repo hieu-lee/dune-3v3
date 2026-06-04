@@ -474,8 +474,8 @@ export async function createCardChoiceStates(server, initialPlayableGame) {
     },
     acquireSpyNetwork: {
       ...acquireSpyNetworkState,
-      spySpaceId: spySpace.id,
-      spySpaceName: spySpace.name,
+      spyPostId: state.spyObservationPostIdForSpace(spySpace.id),
+      spySpaceName: state.spyObservationPostLabelForSpace(spySpace.id),
     },
     acquireInterstellarTrade: acquireInterstellarTradeState,
     priorityContracts: {
@@ -486,25 +486,25 @@ export async function createCardChoiceStates(server, initialPlayableGame) {
     inHighPlaces: {
       ...inHighPlacesState,
       inHighPlacesDrawCardId: inHighPlacesDrawCard.id,
-      spySpaceId: spySpace.id,
-      spySpaceName: spySpace.name,
+      spyPostId: state.spyObservationPostIdForSpace(spySpace.id),
+      spySpaceName: state.spyObservationPostLabelForSpace(spySpace.id),
     },
     beneGesseritOperativeSpy: {
       ...beneGesseritOperativeSpyState,
-      spySpaceId: spySpace.id,
-      spySpaceName: spySpace.name,
+      spyPostId: state.spyObservationPostIdForSpace(spySpace.id),
+      spySpaceName: state.spyObservationPostLabelForSpace(spySpace.id),
     },
     doubleAgentSharedSpy: {
       ...doubleAgentSharedSpyState,
-      sharedSpySpaceId: spyPlaceAfterRecallSpace.id,
-      sharedSpySpaceName: spyPlaceAfterRecallSpace.name,
+      sharedSpyPostId: state.spyObservationPostIdForSpace(spyPlaceAfterRecallSpace.id),
+      sharedSpySpaceName: state.spyObservationPostLabelForSpace(spyPlaceAfterRecallSpace.id),
     },
     beneGesseritOperativeRecallSpy: {
       ...beneGesseritOperativeRecallSpyState,
-      spyRecallSpaceId: spySpace.id,
-      spyRecallSpaceName: spySpace.name,
-      spyPlaceAfterRecallSpaceId: spyPlaceAfterRecallSpace.id,
-      spyPlaceAfterRecallSpaceName: spyPlaceAfterRecallSpace.name,
+      spyRecallPostId: state.spyObservationPostIdForSpace(spySpace.id),
+      spyRecallSpaceName: state.spyObservationPostLabelForSpace(spySpace.id),
+      spyPlaceAfterRecallPostId: state.spyObservationPostIdForSpace(spyPlaceAfterRecallSpace.id),
+      spyPlaceAfterRecallSpaceName: state.spyObservationPostLabelForSpace(spyPlaceAfterRecallSpace.id),
     },
     capturedMentat: {
       ...base,

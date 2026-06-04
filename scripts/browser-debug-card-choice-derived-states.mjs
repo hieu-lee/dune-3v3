@@ -16,6 +16,10 @@ export function createCardChoiceDerivedStates({
   strikeFleet, strikeFleetArrakeenDraw, subversiveAdvisor, treadInDarkness, treadInDarknessDrawCard, treadInDarknessExtraDeckCard,
   treadInDarknessOtherBeneCard, turnActions, unprotectedConflict,
 }) {
+  const arrakeenPostId = state.spyObservationPostIdForSpace(arrakeen.id);
+  const spyPostId = state.spyObservationPostIdForSpace(spySpace.id);
+  const spyPlaceAfterRecallPostId = state.spyObservationPostIdForSpace(spyPlaceAfterRecallSpace.id);
+
   const beneGesseritOperativeAgentBase = {
     ...base,
     players: base.players.map((player) =>
@@ -39,7 +43,7 @@ export function createCardChoiceDerivedStates({
   const beneGesseritOperativeRecallSpyState = turnActions.placeAgentAction(
     {
       ...beneGesseritOperativeAgentBase,
-      spyPosts: { [spySpace.id]: ownerId },
+      spyPosts: { [spyPostId]: ownerId },
       players: beneGesseritOperativeAgentBase.players.map((player) =>
         player.id === ownerId ? { ...player, spies: 0 } : player,
       ),
@@ -92,7 +96,7 @@ export function createCardChoiceDerivedStates({
   const doubleAgentSharedSpyState = turnActions.placeAgentAction(
     {
       ...base,
-      spyPosts: { [spySpace.id]: ownerId, [spyPlaceAfterRecallSpace.id]: "p3" },
+      spyPosts: { [spyPostId]: ownerId, [spyPlaceAfterRecallPostId]: "p3" },
       sharedSpyPosts: {},
       spaces: {},
       players: base.players.map((player) =>
@@ -565,7 +569,7 @@ export function createCardChoiceDerivedStates({
     {
       ...base,
       sharedSpyPosts: {},
-      spyPosts: { [spyPlaceAfterRecallSpace.id]: ownerId },
+      spyPosts: { [spyPlaceAfterRecallPostId]: ownerId },
       players: base.players.map((player) =>
         player.id === ownerId
           ? {
@@ -595,7 +599,7 @@ export function createCardChoiceDerivedStates({
     {
       ...base,
       sharedSpyPosts: {},
-      spyPosts: { [spyPlaceAfterRecallSpace.id]: ownerId },
+      spyPosts: { [spyPlaceAfterRecallPostId]: ownerId },
       players: base.players.map((player) =>
         player.id === ownerId
           ? {
@@ -927,7 +931,7 @@ export function createCardChoiceDerivedStates({
       ...base,
       sharedSpyPosts: {},
       spaces: {},
-      spyPosts: { [arrakeen.id]: ownerId },
+      spyPosts: { [arrakeenPostId]: ownerId },
       turnSpyRecalls: { [ownerId]: 1 },
       players: base.players.map((player) =>
         player.id === ownerId

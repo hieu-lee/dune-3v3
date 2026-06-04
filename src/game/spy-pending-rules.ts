@@ -4,6 +4,7 @@ import {
 } from "./card-pending-rules";
 import { boardSpaces } from "./data";
 import { drawIntrigueCards } from "./intrigue-deck";
+import { scoreActiveGurneyAlwaysSmilingForRecipient } from "./leader-rewards";
 import { advancePendingAction } from "./pending-actions";
 import { stabanTuekLeaderName } from "./player-setup";
 import {
@@ -281,9 +282,12 @@ export function recallSpyForPending(
   }, owner.id, recalledSpyCount);
   if (finalRecall) recalledState = normalizeSpyObservationPosts(recalledState);
 
-  return finalRecall && pending.drawIntrigues
+  const resolvedState = finalRecall && pending.drawIntrigues
     ? drawIntrigueCards(recalledState, owner.id, pending.drawIntrigues, pending.source)
     : recalledState;
+  return finalRecall && pending.strength > 0
+    ? scoreActiveGurneyAlwaysSmilingForRecipient(resolvedState, pending.combatRecipientId)
+    : resolvedState;
 }
 
 export function skipRecallSpy(state: GameState, pending: RecallSpyPendingAction): GameState {

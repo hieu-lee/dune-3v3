@@ -66,6 +66,7 @@ import {
   boardSpaces,
 } from "./data";
 import {
+  scoreActiveGurneyAlwaysSmilingForRecipient,
   scoreGurneyAlwaysSmiling,
 } from "./leader-rewards";
 import {
@@ -251,7 +252,17 @@ export function trashPlayerCard(
   cardId: string,
   choiceIndex?: number,
 ): GameState {
-  return continueAfterResolvedConflictReward(resolveTrashPlayerCard(state, pending, zone, cardId, choiceIndex));
+  const resolvedState = resolveTrashPlayerCard(state, pending, zone, cardId, choiceIndex);
+  const gurneyStrengthRecipientId = pending.combatRecipientId;
+  const shouldScoreGurney =
+    resolvedState !== state &&
+    (pending.strengthReward ?? 0) > 0 &&
+    gurneyStrengthRecipientId !== undefined;
+  return continueAfterResolvedConflictReward(
+    shouldScoreGurney
+      ? scoreActiveGurneyAlwaysSmilingForRecipient(resolvedState, gurneyStrengthRecipientId)
+      : resolvedState,
+  );
 }
 
 export function skipTrashCard(state: GameState, pending: TrashCardPendingAction): GameState {
@@ -485,7 +496,12 @@ export function resolveRetreatTroopsForStrength(
   state: GameState,
   pending: RetreatTroopsForStrengthPendingAction,
 ): GameState {
-  return continueAfterResolvedConflictReward(resolveRetreatTroopsForStrengthForPending(state, pending));
+  const resolvedState = resolveRetreatTroopsForStrengthForPending(state, pending);
+  return continueAfterResolvedConflictReward(
+    resolvedState === state
+      ? resolvedState
+      : scoreActiveGurneyAlwaysSmilingForRecipient(resolvedState, pending.combatRecipientId),
+  );
 }
 
 export function skipRetreatTroopsForStrength(

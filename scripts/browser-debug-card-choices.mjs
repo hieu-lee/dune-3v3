@@ -343,7 +343,7 @@ export async function runCardChoicesSmoke({
   after = await currentGame(page);
   ownerAfter = after.players.find((player) => player.id === "p2");
   assert.equal(ownerAfter.spies, ownerBefore.spies - 1, "Spy Network acquire bonus should spend one spy");
-  assert.equal(after.spyPosts[states.acquireSpyNetwork.spySpaceId], "p2", "Spy Network acquire bonus should place the chosen spy");
+  assert.equal(after.spyPosts[states.acquireSpyNetwork.spyPostId], "p2", "Spy Network acquire bonus should place the chosen spy");
   assert.equal(ownerAfter.discard.at(-1).name, "Spy Network", "Spy Network should remain acquired after resolving its spy bonus");
 
   await setDebugGameAndWait(page, states.acquireInterstellarTrade);
@@ -434,7 +434,7 @@ export async function runCardChoicesSmoke({
   after = await currentGame(page);
   ownerAfter = after.players.find((player) => player.id === "p2");
   assert.equal(ownerAfter.spies, ownerBefore.spies - 1, "In High Places should spend one spy");
-  assert.equal(after.spyPosts[states.inHighPlaces.spySpaceId], "p2", "In High Places should place the chosen spy");
+  assert.equal(after.spyPosts[states.inHighPlaces.spyPostId], "p2", "In High Places should place the chosen spy");
 
   await setDebugGameAndWait(page, states.beneGesseritOperativeSpy);
   pendingText = await page.locator(".pending-panel").innerText();
@@ -450,7 +450,7 @@ export async function runCardChoicesSmoke({
   after = await currentGame(page);
   ownerAfter = after.players.find((player) => player.id === "p2");
   assert.equal(ownerAfter.spies, ownerBefore.spies - 1, "Bene Gesserit Operative should spend one spy");
-  assert.equal(after.spyPosts[states.beneGesseritOperativeSpy.spySpaceId], "p2", "Bene Gesserit Operative should place the chosen spy");
+  assert.equal(after.spyPosts[states.beneGesseritOperativeSpy.spyPostId], "p2", "Bene Gesserit Operative should place the chosen spy");
 
   await setDebugGameAndWait(page, states.doubleAgentSharedSpy);
   pendingText = await page.locator(".pending-panel").innerText();
@@ -466,8 +466,8 @@ export async function runCardChoicesSmoke({
   after = await currentGame(page);
   ownerAfter = after.players.find((player) => player.id === "p2");
   assert.equal(ownerAfter.spies, ownerBefore.spies - 1, "Double Agent should spend one spy");
-  assert.equal(after.spyPosts[states.doubleAgentSharedSpy.sharedSpySpaceId], "p3", "Double Agent should keep the original spy owner");
-  assert.deepEqual(after.sharedSpyPosts[states.doubleAgentSharedSpy.sharedSpySpaceId], ["p2"], "Double Agent should share the target spy post");
+  assert.equal(after.spyPosts[states.doubleAgentSharedSpy.sharedSpyPostId], "p3", "Double Agent should keep the original spy owner");
+  assert.deepEqual(after.sharedSpyPosts[states.doubleAgentSharedSpy.sharedSpyPostId], ["p2"], "Double Agent should share the target spy post");
 
   await setDebugGameAndWait(page, states.beneGesseritOperativeRecallSpy);
   pendingText = await page.locator(".pending-panel").innerText();
@@ -485,9 +485,9 @@ export async function runCardChoicesSmoke({
   after = await currentGame(page);
   ownerAfter = after.players.find((player) => player.id === "p2");
   assert.equal(ownerAfter.spies, 0, "Bene Gesserit Operative recall path should spend the recalled spy");
-  assert.equal(after.spyPosts[states.beneGesseritOperativeRecallSpy.spyRecallSpaceId], undefined, "Bene Gesserit Operative should remove the recalled spy");
+  assert.equal(after.spyPosts[states.beneGesseritOperativeRecallSpy.spyRecallPostId], undefined, "Bene Gesserit Operative should remove the recalled spy");
   assert.equal(
-    after.spyPosts[states.beneGesseritOperativeRecallSpy.spyPlaceAfterRecallSpaceId],
+    after.spyPosts[states.beneGesseritOperativeRecallSpy.spyPlaceAfterRecallPostId],
     "p2",
     "Bene Gesserit Operative should place the recalled spy on the chosen space",
   );

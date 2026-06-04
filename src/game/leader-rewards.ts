@@ -10,7 +10,8 @@ import { recordTurnSpiceGain } from "./turn-trackers";
 import type { FactionId, GameState, Player } from "./types";
 
 const influenceVictoryPointThreshold = 2;
-const gurneyAlwaysSmilingThreshold = 10;
+const gurneyAlwaysSmilingBaseThreshold = 6;
+const gurneyAlwaysSmilingSixPlayerThreshold = 10;
 const margotLoyaltyFaction: FactionId = "bene";
 const margotLoyaltyThreshold = 2;
 const margotLoyaltySpice = 2;
@@ -19,16 +20,16 @@ const irulanBirthrightThreshold = 2;
 
 export function scoreGurneyAlwaysSmiling(state: GameState, playerId: string): GameState {
   const player = state.players.find((candidate) => candidate.id === playerId);
+  const threshold = state.players.length === 6 ? gurneyAlwaysSmilingSixPlayerThreshold : gurneyAlwaysSmilingBaseThreshold;
   if (
     !player ||
     state.phase !== "playing" ||
     state.players[state.activeSeat]?.id !== player.id ||
-    state.players.length !== 6 ||
     player.leader !== gurneyHalleckLeaderName ||
     !player.revealed ||
     player.gurneyAlwaysSmilingScored ||
     !playerHasConflictUnits(player) ||
-    player.conflict < gurneyAlwaysSmilingThreshold
+    player.conflict < threshold
   ) {
     return state;
   }
@@ -45,6 +46,11 @@ export function scoreGurneyAlwaysSmiling(state: GameState, playerId: string): Ga
       ...state.log,
     ],
   };
+}
+
+export function scoreActiveGurneyAlwaysSmilingForRecipient(state: GameState, recipientId: string): GameState {
+  const activePlayer = state.players[state.activeSeat];
+  return activePlayer?.id === recipientId ? scoreGurneyAlwaysSmiling(state, recipientId) : state;
 }
 
 export function adjustInfluence(player: Player, faction: FactionId, amount: number): Player {

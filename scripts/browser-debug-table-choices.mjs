@@ -143,7 +143,7 @@ export async function runTableChoicesSmoke({
   const wheelsAfter = await currentGame(page);
   const wheelsOwnerAfter = wheelsAfter.players.find((player) => player.id === "p2");
   assert.ok(wheelsOwnerAfter, "Expected Feyd after Wheels Within Wheels reveal spy placement");
-  assert.equal(wheelsAfter.spyPosts[states.wheelsRevealSpySpaceId], "p2", "Wheels Within Wheels should place the chosen reveal spy");
+  assert.equal(wheelsAfter.spyPosts[states.wheelsRevealSpyPostId], "p2", "Wheels Within Wheels should place the chosen reveal spy");
   assert.equal(wheelsOwnerAfter.spies, wheelsOwnerBefore.spies - 1, "Wheels Within Wheels should spend one spy");
   assert.equal(wheelsOwnerAfter.persuasion, 1, "Wheels Within Wheels should keep its typed reveal persuasion after spy placement");
 
@@ -163,7 +163,7 @@ export async function runTableChoicesSmoke({
   const spyNetworkAfter = await currentGame(page);
   const spyNetworkOwnerAfter = spyNetworkAfter.players.find((player) => player.id === "p2");
   assert.ok(spyNetworkOwnerAfter, "Expected Feyd after Spy Network reveal recall");
-  assert.equal(spyNetworkAfter.spyPosts[states.spyNetworkRecallSpaceId], undefined, "Spy Network should remove the recalled spy post");
+  assert.equal(spyNetworkAfter.spyPosts[states.spyNetworkRecallPostId], undefined, "Spy Network should remove the recalled spy post");
   assert.equal(spyNetworkOwnerAfter.spies, spyNetworkOwnerBefore.spies + 1, "Spy Network should return the recalled spy");
   assert.equal(spyNetworkOwnerAfter.intrigues.at(-1)?.name, states.spyNetworkRewardIntrigueName, "Spy Network should draw one Intrigue");
   assert.equal(spyNetworkOwnerAfter.persuasion, 2, "Spy Network should keep its typed reveal persuasion after recall");
@@ -433,7 +433,7 @@ export async function runTableChoicesSmoke({
   const specialMissionRecallOwnerAfter = specialMissionRecallAfter.players.find((player) => player.id === "p2");
   assert.ok(specialMissionRecallOwnerAfter, "Expected Feyd after Special Mission recall");
   assert.equal(
-    specialMissionRecallAfter.spyPosts[states.specialMissionRecallSpaceId],
+    specialMissionRecallAfter.spyPosts[states.specialMissionRecallPostId],
     undefined,
     "Special Mission recall should remove the selected spy post",
   );

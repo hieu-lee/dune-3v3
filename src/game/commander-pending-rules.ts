@@ -17,6 +17,7 @@ import {
 import {
   adjustInfluence,
   resolveLeaderInfluenceThresholdRewards,
+  scoreActiveGurneyAlwaysSmilingForRecipient,
 } from "./leader-rewards";
 import {
   advancePendingAction,
@@ -465,7 +466,7 @@ export function resolvePayResourceForStrengthChoice(
     return next;
   });
 
-  return {
+  return scoreActiveGurneyAlwaysSmilingForRecipient({
     ...state,
     players,
     ...advancePendingAction(state),
@@ -473,7 +474,7 @@ export function resolvePayResourceForStrengthChoice(
       `${owner.leader} spends ${pending.cost} ${resourceLabel} for ${pending.source}; ${recipient.leader} adds ${pending.strength} strength.`,
       ...state.log,
     ],
-  };
+  }, pending.combatRecipientId);
 }
 
 export function skipPayResourceForStrength(state: GameState, pending: PayResourceForStrengthPendingAction): GameState {
@@ -635,7 +636,10 @@ export function resolvePayResourceForSandwormsChoice(
       ...state.log,
     ],
   };
-  return recordTurnUnitDeployment(nextState, owner.id, pending.sandworms);
+  return scoreActiveGurneyAlwaysSmilingForRecipient(
+    recordTurnUnitDeployment(nextState, owner.id, pending.sandworms),
+    pending.recipientId,
+  );
 }
 
 export function skipPayResourceForSandworms(state: GameState, pending: PayResourceForSandwormsPendingAction): GameState {

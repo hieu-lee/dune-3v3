@@ -200,7 +200,7 @@ export async function createTableChoiceStates(server, initialPlayableGame) {
     intrigueDiscard: [],
     shieldWall: true,
     sharedSpyPosts: {},
-    spyPosts: { [specialMissionRecallSeedSpace.id]: "p2" },
+    spyPosts: { [state.spyObservationPostIdForSpace(specialMissionRecallSeedSpace.id)]: "p2" },
     turnSpiceGains: {},
     players: base.players.map((player) =>
       player.id === "p2"
@@ -305,11 +305,11 @@ export async function createTableChoiceStates(server, initialPlayableGame) {
       ),
     },
     wheelsWithinWheelsRevealSpy: wheelsRevealSpy,
-    wheelsRevealSpySpaceId: wheelsSpySpace.id,
-    wheelsRevealSpySpaceName: wheelsSpySpace.name,
+    wheelsRevealSpyPostId: state.spyObservationPostIdForSpace(wheelsSpySpace.id),
+    wheelsRevealSpySpaceName: state.spyObservationPostLabelForSpace(wheelsSpySpace.id),
     spyNetworkRevealRecall,
-    spyNetworkRecallSpaceId: spyNetworkRecallSpaces[0].id,
-    spyNetworkRecallSpaceName: spyNetworkRecallSpaces[0].name,
+    spyNetworkRecallPostId: state.spyObservationPostIdForSpace(spyNetworkRecallSpaces[0].id),
+    spyNetworkRecallSpaceName: state.spyObservationPostLabelForSpace(spyNetworkRecallSpaces[0].id),
     spyNetworkRewardIntrigueName: spyNetworkRewardIntrigue.name,
     calculusTrashReveal: {
       ...base,
@@ -434,7 +434,7 @@ export async function createTableChoiceStates(server, initialPlayableGame) {
     specialMissionSpySpaceId: state.spyObservationPostIdForSpace(specialMissionSpySpace.id),
     specialMissionSpySpaceName: state.spyObservationPostLabelForSpace(specialMissionSpySpace.id),
     specialMissionRecallSpy,
-    specialMissionRecallSpaceId: specialMissionRecallSeedSpace.id,
+    specialMissionRecallPostId: state.spyObservationPostIdForSpace(specialMissionRecallSeedSpace.id),
     specialMissionRecallSpaceName: state.spyObservationPostLabelForSpace(specialMissionRecallSpace.id),
     changeAllegiancesAlly: {
       ...base,

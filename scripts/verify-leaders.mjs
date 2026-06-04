@@ -328,14 +328,35 @@ try {
     muadDibAllyA.id,
   );
   assert.equal(playerById(gurneyNoUnits, muadDibAllyA.id).vp, 1, "Gurney should not score from swords alone with no Conflict units");
-  const gurneyNonSixPlayer = state.scoreGurneyAlwaysSmiling(
-    { ...gurneyRevealBase, players: gurneyRevealBase.players.slice(0, 5) },
+  const gurneyFivePlayerPlayers = gurneyRevealBase.players.filter((player) => player.id !== muadDib.id);
+  const gurneyFivePlayerBase = {
+    ...gurneyRevealBase,
+    activeSeat: gurneyFivePlayerPlayers.findIndex((player) => player.id === muadDibAllyA.id),
+    players: gurneyFivePlayerPlayers.map((player) =>
+      player.id === muadDibAllyA.id
+        ? { ...player, conflict: 6, vp: 1, gurneyAlwaysSmilingScored: false }
+        : player,
+    ),
+  };
+  const gurneyNonSixPlayer = state.scoreGurneyAlwaysSmiling(gurneyFivePlayerBase, muadDibAllyA.id);
+  assert.equal(
+    playerById(gurneyNonSixPlayer, muadDibAllyA.id).vp,
+    2,
+    "Gurney should score at 6+ strength outside six-player mode",
+  );
+  const gurneyNonSixUnderThreshold = state.scoreGurneyAlwaysSmiling(
+    {
+      ...gurneyFivePlayerBase,
+      players: gurneyFivePlayerBase.players.map((player) =>
+        player.id === muadDibAllyA.id ? { ...player, conflict: 5, vp: 1, gurneyAlwaysSmilingScored: false } : player,
+      ),
+    },
     muadDibAllyA.id,
   );
   assert.equal(
-    playerById(gurneyNonSixPlayer, muadDibAllyA.id).vp,
+    playerById(gurneyNonSixUnderThreshold, muadDibAllyA.id).vp,
     1,
-    "The automated Gurney threshold should only apply to this six-player implementation",
+    "Gurney should not score below 6 strength outside six-player mode",
   );
   const deployCrossingPending = { kind: "deploy", ownerId: muadDibAllyA.id, remaining: 1, source: "Reveal-turn Detonation" };
   const gurneyAfterRevealDeployment = state.scoreGurneyAlwaysSmiling(
@@ -412,6 +433,174 @@ try {
     playerById(gurneyAfterUnexpectedAllies, muadDibAllyA.id).vp,
     2,
     "Always Smiling should score after Reveal-turn Unexpected Allies brings Gurney to 10 strength",
+  );
+  const gurneyPendingCrossingState = (playerPatch, pendingAction, statePatch = {}) => ({
+    ...gurneyRevealBase,
+    ...statePatch,
+    pendingAction,
+    pendingQueue: [],
+    players: gurneyRevealBase.players.map((player) =>
+      player.id === muadDibAllyA.id
+        ? {
+            ...player,
+            conflict: 8,
+            deployedTroops: 4,
+            deployedSandworms: 0,
+            garrison: 0,
+            vp: 1,
+            gurneyAlwaysSmilingScored: false,
+            ...playerPatch,
+          }
+        : player,
+    ),
+  });
+  const retreatStrengthCrossingPending = {
+    kind: "retreat-troops-for-strength",
+    ownerId: muadDibAllyA.id,
+    combatRecipientId: muadDibAllyA.id,
+    troopCount: 1,
+    strength: 4,
+    optional: true,
+    source: "Verifier retreat strength",
+  };
+  const gurneyAfterRetreatStrength = state.resolveRetreatTroopsForStrength(
+    gurneyPendingCrossingState({ deployedTroops: 5 }, retreatStrengthCrossingPending),
+    retreatStrengthCrossingPending,
+  );
+  assert.equal(
+    playerById(gurneyAfterRetreatStrength, muadDibAllyA.id).vp,
+    2,
+    "Always Smiling should score after a Reveal pending troop retreat brings Gurney to 10 strength",
+  );
+  const gurneyTrashStrengthCard = { ...leadTheWayDraw, id: "gurney-trash-strength-card" };
+  const trashStrengthCrossingPending = {
+    kind: "trash-card",
+    ownerId: muadDibAllyA.id,
+    combatRecipientId: muadDibAllyA.id,
+    zones: ["hand"],
+    strengthReward: 2,
+    optional: true,
+    source: "Verifier trash strength",
+  };
+  const gurneyAfterTrashStrength = state.trashPlayerCard(
+    gurneyPendingCrossingState({ hand: [gurneyTrashStrengthCard] }, trashStrengthCrossingPending),
+    trashStrengthCrossingPending,
+    "hand",
+    gurneyTrashStrengthCard.id,
+  );
+  assert.equal(
+    playerById(gurneyAfterTrashStrength, muadDibAllyA.id).vp,
+    2,
+    "Always Smiling should score after a Reveal pending trash strength reward brings Gurney to 10 strength",
+  );
+  const conflictTrashCard = { ...leadTheWayDraw, id: "gurney-conflict-trash-card" };
+  const conflictTrashPending = {
+    kind: "trash-card",
+    ownerId: feyd.id,
+    optional: false,
+    source: "Verifier conflict trash",
+  };
+  const gurneyAfterPlainTrashReward = state.trashPlayerCard(
+    {
+      ...gurneyRevealBase,
+      pendingAction: conflictTrashPending,
+      pendingQueue: [],
+      players: gurneyRevealBase.players.map((player) => {
+        if (player.id === muadDibAllyA.id) {
+          return { ...player, conflict: 10, deployedTroops: 5, vp: 1, gurneyAlwaysSmilingScored: false };
+        }
+        if (player.id === feyd.id) return { ...player, hand: [conflictTrashCard] };
+        return player;
+      }),
+    },
+    conflictTrashPending,
+    "hand",
+    conflictTrashCard.id,
+  );
+  assert.equal(
+    playerById(gurneyAfterPlainTrashReward, muadDibAllyA.id).vp,
+    1,
+    "Always Smiling should not score from an unrelated plain trash reward after Reveal timing",
+  );
+  assert.equal(
+    playerById(gurneyAfterPlainTrashReward, feyd.id).hand.length,
+    0,
+    "Verifier plain trash reward should resolve successfully",
+  );
+  const spyStrengthCrossingPending = {
+    kind: "recall-spy",
+    ownerId: muadDibAllyA.id,
+    combatRecipientId: muadDibAllyA.id,
+    remaining: 1,
+    strength: 2,
+    optional: true,
+    source: "Verifier spy strength",
+  };
+  const gurneySpyPostId = state.spyObservationPostIdForSpace("secrets");
+  const gurneyAfterSpyStrength = state.recallSpyForPending(
+    gurneyPendingCrossingState(
+      { spies: 1 },
+      spyStrengthCrossingPending,
+      { spyPosts: { [gurneySpyPostId]: muadDibAllyA.id }, sharedSpyPosts: {} },
+    ),
+    spyStrengthCrossingPending,
+    "espionage",
+  );
+  assert.equal(
+    playerById(gurneyAfterSpyStrength, muadDibAllyA.id).vp,
+    2,
+    "Always Smiling should score after a Reveal pending spy recall brings Gurney to 10 strength",
+  );
+  const payStrengthCrossingPending = {
+    kind: "pay-resource-for-strength",
+    ownerId: muadDibAllyA.id,
+    combatRecipientId: muadDibAllyA.id,
+    resource: "spice",
+    cost: 1,
+    strength: 2,
+    optional: true,
+    source: "Verifier spice strength",
+  };
+  const gurneyAfterPayStrength = state.resolvePayResourceForStrengthChoice(
+    gurneyPendingCrossingState(
+      { resources: { ...muadDibAllyA.resources, spice: 1 } },
+      payStrengthCrossingPending,
+    ),
+    payStrengthCrossingPending,
+  );
+  assert.equal(
+    playerById(gurneyAfterPayStrength, muadDibAllyA.id).vp,
+    2,
+    "Always Smiling should score after a Reveal pending resource strength payment brings Gurney to 10 strength",
+  );
+  const paySandwormCrossingPending = {
+    kind: "pay-resource-for-sandworms",
+    ownerId: muadDibAllyA.id,
+    recipientId: muadDibAllyA.id,
+    resource: "water",
+    cost: 1,
+    sandworms: 1,
+    strength: 3,
+    destination: "conflict",
+    optional: true,
+    source: "Verifier worm strength",
+  };
+  const gurneyAfterPaySandworms = state.resolvePayResourceForSandwormsChoice(
+    gurneyPendingCrossingState(
+      {
+        conflict: 7,
+        makerHooks: true,
+        resources: { ...muadDibAllyA.resources, water: 1 },
+      },
+      paySandwormCrossingPending,
+      { shieldWall: false },
+    ),
+    paySandwormCrossingPending,
+  );
+  assert.equal(
+    playerById(gurneyAfterPaySandworms, muadDibAllyA.id).vp,
+    2,
+    "Always Smiling should score after a Reveal pending sandworm payment brings Gurney to 10 strength",
   );
 
   const feydDeviousStrengthBase = {

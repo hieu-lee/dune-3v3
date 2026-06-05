@@ -611,8 +611,8 @@ h2 {
 .team-heading p,
 .conflict-card p,
 .player-topline small,
-.hand-card p,
-.market-card p,
+.hand-card > p,
+.market-card > p,
 .log-panel li {
   color: #c9bca8;
   font-size: 0.78rem;
@@ -675,8 +675,8 @@ h2 {
   margin-bottom: 14px;
 }
 
-.hand-card span,
-.market-card span {
+.hand-card > span,
+.market-card > span {
   color: #baa98e;
   font-size: 0.7rem;
   font-weight: 800;
@@ -684,8 +684,8 @@ h2 {
   text-transform: uppercase;
 }
 
-.hand-card strong,
-.market-card strong {
+.hand-card > strong,
+.market-card > strong {
   display: block;
   margin-top: 5px;
   font-size: 0.95rem;

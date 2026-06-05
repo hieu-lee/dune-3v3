@@ -1,5 +1,6 @@
 import { CircleDollarSign } from "lucide-react";
 import type { Card, ContractCard, PendingAction, Player, ResourceId } from "../game/types";
+import { CardAssetPreview, cardAccessibleSummary } from "./CardAssetPreview";
 
 type AcquireCardPendingAction = Extract<PendingAction, { kind: "acquire-card" }>;
 type ContractPendingAction = Extract<PendingAction, { kind: "contract" }>;
@@ -201,18 +202,18 @@ export function PendingAcquireCardPanel({
                   type="button"
                   key={card.id}
                   className="contract-choice-card acquire-card-choice-card"
-                  aria-label={card.name}
+                  aria-label={cardAccessibleSummary(
+                    card,
+                    `Acquire ${card.name} for ${owner.leader}`,
+                    acquireCostLabel(card, pending.paymentResource),
+                  )}
                   onClick={() => onAcquireCard(card.id)}
-                  title={
-                    pending.paymentResource
-                      ? `Acquire ${card.name} for ${card.cost ?? 0} ${resourceLabels[pending.paymentResource]} for ${owner.leader}`
-                      : `Acquire ${card.name} for ${owner.leader}`
-                  }
                 >
-                  {card.thumbnailPath && <img src={card.thumbnailPath} alt="" />}
-                  <span className="acquire-card-choice-name">{card.name}</span>
-                  <small className="acquire-card-choice-meta">{acquireCostLabel(card, pending.paymentResource)}</small>
-                  <small className="acquire-card-choice-destination">{destinationText}</small>
+                  <CardAssetPreview
+                    card={card}
+                    detailLabel={destinationText}
+                    metaLabel={acquireCostLabel(card, pending.paymentResource)}
+                  />
                 </button>
               ))}
             </div>

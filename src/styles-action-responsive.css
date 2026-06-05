@@ -47,8 +47,6 @@
   .pending-panel {
     align-items: stretch;
   }
-  .card-row,
-  .market-row,
   .trade-controls,
   .trade-intrigue-grid,
   .trade-transfer-lanes:not(.trade-intrigue-grid),
@@ -217,44 +215,13 @@
     width: auto;
   }
   .acquire-card-choice .acquire-card-choice-cards {
-    grid-template-columns: repeat(auto-fit, minmax(106px, 1fr));
-    gap: 5px;
+    grid-template-columns: repeat(auto-fit, minmax(108px, 128px));
+    justify-content: start;
+    gap: 6px;
   }
   .pending-panel .pending-controls.acquire-card-choice .acquire-card-choice-card {
     min-height: 0;
-    display: grid;
-    grid-template-columns: 34px minmax(0, 1fr);
-    grid-template-rows: auto;
-    align-items: start;
-    justify-items: start;
-    column-gap: 6px;
-    row-gap: 2px;
     padding: 6px;
-    text-align: left;
-  }
-  .pending-panel .pending-controls.acquire-card-choice .acquire-card-choice-card img {
-    grid-column: 1;
-    grid-row: 1 / span 3;
-    width: 34px;
-  }
-  .acquire-card-choice .acquire-card-choice-name,
-  .acquire-card-choice .acquire-card-choice-meta,
-  .acquire-card-choice .acquire-card-choice-destination {
-    grid-column: 2;
-    min-width: 0;
-  }
-  .acquire-card-choice .acquire-card-choice-name {
-    font-size: 0.64rem;
-    line-height: 1.12;
-  }
-  .acquire-card-choice .acquire-card-choice-meta,
-  .acquire-card-choice .acquire-card-choice-destination {
-    font-size: 0.58rem;
-    line-height: 1.1;
-    margin-top: 0;
-  }
-  .acquire-card-choice .acquire-card-choice-destination {
-    display: none;
   }
   .contract-choice-actions {
     grid-template-columns: 1fr;
@@ -360,37 +327,24 @@
     min-height: 30px;
   }
   .throne-choice-cards {
-    grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(108px, 128px));
+    justify-content: start;
     gap: 6px;
   }
   .pending-panel .pending-controls .throne-choice-card {
     width: auto;
     min-height: 0;
-    display: grid;
-    grid-template-columns: 38px minmax(0, 1fr);
-    grid-template-rows: auto;
-    align-items: start;
-    justify-items: start;
-    column-gap: 7px;
-    row-gap: 2px;
     padding: 6px;
-    text-align: left;
   }
-  .pending-panel .pending-controls .throne-choice-card img {
-    grid-column: 1;
-    grid-row: 1 / span 2;
-    width: 38px;
-  }
-  .throne-choice-card span,
-  .throne-choice-card small {
-    grid-column: 2;
+  .throne-choice-empty-card > span,
+  .throne-choice-empty-card > small {
     min-width: 0;
   }
-  .throne-choice-card span {
+  .throne-choice-empty-card > span {
     font-size: 0.68rem;
     line-height: 1.12;
   }
-  .throne-choice-card small {
+  .throne-choice-empty-card > small {
     font-size: 0.58rem;
     line-height: 1.1;
   }
@@ -740,256 +694,100 @@
   .hidden-active-hand-stack {
     min-width: 0;
   }
-  .hand-card span,
-  .market-card span {
-    display: block;
+  .hand-card > span,
+  .market-card > span {
     overflow-wrap: anywhere;
     word-break: break-word;
   }
+  .hand-card .card-detail-chips,
+  .market-card .card-detail-chips {
+    display: flex;
+  }
+  .hand-card .card-detail-row,
+  .market-card .card-detail-row {
+    display: grid;
+  }
   .active-hand-panel .card-row,
   .room-private-panel .card-row {
-    gap: 8px;
+    grid-template-columns: repeat(auto-fit, minmax(132px, 220px));
+    justify-content: start;
+    gap: 6px;
   }
   .active-hand-panel .hand-card:not(.hidden-hand-card),
   .room-private-panel .hand-card:not(.hidden-hand-card) {
     min-height: 0;
-    display: grid;
-    grid-template-columns: 72px minmax(0, 1fr);
-    align-items: start;
-    column-gap: 10px;
-    padding: 10px;
-  }
-  .active-hand-panel .hand-card:not(.hidden-hand-card) .card-art,
-  .room-private-panel .hand-card:not(.hidden-hand-card) .card-art {
-    grid-column: 1;
-    grid-row: 1 / span 4;
-    width: 72px;
-    max-height: 104px;
-    margin: 0;
-  }
-  .active-hand-panel .hand-card:not(.hidden-hand-card) > span,
-  .active-hand-panel .hand-card:not(.hidden-hand-card) > strong,
-  .active-hand-panel .hand-card:not(.hidden-hand-card) > p,
-  .active-hand-panel .hand-card:not(.hidden-hand-card) > footer,
-  .room-private-panel .hand-card:not(.hidden-hand-card) > span,
-  .room-private-panel .hand-card:not(.hidden-hand-card) > strong,
-  .room-private-panel .hand-card:not(.hidden-hand-card) > p,
-  .room-private-panel .hand-card:not(.hidden-hand-card) > footer {
-    grid-column: 2;
-    min-width: 0;
-  }
-  .active-hand-panel .hand-card:not(.hidden-hand-card) > strong,
-  .room-private-panel .hand-card:not(.hidden-hand-card) > strong {
-    margin-top: 3px;
-    line-height: 1.14;
-  }
-  .active-hand-panel .hand-card:not(.hidden-hand-card) > p,
-  .room-private-panel .hand-card:not(.hidden-hand-card) > p {
-    min-height: 0;
-    margin-top: 6px;
-    font-size: 0.72rem;
-    line-height: 1.25;
-  }
-  .active-hand-panel .hand-card:not(.hidden-hand-card) > footer,
-  .room-private-panel .hand-card:not(.hidden-hand-card) > footer {
-    margin-top: 7px;
+    padding: 6px;
   }
   .active-hand-panel:not(.active-hand-compact):not(.active-hand-combat) .card-row {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(132px, 220px));
+    justify-content: start;
     gap: 6px;
   }
   .active-hand-panel:not(.active-hand-compact):not(.active-hand-combat) .hand-card:not(.hidden-hand-card) {
-    grid-template-columns: 50px minmax(0, 1fr);
-    column-gap: 6px;
     padding: 6px;
   }
-  .active-hand-panel:not(.active-hand-compact):not(.active-hand-combat) .hand-card:not(.hidden-hand-card) .card-art {
-    width: 50px;
-    max-height: 72px;
-  }
-  .active-hand-panel:not(.active-hand-compact):not(.active-hand-combat) .hand-card:not(.hidden-hand-card) > span {
-    font-size: 0.56rem;
-    line-height: 1.1;
-  }
-  .active-hand-panel:not(.active-hand-compact):not(.active-hand-combat) .hand-card:not(.hidden-hand-card) > strong {
-    margin-top: 1px;
-    font-size: 0.68rem;
-    line-height: 1.1;
-  }
-  .active-hand-panel:not(.active-hand-compact):not(.active-hand-combat) .hand-card:not(.hidden-hand-card) > p {
-    display: -webkit-box;
-    overflow: hidden;
-    margin-top: 3px;
-    font-size: 0.59rem;
-    line-height: 1.12;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-  }
-  .active-hand-panel:not(.active-hand-compact):not(.active-hand-combat) .hand-card:not(.hidden-hand-card) > footer {
-    grid-column: 1 / -1;
-    margin-top: 3px;
-  }
   .active-hand-panel.active-hand-compact .card-row {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(118px, 180px));
+    justify-content: start;
     gap: 6px;
   }
   .active-hand-panel.active-hand-compact .hand-card:not(.hidden-hand-card) {
-    grid-template-columns: 50px minmax(0, 1fr);
-    column-gap: 6px;
     padding: 6px;
   }
-  .active-hand-panel.active-hand-compact .hand-card:not(.hidden-hand-card) .card-art {
-    width: 50px;
-    max-height: 72px;
-  }
-  .active-hand-panel.active-hand-compact .hand-card:not(.hidden-hand-card) > span {
-    font-size: 0.56rem;
-    line-height: 1.1;
-  }
-  .active-hand-panel.active-hand-compact .hand-card:not(.hidden-hand-card) > strong {
-    margin-top: 1px;
-    font-size: 0.68rem;
-    line-height: 1.1;
-  }
-  .active-hand-panel.active-hand-compact .hand-card:not(.hidden-hand-card) > p {
-    display: -webkit-box;
-    overflow: hidden;
-    margin-top: 3px;
-    font-size: 0.59rem;
-    line-height: 1.12;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-  }
-  .active-hand-panel.active-hand-compact .hand-card:not(.hidden-hand-card) > footer {
-    grid-column: 1 / -1;
-    margin-top: 3px;
-  }
   .active-hand-panel.active-hand-combat .card-row {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(118px, 180px));
+    justify-content: start;
     gap: 5px;
   }
   .active-hand-panel.active-hand-combat .hand-card:not(.hidden-hand-card) {
-    grid-template-columns: 44px minmax(0, 1fr);
-    column-gap: 6px;
     padding: 6px;
   }
-  .active-hand-panel.active-hand-combat .hand-card:not(.hidden-hand-card) .card-art {
-    width: 44px;
-    max-height: 64px;
-  }
-  .active-hand-panel.active-hand-combat .hand-card:not(.hidden-hand-card) > span {
-    font-size: 0.56rem;
-    line-height: 1.1;
-  }
-  .active-hand-panel.active-hand-combat .hand-card:not(.hidden-hand-card) > strong {
-    font-size: 0.66rem;
-    line-height: 1.1;
-  }
-  .active-hand-panel.active-hand-combat .hand-card:not(.hidden-hand-card) > p {
-    font-size: 0.58rem;
-    line-height: 1.12;
-    -webkit-line-clamp: 1;
-  }
-  .active-hand-panel.active-hand-combat .hand-card:not(.hidden-hand-card) > footer {
-    grid-column: 1 / -1;
-    margin-top: 2px;
-  }
   .market-panel .market-row {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
+    grid-template-columns: repeat(auto-fit, minmax(132px, 180px));
+    justify-content: start;
+    gap: 6px;
   }
   .market-panel .market-card {
     min-width: 0;
     min-height: 0;
-    display: grid;
-    grid-template-columns: 58px minmax(0, 1fr);
-    align-items: start;
-    column-gap: 7px;
-    padding: 7px;
-  }
-  .market-panel .market-card .card-art {
-    grid-column: 1;
-    grid-row: 1 / span 3;
-    width: 58px;
-    max-height: 84px;
-    margin: 0;
-  }
-  .market-panel .market-card span,
-  .market-panel .market-card strong,
-  .market-panel .market-card p {
-    grid-column: 2;
-    min-width: 0;
-  }
-  .market-panel .market-card strong {
-    margin-top: 1px;
-    font-size: 0.68rem;
-    line-height: 1.1;
-  }
-  .market-panel .market-card p {
-    display: -webkit-box;
-    overflow: hidden;
-    min-height: 0;
-    margin-top: 3px;
-    font-size: 0.59rem;
-    line-height: 1.12;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
+    padding: 6px;
   }
   .market-panel.market-panel-compact .market-row {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(132px, 180px));
+    justify-content: start;
     gap: 6px;
   }
   .market-panel.market-panel-compact .market-card {
-    grid-template-columns: 44px minmax(0, 1fr);
-    column-gap: 6px;
     padding: 6px;
-  }
-  .market-panel.market-panel-compact .market-card .card-art {
-    width: 44px;
-    max-height: 64px;
-  }
-  .market-panel.market-panel-compact .market-card span {
-    font-size: 0.56rem;
-    line-height: 1.1;
-  }
-  .market-panel.market-panel-compact .market-card strong {
-    margin-top: 1px;
-    font-size: 0.66rem;
-    line-height: 1.1;
-  }
-  .market-panel.market-panel-compact .market-card p {
-    display: -webkit-box;
-    overflow: hidden;
-    margin-top: 2px;
-    font-size: 0.58rem;
-    line-height: 1.12;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 1;
   }
   .market-panel.market-panel-combat .panel-heading {
     margin-bottom: 7px;
   }
   .market-panel.market-panel-combat .market-row {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(118px, 180px));
+    justify-content: start;
     gap: 4px;
   }
   .market-panel.market-panel-combat .market-card {
-    grid-template-columns: minmax(0, 1fr);
-    padding: 5px 6px;
+    padding: 5px;
   }
-  .market-panel.market-panel-combat .market-card .card-art,
-  .market-panel.market-panel-combat .market-card p {
-    display: none;
-  }
-  .market-panel.market-panel-combat .market-card span,
-  .market-panel.market-panel-combat .market-card strong {
-    grid-column: 1;
-  }
-  .market-panel.market-panel-combat .market-card span {
+  .card-resting-meta {
     font-size: 0.54rem;
+    padding: 3px 5px;
   }
-  .market-panel.market-panel-combat .market-card strong {
-    font-size: 0.62rem;
+  .card-hold-details {
+    gap: 4px;
+    padding: 6px;
+  }
+  .card-hold-details strong {
+    font-size: 0.68rem;
+  }
+  .card-detail-kicker,
+  .card-detail-row b {
+    font-size: 0.5rem;
+  }
+  .card-detail-row small {
+    font-size: 0.54rem;
   }
   .market-panel.market-panel-combat .throne-market {
     margin-top: 8px;

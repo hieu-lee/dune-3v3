@@ -1,7 +1,7 @@
-import { BookOpen, EyeOff, HandCoins, SkipForward, Swords } from "lucide-react";
+import { BookOpen, EyeOff, HandCoins, SkipForward } from "lucide-react";
 import type { ReactNode } from "react";
-import { iconLabels } from "../game/data";
 import type { GamePhase, Player } from "../game/types";
+import { CardAssetPreview, cardAccessibleSummary } from "./CardAssetPreview";
 
 type ActiveHandPanelProps = {
   activeAllies: readonly Player[];
@@ -188,6 +188,7 @@ export function ActiveHandPanel({
                 key={card.id}
                 data-testid={`hand-card-${card.id}`}
                 data-card-id={card.id}
+                aria-label={hidden ? "Hidden private card" : cardAccessibleSummary(card, `Select ${card.name}`)}
                 aria-pressed={playingPhase && selectedCardId === card.id}
                 onClick={() => playingPhase && onSelectCard(card.id)}
                 disabled={!playingPhase || hidden}
@@ -197,16 +198,14 @@ export function ActiveHandPanel({
                     <span>Dune</span>
                   </div>
                 ) : (
-                  card.thumbnailPath && <img className="card-art" src={card.thumbnailPath} alt="" loading="lazy" />
+                  <CardAssetPreview card={card} detailLabel="In hand" />
                 )}
-                <span>{hidden ? "Private" : card.icons.map((icon) => iconLabels[icon]).join(" / ") || "Reveal"}</span>
-                <strong>{card.name}</strong>
-                <p>{hidden ? "Only visible to that player." : card.play}</p>
-                {!hidden && (
-                  <footer>
-                    <span><BookOpen size={13} /> {card.persuasion}</span>
-                    <span><Swords size={13} /> {card.swords}</span>
-                  </footer>
+                {hidden && (
+                  <>
+                    <span>Private</span>
+                    <strong>{card.name}</strong>
+                    <p>Only visible to that player.</p>
+                  </>
                 )}
               </button>
             );

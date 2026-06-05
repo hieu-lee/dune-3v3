@@ -85,6 +85,8 @@ function pendingActionTitle(game: GameState, pendingAction: PendingAction) {
       return `${playerLeader(playerById(game, pendingAction.ownerId))} ${pendingAction.source}`;
     case "pending-action-choice":
       return `${playerLeader(playerById(game, pendingAction.ownerId))} ${pendingAction.source}`;
+    case "feyd-training":
+      return `${playerLeader(playerById(game, pendingAction.ownerId), "Feyd-Rautha")} ${pendingAction.source}`;
     case "staban-unseen-network":
       return `${playerLeader(playerById(game, pendingAction.ownerId), "Staban Tuek")} Unseen Network`;
     case "amber-desert-scouts":

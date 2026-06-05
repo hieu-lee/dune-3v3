@@ -40,6 +40,9 @@ import { discardCardsForRewardChoices } from "./discard-reward-rules";
 import { changeAllegiancesGainChoices } from "./influence-choices";
 import { influenceEffectOwnerForChoice } from "./influence-loss-rules";
 import {
+  pendingActionForFeydPersonalTraining,
+} from "./feyd-training-rules";
+import {
   acquirableCardsForPending,
 } from "./market-rules";
 import {
@@ -837,6 +840,8 @@ export function pendingActionsForCard(
   if (agentBoardSpaceInfluencePending) typedPendings.push(agentBoardSpaceInfluencePending);
   const agentPaidRewardChoicePending = pendingActionForAgentPaidRewardChoice(card, source, state, target, space);
   if (agentPaidRewardChoicePending) typedPendings.push(agentPaidRewardChoicePending);
+  const feydTrainingPending = pendingActionForFeydPersonalTraining(card, source, state, space);
+  if (feydTrainingPending) typedPendings.push(feydTrainingPending);
   const agentPendingActionChoice = pendingActionForAgentPendingActionChoice(card, source, state, target, space);
   if (agentPendingActionChoice) typedPendings.push(agentPendingActionChoice);
   const agentOpponentDiscardPendings = pendingActionsForAgentOpponentsDiscardCards(card, source, state, target);

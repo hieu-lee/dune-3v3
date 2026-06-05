@@ -1,6 +1,7 @@
 import { Crown, Eye, FileText, Shield, Sparkles, Swords } from "lucide-react";
 import type { CSSProperties } from "react";
 import { battleIconLabels, teams } from "../game/data";
+import { conflictRewardRows, conflictStakesText } from "../game/conflict-reward-display";
 import { playerDoublesConflictRewards } from "../game/state";
 import type { GameState, TeamId } from "../game/types";
 
@@ -21,6 +22,7 @@ export function TableSidebar({ game, tableStateLockedByPending, onShieldWallChan
   const sandwormRewardDoublers = game.conflict ? game.players.filter(playerDoublesConflictRewards) : [];
   const sandwormRewardLabel = sandwormRewardDoublers.map((player) => player.leader).join(", ");
   const shaddamCommander = game.players.find((player) => player.team === "shaddam" && player.role === "Commander");
+  const currentConflictRewardRows = game.conflict ? conflictRewardRows(game.conflict) : [];
 
   return (
     <aside className="team-column">
@@ -55,11 +57,11 @@ export function TableSidebar({ game, tableStateLockedByPending, onShieldWallChan
                   </span>
                 </div>
                 <h2>{game.conflict.name}</h2>
-                <p>{game.conflict.stakes}</p>
+                <p>{conflictStakesText(game.conflict)}</p>
               </div>
             </div>
             <div className="conflict-rewards">
-              {game.conflict.rewards.slice(0, 6).map((reward, index) => (
+              {currentConflictRewardRows.map((reward, index) => (
                 <span key={`${reward}-${index}`}>{reward}</span>
               ))}
             </div>

@@ -1,10 +1,12 @@
 import type { CSSProperties } from "react";
 import { Trophy } from "lucide-react";
 import {
+  feydTrainingLabel,
   factionShortLabels,
   memoryCountLabel,
   resources,
 } from "../app-helpers";
+import { feydRauthaLeaderName } from "../game/leader-constants";
 import { battleIconLabels, factionIds, factionLabels, teams } from "../game/data";
 import { canHaveMakerHooks, playerDoublesConflictRewards } from "../game/state";
 import type { GameState } from "../game/types";
@@ -94,6 +96,9 @@ export function PlayerColumn({
               </span>
               {player.highCouncilSeat && <span className="secondary-stat">High Council</span>}
               {player.makerHooks && <span className="secondary-stat">Maker Hooks</span>}
+              {player.leader === feydRauthaLeaderName && (
+                <span className="secondary-stat">{feydTrainingLabel(player.feydTraining ?? 0)}</span>
+              )}
               {player.jessicaMemories > 0 && <span className="secondary-stat">{memoryCountLabel(player.jessicaMemories)}</span>}
               <span className="primary-stat">{player.spies} spies</span>
               <span className={["primary-stat", "optional-public-stat", player.intrigues.length === 0 ? "is-zero" : ""].filter(Boolean).join(" ")}>

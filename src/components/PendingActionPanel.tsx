@@ -34,6 +34,7 @@ import { PendingBoardAgentRecallPanel } from "./PendingBoardAgentRecallPanel";
 import { PendingBoardInfluenceChoicePanel, PendingOptionalSpacePaymentPanel } from "./PendingBoardChoicePanels";
 import { PendingAcquireCardPanel, PendingContractPanel } from "./PendingCardChoicePanels";
 import { PendingDrawCardsPanel } from "./PendingDrawCardsPanel";
+import { PendingFeydTrainingPanel } from "./PendingFeydTrainingPanel";
 import {
   PendingDiscardDrawPanel,
   PendingDiscardHandCardPanel,
@@ -90,6 +91,7 @@ export function PendingActionPanel({
   chooseDiscardHandCard,
   chooseDiscardCardForInfluenceAndDraw,
   chooseDeployOrRetreatTroops,
+  chooseFeydTraining,
   chooseLoseInfluenceForIntrigues,
   chooseLoseInfluenceForInfluence,
   choosePendingActionChoice,
@@ -297,6 +299,8 @@ export function PendingActionPanel({
       : [];
   const pendingActionChoiceOwner =
     pendingAction.kind === "pending-action-choice" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
+  const pendingFeydTrainingOwner =
+    pendingAction.kind === "feyd-training" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingStabanUnseenNetworkOwner =
     pendingAction.kind === "staban-unseen-network" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingStabanUnseenNetworkSpace =
@@ -536,6 +540,15 @@ export function PendingActionPanel({
           pending={pendingAction}
           onChoose={choosePendingActionChoice}
           onSkip={skipPendingActionChoiceHandler}
+        />
+      )}
+
+      {pendingAction.kind === "feyd-training" && (
+        <PendingFeydTrainingPanel
+          game={game}
+          owner={pendingFeydTrainingOwner}
+          pending={pendingAction}
+          onChoose={chooseFeydTraining}
         />
       )}
 

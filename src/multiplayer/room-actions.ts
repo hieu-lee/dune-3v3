@@ -63,6 +63,7 @@ export type RoomPendingActionCommand =
   | { kind: "choose-lose-influence-for-intrigues"; faction: FactionId }
   | { kind: "choose-lose-influence-for-influence"; choice: InfluenceExchangeChoice }
   | { kind: "choose-maker-reward"; choice: "spice" | "sandworms" }
+  | { kind: "choose-feyd-training"; optionId: string }
   | { kind: "choose-paid-reward"; optionId: string }
   | { kind: "choose-pay-resource-for-contracts"; optionIndex: number }
   | { kind: "choose-pay-resource-for-draw-cards" }
@@ -652,6 +653,7 @@ function pendingActionPlayerIds(state: GameState, pending: PendingAction): strin
     case "pay-resource-for-sandworms":
     case "paid-reward-choice":
     case "pending-action-choice":
+    case "feyd-training":
     case "trash-source-for-trade":
     case "pay-resource-for-contracts":
     case "staban-unseen-network":
@@ -778,6 +780,8 @@ function applyRoomPendingAction(state: GameState, playerId: string, command: Roo
       return maybeStartCombatPhase(gameRules.resolvePendingActionChoice(state, pendingOf(state, "pending-action-choice"), command.optionId));
     case "skip-pending-action-choice":
       return maybeStartCombatPhase(gameRules.skipPendingActionChoice(state, pendingOf(state, "pending-action-choice")));
+    case "choose-feyd-training":
+      return maybeStartCombatPhase(gameRules.resolveFeydTrainingChoice(state, pendingOf(state, "feyd-training"), command.optionId));
     case "choose-staban-unseen-network":
       return maybeStartCombatPhase(gameRules.resolveStabanUnseenNetworkChoice(state, pendingOf(state, "staban-unseen-network"), command.choice));
     case "choose-lady-amber-desert-scouts":

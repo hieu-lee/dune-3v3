@@ -79,6 +79,8 @@ export function makePlayer(
     highCouncilSeat: false,
     callToArmsActive: false,
     gurneyAlwaysSmilingScored: false,
+    muadDibUnpredictableFoeResolved: false,
+    feydTraining: 0,
     jessicaMemories: 0,
     purchaseSequence: 0,
     swordmasterBonus: false,

@@ -77,6 +77,21 @@ function roundStartFixture(state, data, setupPlayers, conflictSourceId = 460) {
 try {
   const data = await server.ssrLoadModule("/src/game/data.ts");
   const state = await server.ssrLoadModule("/src/game/state.ts");
+  const display = await server.ssrLoadModule("/src/game/conflict-reward-display.ts");
+
+  const displayRows = (sourceId) => display.conflictRewardRows(conflictBySourceId(data, sourceId));
+  const displayStakes = (sourceId) => display.conflictStakesText(conflictBySourceId(data, sourceId));
+  assert.match(displayStakes(465), /control of Arrakeen/, "Battle For Arrakeen sidebar text should mention location control");
+  assert.match(displayRows(465)[0], /recall 2 spies -> \+1 VP/, "Battle For Arrakeen sidebar text should mention spy VP conversion");
+  assert.match(displayRows(465)[1], /gain 3 Solari/, "Battle For Arrakeen second place sidebar text should show 3 Solari");
+  assert.match(displayRows(465)[2], /gain 2 Solari/, "Battle For Arrakeen third place sidebar text should show 2 Solari");
+  assert.match(displayRows(464)[0], /pay 4 spice -> \+1 VP/, "Battle For Imperial Basin sidebar text should mention spice VP conversion");
+  assert.match(displayRows(466)[0], /pay 6 Solari -> \+1 VP/, "Battle For Spice Refinery sidebar text should mention Solari VP conversion");
+  assert.match(displayRows(455)[0], /pay 3 spice -> \+1 VP/, "Spice Freighters sidebar text should mention spice VP conversion");
+  assert.match(displayStakes(460), /control of Imperial Basin/, "Secure Imperial Basin sidebar text should mention location control");
+  assert.match(displayStakes(457), /control of Spice Refinery/, "Seize Spice Refinery sidebar text should mention location control");
+  assert.match(displayStakes(456), /control of Arrakeen/, "Siege Of Arrakeen sidebar text should mention location control");
+  assert.match(displayRows(463)[0], /choose 2 Influence/, "Propaganda sidebar text should show two Influence choices");
 
   const desertMouseObjective = objectiveById(data, "objective-desert-mouse-first");
 

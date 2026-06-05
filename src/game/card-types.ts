@@ -161,6 +161,8 @@ export type Player = {
   revealActivatedAllyId?: string;
   callToArmsActive: boolean;
   gurneyAlwaysSmilingScored?: boolean;
+  muadDibUnpredictableFoeResolved?: boolean;
+  feydTraining?: number;
   jessicaMemories: number;
   purchaseSequence: number;
   swordmasterBonus: boolean;

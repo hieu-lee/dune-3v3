@@ -193,6 +193,11 @@ export {
 } from "./pending-action-choice-rules";
 
 export {
+  feydTrainingOptionIsResolvable,
+  resolveFeydTrainingChoice,
+} from "./feyd-training-rules";
+
+export {
   initialGame,
   pendingActionForShaddamPersonalBoard,
   setMakerHooks,
@@ -201,6 +206,8 @@ export {
 
 export {
   adjustInfluence,
+  markMuadDibUnpredictableFoeResolved,
+  resolveMuadDibUnpredictableFoe,
   resolveLeaderInfluenceThresholdRewards,
   scoreGurneyAlwaysSmiling,
 } from "./leader-rewards";

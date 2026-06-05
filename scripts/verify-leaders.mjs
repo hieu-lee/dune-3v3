@@ -341,16 +341,21 @@ try {
     commanderTargets: { [muadDib.id]: muadDibAllyA.id },
     revealPlan: muadDibUnpredictableFoePlan,
   });
-  assert.equal(
-    playerById(muadDibUnpredictableFoeRevealed, muadDib.id).intrigues[0]?.id,
-    "unpredictable-foe-intrigue",
-    "Unpredictable Foe should draw an Intrigue during Muad'Dib's Reveal action",
-  );
-  assert.match(
-    muadDibUnpredictableFoeRevealed.log[0],
-    /draws an Intrigue card from Reveal/,
-    "Unpredictable Foe should use the normal Reveal Intrigue draw path",
-  );
+	  assert.equal(
+	    playerById(muadDibUnpredictableFoeRevealed, muadDib.id).intrigues[0]?.id,
+	    "unpredictable-foe-intrigue",
+	    "Unpredictable Foe should draw an Intrigue during Muad'Dib's Reveal action",
+	  );
+	  assert.equal(
+	    playerById(muadDibUnpredictableFoeRevealed, muadDib.id).muadDibUnpredictableFoeResolved,
+	    true,
+	    "Unpredictable Foe should mark its Reveal-turn draw as resolved",
+	  );
+	  assert.match(
+	    muadDibUnpredictableFoeRevealed.log[0],
+	    /draws an Intrigue card from Reveal/,
+	    "Unpredictable Foe should use the normal Reveal Intrigue draw path",
+	  );
   const muadDibNoSandwormState = {
     ...muadDibUnpredictableFoeBase,
     players: muadDibUnpredictableFoeBase.players.map((player) =>
@@ -403,13 +408,105 @@ try {
       ),
     },
   );
-  assert.equal(
-    feydSandwormPlan.intriguesToDraw,
-    0,
-    "Unpredictable Foe should not trigger for non-Muad'Dib leaders",
-  );
+	  assert.equal(
+	    feydSandwormPlan.intriguesToDraw,
+	    0,
+	    "Unpredictable Foe should not trigger for non-Muad'Dib leaders",
+	  );
 
-  const gurneyRevealBase = {
+	  const desertPower = data.imperiumDeck.find((card) => card.name === "Desert Power");
+	  const unprotectedConflict = data.conflictCards.find((card) => card.name === "Skirmish (Desert Mouse)");
+	  assert.ok(desertPower, "Verifier needs Desert Power for deferred Unpredictable Foe");
+	  assert.ok(unprotectedConflict, "Verifier needs an unprotected Conflict for deferred Unpredictable Foe");
+	  const deferredUnpredictableFoeBase = {
+	    ...game,
+	    activeSeat: game.players.findIndex((player) => player.id === muadDib.id),
+	    conflict: unprotectedConflict,
+	    shieldWall: false,
+	    pendingAction: undefined,
+	    pendingQueue: [],
+	    intrigueDeck: [
+	      { ...intrigueCard, id: "deferred-unpredictable-foe-intrigue" },
+	      { ...intrigueCard, id: "deferred-unpredictable-foe-extra" },
+	    ],
+	    intrigueDiscard: [],
+	    players: game.players.map((player) => {
+	      if (player.id === muadDib.id) {
+	        return {
+	          ...muadDib,
+	          hand: [desertPower],
+	          intrigues: [],
+	          playArea: [],
+	          revealed: false,
+	          persuasion: 0,
+	          resources: { ...muadDib.resources, water: 1 },
+	        };
+	      }
+	      if (player.id === muadDibAllyA.id) {
+	        return {
+	          ...player,
+	          conflict: 0,
+	          deployedSandworms: 0,
+	          makerHooks: true,
+	        };
+	      }
+	      return player;
+	    }),
+	  };
+	  const deferredUnpredictableFoePlan = appTurnActions.revealTurnPlan(
+	    playerById(deferredUnpredictableFoeBase, muadDib.id),
+	    deferredUnpredictableFoeBase,
+	    playerById(deferredUnpredictableFoeBase, muadDibAllyA.id),
+	  );
+	  assert.equal(
+	    deferredUnpredictableFoePlan.intriguesToDraw,
+	    0,
+	    "Unpredictable Foe should not draw before a Reveal pending action creates the first sandworm",
+	  );
+	  const deferredUnpredictableFoeReveal = appTurnActions.revealTurnAction(deferredUnpredictableFoeBase, {
+	    commanderTargets: { [muadDib.id]: muadDibAllyA.id },
+	    revealPlan: deferredUnpredictableFoePlan,
+	  });
+	  assert.equal(
+	    deferredUnpredictableFoeReveal.pendingAction?.kind,
+	    "pay-resource-for-sandworms",
+	    "Desert Power should queue the Reveal sandworm payment before deferred Unpredictable Foe resolves",
+	  );
+	  assert.equal(
+	    playerById(deferredUnpredictableFoeReveal, muadDib.id).intrigues.length,
+	    0,
+	    "Deferred Unpredictable Foe should wait for the sandworm payment",
+	  );
+	  const deferredUnpredictableFoeResolved = state.resolvePayResourceForSandwormsChoice(
+	    deferredUnpredictableFoeReveal,
+	    deferredUnpredictableFoeReveal.pendingAction,
+	  );
+	  assert.equal(
+	    playerById(deferredUnpredictableFoeResolved, muadDibAllyA.id).deployedSandworms,
+	    1,
+	    "Desert Power should create the qualifying sandworm for deferred Unpredictable Foe",
+	  );
+	  assert.equal(
+	    playerById(deferredUnpredictableFoeResolved, muadDib.id).intrigues[0]?.id,
+	    "deferred-unpredictable-foe-intrigue",
+	    "Unpredictable Foe should draw after a Reveal pending action creates the first sandworm",
+	  );
+	  assert.equal(
+	    playerById(deferredUnpredictableFoeResolved, muadDib.id).muadDibUnpredictableFoeResolved,
+	    true,
+	    "Deferred Unpredictable Foe should mark itself resolved",
+	  );
+	  const deferredUnpredictableFoeNoDouble = state.resolveMuadDibUnpredictableFoe(
+	    deferredUnpredictableFoeResolved,
+	    muadDibAllyA.id,
+	  );
+	  assert.equal(
+	    playerById(deferredUnpredictableFoeNoDouble, muadDib.id).intrigues.length,
+	    1,
+	    "Unpredictable Foe should not draw twice after a deferred sandworm trigger",
+	  );
+
+	  const gurneyRevealBase = {
     ...game,
     activeSeat: gurneySeat,
     pendingAction: undefined,

@@ -24,6 +24,7 @@ export type PendingActionPanelProps = {
   chooseDiscardHandCard: (discardCardId: string) => void;
   chooseDiscardCardForInfluenceAndDraw: (discardCardId: string, faction: FactionId) => void;
   chooseDeployOrRetreatTroops: (choice: "deploy" | "retreat") => void;
+  chooseFeydTraining: (optionId: string) => void;
   chooseLoseInfluenceForIntrigues: (faction: FactionId) => void;
   chooseLoseInfluenceForInfluence: (choice: InfluenceExchangeChoice) => void;
   choosePendingActionChoice: (optionId: string) => void;

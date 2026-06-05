@@ -25,6 +25,7 @@ import {
   resolveDiscardCardForInfluenceAndDrawChoice,
   resolveBoardInfluenceChoice,
   resolveBoardAgentRecallChoice,
+  resolveFeydTrainingChoice,
   resolveLeaderTransitionChoice,
   resolveLadyAmberDesertScoutsChoice,
   resolveLoseInfluenceForInfluenceChoice,
@@ -176,6 +177,8 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     runPending("pending-action-choice", (current, pending) => maybeStartCombatPhase(resolvePendingActionChoice(current, pending, optionId)));
   const skipPendingActionChoiceHandler = () =>
     runPending("pending-action-choice", (current, pending) => maybeStartCombatPhase(skipPendingActionChoice(current, pending)));
+  const chooseFeydTraining = (optionId: string) =>
+    runPending("feyd-training", (current, pending) => maybeStartCombatPhase(resolveFeydTrainingChoice(current, pending, optionId)));
   const chooseStabanUnseenNetwork = (choice: StabanUnseenNetworkChoice) =>
     runPending("staban-unseen-network", (current, pending) => maybeStartCombatPhase(resolveStabanUnseenNetworkChoice(current, pending, choice)));
   const chooseLadyAmberDesertScouts = (choice: LadyAmberDesertScoutsChoice) =>
@@ -349,6 +352,7 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     chooseDiscardHandCard,
     chooseDiscardCardForInfluenceAndDraw,
     chooseDeployOrRetreatTroops,
+    chooseFeydTraining,
     chooseLadyAmberDesertScouts,
     chooseLeaderTransition,
     chooseLoseInfluenceForIntrigues,

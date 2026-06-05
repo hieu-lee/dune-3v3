@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 
 const leaderNames = {
+  feyd: "Feyd-Rautha Harkonnen",
   ladyAmber: "Lady Amber Metulli",
   ladyJessica: "Lady Jessica",
   reverendJessica: "Reverend Mother Jessica",
@@ -37,6 +38,22 @@ export async function runLeaderCharacterChoicesSmoke({
   let ownerAfter = after.players.find((player) => player.id === "p2");
   assert.equal(ownerAfter.resources.spice, ownerBefore.resources.spice - 1, "Staban should spend 1 spice");
   assert.equal(ownerAfter.resources.solari, ownerBefore.resources.solari + 3, "Staban should gain 3 Solari");
+
+  await setDebugGameAndWait(page, states.feydPersonalTraining);
+  pendingText = await page.locator(".pending-panel").innerText();
+  assert.match(pendingText, /Personal Training/i);
+  assert.match(pendingText, /Training 1\/4/i);
+  const feydPaidTrainingButton = page.locator(".pending-panel").getByRole("button", { name: /Spend 1 Solari to trash a card/ });
+  assert.equal(await feydPaidTrainingButton.isDisabled(), true, "Feyd paid trash branch should disable without Solari");
+  await screenshot(page, captures, "pending-feyd-personal-training-no-solari.png");
+  before = await currentGame(page);
+  ownerBefore = before.players.find((player) => player.id === "p2");
+  await page.locator(".pending-panel").getByRole("button", { name: /Place 1 Spy/ }).click();
+  await page.waitForFunction(() => window.__DUNE_DEBUG__?.getGame().pendingAction?.kind === "spy");
+  after = await currentGame(page);
+  ownerAfter = after.players.find((player) => player.id === "p2");
+  assert.equal(ownerAfter.feydTraining, ownerBefore.feydTraining + 1, "Feyd training should advance after choosing the spy branch");
+  assert.equal(after.pendingAction.ownerId, "p2", "Feyd spy placement should be queued for Feyd");
 
   await setDebugGameAndWait(page, states.amberDesertScouts);
   pendingText = await page.locator(".pending-panel").innerText();
@@ -398,6 +415,31 @@ async function createLeaderCharacterChoiceStates(server, initialPlayableGame) {
   const arrakeen = findSpace(data.boardSpaces, "arrakeen", "Arrakeen");
   const secrets = findSpace(data.boardSpaces, "secrets", "Secrets");
   const imperialBasin = findSpace(data.boardSpaces, "imperial-basin", "Imperial Basin");
+  const debugFeydSignet = { ...genericSignet, id: "debug-feyd-training-signet" };
+  const feydTrainingState = {
+    ...base,
+    activeSeat: p2Seat,
+    players: base.players.map((player) =>
+      player.id === "p2"
+        ? withLeader(data, {
+            ...player,
+            hand: [],
+            playArea: [debugFeydSignet, ...player.playArea],
+            resources: { ...player.resources, solari: 0 },
+            spies: 3,
+            feydTraining: 0,
+          }, leaderNames.feyd)
+        : player,
+    ),
+  };
+  const feydTrainingPending = state.pendingActionForCard(
+    debugFeydSignet,
+    feydTrainingState.players.find((player) => player.id === "p2"),
+    feydTrainingState,
+    feydTrainingState.players.find((player) => player.id === "p2"),
+    arrakeen,
+  );
+  assert.ok(feydTrainingPending, "Expected a derived Feyd Personal Training pending action");
   const debugDevastatingAssault = { ...devastatingAssault, id: "debug-devastating-assault" };
   const devastatingAssaultState = {
     ...base,
@@ -615,6 +657,10 @@ async function createLeaderCharacterChoiceStates(server, initialPlayableGame) {
         reward: "landsraad",
         source: "Unseen Network",
       },
+    },
+    feydPersonalTraining: {
+      ...feydTrainingState,
+      pendingAction: feydTrainingPending,
     },
     amberDesertScouts: {
       ...base,

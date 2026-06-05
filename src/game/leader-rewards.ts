@@ -4,6 +4,7 @@ import { drawIntrigueCards } from "./intrigue-deck";
 import {
   gurneyHalleckLeaderName,
   ladyMargotFenringLeaderName,
+  muadDibLeaderName,
   princessIrulanLeaderName,
 } from "./leader-constants";
 import { recordTurnSpiceGain } from "./turn-trackers";
@@ -51,6 +52,41 @@ export function scoreGurneyAlwaysSmiling(state: GameState, playerId: string): Ga
 export function scoreActiveGurneyAlwaysSmilingForRecipient(state: GameState, recipientId: string): GameState {
   const activePlayer = state.players[state.activeSeat];
   return activePlayer?.id === recipientId ? scoreGurneyAlwaysSmiling(state, recipientId) : state;
+}
+
+export function markMuadDibUnpredictableFoeResolved(state: GameState, playerId: string): GameState {
+  return {
+    ...state,
+    players: state.players.map((player) =>
+      player.id === playerId ? { ...player, muadDibUnpredictableFoeResolved: true } : player
+    ),
+  };
+}
+
+export function resolveMuadDibUnpredictableFoe(state: GameState, recipientId?: string): GameState {
+  const source = state.players[state.activeSeat];
+  if (
+    !source ||
+    state.phase !== "playing" ||
+    source.leader !== muadDibLeaderName ||
+    source.role !== "Commander" ||
+    !source.revealed ||
+    source.muadDibUnpredictableFoeResolved
+  ) {
+    return state;
+  }
+
+  const recipient = state.players.find((player) => player.id === (recipientId ?? source.revealActivatedAllyId));
+  if (
+    !recipient ||
+    recipient.role !== "Ally" ||
+    recipient.team !== source.team ||
+    recipient.deployedSandworms < 1
+  ) {
+    return state;
+  }
+
+  return drawIntrigueCards(markMuadDibUnpredictableFoeResolved(state, source.id), source.id, 1, "Reveal");
 }
 
 export function adjustInfluence(player: Player, faction: FactionId, amount: number): Player {

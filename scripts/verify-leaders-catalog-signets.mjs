@@ -284,6 +284,193 @@ export function verifyLeaderCatalogAndSignets({ data, state }) {
   );
   assert.equal(amberWrongLeaderSignet.source.resources.spice, 0, "Fill Coffers should not trigger for other Ally leaders");
 
+  const feydSignet = { ...allySignet, id: "feyd-training-signet" };
+  const feydTrashCard = { ...data.allyStarterCards[0], id: "feyd-training-trash-card" };
+  const feydTrainingPlayer = (overrides = {}) => ({
+    ...feyd,
+    playArea: [feydSignet],
+    hand: [feydTrashCard],
+    discard: [],
+    resources: { ...feyd.resources, solari: 1, spice: 0 },
+    feydTraining: 0,
+    ...overrides,
+  });
+  const feydTrainingGame = (owner) => ({
+    ...game,
+    players: game.players.map((player) => (player.id === owner.id ? owner : player)),
+  });
+  const firstTrainingOwner = feydTrainingPlayer();
+  const firstTrainingPending = state.pendingActionsForCard(
+    feydSignet,
+    firstTrainingOwner,
+    feydTrainingGame(firstTrainingOwner),
+    firstTrainingOwner,
+    arrakeen,
+  )[0];
+  assert.equal(firstTrainingPending?.kind, "feyd-training", "Feyd Signet should queue Personal Training");
+  assert.equal(firstTrainingPending.nextPosition, 1, "Feyd should start by moving to Training 1");
+  assert.deepEqual(
+    firstTrainingPending.options.map((option) => option.id),
+    ["pay-solari-trash", "spy"],
+    "Training 1 should offer paid trash or Spy placement",
+  );
+  const paidTrashTraining = state.resolveFeydTrainingChoice(
+    { ...feydTrainingGame(firstTrainingOwner), pendingAction: firstTrainingPending, pendingQueue: [] },
+    firstTrainingPending,
+    "pay-solari-trash",
+  );
+  assert.equal(playerById(paidTrashTraining, feyd.id).feydTraining, 1, "Paid trash branch should advance Feyd's track");
+  assert.equal(paidTrashTraining.pendingAction?.kind, "trash-card", "Paid trash branch should queue a trash selection");
+  assert.equal(paidTrashTraining.pendingAction?.resourceCost?.solari, 1, "Paid trash branch should charge 1 Solari on trash");
+  const paidTrashResolved = state.trashPlayerCard(
+    paidTrashTraining,
+    paidTrashTraining.pendingAction,
+    "hand",
+    feydTrashCard.id,
+  );
+  assert.equal(playerById(paidTrashResolved, feyd.id).resources.solari, 0, "Paid trash should spend 1 Solari");
+  assert.equal(
+    playerById(paidTrashResolved, feyd.id).hand.some((card) => card.id === feydTrashCard.id),
+    false,
+    "Paid trash should trash the selected card",
+  );
+
+  const spyTrainingOwner = feydTrainingPlayer({ resources: { ...feyd.resources, solari: 0, spice: 0 } });
+  const spyTrainingPending = state.pendingActionsForCard(
+    feydSignet,
+    spyTrainingOwner,
+    feydTrainingGame(spyTrainingOwner),
+    spyTrainingOwner,
+    arrakeen,
+  )[0];
+  const paidTrainingOption = spyTrainingPending.options.find((option) => option.id === "pay-solari-trash");
+  assert.ok(paidTrainingOption, "Training 1 should include paid trash option");
+  assert.equal(
+    state.feydTrainingOptionIsResolvable(
+      { ...feydTrainingGame(spyTrainingOwner), pendingAction: spyTrainingPending, pendingQueue: [] },
+      spyTrainingPending,
+      paidTrainingOption,
+    ),
+    false,
+    "Training 1 paid trash should be unavailable without Solari",
+  );
+  const spyTraining = state.resolveFeydTrainingChoice(
+    { ...feydTrainingGame(spyTrainingOwner), pendingAction: spyTrainingPending, pendingQueue: [] },
+    spyTrainingPending,
+    "spy",
+  );
+  assert.equal(playerById(spyTraining, feyd.id).feydTraining, 1, "Spy branch should advance Feyd's track");
+  assert.equal(spyTraining.pendingAction?.kind, "spy", "Spy branch should queue Spy placement");
+  const noSpySupplyTrainingOwner = feydTrainingPlayer({
+    resources: { ...feyd.resources, solari: 0, spice: 0 },
+    spies: 0,
+  });
+  const noSpySupplyTrainingPending = state.pendingActionsForCard(
+    feydSignet,
+    noSpySupplyTrainingOwner,
+    {
+      ...feydTrainingGame(noSpySupplyTrainingOwner),
+      spyPosts: {},
+      sharedSpyPosts: {},
+    },
+    noSpySupplyTrainingOwner,
+    arrakeen,
+  )[0];
+  const noSpySupplyTraining = state.resolveFeydTrainingChoice(
+    {
+      ...feydTrainingGame(noSpySupplyTrainingOwner),
+      pendingAction: noSpySupplyTrainingPending,
+      pendingQueue: [],
+      spyPosts: {},
+      sharedSpyPosts: {},
+    },
+    noSpySupplyTrainingPending,
+    "spy",
+  );
+  assert.equal(playerById(noSpySupplyTraining, feyd.id).feydTraining, 1, "Spy branch should still advance without spy supply");
+  assert.equal(noSpySupplyTraining.pendingAction, undefined, "Spy branch should not queue an unresolvable Spy placement");
+  assert.match(noSpySupplyTraining.log[0], /no legal Spy placement/, "No-supply Spy branch should log the missed placement");
+
+  const trashTrainingOwner = feydTrainingPlayer({ feydTraining: 1 });
+  const trashTrainingPending = state.pendingActionsForCard(
+    feydSignet,
+    trashTrainingOwner,
+    feydTrainingGame(trashTrainingOwner),
+    trashTrainingOwner,
+    arrakeen,
+  )[0];
+  assert.deepEqual(
+    trashTrainingPending.options.map((option) => option.id),
+    ["trash"],
+    "Training 2 should require the trash reward",
+  );
+  const trashTraining = state.resolveFeydTrainingChoice(
+    { ...feydTrainingGame(trashTrainingOwner), pendingAction: trashTrainingPending, pendingQueue: [] },
+    trashTrainingPending,
+    "trash",
+  );
+  assert.equal(playerById(trashTraining, feyd.id).feydTraining, 2, "Training 2 should advance Feyd's track");
+  assert.equal(trashTraining.pendingAction?.kind, "trash-card", "Training 2 should queue a trash selection");
+
+  const spiceTrainingOwner = feydTrainingPlayer({ feydTraining: 2, resources: { ...feyd.resources, spice: 0, solari: 0 } });
+  const spiceTrainingPending = state.pendingActionsForCard(
+    feydSignet,
+    spiceTrainingOwner,
+    feydTrainingGame(spiceTrainingOwner),
+    spiceTrainingOwner,
+    arrakeen,
+  )[0];
+  assert.deepEqual(
+    spiceTrainingPending.options.map((option) => option.id),
+    ["trash", "spy-spice"],
+    "Training 3 should offer trash or Spy plus spice",
+  );
+  const spiceTraining = state.resolveFeydTrainingChoice(
+    { ...feydTrainingGame(spiceTrainingOwner), pendingAction: spiceTrainingPending, pendingQueue: [] },
+    spiceTrainingPending,
+    "spy-spice",
+  );
+  assert.equal(playerById(spiceTraining, feyd.id).feydTraining, 3, "Spy plus spice branch should advance Feyd's track");
+  assert.equal(playerById(spiceTraining, feyd.id).resources.spice, 2, "Spy plus spice branch should gain 2 spice");
+  assert.equal(spiceTraining.pendingAction?.kind, "spy", "Spy plus spice branch should queue Spy placement");
+
+  const finalTrainingOwner = feydTrainingPlayer({ feydTraining: 3, garrison: 3, spies: 3 });
+  const finalTrainingPending = state.pendingActionsForCard(
+    feydSignet,
+    finalTrainingOwner,
+    feydTrainingGame(finalTrainingOwner),
+    finalTrainingOwner,
+    arrakeen,
+  )[0];
+  assert.deepEqual(
+    finalTrainingPending.options.map((option) => option.id),
+    ["troop-spy"],
+    "Training 4 should offer troop plus Spy",
+  );
+  assert.equal(finalTrainingPending.canDeployTroop, true, "Final Feyd troop should remember combat-space deployment");
+  const finalTraining = state.resolveFeydTrainingChoice(
+    { ...feydTrainingGame(finalTrainingOwner), pendingAction: finalTrainingPending, pendingQueue: [] },
+    finalTrainingPending,
+    "troop-spy",
+  );
+  assert.equal(playerById(finalTraining, feyd.id).feydTraining, 4, "Final branch should finish Feyd's track");
+  assert.equal(playerById(finalTraining, feyd.id).garrison, 4, "Final branch should recruit 1 troop");
+  assert.equal(finalTraining.pendingAction?.kind, "spy", "Final branch should queue Spy placement first");
+  assert.equal(finalTraining.pendingQueue[0]?.kind, "deploy", "Final branch should keep the recruited troop deployable");
+
+  const exhaustedTrainingOwner = feydTrainingPlayer({ feydTraining: 4 });
+  assert.equal(
+    state.pendingActionsForCard(
+      feydSignet,
+      exhaustedTrainingOwner,
+      feydTrainingGame(exhaustedTrainingOwner),
+      exhaustedTrainingOwner,
+      arrakeen,
+    ).length,
+    0,
+    "Feyd Signet should do nothing after reaching the rightmost Training space",
+  );
+
 
   return {
     cards: {

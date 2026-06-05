@@ -29,6 +29,19 @@ import type {
   PendingActionChoicePendingOption,
 } from "./effect-types";
 
+export type FeydTrainingReward =
+  | "pay-solari-trash"
+  | "trash"
+  | "spy"
+  | "spy-spice"
+  | "troop-spy";
+
+export type FeydTrainingPendingOption = {
+  id: string;
+  label: string;
+  reward: FeydTrainingReward;
+};
+
 export type PostDeployIntrigueDraw = {
   recipientId: string;
   conditionOwnerId: string;
@@ -428,6 +441,15 @@ export type PendingAction =
       source: string;
       optional?: boolean;
       options: PendingActionChoicePendingOption[];
+    }
+  | {
+      kind: "feyd-training";
+      ownerId: string;
+      cardId: string;
+      source: string;
+      nextPosition: number;
+      canDeployTroop?: boolean;
+      options: FeydTrainingPendingOption[];
     }
   | {
       kind: "team-resource-payment";

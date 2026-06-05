@@ -41,6 +41,7 @@ import {
   resolveLeaderInfluenceThresholdRewards,
   resolveLocationControlIncome,
   resolveStabanSmuggleSpice,
+  markMuadDibUnpredictableFoeResolved,
   scoreGurneyAlwaysSmiling,
 } from "./game/state";
 import {
@@ -493,6 +494,7 @@ export function placeAgentAction(
 type RevealTurnPlan = {
   influenceGains: Partial<Record<FactionId, number>>;
   intriguesToDraw: number;
+  muadDibUnpredictableFoeIntriguesToDraw?: number;
   persuasion: number;
   recruitedTroops: number;
   revealGain: Partial<Resources>;
@@ -522,9 +524,18 @@ export function revealTurnPlan(
   const swords = effectResult.swords + (activePlayer.swordmasterBonus ? 2 : 0);
   const revealGain = effectResult.revealGain;
   const influenceGains = effectResult.influenceGains;
-  const intriguesToDraw = effectResult.intriguesToDraw + leaderEffectResult.intriguesToDraw;
+  const muadDibUnpredictableFoeIntriguesToDraw = leaderEffectResult.intriguesToDraw;
+  const intriguesToDraw = effectResult.intriguesToDraw + muadDibUnpredictableFoeIntriguesToDraw;
   const recruitedTroops = effectResult.recruitedTroops;
-  return { influenceGains, intriguesToDraw, persuasion, recruitedTroops, revealGain, swords };
+  return {
+    influenceGains,
+    intriguesToDraw,
+    ...(muadDibUnpredictableFoeIntriguesToDraw > 0 ? { muadDibUnpredictableFoeIntriguesToDraw } : {}),
+    persuasion,
+    recruitedTroops,
+    revealGain,
+    swords,
+  };
 }
 
 type RevealTurnInput = {
@@ -570,7 +581,15 @@ export function revealTurnAction(
   current: GameState,
   { commanderTargets, revealPlan }: RevealTurnInput,
 ): GameState {
-  const { influenceGains = {}, intriguesToDraw = 0, persuasion, recruitedTroops, revealGain, swords } = revealPlan;
+  const {
+    influenceGains = {},
+    intriguesToDraw = 0,
+    muadDibUnpredictableFoeIntriguesToDraw = 0,
+    persuasion,
+    recruitedTroops,
+    revealGain,
+    swords,
+  } = revealPlan;
   const player = current.players[current.activeSeat];
   const targetId =
     player.role === "Commander"
@@ -631,8 +650,11 @@ export function revealTurnAction(
   const spiceTrackedState = (revealGain.spice ?? 0) > 0
     ? recordTurnSpiceGain(pendingRevealState, player.id, revealGain.spice ?? 0)
     : pendingRevealState;
-  const intrigueState = intriguesToDraw > 0
-    ? drawIntrigueCards(spiceTrackedState, player.id, intriguesToDraw, "Reveal")
+  const leaderTrackedState = muadDibUnpredictableFoeIntriguesToDraw > 0
+    ? markMuadDibUnpredictableFoeResolved(spiceTrackedState, player.id)
     : spiceTrackedState;
+  const intrigueState = intriguesToDraw > 0
+    ? drawIntrigueCards(leaderTrackedState, player.id, intriguesToDraw, "Reveal")
+    : leaderTrackedState;
   return scoreGurneyAlwaysSmiling(intrigueState, player.id);
 }

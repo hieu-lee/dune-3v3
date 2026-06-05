@@ -23,7 +23,7 @@ These cards currently use typed reveal effect specs:
 
 These cards currently use typed Agent effect specs:
 
-- Ally starter cards: Seek Allies' mandatory source-card trash, Signet Ring leader-gated immediate rewards for Gurney Halleck and Lady Amber Metulli, spy placement pending rewards for Lady Margot Fenring and Staban Tuek, Princess Irulan's Chronicler's Insight pending-action choice, the spice-paid Water of Life resource reward for Reverend Mother Jessica, and the spice-paid Spice Agony Intrigue plus memory reward for Lady Jessica. Feyd-Rautha Harkonnen's Personal Training Signet track remains manual because it needs persistent track state plus branch-specific rewards.
+- Ally starter cards: Seek Allies' mandatory source-card trash, Signet Ring leader-gated immediate rewards for Gurney Halleck and Lady Amber Metulli, Feyd-Rautha Harkonnen's persistent Personal Training track choices and rewards, spy placement pending rewards for Lady Margot Fenring and Staban Tuek, Princess Irulan's Chronicler's Insight pending-action choice, the spice-paid Water of Life resource reward for Reverend Mother Jessica, and the spice-paid Spice Agony Intrigue plus memory reward for Lady Jessica.
 - Reserve cards: Prepare The Way.
 - Muad'Dib Commander cards: Command Respect, Demand Attention, Desert Call, Seek Allies, Signet Ring, Threaten Spice Production, Usul.
 - Emperor Commander cards: Critical Shipments, Demand Results, Devastating Assault, Imperial Tent, Seek Allies, Signet Ring.

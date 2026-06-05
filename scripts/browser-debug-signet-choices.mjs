@@ -70,6 +70,30 @@ export async function runSignetChoicesSmoke({
   assert.match(pendingText, /spy placement/i);
   await screenshot(page, captures, "pending-staban-signet-spy.png");
 
+  await setDebugGameAndWait(page, states.feyd);
+  pendingText = await page.locator(".pending-panel").innerText();
+  assert.match(pendingText, /Personal Training/i);
+  assert.match(pendingText, /Spend 1 Solari to trash a card/i);
+  assert.match(pendingText, /Place 1 Spy/i);
+  await screenshot(page, captures, "pending-feyd-personal-training.png");
+  const feydTrainingMobileViewport = { width: 390, height: 900 };
+  await page.setViewportSize(feydTrainingMobileViewport);
+  const feydTrainingMobileScrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+  assert.ok(
+    feydTrainingMobileScrollWidth <= feydTrainingMobileViewport.width,
+    `Feyd Personal Training mobile pending panel should not overflow horizontally (${feydTrainingMobileScrollWidth}px)`,
+  );
+  await screenshot(page, captures, "pending-feyd-personal-training-mobile-390.png");
+  await page.setViewportSize({ width: 1440, height: 1100 });
+  const feydBefore = await currentGame(page);
+  const feydOwnerBefore = feydBefore.players.find((player) => player.id === "p2");
+  await page.locator(".pending-panel").getByRole("button", { name: /Place 1 Spy/ }).click();
+  await page.waitForFunction(() => window.__DUNE_DEBUG__?.getGame().pendingAction?.kind === "spy");
+  const feydAfter = await currentGame(page);
+  const feydOwnerAfter = feydAfter.players.find((player) => player.id === "p2");
+  assert.equal(feydOwnerAfter.feydTraining, feydOwnerBefore.feydTraining + 1, "Feyd Signet should advance the Training track");
+  assert.equal(feydAfter.pendingAction.source, "Personal Training", "Feyd Signet Spy reward should keep the Personal Training source");
+
   await setDebugGameAndWait(page, states.shaddam);
   pendingText = await page.locator(".pending-panel").innerText();
   assert.match(pendingText, /Emperor of the Known Universe/i);
@@ -192,6 +216,31 @@ async function createSignetChoiceStates(server, initialPlayableGame) {
     "Staban Signet should queue the Unseen Network follow-up",
   );
 
+  const feydCard = { ...allySignet, id: "debug-feyd-signet-ring" };
+  const feydTrashCard = { ...drawCard, id: "debug-feyd-training-trash-card" };
+  const feydPlayer = game.players.find((player) => player.id === "p2");
+  assert.ok(feydPlayer, "Expected Feyd for Personal Training Signet");
+  const feydSource = {
+    ...feydPlayer,
+    feydTraining: 0,
+    hand: [feydTrashCard],
+    discard: [],
+    resources: { ...feydPlayer.resources, solari: 1 },
+    spies: 1,
+    playArea: [feydCard],
+  };
+  const feydBase = {
+    ...game,
+    players: game.players.map((player) => player.id === feydSource.id ? feydSource : player),
+  };
+  const feydPending = state.pendingActionForCard(feydCard, feydSource, feydBase, feydSource);
+  assert.equal(feydPending?.kind, "feyd-training", "Expected Feyd Signet Personal Training pending action");
+  assert.deepEqual(
+    feydPending.options.map((option) => option.id),
+    ["pay-solari-trash", "spy"],
+    "Feyd first Training space should offer paid trash or Spy placement",
+  );
+
   const muadDib = {
     ...game,
     activeSeat: 0,
@@ -239,6 +288,14 @@ async function createSignetChoiceStates(server, initialPlayableGame) {
     activeSeat: 2,
     phase: "playing",
     pendingAction: stabanPending,
+    pendingQueue: [],
+  };
+
+  const feyd = {
+    ...feydBase,
+    activeSeat: 1,
+    phase: "playing",
+    pendingAction: feydPending,
     pendingQueue: [],
   };
 
@@ -332,5 +389,5 @@ async function createSignetChoiceStates(server, initialPlayableGame) {
     },
   };
 
-  return { muadDib, gurney, amber, margot, staban, shaddam, irulan };
+  return { muadDib, gurney, amber, margot, staban, feyd, shaddam, irulan };
 }

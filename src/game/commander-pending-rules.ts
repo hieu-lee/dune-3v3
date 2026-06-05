@@ -16,6 +16,7 @@ import {
 } from "./leader-constants";
 import {
   adjustInfluence,
+  resolveMuadDibUnpredictableFoe,
   resolveLeaderInfluenceThresholdRewards,
   scoreActiveGurneyAlwaysSmilingForRecipient,
 } from "./leader-rewards";
@@ -643,10 +644,9 @@ export function resolvePayResourceForSandwormsChoice(
       ...state.log,
     ],
   };
-  return scoreActiveGurneyAlwaysSmilingForRecipient(
-    recordTurnUnitDeployment(nextState, owner.id, pending.sandworms),
-    pending.recipientId,
-  );
+  const deploymentState = recordTurnUnitDeployment(nextState, owner.id, pending.sandworms);
+  const gurneyState = scoreActiveGurneyAlwaysSmilingForRecipient(deploymentState, pending.recipientId);
+  return resolveMuadDibUnpredictableFoe(gurneyState, pending.recipientId);
 }
 
 export function skipPayResourceForSandworms(state: GameState, pending: PayResourceForSandwormsPendingAction): GameState {

@@ -43,6 +43,10 @@ export function memoryCountLabel(count: number) {
   return `${count} ${count === 1 ? "memory" : "memories"}`;
 }
 
+export function feydTrainingLabel(position: number) {
+  return `Training ${Math.min(4, Math.max(0, position))}/4`;
+}
+
 export function troopSupplyLabel(count: number) {
   return `${count} supply ${count === 1 ? "troop" : "troops"}`;
 }

@@ -30,6 +30,7 @@ export function createRoomPendingActionHandlers(sendAction: RoomSendAction): Pen
     chooseLoseInfluenceForIntrigues: (faction) => pending({ kind: "choose-lose-influence-for-intrigues", faction }),
     chooseLoseInfluenceForInfluence: (choice) => pending({ kind: "choose-lose-influence-for-influence", choice }),
     chooseMakerReward: (choice) => pending({ kind: "choose-maker-reward", choice }),
+    chooseFeydTraining: (optionId) => pending({ kind: "choose-feyd-training", optionId }),
     choosePaidReward: (optionId) => pending({ kind: "choose-paid-reward", optionId }),
     choosePayResourceForContracts: (optionIndex) => pending({ kind: "choose-pay-resource-for-contracts", optionIndex }),
     choosePayResourceForDrawCards: () => pending({ kind: "choose-pay-resource-for-draw-cards" }),

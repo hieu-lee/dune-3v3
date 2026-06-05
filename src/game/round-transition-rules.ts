@@ -65,6 +65,7 @@ export function startNextRound(state: GameState): GameState {
         revealActivatedAllyId: undefined,
         callToArmsActive: false,
         gurneyAlwaysSmilingScored: false,
+        muadDibUnpredictableFoeResolved: false,
         conflict: 0,
         deployedTroops: 0,
         deployedSandworms: 0,

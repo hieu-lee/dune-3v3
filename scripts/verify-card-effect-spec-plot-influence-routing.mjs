@@ -246,6 +246,32 @@ export function verifyCardEffectSpecPlotInfluenceRouting({
     imperiumPolitics.effects?.some(
       (spec) =>
         spec.trigger === "plot-intrigue" &&
+        spec.choiceId === "spacing" &&
+        spec.conditions?.some(
+          (condition) =>
+            condition.kind === "has-role" && condition.role === "Ally",
+        ) &&
+        spec.effects.some(
+          (effect) =>
+            effect.kind === "spend-resource" &&
+            effect.selector === "self" &&
+            effect.resource === "solari" &&
+            effect.amount === 1,
+        ) &&
+        spec.effects.some(
+          (effect) =>
+            effect.kind === "gain-influence" &&
+            effect.selector === "self" &&
+            effect.faction === "spacing" &&
+            effect.amount === 1,
+        ),
+    ),
+    "Imperium Politics should carry a typed Ally Spacing Guild Plot choice spec",
+  );
+  assert.ok(
+    imperiumPolitics.effects?.some(
+      (spec) =>
+        spec.trigger === "plot-intrigue" &&
         spec.choiceId === "greatHouses" &&
         spec.conditions?.some(
           (condition) =>
@@ -267,6 +293,32 @@ export function verifyCardEffectSpecPlotInfluenceRouting({
         ),
     ),
     "Imperium Politics should carry a typed Commander routed Great Houses Plot choice spec",
+  );
+  assert.ok(
+    imperiumPolitics.effects?.some(
+      (spec) =>
+        spec.trigger === "plot-intrigue" &&
+        spec.choiceId === "spacing" &&
+        spec.conditions?.some(
+          (condition) =>
+            condition.kind === "has-role" && condition.role === "Commander",
+        ) &&
+        spec.effects.some(
+          (effect) =>
+            effect.kind === "spend-resource" &&
+            effect.selector === "self" &&
+            effect.resource === "solari" &&
+            effect.amount === 1,
+        ) &&
+        spec.effects.some(
+          (effect) =>
+            effect.kind === "gain-influence" &&
+            effect.selector === "activated-ally" &&
+            effect.faction === "spacing" &&
+            effect.amount === 1,
+        ),
+    ),
+    "Imperium Politics should carry a typed Commander routed Spacing Guild Plot choice spec",
   );
   assert.ok(
     imperiumPolitics.effects?.some(
@@ -298,6 +350,16 @@ export function verifyCardEffectSpecPlotInfluenceRouting({
     ),
     "Imperium Politics should carry a typed Shaddam personal Emperor Plot choice spec",
   );
+  assert.equal(
+    imperiumPolitics.effects?.some((spec) => spec.trigger === "plot-intrigue" && spec.choiceId === "fremen"),
+    false,
+    "Imperium Politics should not expose a Fremen Plot choice",
+  );
+  assert.equal(
+    imperiumPolitics.effects?.some((spec) => spec.trigger === "plot-intrigue" && spec.choiceId === "fringeWorlds"),
+    false,
+    "Imperium Politics should not expose a Fringe Worlds Plot choice",
+  );
   const imperiumPoliticsAllyResolved = effectResolver.resolveGameEffects(
     imperiumPolitics.effects,
     {
@@ -321,6 +383,20 @@ export function verifyCardEffectSpecPlotInfluenceRouting({
     imperiumPoliticsAllyResolved.activatedAlly.influenceGains,
     {},
     "Ally Imperium Politics should not route Influence to an activated Ally",
+  );
+  const imperiumPoliticsAllySpacingResolved = effectResolver.resolveGameEffects(
+    imperiumPolitics.effects,
+    {
+      trigger: "plot-intrigue",
+      choiceId: "spacing",
+      source: p2,
+      state: game,
+    },
+  );
+  assert.equal(
+    imperiumPoliticsAllySpacingResolved.influenceGains.spacing,
+    1,
+    "Ally Imperium Politics should gain Spacing Guild Influence",
   );
   const imperiumPoliticsCommanderResolved = effectResolver.resolveGameEffects(
     imperiumPolitics.effects,
@@ -346,6 +422,21 @@ export function verifyCardEffectSpecPlotInfluenceRouting({
     imperiumPoliticsCommanderResolved.activatedAlly.influenceGains.greatHouses,
     1,
     "Commander main-board Imperium Politics should route Influence to the activated Ally",
+  );
+  const imperiumPoliticsCommanderSpacingResolved = effectResolver.resolveGameEffects(
+    imperiumPolitics.effects,
+    {
+      trigger: "plot-intrigue",
+      choiceId: "spacing",
+      source: p4,
+      target: p6,
+      state: game,
+    },
+  );
+  assert.equal(
+    imperiumPoliticsCommanderSpacingResolved.activatedAlly.influenceGains.spacing,
+    1,
+    "Commander Spacing Guild Imperium Politics should route Influence to the activated Ally",
   );
   const imperiumPoliticsShaddamResolved = effectResolver.resolveGameEffects(
     imperiumPolitics.effects,

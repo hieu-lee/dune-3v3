@@ -668,7 +668,9 @@ export async function runTableChoicesSmoke({
   await waitForActiveIntrigue(page, "Imperium Politics");
   const allyPoliticsCard = page.locator(".intrigue-card").filter({ hasText: "Imperium Politics" });
   const allyPoliticsButton = allyPoliticsCard.getByRole("button", { name: /1 Solari -> GH/ });
+  const allyPoliticsSpacingButton = allyPoliticsCard.getByRole("button", { name: /1 Solari -> SG/ });
   assert.equal(await allyPoliticsButton.count(), 1, "Expected one Ally Imperium Politics Great Houses button");
+  assert.equal(await allyPoliticsSpacingButton.count(), 1, "Expected one Ally Imperium Politics Spacing Guild button");
   assert.equal(await allyPoliticsButton.isEnabled(), true, "Ally Imperium Politics should be playable with 1 Solari");
   await screenshot(page, captures, "imperium-politics-ally-ready.png");
 
@@ -704,7 +706,7 @@ export async function runTableChoicesSmoke({
   await waitForActiveIntrigue(page, "Imperium Politics");
   const commanderPoliticsCard = page.locator(".intrigue-card").filter({ hasText: "Imperium Politics" });
   const commanderPoliticsButton = commanderPoliticsCard.getByRole("button", {
-    name: new RegExp(`1 Solari -> GH: ${escapeRegExp(states.imperiumPoliticsCommanderTargetName)}`),
+    name: new RegExp(`1 Solari -> SG: ${escapeRegExp(states.imperiumPoliticsCommanderTargetName)}`),
   });
   assert.equal(await commanderPoliticsButton.count(), 1, "Expected one Commander routed Imperium Politics button");
   assert.equal(
@@ -730,8 +732,8 @@ export async function runTableChoicesSmoke({
         !game.pendingAction &&
         game.pendingQueue.length === 0 &&
         commander.resources.solari === 1 &&
-        commander.influence.greatHouses === 0 &&
-        ally.influence.greatHouses === 2 &&
+        commander.influence.spacing === 0 &&
+        ally.influence.spacing === 2 &&
         !commander.intrigues.some((card) => card.name === "Imperium Politics") &&
         game?.intrigueDiscard.at(-1)?.name === "Imperium Politics",
     );
@@ -742,16 +744,16 @@ export async function runTableChoicesSmoke({
   assert.ok(commanderPoliticsSourceAfter, "Expected Shaddam after routed Imperium Politics");
   assert.ok(commanderPoliticsOwnerAfter, "Expected Princess Irulan after routed Imperium Politics");
   assert.equal(
-    commanderPoliticsSourceAfter.influence.greatHouses,
-    commanderPoliticsSourceBefore.influence.greatHouses,
-    "Commander routed Imperium Politics should not move the Commander's Great Houses Influence",
+    commanderPoliticsSourceAfter.influence.spacing,
+    commanderPoliticsSourceBefore.influence.spacing,
+    "Commander routed Imperium Politics should not move the Commander's Spacing Guild Influence",
   );
   assert.equal(
     commanderPoliticsOwnerAfter.vp,
     commanderPoliticsOwnerBefore.vp + 1,
     "Commander routed Imperium Politics should award the activated Ally threshold VP",
   );
-  assert.match(commanderPoliticsAfter.log[0], /Princess Irulan gains 1 Great Houses Influence/);
+  assert.match(commanderPoliticsAfter.log[0], /Princess Irulan gains 1 Spacing Guild Influence/);
   await screenshot(page, captures, "imperium-politics-commander-after.png");
 
   await setDebugGameAndWait(page, states.manipulatePlot);

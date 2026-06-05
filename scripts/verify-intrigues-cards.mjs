@@ -10,6 +10,7 @@ const intrigueSpecs = {
   crysknife: { sourceId: 159, label: "Crysknife" },
   cunning: { sourceId: 133, label: "Cunning" },
   departForArrakis: { sourceId: 132, label: "Depart For Arrakis" },
+  desertMouse: { sourceId: 157, label: "Desert Mouse" },
   detonation: { sourceId: 131, label: "Detonation" },
   devour: { sourceId: 151, label: "Devour" },
   distraction: { sourceId: 144, label: "Distraction" },
@@ -24,7 +25,11 @@ const intrigueSpecs = {
   marketOpportunity: { sourceId: 145, label: "Market Opportunity" },
   mercenaries: { sourceId: 128, label: "Mercenaries" },
   opportunism: { sourceId: 134, label: "Opportunism" },
+  ornithopter: { sourceId: 158, label: "Ornithopter" },
   questionableMethods: { sourceId: 156, label: "Questionable Methods" },
+  choamProfits: { sourceId: 450, label: "CHOAM Profits" },
+  secureSpiceTrade: { sourceId: 161, label: "Secure Spice Trade" },
+  shadowAlliance: { sourceId: 160, label: "Shadow Alliance" },
   shaddamsFavor: { sourceId: 141, label: "Shaddam's Favor" },
   sietchRitual: { sourceId: 127, label: "Sietch Ritual" },
   specialMission: { sourceId: 136, label: "Special Mission" },
@@ -58,6 +63,14 @@ const summaryExpectations = {
     "If you have a seat on the High Council, gain 2 water.",
     "Councilor's Ambition should expose its High Council requirement",
   ],
+  choamProfits: [
+    "Endgame: if you have completed four or more contracts, gain 1 VP.",
+    "CHOAM Profits should expose its completed-contract Endgame condition",
+  ],
+  crysknife: [
+    "Gain 1 spice as a Plot Intrigue OR at Endgame, flip a face-up Crysknife or wild Conflict you won to gain 1 VP.",
+    "Crysknife should expose both Plot spice and Endgame battle-icon scoring",
+  ],
   cunning: [
     "Draw 1 card OR spend 1 spice to draw 1 card and trash 1 card.",
     "Cunning should expose both Plot branches",
@@ -65,6 +78,10 @@ const summaryExpectations = {
   departForArrakis: [
     "Spend 2 spice to recruit 3 troops; with 3+ Fremen/Fringe Influence, draw 1 card.",
     "Depart For Arrakis should expose its spice troop cost and conditional card draw",
+  ],
+  desertMouse: [
+    "Gain 1 spice as a Plot Intrigue OR at Endgame, flip a face-up Desert Mouse or wild Conflict you won to gain 1 VP.",
+    "Desert Mouse should expose both Plot spice and Endgame battle-icon scoring",
   ],
   detonation: [
     "Remove the Shield Wall OR deploy up to four troops from your garrison to the Conflict.",
@@ -75,7 +92,7 @@ const summaryExpectations = {
     "Devour should expose its sandworm threshold and optional trash effect",
   ],
   distraction: [
-    "After you deploy three or more units to the Conflict in a single turn, place a spy on the same observation post as another player's spy.",
+    "After you deploy three or more units to the Conflict in a single turn, you may place a spy on the same observation post as another player's spy.",
     "Distraction should expose its three-unit shared-spy trigger",
   ],
   findWeakness: [
@@ -87,7 +104,7 @@ const summaryExpectations = {
     "Go To Ground should expose its troop retreat and spy placement effect",
   ],
   imperiumPolitics: [
-    "Spend 1 Solari to gain 1 Emperor/Great Houses or Fremen/Fringe Influence.",
+    "Spend 1 Solari to gain 1 Emperor/Great Houses or Spacing Guild Influence.",
     "Imperium Politics should expose its Solari-for-Influence choice",
   ],
   impress: [
@@ -122,9 +139,21 @@ const summaryExpectations = {
     "Spend 2 Solari and lose 2 Influence to gain 1 VP.",
     "Opportunism should expose its Solari and Influence costs for 1 VP",
   ],
+  ornithopter: [
+    "Gain 1 spice as a Plot Intrigue OR at Endgame, flip a face-up Ornithopter or wild Conflict you won to gain 1 VP.",
+    "Ornithopter should expose both Plot spice and Endgame battle-icon scoring",
+  ],
   questionableMethods: [
     "Add 1 strength; the recipient may lose 1 Influence, or a Commander may lose personal Influence, to add 4 more strength.",
     "Questionable Methods should expose its base strength and optional Influence loss",
+  ],
+  secureSpiceTrade: [
+    "Endgame: if you have at least two The Spice Must Flow cards, gain 1 VP and 2 spice.",
+    "Secure Spice Trade should expose its The Spice Must Flow Endgame condition",
+  ],
+  shadowAlliance: [
+    "Endgame: if you have 4+ Influence on a Faction track where an opponent has the Alliance, gain 1 VP.",
+    "Shadow Alliance should expose its opposing-Alliance Endgame condition",
   ],
   shaddamsFavor: [
     "Recruit 1 troop; with 3+ Emperor/Great Houses Influence, gain 3 Solari.",

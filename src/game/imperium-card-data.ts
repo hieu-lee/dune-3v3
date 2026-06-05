@@ -1097,7 +1097,9 @@ function toImperiumCard(card: HubCard): Card {
     effects,
     ...(card.id === undercoverAssetSourceId ? { ignoreInfluenceRequirements: true } : {}),
     play: imperiumPlayText(card),
-    reveal: imperiumRevealText(card, persuasion, swords, false),
+    reveal: card.id === theacherousManeuverSourceId
+      ? "+1 persuasion. Draw 1 Intrigue."
+      : imperiumRevealText(card, persuasion, swords, false),
     cost: attributeNumber(card, "Persuasion cost"),
     imagePath: card.localImagePath ?? card.fullImageUrl ?? undefined,
     thumbnailPath: card.localThumbnailPath ?? card.thumbnailImageUrl ?? undefined,

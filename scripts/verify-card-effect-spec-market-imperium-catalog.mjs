@@ -759,6 +759,11 @@ export function verifyCardEffectSpecMarketImperiumCatalog({
     ),
     "Treacherous Maneuver should carry a declarative Agent board-space Influence spec with its trash cost",
   );
+  assert.equal(
+    theacherousManeuver.reveal,
+    "+1 persuasion. Draw 1 Intrigue.",
+    "Treacherous Maneuver reveal text should expose its printed Intrigue draw",
+  );
   assert.ok(
     hasAgentEffect(
       publicSpectacle,

@@ -260,7 +260,7 @@ const intrigueSummariesByCatalogId: Partial<Record<number, string>> = {
   133: "Draw 1 card OR spend 1 spice to draw 1 card and trash 1 card.",
   134: "Spend 2 Solari and lose 2 Influence to gain 1 VP.",
   143: "Remove and replace a card in the Imperium Row; during your Reveal turn this round, you may acquire it for 1 Persuasion less.",
-  144: "After you deploy three or more units to the Conflict in a single turn, place a spy on the same observation post as another player's spy.",
+  144: "After you deploy three or more units to the Conflict in a single turn, you may place a spy on the same observation post as another player's spy.",
   447: "If you gained spice this turn, gain 1 Solari and may take a face-up CHOAM contract.",
   135: "Lose 1 Influence to gain 1 Influence; you may also spend 3 spice to gain 1 Influence.",
   136: "Place 1 spy on a City observation post OR recall 1 spy to remove the Shield Wall and gain 2 spice.",
@@ -268,7 +268,7 @@ const intrigueSummariesByCatalogId: Partial<Record<number, string>> = {
   129: "If you have a seat on the High Council, gain 2 water.",
   130: "Spend 5 spice to gain 1 VP; with 3+ Spacing Guild Influence, you may also spend 3 water to gain 1 VP.",
   139: "Spend 5 Solari to gain two different Influence among Emperor/Great Houses, Fremen/Fringe, Bene Gesserit, and Spacing Guild.",
-  140: "Spend 1 Solari to gain 1 Emperor/Great Houses or Fremen/Fringe Influence.",
+  140: "Spend 1 Solari to gain 1 Emperor/Great Houses or Spacing Guild Influence.",
   138: "During your Reveal turn this round, whenever you acquire a card, recruit 1 troop.",
   142: "Draw 1 card; draw 1 more if you have two or more spies on the board.",
   141: "Recruit 1 troop; with 3+ Emperor/Great Houses Influence, gain 3 Solari.",
@@ -285,8 +285,14 @@ const intrigueSummariesByCatalogId: Partial<Record<number, string>> = {
   146: "Retreat 1 or 2 troops, then optionally place a spy.",
   151: "Add 2 strength; if the recipient has one or more sandworms in the Conflict, add 4 strength instead and they may trash a card.",
   154: "Add 3 strength; add 5 instead if you have at least 3 Bene Gesserit Influence.",
+  157: "Gain 1 spice as a Plot Intrigue OR at Endgame, flip a face-up Desert Mouse or wild Conflict you won to gain 1 VP.",
+  158: "Gain 1 spice as a Plot Intrigue OR at Endgame, flip a face-up Ornithopter or wild Conflict you won to gain 1 VP.",
+  159: "Gain 1 spice as a Plot Intrigue OR at Endgame, flip a face-up Crysknife or wild Conflict you won to gain 1 VP.",
+  160: "Endgame: if you have 4+ Influence on a Faction track where an opponent has the Alliance, gain 1 VP.",
+  161: "Endgame: if you have at least two The Spice Must Flow cards, gain 1 VP and 2 spice.",
   448: "Lose 1 Influence to gain 4 Solari as a Plot Intrigue OR add 4 strength in Combat if you have completed at least two contracts.",
   449: "Retreat 1 or 2 troops, then take a face-up CHOAM contract.",
+  450: "Endgame: if you have completed four or more contracts, gain 1 VP.",
 };
 
 const intrigueNamesByCatalogId: Partial<Record<number, string>> = {
@@ -602,16 +608,12 @@ function intrigueCardEffects(card: HubCard): CardEffectSpec[] | undefined {
         hasRole("Commander"),
         hasTeam("shaddam"),
       ]),
-      plotPayResourceForInfluence("fremen", "solari", 1, "self", "fremen", 1, [
-        hasRole("Commander"),
-        hasTeam("muaddib"),
-      ]),
       plotPayResourceForInfluence("greatHouses", "solari", 1, "self", "greatHouses", 1, [hasRole("Ally")]),
-      plotPayResourceForInfluence("fringeWorlds", "solari", 1, "self", "fringeWorlds", 1, [hasRole("Ally")]),
+      plotPayResourceForInfluence("spacing", "solari", 1, "self", "spacing", 1, [hasRole("Ally")]),
       plotPayResourceForInfluence("greatHouses", "solari", 1, "activated-ally", "greatHouses", 1, [
         hasRole("Commander"),
       ]),
-      plotPayResourceForInfluence("fringeWorlds", "solari", 1, "activated-ally", "fringeWorlds", 1, [
+      plotPayResourceForInfluence("spacing", "solari", 1, "activated-ally", "spacing", 1, [
         hasRole("Commander"),
       ]),
     ];

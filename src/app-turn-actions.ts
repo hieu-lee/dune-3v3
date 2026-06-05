@@ -46,7 +46,9 @@ import {
 import {
   resolveCardRevealEffects,
   resolveDeferredAgentConflictUnitIntrigueDraws,
+  resolveGameEffects,
 } from "./game/effect-resolver";
+import { leaderRevealEffectSpecs } from "./game/leader-effect-data";
 import type {
   BoardSpace,
   Card,
@@ -500,15 +502,27 @@ type RevealTurnPlan = {
 export function revealTurnPlan(
   activePlayer: Player,
   state?: Pick<GameState, "agentPlacementOwners" | "roundMakerSpaceVisits" | "spaces" | "spyPosts" | "sharedSpyPosts"> &
-    Partial<Pick<GameState, "turnAcquiredCardIds">>,
+    Partial<Pick<GameState, "players" | "turnAcquiredCardIds">>,
+  combatRecipient?: Player,
 ): RevealTurnPlan {
-  const effectResult = resolveCardRevealEffects(activePlayer.hand, activePlayer, state);
+  const statePlayers = state?.players;
+  const revealCombatRecipient = combatRecipient ??
+    (activePlayer.role === "Commander" && statePlayers
+      ? statePlayers.find((player) => player.id === activatedAllyIdFor(activePlayer, statePlayers, {}))
+      : undefined);
+  const effectResult = resolveCardRevealEffects(activePlayer.hand, activePlayer, state, revealCombatRecipient);
+  const leaderEffectResult = resolveGameEffects(leaderRevealEffectSpecs, {
+    trigger: "reveal",
+    source: activePlayer,
+    state,
+    target: revealCombatRecipient,
+  });
   const highCouncilPersuasion = activePlayer.highCouncilSeat ? 2 : 0;
   const persuasion = effectResult.persuasion + highCouncilPersuasion + boardSpaceRevealPersuasionFor(activePlayer, state);
   const swords = effectResult.swords + (activePlayer.swordmasterBonus ? 2 : 0);
   const revealGain = effectResult.revealGain;
   const influenceGains = effectResult.influenceGains;
-  const intriguesToDraw = effectResult.intriguesToDraw;
+  const intriguesToDraw = effectResult.intriguesToDraw + leaderEffectResult.intriguesToDraw;
   const recruitedTroops = effectResult.recruitedTroops;
   return { influenceGains, intriguesToDraw, persuasion, recruitedTroops, revealGain, swords };
 }

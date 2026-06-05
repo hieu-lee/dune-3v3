@@ -37,6 +37,10 @@ export function hasConflictUnits(count: number) {
   return { kind: "has-conflict-units", count } as const;
 }
 
+export function hasSandwormsInConflict(count: number) {
+  return { kind: "has-sandworms-in-conflict", count } as const;
+}
+
 export function hasInfluence(faction: FactionId, amount: number) {
   return { kind: "has-influence", faction, amount } as const;
 }

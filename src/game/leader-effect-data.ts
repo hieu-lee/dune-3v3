@@ -4,6 +4,7 @@ import {
   hasLeader,
   hasLeaderCounter,
   hasRole,
+  hasSandwormsInConflict,
   hasSpyPosts,
   revealEffects,
   visitedSpaceIcon,
@@ -12,6 +13,7 @@ import {
   feydRauthaLeaderName,
   ladyAmberMetulliLeaderName,
   ladyJessicaLeaderName,
+  muadDibLeaderName,
   reverendMotherJessicaLeaderName,
 } from "./leader-constants";
 import type { CardEffectSpec } from "./types";
@@ -46,6 +48,18 @@ export const leaderPlacementEffectSpecs: CardEffectSpec[] = [
 ];
 
 export const leaderRevealEffectSpecs: CardEffectSpec[] = [
+  revealEffects(
+    [{
+      kind: "draw-intrigues",
+      selector: "self",
+      amount: 1,
+    }],
+    [
+      hasLeader(muadDibLeaderName),
+      hasRole("Commander"),
+      hasSandwormsInConflict(1),
+    ],
+  ),
   revealEffects(
     [{
       kind: "recall-spy",

@@ -247,7 +247,12 @@ export default function App() {
       void roomSession.sendAction({ kind: "reveal-turn", commanderTargets });
       return;
     }
-    const revealPlan = revealTurnPlan(activePlayer, game);
+    const targetId =
+      activePlayer.role === "Commander"
+        ? activatedAllyIdFor(activePlayer, game.players, commanderTargets)
+        : activePlayer.id;
+    const revealTarget = game.players.find((player) => player.id === targetId);
+    const revealPlan = revealTurnPlan(activePlayer, game, revealTarget);
     setGame((current) => revealTurnAction(current, { commanderTargets, revealPlan }));
   }
 

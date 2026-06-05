@@ -22,9 +22,11 @@ try {
 
   leaderRevealEffectSpecs.forEach(validateSpec);
   assert.deepEqual(
-    leaderRevealEffectSpecs.map((spec) => spec.effects.map((effect) => effect.source)),
-    [["Devious Strength"], ["Desert Scouts"]],
-    "Feyd and Amber reveal abilities should be modeled as typed leader reveal specs",
+    leaderRevealEffectSpecs.map((spec) =>
+      spec.effects.map((effect) => effect.source ?? effect.kind)
+    ),
+    [["draw-intrigues"], ["Devious Strength"], ["Desert Scouts"]],
+    "Muad'Dib, Feyd, and Amber reveal abilities should be modeled as typed leader reveal specs",
   );
 
   const {
@@ -274,6 +276,138 @@ try {
   assert.equal(playerById(margotChangeSameFaction, ladyMargot.id).resources.spice, 2, "Margot should gain Loyalty spice when Change Allegiances drops and regains Bene Gesserit 2 Influence");
   assert.equal(margotChangeSameFaction.turnSpiceGains[ladyMargot.id], 2, "Change Allegiances Loyalty spice should be tracked");
   assert.match(margotChangeSameFaction.log[1], /Loyalty/, "Margot's same-Faction Change Allegiances reward should log after the played Intrigue");
+
+  const muadDibUnpredictableFoeBase = {
+    ...game,
+    activeSeat: game.players.findIndex((player) => player.id === muadDib.id),
+    pendingAction: undefined,
+    pendingQueue: [],
+    intrigueDeck: [{ ...intrigueCard, id: "unpredictable-foe-intrigue" }],
+    intrigueDiscard: [],
+    players: game.players.map((player) => {
+      if (player.id === muadDib.id) {
+        return {
+          ...muadDib,
+          hand: [],
+          intrigues: [],
+          playArea: [],
+          revealed: false,
+          deployedSandworms: 0,
+        };
+      }
+      if (player.id === muadDibAllyA.id) {
+        return {
+          ...player,
+          deployedSandworms: 1,
+        };
+      }
+      return player;
+    }),
+  };
+  const muadDibUnpredictableFoePlan = appTurnActions.revealTurnPlan(
+    playerById(muadDibUnpredictableFoeBase, muadDib.id),
+    muadDibUnpredictableFoeBase,
+    playerById(muadDibUnpredictableFoeBase, muadDibAllyA.id),
+  );
+  assert.equal(
+    muadDibUnpredictableFoePlan.intriguesToDraw,
+    1,
+    "Unpredictable Foe should draw 1 Intrigue when Muad'Dib's reveal target has a sandworm in the Conflict",
+  );
+  const muadDibNoTargetUnpredictableFoePlan = appTurnActions.revealTurnPlan(
+    playerById(muadDibUnpredictableFoeBase, muadDib.id),
+    muadDibUnpredictableFoeBase,
+  );
+  assert.equal(
+    muadDibNoTargetUnpredictableFoePlan.intriguesToDraw,
+    1,
+    "Unpredictable Foe should use the default activated Ally when no reveal target is supplied",
+  );
+  const muadDibNoTargetUnpredictableFoeRevealed = appTurnActions.revealTurnAction(muadDibUnpredictableFoeBase, {
+    commanderTargets: {},
+    revealPlan: muadDibNoTargetUnpredictableFoePlan,
+  });
+  assert.equal(
+    playerById(muadDibNoTargetUnpredictableFoeRevealed, muadDib.id).intrigues[0]?.id,
+    "unpredictable-foe-intrigue",
+    "Unpredictable Foe should draw through the default activated Ally on direct no-target reveal actions",
+  );
+  assert.equal(
+    playerById(muadDibNoTargetUnpredictableFoeRevealed, muadDib.id).revealActivatedAllyId,
+    muadDibAllyA.id,
+    "Direct no-target Reveal actions should lock the same default Ally used by the Reveal plan",
+  );
+  const muadDibUnpredictableFoeRevealed = appTurnActions.revealTurnAction(muadDibUnpredictableFoeBase, {
+    commanderTargets: { [muadDib.id]: muadDibAllyA.id },
+    revealPlan: muadDibUnpredictableFoePlan,
+  });
+  assert.equal(
+    playerById(muadDibUnpredictableFoeRevealed, muadDib.id).intrigues[0]?.id,
+    "unpredictable-foe-intrigue",
+    "Unpredictable Foe should draw an Intrigue during Muad'Dib's Reveal action",
+  );
+  assert.match(
+    muadDibUnpredictableFoeRevealed.log[0],
+    /draws an Intrigue card from Reveal/,
+    "Unpredictable Foe should use the normal Reveal Intrigue draw path",
+  );
+  const muadDibNoSandwormState = {
+    ...muadDibUnpredictableFoeBase,
+    players: muadDibUnpredictableFoeBase.players.map((player) =>
+      player.id === muadDibAllyA.id ? { ...player, deployedSandworms: 0 } : player
+    ),
+  };
+  const muadDibNoSandwormPlan = appTurnActions.revealTurnPlan(
+    playerById(muadDibNoSandwormState, muadDib.id),
+    muadDibNoSandwormState,
+    playerById(muadDibNoSandwormState, muadDibAllyA.id),
+  );
+  assert.equal(
+    muadDibNoSandwormPlan.intriguesToDraw,
+    0,
+    "Unpredictable Foe should not draw without the reveal target's sandworms in the Conflict",
+  );
+  const muadDibCommanderOnlySandwormState = {
+    ...muadDibUnpredictableFoeBase,
+    players: muadDibUnpredictableFoeBase.players.map((player) => {
+      if (player.id === muadDib.id) return { ...player, deployedSandworms: 1 };
+      if (player.id === muadDibAllyA.id) return { ...player, deployedSandworms: 0 };
+      return player;
+    }),
+  };
+  const muadDibCommanderOnlySandwormPlan = appTurnActions.revealTurnPlan(
+    playerById(muadDibCommanderOnlySandwormState, muadDib.id),
+    muadDibCommanderOnlySandwormState,
+    playerById(muadDibCommanderOnlySandwormState, muadDibAllyA.id),
+  );
+  assert.equal(
+    muadDibCommanderOnlySandwormPlan.intriguesToDraw,
+    0,
+    "Unpredictable Foe should use the selected reveal target's sandworms for a Commander",
+  );
+  const muadDibNoTargetCommanderOnlySandwormPlan = appTurnActions.revealTurnPlan(
+    playerById(muadDibCommanderOnlySandwormState, muadDib.id),
+    muadDibCommanderOnlySandwormState,
+  );
+  assert.equal(
+    muadDibNoTargetCommanderOnlySandwormPlan.intriguesToDraw,
+    0,
+    "Unpredictable Foe should not use invalid Commander-owned sandworms when no reveal target is supplied",
+  );
+  const feydSandwormPlan = appTurnActions.revealTurnPlan(
+    { ...feyd, hand: [], deployedSandworms: 1 },
+    {
+      ...game,
+      players: game.players.map((player) =>
+        player.id === feyd.id ? { ...feyd, hand: [], deployedSandworms: 1 } : player
+      ),
+    },
+  );
+  assert.equal(
+    feydSandwormPlan.intriguesToDraw,
+    0,
+    "Unpredictable Foe should not trigger for non-Muad'Dib leaders",
+  );
 
   const gurneyRevealBase = {
     ...game,

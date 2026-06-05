@@ -325,9 +325,14 @@ function applyRevealTurn(state: GameState, playerId: string, command: Extract<Ro
   if (state.agentTurnComplete) throw new RoomActionError(409, "Finish the Agent turn before revealing");
   if (player.revealed) throw new RoomActionError(409, "Active player has already revealed");
   const commanderTargets = commanderTargetsFor(player, state.players, command.commanderTargets);
+  const targetId =
+    player.role === "Commander"
+      ? activatedAllyIdFor(player, state.players, commanderTargets)
+      : player.id;
+  const target = state.players.find((candidate) => candidate.id === targetId);
   return revealTurnAction(state, {
     commanderTargets,
-    revealPlan: revealTurnPlan(player, state),
+    revealPlan: revealTurnPlan(player, state, target),
   });
 }
 

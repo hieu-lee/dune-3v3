@@ -685,6 +685,7 @@ export function resolveCardRevealEffects(
   cards: Card[],
   source: Player,
   state?: EffectResolverState,
+  target?: Player,
 ): GameEffectResult {
   const revealSource = cards.length > 0
     ? { ...source, playArea: [...source.playArea, ...cards] }
@@ -699,6 +700,7 @@ export function resolveCardRevealEffects(
           revealedCards: cards,
           source: revealSource,
           state,
+          target,
         })
       : legacyRevealResult(card);
     return mergeEffectResult(result, cardResult);

@@ -61,6 +61,10 @@ export function validateCondition(condition: GameEffectConditionSpec, trigger: G
     if (isNonNegativeInteger(condition.count)) return;
     invalidSpecField("has-conflict-units count", condition.count);
   }
+  if (condition.kind === "has-sandworms-in-conflict") {
+    if (isNonNegativeInteger(condition.count)) return;
+    invalidSpecField("has-sandworms-in-conflict count", condition.count);
+  }
   if (condition.kind === "has-influence") {
     if (!supportedFactions.has(condition.faction)) {
       throw new Error(`Unsupported effect faction "${condition.faction}"`);

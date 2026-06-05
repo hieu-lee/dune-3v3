@@ -188,6 +188,9 @@ export function conditionApplies(condition: GameEffectConditionSpec, context: Ga
   if (condition.kind === "has-conflict-units") {
     return playerConflictUnitCount(conflictUnitConditionPlayer(context)) >= condition.count;
   }
+  if (condition.kind === "has-sandworms-in-conflict") {
+    return (combatEffectRecipient(context)?.deployedSandworms ?? 0) >= condition.count;
+  }
   if (condition.kind === "has-influence") {
     return conditionInfluence(context.source, condition.faction, context.state?.players ?? [context.source]) >= condition.amount;
   }

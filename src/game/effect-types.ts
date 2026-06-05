@@ -275,6 +275,7 @@ export type GameEffectConditionSpec =
   | { kind: "has-combat-recipient-sandworms"; count: number }
   | { kind: "has-spy-posts"; count: number }
   | { kind: "has-conflict-units"; count: number }
+  | { kind: "has-sandworms-in-conflict"; count: number }
   | { kind: "has-influence"; faction: FactionId; amount: number }
   | { kind: "has-completed-contracts"; count: number }
   | { kind: "has-card-trait-in-play"; trait: string; count?: number }

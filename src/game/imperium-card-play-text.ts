@@ -1,5 +1,6 @@
 import {
   branchingPathSourceId,
+  calculusOfPowerSourceId,
   cargoRunnerSourceId,
   corrinthCitySourceId,
   covertOperationSourceId,
@@ -97,6 +98,9 @@ export function imperiumPlayText(card: HubCard) {
   }
   if (card.id === spaceTimeFoldingSourceId) {
     return "Discard 1 card to draw 1 card. If you discarded a Spacing Guild card, draw 1 more card.";
+  }
+  if (card.id === calculusOfPowerSourceId) {
+    return "You may trash 1 card.";
   }
   if (card.id === guildEnvoySourceId) {
     return "Discard 1 card. If you discarded a Spacing Guild card, draw 2 cards.";

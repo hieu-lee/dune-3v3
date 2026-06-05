@@ -60,7 +60,7 @@ These cards currently use typed Agent effect specs:
 - Public Spectacle and Theacherous Maneuver use the typed Agent `gain-influence-choice` primitive; Public Spectacle composes it with typed spy placement.
 - Rebel Supplier, Southern Elders, and Stilgar, The Devoted use typed Agent fixed resource/recruit primitives; troop rewards route to the activated Ally when a Commander plays the card.
 - Smuggler's Harvester uses the typed Agent `gain-resource` primitive gated by the current Agent board space being a Maker space.
-- Smuggler's Haven uses typed Agent VP plus `pay-resource-for-sandworms` primitives with self-or-activated-Ally routing, plus the typed Reveal `gain-resource` primitive gated by the player having a spy post on any Maker board space.
+- Smuggler's Haven uses a typed Agent spice-paid VP reward, plus the typed Reveal `gain-resource` primitive gated by the player having a spy post on any Maker board space.
 - Spacing Guild's Favor uses the typed Agent `draw-cards` primitive plus a typed `discard` resource trigger for its hand-discard spice reward; cleanup discard does not trigger that reward.
 - Steersman uses typed Agent `draw-cards` and `recall-agent` primitives, returning the just-sent Agent to ready supply and leaving the visited board space unoccupied after rewards resolve.
 - Undercover Asset uses the typed Agent `place-spies` primitive.

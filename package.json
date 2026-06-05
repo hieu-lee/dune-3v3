@@ -28,6 +28,7 @@
     "debug:room:vp-endgame": "node scripts/browser-room-vp-endgame.mjs",
     "sync:cards": "node scripts/sync-dune-catalog.mjs",
     "sync:card-images": "node scripts/sync-dune-catalog.mjs --download-images",
+    "audit:cards": "node scripts/card-asset-audit.mjs",
     "verify:alliances": "node scripts/verify-alliances.mjs",
     "verify:app-high-council": "node scripts/verify-app-high-council.mjs",
     "verify:battle-icons": "node scripts/verify-battle-icons.mjs",

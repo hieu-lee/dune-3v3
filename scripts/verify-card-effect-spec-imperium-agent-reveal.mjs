@@ -320,6 +320,16 @@ export function verifyCardEffectSpecImperiumAgentReveal({
     ),
     "Calculus of Power should use a typed Agent selected-card trash effect",
   );
+  assert.equal(
+    calculus.play,
+    "You may trash 1 card.",
+    "Calculus of Power Agent text should expose only its printed trash effect",
+  );
+  assert.doesNotMatch(
+    calculus.play,
+    /Faction: Emperor/i,
+    "Calculus of Power Agent text should not include its card trait as an Agent effect",
+  );
   assert.ok(
     capturedMentat.effects?.some(
       (spec) =>

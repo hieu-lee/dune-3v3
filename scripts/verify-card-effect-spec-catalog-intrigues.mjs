@@ -37,12 +37,12 @@ export function verifyCardEffectSpecCatalogIntrigues({
   } = cards;
   assert.equal(
     revealSpecCards.length,
-    81,
+    83,
     "Unexpected number of cards with declarative Reveal specs",
   );
   assert.equal(
     marketAndImperiumCards.filter(hasFixedRevealReward).length,
-    49,
+    48,
     "Unexpected number of reserve/Imperium cards with fixed reveal rewards",
   );
   assert.deepEqual(
@@ -58,8 +58,8 @@ export function verifyCardEffectSpecCatalogIntrigues({
       .filter((card) => !hasRevealSpec(card))
       .map((card) => card.name)
       .sort(),
-    ["Priority Contracts", "The Spice Must Flow"],
-    "Only zero-reveal reserve/Imperium cards should lack declarative Reveal specs",
+    [],
+    "Every reserve/Imperium card should now carry a declarative Reveal spec",
   );
   assert.deepEqual(
     marketAndImperiumCards
@@ -73,6 +73,7 @@ export function verifyCardEffectSpecCatalogIntrigues({
       "Overthrow",
       "Price is No Object",
       "Spy Network",
+      "Steersman",
       "Strike Fleet",
       "Subversive Advisor",
       "The Spice Must Flow",
@@ -111,11 +112,12 @@ export function verifyCardEffectSpecCatalogIntrigues({
     }),
     [
       {
-        selector: "self",
-        amount: 1,
-        drawIntrigues: 1,
-        optional: true,
-        source: "Spy Network",
+      selector: "self",
+      amount: 1,
+      drawIntrigues: 1,
+      persuasionReward: 0,
+      optional: true,
+      source: "Spy Network",
       },
     ],
     "Spy Network Reveal spy-recall spec should resolve with two owned spy posts",
@@ -418,10 +420,11 @@ export function verifyCardEffectSpecCatalogIntrigues({
     [
       {
         count: 1,
-        recallForSupply: undefined,
-        mustPlace: undefined,
-        placementIcon: undefined,
-        allowSharedPost: undefined,
+      recallForSupply: undefined,
+      mustPlace: undefined,
+      placementIcon: undefined,
+      placementIcons: undefined,
+      allowSharedPost: undefined,
         source: "Go To Ground",
         postPlacementAction: undefined,
       },

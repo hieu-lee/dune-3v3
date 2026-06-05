@@ -255,7 +255,7 @@ export function playImperiumPoliticsPlotIntrigue(
   const player = state.players[state.activeSeat];
   if (!player || player.id !== playerId) return state;
   if (!imperiumPoliticsFactionChoices(player).includes(faction)) return state;
-  const requiresActivatedAlly = player.role === "Commander" && faction !== "emperor";
+  const requiresActivatedAlly = player.role === "Commander" && faction !== commanderPersonalFaction(player);
   return playTypedPlotIntrigue(
     state,
     playerId,

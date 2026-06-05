@@ -266,12 +266,12 @@ try {
   const acquireOwner = playerById(acquireCompleted, ally.id);
   assertCompleted(acquireCompleted, ally.id, "Acquire");
   assert.equal(acquireOwner.vp, acquireBefore.vp + 1, "The Spice Must Flow acquire VP should still apply");
-  assert.equal(acquireOwner.resources.spice, acquireBefore.resources.spice + 1, "The Spice Must Flow acquire spice should still apply");
+  assert.equal(acquireOwner.resources.spice, acquireBefore.resources.spice, "The Spice Must Flow should not gain spice on acquire");
   assert.equal(acquireOwner.resources.solari, acquireBefore.resources.solari + 3, "Acquire contract should pay 3 Solari");
   assert.equal(
-    acquireCompleted.turnSpiceGains[ally.id],
-    (acquireHeld.turnSpiceGains?.[ally.id] ?? 0) + 1,
-    "The Spice Must Flow acquire spice should remain turn-spice tracked",
+    acquireCompleted.turnSpiceGains[ally.id] ?? 0,
+    acquireHeld.turnSpiceGains?.[ally.id] ?? 0,
+    "The Spice Must Flow acquisition should not be turn-spice tracked",
   );
   assert.match(acquireCompleted.log[0], /acquires The Spice Must Flow/);
   assert.match(acquireCompleted.log[1], /completes the Acquire CHOAM contract and gains 3 Solari/);
@@ -470,9 +470,10 @@ try {
   });
   assertCompleted(cumulativeHarvestCompleted, ally.id, "Harvest 3+");
 
-  const priorityContracts = imperiumCardByName("Priority Contracts");
-  const cardSpiceHarvestHeld = withHeldContracts(
-    updatePlayer(
+	  const priorityContracts = imperiumCardByName("Priority Contracts");
+	  const desertPower = imperiumCardByName("Desert Power");
+	  const cardSpiceHarvestHeld = withHeldContracts(
+	    updatePlayer(
       {
         ...game,
         activeSeat: harvestActiveSeat,
@@ -482,22 +483,22 @@ try {
         contractOffer: [contractByName("Secrets")],
       },
       ally.id,
-      (player) => ({
-        ...player,
-        hand: [priorityContracts],
-        playArea: [],
-        agentsReady: Math.max(1, player.agentsReady),
-        resources: { ...player.resources, water: player.resources.water + 1 },
+	      (player) => ({
+	        ...player,
+	        hand: [desertPower],
+	        playArea: [],
+	        agentsReady: Math.max(1, player.agentsReady),
+	        resources: { ...player.resources, water: player.resources.water + 1 },
       }),
     ),
     ally.id,
     ["Harvest 4+"],
-  );
-  const cardSpiceHarvestCompleted = turnActions.placeAgentAction(cardSpiceHarvestHeld, {
-    commanderTargets: {},
-    selectedCard: priorityContracts,
-    selectedSpace: boardSpaceById("hagga-basin"),
-  });
+	  );
+	  const cardSpiceHarvestCompleted = turnActions.placeAgentAction(cardSpiceHarvestHeld, {
+	    commanderTargets: {},
+	    selectedCard: desertPower,
+	    selectedSpace: boardSpaceById("hagga-basin"),
+	  });
   assertCompleted(cardSpiceHarvestCompleted, ally.id, "Harvest 4+");
 
   const marketOpportunity = intrigueByName("Market Opportunity");

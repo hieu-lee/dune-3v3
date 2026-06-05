@@ -1,4 +1,5 @@
 import {
+  hasAcquiredCardThisTurn,
   hasDeployedUnitsThisTurn,
   hasGainedSpiceThisTurn,
   hasRecalledSpyThisTurn,
@@ -14,6 +15,7 @@ import { playerConflictUnitCount } from "./conflict-rules";
 import { playerHasSpyPost, spyPostCount } from "./spy-posts";
 import type { GameEffectContext } from "./effect-resolver-types";
 import type {
+  Card,
   CardEffectSpec,
   EffectAmountSpec,
   FactionId,
@@ -74,10 +76,61 @@ export function hasResourceGain(gain: Partial<Resources>) {
   return Object.values(gain).some((amount) => (amount ?? 0) > 0);
 }
 
-export function amountFor(amount: EffectAmountSpec, source: Player) {
+function effectAmountMultiplier(amount: Exclude<EffectAmountSpec, number>) {
+  return amount.multiplier ?? 1;
+}
+
+function cardTraitCount(cards: readonly Card[], trait: string) {
+  return cards.filter((card) => card.traits?.includes(trait)).length;
+}
+
+function combatRecipientForAmount(context: GameEffectContext | undefined, source: Player) {
+  if (!context) return source;
+  if (source.role === "Commander") {
+    return context.target?.role === "Ally" && context.target.team === source.team
+      ? context.target
+      : undefined;
+  }
+  return source;
+}
+
+function amountSpecCanBePositive(amount: EffectAmountSpec, context: GameEffectContext): boolean {
+  if (typeof amount === "number") return amount > 0;
+  if (amount.kind === "other-revealed-card-strength-count") return false;
+  return amountFor(amount, context.source, context) > 0;
+}
+
+function revealedCardProvidesStrength(card: Card, context: GameEffectContext): boolean {
+  const revealSpecs = card.effects?.filter((spec) => spec.trigger === "reveal");
+  if (!revealSpecs || revealSpecs.length === 0) return (card.swords ?? 0) > 0;
+  return revealSpecs.some((spec) =>
+    spec.effects.some((effect) => effect.kind === "gain-strength" && amountSpecCanBePositive(effect.amount, context)) &&
+    (spec.conditions ?? []).every((condition) => conditionApplies(condition, context))
+  );
+}
+
+export function amountFor(amount: EffectAmountSpec, source: Player, context?: GameEffectContext): number {
   if (typeof amount === "number") return amount;
   if (amount.kind === "completed-contracts") {
     return source.contracts.filter((contract) => contract.completed).length * (amount.multiplier ?? 1);
+  }
+  if (amount.kind === "card-trait-count-in-play") {
+    return cardTraitCount(source.playArea, amount.trait) * effectAmountMultiplier(amount);
+  }
+  if (amount.kind === "revealed-card-trait-count") {
+    return cardTraitCount(context?.revealedCards ?? [], amount.trait) * effectAmountMultiplier(amount);
+  }
+  if (amount.kind === "combat-recipient-sandworms") {
+    return (combatRecipientForAmount(context, source)?.deployedSandworms ?? 0) * effectAmountMultiplier(amount);
+  }
+  if (amount.kind === "other-revealed-card-strength-count") {
+    const revealedCards = context?.revealedCards ?? [];
+    const resolvingCard = context?.resolvingCard;
+    if (!context || !resolvingCard) return 0;
+    return revealedCards
+      .filter((card) => card.id !== resolvingCard.id)
+      .filter((card) => revealedCardProvidesStrength(card, context))
+      .length * effectAmountMultiplier(amount);
   }
   return unsupportedKind("effect amount", amount);
 }
@@ -167,6 +220,15 @@ export function conditionApplies(condition: GameEffectConditionSpec, context: Ga
     if (!context.state?.alliances) return false;
     if (condition.faction) return context.state.alliances[condition.faction] === context.source.id;
     return Object.values(context.state.alliances).includes(context.source.id);
+  }
+  if (condition.kind === "acquired-card-this-turn") {
+    return context.state?.turnAcquiredCardIds
+      ? hasAcquiredCardThisTurn(
+          { turnAcquiredCardIds: context.state.turnAcquiredCardIds },
+          context.source.id,
+          condition.cardId,
+        )
+      : false;
   }
   if (condition.kind === "deployed-units-this-turn") {
     return context.state?.turnUnitDeployments

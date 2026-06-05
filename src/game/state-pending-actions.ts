@@ -52,7 +52,10 @@ import {
   allPlayersDone,
 } from "./game-flow";
 import {
+  type InfluenceExchangeChoice,
+  resolveLoseInfluenceForInfluence as resolveLoseInfluenceForInfluenceForPending,
   resolveLoseInfluenceForIntrigues as resolveLoseInfluenceForIntriguesForPending,
+  skipLoseInfluenceForInfluence as resolveSkipLoseInfluenceForInfluence,
   skipLoseInfluenceForIntrigues as resolveSkipLoseInfluenceForIntrigues,
 } from "./influence-intrigue-rules";
 import {
@@ -158,6 +161,7 @@ type TrashIntrigueForRewardPendingAction = Extract<PendingAction, { kind: "trash
 type TopDeckSelectionPendingAction = Extract<PendingAction, { kind: "top-deck-selection" }>;
 type DiscardHandCardPendingAction = Extract<PendingAction, { kind: "discard-hand-card" }>;
 type LoseInfluenceForIntriguesPendingAction = Extract<PendingAction, { kind: "lose-influence-for-intrigues" }>;
+type LoseInfluenceForInfluencePendingAction = Extract<PendingAction, { kind: "lose-influence-for-influence" }>;
 type PayResourceForHighCouncilSeatPendingAction = Extract<PendingAction, { kind: "pay-resource-for-high-council-seat" }>;
 type BoardInfluenceChoicePendingAction = Extract<PendingAction, { kind: "board-influence-choice" }>;
 type OptionalSpacePaymentPendingAction = Extract<PendingAction, { kind: "optional-space-payment" }>;
@@ -274,9 +278,10 @@ export function resolveBoardInfluenceChoice(
   pending: BoardInfluenceChoicePendingAction,
   ownerId: string,
   faction: FactionId,
+  trashCardId?: string,
 ): GameState {
   return continueAfterResolvedConflictReward(
-    resolveBoardInfluenceChoiceForPending(state, pending, ownerId, faction),
+    resolveBoardInfluenceChoiceForPending(state, pending, ownerId, faction, trashCardId),
   );
 }
 
@@ -458,6 +463,23 @@ export function skipLoseInfluenceForIntrigues(
   pending: LoseInfluenceForIntriguesPendingAction,
 ): GameState {
   return continueAfterResolvedConflictReward(resolveSkipLoseInfluenceForIntrigues(state, pending));
+}
+
+export function resolveLoseInfluenceForInfluenceChoice(
+  state: GameState,
+  pending: LoseInfluenceForInfluencePendingAction,
+  choice: InfluenceExchangeChoice,
+): GameState {
+  return continueAfterResolvedConflictReward(
+    resolveLoseInfluenceForInfluenceForPending(state, pending, choice),
+  );
+}
+
+export function skipLoseInfluenceForInfluence(
+  state: GameState,
+  pending: LoseInfluenceForInfluencePendingAction,
+): GameState {
+  return continueAfterResolvedConflictReward(resolveSkipLoseInfluenceForInfluence(state, pending));
 }
 
 export function resolvePayResourceForHighCouncilSeatChoice(

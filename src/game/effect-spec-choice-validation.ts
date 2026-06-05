@@ -1,11 +1,16 @@
 import type {
   GameEffectSpec,
   GameEffectTrigger,
+  ResourceId,
 } from "./types";
+import {
+  validateCondition,
+} from "./effect-spec-condition-validation";
 import {
   invalidSpecField,
   supportedAcquireDestinations,
   supportedFactions,
+  supportedIcons,
   supportedResources,
   supportedTrashZones,
   unsupportedKind,
@@ -21,7 +26,7 @@ type PendingActionChoiceEffect = Extract<GameEffectSpec, { kind: "pending-action
 type LeaderTransitionChoiceEffect = Extract<GameEffectSpec, { kind: "leader-transition-choice" }>;
 
 export function validatePaidRewardChoiceEffect(effect: PaidRewardChoiceEffect, trigger: GameEffectTrigger) {
-  if (trigger !== "agent-play") {
+  if (trigger !== "agent-play" && trigger !== "reveal") {
     throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
   }
   const selector = (effect as { selector?: unknown }).selector;
@@ -78,6 +83,10 @@ export function validatePaidRewardChoiceEffect(effect: PaidRewardChoiceEffect, t
         validatePositiveAmount("paid-reward-choice resource", reward.amount);
         return;
       }
+      if (reward.kind === "gain-vp") {
+        validatePositiveAmount("paid-reward-choice VP", reward.amount);
+        return;
+      }
       if (reward.kind === "draw-intrigues") {
         validatePositiveAmount("paid-reward-choice intrigues", reward.amount);
         return;
@@ -110,7 +119,7 @@ export function validatePaidRewardChoiceEffect(effect: PaidRewardChoiceEffect, t
 }
 
 export function validatePendingActionChoiceEffect(effect: PendingActionChoiceEffect, trigger: GameEffectTrigger) {
-  if (trigger !== "agent-play") {
+  if (trigger !== "agent-play" && trigger !== "reveal") {
     throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
   }
   const selector = (effect as { selector?: unknown }).selector;
@@ -118,6 +127,7 @@ export function validatePendingActionChoiceEffect(effect: PendingActionChoiceEff
     throw new Error(`Unsupported effect selector "${String(selector)}" for ${effect.kind}`);
   }
   validateSourceLabel("pending-action-choice source", effect.source);
+  validateOptionalBoolean("pending-action-choice optional", effect.optional);
   if (!Array.isArray(effect.options) || effect.options.length === 0) {
     invalidSpecField("pending-action-choice options", effect.options);
   }
@@ -133,6 +143,7 @@ export function validatePendingActionChoiceEffect(effect: PendingActionChoiceEff
     if (typeof option.label !== "string" || option.label.trim().length === 0) {
       invalidSpecField("pending-action-choice option label", option.label);
     }
+    option.conditions?.forEach((condition) => validateCondition(condition, trigger));
     const nestedSelector = (option.effect as { selector?: unknown }).selector;
     if (nestedSelector !== "self") {
       throw new Error(`Unsupported pending-action-choice selector "${String(nestedSelector)}"`);
@@ -171,12 +182,102 @@ export function validatePendingActionChoiceEffect(effect: PendingActionChoiceEff
       ) {
         invalidSpecField("pending-action-choice trash requiredTrait", option.effect.requiredTrait);
       }
-      if ((option.effect as { vpReward?: unknown }).vpReward !== undefined) {
+      if (option.effect.sourceOnly !== undefined && option.effect.sourceOnly !== true) {
+        invalidSpecField("pending-action-choice trash sourceOnly", option.effect.sourceOnly);
+      }
+      const sourceOnly = option.effect.sourceOnly === true;
+      if (sourceOnly) {
+        if (trigger !== "reveal") {
+          throw new Error(`Unsupported pending-action-choice trash sourceOnly for ${trigger}`);
+        }
+        if (!option.effect.zones || option.effect.zones.length !== 1 || option.effect.zones[0] !== "playArea") {
+          invalidSpecField("pending-action-choice source trash zones", option.effect.zones);
+        }
+        if (option.effect.excludeSource !== undefined) {
+          invalidSpecField("pending-action-choice source trash excludeSource", option.effect.excludeSource);
+        }
+        if (option.effect.requiredTrait !== undefined) {
+          invalidSpecField("pending-action-choice source trash requiredTrait", option.effect.requiredTrait);
+        }
+        if (option.effect.spiceRewardCostThreshold !== undefined) {
+          throw new Error("Unsupported pending-action-choice source trash spiceRewardCostThreshold");
+        }
+        if (option.effect.spiceReward !== undefined) {
+          throw new Error("Unsupported pending-action-choice source trash spiceReward");
+        }
+        if (option.effect.vpReward === undefined) {
+          invalidSpecField("pending-action-choice source trash vpReward", option.effect.vpReward);
+        }
+        validatePositiveAmount("pending-action-choice source trash VP", option.effect.vpReward);
+      } else if ((option.effect as { vpReward?: unknown }).vpReward !== undefined) {
         throw new Error("Unsupported pending-action-choice trash vpReward");
       }
       if (option.effect.spiceRewardCostThreshold !== undefined) validateAmount(option.effect.spiceRewardCostThreshold);
       if (option.effect.spiceReward !== undefined) validateAmount(option.effect.spiceReward);
+      if (option.effect.persuasionCost !== undefined) validateAmount(option.effect.persuasionCost);
+      if (option.effect.resourceCost !== undefined) {
+        for (const [resource, amount] of Object.entries(option.effect.resourceCost)) {
+          if (!supportedResources.has(resource as ResourceId)) {
+            throw new Error(`Unsupported effect resource "${resource}"`);
+          }
+          validateAmount(amount);
+        }
+      }
       validateSourceLabel("pending-action-choice trash source", option.effect.source);
+      return;
+    }
+    if (option.effect.kind === "gain-persuasion") {
+      if (trigger !== "reveal") {
+        throw new Error(`Unsupported pending-action-choice gain-persuasion for ${trigger}`);
+      }
+      validatePositiveAmount("pending-action-choice persuasion", option.effect.amount);
+      validateSourceLabel("pending-action-choice persuasion source", option.effect.source);
+      return;
+    }
+    if (option.effect.kind === "gain-resource") {
+      if (trigger !== "reveal") {
+        throw new Error(`Unsupported pending-action-choice gain-resource for ${trigger}`);
+      }
+      if (!supportedResources.has(option.effect.resource)) {
+        throw new Error(`Unsupported effect resource "${option.effect.resource}"`);
+      }
+      validatePositiveAmount("pending-action-choice resource", option.effect.amount);
+      validateSourceLabel("pending-action-choice resource source", option.effect.source);
+      return;
+    }
+    if (option.effect.kind === "gain-strength") {
+      if (trigger !== "reveal") {
+        throw new Error(`Unsupported pending-action-choice gain-strength for ${trigger}`);
+      }
+      validatePositiveAmount("pending-action-choice strength", option.effect.amount);
+      validateSourceLabel("pending-action-choice strength source", option.effect.source);
+      return;
+    }
+    if (option.effect.kind === "place-spies") {
+      if (trigger !== "reveal") {
+        throw new Error(`Unsupported pending-action-choice place-spies for ${trigger}`);
+      }
+      validatePositiveAmount("pending-action-choice place-spies amount", option.effect.amount);
+      validateOptionalBoolean("pending-action-choice place-spies recallForSupply", option.effect.recallForSupply);
+      validateOptionalBoolean("pending-action-choice place-spies mustPlace", option.effect.mustPlace);
+      validateOptionalBoolean("pending-action-choice place-spies allowSharedPost", option.effect.allowSharedPost);
+      if (option.effect.placementIcon !== undefined && !supportedIcons.has(option.effect.placementIcon)) {
+        throw new Error(`Unsupported effect icon "${option.effect.placementIcon}"`);
+      }
+      if (option.effect.placementIcons !== undefined) {
+        if (!Array.isArray(option.effect.placementIcons) || option.effect.placementIcons.length === 0) {
+          invalidSpecField("pending-action-choice place-spies placementIcons", option.effect.placementIcons);
+        }
+        const unsupportedIcon = option.effect.placementIcons.find((icon) => !supportedIcons.has(icon));
+        if (unsupportedIcon) throw new Error(`Unsupported effect icon "${unsupportedIcon}"`);
+      }
+      if (
+        option.effect.postPlacementAction !== undefined &&
+        option.effect.postPlacementAction !== "staban-unseen-network"
+      ) {
+        invalidSpecField("pending-action-choice place-spies postPlacementAction", option.effect.postPlacementAction);
+      }
+      validateSourceLabel("pending-action-choice place-spies source", option.effect.source);
       return;
     }
     unsupportedKind("pending-action-choice effect", option.effect);

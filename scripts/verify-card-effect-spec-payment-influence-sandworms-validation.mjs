@@ -243,7 +243,7 @@ export function verifyCardEffectSpecPaymentInfluenceSandwormsValidation({
   };
   assert.deepEqual(
     turnActions.revealTurnPlan({ ...p3, hand: [revealPayResourceSandwormsCard], highCouncilSeat: false }, game),
-    { influenceGains: {}, persuasion: 0, recruitedTroops: 0, revealGain: {}, swords: 0 },
+    { influenceGains: {}, intriguesToDraw: 0, persuasion: 0, recruitedTroops: 0, revealGain: {}, swords: 0 },
     "Reveal sandworm payment specs should not add immediate reveal rewards by themselves",
   );
   const unprotectedConflict = data.conflictCards.find((card) => card.name === "Skirmish (Desert Mouse)");

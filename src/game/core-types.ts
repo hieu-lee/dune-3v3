@@ -31,6 +31,7 @@ export type GameEffectTrigger =
   | "reveal"
   | "acquire"
   | "discard"
+  | "trash"
   | "plot-intrigue"
   | "combat-intrigue"
   | "conflict-reward"
@@ -60,7 +61,11 @@ export type InfluenceLossForStrengthOwner = "combat-recipient";
 export type InfluenceLossForStrengthAlternateOwner = "source-commander-personal";
 export type EffectAmountSpec =
   | number
-  | { kind: "completed-contracts"; multiplier?: number };
+  | { kind: "completed-contracts"; multiplier?: number }
+  | { kind: "card-trait-count-in-play"; trait: string; multiplier?: number }
+  | { kind: "revealed-card-trait-count"; trait: string; multiplier?: number }
+  | { kind: "combat-recipient-sandworms"; multiplier?: number }
+  | { kind: "other-revealed-card-strength-count"; multiplier?: number };
 export type TroopRetreatBoundSpec =
   | number
   | { kind: "deployed-troops" };

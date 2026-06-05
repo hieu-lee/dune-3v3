@@ -39,6 +39,10 @@ function atomicRewardLabel(
     const label = `+${reward.amount} ${resourceLabels[reward.resource]}`;
     return recipient?.id === owner.id ? label : `${recipientLabel} ${label}`;
   }
+  if (reward.kind === "gain-vp") {
+    const label = `+${reward.amount} VP`;
+    return recipient?.id === owner.id ? label : `${recipientLabel} ${label}`;
+  }
   if (reward.kind === "draw-intrigues") {
     return reward.amount === 1 ? "Intrigue" : `${reward.amount} Intrigues`;
   }

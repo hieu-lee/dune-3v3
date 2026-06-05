@@ -106,9 +106,7 @@ export function expectedFixedReveal(card) {
     revealGain:
       card.name === "Junction Headquarters"
         ? { water: 1 }
-        : card.name === "Delivery Agreement"
-          ? { spice: 1 }
-          : card.revealGain
+        : card.revealGain
             ? { ...card.revealGain }
             : {},
     swords: card.swords,

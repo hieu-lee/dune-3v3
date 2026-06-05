@@ -716,6 +716,97 @@ try {
   await capture(boardInfluencePage, "room-board-influence-scoped.png");
   await boardInfluenceContext.close();
 
+  const requiredTrashInfluenceRoomResponse = await fetch(`${server.resolvedUrls.local[0]}api/rooms`, { method: "POST" });
+  assert.equal(requiredTrashInfluenceRoomResponse.status, 201, "Required-trash board influence UI room should be created");
+  const requiredTrashInfluenceRoom = await requiredTrashInfluenceRoomResponse.json();
+  const requiredTrashInfluenceRecord = server.rooms.get(requiredTrashInfluenceRoom.roomId);
+  assert.ok(requiredTrashInfluenceRecord, "Required-trash board influence UI room should be stored in memory");
+  requiredTrashInfluenceRecord.game = {
+    ...requiredTrashInfluenceRecord.game,
+    pendingAction: {
+      kind: "board-influence-choice",
+      source: "Treacherous Maneuver",
+      cardId: "browser-treacherous-maneuver",
+      cardOwnerId: "p1",
+      requiredHandTrashTrait: "Faction: Emperor",
+      trashSource: true,
+      choices: [{ ownerId: "p3", faction: "bene" }],
+    },
+    pendingQueue: [],
+  };
+  const requiredTrashInfluenceContext = await browser.newContext({ viewport: { width: 1440, height: 1100 } });
+  const requiredTrashInfluencePage = await requiredTrashInfluenceContext.newPage();
+  observePage(requiredTrashInfluencePage);
+  await requiredTrashInfluencePage.goto(`${server.resolvedUrls.local[0]}?room=${requiredTrashInfluenceRoom.roomId}`, { waitUntil: "domcontentloaded" });
+  await claimSeat(requiredTrashInfluencePage, "p3", "Required Trash Ally");
+  await requiredTrashInfluencePage.locator(".room-pending-panel").waitFor({ state: "visible" });
+  assert.equal(
+    await requiredTrashInfluencePage.locator(".pending-panel .support-grid").count(),
+    0,
+    "Room required-trash board-influence recipients should see waiting UI instead of resolver controls",
+  );
+  await capture(requiredTrashInfluencePage, "room-board-influence-required-trash-waiting.png");
+  await requiredTrashInfluenceContext.close();
+
+  const actionChoiceRoomResponse = await fetch(`${server.resolvedUrls.local[0]}api/rooms`, { method: "POST" });
+  assert.equal(actionChoiceRoomResponse.status, 201, "Pending action choice UI room should be created");
+  const actionChoiceRoom = await actionChoiceRoomResponse.json();
+  const actionChoiceRecord = server.rooms.get(actionChoiceRoom.roomId);
+  assert.ok(actionChoiceRecord, "Pending action choice UI room should be stored in memory");
+  actionChoiceRecord.game = {
+    ...actionChoiceRecord.game,
+    pendingAction: {
+      kind: "pending-action-choice",
+      ownerId: "p2",
+      source: "Browser Pending Choice",
+      options: [
+        {
+          id: "spy",
+          label: "Place 1 spy",
+          pending: {
+            kind: "spy",
+            ownerId: "p2",
+            remaining: 1,
+            source: "Browser Pending Choice",
+            recallForSupply: true,
+            mustPlaceSpy: true,
+          },
+        },
+        {
+          id: "strength",
+          label: "+2 strength",
+          pending: {
+            kind: "gain-strength",
+            ownerId: "p2",
+            combatRecipientId: "p2",
+            source: "Browser Pending Choice",
+            amount: 2,
+          },
+        },
+      ],
+    },
+    pendingQueue: [],
+    players: actionChoiceRecord.game.players.map((player) =>
+      player.id === "p2" ? { ...player, spies: 1 } : player
+    ),
+  };
+  const actionChoiceContext = await browser.newContext({ viewport: { width: 1440, height: 1100 } });
+  const actionChoicePage = await actionChoiceContext.newPage();
+  observePage(actionChoicePage);
+  await actionChoicePage.goto(`${server.resolvedUrls.local[0]}?room=${actionChoiceRoom.roomId}`, { waitUntil: "domcontentloaded" });
+  await claimSeat(actionChoicePage, "p2", "Pending Choice Owner");
+  const actionChoiceControls = actionChoicePage.locator(".pending-panel .action-choice-grid");
+  await actionChoiceControls.waitFor({ state: "visible" });
+  const spyChoiceBadge = actionChoiceControls
+    .locator(".action-choice-card", { hasText: "Place 1 spy" })
+    .locator(".action-choice-badge")
+    .first();
+  const spyChoiceBadgeText = await spyChoiceBadge.textContent();
+  assert.match(spyChoiceBadgeText ?? "", /Spy/, "Nested spy pending-action choices should show a Spy badge");
+  assert.doesNotMatch(spyChoiceBadgeText ?? "", /Acquire/, "Nested spy pending-action choices should not show an Acquire badge");
+  await capture(actionChoicePage, "room-pending-action-choice-spy-badge.png");
+  await actionChoiceContext.close();
+
   const plotRoomResponse = await fetch(`${server.resolvedUrls.local[0]}api/rooms`, { method: "POST" });
   assert.equal(plotRoomResponse.status, 201, "Plot UI room should be created");
   const plotRoom = await plotRoomResponse.json();

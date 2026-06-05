@@ -75,8 +75,8 @@ export function verifyCardEffectSpecRevealPending({
   );
   assert.deepEqual(
     covertOperationReveal.revealGain,
-    { solari: 2 },
-    "Covert Operation should reveal for 2 Solari",
+    {},
+    "Covert Operation should not reveal for resources",
   );
   const covertSource = { ...p2, hand: [], playArea: [covertOperation] };
   const covertOpponents = game.players.filter(
@@ -118,6 +118,21 @@ export function verifyCardEffectSpecRevealPending({
       return { ...player, hand: [], discard: [] };
     }),
   };
+  const covertRevealPendings = state.pendingActionsForReveal(
+    covertSource,
+    covertFixture,
+    [covertOperation],
+    covertSource.id,
+  );
+  assert.deepEqual(
+    covertRevealPendings.map((pending) => ({
+      kind: pending.kind,
+      remaining: pending.remaining,
+      source: pending.source,
+    })),
+    [{ kind: "spy", remaining: 2, source: "Covert Operation" }],
+    "Covert Operation should queue its printed reveal spy placement",
+  );
   const covertPendings = state.pendingActionsForCard(
     covertOperation,
     covertSource,

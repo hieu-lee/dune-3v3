@@ -19,6 +19,7 @@ const supportedTriggers = new Set<GameEffectTrigger>([
   "reveal",
   "acquire",
   "discard",
+  "trash",
   "plot-intrigue",
   "combat-intrigue",
   "conflict-reward",
@@ -102,6 +103,10 @@ export function validateCondition(condition: GameEffectConditionSpec, trigger: G
   if (condition.kind === "has-alliance") {
     if (condition.faction === undefined || supportedFactions.has(condition.faction)) return;
     throw new Error(`Unsupported effect faction "${condition.faction}"`);
+  }
+  if (condition.kind === "acquired-card-this-turn") {
+    if (typeof condition.cardId === "string" && condition.cardId.trim().length > 0) return;
+    invalidSpecField("acquired-card-this-turn cardId", condition.cardId);
   }
   if (condition.kind === "deployed-units-this-turn") {
     if (isNonNegativeInteger(condition.count)) return;

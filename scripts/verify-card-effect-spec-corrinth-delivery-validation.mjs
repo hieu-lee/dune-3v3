@@ -114,7 +114,36 @@ export function verifyCardEffectSpecCorrinthDeliveryValidation({
     { ...p2, hand: [deliveryAgreement], highCouncilSeat: false },
     game,
   );
-  assert.equal(deliveryReveal.revealGain.spice, 1, "Delivery Agreement should resolve its default Reveal spice reward");
+  assert.equal(deliveryReveal.revealGain.spice ?? 0, 0, "Delivery Agreement should not auto-gain spice before its Reveal choice");
+  const deliverySpiceFixture = withActivePlayer(game, p2.id, () => ({
+    discard: [],
+    hand: [deliveryAgreement],
+    highCouncilSeat: false,
+    playArea: [],
+    resources: { solari: 0, spice: 0, water: 0 },
+    vp: 0,
+  }));
+  const deliverySpicePlan = turnActions.revealTurnPlan(
+    playerById(deliverySpiceFixture, p2.id),
+    deliverySpiceFixture,
+  );
+  const deliverySpiceRevealed = turnActions.revealTurnAction(deliverySpiceFixture, {
+    commanderTargets: {},
+    revealPlan: deliverySpicePlan,
+  });
+  assert.equal(deliverySpiceRevealed.pendingAction?.kind, "pending-action-choice", "Delivery Agreement should queue a Reveal choice");
+  assert.deepEqual(
+    deliverySpiceRevealed.pendingAction.options.map((option) => option.id),
+    ["spice"],
+    "Delivery Agreement should expose only its spice branch without completed contracts",
+  );
+  const deliverySpiceChosen = state.resolvePendingActionChoice(
+    deliverySpiceRevealed,
+    deliverySpiceRevealed.pendingAction,
+    "spice",
+  );
+  assert.equal(playerById(deliverySpiceChosen, p2.id).resources.spice, 1, "Delivery Agreement spice branch should gain spice");
+  assert.equal(deliverySpiceChosen.turnSpiceGains[p2.id], 1, "Delivery Agreement spice branch should count as turn spice gain");
   const deliveryCompletedContracts = data.standardContracts.slice(0, 4).map((card, index) => ({
     card,
     completed: true,
@@ -139,23 +168,44 @@ export function verifyCardEffectSpecCorrinthDeliveryValidation({
     commanderTargets: {},
     revealPlan: deliveryRevealActionPlan,
   });
+  assert.equal(
+    deliveryRevealed.pendingAction?.kind,
+    "pending-action-choice",
+    "Delivery Agreement should queue completed-contract Reveal branch choices",
+  );
   assert.deepEqual(
+    deliveryRevealed.pendingAction.options.map((option) => option.id),
+    ["spice", "vp"],
+    "Delivery Agreement should offer spice or source-trash VP with four completed contracts",
+  );
+  assert.equal(
+    state.skipPendingActionChoice(deliveryRevealed, deliveryRevealed.pendingAction),
+    deliveryRevealed,
+    "Delivery Agreement's mandatory Reveal branch choice should not be skippable",
+  );
+  const deliveryVpChoice = state.resolvePendingActionChoice(
+    deliveryRevealed,
     deliveryRevealed.pendingAction,
+    "vp",
+  );
+  assert.deepEqual(
+    deliveryVpChoice.pendingAction,
     {
       kind: "trash-card",
       ownerId: p2.id,
       source: "Delivery Agreement",
-      optional: true,
+      optional: false,
       zones: ["playArea"],
       requiredCardId: deliveryAgreement.id,
       vpReward: 1,
     },
-    "Delivery Agreement should queue its completed-contract Reveal source-trash VP branch",
+    "Delivery Agreement VP branch should queue source-card trash",
   );
-  assert.equal(playerById(deliveryRevealed, p2.id).resources.spice, 1, "Delivery Agreement should gain Reveal spice before optional trash");
+  assert.equal(playerById(deliveryVpChoice, p2.id).resources.spice, 0, "Delivery Agreement VP branch should not gain spice");
+  assert.equal(deliveryVpChoice.turnSpiceGains[p2.id] ?? 0, 0, "Delivery Agreement VP branch should not count as turn spice gain");
   const deliveryVpTrashed = state.trashPlayerCard(
-    deliveryRevealed,
-    deliveryRevealed.pendingAction,
+    deliveryVpChoice,
+    deliveryVpChoice.pendingAction,
     "playArea",
     deliveryAgreement.id,
     0,
@@ -166,13 +216,6 @@ export function verifyCardEffectSpecCorrinthDeliveryValidation({
     playerById(deliveryVpTrashed, p2.id).playArea.some((card) => card.id === deliveryAgreement.id),
     false,
     "Delivery Agreement Reveal trash should remove the source card from play",
-  );
-  const deliveryVpSkipped = state.skipTrashCard(deliveryRevealed, deliveryRevealed.pendingAction);
-  assert.equal(playerById(deliveryVpSkipped, p2.id).vp, 0, "Skipping Delivery Agreement Reveal trash should not gain VP");
-  assert.equal(
-    playerById(deliveryVpSkipped, p2.id).playArea.some((card) => card.id === deliveryAgreement.id),
-    true,
-    "Skipping Delivery Agreement Reveal trash should leave the source card in play",
   );
   const malformedVpTrashPending = {
     kind: "trash-card",
@@ -220,7 +263,16 @@ export function verifyCardEffectSpecCorrinthDeliveryValidation({
     commanderTargets: {},
     revealPlan: deliveryUndercontractedPlan,
   });
-  assert.equal(deliveryUndercontractedRevealed.pendingAction, undefined, "Delivery Agreement should not queue Reveal trash below four completed contracts");
+  assert.equal(
+    deliveryUndercontractedRevealed.pendingAction?.kind,
+    "pending-action-choice",
+    "Delivery Agreement should still offer its spice branch below four completed contracts",
+  );
+  assert.deepEqual(
+    deliveryUndercontractedRevealed.pendingAction.options.map((option) => option.id),
+    ["spice"],
+    "Delivery Agreement should not queue its Reveal VP branch below four completed contracts",
+  );
   const corrinthAcquireReplacement = data.imperiumDeck.find((card) => card.id !== corrinthCity.id);
   const deliveryAcquireReplacement = data.imperiumDeck.find((card) => card.id !== deliveryAgreement.id);
   assert.ok(corrinthAcquireReplacement && deliveryAcquireReplacement, "Expected Imperium Row replacements for discard-reward acquisition coverage");

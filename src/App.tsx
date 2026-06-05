@@ -225,6 +225,7 @@ export default function App() {
         agentTurnComplete: false,
         turnHarvestContractIds: {},
         turnMakerSpaceVisits: {},
+        turnAcquiredCardIds: {},
         turnSpiceGains: {},
         turnReverendMotherJessicaRepeats: {},
         turnSpyRecalls: {},

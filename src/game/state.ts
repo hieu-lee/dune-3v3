@@ -99,6 +99,7 @@ export {
 } from "./discard-influence-draw-rules";
 
 export {
+  influenceExchangeChoices,
   loseInfluenceForIntriguesChoices,
 } from "./influence-intrigue-rules";
 
@@ -334,10 +335,12 @@ export {
 
 export {
   hasDeployedThreeOrMoreUnitsThisTurn,
+  hasAcquiredCardThisTurn,
   hasGainedSpiceThisTurn,
   hasVisitedMakerSpaceThisRound,
   hasVisitedMakerSpaceThisTurn,
   recordRoundMakerSpaceVisit,
+  recordTurnAcquiredCard,
   recordTurnMakerSpaceVisit,
   hasUsedReverendMotherJessicaRepeat,
   recordTurnSpiceGain,
@@ -452,6 +455,7 @@ export {
   resolveDiscardCardForInfluenceAndDrawChoice,
   resolveDiscardHandCardChoice,
   resolveLoseInfluenceForIntriguesChoice,
+  resolveLoseInfluenceForInfluenceChoice,
   resolveMakerChoice,
   resolveOptionalSpacePayment,
   resolvePayResourceForHighCouncilSeatChoice,
@@ -467,6 +471,7 @@ export {
   skipDiscardCardForDraw,
   skipDiscardCardForInfluenceAndDraw,
   skipLoseInfluenceForIntrigues,
+  skipLoseInfluenceForInfluence,
   skipOptionalSpacePayment,
   skipPayResourceForHighCouncilSeat,
   skipRetreatTroopsForStrength,
@@ -483,4 +488,5 @@ export type {
   CunningPlotChoice,
   StabanUnseenNetworkChoice,
 } from "./state-pending-actions";
+export type { InfluenceExchangeChoice } from "./influence-intrigue-rules";
 export type { TopDeckSelectionChoice } from "./top-deck-selection-rules";

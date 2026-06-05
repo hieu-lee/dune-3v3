@@ -32,6 +32,9 @@ export function PendingRecallSpyPanel({
     pending.drawIntrigues
       ? `draw ${pending.drawIntrigues} Intrigue ${pending.drawIntrigues === 1 ? "card" : "cards"}`
       : undefined,
+    pending.persuasionReward
+      ? `gain ${pending.persuasionReward} persuasion`
+      : undefined,
   ].filter((part): part is string => Boolean(part));
   const rewardText = rewardParts.length > 0 ? ` to ${rewardParts.join(" and ")}` : "";
 

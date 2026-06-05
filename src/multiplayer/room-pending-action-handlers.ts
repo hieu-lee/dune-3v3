@@ -14,7 +14,8 @@ export function createRoomPendingActionHandlers(sendAction: RoomSendAction): Pen
     adjustTeamResourcePayment: (contributorId, delta) =>
       pending({ kind: "adjust-team-resource-payment", contributorId, delta }),
     chooseBoardAgentRecall: (spaceId) => pending({ kind: "choose-board-agent-recall", spaceId }),
-    chooseBoardInfluence: (ownerId, faction) => pending({ kind: "choose-board-influence", ownerId, faction }),
+    chooseBoardInfluence: (ownerId, faction, trashCardId) =>
+      pending({ kind: "choose-board-influence", ownerId, faction, trashCardId }),
     chooseCommanderResourceSplit: (optionIndex) => pending({ kind: "choose-commander-resource-split", optionIndex }),
     chooseConflictInfluence: (faction) => pending({ kind: "choose-conflict-influence", faction }),
     chooseConflictTieWinner: (winnerId) => pending({ kind: "choose-conflict-tie-winner", winnerId }),
@@ -27,6 +28,7 @@ export function createRoomPendingActionHandlers(sendAction: RoomSendAction): Pen
     chooseLadyAmberDesertScouts: (choice) => pending({ kind: "choose-lady-amber-desert-scouts", choice }),
     chooseLeaderTransition: (choice) => pending({ kind: "choose-leader-transition", choice }),
     chooseLoseInfluenceForIntrigues: (faction) => pending({ kind: "choose-lose-influence-for-intrigues", faction }),
+    chooseLoseInfluenceForInfluence: (choice) => pending({ kind: "choose-lose-influence-for-influence", choice }),
     chooseMakerReward: (choice) => pending({ kind: "choose-maker-reward", choice }),
     choosePaidReward: (optionId) => pending({ kind: "choose-paid-reward", optionId }),
     choosePayResourceForContracts: (optionIndex) => pending({ kind: "choose-pay-resource-for-contracts", optionIndex }),
@@ -66,6 +68,7 @@ export function createRoomPendingActionHandlers(sendAction: RoomSendAction): Pen
     skipDeployOrRetreatTroops: () => pending({ kind: "skip-deploy-or-retreat-troops" }),
     skipInfluenceLoss: () => pending({ kind: "skip-influence-loss" }),
     skipLoseInfluenceForIntriguesChoice: () => pending({ kind: "skip-lose-influence-for-intrigues" }),
+    skipLoseInfluenceForInfluenceChoice: () => pending({ kind: "skip-lose-influence-for-influence" }),
     skipOptionalSpacePaymentChoice: () => pending({ kind: "skip-optional-space-payment" }),
     skipPaidReward: () => pending({ kind: "skip-paid-reward" }),
     skipPayResourceForContractsChoice: () => pending({ kind: "skip-pay-resource-for-contracts" }),

@@ -25,45 +25,52 @@ export function verifyCardEffectSpecRecruitResourceValidation({
     strikeFleet,
   } = cards;
   const { p2, p3, p4 } = players;
+  const rebelSupplierSpyRecallGame = {
+    ...game,
+    turnSpyRecalls: { ...game.turnSpyRecalls, [p2.id]: 1, [p4.id]: 1 },
+  };
   const rebelSupplierEffect = state.applyCardAgentEffect(
     rebelSupplier,
     { ...p2, garrison: 0, resources: { ...p2.resources, spice: 0 } },
     p2,
-    game,
+    rebelSupplierSpyRecallGame,
   );
-  assert.equal(rebelSupplierEffect.source.resources.spice, 1, "Rebel Supplier Agent spec should gain 1 spice");
+  assert.equal(rebelSupplierEffect.source.resources.spice, 0, "Rebel Supplier Agent spec should not gain reveal spice");
   assert.equal(rebelSupplierEffect.source.garrison, 2, "Rebel Supplier Agent spec should recruit 2 troops for an Ally");
   assert.equal(rebelSupplierEffect.recruitedTroops, 2, "Rebel Supplier recruited troops should count for deployment limits");
-  assert.equal(rebelSupplierEffect.sourceSpiceGained, 1, "Rebel Supplier spice should be trackable for turn spice gains");
 
   const rebelSupplierCommanderEffect = state.applyCardAgentEffect(
     rebelSupplier,
     { ...p4, garrison: 0, resources: { ...p4.resources, spice: 0 } },
     { ...p2, garrison: 0 },
-    game,
+    rebelSupplierSpyRecallGame,
   );
-  assert.equal(rebelSupplierCommanderEffect.source.resources.spice, 1, "Commander Rebel Supplier should give spice to the Commander");
+  assert.equal(rebelSupplierCommanderEffect.source.resources.spice, 0, "Commander Rebel Supplier should not gain reveal spice on Agent play");
   assert.equal(rebelSupplierCommanderEffect.source.garrison, 0, "Commander Rebel Supplier should not recruit troops to the Commander");
   assert.equal(rebelSupplierCommanderEffect.target.garrison, 2, "Commander Rebel Supplier should recruit troops to the activated Ally");
   assert.equal(rebelSupplierCommanderEffect.recruitedTroops, 2, "Commander Rebel Supplier recruited troops should count for deployment limits");
 
+  const southernEldersPlayArea = [
+    southernElders,
+    { ...convincingArgument, id: "southern-elders-bene-fixture", traits: ["Faction: Bene Gesserit"] },
+  ];
   const southernEldersEffect = state.applyCardAgentEffect(
     southernElders,
-    { ...p2, garrison: 0, resources: { ...p2.resources, water: 0 } },
+    { ...p2, garrison: 0, playArea: southernEldersPlayArea, resources: { ...p2.resources, water: 0 } },
     p2,
     game,
   );
-  assert.equal(southernEldersEffect.source.resources.water, 1, "Southern Elders Agent spec should gain 1 water");
+  assert.equal(southernEldersEffect.source.resources.water, 0, "Southern Elders Agent spec should not gain reveal water");
   assert.equal(southernEldersEffect.source.garrison, 2, "Southern Elders Agent spec should recruit 2 troops for an Ally");
   assert.equal(southernEldersEffect.recruitedTroops, 2, "Southern Elders recruited troops should count for deployment limits");
 
   const southernEldersCommanderEffect = state.applyCardAgentEffect(
     southernElders,
-    { ...p4, garrison: 0, resources: { ...p4.resources, water: 0 } },
+    { ...p4, garrison: 0, playArea: southernEldersPlayArea, resources: { ...p4.resources, water: 0 } },
     { ...p2, garrison: 0 },
     game,
   );
-  assert.equal(southernEldersCommanderEffect.source.resources.water, 1, "Commander Southern Elders should give water to the Commander");
+  assert.equal(southernEldersCommanderEffect.source.resources.water, 0, "Commander Southern Elders should not gain reveal water on Agent play");
   assert.equal(southernEldersCommanderEffect.source.garrison, 0, "Commander Southern Elders should not recruit troops to the Commander");
   assert.equal(southernEldersCommanderEffect.target.garrison, 2, "Commander Southern Elders should recruit troops to the activated Ally");
   assert.equal(southernEldersCommanderEffect.recruitedTroops, 2, "Commander Southern Elders recruited troops should count for deployment limits");

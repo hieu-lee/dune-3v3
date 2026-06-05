@@ -1,6 +1,6 @@
 import { playersWithPendingCardEffect, potentialDeferredMakerChoiceSpice } from "./card-pending-helpers";
 import { playerTroopSupply } from "./deck-utils";
-import { resolveAgentPaidRewardChoices } from "./effect-resolver";
+import { resolveAgentPaidRewardChoices, resolveRevealPaidRewardChoices } from "./effect-resolver";
 import type {
   BoardSpace,
   Card,
@@ -44,15 +44,38 @@ export function pendingActionForAgentPaidRewardChoice(
   target?: Player,
   space?: BoardSpace,
 ): PendingAction | undefined {
+  return pendingActionForPaidRewardChoice("agent-play", card, source, state, target, space);
+}
+
+export function pendingActionForRevealPaidRewardChoice(
+  card: Card,
+  source: Player,
+  state: GameState,
+  target?: Player,
+): PendingAction | undefined {
+  return pendingActionForPaidRewardChoice("reveal", card, source, state, target);
+}
+
+function pendingActionForPaidRewardChoice(
+  trigger: "agent-play" | "reveal",
+  card: Card,
+  source: Player,
+  state?: GameState,
+  target?: Player,
+  space?: BoardSpace,
+): PendingAction | undefined {
   if (!card.effects || !source.playArea.some((candidate) => candidate.id === card.id)) return undefined;
   const players = state ? playersWithPendingCardEffect(state, source, target) : undefined;
   const effectState = state && players ? { ...state, players } : undefined;
-  const effects = resolveAgentPaidRewardChoices(card.effects, {
+  const context = {
     trigger: "agent-play",
     source,
     target,
     state: effectState,
-  });
+  } as const;
+  const effects = trigger === "reveal"
+    ? resolveRevealPaidRewardChoices(card.effects, { ...context, trigger: "reveal" })
+    : resolveAgentPaidRewardChoices(card.effects, context);
   if (effects.length > 1) throw new Error(`Unsupported multiple paid reward choices for ${card.name}`);
   const [effect] = effects;
   if (!effect || effect.selector !== "self") return undefined;
@@ -137,6 +160,14 @@ export function pendingActionForAgentPaidRewardChoice(
         kind: "gain-resource",
         recipientId: recipient.id,
         resource: reward.resource,
+        amount: reward.amount,
+      };
+    }
+    if (reward.kind === "gain-vp") {
+      if (reward.amount <= 0) return undefined;
+      return {
+        kind: "gain-vp",
+        recipientId: recipient.id,
         amount: reward.amount,
       };
     }

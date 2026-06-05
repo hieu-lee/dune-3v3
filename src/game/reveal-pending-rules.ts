@@ -8,26 +8,35 @@ import {
   highCouncilSeatsTaken,
 } from "./board-rules";
 import {
+  pendingActionForRevealPaidRewardChoice,
+} from "./card-paid-reward-pending-rules";
+import {
   playerTroopSupply,
 } from "./deck-utils";
 import {
   resolveCardEffects,
+  resolveRevealLoseInfluenceForInfluences,
   resolveRevealDeployOrRetreatTroops,
   resolveRevealLoseInfluenceForIntrigues,
   resolveRevealPayResourceForHighCouncilSeats,
   resolveRevealPayResourceForSandworms,
   resolveRevealPayResourceForStrengths,
   resolveRevealPayResourceForTroops,
+  resolveRevealPendingActionChoices,
   resolveRevealRetreatTroopsForStrength,
   resolveRevealSpyRecallForIntrigues,
   resolveRevealTrashCardEffects,
 } from "./effect-resolver";
 import {
+  influenceExchangeChoices,
   loseInfluenceForIntriguesChoices,
 } from "./influence-intrigue-rules";
 import {
   pendingActionsForRevealLeaderAbilities,
 } from "./leader-reveal-pending-rules";
+import {
+  pendingActionChoiceOptionIsResolvable,
+} from "./pending-action-choice-rules";
 import {
   mergedSpyPlacement,
   spyPendingForPlacement,
@@ -40,6 +49,7 @@ import type {
   GameState,
   PendingAction,
   Player,
+  TrashCardZone,
 } from "./types";
 
 function sameTeamAllies(players: Player[], source: Player): [Player, Player] | undefined {
@@ -213,6 +223,33 @@ function pendingActionsForRevealInfluenceIntrigues(
   });
 }
 
+function pendingActionsForRevealInfluenceExchange(
+  card: Card,
+  source: Player,
+  state: GameState,
+  combatRecipientId: string,
+): PendingAction[] {
+  const recipient = state.players.find((player) => player.id === combatRecipientId);
+  return resolveRevealLoseInfluenceForInfluences(card.effects, {
+    trigger: "reveal",
+    source,
+    target: recipient,
+    state,
+  }).flatMap((effect) => {
+    if (effect.selector !== "self" || effect.loseAmount <= 0 || effect.gainAmount <= 0) return [];
+    const pending: Extract<PendingAction, { kind: "lose-influence-for-influence" }> = {
+      kind: "lose-influence-for-influence",
+      ownerId: source.id,
+      ...(source.revealActivatedAllyId ? { influenceOwnerId: source.revealActivatedAllyId } : {}),
+      source: card.name,
+      loseAmount: effect.loseAmount,
+      gainAmount: effect.gainAmount,
+      optional: effect.optional,
+    };
+    return influenceExchangeChoices(state, pending).length > 0 ? [pending] : [];
+  });
+}
+
 function pendingActionsForRevealSpyRecallIntrigues(
   card: Card,
   source: Player,
@@ -226,16 +263,21 @@ function pendingActionsForRevealSpyRecallIntrigues(
     target: recipient,
     state,
   }).flatMap((effect) => {
-    if (effect.selector !== "self" || effect.amount <= 0 || effect.drawIntrigues <= 0) return [];
+    if (
+      effect.selector !== "self" ||
+      effect.amount <= 0 ||
+      (effect.drawIntrigues <= 0 && effect.persuasionReward <= 0)
+    ) return [];
     return [{
       kind: "recall-spy",
       ownerId: source.id,
       combatRecipientId: recipient?.id ?? source.id,
       remaining: effect.amount,
       strength: 0,
+      ...(effect.persuasionReward > 0 ? { persuasionReward: effect.persuasionReward } : {}),
       source: effect.source ?? card.name,
       optional: effect.optional,
-      drawIntrigues: effect.drawIntrigues,
+      ...(effect.drawIntrigues > 0 ? { drawIntrigues: effect.drawIntrigues } : {}),
     }];
   });
 }
@@ -272,8 +314,14 @@ function pendingActionsForRevealTrashCards(
       } : {}),
       ...(effect.spiceReward !== undefined ? { spiceReward: effect.spiceReward } : {}),
       ...(effect.vpReward !== undefined ? { vpReward: effect.vpReward } : {}),
+      ...(effect.persuasionCost !== undefined ? { persuasionCost: effect.persuasionCost } : {}),
+      ...(effect.resourceCost && Object.keys(effect.resourceCost).length > 0 ? {
+        resourceCost: effect.resourceCost,
+      } : {}),
       ...(effect.sourceOnly ? { zones: ["playArea"], requiredCardId: card.id } : {}),
     };
+    if ((pending.persuasionCost ?? 0) > source.persuasion) return [];
+    if (pending.resourceCost && !canPay(source, pending.resourceCost)) return [];
     return trashableCardsForPending(source, pending).length > 0 ? [pending] : [];
   });
 }
@@ -307,6 +355,133 @@ function pendingActionsForRevealPayResourceForHighCouncilSeat(
       source: effect.source ?? card.name,
       cardId: card.id,
     }];
+  });
+}
+
+function pendingActionsForRevealPendingActionChoice(
+  card: Card,
+  source: Player,
+  state: GameState,
+  combatRecipientId: string,
+): PendingAction[] {
+  if (!card.effects || !source.playArea.some((candidate) => candidate.id === card.id)) return [];
+  const recipient = state.players.find((player) => player.id === combatRecipientId);
+  const effects = resolveRevealPendingActionChoices(card.effects, {
+    trigger: "reveal",
+    source,
+    target: recipient,
+    state,
+  });
+  return effects.flatMap((effect) => {
+    if (effect.selector !== "self") return [];
+    const defaultSource = effect.source ?? card.name;
+    const options = effect.options.flatMap((option) => {
+      const sourceLabel = option.effect.source ?? defaultSource;
+      const pending = (() => {
+        if (option.effect.kind === "gain-persuasion") {
+          return {
+            kind: "gain-persuasion" as const,
+            ownerId: source.id,
+            source: sourceLabel,
+            amount: option.effect.amount,
+          };
+        }
+        if (option.effect.kind === "gain-resource") {
+          return {
+            kind: "gain-resource" as const,
+            ownerId: source.id,
+            source: sourceLabel,
+            resource: option.effect.resource,
+            amount: option.effect.amount,
+          };
+        }
+        if (option.effect.kind === "gain-strength") {
+          return recipient
+            ? {
+                kind: "gain-strength" as const,
+                ownerId: source.id,
+                combatRecipientId: recipient.id,
+                source: sourceLabel,
+                amount: option.effect.amount,
+              }
+            : undefined;
+        }
+        if (option.effect.kind === "trash-card") {
+          return {
+            kind: "trash-card" as const,
+            ownerId: source.id,
+            source: sourceLabel,
+            optional: option.effect.optional,
+            ...(option.effect.zones ? { zones: option.effect.zones } : {}),
+            ...(option.effect.excludeSource ? { excludeCardId: card.id } : {}),
+            ...(option.effect.sourceOnly ? { zones: ["playArea"] as TrashCardZone[], requiredCardId: card.id } : {}),
+            ...(option.effect.requiredTrait ? { requiredTrait: option.effect.requiredTrait } : {}),
+            ...(option.effect.spiceRewardCostThreshold !== undefined
+              ? { spiceRewardCostThreshold: option.effect.spiceRewardCostThreshold }
+              : {}),
+            ...(option.effect.spiceReward !== undefined ? { spiceReward: option.effect.spiceReward } : {}),
+            ...(option.effect.vpReward !== undefined ? { vpReward: option.effect.vpReward } : {}),
+            ...(option.effect.persuasionCost !== undefined ? { persuasionCost: option.effect.persuasionCost } : {}),
+            ...(option.effect.resourceCost ? { resourceCost: option.effect.resourceCost } : {}),
+          };
+        }
+        if (option.effect.kind === "place-spies") {
+          const pending = spyPendingForPlacement(
+            sourceLabel,
+            source,
+            {
+              count: option.effect.amount,
+              recallForSupply: option.effect.recallForSupply,
+              mustPlace: option.effect.mustPlace,
+              placementIcon: option.effect.placementIcon,
+              placementIcons: option.effect.placementIcons,
+              allowSharedPost: option.effect.allowSharedPost,
+              source: option.effect.source,
+              postPlacementAction: option.effect.postPlacementAction,
+            },
+            state,
+          );
+          return pending?.kind === "spy" ? pending : undefined;
+        }
+        if (option.effect.kind === "acquire-card") {
+          const pendingBase = {
+            kind: "acquire-card" as const,
+            ownerId: source.id,
+            source: sourceLabel,
+            ...(option.effect.minCost !== undefined ? { minCost: option.effect.minCost } : {}),
+            destination: option.effect.destination,
+            optional: option.effect.optional,
+          };
+          return option.effect.paymentResource !== undefined
+            ? {
+                ...pendingBase,
+                ...(option.effect.maxCost !== undefined ? { maxCost: option.effect.maxCost } : {}),
+                paymentResource: option.effect.paymentResource,
+              }
+            : option.effect.maxCost !== undefined
+              ? { ...pendingBase, maxCost: option.effect.maxCost }
+              : undefined;
+        }
+        return undefined;
+      })();
+      if (!pending) return [];
+      const pendingOption = {
+        id: option.id,
+        label: option.label,
+        pending,
+      };
+      return pendingActionChoiceOptionIsResolvable(state, pendingOption) ? [pendingOption] : [];
+    });
+    return options.length > 0
+      ? [{
+          kind: "pending-action-choice" as const,
+          ownerId: source.id,
+          cardId: card.id,
+          source: defaultSource,
+          ...(effect.optional ? { optional: true as const } : {}),
+          options,
+        }]
+      : [];
   });
 }
 
@@ -400,8 +575,22 @@ export function pendingActionsForReveal(
   const payResourceHighCouncilSeatPendings = revealedCards.flatMap((card) =>
     pendingActionsForRevealPayResourceForHighCouncilSeat(card, source, state)
   );
+  const paidRewardChoicePendings = revealedCards
+    .map((card) => pendingActionForRevealPaidRewardChoice(
+      card,
+      source,
+      state,
+      state.players.find((player) => player.id === combatRecipientId),
+    ))
+    .filter((pending): pending is PendingAction => Boolean(pending));
+  const pendingActionChoicePendings = revealedCards.flatMap((card) =>
+    pendingActionsForRevealPendingActionChoice(card, source, state, combatRecipientId)
+  );
   const influenceIntriguePendings = revealedCards.flatMap((card) =>
     pendingActionsForRevealInfluenceIntrigues(card, source, state, combatRecipientId)
+  );
+  const influenceExchangePendings = revealedCards.flatMap((card) =>
+    pendingActionsForRevealInfluenceExchange(card, source, state, combatRecipientId)
   );
   const spyRecallIntriguePendings = revealedCards.flatMap((card) =>
     pendingActionsForRevealSpyRecallIntrigues(card, source, state, combatRecipientId)
@@ -421,7 +610,10 @@ export function pendingActionsForReveal(
     ...payResourceTroopPendings,
     ...payResourceSandwormPendings,
     ...payResourceHighCouncilSeatPendings,
+    ...paidRewardChoicePendings,
+    ...pendingActionChoicePendings,
     ...influenceIntriguePendings,
+    ...influenceExchangePendings,
     ...spyRecallIntriguePendings,
     ...retreatTroopStrengthPendings,
     ...deployOrRetreatTroopPendings,

@@ -125,7 +125,7 @@ export function verifyCardEffectSpecImperiumUtility({ cards }) {
   );
   assert.equal(
     reliableInformant.play,
-    "Gain 1 Solari on Emperor, Bene Gesserit, or Spacing Guild board spaces.",
+    "Place 1 spy on Emperor, Bene Gesserit, or Spacing Guild board spaces.",
     "Reliable Informant play text should name its board-space icon condition",
   );
   for (const icon of ["emperor", "bene", "spacing"]) {
@@ -140,13 +140,15 @@ export function verifyCardEffectSpecImperiumUtility({ cards }) {
           ) &&
           spec.effects.some(
             (effect) =>
-              effect.kind === "gain-resource" &&
+              effect.kind === "place-spies" &&
               effect.selector === "self" &&
-              effect.resource === "solari" &&
-              effect.amount === 1,
+              effect.amount === 1 &&
+              effect.recallForSupply === true &&
+              effect.mustPlace === true &&
+              effect.placementIcon === icon,
           ),
       ),
-      `Reliable Informant should carry a ${icon} board-space gated Agent Solari spec`,
+      `Reliable Informant should carry a ${icon} board-space gated Agent spy-placement spec`,
     );
   }
   assert.equal(
@@ -258,8 +260,8 @@ export function verifyCardEffectSpecImperiumUtility({ cards }) {
   );
   assert.equal(
     guildSpy.reveal,
-    "+2 persuasion.",
-    "Guild Spy should keep its fixed reveal persuasion",
+    "+2 persuasion. If you acquired The Spice Must Flow this turn, gain 1 Influence with each faction you're spying on.",
+    "Guild Spy should keep its fixed reveal persuasion and expose its Spice Must Flow reveal clause",
   );
   assert.ok(
     guildSpy.effects?.some(
@@ -270,6 +272,24 @@ export function verifyCardEffectSpecImperiumUtility({ cards }) {
         ),
     ),
     "Guild Spy should carry its printed persuasion in Reveal specs",
+  );
+  assert.ok(
+    guildSpy.effects?.some(
+      (spec) =>
+        spec.trigger === "reveal" &&
+        spec.conditions?.some(
+          (condition) =>
+            condition.kind === "acquired-card-this-turn" &&
+            condition.cardId === "538",
+        ) &&
+        spec.effects.some(
+          (effect) =>
+            effect.kind === "gain-influence-for-spied-factions" &&
+            effect.selector === "self" &&
+            effect.amount === 1,
+        ),
+    ),
+    "Guild Spy should carry its Spice Must Flow gated spied-faction Influence reveal spec",
   );
   assert.ok(
     guildSpy.effects?.some(

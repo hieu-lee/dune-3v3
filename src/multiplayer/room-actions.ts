@@ -32,6 +32,7 @@ import type {
   CunningPlotChoice,
   DepartForArrakisChoice,
   ImperiumPoliticsChoice,
+  InfluenceExchangeChoice,
   InfluenceLossPair,
   LadyAmberDesertScoutsChoice,
   LeaderTransitionChoice,
@@ -48,7 +49,7 @@ export type RoomPendingActionCommand =
   | { kind: "acquire-pending-card"; cardId: string }
   | { kind: "adjust-team-resource-payment"; contributorId: string; delta: number }
   | { kind: "choose-board-agent-recall"; spaceId: string }
-  | { kind: "choose-board-influence"; ownerId: string; faction: FactionId }
+  | { kind: "choose-board-influence"; ownerId: string; faction: FactionId; trashCardId?: string }
   | { kind: "choose-commander-resource-split"; optionIndex: number }
   | { kind: "choose-conflict-influence"; faction: FactionId }
   | { kind: "choose-conflict-tie-winner"; winnerId?: string }
@@ -60,6 +61,7 @@ export type RoomPendingActionCommand =
   | { kind: "choose-lady-amber-desert-scouts"; choice: LadyAmberDesertScoutsChoice }
   | { kind: "choose-leader-transition"; choice: LeaderTransitionChoice }
   | { kind: "choose-lose-influence-for-intrigues"; faction: FactionId }
+  | { kind: "choose-lose-influence-for-influence"; choice: InfluenceExchangeChoice }
   | { kind: "choose-maker-reward"; choice: "spice" | "sandworms" }
   | { kind: "choose-paid-reward"; optionId: string }
   | { kind: "choose-pay-resource-for-contracts"; optionIndex: number }
@@ -99,6 +101,7 @@ export type RoomPendingActionCommand =
   | { kind: "skip-deploy-or-retreat-troops" }
   | { kind: "skip-influence-loss" }
   | { kind: "skip-lose-influence-for-intrigues" }
+  | { kind: "skip-lose-influence-for-influence" }
   | { kind: "skip-optional-space-payment" }
   | { kind: "skip-paid-reward" }
   | { kind: "skip-pay-resource-for-contracts" }
@@ -306,6 +309,7 @@ function applyEndAgent(state: GameState, playerId: string) {
     agentTurnComplete: false,
     turnHarvestContractIds: {},
     turnMakerSpaceVisits: {},
+    turnAcquiredCardIds: {},
     turnSpiceGains: {},
     turnReverendMotherJessicaRepeats: {},
     turnSpyRecalls: {},
@@ -587,6 +591,12 @@ function unique(ids: Array<string | undefined>) {
   return [...new Set(ids.filter((id): id is string => Boolean(id)))];
 }
 
+function boardInfluenceChoiceResolverIds(pending: Extract<PendingAction, { kind: "board-influence-choice" }>) {
+  return pending.requiredHandTrashTrait
+    ? unique([pending.cardOwnerId])
+    : unique(pending.choices.map((choice) => choice.ownerId));
+}
+
 function pendingActionPlayerIds(state: GameState, pending: PendingAction): string[] {
   switch (pending.kind) {
     case "trade":
@@ -599,11 +609,7 @@ function pendingActionPlayerIds(state: GameState, pending: PendingAction): strin
     case "commander-resource-split":
       return unique([pending.commanderId, pending.allyId]);
     case "board-influence-choice":
-      return unique([
-        pending.cardOwnerId,
-        pending.targetOwnerId,
-        ...pending.choices.map((choice) => choice.ownerId),
-      ]);
+      return boardInfluenceChoiceResolverIds(pending);
     case "team-resource-payment":
       return unique([pending.ownerId, ...pending.contributorIds]);
     case "lose-influence":
@@ -631,6 +637,7 @@ function pendingActionPlayerIds(state: GameState, pending: PendingAction): strin
     case "top-deck-selection":
     case "trash-intrigue-for-reward":
     case "lose-influence-for-intrigues":
+    case "lose-influence-for-influence":
     case "discard-hand-card":
     case "pay-resource-for-influence":
     case "pay-resource-for-strength":
@@ -878,6 +885,10 @@ function applyRoomPendingAction(state: GameState, playerId: string, command: Roo
       return maybeStartCombatPhase(gameRules.resolveLoseInfluenceForIntriguesChoice(state, pendingOf(state, "lose-influence-for-intrigues"), command.faction));
     case "skip-lose-influence-for-intrigues":
       return maybeStartCombatPhase(gameRules.skipLoseInfluenceForIntrigues(state, pendingOf(state, "lose-influence-for-intrigues")));
+    case "choose-lose-influence-for-influence":
+      return maybeStartCombatPhase(gameRules.resolveLoseInfluenceForInfluenceChoice(state, pendingOf(state, "lose-influence-for-influence"), command.choice));
+    case "skip-lose-influence-for-influence":
+      return maybeStartCombatPhase(gameRules.skipLoseInfluenceForInfluence(state, pendingOf(state, "lose-influence-for-influence")));
     case "choose-throne-row-card":
       return applyChooseThroneRowCard(state, playerId, { kind: "choose-throne-row-card", cardId: command.cardId });
     case "choose-conflict-tie-winner":
@@ -890,11 +901,26 @@ function applyRoomPendingAction(state: GameState, playerId: string, command: Roo
       return gameRules.startNextRound(gameRules.skipConflictVpConversion(state, pendingOf(state, "conflict-vp-conversion")));
     case "choose-conflict-influence":
       return gameRules.startNextRound(gameRules.gainConflictInfluenceForPending(state, pendingOf(state, "conflict-influence"), command.faction));
-    case "choose-board-influence":
-      if (command.ownerId !== playerId) {
+    case "choose-board-influence": {
+      const boardInfluencePending = pendingOf(state, "board-influence-choice");
+      if (
+        command.ownerId !== playerId &&
+        !(
+          boardInfluencePending.requiredHandTrashTrait &&
+          boardInfluencePending.cardOwnerId === playerId &&
+          typeof command.trashCardId === "string"
+        )
+      ) {
         throw new RoomActionError(403, "You can only choose Influence for your own seat");
       }
-      return maybeStartCombatPhase(gameRules.resolveBoardInfluenceChoice(state, pendingOf(state, "board-influence-choice"), command.ownerId, command.faction));
+      return maybeStartCombatPhase(gameRules.resolveBoardInfluenceChoice(
+        state,
+        boardInfluencePending,
+        command.ownerId,
+        command.faction,
+        command.trashCardId,
+      ));
+    }
     case "choose-board-agent-recall": {
       const pending = pendingOf(state, "recall-agent-from-board");
       if (!gameRules.boardAgentRecallSpacesForPending(state, pending).includes(command.spaceId)) {

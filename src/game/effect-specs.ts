@@ -4,6 +4,7 @@ export {
   agentPlayEffects,
   combatIntrigueEffects,
   discardEffects,
+  trashEffects,
   plotIntrigueEffects,
   revealEffects,
 } from "./effect-spec-base";

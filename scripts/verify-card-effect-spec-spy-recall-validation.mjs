@@ -177,6 +177,7 @@ export function verifyCardEffectSpecSpyRecallValidation({
         selector: "self",
         amount: 1,
         drawIntrigues: 1,
+        persuasionReward: 0,
         optional: true,
         source: "Test",
       },
@@ -642,6 +643,7 @@ export function verifyCardEffectSpecSpyRecallValidation({
     }),
     {
       influenceGains: {},
+      intriguesToDraw: 0,
       persuasion: 0,
       recruitedTroops: 0,
       revealGain: {},
@@ -691,6 +693,7 @@ export function verifyCardEffectSpecSpyRecallValidation({
     revealSpyRecallPlan,
     {
       influenceGains: {},
+      intriguesToDraw: 0,
       persuasion: 0,
       recruitedTroops: 0,
       revealGain: {},

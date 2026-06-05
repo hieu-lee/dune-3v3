@@ -82,6 +82,7 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     effect.kind !== "gain-vp" &&
     effect.kind !== "place-spies" &&
     effect.kind !== "draw-intrigues" &&
+    effect.kind !== "gain-influence" &&
     effect.kind !== "gain-influence-choice" &&
     effect.kind !== "take-contracts"
   ) {
@@ -91,6 +92,9 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
   }
   if (trigger === "discard" && effect.kind !== "gain-resource") {
+    throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
+  }
+  if (trigger === "trash" && effect.kind !== "draw-intrigues") {
     throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
   }
   if (effect.kind === "gain-resource") {
@@ -137,13 +141,20 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     return;
   }
   if (effect.kind === "gain-influence") {
-    if (trigger !== "plot-intrigue" && trigger !== "reveal") {
+    if (trigger !== "plot-intrigue" && trigger !== "reveal" && trigger !== "acquire") {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
     }
     if (!supportedFactions.has(effect.faction)) {
       throw new Error(`Unsupported effect faction "${effect.faction}"`);
     }
     validateAmount(effect.amount);
+    return;
+  }
+  if (effect.kind === "gain-influence-for-spied-factions") {
+    if (trigger !== "reveal") {
+      throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
+    }
+    validatePositiveAmount("gain-influence-for-spied-factions amount", effect.amount);
     return;
   }
   if (effect.kind === "gain-vp") {
@@ -172,7 +183,7 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     return;
   }
   if (effect.kind === "draw-intrigues") {
-    if (trigger !== "agent-play" && trigger !== "acquire" && trigger !== "plot-intrigue") {
+    if (trigger !== "agent-play" && trigger !== "reveal" && trigger !== "acquire" && trigger !== "plot-intrigue" && trigger !== "trash") {
       throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
     }
     validateAmount(effect.amount);
@@ -234,6 +245,12 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     }
     validatePositiveAmount("gain-board-space-influence amount", effect.amount);
     validateOptionalBoolean("gain-board-space-influence trashSource", effect.trashSource);
+    if (
+      effect.requiredHandTrashTrait !== undefined &&
+      (typeof effect.requiredHandTrashTrait !== "string" || effect.requiredHandTrashTrait.trim().length === 0)
+    ) {
+      invalidSpecField("gain-board-space-influence requiredHandTrashTrait", effect.requiredHandTrashTrait);
+    }
     validateSourceLabel("gain-board-space-influence source", effect.source);
     return;
   }
@@ -404,6 +421,12 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
       if (effect.vpReward !== undefined) {
         throw new Error(`Unsupported trash-card vpReward for ${trigger}`);
       }
+      if (effect.persuasionCost !== undefined) {
+        throw new Error(`Unsupported trash-card persuasionCost for ${trigger}`);
+      }
+      if (effect.resourceCost !== undefined) {
+        throw new Error(`Unsupported trash-card resourceCost for ${trigger}`);
+      }
       return;
     }
     const revealSourceOnly = trigger === "reveal" && effect.sourceOnly === true;
@@ -439,6 +462,8 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
         invalidSpecField("trash-card vpReward", effect.vpReward);
       }
       validatePositiveAmount("trash-card vpReward", effect.vpReward);
+      if (effect.persuasionCost !== undefined) validatePositiveAmount("trash-card persuasionCost", effect.persuasionCost);
+      validateResourceAmountMap("trash-card resourceCost", effect.resourceCost);
       return;
     }
     if (trigger === "combat-intrigue" && effect.optional !== true) {
@@ -464,6 +489,12 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     if (effect.strengthReward !== undefined) validateAmount(effect.strengthReward);
     if (effect.spiceRewardCostThreshold !== undefined) validateAmount(effect.spiceRewardCostThreshold);
     if (effect.spiceReward !== undefined) validateAmount(effect.spiceReward);
+    if (effect.persuasionCost !== undefined) {
+      throw new Error(`Unsupported trash-card persuasionCost for ${trigger}`);
+    }
+    if (effect.resourceCost !== undefined) {
+      throw new Error(`Unsupported trash-card resourceCost for ${trigger}`);
+    }
     return;
   }
   if (effect.kind === "lose-influence-for-intrigues") {
@@ -474,6 +505,18 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
       throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
     }
     validateAmount(effect.amount);
+    return;
+  }
+  if (effect.kind === "lose-influence-for-influence") {
+    if (trigger !== "reveal") {
+      throw new Error(`Unsupported effect "${effect.kind}" for ${trigger}`);
+    }
+    if (effect.selector !== "self") {
+      throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
+    }
+    validatePositiveAmount("lose-influence-for-influence loseAmount", effect.loseAmount);
+    validatePositiveAmount("lose-influence-for-influence gainAmount", effect.gainAmount);
+    validateOptionalBoolean("lose-influence-for-influence optional", (effect as { optional?: unknown }).optional);
     return;
   }
   if (effect.kind === "lose-influence-for-strength") {
@@ -522,6 +565,7 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
       throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
     }
     validateAmount(effect.drawCards);
+    if (effect.drawIntrigues !== undefined) validateAmount(effect.drawIntrigues);
     validateOptionalBoolean("discard-card-for-draw optional", (effect as { optional?: unknown }).optional);
     if (effect.bonusDraw !== undefined) {
       if (
@@ -801,11 +845,15 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
       const amount = effect.amount;
       const drawIntrigues = effect.drawIntrigues;
       const strengthReward = effect.strengthReward;
+      const persuasionReward = effect.persuasionReward;
       if (amount === undefined) {
         invalidSpecField("recall-spy amount", amount);
       }
-      if ((drawIntrigues === undefined && strengthReward === undefined) || (drawIntrigues !== undefined && strengthReward !== undefined)) {
-        invalidSpecField("recall-spy reveal reward", { drawIntrigues, strengthReward });
+      const rewardCount = [drawIntrigues, strengthReward, persuasionReward]
+        .filter((reward) => reward !== undefined)
+        .length;
+      if (rewardCount !== 1) {
+        invalidSpecField("recall-spy reveal reward", { drawIntrigues, strengthReward, persuasionReward });
       }
       if (effect.reward !== undefined) {
         throw new Error(`Unsupported recall-spy reward for ${trigger}`);
@@ -820,6 +868,9 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
       if (strengthReward !== undefined) {
         validatePositiveAmount("recall-spy strengthReward", strengthReward);
       }
+      if (persuasionReward !== undefined) {
+        validatePositiveAmount("recall-spy persuasionReward", persuasionReward);
+      }
       validateOptionalBoolean("recall-spy optional", effect.optional);
       return;
     }
@@ -831,6 +882,9 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     }
     if (effect.drawIntrigues !== undefined) {
       throw new Error(`Unsupported recall-spy drawIntrigues for ${trigger}`);
+    }
+    if (effect.persuasionReward !== undefined) {
+      throw new Error(`Unsupported recall-spy persuasionReward for ${trigger}`);
     }
     if (effect.optional !== undefined) {
       throw new Error(`Unsupported recall-spy optional for ${trigger}`);
@@ -857,6 +911,13 @@ function validateEffect(effect: GameEffectSpec, trigger: GameEffectTrigger) {
     validateSourceLabel("place-spies source", effect.source);
     if (effect.placementIcon !== undefined && !supportedIcons.has(effect.placementIcon)) {
       throw new Error(`Unsupported effect icon "${effect.placementIcon}"`);
+    }
+    if (effect.placementIcons !== undefined) {
+      if (!Array.isArray(effect.placementIcons) || effect.placementIcons.length === 0) {
+        invalidSpecField("place-spies placementIcons", effect.placementIcons);
+      }
+      const unsupportedIcon = effect.placementIcons.find((icon) => !supportedIcons.has(icon));
+      if (unsupportedIcon) throw new Error(`Unsupported effect icon "${unsupportedIcon}"`);
     }
     validateOptionalBoolean("place-spies recallForSupply", effect.recallForSupply);
     validateOptionalBoolean("place-spies mustPlace", effect.mustPlace);

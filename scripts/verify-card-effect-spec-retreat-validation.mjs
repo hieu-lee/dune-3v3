@@ -100,10 +100,17 @@ export function verifyCardEffectSpecRetreatValidation({
     name: "Effect Spec Reveal Intrigue Draw",
     effects: [revealSpec([{ kind: "draw-intrigues", selector: "self", amount: 1 }])],
   };
-  assert.throws(
-    () => turnActions.revealTurnPlan({ ...p2, hand: [revealIntrigueDrawCard], highCouncilSeat: false }),
-    /Unsupported effect "draw-intrigues" for reveal/,
-    "Intrigue draw specs should stay out of Reveal until a reveal-time state resolver supports them",
+  assert.deepEqual(
+    turnActions.revealTurnPlan({ ...p2, hand: [revealIntrigueDrawCard], highCouncilSeat: false }),
+    {
+      influenceGains: {},
+      intriguesToDraw: 1,
+      persuasion: 0,
+      recruitedTroops: 0,
+      revealGain: {},
+      swords: 0,
+    },
+    "Reveal Intrigue draw specs should add to the reveal-time Intrigue draw count",
   );
   const agentRetreatStrengthCard = {
     ...convincingArgument,

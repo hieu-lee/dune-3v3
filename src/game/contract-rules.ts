@@ -1,9 +1,12 @@
 import {
   addAcquiredCard,
+  acquiredCardTrackerIds,
   acquiredCardIdFor,
   acquireMarketCard as acquireMarketCardBase,
   acquireCardPendingIsValid,
   acquireRewardParts,
+  applyGuildSpySpiceMustFlowReward,
+  applyAcquireInfluenceRewards,
   callToArmsRecruitOwner,
   drawAcquireIntrigues,
   formatAcquireOutcome,
@@ -22,7 +25,12 @@ import {
   resolveLeaderInfluenceThresholdRewards,
 } from "./leader-rewards";
 import { advancePendingAction, prependPendingAction } from "./pending-actions";
-import { hasVisitedMakerSpaceThisTurn, recordTurnSpiceGain } from "./turn-trackers";
+import {
+  hasAcquiredCardThisTurn,
+  hasVisitedMakerSpaceThisTurn,
+  recordTurnAcquiredCard,
+  recordTurnSpiceGain,
+} from "./turn-trackers";
 import type {
   Card,
   ContractCard,
@@ -698,6 +706,11 @@ export function resolveAcquireCardForPending(
   const recruitOwner = callToArmsRecruit.owner;
   const recruitedTroops = recruitOwner ? Math.min(playerTroopSupply(recruitOwner), 1) : 0;
   const acquireReward = resolveCardAcquireEffects(card, owner, state);
+  const alreadyAcquiredSpiceMustFlow = hasAcquiredCardThisTurn(
+    state,
+    owner.id,
+    String(spiceMustFlowSourceId),
+  ) || hasAcquiredCardThisTurn(state, owner.id, card.id);
   const players = state.players.map((player) => {
     let next = player;
     if (player.id === owner.id) {
@@ -727,7 +740,7 @@ export function resolveAcquireCardForPending(
   ]);
   const actionLog =
     `${owner.leader} acquires ${card.name} to their ${destinationText}${paymentText} from ${pending.source}${outcomeText}.`;
-  const acquiredStateBase = recordAcquireSpiceGain({
+  const loggedState = {
     ...state,
     players,
     imperiumRow,
@@ -738,7 +751,16 @@ export function resolveAcquireCardForPending(
       actionLog,
       ...state.log,
     ],
-  }, owner.id, acquireReward);
+  };
+  const spiceTrackedState = recordAcquireSpiceGain(loggedState, owner.id, acquireReward);
+  const acquiredTrackedState = recordTurnAcquiredCard(spiceTrackedState, owner.id, acquiredCardTrackerIds(card));
+  const acquireInfluenceState = applyAcquireInfluenceRewards(acquiredTrackedState, owner.id, acquireReward);
+  const acquiredStateBase = applyGuildSpySpiceMustFlowReward(
+    acquireInfluenceState,
+    owner.id,
+    card,
+    alreadyAcquiredSpiceMustFlow,
+  );
   const acquiredState = drawAcquireIntrigues(
     completeChoamContractsForCurrentTurnHarvests(acquiredStateBase, actionLog).state,
     owner.id,

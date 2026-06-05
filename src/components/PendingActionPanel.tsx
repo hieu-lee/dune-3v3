@@ -16,6 +16,7 @@ import {
   discardCardForDrawChoices,
   discardCardForInfluenceAndDrawChoices,
   discardCardForInfluenceAndDrawDiscardChoices,
+  influenceExchangeChoices,
   influenceLossOptions,
   loseInfluenceForIntriguesChoices,
   placeableSpySpaces,
@@ -38,6 +39,7 @@ import {
   PendingDiscardHandCardPanel,
   PendingDiscardInfluenceDrawPanel,
   PendingDiscardRewardPanel,
+  PendingInfluenceExchangePanel,
   PendingInfluenceIntriguePanel,
 } from "./PendingCapturedMentatPanel";
 import { PendingConflictInfluencePanel } from "./PendingConflictInfluencePanel";
@@ -89,6 +91,7 @@ export function PendingActionPanel({
   chooseDiscardCardForInfluenceAndDraw,
   chooseDeployOrRetreatTroops,
   chooseLoseInfluenceForIntrigues,
+  chooseLoseInfluenceForInfluence,
   choosePendingActionChoice,
   chooseLeaderTransition,
   chooseLadyAmberDesertScouts,
@@ -127,6 +130,7 @@ export function PendingActionPanel({
   skipDiscardCardForInfluenceAndDrawChoice,
   skipDeployOrRetreatTroops,
   skipLoseInfluenceForIntriguesChoice,
+  skipLoseInfluenceForInfluenceChoice,
   skipControlDefense,
   skipConflictVpReward,
   skipInfluenceLoss,
@@ -224,6 +228,10 @@ export function PendingActionPanel({
     pendingAction.kind === "lose-influence-for-intrigues" && pendingInfluenceIntrigueOwner
       ? loseInfluenceForIntriguesChoices(pendingInfluenceIntrigueOwner)
       : [];
+  const pendingInfluenceExchangeOwner =
+    pendingAction.kind === "lose-influence-for-influence" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
+  const pendingInfluenceExchangeChoices =
+    pendingAction.kind === "lose-influence-for-influence" ? influenceExchangeChoices(game, pendingAction) : [];
   const pendingMakerOwner =
     pendingAction.kind === "maker-choice" ? game.players.find((player) => player.id === pendingAction.ownerId) : undefined;
   const pendingMakerSpiceOwner =
@@ -708,6 +716,7 @@ export function PendingActionPanel({
           bonusIntrigues={pendingAction.bonusIntrigues}
           discardChoices={pendingDiscardDrawChoices}
           drawCards={pendingAction.drawCards}
+          drawIntrigues={pendingAction.drawIntrigues}
           optional={pendingAction.optional}
           owner={pendingDiscardDrawOwner}
           source={pendingAction.source}
@@ -783,6 +792,20 @@ export function PendingActionPanel({
           source={pendingAction.source}
           onChoose={chooseLoseInfluenceForIntrigues}
           onSkip={skipLoseInfluenceForIntriguesChoice}
+        />
+      )}
+
+      {pendingAction.kind === "lose-influence-for-influence" && (
+        <PendingInfluenceExchangePanel
+          choices={pendingInfluenceExchangeChoices}
+          gainAmount={pendingAction.gainAmount}
+          loseAmount={pendingAction.loseAmount}
+          optional={pendingAction.optional}
+          owner={pendingInfluenceExchangeOwner}
+          players={game.players}
+          source={pendingAction.source}
+          onChoose={chooseLoseInfluenceForInfluence}
+          onSkip={skipLoseInfluenceForInfluenceChoice}
         />
       )}
 

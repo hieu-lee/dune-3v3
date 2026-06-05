@@ -15,6 +15,7 @@ import type {
   LeaderCounterId,
   PaidRewardChoiceSelector,
   PlayerSelector,
+  Resources,
   ResourceId,
   SandwormEffectDestination,
   SandwormEffectRecipient,
@@ -47,6 +48,11 @@ export type PaidRewardChoiceEffectAtomicReward =
       kind: "gain-resource";
       selector: PaidRewardChoiceSelector;
       resource: ResourceId;
+      amount: EffectAmountSpec;
+    }
+  | {
+      kind: "gain-vp";
+      selector: PaidRewardChoiceSelector;
       amount: EffectAmountSpec;
     }
   | {
@@ -90,6 +96,11 @@ export type PaidRewardChoicePendingAtomicReward =
       amount: number;
     }
   | {
+      kind: "gain-vp";
+      recipientId: string;
+      amount: number;
+    }
+  | {
       kind: "draw-intrigues";
       recipientId: string;
       amount: number;
@@ -127,14 +138,50 @@ export type PendingActionChoiceEffect =
       optional?: boolean;
       zones?: TrashCardZone[];
       excludeSource?: boolean;
+      sourceOnly?: boolean;
       requiredTrait?: string;
       spiceRewardCostThreshold?: EffectAmountSpec;
       spiceReward?: EffectAmountSpec;
+      vpReward?: EffectAmountSpec;
+      persuasionCost?: EffectAmountSpec;
+      resourceCost?: Partial<Record<ResourceId, EffectAmountSpec>>;
       source?: string;
+    }
+  | {
+      kind: "gain-persuasion";
+      selector: "self";
+      amount: EffectAmountSpec;
+      source?: string;
+    }
+  | {
+      kind: "gain-resource";
+      selector: "self";
+      resource: ResourceId;
+      amount: EffectAmountSpec;
+      source?: string;
+    }
+  | {
+      kind: "gain-strength";
+      selector: "self";
+      amount: EffectAmountSpec;
+      source?: string;
+    }
+  | {
+      kind: "place-spies";
+      selector: "self";
+      amount: EffectAmountSpec;
+      recallForSupply?: boolean;
+      mustPlace?: boolean;
+      placementIcon?: IconId;
+      placementIcons?: IconId[];
+      allowSharedPost?: boolean;
+      source?: string;
+      postPlacementAction?: "staban-unseen-network";
     };
 export type PendingActionChoiceEffectOption = {
   id: string;
   label: string;
+  conditions?: GameEffectConditionSpec[];
   effect: PendingActionChoiceEffect;
 };
 export type PendingActionChoiceNestedPending =
@@ -153,9 +200,45 @@ export type PendingActionChoiceNestedPending =
       optional: boolean;
       zones?: TrashCardZone[];
       excludeCardId?: string;
+      requiredCardId?: string;
       requiredTrait?: string;
       spiceRewardCostThreshold?: number;
       spiceReward?: number;
+      vpReward?: number;
+      persuasionCost?: number;
+      resourceCost?: Partial<Resources>;
+    }
+  | {
+      kind: "gain-persuasion";
+      ownerId: string;
+      source: string;
+      amount: number;
+    }
+  | {
+      kind: "spy";
+      ownerId: string;
+      remaining: number;
+      source: string;
+      recallForSupply?: boolean;
+      mustPlaceSpy?: boolean;
+      placementIcon?: IconId;
+      placementIcons?: IconId[];
+      allowSharedPost?: boolean;
+      postPlacementAction?: "staban-unseen-network";
+    }
+  | {
+      kind: "gain-resource";
+      ownerId: string;
+      source: string;
+      resource: ResourceId;
+      amount: number;
+    }
+  | {
+      kind: "gain-strength";
+      ownerId: string;
+      combatRecipientId: string;
+      source: string;
+      amount: number;
     };
 export type PendingActionChoicePendingOption = {
   id: string;
@@ -181,6 +264,7 @@ export type GameEffectConditionSpec =
   | { kind: "has-leader"; leader: string }
   | { kind: "has-leader-counter"; counter: LeaderCounterId; amount: number }
   | { kind: "has-alliance"; faction?: FactionId }
+  | { kind: "acquired-card-this-turn"; cardId: string }
   | { kind: "deployed-units-this-turn"; count: number }
   | { kind: "recalled-spy-this-turn" }
   | { kind: "gained-spice-this-turn" };
@@ -198,6 +282,7 @@ export type GameEffectSpec =
   | { kind: "spend-resource"; selector: PlayerSelector; resource: ResourceId; amount: EffectAmountSpec; source?: string }
   | { kind: "lose-influence"; selector: PlayerSelector; faction: FactionId; amount: EffectAmountSpec }
   | { kind: "gain-influence"; selector: PlayerSelector; faction: FactionId; amount: EffectAmountSpec }
+  | { kind: "gain-influence-for-spied-factions"; selector: "self"; amount: EffectAmountSpec }
   | { kind: "gain-persuasion"; selector: PlayerSelector; amount: EffectAmountSpec }
   | { kind: "gain-strength"; selector: PlayerSelector; amount: EffectAmountSpec }
   | { kind: "gain-vp"; selector: PlayerSelector; amount: EffectAmountSpec }
@@ -224,6 +309,7 @@ export type GameEffectSpec =
       selector: "self";
       amount: EffectAmountSpec;
       trashSource?: boolean;
+      requiredHandTrashTrait?: string;
       source?: string;
     }
   | {
@@ -238,6 +324,7 @@ export type GameEffectSpec =
       kind: "pending-action-choice";
       selector: "self";
       options: PendingActionChoiceEffectOption[];
+      optional?: boolean;
       source?: string;
     }
   | {
@@ -300,11 +387,20 @@ export type GameEffectSpec =
       spiceReward?: EffectAmountSpec;
       drawCardsReward?: EffectAmountSpec;
       vpReward?: EffectAmountSpec;
+      persuasionCost?: EffectAmountSpec;
+      resourceCost?: Partial<Record<ResourceId, EffectAmountSpec>>;
     }
   | {
       kind: "lose-influence-for-intrigues";
       selector: PlayerSelector;
       amount: EffectAmountSpec;
+      optional?: boolean;
+    }
+  | {
+      kind: "lose-influence-for-influence";
+      selector: PlayerSelector;
+      loseAmount: EffectAmountSpec;
+      gainAmount: EffectAmountSpec;
       optional?: boolean;
     }
   | {
@@ -381,6 +477,7 @@ export type GameEffectSpec =
       kind: "discard-card-for-draw";
       selector: PlayerSelector;
       drawCards: EffectAmountSpec;
+      drawIntrigues?: EffectAmountSpec;
       optional?: boolean;
       bonusDraw?: {
         requiredDiscardTrait: string;
@@ -501,6 +598,7 @@ export type GameEffectSpec =
       amount?: EffectAmountSpec;
       source?: string;
       strengthReward?: EffectAmountSpec;
+      persuasionReward?: EffectAmountSpec;
       drawIntrigues?: EffectAmountSpec;
       optional?: boolean;
       reward?: {
@@ -516,6 +614,7 @@ export type GameEffectSpec =
       recallForSupply?: boolean;
       mustPlace?: boolean;
       placementIcon?: IconId;
+      placementIcons?: IconId[];
       allowSharedPost?: boolean;
       source?: string;
       postPlacementAction?: "staban-unseen-network";

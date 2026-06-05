@@ -54,6 +54,17 @@ export function validateAmount(amount: EffectAmountSpec) {
     if (amount.multiplier === undefined || isNonNegativeInteger(amount.multiplier)) return;
     invalidSpecField("completed-contracts multiplier", amount.multiplier);
   }
+  if (amount.kind === "card-trait-count-in-play" || amount.kind === "revealed-card-trait-count") {
+    if (typeof amount.trait !== "string" || amount.trait.trim().length === 0) {
+      invalidSpecField(`${amount.kind} trait`, amount.trait);
+    }
+    if (amount.multiplier === undefined || isNonNegativeInteger(amount.multiplier)) return;
+    invalidSpecField(`${amount.kind} multiplier`, amount.multiplier);
+  }
+  if (amount.kind === "combat-recipient-sandworms" || amount.kind === "other-revealed-card-strength-count") {
+    if (amount.multiplier === undefined || isNonNegativeInteger(amount.multiplier)) return;
+    invalidSpecField(`${amount.kind} multiplier`, amount.multiplier);
+  }
   unsupportedKind("effect amount", amount);
 }
 
@@ -87,6 +98,17 @@ export function validatePositiveAmount(label: string, amount: EffectAmountSpec) 
   if (amount.kind === "completed-contracts") {
     if (amount.multiplier === undefined || isPositiveInteger(amount.multiplier)) return;
     invalidSpecField(`${label} completed-contracts multiplier`, amount.multiplier);
+  }
+  if (amount.kind === "card-trait-count-in-play" || amount.kind === "revealed-card-trait-count") {
+    if (typeof amount.trait !== "string" || amount.trait.trim().length === 0) {
+      invalidSpecField(`${label} ${amount.kind} trait`, amount.trait);
+    }
+    if (amount.multiplier === undefined || isPositiveInteger(amount.multiplier)) return;
+    invalidSpecField(`${label} ${amount.kind} multiplier`, amount.multiplier);
+  }
+  if (amount.kind === "combat-recipient-sandworms" || amount.kind === "other-revealed-card-strength-count") {
+    if (amount.multiplier === undefined || isPositiveInteger(amount.multiplier)) return;
+    invalidSpecField(`${label} ${amount.kind} multiplier`, amount.multiplier);
   }
   unsupportedKind(label, amount);
 }

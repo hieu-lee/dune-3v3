@@ -84,6 +84,7 @@ export function agentPaidRewardChoice(
 export function agentPendingActionChoice(
   options: PendingActionChoiceEffectOption[],
   specOptions: {
+    optional?: true;
     source?: string;
   } = {},
   conditions?: GameEffectConditionSpec[],
@@ -93,6 +94,7 @@ export function agentPendingActionChoice(
       kind: "pending-action-choice",
       selector: "self",
       options: clonePendingActionChoiceOptions(options),
+      ...(specOptions.optional ? { optional: true } : {}),
       ...(specOptions.source ? { source: specOptions.source } : {}),
     },
   ], conditions);
@@ -121,6 +123,7 @@ export function agentDiscardCardForInfluenceAndDraw(
 export function agentDiscardCardForDraw(
   drawCards: EffectAmountSpec,
   options: {
+    drawIntrigues?: EffectAmountSpec;
     optional?: boolean;
     bonusDraw?: {
       requiredDiscardTrait: string;
@@ -138,6 +141,7 @@ export function agentDiscardCardForDraw(
       kind: "discard-card-for-draw",
       selector: "self",
       drawCards,
+      ...(options.drawIntrigues !== undefined ? { drawIntrigues: options.drawIntrigues } : {}),
       optional: options.optional ?? false,
       ...(options.bonusDraw ? { bonusDraw: { ...options.bonusDraw } } : {}),
       ...(options.bonusIntrigues ? { bonusIntrigues: { ...options.bonusIntrigues } } : {}),
@@ -551,6 +555,7 @@ export function agentGainBoardSpaceInfluence(
   amount: EffectAmountSpec,
   options: {
     trashSource?: boolean;
+    requiredHandTrashTrait?: string;
     source?: string;
   } = {},
   conditions?: GameEffectConditionSpec[],
@@ -616,6 +621,7 @@ export function agentPlaceSpies(
     recallForSupply?: boolean;
     mustPlace?: boolean;
     placementIcon?: IconId;
+    placementIcons?: IconId[];
     allowSharedPost?: boolean;
     source?: string;
     postPlacementAction?: "staban-unseen-network";

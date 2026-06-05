@@ -14,6 +14,8 @@ export function verifyImperiumCardAcquireEffects({
 }) {
   const { beneGesseritOperative, overthrow, prepareTheWay, priceIsNoObject, spiceMustFlow, spyNetwork } = cards;
   const { highCouncil, secrets } = spaces;
+  const guildSpy = data.imperiumDeck.find((card) => card.name === "Guild Spy");
+  assert.ok(guildSpy, "Expected Guild Spy for acquisition timing coverage");
   const beneSpySpace = state.spyObservationPostChoiceSpaces().find((space) => space.id === "espionage");
   assert.ok(beneSpySpace, "Espionage should be the Bene spy-post representative");
   const p2 = playerById(game, playerId);
@@ -47,15 +49,67 @@ export function verifyImperiumCardAcquireEffects({
   const spiceBuyer = playerById(spiceBought, p2.id);
   assert.equal(spiceBuyer.persuasion, 0, "The Spice Must Flow should spend 9 persuasion");
   assert.equal(spiceBuyer.vp, 1, "The Spice Must Flow should award exactly one VP through acquire specs");
-  assert.equal(spiceBuyer.resources.spice, 1, "The Spice Must Flow should award its acquire spice bonus");
-  assert.equal(spiceBought.turnSpiceGains[p2.id], 1, "The Spice Must Flow acquire spice should count as turn spice gain");
+  assert.equal(spiceBuyer.resources.spice, 0, "The Spice Must Flow should not award spice on acquisition");
+  assert.equal(spiceBought.turnSpiceGains[p2.id] ?? 0, 0, "The Spice Must Flow acquisition should not count as turn spice gain");
   assert.equal(spiceBuyer.discard.at(-1).sourceId, 538, "The Spice Must Flow should go to discard when bought");
   assert.notEqual(
     spiceBuyer.discard.at(-1).id,
     spiceMustFlow.id,
     "The Spice Must Flow reserve acquisitions should create a physical card copy",
   );
-  assert.match(spiceBought.log[0], /acquires The Spice Must Flow for 1 VP and gains 1 spice/);
+  assert.match(spiceBought.log[0], /acquires The Spice Must Flow for 1 VP/);
+
+  const guildSpyRewardFixture = {
+    ...withActivePlayer(game, p2.id, (player) => ({
+      revealed: true,
+      persuasion: 18,
+      vp: 0,
+      playArea: [guildSpy],
+      influence: { ...player.influence, bene: 0 },
+    })),
+    sharedSpyPosts: {},
+    spyPosts: { [state.spyObservationPostIdForSpace(secrets.id)]: p2.id },
+  };
+  const guildSpyRewarded = state.acquireMarketCard(guildSpyRewardFixture, p2.id, spiceMustFlow.id);
+  const guildSpyRewardedBuyer = playerById(guildSpyRewarded, p2.id);
+  assert.equal(
+    guildSpyRewardedBuyer.influence.bene,
+    1,
+    "Guild Spy should award Bene Gesserit Influence after a revealed The Spice Must Flow acquisition",
+  );
+  assert.deepEqual(
+    guildSpyRewarded.turnAcquiredCardIds[p2.id],
+    [spiceMustFlow.id, String(spiceMustFlow.sourceId)],
+    "The Spice Must Flow acquisition should track both card id and source id for same-turn conditions",
+  );
+  assert.match(guildSpyRewarded.log[0], /resolves Guild Spy: gains 1 Influence with Bene Gesserit/);
+  const guildSpySecondPurchase = state.acquireMarketCard(guildSpyRewarded, p2.id, spiceMustFlow.id);
+  assert.equal(
+    playerById(guildSpySecondPurchase, p2.id).influence.bene,
+    1,
+    "Guild Spy should not award duplicate Influence for a second The Spice Must Flow acquisition in the same turn",
+  );
+  const guildSpyAgentOnlyFixture = {
+    ...withActivePlayer(game, p2.id, (player) => ({
+      revealed: true,
+      persuasion: 9,
+      playArea: [{ ...guildSpy, id: "agent-played-guild-spy", agentPlacementSpaceId: secrets.id }],
+      influence: { ...player.influence, bene: 0 },
+    })),
+    sharedSpyPosts: {},
+    spyPosts: { [state.spyObservationPostIdForSpace(secrets.id)]: p2.id },
+  };
+  const guildSpyAgentOnlyBought = state.acquireMarketCard(guildSpyAgentOnlyFixture, p2.id, spiceMustFlow.id);
+  assert.equal(
+    playerById(guildSpyAgentOnlyBought, p2.id).influence.bene,
+    0,
+    "An Agent-played Guild Spy should not award its Reveal-only Influence after The Spice Must Flow acquisition",
+  );
+  assert.equal(
+    guildSpyAgentOnlyBought.log.some((entry) => /resolves Guild Spy/.test(entry)),
+    false,
+    "Agent-played Guild Spy should not log a delayed Reveal reward",
+  );
 
   const overthrowReplacement = data.imperiumDeck.find((card) => card.id !== overthrow.id);
   const overthrowIntrigue = { ...data.intrigueCards[0], id: "overthrow-acquire-intrigue" };
@@ -441,13 +495,63 @@ export function verifyImperiumCardAcquireEffects({
   const spicePendingAcquired = state.acquireCardForPending(spicePendingFixture, spiceAcquirePending, spiceMustFlow.id);
   const spicePendingOwner = playerById(spicePendingAcquired, p2.id);
   assert.equal(spicePendingOwner.vp, 1, "Acquire-card pending actions should award The Spice Must Flow VP");
-  assert.equal(spicePendingOwner.resources.spice, 1, "Acquire-card pending actions should award The Spice Must Flow spice");
-  assert.equal(spicePendingAcquired.turnSpiceGains[p2.id], 1, "Acquire-card pending spice should count as turn spice gain");
+  assert.equal(spicePendingOwner.resources.spice, 0, "Acquire-card pending actions should not award The Spice Must Flow spice");
+  assert.equal(spicePendingAcquired.turnSpiceGains[p2.id] ?? 0, 0, "Acquire-card pending acquisition should not count as turn spice gain");
+  assert.deepEqual(
+    spicePendingAcquired.turnAcquiredCardIds[p2.id],
+    [spiceMustFlow.id, String(spiceMustFlow.sourceId)],
+    "Acquire-card pending acquisition should track both The Spice Must Flow card id and source id",
+  );
   assert.equal(spicePendingOwner.hand.at(-1).sourceId, 538, "Acquire-card pending should honor the requested destination");
   assert.equal(spicePendingAcquired.pendingAction, undefined, "Acquire-card pending should advance after acquisition");
   assert.match(
     spicePendingAcquired.log[0],
-    /acquires The Spice Must Flow to their hand from Verifier Acquire for 1 VP and gains 1 spice/,
+    /acquires The Spice Must Flow to their hand from Verifier Acquire for 1 VP/,
+  );
+  const spicePendingGuildSpyFixture = {
+    ...withActivePlayer(game, p2.id, (player) => ({
+      revealed: true,
+      playArea: [guildSpy],
+      influence: { ...player.influence, bene: 0 },
+      resources: { ...player.resources, spice: 0 },
+      vp: 0,
+    })),
+    pendingAction: spiceAcquirePending,
+    pendingQueue: [],
+    sharedSpyPosts: {},
+    spyPosts: { [state.spyObservationPostIdForSpace(secrets.id)]: p2.id },
+    turnAcquiredCardIds: {},
+  };
+  const spicePendingGuildSpyRewarded = state.acquireCardForPending(
+    spicePendingGuildSpyFixture,
+    spiceAcquirePending,
+    spiceMustFlow.id,
+  );
+  assert.equal(
+    playerById(spicePendingGuildSpyRewarded, p2.id).influence.bene,
+    1,
+    "Guild Spy should award Bene Gesserit Influence after a revealed pending The Spice Must Flow acquisition",
+  );
+  assert.deepEqual(
+    spicePendingGuildSpyRewarded.turnAcquiredCardIds[p2.id],
+    [spiceMustFlow.id, String(spiceMustFlow.sourceId)],
+    "Guild Spy pending The Spice Must Flow acquisition should keep same-turn acquisition tracking",
+  );
+  assert.match(spicePendingGuildSpyRewarded.log[0], /resolves Guild Spy: gains 1 Influence with Bene Gesserit/);
+  const spicePendingGuildSpySecondFixture = {
+    ...spicePendingGuildSpyRewarded,
+    pendingAction: spiceAcquirePending,
+    pendingQueue: [],
+  };
+  const spicePendingGuildSpySecond = state.acquireCardForPending(
+    spicePendingGuildSpySecondFixture,
+    spiceAcquirePending,
+    spiceMustFlow.id,
+  );
+  assert.equal(
+    playerById(spicePendingGuildSpySecond, p2.id).influence.bene,
+    1,
+    "Guild Spy should not award duplicate Influence for a second pending The Spice Must Flow acquisition in the same turn",
   );
 
   const overthrowAcquirePending = {

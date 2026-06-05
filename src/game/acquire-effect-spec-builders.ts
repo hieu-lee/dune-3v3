@@ -3,6 +3,7 @@ import type {
   CardEffectSpec,
   ContractEffectSourcePool,
   EffectAmountSpec,
+  FactionId,
   GameEffectConditionSpec,
   IconId,
   ResourceId,
@@ -18,6 +19,14 @@ export function acquireGainResource(
 
 export function acquireGainVp(amount: EffectAmountSpec, conditions?: GameEffectConditionSpec[]): CardEffectSpec {
   return acquireEffects([{ kind: "gain-vp", selector: "self", amount }], conditions);
+}
+
+export function acquireGainInfluence(
+  faction: FactionId,
+  amount: EffectAmountSpec,
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return acquireEffects([{ kind: "gain-influence", selector: "self", faction, amount }], conditions);
 }
 
 export function acquireGainInfluenceChoice(

@@ -22,7 +22,8 @@ export function placeableSpySpaces(state: GameState, pending: SpyPendingAction) 
   if (!owner || owner.spies <= 0) return [];
   return uniqueSpyPostSpaces(spyObservationPostChoiceSpaces().filter((space) =>
     (pending.allowSharedPost ? canPlaceSharedSpyPost(state, space, owner) : canPlaceSpyPost(state, space, owner)) &&
-    (!pending.placementIcon || space.icon === pending.placementIcon)
+    (!pending.placementIcon || space.icon === pending.placementIcon) &&
+    (!pending.placementIcons || pending.placementIcons.includes(space.icon))
   ));
 }
 
@@ -50,6 +51,7 @@ export function recallableSpySupplySpaces(state: GameState, pending: SpyPendingA
   }
   return uniqueSpyPostSpaces(allOwnSpies.filter((space) => {
     if (pending.placementIcon && space.icon !== pending.placementIcon) return false;
+    if (pending.placementIcons && !pending.placementIcons.includes(space.icon)) return false;
     const recalledSpyState = removeSpyPostOwner(state, space.id, owner.id);
     return placeableSpySpaces({
       ...state,

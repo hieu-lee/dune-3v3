@@ -57,10 +57,11 @@ export function verifyCardEffectSpecDrawTopDeckValidation({
   assert.match(maulaPistolEffect.log ?? "", /Maula Pistol: draws 1 card/);
 
   const leadershipDraw = { ...dagger, id: "leadership-agent-draw-fixture" };
+  const leadershipSource = { ...p2, deck: [leadershipDraw], discard: [], deployedSandworms: 1, hand: [] };
   const leadershipEffect = state.applyCardAgentEffect(
     leadership,
-    { ...p2, deck: [leadershipDraw], discard: [], hand: [] },
-    p2,
+    leadershipSource,
+    leadershipSource,
     game,
   );
   assert.equal(leadershipEffect.source.hand[0]?.id, leadershipDraw.id, "Leadership Agent spec should draw 1 card");
@@ -208,14 +209,24 @@ export function verifyCardEffectSpecDrawTopDeckValidation({
     "Long Live the Fighters should leave short decks unchanged",
   );
 
-  for (const card of [imperialSpymaster, sardaukarSoldier]) {
-    const intrigueEffect = state.applyCardAgentEffect(card, p2, p2, game);
-    assert.equal(intrigueEffect.sourceIntriguesToDraw, 1, `${card.name} Agent spec should draw 1 Intrigue`);
-  }
-  const theacherousManeuverEffect = state.applyCardAgentEffect(theacherousManeuver, p2, p2, game);
-  assert.equal(
-    theacherousManeuverEffect.sourceIntriguesToDraw,
-    1,
-    "Theacherous Maneuver Agent spec should draw 1 Intrigue",
+  const imperialSpymasterEffect = state.applyCardAgentEffect(
+    imperialSpymaster,
+    p2,
+    p2,
+    { ...game, turnSpyRecalls: { ...game.turnSpyRecalls, [p2.id]: 1 } },
+  );
+  assert.equal(imperialSpymasterEffect.sourceIntriguesToDraw, 1, "Imperial Spymaster Agent spec should draw 1 Intrigue after a spy recall");
+  assert.ok(
+    sardaukarSoldier.effects?.some(
+      (spec) =>
+        spec.trigger === "trash" &&
+        spec.effects.some(
+          (effect) =>
+            effect.kind === "draw-intrigues" &&
+            effect.selector === "self" &&
+            effect.amount === 1,
+        ),
+    ),
+    "Sardaukar Soldier should draw 1 Intrigue from a trash-trigger spec",
   );
 }

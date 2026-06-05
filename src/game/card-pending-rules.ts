@@ -147,13 +147,14 @@ function pendingActionForAgentDiscardCardForDraw(
   return effects
     .map((effect): PendingAction | undefined => {
       const maxDrawCards = effect.drawCards + (effect.bonusDraw?.drawCards ?? 0);
-      const maxIntrigues = effect.bonusIntrigues?.amount ?? 0;
+      const maxIntrigues = (effect.drawIntrigues ?? 0) + (effect.bonusIntrigues?.amount ?? 0);
       if (effect.selector !== "self" || (maxDrawCards <= 0 && maxIntrigues <= 0)) return undefined;
       const pending: Extract<PendingAction, { kind: "discard-card-for-draw" }> = {
         kind: "discard-card-for-draw",
         ownerId: source.id,
         source: card.name,
         drawCards: effect.drawCards,
+        ...(effect.drawIntrigues !== undefined ? { drawIntrigues: effect.drawIntrigues } : {}),
         optional: effect.optional,
         ...(effect.bonusDraw ? { bonusDraw: { ...effect.bonusDraw } } : {}),
         ...(effect.bonusIntrigues ? { bonusIntrigues: { ...effect.bonusIntrigues } } : {}),
@@ -319,6 +320,12 @@ function pendingActionForAgentBoardSpaceInfluence(
     .map((effect): PendingAction | undefined => {
       if (effect.selector !== "self" || effect.amount <= 0) return undefined;
       if (effect.trashSource && !source.playArea.some((candidate) => candidate.id === card.id)) return undefined;
+      if (
+        effect.requiredHandTrashTrait &&
+        !source.hand.some((candidate) => candidate.traits?.includes(effect.requiredHandTrashTrait ?? ""))
+      ) {
+        return undefined;
+      }
       const choices = boardSpaceInfluenceChoicesFor(space, source, target);
       if (choices.length === 0) return undefined;
       return {
@@ -333,6 +340,7 @@ function pendingActionForAgentBoardSpaceInfluence(
           ? { targetOwnerId: sourceCardInPlay.agentPlacementTargetOwnerId ?? target?.id }
           : {}),
         ...(effect.trashSource ? { trashSource: true } : {}),
+        ...(effect.requiredHandTrashTrait ? { requiredHandTrashTrait: effect.requiredHandTrashTrait } : {}),
         choices,
       };
     })
@@ -429,6 +437,7 @@ function pendingActionForAgentAcquireCard(
 function pendingActionChoiceNestedPendingFor(
   card: Card,
   source: Player,
+  state: GameState,
   option: ReturnType<typeof resolveAgentPendingActionChoices>[number]["options"][number],
   defaultSource: string,
 ): PendingActionChoiceNestedPending | undefined {
@@ -460,11 +469,59 @@ function pendingActionChoiceNestedPendingFor(
       optional: option.effect.optional,
       ...(option.effect.zones ? { zones: option.effect.zones } : {}),
       ...(option.effect.excludeSource ? { excludeCardId: card.id } : {}),
+      ...(option.effect.sourceOnly ? { zones: ["playArea"], requiredCardId: card.id } : {}),
       ...(option.effect.requiredTrait ? { requiredTrait: option.effect.requiredTrait } : {}),
       ...(option.effect.spiceRewardCostThreshold !== undefined ? {
         spiceRewardCostThreshold: option.effect.spiceRewardCostThreshold,
       } : {}),
       ...(option.effect.spiceReward !== undefined ? { spiceReward: option.effect.spiceReward } : {}),
+      ...(option.effect.vpReward !== undefined ? { vpReward: option.effect.vpReward } : {}),
+      ...(option.effect.persuasionCost !== undefined ? { persuasionCost: option.effect.persuasionCost } : {}),
+      ...(option.effect.resourceCost ? { resourceCost: option.effect.resourceCost } : {}),
+    };
+  }
+  if (option.effect.kind === "place-spies") {
+    const pending = spyPendingForPlacement(
+      sourceLabel,
+      source,
+      {
+        count: option.effect.amount,
+        recallForSupply: option.effect.recallForSupply,
+        mustPlace: option.effect.mustPlace,
+        placementIcon: option.effect.placementIcon,
+        placementIcons: option.effect.placementIcons,
+        allowSharedPost: option.effect.allowSharedPost,
+        source: option.effect.source,
+        postPlacementAction: option.effect.postPlacementAction,
+      },
+      state,
+    );
+    return pending?.kind === "spy" ? pending : undefined;
+  }
+  if (option.effect.kind === "gain-persuasion") {
+    return {
+      kind: "gain-persuasion",
+      ownerId: source.id,
+      source: sourceLabel,
+      amount: option.effect.amount,
+    };
+  }
+  if (option.effect.kind === "gain-resource") {
+    return {
+      kind: "gain-resource",
+      ownerId: source.id,
+      source: sourceLabel,
+      resource: option.effect.resource,
+      amount: option.effect.amount,
+    };
+  }
+  if (option.effect.kind === "gain-strength") {
+    return {
+      kind: "gain-strength",
+      ownerId: source.id,
+      combatRecipientId: source.id,
+      source: sourceLabel,
+      amount: option.effect.amount,
     };
   }
   const effect = option.effect as { kind?: unknown };
@@ -494,7 +551,7 @@ function pendingActionForAgentPendingActionChoice(
   if (!effect || effect.selector !== "self") return undefined;
   const defaultSource = effect.source ?? card.name;
   const options = effect.options.flatMap((option): PendingActionChoicePendingOption[] => {
-    const pending = pendingActionChoiceNestedPendingFor(card, source, option, defaultSource);
+    const pending = pendingActionChoiceNestedPendingFor(card, source, effectState, option, defaultSource);
     if (!pending) return [];
     const pendingOption = {
       id: option.id,
@@ -509,6 +566,7 @@ function pendingActionForAgentPendingActionChoice(
         ownerId: source.id,
         cardId: card.id,
         source: defaultSource,
+        ...(effect.optional ? { optional: true } : {}),
         options,
       }
     : undefined;

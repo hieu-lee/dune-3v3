@@ -43,11 +43,11 @@ export function verifyImperiumCardCatalogSpecs({ data, game, state }) {
     true,
     "Interstellar Trade should be recognized",
   );
-  assert.match(interstellarTrade.play, /No Agent effect/i);
-  assert.doesNotMatch(
-    interstellarTrade.play,
-    /Acquire bonus|Gain one Influence|Take a face-up contract/i,
-  );
+	  assert.match(interstellarTrade.play, /Gain 1 Influence/i);
+	  assert.doesNotMatch(
+	    interstellarTrade.play,
+	    /Acquire bonus|Take a face-up contract/i,
+	  );
   assert.match(
     interstellarTrade.reveal,
     /completed contract/,
@@ -61,17 +61,17 @@ export function verifyImperiumCardCatalogSpecs({ data, game, state }) {
   assert.ok(
     interstellarTrade.effects?.some(
       (spec) =>
-        spec.trigger === "acquire" &&
-        spec.effects.some(
-          (effect) =>
-            effect.kind === "gain-influence-choice" &&
+	        spec.trigger === "agent-play" &&
+	        spec.effects.some(
+	          (effect) =>
+	            effect.kind === "gain-influence-choice" &&
             effect.selector === "self" &&
             effect.amount === 1 &&
             effect.source === "Interstellar Trade",
         ),
-    ),
-    "Interstellar Trade should carry a typed acquire Influence-choice effect",
-  );
+	    ),
+	    "Interstellar Trade should carry a typed Agent Influence-choice effect",
+	  );
   assert.ok(
     interstellarTrade.effects?.some(
       (spec) =>
@@ -172,33 +172,34 @@ export function verifyImperiumCardCatalogSpecs({ data, game, state }) {
       (spec) =>
         spec.trigger === "reveal" &&
         spec.effects.some(
-          (effect) =>
-            effect.kind === "lose-influence-for-intrigues" &&
-            effect.amount === 1 &&
-            effect.optional === true,
-        ),
-    ),
-    "Captured Mentat should carry a declarative Reveal Influence-for-Intrigue spec",
-  );
+	          (effect) =>
+	            effect.kind === "lose-influence-for-influence" &&
+	            effect.loseAmount === 1 &&
+	            effect.gainAmount === 1 &&
+	            effect.optional === true,
+	        ),
+	    ),
+	    "Captured Mentat should carry a declarative Reveal Influence-for-Influence spec",
+	  );
   assert.ok(
     capturedMentat.effects?.some(
       (spec) =>
         spec.trigger === "agent-play" &&
         spec.effects.some(
-          (effect) =>
-            effect.kind === "discard-card-for-influence-and-draw" &&
-            effect.drawCards === 1 &&
-            effect.influenceAmount === 1 &&
-            effect.optional === true,
-        ),
-    ),
-    "Captured Mentat should carry a declarative Agent discard-for-Influence-and-draw spec",
-  );
-  assert.match(
-    capturedMentat.play,
-    /discard 1 card.*gain 1 Influence.*draw 1 card/i,
-  );
-  assert.match(capturedMentat.reveal, /lose 1 Influence.*draw 1 Intrigue/i);
+	          (effect) =>
+	            effect.kind === "discard-card-for-draw" &&
+	            effect.drawCards === 1 &&
+	            effect.drawIntrigues === 1 &&
+	            effect.optional === false,
+	        ),
+	    ),
+	    "Captured Mentat should carry a declarative Agent discard-for-card-and-Intrigue-draw spec",
+	  );
+	  assert.match(
+	    capturedMentat.play,
+	    /Discard 1 card.*draw 1 Intrigue.*1 card/i,
+	  );
+	  assert.match(capturedMentat.reveal, /lose 1 Influence.*gain 1 Influence/i);
   const dangerousRhetoric = data.imperiumDeck.find(
     (card) => card.name === "Dangerous Rhetoric",
   );
@@ -593,17 +594,23 @@ export function verifyImperiumCardCatalogSpecs({ data, game, state }) {
       sardaukarCoordination.effects?.some(
         (spec) =>
           spec.trigger === "reveal" &&
-          spec.effects.some(
-            (effect) => effect.kind === "gain-strength" && effect.amount === 1,
-          ),
-      ),
-    "Sardaukar Coordination should preserve typed Reveal persuasion and strength effects",
-  );
+	          spec.effects.some(
+	            (effect) =>
+	              effect.kind === "gain-strength" &&
+	              effect.amount.kind === "revealed-card-trait-count" &&
+	              effect.amount.trait === "Faction: Emperor",
+	          ),
+	      ),
+	    "Sardaukar Coordination should preserve typed Reveal persuasion and Emperor-count strength effects",
+	  );
   assert.match(
     sardaukarCoordination.play,
     /deploy any troops you recruit this turn/i,
   );
-  assert.equal(sardaukarCoordination.reveal, "+2 persuasion and +1 strength.");
+	  assert.equal(
+	    sardaukarCoordination.reveal,
+	    "+2 persuasion. Add +1 strength for each Emperor card you revealed, including this one.",
+	  );
   const longLiveTheFighters = data.imperiumDeck.find(
     (card) => card.name === "Long Live the Fighters",
   );

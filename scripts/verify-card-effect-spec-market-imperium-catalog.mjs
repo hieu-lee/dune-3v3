@@ -282,7 +282,8 @@ export function verifyCardEffectSpecMarketImperiumCatalog({
         (effect) =>
           effect.kind === "gain-strength" &&
           effect.selector === "self" &&
-          effect.amount === 1,
+          effect.amount?.kind === "revealed-card-trait-count" &&
+          effect.amount.trait === "Faction: Emperor",
       ),
     "Sardaukar Coordination should carry typed Reveal persuasion and strength specs",
   );
@@ -352,7 +353,7 @@ export function verifyCardEffectSpecMarketImperiumCatalog({
   assert.ok(
     spiceMustFlow.effects?.some(
       (spec) =>
-        spec.trigger === "acquire" &&
+        spec.trigger === "reveal" &&
         spec.effects.some(
           (effect) =>
             effect.kind === "gain-resource" &&
@@ -361,10 +362,10 @@ export function verifyCardEffectSpecMarketImperiumCatalog({
             effect.amount === 1,
         ),
     ),
-    "The Spice Must Flow should use a typed acquire spice effect",
+    "The Spice Must Flow should use a typed reveal spice effect",
   );
   assert.ok(
-    hasAcquireEffect(
+    hasAgentEffect(
       interstellarTrade,
       (effect) =>
         effect.kind === "gain-influence-choice" &&
@@ -372,7 +373,7 @@ export function verifyCardEffectSpecMarketImperiumCatalog({
         effect.amount === 1 &&
         effect.source === "Interstellar Trade",
     ),
-    "Interstellar Trade should use a typed acquire Influence-choice effect",
+    "Interstellar Trade should use a typed Agent Influence-choice effect",
   );
   assert.ok(
     hasAcquireEffect(
@@ -387,25 +388,44 @@ export function verifyCardEffectSpecMarketImperiumCatalog({
     "Interstellar Trade should use a typed acquire face-up contract effect",
   );
   assert.ok(
-    hasAgentEffect(
-      priorityContracts,
-      (effect) =>
-        effect.kind === "gain-resource" &&
-        effect.selector === "self" &&
-        effect.resource === "spice" &&
-        effect.amount === 2,
+    priorityContracts.effects?.some(
+      (spec) =>
+        spec.trigger === "reveal" &&
+        spec.effects.some(
+          (effect) =>
+            effect.kind === "pending-action-choice" &&
+            effect.options.some(
+              (option) =>
+                option.id === "spice" &&
+                option.effect.kind === "gain-resource" &&
+                option.effect.resource === "spice" &&
+                option.effect.amount === 2,
+            ),
+        ),
     ),
-    "Priority Contracts should use a typed Agent spice effect",
+    "Priority Contracts should use a typed Reveal spice choice",
   );
   assert.ok(
-    hasAgentEffect(
-      priorityContracts,
-      (effect) =>
-        effect.kind === "gain-vp" &&
-        effect.selector === "self" &&
-        effect.amount === 1,
+    priorityContracts.effects?.some(
+      (spec) =>
+        spec.trigger === "reveal" &&
+        spec.effects.some(
+          (effect) =>
+            effect.kind === "pending-action-choice" &&
+            effect.options.some(
+              (option) =>
+                option.id === "vp" &&
+                option.conditions?.some(
+                  (condition) => condition.kind === "has-completed-contracts" && condition.count === 4,
+                ) &&
+                option.effect.kind === "trash-card" &&
+                option.effect.selector === "self" &&
+                option.effect.sourceOnly === true &&
+                option.effect.vpReward === 1,
+            ),
+        ),
     ),
-    "Priority Contracts should use a typed Agent VP effect",
+    "Priority Contracts should use a typed conditional Reveal self-trash VP choice",
   );
   assert.ok(
     hasAgentEffect(
@@ -506,34 +526,37 @@ export function verifyCardEffectSpecMarketImperiumCatalog({
     hasRevealEffect(
       deliveryAgreement,
       (effect) =>
-        effect.kind === "gain-resource" &&
-        effect.selector === "self" &&
-        effect.resource === "spice" &&
-        effect.amount === 1,
-    ),
-    "Delivery Agreement should carry its default Reveal spice reward as a typed effect",
-  );
-  assert.ok(
-    deliveryAgreement.effects?.some(
-      (spec) =>
-        spec.trigger === "reveal" &&
-        spec.conditions?.some(
-          (condition) =>
-            condition.kind === "has-completed-contracts" &&
-            condition.count === 4,
-        ) &&
-        spec.effects.some(
-          (effect) =>
-            effect.kind === "trash-card" &&
-            effect.selector === "self" &&
-            effect.sourceOnly === true &&
-            effect.zones?.length === 1 &&
-            effect.zones[0] === "playArea" &&
-            effect.vpReward === 1 &&
-            effect.optional === true,
+        effect.kind === "pending-action-choice" &&
+        effect.source === "Delivery Agreement" &&
+        effect.options.some((option) =>
+          option.id === "spice" &&
+          option.effect.kind === "gain-resource" &&
+          option.effect.selector === "self" &&
+          option.effect.resource === "spice" &&
+          option.effect.amount === 1
         ),
     ),
-    "Delivery Agreement should carry its completed-contract source-trash VP Reveal branch as a typed effect",
+    "Delivery Agreement should carry its Reveal spice branch as a typed choice",
+  );
+  assert.ok(
+    hasRevealEffect(
+      deliveryAgreement,
+      (effect) =>
+        effect.kind === "pending-action-choice" &&
+        effect.source === "Delivery Agreement" &&
+        effect.options.some((option) =>
+          option.id === "vp" &&
+          option.conditions?.some((condition) => condition.kind === "has-completed-contracts" && condition.count === 4) &&
+          option.effect.kind === "trash-card" &&
+          option.effect.selector === "self" &&
+          option.effect.sourceOnly === true &&
+          option.effect.zones?.length === 1 &&
+          option.effect.zones[0] === "playArea" &&
+          option.effect.vpReward === 1 &&
+          option.effect.optional === false
+        ),
+    ),
+    "Delivery Agreement should carry its completed-contract source-trash VP Reveal branch as a typed choice",
   );
   assert.equal(
     corrinthCity.acquired,
@@ -576,6 +599,7 @@ export function verifyCardEffectSpecMarketImperiumCatalog({
       "Hidden Missive",
       "Imperial Spymaster",
       "In High Places",
+      "Interstellar Trade",
       "Junction Headquarters",
       "Leadership",
       "Long Live the Fighters",
@@ -591,7 +615,6 @@ export function verifyCardEffectSpecMarketImperiumCatalog({
       "Rebel Supplier",
       "Reliable Informant",
       "Sardaukar Coordination",
-      "Sardaukar Soldier",
       "Shishakli",
       "Smuggler's Harvester",
       "Smuggler's Haven",
@@ -602,9 +625,8 @@ export function verifyCardEffectSpecMarketImperiumCatalog({
       "Stilgar, The Devoted",
       "Strike Fleet",
       "Subversive Advisor",
-      "Theacherous Maneuver",
+      "Treacherous Maneuver",
       "Tread in Darkness",
-      "Undercover Asset",
       "Weirding Woman",
       "Wheels Within Wheels",
     ],
@@ -663,60 +685,68 @@ export function verifyCardEffectSpecMarketImperiumCatalog({
       (effect) =>
         effect.kind === "draw-cards" &&
         effect.selector === "self" &&
-        effect.amount === 1,
+        effect.amount?.kind === "combat-recipient-sandworms",
     ),
     "Leadership should carry a declarative Agent draw-card spec",
   );
-  for (const card of [imperialSpymaster, sardaukarSoldier]) {
-    assert.ok(
-      hasAgentEffect(
-        card,
-        (effect) =>
-          effect.kind === "draw-intrigues" &&
-          effect.selector === "self" &&
-          effect.amount === 1,
-      ),
-      `${card.name} should carry a declarative Agent Intrigue draw spec`,
-    );
-  }
-  for (const card of [publicSpectacle, theacherousManeuver]) {
-    assert.ok(
-      hasAgentEffect(
-        card,
-        (effect) =>
-          effect.kind === "gain-influence-choice" &&
-          effect.selector === "self" &&
-          effect.amount === 1,
-      ),
-      `${card.name} should carry a declarative Agent Influence-choice spec`,
-    );
-  }
   assert.ok(
     hasAgentEffect(
-      theacherousManeuver,
+      imperialSpymaster,
       (effect) =>
         effect.kind === "draw-intrigues" &&
         effect.selector === "self" &&
         effect.amount === 1,
     ),
-    "Theacherous Maneuver should carry a declarative Agent Intrigue draw spec",
+    "Imperial Spymaster should carry a declarative Agent Intrigue draw spec",
   );
-  for (const card of [publicSpectacle, undercoverAsset]) {
-    assert.ok(
-      hasAgentEffect(
-        card,
-        (effect) =>
-          effect.kind === "place-spies" &&
-          effect.selector === "self" &&
-          effect.amount === 1 &&
-          effect.recallForSupply === true &&
-          effect.mustPlace === true,
-      ),
-      `${card.name} should carry a declarative Agent spy-placement spec`,
-    );
-  }
+  assert.ok(
+    sardaukarSoldier.effects?.some(
+      (spec) =>
+        spec.trigger === "trash" &&
+        spec.effects.some(
+          (effect) =>
+            effect.kind === "draw-intrigues" &&
+            effect.selector === "self" &&
+            effect.amount === 1,
+        ),
+    ),
+    "Sardaukar Soldier should carry a declarative trash-trigger Intrigue draw spec",
+  );
   assert.ok(
     hasAgentEffect(
+      theacherousManeuver,
+      (effect) =>
+        effect.kind === "gain-board-space-influence" &&
+        effect.selector === "self" &&
+        effect.amount === 1 &&
+        effect.trashSource === true &&
+        effect.requiredHandTrashTrait === "Faction: Emperor" &&
+        effect.source === "Treacherous Maneuver",
+    ),
+    "Treacherous Maneuver should carry a declarative Agent board-space Influence spec with its trash cost",
+  );
+  assert.ok(
+    hasAgentEffect(
+      publicSpectacle,
+      (effect) =>
+        effect.kind === "gain-influence-choice" &&
+        effect.selector === "self" &&
+        effect.amount === 1,
+    ),
+    "Public Spectacle should carry a declarative Agent Influence-choice spec",
+  );
+  assert.ok(
+    hasAgentEffect(
+      theacherousManeuver,
+      (effect) =>
+        effect.kind === "gain-board-space-influence" &&
+        effect.selector === "self" &&
+        effect.amount === 1,
+    ),
+    "Treacherous Maneuver should carry a declarative Agent board-space Influence spec",
+  );
+  assert.ok(
+    hasRevealEffect(
       rebelSupplier,
       (effect) =>
         effect.kind === "gain-resource" &&
@@ -724,7 +754,7 @@ export function verifyCardEffectSpecMarketImperiumCatalog({
         effect.resource === "spice" &&
         effect.amount === 1,
     ),
-    "Rebel Supplier should carry a declarative Agent spice spec",
+    "Rebel Supplier should carry a declarative Reveal spice spec",
   );
   assert.ok(
     desertPower.effects?.some(
@@ -767,7 +797,7 @@ export function verifyCardEffectSpecMarketImperiumCatalog({
     "Desert Power reveal text should expose its typed sandworm choice",
   );
   assert.ok(
-    hasAgentEffect(
+    hasRevealEffect(
       southernElders,
       (effect) =>
         effect.kind === "gain-resource" &&
@@ -775,7 +805,7 @@ export function verifyCardEffectSpecMarketImperiumCatalog({
         effect.resource === "water" &&
         effect.amount === 1,
     ),
-    "Southern Elders should carry a declarative Agent water spec",
+    "Southern Elders should carry a declarative Reveal water spec",
   );
   for (const [card, expectedTroops] of [
     [rebelSupplier, 2],

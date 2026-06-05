@@ -1,4 +1,6 @@
 import { advancePendingAction } from "./pending-actions";
+import { applyTrashedCardTriggers } from "./discard-trigger-rules";
+import { canPay } from "./board-rules";
 import { playerHasConflictUnits } from "./conflict-rules";
 import { drawCards } from "./deck-utils";
 import { recordTurnSpiceGainAndCompleteHarvestContracts } from "./contract-rules";
@@ -57,6 +59,15 @@ function drawnCardsText(requested: number, actual: number) {
   return `draws ${actual} of ${requested} cards`;
 }
 
+function resourceCostText(cost: Partial<Player["resources"]> | undefined) {
+  const parts = [
+    cost?.solari ? `${cost.solari} Solari` : undefined,
+    cost?.spice ? `${cost.spice} spice` : undefined,
+    cost?.water ? `${cost.water} water` : undefined,
+  ].filter((part): part is string => Boolean(part));
+  return parts.length > 0 ? parts.join(" and ") : "";
+}
+
 function sourcePlayAreaVpReward(pending: TrashCardPendingAction, zone: TrashCardZone, cardId: string) {
   const vpReward = pending.vpReward ?? 0;
   if (vpReward <= 0) return 0;
@@ -106,6 +117,9 @@ export function trashPlayerCard(
     }
     return state;
   }
+  const persuasionCost = pending.persuasionCost ?? 0;
+  const resourceCost = pending.resourceCost ?? {};
+  if (owner.persuasion < persuasionCost || !canPay(owner, resourceCost)) return state;
   const cards = cardsForTrashZone(owner, zone);
   const card = choice.card;
   const combatRecipient = pending.combatRecipientId
@@ -129,8 +143,11 @@ export function trashPlayerCard(
         ...updateTrashZone(player, zone, removeCardInstance(cards, card)),
         resources: {
           ...player.resources,
-          spice: player.resources.spice + spiceReward,
+          solari: player.resources.solari - (resourceCost.solari ?? 0),
+          water: player.resources.water - (resourceCost.water ?? 0),
+          spice: player.resources.spice - (resourceCost.spice ?? 0) + spiceReward,
         },
+        persuasion: player.persuasion - persuasionCost,
         vp: player.vp + vpReward,
       };
       if (drawCardsReward > 0) {
@@ -151,12 +168,13 @@ export function trashPlayerCard(
     players,
     ...advancePendingAction(state),
     log: [
-      `${owner.leader} trashes ${card.name} from ${pending.source}${spiceReward > 0 ? ` and gains ${spiceReward} spice` : ""}${vpReward > 0 ? ` and gains ${vpReward} VP` : ""}${strengthReward > 0 ? ` and adds ${strengthReward} strength` : ""}${drawCardsReward > 0 ? ` and ${drawnCardsText(drawCardsReward, cardsDrawn)}` : ""}.`,
+      `${owner.leader} trashes ${card.name} from ${pending.source}${persuasionCost > 0 ? `, spending ${persuasionCost} persuasion` : ""}${resourceCostText(resourceCost) ? `, spending ${resourceCostText(resourceCost)}` : ""}${spiceReward > 0 ? ` and gains ${spiceReward} spice` : ""}${vpReward > 0 ? ` and gains ${vpReward} VP` : ""}${strengthReward > 0 ? ` and adds ${strengthReward} strength` : ""}${drawCardsReward > 0 ? ` and ${drawnCardsText(drawCardsReward, cardsDrawn)}` : ""}.`,
       ...state.log,
     ],
   };
+  const spiceTrackedState = recordTurnSpiceGainAndCompleteHarvestContracts(nextState, owner.id, spiceReward).state;
   return advancePastUnresolvableMandatoryTrash(
-    recordTurnSpiceGainAndCompleteHarvestContracts(nextState, owner.id, spiceReward).state,
+    applyTrashedCardTriggers(spiceTrackedState, owner.id, card, { logAfterCurrentAction: true }),
   );
 }
 

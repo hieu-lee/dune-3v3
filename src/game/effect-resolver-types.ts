@@ -1,6 +1,7 @@
 import type {
   AcquireCardDestination,
   BoardSpace,
+  Card,
   CommanderResourceSplitOption,
   ContractEffectRecipient,
   ContractEffectSourcePool,
@@ -33,6 +34,7 @@ export type SpyPlacementEffectResult = {
   recallForSupply?: boolean;
   mustPlace?: boolean;
   placementIcon?: IconId;
+  placementIcons?: IconId[];
   allowSharedPost?: boolean;
   source?: string;
   postPlacementAction?: "staban-unseen-network";
@@ -57,6 +59,7 @@ export type RevealSpyRecallForIntrigues = {
   selector: PlayerSelector;
   amount: number;
   drawIntrigues: number;
+  persuasionReward: number;
   optional: boolean;
   source?: string;
 };
@@ -94,6 +97,7 @@ export type EffectResolverState = Partial<
     "roundMakerSpaceVisits" |
     "sharedSpyPosts" |
     "spyPosts" |
+    "turnAcquiredCardIds" |
     "turnSpiceGains" |
     "turnSpyRecalls" |
     "turnUnitDeployments"
@@ -103,6 +107,8 @@ export type EffectResolverState = Partial<
 export type GameEffectContext = {
   trigger: GameEffectTrigger;
   choiceId?: string;
+  resolvingCard?: Card;
+  revealedCards?: Card[];
   selectedTroopCount?: number;
   source: Player;
   target?: Player;
@@ -142,6 +148,8 @@ export type TrashCardEffect = {
   spiceReward?: number;
   drawCardsReward?: number;
   vpReward?: number;
+  persuasionCost?: number;
+  resourceCost?: Partial<Resources>;
 };
 
 export type RevealTrashCardEffect = TrashCardEffect;
@@ -149,6 +157,13 @@ export type RevealTrashCardEffect = TrashCardEffect;
 export type RevealLoseInfluenceForIntrigues = {
   selector: PlayerSelector;
   amount: number;
+  optional: boolean;
+};
+
+export type RevealLoseInfluenceForInfluence = {
+  selector: PlayerSelector;
+  loseAmount: number;
+  gainAmount: number;
   optional: boolean;
 };
 
@@ -206,6 +221,7 @@ export type AgentDiscardCardForInfluenceAndDraw = {
 export type AgentDiscardCardForDraw = {
   selector: PlayerSelector;
   drawCards: number;
+  drawIntrigues?: number;
   optional: boolean;
   bonusDraw?: {
     requiredDiscardTrait: string;
@@ -277,6 +293,11 @@ export type AgentPaidRewardChoiceAtomicReward =
       amount: number;
     }
   | {
+      kind: "gain-vp";
+      selector: "self" | "activated-ally";
+      amount: number;
+    }
+  | {
       kind: "draw-intrigues";
       selector: "self" | "activated-ally";
       amount: number;
@@ -334,13 +355,65 @@ export type AgentPendingActionChoice = {
           optional: boolean;
           zones?: TrashCardZone[];
           excludeSource: boolean;
+          sourceOnly?: boolean;
           requiredTrait?: string;
           spiceRewardCostThreshold?: number;
           spiceReward?: number;
+          vpReward?: number;
+          persuasionCost?: number;
+          resourceCost?: Partial<Resources>;
           source?: string;
         };
       }
+    | {
+        id: string;
+        label: string;
+        effect: {
+          kind: "gain-persuasion";
+          selector: "self";
+          amount: number;
+          source?: string;
+        };
+      }
+    | {
+        id: string;
+        label: string;
+        effect: {
+          kind: "gain-resource";
+          selector: "self";
+          resource: ResourceId;
+          amount: number;
+          source?: string;
+        };
+      }
+    | {
+        id: string;
+        label: string;
+        effect: {
+          kind: "gain-strength";
+          selector: "self";
+          amount: number;
+          source?: string;
+        };
+      }
+    | {
+        id: string;
+        label: string;
+        effect: {
+          kind: "place-spies";
+          selector: "self";
+          amount: number;
+          recallForSupply?: boolean;
+          mustPlace?: boolean;
+          placementIcon?: IconId;
+          placementIcons?: IconId[];
+          allowSharedPost?: boolean;
+          source?: string;
+          postPlacementAction?: "staban-unseen-network";
+        };
+      }
   >;
+  optional?: boolean;
   source?: string;
 };
 
@@ -402,6 +475,7 @@ export type AgentBoardSpaceInfluence = {
   selector: "self";
   amount: number;
   trashSource: boolean;
+  requiredHandTrashTrait?: string;
   source?: string;
 };
 

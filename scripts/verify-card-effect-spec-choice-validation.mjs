@@ -269,10 +269,17 @@ export function verifyCardEffectSpecChoiceValidation({
     name: "Effect Spec Reveal Paid Reward Choice",
     effects: [revealSpec([paidRewardChoiceEffect()])],
   };
-  assert.throws(
-    () => turnActions.revealTurnPlan({ ...p2, hand: [revealPaidRewardChoiceCard], highCouncilSeat: false }),
-    /Unsupported effect "paid-reward-choice" for reveal/,
-    "Paid reward choice specs should stay in Agent play",
+  assert.deepEqual(
+    turnActions.revealTurnPlan({ ...p2, hand: [revealPaidRewardChoiceCard], highCouncilSeat: false }),
+    {
+      influenceGains: {},
+      intriguesToDraw: 0,
+      persuasion: 0,
+      recruitedTroops: 0,
+      revealGain: {},
+      swords: 0,
+    },
+    "Reveal paid reward choice specs should not alter fixed reveal totals",
   );
   assert.throws(
     () => state.applyCardAgentEffect(
@@ -649,20 +656,39 @@ export function verifyCardEffectSpecChoiceValidation({
   assert.throws(
     () => state.applyCardAgentEffect(
       paidRewardChoiceCard(
-        "effect-spec-invalid-paid-reward-choice-reward-kind-card",
+        "effect-spec-invalid-paid-reward-choice-vp-amount-card",
         paidRewardChoiceEffect({
           options: [{
             id: "vp",
             resource: "solari",
             cost: 3,
-            reward: { kind: "gain-vp", selector: "self", amount: 1 },
+            reward: { kind: "gain-vp", selector: "self", amount: 0 },
           }],
         }),
       ),
       p4,
       p6,
     ),
-    /Unsupported paid-reward-choice reward "gain-vp"/,
+    /Invalid paid-reward-choice VP "0"/,
+    "Paid reward choice VP branches should require positive rewards",
+  );
+  assert.throws(
+    () => state.applyCardAgentEffect(
+      paidRewardChoiceCard(
+        "effect-spec-invalid-paid-reward-choice-reward-kind-card",
+        paidRewardChoiceEffect({
+          options: [{
+            id: "persuasion",
+            resource: "solari",
+            cost: 3,
+            reward: { kind: "gain-persuasion", selector: "self", amount: 1 },
+          }],
+        }),
+      ),
+      p4,
+      p6,
+    ),
+    /Unsupported paid-reward-choice reward "gain-persuasion"/,
     "Paid reward choice specs should reject unsupported reward kinds",
   );
   const pendingActionChoiceAcquireOption = {
@@ -695,10 +721,17 @@ export function verifyCardEffectSpecChoiceValidation({
     name: "Effect Spec Reveal Pending Action Choice",
     effects: [revealSpec([pendingActionChoiceEffect()])],
   };
-  assert.throws(
-    () => turnActions.revealTurnPlan({ ...p2, hand: [revealPendingActionChoiceCard], highCouncilSeat: false }),
-    /Unsupported effect "pending-action-choice" for reveal/,
-    "Pending action choice specs should stay in Agent play",
+  assert.deepEqual(
+    turnActions.revealTurnPlan({ ...p2, hand: [revealPendingActionChoiceCard], highCouncilSeat: false }),
+    {
+      influenceGains: {},
+      intriguesToDraw: 0,
+      persuasion: 0,
+      recruitedTroops: 0,
+      revealGain: {},
+      swords: 0,
+    },
+    "Reveal pending action choice specs should not alter fixed reveal totals",
   );
   assert.throws(
     () => state.applyCardAgentEffect(

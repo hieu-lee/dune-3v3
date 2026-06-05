@@ -289,14 +289,18 @@ export function createCardChoiceDerivedStates({
   });
   assert.equal(
     deliveryAgreementRevealTrashState.pendingAction?.kind,
-    "trash-card",
-    "Expected Delivery Agreement Reveal to queue source-card trash",
+    "pending-action-choice",
+    "Expected Delivery Agreement Reveal to queue branch choices",
   );
-  assert.equal(deliveryAgreementRevealTrashState.pendingAction.vpReward, 1, "Expected Delivery Agreement Reveal trash to carry VP reward");
+  assert.deepEqual(
+    deliveryAgreementRevealTrashState.pendingAction.options.map((option) => option.id),
+    ["spice", "vp"],
+    "Expected Delivery Agreement Reveal to offer spice or source-card trash",
+  );
   assert.equal(
     deliveryAgreementRevealTrashState.players.find((player) => player.id === ownerId)?.resources.spice,
-    1,
-    "Expected Delivery Agreement Reveal to gain spice before the VP trash choice",
+    0,
+    "Expected Delivery Agreement Reveal to wait for a branch before gaining spice",
   );
   const longLiveTheFightersState = turnActions.placeAgentAction(
     {
@@ -880,13 +884,13 @@ export function createCardChoiceDerivedStates({
   );
   assert.equal(
     acquireInterstellarTradeState.pendingAction?.kind,
-    "board-influence-choice",
-    "Expected Interstellar Trade purchase to queue an Influence choice first",
+    "contract",
+    "Expected Interstellar Trade purchase to queue a contract choice",
   );
   assert.deepEqual(
     acquireInterstellarTradeState.pendingQueue.map((pending) => pending.kind),
-    ["contract"],
-    "Expected Interstellar Trade purchase to queue a contract after Influence",
+    [],
+    "Expected Interstellar Trade purchase not to queue additional pending actions",
   );
   const priorityContractsState = turnActions.placeAgentAction(
     {
@@ -918,13 +922,13 @@ export function createCardChoiceDerivedStates({
   );
   assert.equal(
     priorityContractsState.players.find((player) => player.id === ownerId)?.resources.spice,
-    2,
-    "Expected Priority Contracts browser state to grant 2 spice",
+    0,
+    "Expected Priority Contracts Agent play not to grant Reveal spice",
   );
   assert.equal(
     priorityContractsState.players.find((player) => player.id === ownerId)?.vp,
-    1,
-    "Expected Priority Contracts browser state to grant 1 VP",
+    0,
+    "Expected Priority Contracts Agent play not to grant Reveal VP",
   );
   const strikeFleetDeployState = turnActions.placeAgentAction(
     {

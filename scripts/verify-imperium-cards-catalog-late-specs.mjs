@@ -26,46 +26,59 @@ export function verifyImperiumCardLateCatalogSpecs({
     deliveryAgreement,
     "Imperium deck should include Delivery Agreement",
   );
-  assert.ok(
-    priorityContracts.effects?.some(
-      (spec) =>
-        spec.trigger === "agent-play" &&
-        spec.effects.some(
-          (effect) =>
-            effect.kind === "gain-resource" &&
-            effect.selector === "self" &&
-            effect.resource === "spice" &&
-            effect.amount === 2,
-        ),
-    ) &&
-      priorityContracts.effects?.some(
-        (spec) =>
-          spec.trigger === "agent-play" &&
-          spec.effects.some(
-            (effect) =>
-              effect.kind === "gain-vp" &&
-              effect.selector === "self" &&
-              effect.amount === 1,
-          ),
-      ) &&
-      priorityContracts.effects?.some(
-        (spec) =>
-          spec.trigger === "agent-play" &&
-          spec.effects.some(
-            (effect) =>
-              effect.kind === "take-contracts" &&
-              effect.selector === "self" &&
-              effect.amount === 1 &&
-              effect.sourcePool === "public-offer" &&
-              effect.source === "Priority Contracts",
-          ),
-      ),
-    "Priority Contracts should model its Agent spice, VP, and public contract rewards as typed effects",
-  );
-  assert.match(
-    priorityContracts.play,
-    /Spice 2.*Take a face-up contract.*Victory Point/i,
-  );
+	  assert.ok(
+	    priorityContracts.effects?.some(
+	      (spec) =>
+	        spec.trigger === "agent-play" &&
+	        spec.effects.some(
+	          (effect) =>
+	            effect.kind === "take-contracts" &&
+	            effect.selector === "self" &&
+	            effect.amount === 1 &&
+	            effect.sourcePool === "public-offer" &&
+	            effect.source === "Priority Contracts",
+	        ),
+	    ) &&
+	      priorityContracts.effects?.some(
+	        (spec) =>
+	          spec.trigger === "reveal" &&
+	          spec.effects.some(
+	            (effect) =>
+	              effect.kind === "pending-action-choice" &&
+	              effect.options.some(
+	                (option) =>
+	                  option.id === "spice" &&
+	                  option.effect.kind === "gain-resource" &&
+	                  option.effect.resource === "spice" &&
+	                  option.effect.amount === 2,
+	              ),
+	          ),
+	      ) &&
+	      priorityContracts.effects?.some(
+	        (spec) =>
+	          spec.trigger === "reveal" &&
+	          spec.effects.some(
+	            (effect) =>
+	              effect.kind === "pending-action-choice" &&
+	              effect.options.some(
+	                (option) =>
+	                  option.id === "vp" &&
+	                  option.conditions?.some(
+	                    (condition) => condition.kind === "has-completed-contracts" && condition.count === 4,
+	                  ) &&
+	                  option.effect.kind === "trash-card" &&
+	                  option.effect.selector === "self" &&
+	                  option.effect.sourceOnly === true &&
+	                  option.effect.vpReward === 1,
+	              ),
+	          ),
+	      ),
+	    "Priority Contracts should model its Agent contract and Reveal spice/VP choices as typed effects",
+	  );
+	  assert.match(
+	    priorityContracts.play,
+	    /Take a face-up CHOAM contract/i,
+	  );
   assert.equal(
     priorityContracts.acquired,
     undefined,
@@ -155,26 +168,33 @@ export function verifyImperiumCardLateCatalogSpecs({
   );
   assert.match(
     deliveryAgreement.reveal,
-    /Gain 1 spice.*four or more contracts.*gain 1 VP/i,
+    /Gain 1 spice,\s+or if you have completed four or more contracts.*gain 1 VP/i,
   );
   assert.ok(
     deliveryAgreement.effects?.some(
       (spec) =>
         spec.trigger === "reveal" &&
-        spec.conditions?.some(
-          (condition) =>
-            condition.kind === "has-completed-contracts" &&
-            condition.count === 4,
-        ) &&
         spec.effects.some(
           (effect) =>
-            effect.kind === "trash-card" &&
-            effect.selector === "self" &&
-            effect.sourceOnly === true &&
-            effect.vpReward === 1,
+            effect.kind === "pending-action-choice" &&
+            effect.source === "Delivery Agreement" &&
+            effect.options.some((option) =>
+              option.id === "spice" &&
+              option.effect.kind === "gain-resource" &&
+              option.effect.resource === "spice" &&
+              option.effect.amount === 1
+            ) &&
+            effect.options.some((option) =>
+              option.id === "vp" &&
+              option.conditions?.some((condition) => condition.kind === "has-completed-contracts" && condition.count === 4) &&
+              option.effect.kind === "trash-card" &&
+              option.effect.selector === "self" &&
+              option.effect.sourceOnly === true &&
+              option.effect.vpReward === 1
+            ),
         ),
     ),
-    "Delivery Agreement should model its completed-contract Reveal source-trash VP branch as a typed effect",
+    "Delivery Agreement should model its Reveal spice or completed-contract VP branches as a typed choice",
   );
   assert.equal(
     deliveryAgreement.acquired,
@@ -185,7 +205,7 @@ export function verifyImperiumCardLateCatalogSpecs({
     data.imperiumDeck.find((card) => card.name === "Smuggler's Haven")
       ?.acquired,
     undefined,
-    "Smuggler's Haven VP should be modeled by its typed Agent effect",
+    "Smuggler's Haven VP should be modeled by its typed Agent payment",
   );
   const smugglersHaven = data.imperiumDeck.find(
     (card) => card.name === "Smuggler's Haven",
@@ -196,16 +216,24 @@ export function verifyImperiumCardLateCatalogSpecs({
         spec.trigger === "agent-play" &&
         spec.effects.some(
           (effect) =>
-            effect.kind === "gain-vp" &&
+            effect.kind === "paid-reward-choice" &&
             effect.selector === "self" &&
-            effect.amount === 1,
+            effect.requirePayableOption === true &&
+            effect.options.some((option) =>
+              option.id === "vp" &&
+              option.resource === "spice" &&
+              option.cost === 4 &&
+              option.reward.kind === "gain-vp" &&
+              option.reward.selector === "self" &&
+              option.reward.amount === 1
+            ),
         ),
     ),
-    "Smuggler's Haven should carry its printed Agent VP as a typed effect",
+    "Smuggler's Haven should carry its printed spice-for-VP Agent payment as a typed effect",
   );
   assert.match(
     smugglersHaven.play,
-    /Gain 1 VP.*Pay 4 spice to summon 1 sandworm/i,
+    /Pay 4 spice to gain 1 VP/i,
   );
   const prepareTheWay = data.reserveMarket.find(
     (card) => card.sourceId === 537,
@@ -306,7 +334,7 @@ export function verifyImperiumCardLateCatalogSpecs({
   assert.ok(
     spiceMustFlow.effects?.some(
       (spec) =>
-        spec.trigger === "acquire" &&
+        spec.trigger === "reveal" &&
         spec.effects.some(
           (effect) =>
             effect.kind === "gain-resource" &&
@@ -314,7 +342,7 @@ export function verifyImperiumCardLateCatalogSpecs({
             effect.amount === 1,
         ),
     ),
-    "The Spice Must Flow should model its acquire spice as a typed acquire effect",
+    "The Spice Must Flow should model its reveal spice as a typed Reveal effect",
   );
   assert.ok(
     spyNetwork.effects?.some(

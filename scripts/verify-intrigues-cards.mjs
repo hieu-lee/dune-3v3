@@ -87,7 +87,7 @@ const summaryExpectations = {
     "Go To Ground should expose its troop retreat and spy placement effect",
   ],
   imperiumPolitics: [
-    "Spend 1 Solari to gain 1 Emperor/Great Houses or Spacing Guild Influence.",
+    "Spend 1 Solari to gain 1 Emperor/Great Houses or Fremen/Fringe Influence.",
     "Imperium Politics should expose its Solari-for-Influence choice",
   ],
   impress: [

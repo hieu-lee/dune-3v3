@@ -25,7 +25,7 @@ export function iconCanReach(
   sharedSpyPosts: Record<string, string[]> = {},
 ) {
   if (!canEnterSpace(space, player, swordmasterClaimed, players)) return false;
-  if (!canMeetInfluenceRequirement(space, player, players)) return false;
+  if (!card.ignoreInfluenceRequirements && !canMeetInfluenceRequirement(space, player, players)) return false;
   if (card.icons.includes(space.icon)) return true;
   if (card.icons.includes("spy") && playerHasSpyPost({ spyPosts, sharedSpyPosts }, space.id, player.id)) return true;
   if (player.role === "Commander" && player.team === "muaddib" && space.icon === "fremen") {

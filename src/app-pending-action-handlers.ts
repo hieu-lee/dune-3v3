@@ -27,6 +27,7 @@ import {
   resolveBoardAgentRecallChoice,
   resolveLeaderTransitionChoice,
   resolveLadyAmberDesertScoutsChoice,
+  resolveLoseInfluenceForInfluenceChoice,
   resolveLoseInfluenceForIntriguesChoice,
   resolveMakerChoice,
   resolveOptionalSpacePayment,
@@ -55,6 +56,7 @@ import {
   skipDiscardCardForDraw,
   skipDiscardCardForInfluenceAndDraw,
   skipLoseInfluence,
+  skipLoseInfluenceForInfluence,
   skipLoseInfluenceForIntrigues,
   skipOptionalSpacePayment,
   skipPayResourceForHighCouncilSeat,
@@ -89,6 +91,7 @@ import type {
 } from "./game/types";
 import type {
   LadyAmberDesertScoutsChoice,
+  InfluenceExchangeChoice,
   LeaderTransitionChoice,
   RepeatBoardSpaceChoice,
   StabanUnseenNetworkChoice,
@@ -302,6 +305,14 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     );
   const skipLoseInfluenceForIntriguesChoice = () =>
     runPending("lose-influence-for-intrigues", (current, pending) => maybeStartCombatPhase(skipLoseInfluenceForIntrigues(current, pending)));
+  const chooseLoseInfluenceForInfluence = (choice: InfluenceExchangeChoice) =>
+    runPending("lose-influence-for-influence", (current, pending) =>
+      maybeStartCombatPhase(resolveLoseInfluenceForInfluenceChoice(current, pending, choice))
+    );
+  const skipLoseInfluenceForInfluenceChoice = () =>
+    runPending("lose-influence-for-influence", (current, pending) =>
+      maybeStartCombatPhase(skipLoseInfluenceForInfluence(current, pending))
+    );
   const collectContractFallback = () =>
     runPending("contract", (current, pending) => maybeStartCombatPhase(collectChoamContractFallback(current, pending)));
   const chooseConflictTieWinner = (winnerId?: string) =>
@@ -314,8 +325,8 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     runPending("conflict-vp-conversion", (current, pending) => startNextRound(skipConflictVpConversion(current, pending)));
   const chooseConflictInfluence = (faction: FactionId) =>
     runPending("conflict-influence", (current, pending) => startNextRound(gainConflictInfluenceForPending(current, pending, faction)));
-  const chooseBoardInfluence = (ownerId: string, faction: FactionId) =>
-    runPending("board-influence-choice", (current, pending) => maybeStartCombatPhase(resolveBoardInfluenceChoice(current, pending, ownerId, faction)));
+  const chooseBoardInfluence = (ownerId: string, faction: FactionId, trashCardId?: string) =>
+    runPending("board-influence-choice", (current, pending) => maybeStartCombatPhase(resolveBoardInfluenceChoice(current, pending, ownerId, faction, trashCardId)));
   const chooseBoardAgentRecall = (spaceId: string) =>
     runPending("recall-agent-from-board", (current, pending) =>
       maybeStartCombatPhase(resolveBoardAgentRecallChoice(current, pending, spaceId))
@@ -341,6 +352,7 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     chooseLadyAmberDesertScouts,
     chooseLeaderTransition,
     chooseLoseInfluenceForIntrigues,
+    chooseLoseInfluenceForInfluence,
     chooseMakerReward,
     choosePayResourceForContracts,
     choosePayResourceForDrawCards,
@@ -380,6 +392,7 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
     skipDiscardCardForInfluenceAndDrawChoice,
     skipInfluenceLoss,
     skipLoseInfluenceForIntriguesChoice,
+    skipLoseInfluenceForInfluenceChoice,
     skipOptionalSpacePaymentChoice,
     skipPaidReward,
     skipPendingActionChoiceHandler,

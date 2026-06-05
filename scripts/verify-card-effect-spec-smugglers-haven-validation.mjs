@@ -39,10 +39,10 @@ export function verifyCardEffectSpecSmugglersHavenValidation({
   );
   assert.equal(
     smugglersHavenAgentEffect.source.vp,
-    smugglersHavenAllySource.vp + 1,
-    "Smuggler's Haven should gain its printed VP during Agent play",
+    smugglersHavenAllySource.vp,
+    "Smuggler's Haven should not gain VP before paying its printed Agent cost",
   );
-  assert.match(smugglersHavenAgentEffect.log ?? "", /Smuggler's Haven: gains 1 VP/);
+  assert.equal(smugglersHavenAgentEffect.log, undefined, "Smuggler's Haven should not log an unpaid VP reward");
   const smugglersHavenAllyPending = state.pendingActionForCard(
     smugglersHaven,
     smugglersHavenAllySource,
@@ -53,47 +53,49 @@ export function verifyCardEffectSpecSmugglersHavenValidation({
   assert.deepEqual(
     smugglersHavenAllyPending,
     {
-      kind: "pay-resource-for-sandworms",
+      kind: "paid-reward-choice",
       ownerId: p3.id,
-      recipientId: p3.id,
-      resource: "spice",
-      cost: 4,
-      sandworms: 1,
-      strength: 3,
-      destination: "conflict",
-      optional: true,
       source: "Smuggler's Haven",
       cardId: smugglersHaven.id,
+      requirePayableOption: true,
+      options: [{
+        id: "vp",
+        resource: "spice",
+        cost: 4,
+        reward: { kind: "gain-vp", recipientId: p3.id, amount: 1 },
+      }],
     },
-    "Smuggler's Haven should queue a self sandworm payment for an Ally",
+    "Smuggler's Haven should queue its printed spice-for-VP Agent payment for an Ally",
   );
-  const smugglersHavenAllyResolved = state.resolvePayResourceForSandwormsChoice(
+  const smugglersHavenAllyResolved = state.resolvePaidRewardChoice(
     { ...smugglersHavenAllyState, pendingAction: smugglersHavenAllyPending },
     smugglersHavenAllyPending,
+    "vp",
   );
   assert.equal(playerById(smugglersHavenAllyResolved, p3.id).resources.spice, 0, "Smuggler's Haven Ally payment should spend 4 spice");
-  assert.equal(playerById(smugglersHavenAllyResolved, p3.id).deployedSandworms, 1, "Smuggler's Haven Ally payment should deploy a self sandworm");
-  assert.equal(playerById(smugglersHavenAllyResolved, p3.id).conflict, 3, "Smuggler's Haven Ally sandworm should add 3 strength");
+  assert.equal(playerById(smugglersHavenAllyResolved, p3.id).vp, smugglersHavenAllySource.vp + 1, "Smuggler's Haven Ally payment should gain 1 VP");
+  assert.equal(playerById(smugglersHavenAllyResolved, p3.id).deployedSandworms, 0, "Smuggler's Haven should not deploy sandworms");
+  assert.equal(playerById(smugglersHavenAllyResolved, p3.id).conflict, 0, "Smuggler's Haven should not add combat strength");
   assert.equal(
-    smugglersHavenAllyResolved.turnUnitDeployments[p3.id],
-    1,
-    "Smuggler's Haven Ally sandworm should count as that player's turn deployment",
+    smugglersHavenAllyResolved.turnUnitDeployments[p3.id] ?? 0,
+    0,
+    "Smuggler's Haven should not count as a unit deployment",
   );
   assert.equal(
     state.pendingActionForCard(
       smugglersHaven,
-      { ...smugglersHavenAllySource, makerHooks: false },
+      { ...smugglersHavenAllySource, resources: { solari: 0, spice: 3, water: 0 } },
       {
         ...smugglersHavenAllyState,
         players: smugglersHavenAllyState.players.map((player) =>
-          player.id === p3.id ? { ...smugglersHavenAllySource, makerHooks: false } : player,
+          player.id === p3.id ? { ...smugglersHavenAllySource, resources: { solari: 0, spice: 3, water: 0 } } : player,
         ),
       },
-      { ...smugglersHavenAllySource, makerHooks: false },
+      { ...smugglersHavenAllySource, resources: { solari: 0, spice: 3, water: 0 } },
       deliverSupplies,
     ),
     undefined,
-    "Smuggler's Haven should not queue self sandworms without Maker Hooks",
+    "Smuggler's Haven should not queue its paid VP reward when the player cannot pay",
   );
   const smugglersHavenCommanderSource = {
     ...p1,
@@ -125,22 +127,29 @@ export function verifyCardEffectSpecSmugglersHavenValidation({
   );
   assert.ok(smugglersHavenCommanderPending, "Smuggler's Haven should queue for a Commander with a hooked activated Ally");
   assert.equal(smugglersHavenCommanderPending?.ownerId, p1.id, "Commander Smuggler's Haven payment should be paid by the Commander");
-  assert.equal(
-    smugglersHavenCommanderPending?.recipientId,
-    p3.id,
-    "Commander Smuggler's Haven payment should summon for the activated Ally",
+  assert.deepEqual(
+    smugglersHavenCommanderPending?.options,
+    [{
+      id: "vp",
+      resource: "spice",
+      cost: 4,
+      reward: { kind: "gain-vp", recipientId: p1.id, amount: 1 },
+    }],
+    "Commander Smuggler's Haven payment should award VP to the Commander",
   );
-  const smugglersHavenCommanderResolved = state.resolvePayResourceForSandwormsChoice(
+  const smugglersHavenCommanderResolved = state.resolvePaidRewardChoice(
     { ...smugglersHavenCommanderState, pendingAction: smugglersHavenCommanderPending },
     smugglersHavenCommanderPending,
+    "vp",
   );
   assert.equal(playerById(smugglersHavenCommanderResolved, p1.id).resources.spice, 0, "Commander Smuggler's Haven should spend Commander spice");
-  assert.equal(playerById(smugglersHavenCommanderResolved, p3.id).deployedSandworms, 1, "Commander Smuggler's Haven should deploy the Ally sandworm");
-  assert.equal(playerById(smugglersHavenCommanderResolved, p3.id).conflict, 3, "Commander Smuggler's Haven sandworm should add Ally strength");
+  assert.equal(playerById(smugglersHavenCommanderResolved, p1.id).vp, smugglersHavenCommanderSource.vp + 1, "Commander Smuggler's Haven should gain Commander VP");
+  assert.equal(playerById(smugglersHavenCommanderResolved, p3.id).deployedSandworms, 0, "Commander Smuggler's Haven should not deploy Ally sandworms");
+  assert.equal(playerById(smugglersHavenCommanderResolved, p3.id).conflict, 0, "Commander Smuggler's Haven should not add Ally strength");
   assert.equal(
-    smugglersHavenCommanderResolved.turnUnitDeployments[p1.id],
-    1,
-    "Commander Smuggler's Haven sandworm should count for the Commander turn",
+    smugglersHavenCommanderResolved.turnUnitDeployments[p1.id] ?? 0,
+    0,
+    "Commander Smuggler's Haven should not count as a unit deployment",
   );
   const smugglersHavenSpiedMakerReveal = turnActions.revealTurnPlan(
     { ...p2, hand: [smugglersHaven], highCouncilSeat: false },

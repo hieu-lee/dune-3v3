@@ -66,8 +66,8 @@ export function verifyCardEffectSpecImperiumContractAlliance({
   );
   assert.equal(
     deliveryAgreement.reveal,
-    "Gain 1 spice. If you have completed four or more contracts, trash this card to gain 1 VP.",
-    "Delivery Agreement reveal text should preserve its conditional VP branch",
+    "Gain 1 spice, or if you have completed four or more contracts, trash this card to gain 1 VP.",
+    "Delivery Agreement reveal text should describe its conditional VP branch as an alternative",
   );
   assert.deepEqual(
     deliveryAgreement.effects?.filter((spec) => spec.trigger === "agent-play"),
@@ -91,19 +91,30 @@ export function verifyCardEffectSpecImperiumContractAlliance({
     deliveryAgreement.effects?.some(
       (spec) =>
         spec.trigger === "reveal" &&
-        spec.conditions?.some(
-          (condition) =>
-            condition.kind === "has-completed-contracts" &&
-            condition.count === 4,
-        ) &&
         spec.effects.some(
           (effect) =>
-            effect.kind === "trash-card" &&
-            effect.sourceOnly === true &&
-            effect.vpReward === 1,
+            effect.kind === "pending-action-choice" &&
+            effect.source === "Delivery Agreement" &&
+            effect.options.some((option) =>
+              option.id === "spice" &&
+              option.effect.kind === "gain-resource" &&
+              option.effect.resource === "spice" &&
+              option.effect.amount === 1
+            ) &&
+            effect.options.some((option) =>
+              option.id === "vp" &&
+              option.conditions?.some(
+                (condition) =>
+                  condition.kind === "has-completed-contracts" &&
+                  condition.count === 4,
+              ) &&
+              option.effect.kind === "trash-card" &&
+              option.effect.sourceOnly === true &&
+              option.effect.vpReward === 1
+            ),
         ),
     ),
-    "Delivery Agreement should model its completed-contract Reveal source-trash VP branch as a typed effect",
+    "Delivery Agreement should model its Reveal spice or completed-contract VP branches as a typed choice",
   );
   assert.equal(
     longLiveTheFighters.play,
@@ -239,8 +250,8 @@ export function verifyCardEffectSpecImperiumContractAlliance({
   );
   assert.equal(
     spacingGuildFavor.reveal,
-    "+2 persuasion.",
-    "Spacing Guild's Favor should keep its fixed reveal persuasion",
+    "+2 persuasion. You may pay 3 spice to gain 1 Influence.",
+    "Spacing Guild's Favor should expose its printed persuasion and spice-for-Influence reveal option",
   );
   assert.ok(
     spacingGuildFavor.effects?.some(
@@ -251,6 +262,31 @@ export function verifyCardEffectSpecImperiumContractAlliance({
         ),
     ),
     "Spacing Guild's Favor should carry its printed persuasion in Reveal specs",
+  );
+  assert.ok(
+    spacingGuildFavor.effects?.some(
+      (spec) =>
+        spec.trigger === "reveal" &&
+        spec.conditions?.some(
+          (condition) => condition.kind === "has-role" && condition.role === "Ally",
+        ) &&
+        spec.effects.some(
+          (effect) =>
+            effect.kind === "paid-reward-choice" &&
+            effect.selector === "self" &&
+            effect.source === "Spacing Guild's Favor" &&
+            effect.requirePayableOption === true &&
+            effect.options.some(
+              (option) =>
+                option.resource === "spice" &&
+                option.cost === 3 &&
+                option.reward.kind === "gain-influence" &&
+                option.reward.selector === "self" &&
+                option.reward.amount === 1,
+            ),
+        ),
+    ),
+    "Spacing Guild's Favor should carry a typed Reveal spice-for-Influence payment spec",
   );
   assert.ok(
     hasAgentEffect(

@@ -1,5 +1,6 @@
 import type {
   LadyAmberDesertScoutsChoice,
+  InfluenceExchangeChoice,
   LeaderTransitionChoice,
   RepeatBoardSpaceChoice,
   StabanUnseenNetworkChoice,
@@ -15,7 +16,7 @@ export type PendingActionPanelProps = {
   adjustTeamResourcePayment: (contributorId: string, delta: number) => void;
   chooseCommanderResourceSplit: (optionIndex: number) => void;
   chooseConflictInfluence: (faction: FactionId) => void;
-  chooseBoardInfluence: (ownerId: string, faction: FactionId) => void;
+  chooseBoardInfluence: (ownerId: string, faction: FactionId, trashCardId?: string) => void;
   chooseBoardAgentRecall: (spaceId: string) => void;
   chooseConflictTieWinner: (winnerId?: string) => void;
   chooseDiscardCardsForReward: (discardCardId: string) => void;
@@ -24,6 +25,7 @@ export type PendingActionPanelProps = {
   chooseDiscardCardForInfluenceAndDraw: (discardCardId: string, faction: FactionId) => void;
   chooseDeployOrRetreatTroops: (choice: "deploy" | "retreat") => void;
   chooseLoseInfluenceForIntrigues: (faction: FactionId) => void;
+  chooseLoseInfluenceForInfluence: (choice: InfluenceExchangeChoice) => void;
   choosePendingActionChoice: (optionId: string) => void;
   chooseLeaderTransition: (choice: LeaderTransitionChoice) => void;
   chooseLadyAmberDesertScouts: (choice: LadyAmberDesertScoutsChoice) => void;
@@ -62,6 +64,7 @@ export type PendingActionPanelProps = {
   skipDiscardCardForInfluenceAndDrawChoice: () => void;
   skipDeployOrRetreatTroops: () => void;
   skipLoseInfluenceForIntriguesChoice: () => void;
+  skipLoseInfluenceForInfluenceChoice: () => void;
   skipControlDefense: () => void;
   skipConflictVpReward: () => void;
   skipInfluenceLoss: () => void;

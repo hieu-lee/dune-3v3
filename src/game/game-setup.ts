@@ -53,6 +53,7 @@ export function initialGame(): GameState {
     roundMakerSpaceVisits: {},
     turnHarvestContractIds: {},
     turnMakerSpaceVisits: {},
+    turnAcquiredCardIds: {},
     turnSpiceGains: {},
     turnReverendMotherJessicaRepeats: {},
     turnSpyRecalls: {},

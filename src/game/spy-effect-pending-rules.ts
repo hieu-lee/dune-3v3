@@ -13,6 +13,7 @@ function sameSpyPlacementDetails(first: SpyPlacementEffectResult, second: SpyPla
   return first.recallForSupply === second.recallForSupply &&
     first.mustPlace === second.mustPlace &&
     first.placementIcon === second.placementIcon &&
+    JSON.stringify(first.placementIcons ?? []) === JSON.stringify(second.placementIcons ?? []) &&
     first.allowSharedPost === second.allowSharedPost &&
     first.source === second.source &&
     first.postPlacementAction === second.postPlacementAction;
@@ -44,6 +45,7 @@ export function spyPendingForPlacement(
     ...(placement.recallForSupply ? { recallForSupply: true } : {}),
     ...(placement.mustPlace ? { mustPlaceSpy: true } : {}),
     ...(placement.placementIcon ? { placementIcon: placement.placementIcon } : {}),
+    ...(placement.placementIcons ? { placementIcons: [...placement.placementIcons] } : {}),
     ...(placement.allowSharedPost ? { allowSharedPost: true } : {}),
     ...(placement.postPlacementAction ? { postPlacementAction: placement.postPlacementAction } : {}),
     source: placement.source ?? sourceName,

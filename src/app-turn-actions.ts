@@ -490,6 +490,7 @@ export function placeAgentAction(
 
 type RevealTurnPlan = {
   influenceGains: Partial<Record<FactionId, number>>;
+  intriguesToDraw: number;
   persuasion: number;
   recruitedTroops: number;
   revealGain: Partial<Resources>;
@@ -498,7 +499,8 @@ type RevealTurnPlan = {
 
 export function revealTurnPlan(
   activePlayer: Player,
-  state?: Pick<GameState, "agentPlacementOwners" | "roundMakerSpaceVisits" | "spaces" | "spyPosts" | "sharedSpyPosts">,
+  state?: Pick<GameState, "agentPlacementOwners" | "roundMakerSpaceVisits" | "spaces" | "spyPosts" | "sharedSpyPosts"> &
+    Partial<Pick<GameState, "turnAcquiredCardIds">>,
 ): RevealTurnPlan {
   const effectResult = resolveCardRevealEffects(activePlayer.hand, activePlayer, state);
   const highCouncilPersuasion = activePlayer.highCouncilSeat ? 2 : 0;
@@ -506,8 +508,9 @@ export function revealTurnPlan(
   const swords = effectResult.swords + (activePlayer.swordmasterBonus ? 2 : 0);
   const revealGain = effectResult.revealGain;
   const influenceGains = effectResult.influenceGains;
+  const intriguesToDraw = effectResult.intriguesToDraw;
   const recruitedTroops = effectResult.recruitedTroops;
-  return { influenceGains, persuasion, recruitedTroops, revealGain, swords };
+  return { influenceGains, intriguesToDraw, persuasion, recruitedTroops, revealGain, swords };
 }
 
 type RevealTurnInput = {
@@ -553,7 +556,7 @@ export function revealTurnAction(
   current: GameState,
   { commanderTargets, revealPlan }: RevealTurnInput,
 ): GameState {
-  const { influenceGains = {}, persuasion, recruitedTroops, revealGain, swords } = revealPlan;
+  const { influenceGains = {}, intriguesToDraw = 0, persuasion, recruitedTroops, revealGain, swords } = revealPlan;
   const player = current.players[current.activeSeat];
   const targetId =
     player.role === "Commander"
@@ -614,5 +617,8 @@ export function revealTurnAction(
   const spiceTrackedState = (revealGain.spice ?? 0) > 0
     ? recordTurnSpiceGain(pendingRevealState, player.id, revealGain.spice ?? 0)
     : pendingRevealState;
-  return scoreGurneyAlwaysSmiling(spiceTrackedState, player.id);
+  const intrigueState = intriguesToDraw > 0
+    ? drawIntrigueCards(spiceTrackedState, player.id, intriguesToDraw, "Reveal")
+    : spiceTrackedState;
+  return scoreGurneyAlwaysSmiling(intrigueState, player.id);
 }

@@ -11,7 +11,7 @@ export function verifyCardEffectSpecPendingRewardValidation({
   players,
   state,
 }) {
-  const { arrakeen } = boardSpaces;
+  const { arrakeen, economicSupport } = boardSpaces;
   const {
     allySignet,
     convincingArgument,
@@ -48,50 +48,62 @@ export function verifyCardEffectSpecPendingRewardValidation({
   );
   assert.deepEqual(
     undercoverPendings.map((pending) => pending.kind),
-    ["spy"],
-    "Undercover Asset should queue a typed spy placement",
+    [],
+    "Undercover Asset should not queue an Agent pending action",
   );
-  assert.equal(undercoverPendings[0].ownerId, p2.id, "Undercover Asset spy placement should target the source player");
-  assert.equal(undercoverPendings[0].source, "Undercover Asset");
+  assert.equal(undercoverAsset.ignoreInfluenceRequirements, true, "Undercover Asset should ignore board-space Influence requirements on Agent placement");
 
   const publicSpectacleSource = pendingPrimitiveSource(publicSpectacle);
   const publicSpectaclePendings = state.pendingActionsForCard(
     publicSpectacle,
     publicSpectacleSource,
-    pendingPrimitiveFixture(publicSpectacleSource),
+    {
+      ...pendingPrimitiveFixture(publicSpectacleSource),
+      turnSpyRecalls: { ...game.turnSpyRecalls, [p2.id]: 1 },
+    },
   );
   assert.deepEqual(
     publicSpectaclePendings.map((pending) => pending.kind),
-    ["spy", "board-influence-choice"],
-    "Public Spectacle should compose spy placement before its typed Influence choice",
+    ["board-influence-choice"],
+    "Public Spectacle should queue its typed Influence choice after a spy recall",
   );
-  assert.equal(publicSpectaclePendings[0].ownerId, p2.id, "Public Spectacle spy placement should target the source player");
   assert.equal(publicSpectaclePendings[0].source, "Public Spectacle");
-  assert.equal(publicSpectaclePendings[1].source, "Public Spectacle");
-  assert.equal(publicSpectaclePendings[1].sourceEffect, "gain-influence-choice");
-  assert.equal(publicSpectaclePendings[1].amount, 1);
-  assert.equal(publicSpectaclePendings[1].cardId, publicSpectacle.id);
-  assert.equal(publicSpectaclePendings[1].cardOwnerId, p2.id);
-  assert.equal(publicSpectaclePendings[1].trashSource, undefined, "Public Spectacle should not trash itself after Influence");
-  assert.ok(publicSpectaclePendings[1].choices.length > 0, "Public Spectacle should expose at least one Influence choice");
+  assert.equal(publicSpectaclePendings[0].sourceEffect, "gain-influence-choice");
+  assert.equal(publicSpectaclePendings[0].amount, 1);
+  assert.equal(publicSpectaclePendings[0].cardId, publicSpectacle.id);
+  assert.equal(publicSpectaclePendings[0].cardOwnerId, p2.id);
+  assert.equal(publicSpectaclePendings[0].trashSource, undefined, "Public Spectacle should not trash itself after Influence");
+  assert.ok(publicSpectaclePendings[0].choices.length > 0, "Public Spectacle should expose at least one Influence choice");
 
-  const theacherousManeuverSource = pendingPrimitiveSource(theacherousManeuver);
+  const theacherousManeuverInPlay = {
+    ...theacherousManeuver,
+    agentPlacementSpaceId: economicSupport.id,
+    agentPlacementTargetOwnerId: p2.id,
+  };
+  const theacherousManeuverSource = pendingPrimitiveSource(theacherousManeuverInPlay, {
+    hand: [{ ...emperorSignet, traits: ["Faction: Emperor"] }],
+    playArea: [theacherousManeuverInPlay],
+  });
   const theacherousManeuverPendings = state.pendingActionsForCard(
-    theacherousManeuver,
+    theacherousManeuverInPlay,
     theacherousManeuverSource,
     pendingPrimitiveFixture(theacherousManeuverSource),
+    theacherousManeuverSource,
+    economicSupport,
   );
   assert.deepEqual(
     theacherousManeuverPendings.map((pending) => pending.kind),
     ["board-influence-choice"],
-    "Theacherous Maneuver should queue a typed Influence choice",
+    "Treacherous Maneuver should queue a typed board-space Influence choice",
   );
-  assert.equal(theacherousManeuverPendings[0].source, "Theacherous Maneuver");
-  assert.equal(theacherousManeuverPendings[0].sourceEffect, "gain-influence-choice");
+  assert.equal(theacherousManeuverPendings[0].source, "Treacherous Maneuver");
+  assert.equal(theacherousManeuverPendings[0].sourceEffect, "gain-board-space-influence");
   assert.equal(theacherousManeuverPendings[0].amount, 1);
-  assert.equal(theacherousManeuverPendings[0].cardId, theacherousManeuver.id);
+  assert.equal(theacherousManeuverPendings[0].trashSource, true);
+  assert.equal(theacherousManeuverPendings[0].requiredHandTrashTrait, "Faction: Emperor");
+  assert.equal(theacherousManeuverPendings[0].cardId, theacherousManeuverInPlay.id);
   assert.equal(theacherousManeuverPendings[0].cardOwnerId, p2.id);
-  assert.ok(theacherousManeuverPendings[0].choices.length > 0, "Theacherous Maneuver should expose Influence choices");
+  assert.ok(theacherousManeuverPendings[0].choices.length > 0, "Treacherous Maneuver should expose Influence choices");
 
   const shaddamSignetPaidRewardSource = {
     ...p4,

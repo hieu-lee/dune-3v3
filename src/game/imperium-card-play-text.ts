@@ -1,5 +1,6 @@
 import {
   branchingPathSourceId,
+  cargoRunnerSourceId,
   corrinthCitySourceId,
   covertOperationSourceId,
   dangerousRhetoricSourceId,
@@ -13,23 +14,37 @@ import {
   guildSpySourceId,
   hiddenMissiveSourceId,
   inHighPlacesSourceId,
+  imperialSpymasterSourceId,
   interstellarTradeSourceId,
   junctionHeadquartersSourceId,
+  leadershipSourceId,
   longLiveTheFightersSourceId,
+  makerKeeperSourceId,
+  maulaPistolSourceId,
+  northernWatermasterSourceId,
   overthrowSourceId,
   priceIsNoObjectSourceId,
+  priorityContractsSourceId,
+  publicSpectacleSourceId,
+  rebelSupplierSourceId,
   reliableInformantSourceId,
   sardaukarCoordinationSourceId,
+  sardaukarSoldierSourceId,
   shishakliSourceId,
   smugglersHavenSourceId,
   smugglersHarvesterSourceId,
+  southernEldersSourceId,
   spacingGuildFavorSourceId,
   spaceTimeFoldingSourceId,
+  spiceMustFlowSourceId,
   steersmanSourceId,
   spyNetworkSourceId,
   strikeFleetSourceId,
   subversiveAdvisorSourceId,
+  stilgarDevotedSourceId,
   treadInDarknessSourceId,
+  theacherousManeuverSourceId,
+  undercoverAssetSourceId,
   truthtranceSourceId,
   unswervingLoyaltySourceId,
   weirdingWomanSourceId,
@@ -50,17 +65,29 @@ export function imperiumPlayText(card: HubCard) {
   if (card.id === fedaykinStilltentSourceId) {
     return "If you sent an Agent to a Maker board space this turn, recruit 1 troop.";
   }
+  if (card.id === cargoRunnerSourceId) {
+    return "If you have 2 or more completed contracts, draw 1 card. If you have 4 or more, draw 1 more card.";
+  }
   if (card.id === hiddenMissiveSourceId) {
     return "If you have 2 or more Bene Gesserit Influence, recruit 1 troop and draw 1 card.";
+  }
+  if (card.id === makerKeeperSourceId) {
+    return "If you have 2 or more Bene Gesserit Influence, gain 1 water. If you have 2 or more Fremen Influence, gain 1 spice.";
+  }
+  if (card.id === maulaPistolSourceId) {
+    return "Draw 1 card.";
+  }
+  if (card.id === northernWatermasterSourceId) {
+    return "Gain 1 water.";
   }
   if (card.id === wheelsWithinWheelsSourceId) {
     return "If you have 2 or more Emperor/Great Houses Influence, gain 2 Solari. If you have 2 or more Spacing Guild Influence, gain 1 spice.";
   }
   if (card.id === reliableInformantSourceId) {
-    return "Gain 1 Solari on Emperor, Bene Gesserit, or Spacing Guild board spaces.";
+    return "Place 1 spy on Emperor, Bene Gesserit, or Spacing Guild board spaces.";
   }
   if (card.id === smugglersHavenSourceId) {
-    return "Gain 1 VP. Pay 4 spice to summon 1 sandworm.";
+    return "Pay 4 spice to gain 1 VP.";
   }
   if (card.id === corrinthCitySourceId) {
     return "Discard 2 cards and spend 5 Solari to gain 1 VP.";
@@ -88,6 +115,18 @@ export function imperiumPlayText(card: HubCard) {
   }
   if (card.id === covertOperationSourceId) {
     return "Each opponent discards a card.";
+  }
+  if (card.id === imperialSpymasterSourceId) {
+    return "If you recalled a Spy this turn, draw 1 Intrigue.";
+  }
+  if (card.id === publicSpectacleSourceId) {
+    return "If you recalled a Spy this turn, gain 1 Influence.";
+  }
+  if (card.id === rebelSupplierSourceId) {
+    return "If you recalled a Spy this turn, recruit 2 troops.";
+  }
+  if (card.id === southernEldersSourceId) {
+    return "If you have another Bene Gesserit card in play, recruit 2 troops.";
   }
   if (card.id === dangerousRhetoricSourceId) {
     return "Gain 1 Influence and trash this card.";
@@ -119,11 +158,20 @@ export function imperiumPlayText(card: HubCard) {
   if (card.id === steersmanSourceId) {
     return "Draw 1 card. Recall Agent.";
   }
+  if (card.id === leadershipSourceId) {
+    return "For each sandworm you have in the Conflict, draw 1 card.";
+  }
+  if (card.id === undercoverAssetSourceId) {
+    return "Ignore Influence requirements on board spaces when sending an Agent this turn.";
+  }
+  if (card.id === theacherousManeuverSourceId) {
+    return "Trash this card and an Emperor card from your hand to gain two Influence instead of one.";
+  }
   if (card.id === longLiveTheFightersSourceId) {
     return "If your deck has three or more cards, look at the top three cards. Draw one, discard one, and trash one.";
   }
   if (card.id === interstellarTradeSourceId || card.id === truthtranceSourceId) {
-    return "No Agent effect.";
+    return card.id === interstellarTradeSourceId ? "Gain 1 Influence." : "No Agent effect.";
   }
   if (card.id === spyNetworkSourceId) {
     return "No agent icons.";
@@ -137,8 +185,20 @@ export function imperiumPlayText(card: HubCard) {
   if (card.id === sardaukarCoordinationSourceId) {
     return "You may deploy any troops you recruit this turn to the Conflict.";
   }
+  if (card.id === sardaukarSoldierSourceId) {
+    return "When this card is trashed, draw 1 Intrigue.";
+  }
+  if (card.id === stilgarDevotedSourceId) {
+    return "Recruit 2 troops.";
+  }
   if (card.id === strikeFleetSourceId) {
     return "If you recalled a Spy this turn, recruit 3 troops.";
+  }
+  if (card.id === priorityContractsSourceId) {
+    return "Take a face-up CHOAM contract.";
+  }
+  if (card.id === spiceMustFlowSourceId) {
+    return "Acquire bonus: gain 1 VP.";
   }
   return summarizeAttributes(card);
 }

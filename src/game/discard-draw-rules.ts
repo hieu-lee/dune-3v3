@@ -47,7 +47,7 @@ export function resolveDiscardCardForDraw(
   if (!discardedCard) return state;
 
   const requestedDraws = pending.drawCards + bonusDrawFor(discardedCard, pending);
-  const requestedIntrigues = bonusIntriguesFor(discardedCard, pending);
+  const requestedIntrigues = (pending.drawIntrigues ?? 0) + bonusIntriguesFor(discardedCard, pending);
   const ownerAfterDiscard = {
     ...owner,
     hand: owner.hand.filter((card) => card.id !== discardedCard.id),

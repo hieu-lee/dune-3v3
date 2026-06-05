@@ -206,7 +206,7 @@ try {
     kind: "pay-resource-for-influence",
     ownerId: muadDib.id,
     influenceOwnerId: ladyMargot.id,
-    resource: "solari",
+    resource: "spice",
     cost: 4,
     faction: "bene",
     amount: 1,
@@ -221,20 +221,20 @@ try {
     pendingQueue: [],
     turnSpiceGains: {},
     players: game.players.map((player) => {
-      if (player.id === muadDib.id) {
-        return {
-          ...player,
-          resources: { ...player.resources, solari: 4 },
-          playArea: [demandAttention],
-        };
-      }
+	      if (player.id === muadDib.id) {
+	        return {
+	          ...player,
+	          resources: { ...player.resources, spice: 4 },
+	          playArea: [demandAttention],
+	        };
+	      }
       if (player.id === ladyMargot.id) {
         return {
-          ...ladyMargot,
-          team: muadDib.team,
-          resources: { ...ladyMargot.resources, spice: 0 },
-          influence: { ...ladyMargot.influence, bene: 1 },
-        };
+	          ...ladyMargot,
+	          team: muadDib.team,
+	          resources: { ...ladyMargot.resources, spice: 0 },
+	          influence: { ...ladyMargot.influence, bene: 1 },
+	        };
       }
       return player;
     }),
@@ -1024,12 +1024,12 @@ try {
   const malformedPaidRewardPending = {
     ...shaddamSignetPending,
     options: [{
-      id: "vp",
-      resource: "solari",
-      cost: 1,
-      reward: { kind: "gain-vp", recipientId: emperor.id, amount: 1 },
-    }],
-  };
+	      id: "vp",
+	      resource: "solari",
+	      cost: 1,
+	      reward: { kind: "gain-persuasion", recipientId: emperor.id, amount: 1 },
+	    }],
+	  };
   const malformedPaidRewardState = { ...signetResolutionBase, pendingAction: malformedPaidRewardPending };
   assert.equal(
     state.resolvePaidRewardChoice(malformedPaidRewardState, malformedPaidRewardPending, "vp"),

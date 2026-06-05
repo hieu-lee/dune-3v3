@@ -392,16 +392,16 @@ try {
     undefined,
     "Controversial Technology should not queue mandatory trash when no cards are trashable",
   );
-  const demandAttentionControversialTech = place(
-    turnActions,
-    playableGame(state, "p1", demandAttention, (player) => ({
-      ...player,
-      deck: [],
-      discard: [],
-      resources: { ...player.resources, spice: 2, solari: 4 },
-    })),
-    demandAttention,
-    spaces.controversialTech,
+	  const demandAttentionControversialTech = place(
+	    turnActions,
+	    playableGame(state, "p1", demandAttention, (player) => ({
+	      ...player,
+	      deck: [],
+	      discard: [],
+	      resources: { ...player.resources, spice: 6, solari: 0 },
+	    })),
+	    demandAttention,
+	    spaces.controversialTech,
     { p1: "p3" },
   );
   assert.equal(

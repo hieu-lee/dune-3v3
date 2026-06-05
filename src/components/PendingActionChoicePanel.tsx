@@ -1,4 +1,4 @@
-import { BookOpen, X } from "lucide-react";
+import { BookOpen, Coins, Dumbbell, Eye, Gem, X } from "lucide-react";
 import {
   pendingActionChoiceOptionIsResolvable,
 } from "../game/state";
@@ -16,11 +16,19 @@ type PendingActionChoicePanelProps = {
 
 function optionIcon(kind: PendingActionChoicePendingAction["options"][number]["pending"]["kind"]) {
   if (kind === "trash-card") return <X size={13} />;
+  if (kind === "gain-persuasion") return <Gem size={13} />;
+  if (kind === "gain-resource") return <Coins size={13} />;
+  if (kind === "gain-strength") return <Dumbbell size={13} />;
+  if (kind === "spy") return <Eye size={13} />;
   return <BookOpen size={13} />;
 }
 
 function optionKindLabel(kind: PendingActionChoicePendingAction["options"][number]["pending"]["kind"]) {
   if (kind === "trash-card") return "Trash";
+  if (kind === "gain-persuasion") return "Persuasion";
+  if (kind === "gain-resource") return "Resource";
+  if (kind === "gain-strength") return "Strength";
+  if (kind === "spy") return "Spy";
   return "Acquire";
 }
 
@@ -71,16 +79,18 @@ export function PendingActionChoicePanel({
       ) : (
         <span>{pending.source} can no longer resolve with the current table state.</span>
       )}
-      <button
-        type="button"
-        className="leader-choice-card action-choice-card"
-        onClick={onSkip}
-        aria-label="Skip"
-      >
-        <span className="leader-choice-badge action-choice-badge">Pass</span>
-        <strong>Skip</strong>
-        <small>Decline this follow-up action.</small>
-      </button>
+      {pending.optional === true && (
+        <button
+          type="button"
+          className="leader-choice-card action-choice-card"
+          onClick={onSkip}
+          aria-label="Skip"
+        >
+          <span className="leader-choice-badge action-choice-badge">Pass</span>
+          <strong>Skip</strong>
+          <small>Decline this follow-up action.</small>
+        </button>
+      )}
     </div>
   );
 }

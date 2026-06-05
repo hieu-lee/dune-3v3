@@ -12,7 +12,7 @@ export function verifyCardEffectSpecMakerFremenValidation({
   withActivePlayer,
 }) {
   const { deliverSupplies, economicSupport, highCouncil, secrets } = boardSpaces;
-  const { capturedMentat, makerKeeper, northernWatermaster, paracompass, reliableInformant, shishakli } = cards;
+  const { capturedMentat, convincingArgument, makerKeeper, northernWatermaster, paracompass, reliableInformant, shishakli } = cards;
   const { fremenSupportCard } = fixtures;
   const { p2 } = players;
   const makerKeeperSource = {
@@ -122,10 +122,21 @@ export function verifyCardEffectSpecMakerFremenValidation({
   assert.equal(playerById(shishakliRevealed, p2.id).influence.fremen, 2, "Shishakli Reveal should apply Fremen Influence");
   assert.equal(playerById(shishakliRevealed, p2.id).vp, 1, "Shishakli Reveal Influence should resolve threshold VP");
   assert.match(shishakliRevealed.log[0], /gains 1 Fremen Influence/, "Shishakli Reveal log should mention Influence gain");
+  const sameRevealBeneInfluenceCard = {
+    ...convincingArgument,
+    id: "captured-mentat-same-reveal-bene-fixture",
+    name: "Captured Mentat Same Reveal Bene Fixture",
+    effects: [
+      {
+        trigger: "reveal",
+        effects: [{ kind: "gain-influence", selector: "self", faction: "bene", amount: 1 }],
+      },
+    ],
+  };
   const shishakliCapturedMentatFixture = withActivePlayer(game, p2.id, (player) => ({
     ...player,
     agentsReady: 1,
-    hand: [shishakli, capturedMentat, fremenSupportCard],
+    hand: [sameRevealBeneInfluenceCard, capturedMentat],
     highCouncilSeat: false,
     influence: {
       emperor: 0,
@@ -146,13 +157,13 @@ export function verifyCardEffectSpecMakerFremenValidation({
     { commanderTargets: {}, revealPlan: shishakliCapturedMentatPlan },
   );
   assert.equal(
-    playerById(shishakliCapturedMentatRevealed, p2.id).influence.fremen,
+    playerById(shishakliCapturedMentatRevealed, p2.id).influence.bene,
     1,
-    "Shishakli should apply Reveal Influence before same-reveal pending choices are generated",
+    "Reveal Influence should apply before same-reveal pending choices are generated",
   );
   assert.equal(
     shishakliCapturedMentatRevealed.pendingAction?.kind,
-    "lose-influence-for-intrigues",
+    "lose-influence-for-influence",
     "Captured Mentat should see Shishakli's same-reveal Influence gain when queuing its pending choice",
   );
   assert.equal(shishakliCapturedMentatRevealed.pendingAction?.source, "Captured Mentat");
@@ -204,33 +215,52 @@ export function verifyCardEffectSpecMakerFremenValidation({
     [secrets, "Bene Gesserit"],
     [deliverSupplies, "Spacing Guild"],
   ]) {
-    const reliableInformantEffect = state.applyCardAgentEffect(
+    const reliableInformantSource = {
+      ...p2,
+      resources: { solari: 0, spice: 0, water: 0 },
+      playArea: [reliableInformant],
+    };
+    const [reliableInformantPending] = state.pendingActionsForCard(
       reliableInformant,
-      { ...p2, resources: { solari: 0, spice: 0, water: 0 } },
+      reliableInformantSource,
+      {
+        ...game,
+        players: game.players.map((player) => player.id === p2.id ? reliableInformantSource : player),
+      },
       p2,
-      game,
       space,
     );
     assert.deepEqual(
-      reliableInformantEffect.source.resources,
-      { solari: 1, spice: 0, water: 0 },
-      `Reliable Informant should gain 1 Agent Solari on ${label} spaces`,
+      {
+        kind: reliableInformantPending?.kind,
+        remaining: reliableInformantPending?.remaining,
+        placementIcon: reliableInformantPending?.placementIcon,
+        source: reliableInformantPending?.source,
+      },
+      { kind: "spy", remaining: 1, placementIcon: space.icon, source: "Reliable Informant" },
+      `Reliable Informant should place 1 Agent spy on ${label} spaces`,
     );
-    assert.match(reliableInformantEffect.log ?? "", /Reliable Informant: gains 1 Solari/);
   }
-  const reliableInformantLandsraadEffect = state.applyCardAgentEffect(
+  const reliableInformantLandsraadSource = {
+    ...p2,
+    resources: { solari: 0, spice: 0, water: 0 },
+    playArea: [reliableInformant],
+  };
+  const reliableInformantLandsraadPendings = state.pendingActionsForCard(
     reliableInformant,
-    { ...p2, resources: { solari: 0, spice: 0, water: 0 } },
+    reliableInformantLandsraadSource,
+    {
+      ...game,
+      players: game.players.map((player) => player.id === p2.id ? reliableInformantLandsraadSource : player),
+    },
     p2,
-    game,
     highCouncil,
   );
   assert.deepEqual(
-    reliableInformantLandsraadEffect.source.resources,
-    { solari: 0, spice: 0, water: 0 },
-    "Reliable Informant should not gain Agent Solari on unrelated board-space icons",
+    reliableInformantLandsraadPendings,
+    [],
+    "Reliable Informant should not place an Agent spy on unrelated board-space icons",
   );
-  assert.equal(reliableInformantLandsraadEffect.log, undefined, "Reliable Informant should not log when no Agent spec applies");
   const reliableInformantReveal = turnActions.revealTurnPlan(
     { ...p2, hand: [reliableInformant], highCouncilSeat: false },
     game,

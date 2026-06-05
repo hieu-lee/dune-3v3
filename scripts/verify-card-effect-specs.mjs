@@ -134,7 +134,7 @@ try {
   const spaceTimeFolding = data.imperiumDeck.find((card) => card.name === "Space-time Folding");
   const steersman = data.imperiumDeck.find((card) => card.name === "Steersman");
   const stilgar = data.imperiumDeck.find((card) => card.name === "Stilgar, The Devoted");
-  const theacherousManeuver = data.imperiumDeck.find((card) => card.name === "Theacherous Maneuver");
+  const theacherousManeuver = data.imperiumDeck.find((card) => card.name === "Treacherous Maneuver");
   const undercoverAsset = data.imperiumDeck.find((card) => card.name === "Undercover Asset");
   const unswervingLoyalty = data.imperiumDeck.find((card) => card.name === "Unswerving Loyalty");
   const truthtrance = data.imperiumDeck.find((card) => card.name === "Truthtrance");
@@ -678,7 +678,7 @@ try {
     withActivePlayer,
   });
   verifyCardEffectSpecPendingRewardValidation({
-    boardSpaces: { arrakeen },
+    boardSpaces: { arrakeen, economicSupport },
     cards: {
       allySignet,
       convincingArgument,

@@ -263,7 +263,13 @@ export function recallSpyForPending(
   const recipient = state.players.find((player) => player.id === pending.combatRecipientId);
   const players = state.players.map((player) => {
     let next = player;
-    if (player.id === owner.id) next = { ...next, spies: next.spies + removedSpyCount };
+    if (player.id === owner.id) {
+      next = {
+        ...next,
+        spies: next.spies + removedSpyCount,
+        persuasion: finalRecall ? next.persuasion + (pending.persuasionReward ?? 0) : next.persuasion,
+      };
+    }
     if (finalRecall && player.id === pending.combatRecipientId) {
       next = { ...next, conflict: next.conflict + pending.strength };
     }
@@ -272,13 +278,16 @@ export function recallSpyForPending(
   const strengthText = finalRecall && pending.strength > 0
     ? `, adding ${pending.strength} strength to ${recipient?.leader ?? "the chosen combatant"}`
     : "";
+  const persuasionText = finalRecall && (pending.persuasionReward ?? 0) > 0
+    ? `, gaining ${pending.persuasionReward} persuasion`
+    : "";
   let recalledState = recordTurnSpyRecall({
     ...state,
     players,
     spyPosts,
     sharedSpyPosts,
     ...(finalRecall ? advancePendingAction(state) : { pendingAction: { ...pending, remaining } }),
-    log: [`${owner.leader} recalls a spy from ${spyObservationPostLabelForSpace(space.id)} for ${pending.source}${strengthText}.`, ...state.log],
+    log: [`${owner.leader} recalls a spy from ${spyObservationPostLabelForSpace(space.id)} for ${pending.source}${strengthText}${persuasionText}.`, ...state.log],
   }, owner.id, recalledSpyCount);
   if (finalRecall) recalledState = normalizeSpyObservationPosts(recalledState);
 

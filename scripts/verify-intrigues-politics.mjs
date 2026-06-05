@@ -20,7 +20,7 @@ export function verifyImperiumPoliticsPlotIntrigue({ cards, game, state }) {
         ? {
             ...candidate,
             resources: { ...candidate.resources, solari: 2 },
-            influence: { ...candidate.influence, greatHouses: 1, spacing: 1, emperor: 1 },
+            influence: { ...candidate.influence, greatHouses: 1, fringeWorlds: 1, emperor: 1 },
             intrigues: [imperiumPolitics],
           }
         : { ...candidate, intrigues: [] },
@@ -33,8 +33,8 @@ export function verifyImperiumPoliticsPlotIntrigue({ cards, game, state }) {
   );
   assert.deepEqual(
     state.imperiumPoliticsFactionChoices(playerById(imperiumPoliticsFixture, "p2")),
-    ["greatHouses", "spacing"],
-    "Allies should choose Great Houses or Spacing Guild from Imperium Politics",
+    ["greatHouses", "fringeWorlds"],
+    "Allies should choose Great Houses or Fremen/Fringe from Imperium Politics",
   );
   const imperiumPoliticsGreatHouses = state.playImperiumPoliticsPlotIntrigue(
     imperiumPoliticsFixture,
@@ -49,14 +49,14 @@ export function verifyImperiumPoliticsPlotIntrigue({ cards, game, state }) {
   assert.deepEqual(playerById(imperiumPoliticsGreatHouses, "p2").intrigues, []);
   assert.equal(imperiumPoliticsGreatHouses.intrigueDiscard.at(-1).id, imperiumPolitics.id);
   assert.match(imperiumPoliticsGreatHouses.log[0], /Imperium Politics, spends 1 Solari, and gains 1 Great Houses Influence/);
-  const imperiumPoliticsSpacing = state.playImperiumPoliticsPlotIntrigue(
+  const imperiumPoliticsFringe = state.playImperiumPoliticsPlotIntrigue(
     imperiumPoliticsFixture,
     "p2",
     imperiumPolitics.id,
-    "spacing",
+    "fringeWorlds",
   );
-  assert.equal(playerById(imperiumPoliticsSpacing, "p2").influence.spacing, 2, "Imperium Politics should allow Spacing Guild Influence");
-  assert.equal(playerById(imperiumPoliticsSpacing, "p2").resources.solari, 1);
+  assert.equal(playerById(imperiumPoliticsFringe, "p2").influence.fringeWorlds, 2, "Imperium Politics should allow Fremen/Fringe Influence");
+  assert.equal(playerById(imperiumPoliticsFringe, "p2").resources.solari, 1);
   const poorImperiumPolitics = {
     ...imperiumPoliticsFixture,
     players: imperiumPoliticsFixture.players.map((candidate) =>
@@ -66,12 +66,12 @@ export function verifyImperiumPoliticsPlotIntrigue({ cards, game, state }) {
     ),
   };
   assert.equal(
-    state.playImperiumPoliticsPlotIntrigue(poorImperiumPolitics, "p2", imperiumPolitics.id, "spacing"),
+    state.playImperiumPoliticsPlotIntrigue(poorImperiumPolitics, "p2", imperiumPolitics.id, "fringeWorlds"),
     poorImperiumPolitics,
     "Imperium Politics should require 1 Solari",
   );
   assert.equal(
-    state.playImperiumPoliticsPlotIntrigue(imperiumPoliticsFixture, "p2", mercenaries.id, "spacing"),
+    state.playImperiumPoliticsPlotIntrigue(imperiumPoliticsFixture, "p2", mercenaries.id, "fringeWorlds"),
     imperiumPoliticsFixture,
     "Imperium Politics should reject other Intrigue cards",
   );
@@ -81,7 +81,7 @@ export function verifyImperiumPoliticsPlotIntrigue({ cards, game, state }) {
     "Only Shaddam should choose personal Emperor Influence from Imperium Politics",
   );
   assert.equal(
-    state.playImperiumPoliticsPlotIntrigue(imperiumPoliticsFixture, "p2", imperiumPolitics.id, "fremen"),
+    state.playImperiumPoliticsPlotIntrigue(imperiumPoliticsFixture, "p2", imperiumPolitics.id, "spacing"),
     imperiumPoliticsFixture,
     "Imperium Politics should reject unknown choices",
   );
@@ -90,7 +90,7 @@ export function verifyImperiumPoliticsPlotIntrigue({ cards, game, state }) {
     pendingAction: { kind: "spy", ownerId: "p2", remaining: 1, source: "Test" },
   };
   assert.equal(
-    state.playImperiumPoliticsPlotIntrigue(pendingImperiumPolitics, "p2", imperiumPolitics.id, "spacing"),
+    state.playImperiumPoliticsPlotIntrigue(pendingImperiumPolitics, "p2", imperiumPolitics.id, "fringeWorlds"),
     pendingImperiumPolitics,
     "Imperium Politics should wait for pending actions to resolve",
   );
@@ -99,18 +99,18 @@ export function verifyImperiumPoliticsPlotIntrigue({ cards, game, state }) {
     pendingQueue: [{ kind: "spy", ownerId: "p2", remaining: 1, source: "Test" }],
   };
   assert.equal(
-    state.playImperiumPoliticsPlotIntrigue(queuedImperiumPolitics, "p2", imperiumPolitics.id, "spacing"),
+    state.playImperiumPoliticsPlotIntrigue(queuedImperiumPolitics, "p2", imperiumPolitics.id, "fringeWorlds"),
     queuedImperiumPolitics,
     "Imperium Politics should wait for queued pending actions to resolve",
   );
   assert.equal(
-    state.playImperiumPoliticsPlotIntrigue(imperiumPoliticsFixture, "p3", imperiumPolitics.id, "spacing"),
+    state.playImperiumPoliticsPlotIntrigue(imperiumPoliticsFixture, "p3", imperiumPolitics.id, "fringeWorlds"),
     imperiumPoliticsFixture,
     "Only the active player should play Imperium Politics",
   );
   const combatImperiumPolitics = { ...imperiumPoliticsFixture, phase: "combat" };
   assert.equal(
-    state.playImperiumPoliticsPlotIntrigue(combatImperiumPolitics, "p2", imperiumPolitics.id, "spacing"),
+    state.playImperiumPoliticsPlotIntrigue(combatImperiumPolitics, "p2", imperiumPolitics.id, "fringeWorlds"),
     combatImperiumPolitics,
     "Imperium Politics should only resolve during normal play",
   );
@@ -122,22 +122,22 @@ export function verifyImperiumPoliticsPlotIntrigue({ cards, game, state }) {
         return {
           ...candidate,
           resources: { ...candidate.resources, solari: 2 },
-          influence: { ...candidate.influence, emperor: 1, greatHouses: 0, spacing: 0 },
+          influence: { ...candidate.influence, emperor: 1, greatHouses: 0, fringeWorlds: 0 },
           revealed: true,
           revealActivatedAllyId: "p6",
           intrigues: [imperiumPolitics],
         };
       }
       if (candidate.id === "p6") {
-        return { ...candidate, influence: { ...candidate.influence, greatHouses: 1, spacing: 1 }, intrigues: [] };
+        return { ...candidate, influence: { ...candidate.influence, greatHouses: 1, fringeWorlds: 1 }, intrigues: [] };
       }
       return { ...candidate, intrigues: [] };
     }),
   };
   assert.deepEqual(
     state.imperiumPoliticsFactionChoices(playerById(commanderImperiumPoliticsFixture, "p4")),
-    ["emperor", "greatHouses", "spacing"],
-    "Shaddam should choose personal Emperor, Great Houses, or Spacing Guild from Imperium Politics",
+    ["emperor", "greatHouses", "fringeWorlds"],
+    "Shaddam should choose personal Emperor, Great Houses, or Fremen/Fringe from Imperium Politics",
   );
   const shaddamPersonalPolitics = state.playImperiumPoliticsPlotIntrigue(
     commanderImperiumPoliticsFixture,
@@ -162,15 +162,15 @@ export function verifyImperiumPoliticsPlotIntrigue({ cards, game, state }) {
   assert.equal(playerById(shaddamGreatHousesPolitics, "p6").influence.greatHouses, 2, "Commander game-board Influence should move the activated Ally");
   assert.equal(playerById(shaddamGreatHousesPolitics, "p6").vp, playerById(commanderImperiumPoliticsFixture, "p6").vp + 1);
   assert.match(shaddamGreatHousesPolitics.log[0], /Princess Irulan gains 1 Great Houses Influence/);
-  const shaddamSpacingPolitics = state.playImperiumPoliticsPlotIntrigue(
+  const shaddamFringePolitics = state.playImperiumPoliticsPlotIntrigue(
     commanderImperiumPoliticsFixture,
     "p4",
     imperiumPolitics.id,
-    "spacing",
+    "fringeWorlds",
     "p6",
   );
-  assert.equal(playerById(shaddamSpacingPolitics, "p6").influence.spacing, 2, "Commander Spacing Guild Influence should move the activated Ally");
-  assert.equal(playerById(shaddamSpacingPolitics, "p4").influence.spacing, 0);
+  assert.equal(playerById(shaddamFringePolitics, "p6").influence.fringeWorlds, 2, "Commander Fremen/Fringe Influence should move the activated Ally");
+  assert.equal(playerById(shaddamFringePolitics, "p4").influence.fringeWorlds, 0);
   assert.equal(
     state.playImperiumPoliticsPlotIntrigue(commanderImperiumPoliticsFixture, "p4", imperiumPolitics.id, "greatHouses", "p2"),
     commanderImperiumPoliticsFixture,

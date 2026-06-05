@@ -84,6 +84,8 @@ function paidRewardChoiceOptionIsValid(option: PaidRewardChoicePendingOption) {
         return Boolean(factionLabels[reward.faction]) && paymentPendingAmountIsValid(reward.amount);
       case "gain-resource":
         return Boolean(resourceLabels[reward.resource]) && paymentPendingAmountIsValid(reward.amount);
+      case "gain-vp":
+        return paymentPendingAmountIsValid(reward.amount);
       case "draw-intrigues":
         return paymentPendingAmountIsValid(reward.amount);
       case "gain-leader-counter":
@@ -124,6 +126,8 @@ function paidRewardChoiceRewardText(reward: PaidRewardChoicePendingAtomicReward,
       return `${recipient.leader} gains ${reward.amount} ${factionLabels[reward.faction]} Influence`;
     case "gain-resource":
       return `${recipient.leader} gains ${reward.amount} ${resourceLabels[reward.resource]}`;
+    case "gain-vp":
+      return `${recipient.leader} gains ${reward.amount} VP`;
     case "draw-intrigues":
       return `${recipient.leader} draws ${reward.amount} Intrigue${reward.amount === 1 ? "" : "s"}`;
     case "gain-leader-counter":
@@ -225,6 +229,9 @@ export function resolvePaidRewardChoice(
               [reward.resource]: next.resources[reward.resource] + reward.amount,
             },
           };
+          break;
+        case "gain-vp":
+          next = { ...next, vp: next.vp + reward.amount };
           break;
         case "gain-leader-counter":
           next = reward.counter === "jessicaMemories"

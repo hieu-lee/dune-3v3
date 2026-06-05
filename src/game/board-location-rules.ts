@@ -9,6 +9,9 @@ import {
   completeChoamContractsForCurrentTurnHarvests,
   recordTurnSpiceGainAndCompleteHarvestContracts,
 } from "./contract-rules";
+import {
+  applyTrashedCardTriggers,
+} from "./discard-trigger-rules";
 import { changeAllegiancesGainChoices } from "./influence-choices";
 import { influenceEffectOwnerForChoice } from "./influence-loss-rules";
 import type { GameEffectTrigger } from "./types";
@@ -39,6 +42,16 @@ function boardInfluenceChoicePendingIsValid(pending: BoardInfluenceChoicePending
     (pending.amount === undefined || (Number.isInteger(pending.amount) && pending.amount > 0)) &&
     (pending.trashSource === undefined || typeof pending.trashSource === "boolean") &&
     (pending.trashSource !== true || (hasSourceCard && !isAcquireSource)) &&
+    (
+      pending.requiredHandTrashTrait === undefined ||
+      (
+        typeof pending.requiredHandTrashTrait === "string" &&
+        pending.requiredHandTrashTrait.trim().length > 0 &&
+        hasSourceCard &&
+        !isAcquireSource &&
+        pending.trashSource === true
+      )
+    ) &&
     (!hasSourceCard || (typeof pending.cardId === "string" && typeof pending.cardOwnerId === "string")) &&
     (pending.targetOwnerId === undefined || typeof pending.targetOwnerId === "string") &&
     (isAcquireSource || hasSourceCard || (
@@ -176,6 +189,7 @@ function sourceCardSupportsBoardSpaceInfluenceChoice(
   if (!effects.some((effect) =>
     effect.selector === "self" &&
     effect.trashSource === (pending.trashSource === true) &&
+    effect.requiredHandTrashTrait === pending.requiredHandTrashTrait &&
     (
       effect.amount === amount ||
       (includesBaseBoardChoice && effect.amount + (baseBoardChoice.amount ?? 1) === amount)
@@ -215,11 +229,35 @@ function formatResourceEntries(resources: Partial<Record<ResourceId, number>>) {
     .join(", ");
 }
 
+function firstHandTrashCardForPending(
+  sourceOwner: Player,
+  pending: BoardInfluenceChoicePendingAction,
+  trashCardId: string | undefined,
+) {
+  if (!pending.requiredHandTrashTrait || !trashCardId) return undefined;
+  return sourceOwner.hand.find((card) =>
+    card.id === trashCardId &&
+    card.traits?.includes(pending.requiredHandTrashTrait ?? "")
+  );
+}
+
+function removeOneCardById(cards: Card[], cardId: string) {
+  let removed = false;
+  return cards.filter((card) => {
+    if (!removed && card.id === cardId) {
+      removed = true;
+      return false;
+    }
+    return true;
+  });
+}
+
 export function resolveBoardInfluenceChoice(
   state: GameState,
   pending: BoardInfluenceChoicePendingAction,
   ownerId: string,
   faction: BoardInfluenceChoicePendingAction["choices"][number]["faction"],
+  trashCardId?: string,
 ): GameState {
   if (state.pendingAction !== pending || !boardInfluenceChoicePendingIsValid(pending)) return state;
   const amount = pending.amount ?? 1;
@@ -241,17 +279,32 @@ export function resolveBoardInfluenceChoice(
     return state;
   }
   if (!hasSourceCard && !boardInfluenceChoiceMatchesCurrentBoardSpace(state, pending)) return state;
+  const requiredHandTrashCard = sourceOwner
+    ? firstHandTrashCardForPending(sourceOwner, pending, trashCardId)
+    : undefined;
+  if (pending.requiredHandTrashTrait && !requiredHandTrashCard) return state;
   const choice = pending.choices.find((candidate) => candidate.ownerId === ownerId && candidate.faction === faction);
   if (!choice) return state;
   const owner = state.players.find((player) => player.id === choice.ownerId);
   if (!owner) return state;
 
-  const actionLog = `${owner.leader} gains ${amount} ${factionLabels[choice.faction]} Influence from ${pending.source}.`;
+  const trashText = pending.trashSource && sourceCard
+    ? `, trashing ${sourceCard.name}${requiredHandTrashCard ? ` and ${requiredHandTrashCard.name}` : ""}`
+    : "";
+  const actionLog = `${owner.leader} gains ${amount} ${factionLabels[choice.faction]} Influence from ${pending.source}${trashText}.`;
   const advancedState = {
     ...state,
     players: state.players.map((player) => {
-      if (!pending.trashSource || !pending.cardId || player.id !== pending.cardOwnerId) return player;
-      return { ...player, playArea: player.playArea.filter((card) => card.id !== pending.cardId) };
+      if (player.id !== pending.cardOwnerId) return player;
+      return {
+        ...player,
+        ...(pending.trashSource && pending.cardId
+          ? { playArea: removeOneCardById(player.playArea, pending.cardId) }
+          : {}),
+        ...(requiredHandTrashCard
+          ? { hand: removeOneCardById(player.hand, requiredHandTrashCard.id) }
+          : {}),
+      };
     }),
     ...advancePendingAction(state),
     log: [
@@ -259,10 +312,13 @@ export function resolveBoardInfluenceChoice(
       ...state.log,
     ],
   };
-  return completeChoamContractsForCurrentTurnHarvests(
+  const influenceState = completeChoamContractsForCurrentTurnHarvests(
     adjustInfluenceAndResolveThresholdRewards(advancedState, owner.id, choice.faction, amount),
     actionLog,
   ).state;
+  return requiredHandTrashCard && sourceOwner
+    ? applyTrashedCardTriggers(influenceState, sourceOwner.id, requiredHandTrashCard, { logAfterCurrentAction: true })
+    : influenceState;
 }
 
 export function resolveOptionalSpacePayment(

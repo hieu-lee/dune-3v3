@@ -292,37 +292,17 @@ export function verifyCardEffectSpecAgentSpyRevealValidation({
     commanderTargets: {},
     revealPlan: wheelsRevealPlan,
   });
-  assert.equal(wheelsRevealed.pendingAction?.kind, "spy", "Wheels Within Wheels Reveal should queue a spy placement");
-  assert.equal(wheelsRevealed.pendingAction?.source, "Wheels Within Wheels");
-  assert.equal(wheelsRevealed.pendingAction?.ownerId, p2.id);
-  assert.equal(wheelsRevealed.pendingAction?.remaining, 1);
-  assert.equal(wheelsRevealed.pendingAction?.mustPlaceSpy, true);
+  assert.deepEqual(
+    {
+      kind: wheelsRevealed.pendingAction?.kind,
+      remaining: wheelsRevealed.pendingAction?.remaining,
+      source: wheelsRevealed.pendingAction?.source,
+    },
+    { kind: "spy", remaining: 1, source: "Wheels Within Wheels" },
+    "Wheels Within Wheels Reveal should queue spy placement",
+  );
   assert.equal(playerById(wheelsRevealed, p2.id).persuasion, 1);
-  const wheelsRevealSpySpace = state.placeableSpySpaces(wheelsRevealed, wheelsRevealed.pendingAction)[0];
-  assert.ok(wheelsRevealSpySpace, "Wheels Within Wheels Reveal should have a legal spy placement space");
-  const wheelsPlacedSpy = state.placeSpyForPending(wheelsRevealed, wheelsRevealed.pendingAction, wheelsRevealSpySpace.id);
-  assert.equal(wheelsPlacedSpy.pendingAction, undefined, "Placing the Wheels Within Wheels reveal spy should clear pending");
-  assert.equal(
-    wheelsPlacedSpy.spyPosts[state.spyObservationPostIdForSpace(wheelsRevealSpySpace.id)],
-    p2.id,
-    "Wheels Within Wheels should place the chosen spy",
-  );
-  assert.equal(playerById(wheelsPlacedSpy, p2.id).spies, 0, "Wheels Within Wheels should spend the reveal spy");
-  assert.match(wheelsPlacedSpy.log[0], /places a spy near .* from Wheels Within Wheels/);
-  const wheelsRevealNoSpyFixture = {
-    ...wheelsRevealFixture,
-    players: wheelsRevealFixture.players.map((player) => player.id === p2.id ? { ...player, spies: 0 } : player),
-  };
-  const wheelsNoSpyPlan = turnActions.revealTurnPlan(playerById(wheelsRevealNoSpyFixture, p2.id), wheelsRevealNoSpyFixture);
-  const wheelsNoSpyReveal = turnActions.revealTurnAction(wheelsRevealNoSpyFixture, {
-    commanderTargets: {},
-    revealPlan: wheelsNoSpyPlan,
-  });
-  assert.equal(
-    wheelsNoSpyReveal.pendingAction,
-    undefined,
-    "Wheels Within Wheels should not pause Reveal when no spy can be placed",
-  );
+  assert.equal(playerById(wheelsRevealed, p2.id).resources.solari, p2.resources.solari, "Wheels Within Wheels Reveal should not gain Solari");
   const devastatingAssaultEffect = state.applyCardAgentEffect(
     devastatingAssault,
     { ...p4, resources: { solari: 0, spice: 0, water: 0 } },

@@ -5,6 +5,8 @@ import type {
   FactionId,
   GameEffectConditionSpec,
   IconId,
+  PaidRewardChoiceEffectOption,
+  PendingActionChoiceEffectOption,
   ResourceId,
   SandwormEffectDestination,
   SandwormEffectRecipient,
@@ -32,12 +34,61 @@ export function revealGainStrength(amount: EffectAmountSpec, conditions?: GameEf
   return revealEffects([{ kind: "gain-strength", selector: "self", amount }], conditions);
 }
 
+export function revealDrawIntrigues(amount: EffectAmountSpec, conditions?: GameEffectConditionSpec[]): CardEffectSpec {
+  return revealEffects([{ kind: "draw-intrigues", selector: "self", amount }], conditions);
+}
+
 export function revealGainInfluence(
   faction: FactionId,
   amount: EffectAmountSpec,
   conditions?: GameEffectConditionSpec[],
 ): CardEffectSpec {
   return revealEffects([{ kind: "gain-influence", selector: "self", faction, amount }], conditions);
+}
+
+export function revealGainInfluenceForSpiedFactions(
+  amount: EffectAmountSpec,
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return revealEffects([{ kind: "gain-influence-for-spied-factions", selector: "self", amount }], conditions);
+}
+
+export function revealPaidRewardChoice(
+  options: PaidRewardChoiceEffectOption[],
+  specOptions: {
+    requirePayableOption?: true;
+    source?: string;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return revealEffects([
+    {
+      kind: "paid-reward-choice",
+      selector: "self",
+      options,
+      ...(specOptions.requirePayableOption ? { requirePayableOption: true } : {}),
+      ...(specOptions.source ? { source: specOptions.source } : {}),
+    },
+  ], conditions);
+}
+
+export function revealPendingActionChoice(
+  options: PendingActionChoiceEffectOption[],
+  specOptions: {
+    optional?: true;
+    source?: string;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return revealEffects([
+    {
+      kind: "pending-action-choice",
+      selector: "self",
+      options,
+      ...(specOptions.optional ? { optional: true } : {}),
+      ...(specOptions.source ? { source: specOptions.source } : {}),
+    },
+  ], conditions);
 }
 
 export function revealRecruitTroops(
@@ -54,6 +105,7 @@ export function revealPlaceSpies(
     recallForSupply?: boolean;
     mustPlace?: boolean;
     placementIcon?: IconId;
+    placementIcons?: IconId[];
     allowSharedPost?: boolean;
     source?: string;
     postPlacementAction?: "staban-unseen-network";
@@ -123,6 +175,8 @@ export function revealTrashSourceForVp(
   vp: EffectAmountSpec,
   options: {
     optional?: boolean;
+    persuasionCost?: EffectAmountSpec;
+    resourceCost?: Partial<Record<ResourceId, EffectAmountSpec>>;
   } = {},
   conditions?: GameEffectConditionSpec[],
 ): CardEffectSpec {
@@ -157,11 +211,32 @@ export function revealLoseInfluenceForIntrigues(
   ], conditions);
 }
 
+export function revealLoseInfluenceForInfluence(
+  options: {
+    loseAmount?: EffectAmountSpec;
+    gainAmount?: EffectAmountSpec;
+    optional?: boolean;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return revealEffects([
+    {
+      kind: "lose-influence-for-influence",
+      selector: "self",
+      loseAmount: options.loseAmount ?? 1,
+      gainAmount: options.gainAmount ?? 1,
+      optional: true,
+      ...options,
+    },
+  ], conditions);
+}
+
 export function revealRecallSpyForIntrigues(
   drawIntrigues: EffectAmountSpec,
   options: {
     amount?: EffectAmountSpec;
     optional?: boolean;
+    persuasionReward?: EffectAmountSpec;
     source?: string;
   } = {},
   conditions?: GameEffectConditionSpec[],
@@ -172,6 +247,29 @@ export function revealRecallSpyForIntrigues(
       selector: "self",
       amount: options.amount ?? 1,
       drawIntrigues,
+      ...(options.persuasionReward !== undefined ? { persuasionReward: options.persuasionReward } : {}),
+      optional: true,
+      ...(options.source ? { source: options.source } : {}),
+      ...(options.optional !== undefined ? { optional: options.optional } : {}),
+    },
+  ], conditions);
+}
+
+export function revealRecallSpiesForPersuasion(
+  amount: EffectAmountSpec,
+  persuasionReward: EffectAmountSpec,
+  options: {
+    optional?: boolean;
+    source?: string;
+  } = {},
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return revealEffects([
+    {
+      kind: "recall-spy",
+      selector: "self",
+      amount,
+      persuasionReward,
       optional: true,
       ...(options.source ? { source: options.source } : {}),
       ...(options.optional !== undefined ? { optional: options.optional } : {}),

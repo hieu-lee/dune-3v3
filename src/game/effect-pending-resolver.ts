@@ -37,6 +37,7 @@ import type {
   PlotDeployTroops,
   PlotSummonSandworms,
   RevealDeployOrRetreatTroops,
+  RevealLoseInfluenceForInfluence,
   RevealLoseInfluenceForIntrigues,
   RevealRetreatTroopsForStrength,
   RevealRetreatTroops,
@@ -66,7 +67,7 @@ function resolvedResourceGain(
 ): Partial<Resources> {
   const resolved: Partial<Resources> = {};
   for (const [resource, amount] of Object.entries(gain ?? {}) as [ResourceId, EffectAmountSpec][]) {
-    resolved[resource] = amountFor(amount, context.source);
+    resolved[resource] = amountFor(amount, context.source, context);
   }
   return resolved;
 }
@@ -196,6 +197,10 @@ export function resolveTrashCardEffects(
           ? undefined
           : amountFor(effect.drawCardsReward, context.source),
         vpReward: effect.vpReward === undefined ? undefined : amountFor(effect.vpReward, context.source),
+        persuasionCost: effect.persuasionCost === undefined
+          ? undefined
+          : amountFor(effect.persuasionCost, context.source, context),
+        resourceCost: resolvedResourceGain(effect.resourceCost, context),
       }));
   });
 }
@@ -225,6 +230,25 @@ export function resolveRevealLoseInfluenceForIntrigues(
   });
 }
 
+export function resolveRevealLoseInfluenceForInfluences(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): RevealLoseInfluenceForInfluence[] {
+  specs?.forEach(validateSpec);
+  return (specs ?? []).flatMap((spec) => {
+    if (spec.trigger !== "reveal") return [];
+    if (!specApplies(spec, context)) return [];
+    return spec.effects
+      .filter((effect) => effect.kind === "lose-influence-for-influence")
+      .map((effect) => ({
+        selector: effect.selector,
+        loseAmount: amountFor(effect.loseAmount, context.source, context),
+        gainAmount: amountFor(effect.gainAmount, context.source, context),
+        optional: effect.optional ?? true,
+      }));
+  });
+}
+
 export function resolveRevealSpyRecallForIntrigues(
   specs: CardEffectSpec[] | undefined,
   context: GameEffectContext,
@@ -235,15 +259,31 @@ export function resolveRevealSpyRecallForIntrigues(
     if (!specApplies(spec, context)) return [];
     return spec.effects
       .filter((effect) => effect.kind === "recall-spy")
-      .filter((effect) => effect.drawIntrigues !== undefined)
-      .map((effect) => {
-        if (effect.amount === undefined || effect.drawIntrigues === undefined) {
-          throw new Error("Unsupported Reveal recall-spy effect without amount and drawIntrigues");
+      .filter((effect) => effect.drawIntrigues !== undefined || effect.persuasionReward !== undefined)
+      .flatMap((effect) => {
+        if (effect.amount === undefined) {
+          throw new Error("Unsupported Reveal recall-spy effect without amount");
+        }
+        const amount = amountFor(effect.amount, context.source, context);
+        if (
+          context.state?.spyPosts &&
+          context.state.sharedSpyPosts &&
+          spyPostCount(
+            { spyPosts: context.state.spyPosts, sharedSpyPosts: context.state.sharedSpyPosts },
+            context.source.id,
+          ) < amount
+        ) {
+          return [];
         }
         return {
           selector: effect.selector,
-          amount: amountFor(effect.amount, context.source),
-          drawIntrigues: amountFor(effect.drawIntrigues, context.source),
+          amount,
+          drawIntrigues: effect.drawIntrigues === undefined
+            ? 0
+            : amountFor(effect.drawIntrigues, context.source, context),
+          persuasionReward: effect.persuasionReward === undefined
+            ? 0
+            : amountFor(effect.persuasionReward, context.source, context),
           optional: effect.optional ?? true,
           source: effect.source,
         };
@@ -320,6 +360,7 @@ export function resolveAgentDiscardCardForDraws(
       .map((effect) => ({
         selector: effect.selector,
         drawCards: amountFor(effect.drawCards, context.source),
+        ...(effect.drawIntrigues !== undefined ? { drawIntrigues: amountFor(effect.drawIntrigues, context.source) } : {}),
         optional: effect.optional ?? false,
         ...(effect.bonusDraw
           ? {
@@ -448,6 +489,7 @@ export function resolveAgentBoardSpaceInfluences(
         selector: effect.selector,
         amount: amountFor(effect.amount, context.source),
         trashSource: effect.trashSource ?? false,
+        requiredHandTrashTrait: effect.requiredHandTrashTrait,
         source: effect.source,
       }));
   });

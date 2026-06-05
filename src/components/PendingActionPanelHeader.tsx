@@ -73,6 +73,8 @@ function pendingActionTitle(game: GameState, pendingAction: PendingAction) {
       return `${playerLeader(playerById(game, pendingAction.ownerId))} ${pendingAction.source}`;
     case "lose-influence-for-intrigues":
       return `${playerLeader(playerById(game, pendingAction.ownerId))} ${pendingAction.source} reveal`;
+    case "lose-influence-for-influence":
+      return `${playerLeader(playerById(game, pendingAction.ownerId))} ${pendingAction.source} reveal`;
     case "maker-choice":
       return `${makerChoiceLabel(game, pendingAction)} Maker space`;
     case "sietch-tabr":

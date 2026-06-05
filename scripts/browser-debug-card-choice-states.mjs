@@ -97,7 +97,7 @@ export async function createCardChoiceStates(server, initialPlayableGame) {
   const capturedMentatDraw = { ...data.imperiumDeck.find((card) => card.name === "Calculus of Power"), id: "browser-captured-mentat-draw-card" };
   assert.ok(capturedMentatDraw.name, "Expected Captured Mentat draw card");
   const capturedMentatIntrigue = { ...data.intrigueCards[0], id: "browser-captured-mentat-intrigue-card" };
-  assert.ok(capturedMentatIntrigue.name, "Expected Captured Mentat reveal Intrigue card");
+  assert.ok(capturedMentatIntrigue.name, "Expected Captured Mentat Intrigue card");
   const spaceTimeFoldingDiscard = {
     ...spaceTimeFolding,
     id: "browser-space-time-folding-discard-card",
@@ -511,6 +511,9 @@ export async function createCardChoiceStates(server, initialPlayableGame) {
       capturedMentatDiscardId: capturedMentatDiscard.id,
       capturedMentatDiscardName: capturedMentatDiscard.name,
       capturedMentatDrawId: capturedMentatDraw.id,
+      capturedMentatIntrigueId: capturedMentatIntrigue.id,
+      intrigueDeck: [capturedMentatIntrigue],
+      intrigueDiscard: [],
       players: base.players.map((player) =>
         player.id === ownerId
           ? {
@@ -518,18 +521,17 @@ export async function createCardChoiceStates(server, initialPlayableGame) {
               deck: [capturedMentatDraw],
               discard: [],
               hand: [capturedMentatDiscard],
-              influence: { ...player.influence, bene: 0 },
               playArea: [capturedMentat],
             }
           : player,
       ),
       pendingAction: {
-        kind: "discard-card-for-influence-and-draw",
+        kind: "discard-card-for-draw",
         ownerId,
         source: "Captured Mentat",
         drawCards: 1,
-        influenceAmount: 1,
-        optional: true,
+        drawIntrigues: 1,
+        optional: false,
       },
     },
     spaceTimeFolding: {
@@ -693,25 +695,24 @@ export async function createCardChoiceStates(server, initialPlayableGame) {
     },
     capturedMentatReveal: {
       ...base,
-      capturedMentatIntrigueId: capturedMentatIntrigue.id,
-      intrigueDeck: [capturedMentatIntrigue],
-      intrigueDiscard: [],
       players: base.players.map((player) =>
         player.id === ownerId
           ? {
               ...player,
               hand: [],
-              influence: { ...player.influence, bene: 1 },
+              influence: { ...player.influence, bene: 2, spacing: 0 },
               intrigues: [],
               playArea: [capturedMentat],
+              vp: 1,
             }
           : player,
       ),
       pendingAction: {
-        kind: "lose-influence-for-intrigues",
+        kind: "lose-influence-for-influence",
         ownerId,
         source: "Captured Mentat",
-        amount: 1,
+        loseAmount: 1,
+        gainAmount: 1,
         optional: true,
       },
     },

@@ -67,6 +67,35 @@ export function cloneCardEffects(effects: CardEffectSpec[] | undefined): CardEff
             : {}),
         };
       }
+      if (effect.kind === "discard-card-for-draw") {
+        return {
+          ...effect,
+          drawCards: cloneAmount(effect.drawCards),
+          ...(effect.drawIntrigues !== undefined ? { drawIntrigues: cloneAmount(effect.drawIntrigues) } : {}),
+          ...(effect.bonusDraw
+            ? {
+                bonusDraw: {
+                  ...effect.bonusDraw,
+                  drawCards: cloneAmount(effect.bonusDraw.drawCards),
+                },
+              }
+            : {}),
+          ...(effect.bonusIntrigues
+            ? {
+                bonusIntrigues: {
+                  ...effect.bonusIntrigues,
+                  amount: cloneAmount(effect.bonusIntrigues.amount),
+                },
+              }
+          : {}),
+        };
+      }
+      if (effect.kind === "place-spies") {
+        return {
+          ...effect,
+          ...(effect.placementIcons ? { placementIcons: [...effect.placementIcons] } : {}),
+        };
+      }
       return {
         ...effect,
         ...("amount" in effect && effect.amount !== undefined
@@ -96,14 +125,17 @@ export function cloneCardEffects(effects: CardEffectSpec[] | undefined): CardEff
         ...("vpReward" in effect && effect.vpReward !== undefined
           ? { vpReward: cloneAmount(effect.vpReward) }
           : {}),
+        ...("loseAmount" in effect
+          ? { loseAmount: cloneAmount(effect.loseAmount) }
+          : {}),
+        ...("gainAmount" in effect
+          ? { gainAmount: cloneAmount(effect.gainAmount) }
+          : {}),
+        ...("resourceCost" in effect && effect.resourceCost !== undefined
+          ? { resourceCost: cloneResourceAmountMap(effect.resourceCost) }
+          : {}),
         ...("drawCards" in effect
           ? { drawCards: cloneAmount(effect.drawCards) }
-          : {}),
-        ...("bonusDraw" in effect && effect.bonusDraw
-          ? { bonusDraw: { ...effect.bonusDraw, drawCards: cloneAmount(effect.bonusDraw.drawCards) } }
-          : {}),
-        ...("bonusIntrigues" in effect && effect.bonusIntrigues
-          ? { bonusIntrigues: { ...effect.bonusIntrigues, amount: cloneAmount(effect.bonusIntrigues.amount) } }
           : {}),
         ...("influenceAmount" in effect
           ? { influenceAmount: cloneAmount(effect.influenceAmount) }
@@ -135,6 +167,7 @@ export function clonePendingActionChoiceOptions(options: PendingActionChoiceEffe
     if (option.effect.kind === "acquire-card") {
       return {
         ...option,
+        ...(option.conditions ? { conditions: option.conditions.map((condition) => ({ ...condition })) } : {}),
         effect: {
           ...option.effect,
           ...(option.effect.minCost !== undefined ? { minCost: cloneAmount(option.effect.minCost) } : {}),
@@ -145,6 +178,7 @@ export function clonePendingActionChoiceOptions(options: PendingActionChoiceEffe
     if (option.effect.kind === "trash-card") {
       return {
         ...option,
+        ...(option.conditions ? { conditions: option.conditions.map((condition) => ({ ...condition })) } : {}),
         effect: {
           ...option.effect,
           ...(option.effect.zones ? { zones: [...option.effect.zones] } : {}),
@@ -154,6 +188,40 @@ export function clonePendingActionChoiceOptions(options: PendingActionChoiceEffe
           ...(option.effect.spiceReward !== undefined
             ? { spiceReward: cloneAmount(option.effect.spiceReward) }
             : {}),
+          ...(option.effect.vpReward !== undefined
+            ? { vpReward: cloneAmount(option.effect.vpReward) }
+            : {}),
+          ...(option.effect.persuasionCost !== undefined
+            ? { persuasionCost: cloneAmount(option.effect.persuasionCost) }
+            : {}),
+          ...(option.effect.resourceCost
+            ? { resourceCost: cloneResourceAmountMap(option.effect.resourceCost) }
+            : {}),
+        },
+      };
+    }
+    if (option.effect.kind === "place-spies") {
+      return {
+        ...option,
+        ...(option.conditions ? { conditions: option.conditions.map((condition) => ({ ...condition })) } : {}),
+        effect: {
+          ...option.effect,
+          amount: cloneAmount(option.effect.amount),
+          ...(option.effect.placementIcons ? { placementIcons: [...option.effect.placementIcons] } : {}),
+        },
+      };
+    }
+    if (
+      option.effect.kind === "gain-persuasion" ||
+      option.effect.kind === "gain-resource" ||
+      option.effect.kind === "gain-strength"
+    ) {
+      return {
+        ...option,
+        ...(option.conditions ? { conditions: option.conditions.map((condition) => ({ ...condition })) } : {}),
+        effect: {
+          ...option.effect,
+          amount: cloneAmount(option.effect.amount),
         },
       };
     }
@@ -187,6 +255,7 @@ function clonePaidRewardChoiceAtomicReward(
     case "recruit-troops":
     case "gain-influence":
     case "gain-resource":
+    case "gain-vp":
     case "draw-intrigues":
       return {
         ...reward,

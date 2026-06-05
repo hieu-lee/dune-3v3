@@ -1,4 +1,5 @@
 import { validateSpec } from "./effect-spec-validation";
+import { boardSpaces } from "./board-space-data";
 import {
   addInfluenceAmount,
   addResourceSpend,
@@ -15,6 +16,7 @@ import {
   emptyEffectResult,
   emptyPlayerEffectResult,
 } from "./effect-resolver-types";
+import { spyPostOwnerIds } from "./spy-posts";
 import type {
   Card,
   CardEffectSpec,
@@ -37,6 +39,8 @@ export {
   resolveAgentPaidRewardChoices,
   resolveAgentPendingActionChoices,
   resolveLeaderTransitionChoices,
+  resolveRevealPaidRewardChoices,
+  resolveRevealPendingActionChoices,
 } from "./effect-choice-resolver";
 export * from "./effect-pending-resolver";
 export type {
@@ -72,6 +76,7 @@ export type {
   PlotDeployTroops,
   PlotSummonSandworms,
   RevealLoseInfluenceForIntrigues,
+  RevealLoseInfluenceForInfluence,
   RevealPayResourceForHighCouncilSeat,
   RevealPayResourceForSandworms,
   RevealPayResourceForStrength,
@@ -210,6 +215,19 @@ function addSelectedInfluenceGain(
   return unsupportedKind("effect selector", selector);
 }
 
+function spiedInfluenceFactions(context: GameEffectContext): FactionId[] {
+  const spyPosts = context.state?.spyPosts;
+  const sharedSpyPosts = context.state?.sharedSpyPosts;
+  if (!spyPosts || !sharedSpyPosts) return [];
+  const factions = boardSpaces.flatMap((space) => {
+    if (space.zone !== "Faction" || !space.influence) return [];
+    return spyPostOwnerIds({ spyPosts, sharedSpyPosts }, space.id).includes(context.source.id)
+      ? [space.influence]
+      : [];
+  });
+  return [...new Set(factions)];
+}
+
 function addSelectedIntriguesToDraw(result: GameEffectResult, selector: PlayerSelector, amount: number) {
   if (selector === "self") {
     return { ...result, intriguesToDraw: result.intriguesToDraw + amount };
@@ -250,15 +268,15 @@ function addSelectedSpyPlacement(
 function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context: GameEffectContext): GameEffectResult {
   if (!selectorApplies(effect.selector, context)) return result;
   if (effect.kind === "gain-resource") {
-    const amount = amountFor(effect.amount, context.source);
+    const amount = amountFor(effect.amount, context.source, context);
     return addSelectedRevealGain(result, effect.selector, effect.resource, amount, effect.source);
   }
   if (effect.kind === "spend-resource") {
-    const amount = amountFor(effect.amount, context.source);
+    const amount = amountFor(effect.amount, context.source, context);
     return addSelectedResourceSpend(result, effect.selector, effect.resource, amount);
   }
   if (effect.kind === "lose-influence") {
-    const amount = amountFor(effect.amount, context.source);
+    const amount = amountFor(effect.amount, context.source, context);
     return {
       ...result,
       influenceLosses: addInfluenceAmount(result.influenceLosses, effect.faction, amount),
@@ -269,35 +287,42 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
     };
   }
   if (effect.kind === "gain-influence") {
-    const amount = amountFor(effect.amount, context.source);
+    const amount = amountFor(effect.amount, context.source, context);
     return addSelectedInfluenceGain(result, effect.selector, effect.faction, amount);
+  }
+  if (effect.kind === "gain-influence-for-spied-factions") {
+    const amount = amountFor(effect.amount, context.source, context);
+    return spiedInfluenceFactions(context).reduce(
+      (nextResult, faction) => addSelectedInfluenceGain(nextResult, effect.selector, faction, amount),
+      result,
+    );
   }
   if (effect.kind === "gain-persuasion") {
     if (effect.selector !== "self") {
       throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
     }
-    const amount = amountFor(effect.amount, context.source);
+    const amount = amountFor(effect.amount, context.source, context);
     return { ...result, persuasion: result.persuasion + amount };
   }
   if (effect.kind === "gain-strength") {
     if (effect.selector !== "self") {
       throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
     }
-    const amount = amountFor(effect.amount, context.source);
+    const amount = amountFor(effect.amount, context.source, context);
     return { ...result, swords: result.swords + amount };
   }
   if (effect.kind === "gain-vp") {
     if (effect.selector !== "self") {
       throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
     }
-    const amount = amountFor(effect.amount, context.source);
+    const amount = amountFor(effect.amount, context.source, context);
     return { ...result, vp: result.vp + amount };
   }
   if (effect.kind === "draw-cards") {
     if (effect.selector !== "self") {
       throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
     }
-    const amount = amountFor(effect.amount, context.source);
+    const amount = amountFor(effect.amount, context.source, context);
     return {
       ...result,
       cardsToDraw: result.cardsToDraw + amount,
@@ -310,7 +335,7 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
     };
   }
   if (effect.kind === "draw-intrigues") {
-    const amount = amountFor(effect.amount, context.source);
+    const amount = amountFor(effect.amount, context.source, context);
     return addSelectedIntriguesToDraw(result, effect.selector, amount);
   }
   if (effect.kind === "discard-card") {
@@ -320,7 +345,7 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
     if (effect.selector !== "self") {
       throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
     }
-    const amount = amountFor(effect.amount, context.source);
+    const amount = amountFor(effect.amount, context.source, context);
     return { ...result, acquireRecruitBonus: result.acquireRecruitBonus + amount };
   }
   if (effect.kind === "remove-shield-wall") {
@@ -342,7 +367,7 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
     return result;
   }
   if (effect.kind === "recruit-troops") {
-    const amount = amountFor(effect.amount, context.source);
+    const amount = amountFor(effect.amount, context.source, context);
     return addSelectedRecruitedTroops(result, effect.selector, amount, effect.source);
   }
   if (effect.kind === "deploy-recruited-troops") {
@@ -374,6 +399,9 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
     return result;
   }
   if (effect.kind === "lose-influence-for-intrigues") {
+    return result;
+  }
+  if (effect.kind === "lose-influence-for-influence") {
     return result;
   }
   if (effect.kind === "lose-influence-for-strength") {
@@ -476,7 +504,7 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
       throw new Error(`Unsupported effect selector "${effect.selector}" for ${effect.kind}`);
     }
     if (!context.space?.id) return result;
-    const rewardAmount = effect.reward ? amountFor(effect.reward.amount, context.source) : 0;
+    const rewardAmount = effect.reward ? amountFor(effect.reward.amount, context.source, context) : 0;
     const withRecall = {
       ...result,
       removeShieldWall: result.removeShieldWall || effect.removeShieldWall === true,
@@ -493,12 +521,13 @@ function resolveEffect(result: GameEffectResult, effect: GameEffectSpec, context
       : withRecall;
   }
   if (effect.kind === "place-spies") {
-    const amount = amountFor(effect.amount, context.source);
+    const amount = amountFor(effect.amount, context.source, context);
     return addSelectedSpyPlacement(result, effect.selector, {
       count: amount,
       recallForSupply: effect.recallForSupply,
       mustPlace: effect.mustPlace,
       placementIcon: effect.placementIcon,
+      placementIcons: effect.placementIcons,
       allowSharedPost: effect.allowSharedPost,
       source: effect.source,
       postPlacementAction: effect.postPlacementAction,
@@ -664,7 +693,13 @@ export function resolveCardRevealEffects(
     card.effects?.forEach(validateSpec);
     const revealSpecs = card.effects?.filter((spec) => spec.trigger === "reveal");
     const cardResult = revealSpecs && revealSpecs.length > 0
-      ? resolveGameEffects(revealSpecs, { trigger: "reveal", source: revealSource, state })
+      ? resolveGameEffects(revealSpecs, {
+          trigger: "reveal",
+          resolvingCard: card,
+          revealedCards: cards,
+          source: revealSource,
+          state,
+        })
       : legacyRevealResult(card);
     return mergeEffectResult(result, cardResult);
   }, emptyEffectResult);
@@ -705,4 +740,17 @@ export function resolveCardAcquireEffects(
   return acquireSpecs && acquireSpecs.length > 0
     ? resolveGameEffects(acquireSpecs, { trigger: "acquire", source, state })
     : legacyAcquireResult(card);
+}
+
+export function resolveGainInfluenceForSpiedFactions(
+  source: Player,
+  state: EffectResolverState,
+  amount: number,
+): GameEffectResult {
+  return resolveGameEffects([
+    {
+      trigger: "reveal",
+      effects: [{ kind: "gain-influence-for-spied-factions", selector: "self", amount }],
+    },
+  ], { trigger: "reveal", source, state });
 }

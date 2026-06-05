@@ -358,7 +358,7 @@ const muadDibCommanderSpecs: Array<StarterCardSpec & { sourceId: number }> = [
     swords: 0,
     effects: [
       agentPayResourceForInfluence(
-        "solari",
+        "spice",
         4,
         "board-space",
         1,
@@ -367,7 +367,7 @@ const muadDibCommanderSpecs: Array<StarterCardSpec & { sourceId: number }> = [
       ),
       revealGainPersuasion(1),
     ],
-    play: "Pay 4 Solari to add 1 more Influence from the visited faction space, then trash this card.",
+    play: "Pay 4 spice to add 1 more Influence from the visited faction space, then trash this card.",
     reveal: starterRevealText(1, 0),
   },
   {

@@ -67,16 +67,16 @@ export function verifyCardEffectSpecContractCardValidation({
     highCouncilSeat: false,
   }, game);
   assert.equal(interstellarReveal.persuasion, 2, "Interstellar Trade should use completed-contract amount specs");
-  assert.match(interstellarTrade.play, /No Agent effect/i);
-  assert.doesNotMatch(interstellarTrade.play, /Acquire bonus|Gain one Influence|Take a face-up contract/i);
+  assert.equal(interstellarTrade.play, "Gain 1 Influence.");
+  assert.doesNotMatch(interstellarTrade.play, /Acquire bonus|Take a face-up contract/i);
   assert.deepEqual(
     effectResolver.resolveGainInfluenceChoices(interstellarTrade.effects, {
-      trigger: "acquire",
+      trigger: "agent-play",
       source: p2,
       state: game,
     }),
     [{ selector: "self", amount: 1, trashSource: false, source: "Interstellar Trade" }],
-    "Interstellar Trade acquire Influence choice should resolve from typed specs",
+    "Interstellar Trade Agent Influence choice should resolve from typed specs",
   );
   assert.deepEqual(
     effectResolver.resolveTakeContracts(interstellarTrade.effects, {
@@ -86,21 +86,6 @@ export function verifyCardEffectSpecContractCardValidation({
     }),
     [{ selector: "self", amount: 1, sourcePool: "public-offer", optional: false, source: "Interstellar Trade" }],
     "Interstellar Trade acquire contract bonus should resolve from typed specs",
-  );
-  const priorityContractsAgentResult = effectResolver.resolveGameEffects(priorityContracts.effects, {
-    trigger: "agent-play",
-    source: p2,
-    state: game,
-  });
-  assert.equal(
-    priorityContractsAgentResult.revealGain.spice,
-    2,
-    "Priority Contracts Agent spice bonus should resolve from typed specs",
-  );
-  assert.equal(
-    priorityContractsAgentResult.vp,
-    1,
-    "Priority Contracts Agent VP bonus should resolve from typed specs",
   );
   assert.deepEqual(
     effectResolver.resolveTakeContracts(priorityContracts.effects, {
@@ -168,9 +153,9 @@ export function verifyCardEffectSpecContractCardValidation({
     { kind: "contract", ownerId: p2.id, source: "Priority Contracts", publicOnly: true },
     "Priority Contracts should queue a public CHOAM contract after Agent placement",
   );
-  assert.equal(playerById(priorityContractsPlaced, p2.id).resources.spice, 3, "Priority Contracts should grant 2 spice immediately");
-  assert.equal(playerById(priorityContractsPlaced, p2.id).vp, 1, "Priority Contracts should grant 1 VP immediately");
-  assert.match(priorityContractsPlaced.log[0], /Priority Contracts: gains 2 spice; gains 1 VP/);
+  assert.equal(playerById(priorityContractsPlaced, p2.id).resources.spice, 1, "Priority Contracts should not grant immediate spice");
+  assert.equal(playerById(priorityContractsPlaced, p2.id).vp, 0, "Priority Contracts should not grant immediate VP");
+  assert.doesNotMatch(priorityContractsPlaced.log[0] ?? "", /Priority Contracts: gains 2 spice|gains 1 VP/);
   const priorityContractsResolved = state.takeChoamContract(
     priorityContractsPlaced,
     priorityContractsPlaced.pendingAction,
@@ -303,7 +288,7 @@ export function verifyCardEffectSpecContractCardValidation({
     },
   );
   assert.equal(priorityContractsNoOffer.pendingAction, undefined, "Priority Contracts should not queue when no public contracts remain");
-  assert.equal(playerById(priorityContractsNoOffer, p2.id).resources.spice, 3, "Priority Contracts no-offer path should still grant spice");
-  assert.equal(playerById(priorityContractsNoOffer, p2.id).vp, 1, "Priority Contracts no-offer path should still grant VP");
+  assert.equal(playerById(priorityContractsNoOffer, p2.id).resources.spice, 1, "Priority Contracts no-offer path should not grant spice");
+  assert.equal(playerById(priorityContractsNoOffer, p2.id).vp, 0, "Priority Contracts no-offer path should not grant VP");
 
 }

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Handshake } from "lucide-react";
 import { factionShortLabels } from "../app-helpers";
 import { factionLabels } from "../game/data";
+import type { InfluenceExchangeChoice } from "../game/state";
 import type { Card, FactionId, PendingAction, Player, ResourceId, Resources } from "../game/types";
 
 type PendingDiscardInfluenceDrawPanelProps = {
@@ -127,6 +128,7 @@ type PendingDiscardDrawPanelProps = {
     requiredDiscardTrait: string;
     amount: number;
   };
+  drawIntrigues?: number;
   optional: boolean;
   owner?: Player;
   source: string;
@@ -190,6 +192,7 @@ function discardableCountText(count: number) {
 export function PendingDiscardDrawPanel({
   discardChoices,
   drawCards,
+  drawIntrigues = 0,
   bonusDraw,
   bonusIntrigues,
   optional,
@@ -208,9 +211,14 @@ export function PendingDiscardDrawPanel({
       ? bonusIntrigues.amount
       : 0;
   const totalDrawCards = drawCards + selectedBonusDraw;
+  const totalIntrigues = drawIntrigues + selectedBonusIntrigues;
   const bonusTexts = bonusRewardTexts(bonusDraw, bonusIntrigues, drawCards);
-  const summaryText = [baseDrawText(drawCards), ...bonusTexts].join(". ");
-  const resolveLabel = `Resolve ${source}${selectedCard ? selectedDrawSuffix(totalDrawCards, selectedBonusIntrigues) : ""}`;
+  const baseTexts = [
+    baseDrawText(drawCards),
+    drawIntrigues > 0 ? `Draw ${intrigueCountText(drawIntrigues)}` : undefined,
+  ].filter((part): part is string => Boolean(part));
+  const summaryText = [...baseTexts, ...bonusTexts].join(". ");
+  const resolveLabel = `Resolve ${source}${selectedCard ? selectedDrawSuffix(totalDrawCards, totalIntrigues) : ""}`;
 
   return (
     <div className="pending-controls discard-choice-grid">
@@ -242,7 +250,7 @@ export function PendingDiscardDrawPanel({
                 <strong>{card.name}</strong>
                 <small>
                   {selectedCardId === card.id
-                    ? selectedDrawSuffix(totalDrawCards, selectedBonusIntrigues).replace(/[()]/g, "")
+                    ? selectedDrawSuffix(totalDrawCards, totalIntrigues).replace(/[()]/g, "")
                     : "Select to preview reward."}
                 </small>
               </button>
@@ -504,6 +512,70 @@ export function PendingInfluenceIntriguePanel({
           <small>Lose 1 Influence to draw {intrigueText}</small>
         </button>
       ))}
+      {optional && (
+        <button type="button" className="influence-choice-skip" aria-label="Skip" onClick={onSkip}>
+          Skip
+        </button>
+      )}
+    </div>
+  );
+}
+
+type PendingInfluenceExchangePanelProps = {
+  choices: InfluenceExchangeChoice[];
+  gainAmount: number;
+  loseAmount: number;
+  optional: boolean;
+  owner?: Player;
+  players: Player[];
+  source: string;
+  onChoose: (choice: InfluenceExchangeChoice) => void;
+  onSkip: () => void;
+};
+
+function playerLabel(players: Player[], playerId: string) {
+  return players.find((player) => player.id === playerId)?.leader ?? "Player";
+}
+
+export function PendingInfluenceExchangePanel({
+  choices,
+  gainAmount,
+  loseAmount,
+  optional,
+  owner,
+  players,
+  source,
+  onChoose,
+  onSkip,
+}: PendingInfluenceExchangePanelProps) {
+  return (
+    <div className="pending-controls support-grid influence-choice-grid">
+      <div className="influence-choice-summary">
+        <span>{source}</span>
+        <strong>{owner?.leader ?? "Player"}</strong>
+        <small>Lose {loseAmount} Influence to gain {gainAmount} Influence.</small>
+      </div>
+      {choices.map((choice) => {
+        const key = `${choice.loseOwnerId}-${choice.loseFaction}-${choice.gainOwnerId}-${choice.gainFaction}`;
+        const loseLabel = `${playerLabel(players, choice.loseOwnerId)}: ${factionLabels[choice.loseFaction]}`;
+        const gainLabel = `${playerLabel(players, choice.gainOwnerId)}: ${factionLabels[choice.gainFaction]}`;
+        return (
+          <button
+            type="button"
+            className="influence-choice-card"
+            aria-label={`${loseLabel} to ${gainLabel}`}
+            key={key}
+            onClick={() => onChoose(choice)}
+            title={`Lose ${factionLabels[choice.loseFaction]} Influence and gain ${factionLabels[choice.gainFaction]} Influence`}
+          >
+            <span className="influence-choice-badge">
+              <Handshake size={14} /> {factionShortLabels[choice.loseFaction]} to {factionShortLabels[choice.gainFaction]}
+            </span>
+            <strong>{gainLabel}</strong>
+            <small>Lose from {loseLabel}</small>
+          </button>
+        );
+      })}
       {optional && (
         <button type="button" className="influence-choice-skip" aria-label="Skip" onClick={onSkip}>
           Skip

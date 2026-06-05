@@ -20,10 +20,10 @@ export function verifyStarterDeckDemandAttention({
       spec.conditions?.some((condition) => condition.kind === "has-team" && condition.team === "muaddib") &&
       spec.conditions?.some((condition) => condition.kind === "has-role" && condition.role === "Commander") &&
       spec.effects.some((effect) =>
-        effect.kind === "pay-resource-for-influence" &&
-        effect.selector === "self" &&
-        effect.resource === "solari" &&
-        effect.cost === 4 &&
+	        effect.kind === "pay-resource-for-influence" &&
+	        effect.selector === "self" &&
+	        effect.resource === "spice" &&
+	        effect.cost === 4 &&
         effect.faction === "board-space" &&
         effect.amount === 1 &&
         effect.recipient === "board-effect-recipient" &&
@@ -41,11 +41,11 @@ export function verifyStarterDeckDemandAttention({
   assert.ok(desertMastery, "Desert Mastery should exist for Demand Attention personal-space regression");
   const espionage = data.boardSpaces.find((space) => space.id === "espionage");
   assert.ok(espionage, "Espionage should exist for Demand Attention queue-order regression");
-  const baseDemandAttentionSource = {
-    ...muadDib,
-    resources: { solari: 4, spice: 0, water: 0 },
-    playArea: [demandAttention],
-  };
+	  const baseDemandAttentionSource = {
+	    ...muadDib,
+	    resources: { solari: 0, spice: 4, water: 0 },
+	    playArea: [demandAttention],
+	  };
   const baseDemandAttentionTarget = {
     ...muadDibAllyA,
     influence: { ...muadDibAllyA.influence, bene: 1 },
@@ -73,11 +73,11 @@ export function verifyStarterDeckDemandAttention({
     secrets,
   );
   assert.deepEqual(demandAttentionPending, {
-    kind: "pay-resource-for-influence",
-    ownerId: muadDib.id,
-    influenceOwnerId: muadDibAllyA.id,
-    resource: "solari",
-    cost: 4,
+	    kind: "pay-resource-for-influence",
+	    ownerId: muadDib.id,
+	    influenceOwnerId: muadDibAllyA.id,
+	    resource: "spice",
+	    cost: 4,
     faction: "bene",
     amount: 1,
     optional: true,
@@ -112,15 +112,15 @@ export function verifyStarterDeckDemandAttention({
   );
   assert.equal(
     state.pendingActionForCard(
-      demandAttention,
-      { ...demandAttentionBoardEffect.source, resources: { solari: 3, spice: 0, water: 0 } },
-      game,
+	      demandAttention,
+	      { ...demandAttentionBoardEffect.source, resources: { solari: 0, spice: 3, water: 0 } },
+	      game,
       demandAttentionBoardEffect.target,
       secrets,
     ),
     undefined,
-    "Demand Attention should not queue when Muad'Dib cannot pay 4 Solari",
-  );
+	    "Demand Attention should not queue when Muad'Dib cannot pay 4 spice",
+	  );
   assert.equal(
     state.pendingActionForCard(demandAttention, demandAttentionBoardEffect.source, game, shaddamAlly, secrets),
     undefined,
@@ -164,10 +164,10 @@ export function verifyStarterDeckDemandAttention({
     demandAttentionPending,
   );
   assert.equal(
-    playerById(resolvedDemandAttention, muadDib.id).resources.solari,
-    0,
-    "Demand Attention resolution spends 4 Muad'Dib Solari",
-  );
+	    playerById(resolvedDemandAttention, muadDib.id).resources.spice,
+	    0,
+	    "Demand Attention resolution spends 4 Muad'Dib spice",
+	  );
   assert.deepEqual(
     playerById(resolvedDemandAttention, muadDib.id).playArea,
     [],
@@ -184,14 +184,14 @@ export function verifyStarterDeckDemandAttention({
     "Demand Attention should not score a second VP when the activated Ally was already at 2 Influence",
   );
   assert.equal(resolvedDemandAttention.pendingAction, undefined, "Demand Attention resolution should advance pending action");
-  assert.match(resolvedDemandAttention.log[0], /spends 4 Solari for Demand Attention/, "Demand Attention should log resolution");
+	  assert.match(resolvedDemandAttention.log[0], /spends 4 spice for Demand Attention/, "Demand Attention should log resolution");
 
   const skippedDemandAttention = state.skipPayResourceForInfluence(baseDemandAttentionResolution, demandAttentionPending);
   assert.equal(
-    playerById(skippedDemandAttention, muadDib.id).resources.solari,
-    4,
-    "Skipping Demand Attention should not spend Muad'Dib Solari",
-  );
+	    playerById(skippedDemandAttention, muadDib.id).resources.spice,
+	    4,
+	    "Skipping Demand Attention should not spend Muad'Dib spice",
+	  );
   assert.deepEqual(
     playerById(skippedDemandAttention, muadDib.id).playArea,
     [demandAttention],
@@ -332,11 +332,11 @@ export function verifyStarterDeckDemandAttention({
     desertMastery,
   );
   assert.deepEqual(personalDemandAttentionPending, {
-    kind: "pay-resource-for-influence",
-    ownerId: muadDib.id,
-    influenceOwnerId: muadDib.id,
-    resource: "solari",
-    cost: 4,
+	    kind: "pay-resource-for-influence",
+	    ownerId: muadDib.id,
+	    influenceOwnerId: muadDib.id,
+	    resource: "spice",
+	    cost: 4,
     faction: "fremen",
     amount: 1,
     optional: true,

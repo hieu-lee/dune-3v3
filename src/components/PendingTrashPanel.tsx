@@ -23,7 +23,14 @@ export function PendingTrashPanel({
 }: PendingTrashPanelProps) {
   const drawCardsReward = pending.drawCardsReward ?? 0;
   const vpReward = pending.vpReward ?? 0;
+  const costParts = [
+    pending.persuasionCost ? `spend ${pending.persuasionCost} persuasion` : undefined,
+    pending.resourceCost?.solari ? `spend ${pending.resourceCost.solari} Solari` : undefined,
+    pending.resourceCost?.spice ? `spend ${pending.resourceCost.spice} spice` : undefined,
+    pending.resourceCost?.water ? `spend ${pending.resourceCost.water} water` : undefined,
+  ].filter((part): part is string => Boolean(part));
   const rewardParts = [
+    costParts.length > 0 ? `Cost: ${costParts.join(" and ")}` : undefined,
     drawCardsReward > 0
       ? `Trash reward: draw ${drawCardsReward} card${drawCardsReward === 1 ? "" : "s"}`
       : undefined,

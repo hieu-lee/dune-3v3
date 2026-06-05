@@ -235,69 +235,27 @@ export function verifyImperiumCardMarketContractEffects({
   assert.equal(playerById(interstellarAcquired, p2.id).persuasion, 0);
   assert.equal(
     interstellarAcquired.pendingAction?.kind,
-    "board-influence-choice",
+    "contract",
   );
-  assert.equal(interstellarAcquired.pendingAction.sourceTrigger, "acquire");
-  assert.equal(interstellarAcquired.pendingAction.source, "Interstellar Trade");
-  assert.equal(interstellarAcquired.pendingAction.cardId, interstellarTrade.id);
-  assert.deepEqual(
-    interstellarAcquired.pendingAction.choices.map(
-      (choice) => `${choice.ownerId}:${choice.faction}`,
-    ),
-    [
-      `${p2.id}:greatHouses`,
-      `${p2.id}:spacing`,
-      `${p2.id}:bene`,
-      `${p2.id}:fringeWorlds`,
-    ],
-    "Interstellar Trade should offer main-board Influence choices to an Ally buyer",
+  assert.equal(
+    interstellarAcquired.pendingAction.source,
+    "Interstellar Trade",
   );
+  assert.equal(interstellarAcquired.pendingAction.publicOnly, true);
   assert.deepEqual(
     interstellarAcquired.pendingQueue,
-    [
-      {
-        kind: "contract",
-        ownerId: p2.id,
-        source: "Interstellar Trade",
-        publicOnly: true,
-      },
-    ],
-    "Interstellar Trade should queue its face-up CHOAM contract after the Influence choice",
-  );
-  const forgedInterstellarAcquirePending = {
-    ...interstellarAcquired.pendingAction,
-    cardId: "missing-interstellar-trade-card",
-  };
-  const forgedInterstellarAcquireFixture = {
-    ...interstellarAcquired,
-    pendingAction: forgedInterstellarAcquirePending,
-  };
-  const forgedInterstellarAcquireResolved = state.resolveBoardInfluenceChoice(
-    forgedInterstellarAcquireFixture,
-    forgedInterstellarAcquirePending,
-    p2.id,
-    "bene",
+    [],
+    "Interstellar Trade acquisition should only queue its public CHOAM contract",
   );
   assert.equal(
-    forgedInterstellarAcquireResolved,
-    forgedInterstellarAcquireFixture,
-    "Acquire Influence pendings should require the acquired source card to carry the matching spec",
+    playerById(interstellarAcquired, p2.id).influence.bene,
+    1,
+    "Interstellar Trade acquisition should not grant Influence",
   );
-  const interstellarInfluenceResolved = state.resolveBoardInfluenceChoice(
+  assert.equal(playerById(interstellarAcquired, p2.id).vp, 0);
+  const interstellarContractResolved = state.takeChoamContract(
     interstellarAcquired,
     interstellarAcquired.pendingAction,
-    p2.id,
-    "bene",
-  );
-  assert.equal(
-    playerById(interstellarInfluenceResolved, p2.id).influence.bene,
-    2,
-  );
-  assert.equal(playerById(interstellarInfluenceResolved, p2.id).vp, 1);
-  assert.equal(interstellarInfluenceResolved.pendingAction?.kind, "contract");
-  const interstellarContractResolved = state.takeChoamContract(
-    interstellarInfluenceResolved,
-    interstellarInfluenceResolved.pendingAction,
     interstellarAcquireContract.id,
   );
   assert.equal(interstellarContractResolved.pendingAction, undefined);
@@ -322,8 +280,8 @@ export function verifyImperiumCardMarketContractEffects({
     interstellarTrade.id,
   );
   assert.equal(
-    noPublicInterstellarAcquired.pendingAction?.kind,
-    "board-influence-choice",
+    noPublicInterstellarAcquired.pendingAction,
+    undefined,
   );
   assert.deepEqual(
     noPublicInterstellarAcquired.pendingQueue,
@@ -373,20 +331,17 @@ export function verifyImperiumCardMarketContractEffects({
     },
     "Priority Contracts should queue a public CHOAM contract after Agent placement",
   );
-  assert.equal(
-    playerById(priorityContractsPlaced, p2.id).resources.spice,
-    3,
-    "Priority Contracts should grant 2 spice immediately",
-  );
-  assert.equal(
-    playerById(priorityContractsPlaced, p2.id).vp,
-    1,
-    "Priority Contracts should grant 1 VP immediately",
-  );
-  assert.match(
-    priorityContractsPlaced.log[0],
-    /Priority Contracts: gains 2 spice; gains 1 VP/,
-  );
+	  assert.equal(
+	    playerById(priorityContractsPlaced, p2.id).resources.spice,
+	    1,
+	    "Priority Contracts should not grant immediate spice",
+	  );
+	  assert.equal(
+	    playerById(priorityContractsPlaced, p2.id).vp,
+	    0,
+	    "Priority Contracts should not grant immediate VP",
+	  );
+	  assert.doesNotMatch(priorityContractsPlaced.log[0] ?? "", /Priority Contracts: gains 2 spice|gains 1 VP/);
   const priorityContractsResolved = state.takeChoamContract(
     priorityContractsPlaced,
     priorityContractsPlaced.pendingAction,
@@ -427,16 +382,46 @@ export function verifyImperiumCardMarketContractEffects({
     undefined,
     "Priority Contracts should not queue when no public contracts remain",
   );
-  assert.equal(
-    playerById(priorityContractsNoOffer, p2.id).resources.spice,
-    3,
-    "Priority Contracts no-offer path should still grant spice",
+	  assert.equal(
+	    playerById(priorityContractsNoOffer, p2.id).resources.spice,
+	    1,
+	    "Priority Contracts no-offer path should not grant spice",
+	  );
+	  assert.equal(
+	    playerById(priorityContractsNoOffer, p2.id).vp,
+	    0,
+	    "Priority Contracts no-offer path should not grant VP",
+	  );
+  const priorityRevealFixture = {
+    ...withActivePlayer(game, p2.id, () => ({
+      discard: [],
+      hand: [priorityContracts],
+      playArea: [],
+      resources: { solari: 0, spice: 0, water: 0 },
+      vp: 0,
+    })),
+    turnSpiceGains: {},
+  };
+  const priorityRevealPlan = turnActions.revealTurnPlan(
+    playerById(priorityRevealFixture, p2.id),
+    priorityRevealFixture,
   );
+  const priorityRevealed = turnActions.revealTurnAction(priorityRevealFixture, {
+    commanderTargets: {},
+    revealPlan: priorityRevealPlan,
+  });
   assert.equal(
-    playerById(priorityContractsNoOffer, p2.id).vp,
-    1,
-    "Priority Contracts no-offer path should still grant VP",
+    priorityRevealed.pendingAction?.kind,
+    "pending-action-choice",
+    "Priority Contracts should queue its Reveal branch choice",
   );
+  const prioritySpiceChosen = state.resolvePendingActionChoice(
+    priorityRevealed,
+    priorityRevealed.pendingAction,
+    "spice",
+  );
+  assert.equal(playerById(prioritySpiceChosen, p2.id).resources.spice, 2, "Priority Contracts spice branch should gain 2 spice");
+  assert.equal(prioritySpiceChosen.turnSpiceGains[p2.id], 2, "Priority Contracts spice branch should count as turn spice gain");
   const corrinthReveal = turnActions.revealTurnPlan(
     { ...p2, hand: [corrinthCity], highCouncilSeat: false },
     game,
@@ -491,10 +476,42 @@ export function verifyImperiumCardMarketContractEffects({
     game,
   );
   assert.equal(
-    deliveryReveal.revealGain.spice,
-    1,
-    "Delivery Agreement should resolve its typed Reveal spice reward",
+    deliveryReveal.revealGain.spice ?? 0,
+    0,
+    "Delivery Agreement should not auto-gain spice before its Reveal choice",
   );
+  const deliverySpiceFixture = withActivePlayer(game, p2.id, () => ({
+    discard: [],
+    hand: [deliveryAgreement],
+    playArea: [],
+    resources: { solari: 0, spice: 0, water: 0 },
+    vp: 0,
+  }));
+  const deliverySpiceActionPlan = turnActions.revealTurnPlan(
+    playerById(deliverySpiceFixture, p2.id),
+    deliverySpiceFixture,
+  );
+  const deliverySpiceRevealed = turnActions.revealTurnAction(deliverySpiceFixture, {
+    commanderTargets: {},
+    revealPlan: deliverySpiceActionPlan,
+  });
+  assert.equal(
+    deliverySpiceRevealed.pendingAction?.kind,
+    "pending-action-choice",
+    "Delivery Agreement should queue a Reveal branch choice",
+  );
+  assert.deepEqual(
+    deliverySpiceRevealed.pendingAction.options.map((option) => option.id),
+    ["spice"],
+    "Delivery Agreement should expose only its spice branch without completed contracts",
+  );
+  const deliverySpiceChosen = state.resolvePendingActionChoice(
+    deliverySpiceRevealed,
+    deliverySpiceRevealed.pendingAction,
+    "spice",
+  );
+  assert.equal(playerById(deliverySpiceChosen, p2.id).resources.spice, 1, "Delivery Agreement spice branch should gain spice");
+  assert.equal(deliverySpiceChosen.turnSpiceGains[p2.id], 1, "Delivery Agreement spice branch should count as turn spice gain");
   const deliveryCompletedContracts = data.standardContracts
     .slice(0, 4)
     .map((card, index) => ({
@@ -520,17 +537,34 @@ export function verifyImperiumCardMarketContractEffects({
   });
   assert.equal(
     deliveryRevealed.pendingAction?.kind,
-    "trash-card",
-    "Delivery Agreement should queue completed-contract Reveal trash",
+    "pending-action-choice",
+    "Delivery Agreement should queue completed-contract Reveal branch choices",
+  );
+  assert.deepEqual(
+    deliveryRevealed.pendingAction.options.map((option) => option.id),
+    ["spice", "vp"],
+    "Delivery Agreement should offer spice or source-trash VP with four completed contracts",
+  );
+  const deliveryVpChoice = state.resolvePendingActionChoice(
+    deliveryRevealed,
+    deliveryRevealed.pendingAction,
+    "vp",
   );
   assert.equal(
-    deliveryRevealed.pendingAction?.vpReward,
+    deliveryVpChoice.pendingAction?.kind,
+    "trash-card",
+    "Delivery Agreement VP branch should queue source-card trash",
+  );
+  assert.equal(
+    deliveryVpChoice.pendingAction?.vpReward,
     1,
     "Delivery Agreement Reveal trash should carry VP reward",
   );
+  assert.equal(playerById(deliveryVpChoice, p2.id).resources.spice, 0, "Delivery Agreement VP branch should not gain spice");
+  assert.equal(deliveryVpChoice.turnSpiceGains[p2.id] ?? 0, 0, "Delivery Agreement VP branch should not count as turn spice gain");
   const deliveryVpTrashed = state.trashPlayerCard(
-    deliveryRevealed,
-    deliveryRevealed.pendingAction,
+    deliveryVpChoice,
+    deliveryVpChoice.pendingAction,
     "playArea",
     deliveryAgreement.id,
     0,

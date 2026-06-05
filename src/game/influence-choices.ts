@@ -1,10 +1,11 @@
 import { factionIds } from "./data";
+import { commanderPersonalFaction } from "./commander-rules";
 import type { FactionId, Player } from "./types";
 
 export type InfluenceLossPair = [FactionId, FactionId];
 export type BuyAccessChoice = [FactionId, FactionId];
 export type SietchRitualChoice = "bene" | "fremen" | "fringeWorlds";
-export type ImperiumPoliticsChoice = "greatHouses" | "emperor" | "spacing";
+export type ImperiumPoliticsChoice = "greatHouses" | "emperor" | "fringeWorlds" | "fremen";
 
 export const mainBoardInfluenceChoices: FactionId[] = ["greatHouses", "spacing", "bene", "fringeWorlds"];
 
@@ -56,10 +57,13 @@ export function validInfluenceLossPair(player: Player, choice: InfluenceLossPair
 }
 
 export function imperiumPoliticsFactionChoices(player: Player): ImperiumPoliticsChoice[] {
-  if (player.role === "Commander" && player.team === "shaddam") {
-    return ["emperor", "greatHouses", "spacing"];
+  if (player.role === "Commander") {
+    const personalFaction = commanderPersonalFaction(player);
+    return personalFaction === "fremen"
+      ? ["greatHouses", "fremen", "fringeWorlds"]
+      : ["emperor", "greatHouses", "fringeWorlds"];
   }
-  return ["greatHouses", "spacing"];
+  return ["greatHouses", "fringeWorlds"];
 }
 
 function buyAccessFactionChoices(player: Player): FactionId[] {

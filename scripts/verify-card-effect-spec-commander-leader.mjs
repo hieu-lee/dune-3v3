@@ -57,7 +57,7 @@ export function verifyCardEffectSpecCommanderLeader({
           (effect) =>
             effect.kind === "pay-resource-for-influence" &&
             effect.selector === "self" &&
-            effect.resource === "solari" &&
+            effect.resource === "spice" &&
             effect.cost === 4 &&
             effect.faction === "board-space" &&
             effect.amount === 1 &&
@@ -242,7 +242,7 @@ export function verifyCardEffectSpecCommanderLeader({
           (effect) =>
             effect.kind === "gain-resource" &&
             effect.selector === "self" &&
-            effect.resource === "solari" &&
+            effect.resource === "spice" &&
             effect.amount === 1 &&
             effect.source === "Fill Coffers",
         ),

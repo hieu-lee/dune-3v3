@@ -151,36 +151,30 @@ export function verifyCardEffectSpecImperiumMakerSpy({ cards }) {
   );
   assert.equal(
     smugglersHaven.play,
-    "Gain 1 VP. Pay 4 spice to summon 1 sandworm.",
-    "Smuggler's Haven play text should expose its Agent VP and sandworm payment",
+    "Pay 4 spice to gain 1 VP.",
+    "Smuggler's Haven play text should expose its printed Agent spice-for-VP payment",
   );
   assert.ok(
     hasAgentEffect(
       smugglersHaven,
       (effect) =>
-        effect.kind === "gain-vp" &&
+        effect.kind === "paid-reward-choice" &&
         effect.selector === "self" &&
-        effect.amount === 1,
-    ),
-    "Smuggler's Haven should carry a typed Agent VP effect",
-  );
-  assert.ok(
-    smugglersHaven.effects?.some(
-      (spec) =>
-        spec.trigger === "agent-play" &&
-        spec.effects.some(
-          (effect) =>
-            effect.kind === "pay-resource-for-sandworms" &&
-            effect.selector === "self" &&
-            effect.resource === "spice" &&
-            effect.cost === 4 &&
-            effect.sandworms === 1 &&
-            effect.recipient === "self-or-activated-ally" &&
-            effect.destination === "conflict" &&
-            effect.optional === true,
+        effect.requirePayableOption === true &&
+        effect.options.some((option) =>
+          option.id === "vp" &&
+          option.resource === "spice" &&
+          option.cost === 4 &&
+          option.reward.kind === "gain-vp" &&
+          option.reward.selector === "self" &&
+          option.reward.amount === 1
         ),
     ),
-    "Smuggler's Haven should carry a typed Agent self-or-activated-Ally sandworm payment spec",
+    "Smuggler's Haven should carry a typed Agent spice-for-VP paid reward",
+  );
+  assert.ok(
+    !hasAgentEffect(smugglersHaven, (effect) => effect.kind === "pay-resource-for-sandworms"),
+    "Smuggler's Haven should not model its printed VP icon as a sandworm payment",
   );
   assert.equal(
     smugglersHaven.reveal,
@@ -382,9 +376,10 @@ export function verifyCardEffectSpecImperiumMakerSpy({ cards }) {
         effect.kind === "place-spies" &&
         effect.selector === "self" &&
         effect.amount === 1 &&
+        effect.recallForSupply === true &&
         effect.mustPlace === true,
     ),
-    "Wheels Within Wheels should carry a Reveal spy placement spec",
+    "Wheels Within Wheels should carry a Reveal spy-placement spec",
   );
   assert.ok(
     wheelsWithinWheels.effects?.some(

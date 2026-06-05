@@ -23,6 +23,7 @@ export type Card = {
   revealGain?: Partial<Resources>;
   effects?: CardEffectSpec[];
   trashOnPlay?: boolean;
+  ignoreInfluenceRequirements?: boolean;
   play: string;
   reveal: string;
   cost?: number;

@@ -1,6 +1,7 @@
 import { resolveCardEffects, type GameEffectResult } from "./effect-resolver";
 import { recordTurnSpiceGainAndCompleteHarvestContracts } from "./contract-rules";
-import type { Card, GameState, Player, Resources } from "./types";
+import { drawIntrigueCards } from "./intrigue-deck";
+import type { Card, GameEffectTrigger, GameState, Player, Resources } from "./types";
 
 type DiscardedFromHandTriggerOptions = {
   logAfterCurrentAction?: boolean;
@@ -40,12 +41,13 @@ function appendTriggerLog(log: string[], entry: string, options: DiscardedFromHa
   return [entry, ...log];
 }
 
-function assertSupportedDiscardResult(card: Card, result: GameEffectResult) {
+function assertSupportedCardTriggerResult(card: Card, trigger: GameEffectTrigger, result: GameEffectResult) {
+  const allowIntrigueDraw = trigger === "trash";
   if (
     result.acquireRecruitBonus > 0 ||
     result.blocksDeploymentsThisTurn ||
     result.cardsToDraw > 0 ||
-    result.intriguesToDraw > 0 ||
+    (!allowIntrigueDraw && result.intriguesToDraw > 0) ||
     Object.values(result.influenceGains).some((amount) => amount > 0) ||
     result.influenceAdjustments.length > 0 ||
     Object.values(result.influenceLosses).some((amount) => amount > 0) ||
@@ -63,8 +65,46 @@ function assertSupportedDiscardResult(card: Card, result: GameEffectResult) {
     hasResourceGain(result.activatedAlly.revealGain) ||
     result.activatedAlly.spyPlacements.length > 0
   ) {
-    throw new Error(`Unsupported discard trigger result for ${card.name}`);
+    throw new Error(`Unsupported ${trigger} trigger result for ${card.name}`);
   }
+}
+
+function applyCardTriggers(
+  state: GameState,
+  ownerId: string,
+  triggeredCard: Card,
+  trigger: GameEffectTrigger,
+  options: DiscardedFromHandTriggerOptions = {},
+): GameState {
+  if (!triggeredCard.effects) return state;
+  const owner = state.players.find((player) => player.id === ownerId);
+  if (!owner) return state;
+  const result = resolveCardEffects([triggeredCard], {
+    trigger,
+    source: owner,
+    state,
+  });
+  assertSupportedCardTriggerResult(triggeredCard, trigger, result);
+  let nextState = state;
+  if (hasResourceGain(result.revealGain)) {
+    const ownerAfterTrigger: Player = {
+      ...owner,
+      resources: addResources(owner.resources, result.revealGain),
+    };
+    const source = result.revealGainSource ?? triggeredCard.name;
+    const triggerLog = `${owner.leader} resolves ${source}: ${resourceGainText(result.revealGain)}.`;
+    nextState = {
+      ...nextState,
+      players: nextState.players.map((player) => player.id === owner.id ? ownerAfterTrigger : player),
+      log: appendTriggerLog(nextState.log, triggerLog, options),
+    };
+    if (result.revealGain.spice) {
+      nextState = recordTurnSpiceGainAndCompleteHarvestContracts(nextState, owner.id, result.revealGain.spice).state;
+    }
+  }
+  return result.intriguesToDraw > 0
+    ? drawIntrigueCards(nextState, owner.id, result.intriguesToDraw, triggeredCard.name)
+    : nextState;
 }
 
 export function applyDiscardedFromHandTriggers(
@@ -73,28 +113,14 @@ export function applyDiscardedFromHandTriggers(
   discardedCard: Card,
   options: DiscardedFromHandTriggerOptions = {},
 ): GameState {
-  if (!discardedCard.effects) return state;
-  const owner = state.players.find((player) => player.id === ownerId);
-  if (!owner) return state;
-  const result = resolveCardEffects([discardedCard], {
-    trigger: "discard",
-    source: owner,
-    state,
-  });
-  assertSupportedDiscardResult(discardedCard, result);
-  if (!hasResourceGain(result.revealGain)) return state;
-  const ownerAfterTrigger: Player = {
-    ...owner,
-    resources: addResources(owner.resources, result.revealGain),
-  };
-  const source = result.revealGainSource ?? discardedCard.name;
-  const triggerLog = `${owner.leader} resolves ${source}: ${resourceGainText(result.revealGain)}.`;
-  const nextState = {
-    ...state,
-    players: state.players.map((player) => player.id === owner.id ? ownerAfterTrigger : player),
-    log: appendTriggerLog(state.log, triggerLog, options),
-  };
-  return result.revealGain.spice
-    ? recordTurnSpiceGainAndCompleteHarvestContracts(nextState, owner.id, result.revealGain.spice).state
-    : nextState;
+  return applyCardTriggers(state, ownerId, discardedCard, "discard", options);
+}
+
+export function applyTrashedCardTriggers(
+  state: GameState,
+  ownerId: string,
+  trashedCard: Card,
+  options: DiscardedFromHandTriggerOptions = {},
+): GameState {
+  return applyCardTriggers(state, ownerId, trashedCard, "trash", options);
 }

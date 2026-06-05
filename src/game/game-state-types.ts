@@ -75,6 +75,7 @@ export type PendingAction =
       remaining: number;
       source: string;
       placementIcon?: IconId;
+      placementIcons?: IconId[];
       recallForSupply?: boolean;
       mustPlaceSpy?: boolean;
       allowSharedPost?: boolean;
@@ -86,6 +87,7 @@ export type PendingAction =
       combatRecipientId: string;
       remaining: number;
       strength: number;
+      persuasionReward?: number;
       source: string;
       optional: boolean;
       drawIntrigues?: number;
@@ -113,6 +115,7 @@ export type PendingAction =
       sourceEffect?: "gain-influence-choice" | "gain-board-space-influence";
       amount?: number;
       trashSource?: boolean;
+      requiredHandTrashTrait?: string;
       cardId?: string;
       cardOwnerId?: string;
       targetOwnerId?: string;
@@ -142,6 +145,8 @@ export type PendingAction =
       requiredTrait?: string;
       spiceRewardCostThreshold?: number;
       spiceReward?: number;
+      persuasionCost?: number;
+      resourceCost?: Partial<Resources>;
       combatRecipientId?: string;
       strengthReward?: number;
       drawCardsReward?: number;
@@ -166,6 +171,15 @@ export type PendingAction =
       troopCount: number;
       strength: number;
       source: string;
+      optional: boolean;
+    }
+  | {
+      kind: "lose-influence-for-influence";
+      ownerId: string;
+      influenceOwnerId?: string;
+      source: string;
+      loseAmount: number;
+      gainAmount: number;
       optional: boolean;
     }
   | {
@@ -252,6 +266,7 @@ export type PendingAction =
       ownerId: string;
       source: string;
       drawCards: number;
+      drawIntrigues?: number;
       optional: boolean;
       bonusDraw?: {
         requiredDiscardTrait: string;
@@ -411,6 +426,7 @@ export type PendingAction =
       ownerId: string;
       cardId?: string;
       source: string;
+      optional?: boolean;
       options: PendingActionChoicePendingOption[];
     }
   | {
@@ -502,6 +518,7 @@ export type GameState = {
   roundMakerSpaceVisits?: Record<string, boolean>;
   turnHarvestContractIds?: Record<string, string[]>;
   turnMakerSpaceVisits?: Record<string, boolean>;
+  turnAcquiredCardIds?: Record<string, string[]>;
   turnSpiceGains: Record<string, number>;
   turnReverendMotherJessicaRepeats: Record<string, boolean>;
   turnSpyRecalls: Record<string, number>;

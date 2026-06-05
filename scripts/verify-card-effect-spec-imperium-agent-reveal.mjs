@@ -336,12 +336,13 @@ export function verifyCardEffectSpecImperiumAgentReveal({
         spec.trigger === "reveal" &&
         spec.effects.some(
           (effect) =>
-            effect.kind === "lose-influence-for-intrigues" &&
-            effect.amount === 1 &&
+            effect.kind === "lose-influence-for-influence" &&
+            effect.loseAmount === 1 &&
+            effect.gainAmount === 1 &&
             effect.optional === true,
         ),
     ),
-    "Captured Mentat should carry a declarative Reveal Influence-for-Intrigue spec",
+    "Captured Mentat should carry a declarative Reveal Influence-for-Influence spec",
   );
   assert.ok(
     capturedMentat.effects?.some(
@@ -349,14 +350,14 @@ export function verifyCardEffectSpecImperiumAgentReveal({
         spec.trigger === "agent-play" &&
         spec.effects.some(
           (effect) =>
-            effect.kind === "discard-card-for-influence-and-draw" &&
+            effect.kind === "discard-card-for-draw" &&
             effect.selector === "self" &&
             effect.drawCards === 1 &&
-            effect.influenceAmount === 1 &&
-            effect.optional === true,
+            effect.drawIntrigues === 1 &&
+            effect.optional === false,
         ),
     ),
-    "Captured Mentat should carry a declarative Agent discard-for-Influence-and-draw spec",
+    "Captured Mentat should carry a declarative Agent discard-for-card-and-Intrigue draw spec",
   );
   assert.ok(
     dangerousRhetoric.effects?.some(
@@ -537,8 +538,8 @@ export function verifyCardEffectSpecImperiumAgentReveal({
   );
   assert.equal(
     covertOperation.reveal,
-    "Gain 2 Solari.",
-    "Covert Operation reveal text should preserve its printed Solari reveal",
+    "Place 2 spies.",
+    "Covert Operation reveal text should preserve its printed spy reveal",
   );
   assert.ok(
     covertOperation.effects?.some(
@@ -546,13 +547,14 @@ export function verifyCardEffectSpecImperiumAgentReveal({
         spec.trigger === "reveal" &&
         spec.effects.some(
           (effect) =>
-            effect.kind === "gain-resource" &&
+            effect.kind === "place-spies" &&
             effect.selector === "self" &&
-            effect.resource === "solari" &&
-            effect.amount === 2,
+            effect.amount === 2 &&
+            effect.recallForSupply === true &&
+            effect.mustPlace === true,
         ),
     ),
-    "Covert Operation should carry a reveal Solari spec",
+    "Covert Operation should carry a reveal spy-placement spec",
   );
   assert.ok(
     covertOperation.effects?.some(
@@ -570,7 +572,7 @@ export function verifyCardEffectSpecImperiumAgentReveal({
   assert.equal(
     hasAgentEffect(covertOperation, (effect) => effect.kind === "place-spies"),
     false,
-    "Covert Operation should not treat its image-verified Reveal Solari icons as Agent spy placement",
+    "Covert Operation should not treat its Reveal spy icons as Agent spy placement",
   );
   assert.ok(
     beneGesseritOperative.effects?.some(

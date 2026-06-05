@@ -33,6 +33,9 @@ const {
   shaddamReservedContracts,
   standardContracts,
 } = await server.ssrLoadModule("/src/game/data.ts");
+const {
+  roomPendingActionCanResolve,
+} = await server.ssrLoadModule("/src/multiplayer/room-actions.ts");
 
 async function jsonFetch(path, options = {}) {
   const response = await fetch(`${baseUrl}${path}`, options);
@@ -1467,6 +1470,28 @@ try {
     player(ownBoardInfluence.body.snapshot, boardInfluenceAllyId).influence.bene,
     1,
     "Room board influence choice should grant Influence only to the claimed owner",
+  );
+  const requiredTrashBoardInfluenceState = {
+    ...boardInfluenceRecord.game,
+    pendingAction: {
+      kind: "board-influence-choice",
+      source: "Treacherous Maneuver",
+      cardId: "treacherous-maneuver-room-card",
+      cardOwnerId: boardInfluenceCommanderId,
+      requiredHandTrashTrait: "Faction: Emperor",
+      trashSource: true,
+      choices: [{ ownerId: boardInfluenceAllyId, faction: "bene" }],
+    },
+  };
+  assert.equal(
+    roomPendingActionCanResolve(requiredTrashBoardInfluenceState, boardInfluenceAllyId),
+    false,
+    "Required-trash board influence choices should not mark the Influence recipient as the room resolver",
+  );
+  assert.equal(
+    roomPendingActionCanResolve(requiredTrashBoardInfluenceState, boardInfluenceCommanderId),
+    true,
+    "Required-trash board influence choices should mark the source card owner as the room resolver",
   );
 
   const boardAgentRecallRoom = await jsonFetch("/api/rooms", { method: "POST" });

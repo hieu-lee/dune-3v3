@@ -41,6 +41,12 @@ function resolvePaidRewardChoiceOption(
           resource: reward.resource,
           amount: amountFor(reward.amount, context.source),
         };
+      case "gain-vp":
+        return {
+          kind: "gain-vp",
+          selector: reward.selector,
+          amount: amountFor(reward.amount, context.source),
+        };
       case "draw-intrigues":
         return {
           kind: "draw-intrigues",
@@ -87,6 +93,7 @@ function resolvePaidRewardChoiceOption(
         reward: resolveReward(option.reward),
       };
     case "gain-resource":
+    case "gain-vp":
       return {
         ...resolvedBase,
         reward: resolveReward(option.reward),
@@ -104,13 +111,14 @@ function resolvePaidRewardChoiceOption(
   }
 }
 
-export function resolveAgentPaidRewardChoices(
+function resolvePaidRewardChoicesForTrigger(
   specs: CardEffectSpec[] | undefined,
   context: GameEffectContext,
+  trigger: GameEffectContext["trigger"],
 ): AgentPaidRewardChoice[] {
   specs?.forEach(validateSpec);
   return (specs ?? []).flatMap((spec) => {
-    if (spec.trigger !== "agent-play") return [];
+    if (spec.trigger !== trigger) return [];
     if (!specApplies(spec, context)) return [];
     return spec.effects
       .filter((effect) => effect.kind === "paid-reward-choice")
@@ -122,6 +130,20 @@ export function resolveAgentPaidRewardChoices(
         source: effect.source,
       }));
   });
+}
+
+export function resolveAgentPaidRewardChoices(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): AgentPaidRewardChoice[] {
+  return resolvePaidRewardChoicesForTrigger(specs, context, "agent-play");
+}
+
+export function resolveRevealPaidRewardChoices(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): AgentPaidRewardChoice[] {
+  return resolvePaidRewardChoicesForTrigger(specs, context, "reveal");
 }
 
 function resolvePendingActionChoiceOption(
@@ -154,6 +176,7 @@ function resolvePendingActionChoiceOption(
         optional: option.effect.optional ?? false,
         ...(option.effect.zones ? { zones: [...option.effect.zones] } : {}),
         excludeSource: option.effect.excludeSource ?? false,
+        ...(option.effect.sourceOnly ? { sourceOnly: true } : {}),
         ...(option.effect.requiredTrait ? { requiredTrait: option.effect.requiredTrait } : {}),
         ...(option.effect.spiceRewardCostThreshold !== undefined
           ? { spiceRewardCostThreshold: amountFor(option.effect.spiceRewardCostThreshold, context.source) }
@@ -161,6 +184,75 @@ function resolvePendingActionChoiceOption(
         ...(option.effect.spiceReward !== undefined
           ? { spiceReward: amountFor(option.effect.spiceReward, context.source) }
           : {}),
+        ...(option.effect.vpReward !== undefined
+          ? { vpReward: amountFor(option.effect.vpReward, context.source) }
+          : {}),
+        ...(option.effect.persuasionCost !== undefined
+          ? { persuasionCost: amountFor(option.effect.persuasionCost, context.source) }
+          : {}),
+        ...(option.effect.resourceCost
+          ? {
+              resourceCost: Object.fromEntries(
+                Object.entries(option.effect.resourceCost)
+                  .map(([resource, amount]) => [resource, amountFor(amount, context.source)])
+              ),
+            }
+          : {}),
+        ...(option.effect.source ? { source: option.effect.source } : {}),
+      },
+    };
+  }
+  if (option.effect.kind === "place-spies") {
+    return {
+      id: option.id,
+      label: option.label,
+      effect: {
+        kind: "place-spies",
+        selector: option.effect.selector,
+        amount: amountFor(option.effect.amount, context.source),
+        ...(option.effect.recallForSupply ? { recallForSupply: true } : {}),
+        ...(option.effect.mustPlace ? { mustPlace: true } : {}),
+        ...(option.effect.placementIcon ? { placementIcon: option.effect.placementIcon } : {}),
+        ...(option.effect.placementIcons ? { placementIcons: [...option.effect.placementIcons] } : {}),
+        ...(option.effect.allowSharedPost ? { allowSharedPost: true } : {}),
+        ...(option.effect.source ? { source: option.effect.source } : {}),
+        ...(option.effect.postPlacementAction ? { postPlacementAction: option.effect.postPlacementAction } : {}),
+      },
+    };
+  }
+  if (option.effect.kind === "gain-persuasion") {
+    return {
+      id: option.id,
+      label: option.label,
+      effect: {
+        kind: "gain-persuasion",
+        selector: option.effect.selector,
+        amount: amountFor(option.effect.amount, context.source),
+        ...(option.effect.source ? { source: option.effect.source } : {}),
+      },
+    };
+  }
+  if (option.effect.kind === "gain-resource") {
+    return {
+      id: option.id,
+      label: option.label,
+      effect: {
+        kind: "gain-resource",
+        selector: option.effect.selector,
+        resource: option.effect.resource,
+        amount: amountFor(option.effect.amount, context.source),
+        ...(option.effect.source ? { source: option.effect.source } : {}),
+      },
+    };
+  }
+  if (option.effect.kind === "gain-strength") {
+    return {
+      id: option.id,
+      label: option.label,
+      effect: {
+        kind: "gain-strength",
+        selector: option.effect.selector,
+        amount: amountFor(option.effect.amount, context.source),
         ...(option.effect.source ? { source: option.effect.source } : {}),
       },
     };
@@ -169,22 +261,40 @@ function resolvePendingActionChoiceOption(
   throw new Error(`Unsupported pending-action-choice effect "${String(effect.kind)}"`);
 }
 
-export function resolveAgentPendingActionChoices(
+function resolvePendingActionChoicesForTrigger(
   specs: CardEffectSpec[] | undefined,
   context: GameEffectContext,
+  trigger: GameEffectContext["trigger"],
 ): AgentPendingActionChoice[] {
   specs?.forEach(validateSpec);
   return (specs ?? []).flatMap((spec) => {
-    if (spec.trigger !== "agent-play") return [];
+    if (spec.trigger !== trigger) return [];
     if (!specApplies(spec, context)) return [];
     return spec.effects
       .filter((effect) => effect.kind === "pending-action-choice")
       .map((effect) => ({
         selector: effect.selector,
-        options: effect.options.map((option) => resolvePendingActionChoiceOption(option, context)),
+        options: effect.options
+          .filter((option) => specApplies({ trigger, effects: [], conditions: option.conditions }, context))
+          .map((option) => resolvePendingActionChoiceOption(option, context)),
+        ...(effect.optional ? { optional: true } : {}),
         source: effect.source,
       }));
   });
+}
+
+export function resolveAgentPendingActionChoices(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): AgentPendingActionChoice[] {
+  return resolvePendingActionChoicesForTrigger(specs, context, "agent-play");
+}
+
+export function resolveRevealPendingActionChoices(
+  specs: CardEffectSpec[] | undefined,
+  context: GameEffectContext,
+): AgentPendingActionChoice[] {
+  return resolvePendingActionChoicesForTrigger(specs, context, "reveal");
 }
 
 export function resolveLeaderTransitionChoices(

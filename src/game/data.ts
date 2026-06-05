@@ -268,7 +268,7 @@ const intrigueSummariesByCatalogId: Partial<Record<number, string>> = {
   129: "If you have a seat on the High Council, gain 2 water.",
   130: "Spend 5 spice to gain 1 VP; with 3+ Spacing Guild Influence, you may also spend 3 water to gain 1 VP.",
   139: "Spend 5 Solari to gain two different Influence among Emperor/Great Houses, Fremen/Fringe, Bene Gesserit, and Spacing Guild.",
-  140: "Spend 1 Solari to gain 1 Emperor/Great Houses or Spacing Guild Influence.",
+  140: "Spend 1 Solari to gain 1 Emperor/Great Houses or Fremen/Fringe Influence.",
   138: "During your Reveal turn this round, whenever you acquire a card, recruit 1 troop.",
   142: "Draw 1 card; draw 1 more if you have two or more spies on the board.",
   141: "Recruit 1 troop; with 3+ Emperor/Great Houses Influence, gain 3 Solari.",
@@ -287,6 +287,10 @@ const intrigueSummariesByCatalogId: Partial<Record<number, string>> = {
   154: "Add 3 strength; add 5 instead if you have at least 3 Bene Gesserit Influence.",
   448: "Lose 1 Influence to gain 4 Solari as a Plot Intrigue OR add 4 strength in Combat if you have completed at least two contracts.",
   449: "Retreat 1 or 2 troops, then take a face-up CHOAM contract.",
+};
+
+const intrigueNamesByCatalogId: Partial<Record<number, string>> = {
+  158: "Ornithopter",
 };
 
 function toLeaderCard(card: HubCard): LeaderCard {
@@ -598,12 +602,16 @@ function intrigueCardEffects(card: HubCard): CardEffectSpec[] | undefined {
         hasRole("Commander"),
         hasTeam("shaddam"),
       ]),
+      plotPayResourceForInfluence("fremen", "solari", 1, "self", "fremen", 1, [
+        hasRole("Commander"),
+        hasTeam("muaddib"),
+      ]),
       plotPayResourceForInfluence("greatHouses", "solari", 1, "self", "greatHouses", 1, [hasRole("Ally")]),
-      plotPayResourceForInfluence("spacing", "solari", 1, "self", "spacing", 1, [hasRole("Ally")]),
+      plotPayResourceForInfluence("fringeWorlds", "solari", 1, "self", "fringeWorlds", 1, [hasRole("Ally")]),
       plotPayResourceForInfluence("greatHouses", "solari", 1, "activated-ally", "greatHouses", 1, [
         hasRole("Commander"),
       ]),
-      plotPayResourceForInfluence("spacing", "solari", 1, "activated-ally", "spacing", 1, [
+      plotPayResourceForInfluence("fringeWorlds", "solari", 1, "activated-ally", "fringeWorlds", 1, [
         hasRole("Commander"),
       ]),
     ];
@@ -639,7 +647,7 @@ function toIntrigueCard(card: HubCard): IntrigueCard {
   const combatSwords = attributeNumber(card, "Swords");
   return {
     id: `intrigue-${card.id}`,
-    name: card.name,
+    name: intrigueNamesByCatalogId[card.id] ?? card.name,
     summary: intrigueSummariesByCatalogId[card.id] ?? summarizeAttributes(card),
     effects: intrigueCardEffects(card),
     battleIcon,

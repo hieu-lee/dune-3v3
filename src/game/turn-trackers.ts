@@ -4,6 +4,30 @@ export function hasGainedSpiceThisTurn(state: Pick<GameState, "turnSpiceGains">,
   return (state.turnSpiceGains[playerId] ?? 0) > 0;
 }
 
+export function hasAcquiredCardThisTurn(
+  state: Pick<GameState, "turnAcquiredCardIds">,
+  playerId: string,
+  cardId: string,
+) {
+  return Boolean(state.turnAcquiredCardIds?.[playerId]?.includes(cardId));
+}
+
+export function recordTurnAcquiredCard(state: GameState, playerId: string, cardIds: string | string[]): GameState {
+  if (state.phase !== "playing") return state;
+  const existingCardIds = state.turnAcquiredCardIds?.[playerId] ?? [];
+  const nextCardIds = [...new Set([
+    ...existingCardIds,
+    ...(Array.isArray(cardIds) ? cardIds : [cardIds]),
+  ])];
+  return {
+    ...state,
+    turnAcquiredCardIds: {
+      ...state.turnAcquiredCardIds,
+      [playerId]: nextCardIds,
+    },
+  };
+}
+
 export function hasVisitedMakerSpaceThisRound(state: Pick<GameState, "roundMakerSpaceVisits">, playerId: string) {
   return Boolean(state.roundMakerSpaceVisits?.[playerId]);
 }

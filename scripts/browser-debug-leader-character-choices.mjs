@@ -257,25 +257,25 @@ export async function runLeaderCharacterChoicesSmoke({
   assert.equal(assaultCommanderAfter.resources.solari, assaultCommanderBefore.resources.solari - 3, "Devastating Assault should spend 3 Solari");
   assert.equal(assaultRecipientAfter.conflict, assaultRecipientBefore.conflict + 5, "Devastating Assault should add strength to the activated Ally");
 
-  await setDebugGameAndWait(page, states.demandAttention);
-  pendingText = await page.locator(".pending-panel").innerText();
-  assert.match(pendingText, /Demand Attention/i);
-  assert.match(pendingText, /Spend 4 Solari: Gurney Halleck \+1 Bene Gesserit Influence/i);
-  await screenshot(page, captures, "pending-demand-attention.png");
+	  await setDebugGameAndWait(page, states.demandAttention);
+	  pendingText = await page.locator(".pending-panel").innerText();
+	  assert.match(pendingText, /Demand Attention/i);
+	  assert.match(pendingText, /Spend 4 spice: Gurney Halleck \+1 Bene Gesserit Influence/i);
+	  await screenshot(page, captures, "pending-demand-attention.png");
   before = await currentGame(page);
   const demandAttentionCommanderBefore = before.players.find((player) => player.id === "p1");
   const demandAttentionRecipientBefore = before.players.find((player) => player.id === "p3");
   const demandAttentionCardId = before.pendingAction.cardId;
-  await page.locator(".pending-panel").getByRole("button", { name: /Spend 4 Solari: Gurney Halleck \+1 Bene Gesserit Influence/ }).click();
+	  await page.locator(".pending-panel").getByRole("button", { name: /Spend 4 spice: Gurney Halleck \+1 Bene Gesserit Influence/ }).click();
   await waitForNoPending(page);
   after = await currentGame(page);
   const demandAttentionCommanderAfter = after.players.find((player) => player.id === "p1");
   const demandAttentionRecipientAfter = after.players.find((player) => player.id === "p3");
   assert.equal(
-    demandAttentionCommanderAfter.resources.solari,
-    demandAttentionCommanderBefore.resources.solari - 4,
-    "Demand Attention should spend 4 Solari",
-  );
+	    demandAttentionCommanderAfter.resources.spice,
+	    demandAttentionCommanderBefore.resources.spice - 4,
+	    "Demand Attention should spend 4 spice",
+	  );
   assert.equal(
     demandAttentionRecipientAfter.influence.bene,
     demandAttentionRecipientBefore.influence.bene + 1,
@@ -429,12 +429,12 @@ async function createLeaderCharacterChoiceStates(server, initialPlayableGame) {
     ...base,
     activeSeat: p1Seat,
     players: base.players.map((player) => {
-      if (player.id === "p1") {
-        return {
-          ...player,
-          resources: { ...player.resources, solari: 4 },
-          playArea: [debugDemandAttention, ...player.playArea],
-        };
+	      if (player.id === "p1") {
+	        return {
+	          ...player,
+	          resources: { ...player.resources, spice: 4 },
+	          playArea: [debugDemandAttention, ...player.playArea],
+	        };
       }
       if (player.id === "p3") {
         return { ...player, influence: { ...player.influence, bene: 1 } };

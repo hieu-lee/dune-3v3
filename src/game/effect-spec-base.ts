@@ -57,6 +57,13 @@ export function discardEffects(
   return effectSpec("discard", effects, conditions);
 }
 
+export function trashEffects(
+  effects: GameEffectSpec[],
+  conditions?: GameEffectConditionSpec[],
+): CardEffectSpec {
+  return effectSpec("trash", effects, conditions);
+}
+
 export function plotIntrigueEffects(
   effects: GameEffectSpec[],
   conditions?: GameEffectConditionSpec[],

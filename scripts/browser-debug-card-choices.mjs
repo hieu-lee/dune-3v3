@@ -349,26 +349,17 @@ export async function runCardChoicesSmoke({
   await setDebugGameAndWait(page, states.acquireInterstellarTrade);
   pendingText = await page.locator(".pending-panel").innerText();
   assert.match(pendingText, /Interstellar Trade/i);
-  assert.match(pendingText, /Choose Influence/i);
-  assert.match(pendingText, /BG/i);
-  await screenshot(page, captures, "pending-acquire-interstellar-trade-influence.png");
-
+  assert.match(pendingText, /CHOAM contract/i);
   before = await currentGame(page);
   ownerBefore = before.players.find((player) => player.id === "p2");
-  await page.locator(".pending-panel").getByRole("button", { name: /BG/ }).click();
-  await page.waitForFunction(() => window.__DUNE_DEBUG__?.getGame()?.pendingAction?.kind === "contract");
-  after = await currentGame(page);
-  ownerAfter = after.players.find((player) => player.id === "p2");
-  assert.equal(ownerAfter.influence.bene, ownerBefore.influence.bene + 1, "Interstellar Trade acquire bonus should gain chosen Influence");
-  assert.equal(after.pendingAction?.source, "Interstellar Trade", "Interstellar Trade should queue its contract after Influence");
-
-  pendingText = await page.locator(".pending-panel").innerText();
-  const interstellarContractName = after.contractOffer[0].name;
+  assert.equal(before.pendingAction?.source, "Interstellar Trade", "Interstellar Trade should queue its contract directly");
+  assert.equal(ownerBefore.influence.bene, 1, "Interstellar Trade acquisition should not grant Influence");
+  const interstellarContractName = before.contractOffer[0].name;
   assert.match(pendingText, /CHOAM contract/i);
   assert.match(pendingText, new RegExp(escapeRegExp(interstellarContractName)));
   await screenshot(page, captures, "pending-acquire-interstellar-trade-contract.png");
 
-  const contractBefore = after;
+  const contractBefore = before;
   await page.locator(".pending-panel").getByRole("button", { name: interstellarContractName }).click();
   await waitForNoPending(page);
   after = await currentGame(page);
@@ -392,8 +383,8 @@ export async function runCardChoicesSmoke({
   before = await currentGame(page);
   assert.equal(before.pendingAction?.source, "Priority Contracts", "Priority Contracts should source the browser contract pending");
   ownerBefore = before.players.find((player) => player.id === "p2");
-  assert.equal(ownerBefore.resources.spice, 2, "Priority Contracts should grant 2 spice before contract selection");
-  assert.equal(ownerBefore.vp, 1, "Priority Contracts should grant 1 VP before contract selection");
+  assert.equal(ownerBefore.resources.spice, 0, "Priority Contracts Agent play should not grant Reveal spice before contract selection");
+  assert.equal(ownerBefore.vp, 0, "Priority Contracts Agent play should not grant Reveal VP before contract selection");
   await page.locator(".pending-panel").getByRole("button", { name: priorityContractName }).click();
   await waitForNoPending(page);
   after = await currentGame(page);
@@ -497,9 +488,11 @@ export async function runCardChoicesSmoke({
   const capturedMentatDiscardName = states.capturedMentat.capturedMentatDiscardName;
   const capturedMentatDiscardId = states.capturedMentat.capturedMentatDiscardId;
   const capturedMentatDrawId = states.capturedMentat.capturedMentatDrawId;
+  const capturedMentatIntrigueId = states.capturedMentat.capturedMentatIntrigueId;
   assert.match(pendingText, /Captured Mentat/i);
   assert.match(pendingText, new RegExp(escapeRegExp(capturedMentatDiscardName)));
-  assert.match(pendingText, /Bene Gesserit/i);
+  assert.match(pendingText, /Draw 1 Intrigue card/i);
+  assert.doesNotMatch(pendingText, /Bene Gesserit/i);
   await screenshot(page, captures, "pending-captured-mentat.png");
   const capturedMentatMobileViewport = { width: 390, height: 900 };
   await page.setViewportSize(capturedMentatMobileViewport);
@@ -514,14 +507,14 @@ export async function runCardChoicesSmoke({
   before = await currentGame(page);
   ownerBefore = before.players.find((player) => player.id === "p2");
   await page.locator(".pending-panel").getByRole("button", { name: capturedMentatDiscardName }).click();
-  await page.locator(".pending-panel").getByRole("button", { name: "Bene Gesserit" }).click();
-  await page.locator(".pending-panel").getByRole("button", { name: "Resolve Captured Mentat" }).click();
+  await page.locator(".pending-panel").getByRole("button", { name: /Resolve Captured Mentat/ }).click();
   await waitForNoPending(page);
   after = await currentGame(page);
   ownerAfter = after.players.find((player) => player.id === "p2");
   assert.equal(ownerAfter.discard.at(-1).id, capturedMentatDiscardId, "Captured Mentat should discard the selected card");
   assert.equal(ownerAfter.hand.at(-1).id, capturedMentatDrawId, "Captured Mentat should draw one deck card");
-  assert.equal(ownerAfter.influence.bene, ownerBefore.influence.bene + 1, "Captured Mentat should gain chosen Influence");
+  assert.equal(ownerAfter.intrigues.at(-1).id, capturedMentatIntrigueId, "Captured Mentat should draw one Intrigue");
+  assert.equal(ownerAfter.influence.bene, ownerBefore.influence.bene, "Captured Mentat Agent should not gain Influence");
 
   await setDebugGameAndWait(page, states.spaceTimeFolding);
   pendingText = await page.locator(".pending-panel").innerText();
@@ -654,20 +647,31 @@ export async function runCardChoicesSmoke({
   await setDebugGameAndWait(page, states.deliveryAgreementRevealTrash);
   pendingText = await page.locator(".pending-panel").innerText();
   assert.match(pendingText, /Delivery Agreement/i);
-  assert.match(pendingText, /Trash reward: gain 1 VP/i);
-  assert.match(pendingText, /Skip/i);
-  await screenshot(page, captures, "pending-delivery-agreement-reveal-trash.png");
+  assert.match(pendingText, /Trash this card for 1 VP/i);
+  assert.doesNotMatch(pendingText, /Skip/i);
+  await screenshot(page, captures, "pending-delivery-agreement-reveal-choice.png");
 
   before = await currentGame(page);
   ownerBefore = before.players.find((player) => player.id === "p2");
-  assert.equal(ownerBefore.resources.spice, 1, "Delivery Agreement should gain its Reveal spice before the VP trash choice");
+  assert.equal(ownerBefore.resources.spice, 0, "Delivery Agreement should not gain spice before choosing a Reveal branch");
+  assert.equal(before.turnSpiceGains.p2 ?? 0, 0, "Delivery Agreement VP branch should not inherit a spice gain");
+  await page.locator(".pending-panel").getByRole("button", { name: "Trash this card for 1 VP" }).click();
+  await page.locator(".pending-panel").getByRole("button", { name: /Delivery Agreement \(in play\)/ }).waitFor();
+  const deliveryTrashPending = await currentGame(page);
+  assert.equal(
+    deliveryTrashPending.players.find((player) => player.id === "p2")?.resources.spice,
+    0,
+    "Choosing Delivery Agreement's VP branch should not gain spice",
+  );
+  assert.equal(deliveryTrashPending.turnSpiceGains.p2 ?? 0, 0, "Choosing Delivery Agreement's VP branch should not count as turn spice gain");
+  await screenshot(page, captures, "pending-delivery-agreement-reveal-trash.png");
   await page.locator(".pending-panel").getByRole("button", { name: /Delivery Agreement \(in play\)/ }).click();
   await waitForNoPending(page);
   after = await currentGame(page);
   ownerAfter = after.players.find((player) => player.id === "p2");
   assert.equal(ownerAfter.vp, ownerBefore.vp + 1, "Delivery Agreement Reveal trash should gain 1 VP");
   assert.equal(
-    ownerAfter.playArea.some((card) => card.id === before.pendingAction.requiredCardId),
+    ownerAfter.playArea.some((card) => card.id === deliveryTrashPending.pendingAction.requiredCardId),
     false,
     "Delivery Agreement Reveal trash should remove the source card from play",
   );
@@ -997,9 +1001,9 @@ export async function runCardChoicesSmoke({
 
   await setDebugGameAndWait(page, states.capturedMentatReveal);
   pendingText = await page.locator(".pending-panel").innerText();
-  const capturedMentatIntrigueId = states.capturedMentatReveal.capturedMentatIntrigueId;
   assert.match(pendingText, /Captured Mentat reveal/i);
   assert.match(pendingText, /Bene Gesserit/i);
+  assert.match(pendingText, /Lose 1 Influence to gain 1 Influence/i);
   await screenshot(page, captures, "pending-captured-mentat-reveal.png");
   const capturedMentatRevealMobileViewport = { width: 390, height: 900 };
   await page.setViewportSize(capturedMentatRevealMobileViewport);
@@ -1013,12 +1017,14 @@ export async function runCardChoicesSmoke({
 
   before = await currentGame(page);
   ownerBefore = before.players.find((player) => player.id === "p2");
-  await page.locator(".pending-panel").getByRole("button", { name: "Bene Gesserit" }).click();
+  await page.locator(".pending-panel").getByRole("button", { name: /Bene Gesserit to .*Spacing Guild/ }).click();
   await waitForNoPending(page);
   after = await currentGame(page);
   ownerAfter = after.players.find((player) => player.id === "p2");
   assert.equal(ownerAfter.influence.bene, ownerBefore.influence.bene - 1, "Captured Mentat reveal should lose chosen Influence");
-  assert.equal(ownerAfter.intrigues.at(-1).id, capturedMentatIntrigueId, "Captured Mentat reveal should draw one Intrigue");
+  assert.equal(ownerAfter.influence.spacing, ownerBefore.influence.spacing + 1, "Captured Mentat reveal should gain chosen Influence");
+  assert.equal(ownerAfter.intrigues.length, ownerBefore.intrigues.length, "Captured Mentat reveal should not draw an Intrigue");
+  assert.equal(ownerAfter.vp, ownerBefore.vp - 1, "Captured Mentat reveal should lose threshold VP when Influence drops below two");
 
   await setDebugGameAndWait(page, states.acquireEmpty);
   pendingText = await page.locator(".pending-panel").innerText();

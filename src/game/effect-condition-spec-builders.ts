@@ -77,6 +77,10 @@ export function hasAlliance(faction?: FactionId) {
   return faction ? ({ kind: "has-alliance", faction } as const) : ({ kind: "has-alliance" } as const);
 }
 
+export function acquiredCardThisTurn(cardId: string) {
+  return { kind: "acquired-card-this-turn", cardId } as const;
+}
+
 export function deployedUnitsThisTurn(count: number) {
   return { kind: "deployed-units-this-turn", count } as const;
 }

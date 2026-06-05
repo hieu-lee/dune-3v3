@@ -86,7 +86,7 @@ try {
     [
       ["Crysknife", "crysknife"],
       ["Desert Mouse", "desertMouse"],
-      ["Ornitopter", "ornithopter"],
+      ["Ornithopter", "ornithopter"],
     ],
     "Battle-icon Endgame Intrigues should expose structured icons",
   );

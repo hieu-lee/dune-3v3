@@ -1,6 +1,11 @@
-import { canMoveCardToThroneRow } from "./card-identifiers";
+import {
+  canMoveCardToThroneRow,
+  guildSpySourceId,
+  spiceMustFlowSourceId,
+} from "./card-identifiers";
 import {
   resolveCardAcquireEffects,
+  resolveGainInfluenceForSpiedFactions,
   resolveGainInfluenceChoices,
   resolveTakeContracts,
   type GameEffectResult,
@@ -9,11 +14,15 @@ import { changeAllegiancesGainChoices } from "./influence-choices";
 import { playerTroopSupply } from "./deck-utils";
 import { influenceEffectOwnerForChoice } from "./influence-loss-rules";
 import { drawIntrigueCards } from "./intrigue-deck";
+import {
+  adjustInfluenceAndResolveThresholdRewards,
+} from "./leader-rewards";
 import { advancePendingAction, queuePendingActions } from "./pending-actions";
 import { defaultActivatedAllyId } from "./placement-rules";
 import { pendingActionForSpyPlacements } from "./spy-effect-pending-rules";
-import { recordTurnSpiceGain } from "./turn-trackers";
-import type { Card, GameState, PendingAction, Player, ResourceId, Resources } from "./types";
+import { hasAcquiredCardThisTurn, recordTurnAcquiredCard, recordTurnSpiceGain } from "./turn-trackers";
+import { factionLabels } from "./data";
+import type { Card, FactionId, GameState, PendingAction, Player, ResourceId, Resources } from "./types";
 
 type AcquireCardPendingAction = Extract<PendingAction, { kind: "acquire-card" }>;
 type ThroneRowPendingAction = Extract<PendingAction, { kind: "throne-row" }>;
@@ -43,6 +52,9 @@ export function acquireRewardParts(reward: GameEffectResult) {
   if (reward.vp > 0) parts.push(`for ${reward.vp} VP`);
   const resourceText = formatResourceEntries(reward.revealGain);
   if (resourceText) parts.push(`gains ${resourceText}`);
+  Object.entries(reward.influenceGains)
+    .filter((entry): entry is [FactionId, number] => (entry[1] ?? 0) > 0)
+    .forEach(([faction, amount]) => parts.push(`gains ${amount} ${factionLabels[faction]} Influence`));
   return parts;
 }
 
@@ -69,6 +81,49 @@ export function drawAcquireIntrigues(
   return acquireReward.intriguesToDraw > 0
     ? drawIntrigueCards(state, playerId, acquireReward.intriguesToDraw, card.name)
     : state;
+}
+
+export function applyAcquireInfluenceRewards(state: GameState, ownerId: string, reward: GameEffectResult) {
+  return reward.influenceAdjustments.reduce((nextState, adjustment) => {
+    if (adjustment.selector !== "self" || adjustment.amount <= 0) return nextState;
+    return adjustInfluenceAndResolveThresholdRewards(nextState, ownerId, adjustment.faction, adjustment.amount);
+  }, state);
+}
+
+export function acquiredCardTrackerIds(card: Card) {
+  return [
+    card.id,
+    ...(card.sourceId !== undefined ? [String(card.sourceId)] : []),
+  ];
+}
+
+export function applyGuildSpySpiceMustFlowReward(
+  state: GameState,
+  buyerId: string,
+  acquiredCard: Card,
+  alreadyAcquiredSpiceMustFlow: boolean,
+) {
+  if (acquiredCard.sourceId !== spiceMustFlowSourceId || alreadyAcquiredSpiceMustFlow) return state;
+  const buyer = state.players.find((player) => player.id === buyerId);
+  if (!buyer?.revealed) return state;
+  const revealedGuildSpyCount = buyer.playArea.filter((card) =>
+    card.sourceId === guildSpySourceId && !card.agentPlacementSpaceId
+  ).length;
+  if (revealedGuildSpyCount <= 0) return state;
+  const reward = resolveGainInfluenceForSpiedFactions(buyer, state, revealedGuildSpyCount);
+  const gainedFactions = reward.influenceAdjustments
+    .filter((adjustment) => adjustment.selector === "self" && adjustment.amount > 0)
+    .map((adjustment) => adjustment.faction);
+  if (gainedFactions.length === 0) return state;
+  const amountText = revealedGuildSpyCount === 1 ? "1 Influence" : `${revealedGuildSpyCount} Influence`;
+  const factionText = [...new Set(gainedFactions)].map((faction) => factionLabels[faction]).join(", ");
+  return applyAcquireInfluenceRewards({
+    ...state,
+    log: [
+      `${buyer.leader} resolves Guild Spy: gains ${amountText} with ${factionText}.`,
+      ...state.log,
+    ],
+  }, buyer.id, reward);
 }
 
 export function pendingActionForAcquireSpyReward(
@@ -270,6 +325,11 @@ export function acquireMarketCard(
   const recruitOwner = callToArmsRecruit.owner;
   const recruitedTroops = recruitOwner ? Math.min(playerTroopSupply(recruitOwner), 1) : 0;
   const acquireReward = resolveCardAcquireEffects(card, buyer, state);
+  const alreadyAcquiredSpiceMustFlow = hasAcquiredCardThisTurn(
+    state,
+    buyer.id,
+    String(spiceMustFlowSourceId),
+  ) || hasAcquiredCardThisTurn(state, buyer.id, card.id);
   const players = state.players.map((player) => {
     let next = player;
     if (player.id === buyer.id) {
@@ -296,7 +356,7 @@ export function acquireMarketCard(
     ...(recruitPart ? [recruitPart] : []),
   ]);
 
-  const acquiredStateBase = recordAcquireSpiceGain({
+  const loggedState = {
     ...state,
     players,
     imperiumRow,
@@ -306,7 +366,16 @@ export function acquireMarketCard(
       `${buyer.leader} acquires ${card.name}${outcomeText}.`,
       ...state.log,
     ],
-  }, buyer.id, acquireReward);
+  };
+  const spiceTrackedState = recordAcquireSpiceGain(loggedState, buyer.id, acquireReward);
+  const acquiredTrackedState = recordTurnAcquiredCard(spiceTrackedState, buyer.id, acquiredCardTrackerIds(card));
+  const acquireInfluenceState = applyAcquireInfluenceRewards(acquiredTrackedState, buyer.id, acquireReward);
+  const acquiredStateBase = applyGuildSpySpiceMustFlowReward(
+    acquireInfluenceState,
+    buyer.id,
+    card,
+    alreadyAcquiredSpiceMustFlow,
+  );
   const acquiredState = drawAcquireIntrigues(acquiredStateBase, buyer.id, card, acquireReward);
   return {
     ...acquiredState,

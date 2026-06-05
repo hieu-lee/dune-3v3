@@ -10,6 +10,7 @@ function matchingSpyPendingDetails(first: SpyPendingAction, second: SpyPendingAc
   return (
     first.ownerId === second.ownerId &&
     first.placementIcon === second.placementIcon &&
+    JSON.stringify(first.placementIcons ?? []) === JSON.stringify(second.placementIcons ?? []) &&
     first.recallForSupply === second.recallForSupply &&
     first.mustPlaceSpy === second.mustPlaceSpy &&
     first.allowSharedPost === second.allowSharedPost &&

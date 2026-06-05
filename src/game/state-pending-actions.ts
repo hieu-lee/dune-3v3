@@ -130,6 +130,7 @@ function continueAfterResolvedConflictReward(state: GameState): GameState {
 
 export function finishPendingAction(state: GameState): GameState {
   if (state.pendingAction?.kind === "spy" && state.pendingAction.mustPlaceSpy) return state;
+  if (state.pendingAction?.kind === "recall-spy" && state.pendingAction.optional !== true) return state;
   if (state.pendingAction?.kind === "acquire-card" && state.pendingAction.optional !== true) return state;
   if (state.pendingAction?.kind === "contract" && state.pendingAction.optional !== true) return state;
   if (state.pendingAction?.kind === "discard-hand-card") return state;

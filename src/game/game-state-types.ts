@@ -91,6 +91,7 @@ export type PendingAction =
       placementIcons?: IconId[];
       recallForSupply?: boolean;
       mustPlaceSpy?: boolean;
+      mustPlaceRecalledSpyOnly?: true;
       allowSharedPost?: boolean;
       postPlacementAction?: "staban-unseen-network";
     }

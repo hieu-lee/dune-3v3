@@ -511,7 +511,8 @@ try {
     players: { p1, p2, p4, p6 },
   });
   verifyCardEffectSpecRevealPending({
-    cards: { convincingArgument, covertOperation, dagger },
+    boardSpaces: { deliverSupplies, highCouncil },
+    cards: { convincingArgument, covertOperation, dagger, inHighPlaces },
     game,
     players: { p2 },
     revealSpecCards,
@@ -715,7 +716,7 @@ try {
     withActivePlayer,
   });
   verifyCardEffectSpecMakerFremenValidation({
-    boardSpaces: { deliverSupplies, economicSupport, highCouncil, secrets },
+    boardSpaces: { deliverSupplies },
     cards: { capturedMentat, makerKeeper, northernWatermaster, paracompass, reliableInformant, shishakli },
     fixtures: { fremenSupportCard },
     game,

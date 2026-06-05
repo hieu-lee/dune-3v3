@@ -675,10 +675,19 @@ export function verifyImperiumCardAcquireEffects({
     1,
     "Merged recall-for-supply spy rewards should remain resolvable after placing the recalled spy",
   );
-  assert.equal(spyPendingRecallPlaced.pendingAction.mustPlaceSpy, false);
   assert.equal(
-    state.finishPendingAction(spyPendingRecallPlaced).pendingAction,
-    undefined,
-    "Remaining merged recall-for-supply spy rewards should be skippable after the mandatory placement resolves",
+    spyPendingRecallPlaced.pendingAction.mustPlaceSpy,
+    true,
+    "Merged mandatory spy rewards should keep the second placement mandatory after the recalled spy is placed",
+  );
+  assert.equal(
+    state.finishPendingAction(spyPendingRecallPlaced),
+    spyPendingRecallPlaced,
+    "Remaining merged mandatory spy rewards should not be skippable after one recalled-spy placement",
+  );
+  assert.deepEqual(
+    state.recallableSpySupplySpaces(spyPendingRecallPlaced, spyPendingRecallPlaced.pendingAction).map((space) => space.id),
+    [beneSpySpace.id],
+    "Merged mandatory spy rewards should allow recalling the newly placed spy for the second placement",
   );
 }

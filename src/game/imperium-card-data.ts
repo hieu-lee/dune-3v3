@@ -704,20 +704,7 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
       agentPlaceSpies(
         "self",
         1,
-        { recallForSupply: true, mustPlace: true, placementIcon: "emperor" },
-        [visitedSpaceIcon("emperor")],
-      ),
-      agentPlaceSpies(
-        "self",
-        1,
-        { recallForSupply: true, mustPlace: true, placementIcon: "bene" },
-        [visitedSpaceIcon("bene")],
-      ),
-      agentPlaceSpies(
-        "self",
-        1,
-        { recallForSupply: true, mustPlace: true, placementIcon: "spacing" },
-        [visitedSpaceIcon("spacing")],
+        { recallForSupply: true, mustPlace: true, placementIcons: ["emperor", "bene", "spacing"] },
       ),
       revealGainPersuasion(1),
       revealGainResource("solari", 1),

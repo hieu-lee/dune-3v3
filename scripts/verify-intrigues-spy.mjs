@@ -166,6 +166,7 @@ export function verifyDistractionPlotIntrigue({ cards, data, game, state }) {
     ...noSupplyPlayed.pendingAction,
     recallForSupply: false,
     mustPlaceSpy: true,
+    mustPlaceRecalledSpyOnly: true,
   });
   const distractionNoSupplyPlaced = state.placeSpyForPending(
     distractionNoSupplyRecalled,

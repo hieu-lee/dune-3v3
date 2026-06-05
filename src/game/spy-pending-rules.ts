@@ -39,6 +39,11 @@ type StabanUnseenNetworkPendingAction = Extract<PendingAction, { kind: "staban-u
 type RecallSpyPendingAction = Extract<PendingAction, { kind: "recall-spy" }>;
 type FinishPendingResolution = (state: GameState) => GameState;
 
+function pendingPlacementCanContinue(state: GameState, pending: SpyPendingAction) {
+  return placeableSpySpaces(state, pending).length > 0 ||
+    recallableSpySupplySpaces(state, pending).length > 0;
+}
+
 function stabanUnseenNetworkRewardForSpace(space: BoardSpace) {
   if (space.icon === "landsraad") return "landsraad" as const;
   if (stabanUnseenNetworkFactionIcons.includes(space.icon)) return "faction" as const;
@@ -112,13 +117,27 @@ export function resolvePlaceSpyForPending(
           space,
         )
       : undefined;
+  const nextPending = { ...pending, remaining };
+  const nextPendingState = {
+    ...state,
+    players,
+    spyPosts,
+    sharedSpyPosts,
+  };
+  const { mustPlaceRecalledSpyOnly, ...continuedPending } = nextPending;
+  const shouldKeepPlacementRequired = pending.mustPlaceSpy && !mustPlaceRecalledSpyOnly;
   return finishPendingResolution({
     ...state,
     players,
     spyPosts,
     sharedSpyPosts,
     ...(remaining > 0
-      ? { pendingAction: { ...pending, remaining, mustPlaceSpy: false } }
+      ? {
+          pendingAction: {
+            ...continuedPending,
+            mustPlaceSpy: shouldKeepPlacementRequired && pendingPlacementCanContinue(nextPendingState, continuedPending),
+          },
+        }
       : stabanPending
         ? {
             pendingAction: stabanPending,
@@ -150,7 +169,12 @@ export function recallSpyForSupplyForPending(
     ),
     spyPosts,
     sharedSpyPosts,
-    pendingAction: { ...pending, recallForSupply: pending.remaining > 1, mustPlaceSpy: true },
+    pendingAction: {
+      ...pending,
+      recallForSupply: pending.remaining > 1,
+      mustPlaceSpy: true,
+      ...(pending.mustPlaceSpy === true ? {} : { mustPlaceRecalledSpyOnly: true }),
+    },
     log: [`${owner.leader} recalls a spy from ${spyObservationPostLabelForSpace(space.id)} for ${pending.source}.`, ...state.log],
   }, owner.id, recalledSpyCount);
 }
@@ -286,7 +310,7 @@ export function recallSpyForPending(
     players,
     spyPosts,
     sharedSpyPosts,
-    ...(finalRecall ? advancePendingAction(state) : { pendingAction: { ...pending, remaining } }),
+    ...(finalRecall ? advancePendingAction(state) : { pendingAction: { ...pending, remaining, optional: false } }),
     log: [`${owner.leader} recalls a spy from ${spyObservationPostLabelForSpace(space.id)} for ${pending.source}${strengthText}${persuasionText}.`, ...state.log],
   }, owner.id, recalledSpyCount);
   if (finalRecall) recalledState = normalizeSpyObservationPosts(recalledState);

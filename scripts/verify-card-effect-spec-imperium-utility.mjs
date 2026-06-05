@@ -128,29 +128,24 @@ export function verifyCardEffectSpecImperiumUtility({ cards }) {
     "Place 1 spy on Emperor, Bene Gesserit, or Spacing Guild board spaces.",
     "Reliable Informant play text should name its board-space icon condition",
   );
-  for (const icon of ["emperor", "bene", "spacing"]) {
-    assert.ok(
-      reliableInformant.effects?.some(
-        (spec) =>
-          spec.trigger === "agent-play" &&
-          spec.conditions?.some(
-            (condition) =>
-              condition.kind === "visited-space-icon" &&
-              condition.icon === icon,
-          ) &&
-          spec.effects.some(
-            (effect) =>
-              effect.kind === "place-spies" &&
-              effect.selector === "self" &&
-              effect.amount === 1 &&
-              effect.recallForSupply === true &&
-              effect.mustPlace === true &&
-              effect.placementIcon === icon,
-          ),
-      ),
-      `Reliable Informant should carry a ${icon} board-space gated Agent spy-placement spec`,
-    );
-  }
+  assert.ok(
+    reliableInformant.effects?.some(
+      (spec) =>
+        spec.trigger === "agent-play" &&
+        !spec.conditions?.some((condition) => condition.kind === "visited-space-icon") &&
+        spec.effects.some(
+          (effect) =>
+            effect.kind === "place-spies" &&
+            effect.selector === "self" &&
+            effect.amount === 1 &&
+            effect.recallForSupply === true &&
+            effect.mustPlace === true &&
+            effect.placementIcon === undefined &&
+            JSON.stringify(effect.placementIcons) === JSON.stringify(["emperor", "bene", "spacing"]),
+        ),
+    ),
+    "Reliable Informant should carry one Agent spy-placement spec for the three printed board-space icons",
+  );
   assert.equal(
     reliableInformant.reveal,
     "+1 persuasion. Gain 1 Solari.",

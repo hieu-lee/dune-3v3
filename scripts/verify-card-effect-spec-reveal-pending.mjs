@@ -7,6 +7,7 @@ import {
 import { playerById } from "./verify-starter-decks-fixtures.mjs";
 
 export function verifyCardEffectSpecRevealPending({
+  boardSpaces,
   cards,
   game,
   players,
@@ -14,7 +15,8 @@ export function verifyCardEffectSpecRevealPending({
   state,
   turnActions,
 }) {
-  const { convincingArgument, covertOperation, dagger } = cards;
+  const { deliverSupplies, highCouncil } = boardSpaces;
+  const { convincingArgument, covertOperation, dagger, inHighPlaces } = cards;
   const { p2 } = players;
   for (const card of revealSpecCards) {
     assert.deepEqual(
@@ -129,9 +131,36 @@ export function verifyCardEffectSpecRevealPending({
       kind: pending.kind,
       remaining: pending.remaining,
       source: pending.source,
+      mustPlaceSpy: pending.mustPlaceSpy,
     })),
-    [{ kind: "spy", remaining: 2, source: "Covert Operation" }],
+    [{ kind: "spy", remaining: 2, source: "Covert Operation", mustPlaceSpy: true }],
     "Covert Operation should queue its printed reveal spy placement",
+  );
+  const covertSpyQueued = {
+    ...covertFixture,
+    pendingAction: covertRevealPendings[0],
+    pendingQueue: [],
+  };
+  const covertFirstSpyPlaced = state.placeSpyForPending(
+    covertSpyQueued,
+    covertSpyQueued.pendingAction,
+    highCouncil.id,
+  );
+  assert.equal(
+    covertFirstSpyPlaced.pendingAction?.kind,
+    "spy",
+    "Covert Operation should keep a spy pending after placing only one of two spies",
+  );
+  assert.equal(covertFirstSpyPlaced.pendingAction.remaining, 1);
+  assert.equal(
+    covertFirstSpyPlaced.pendingAction.mustPlaceSpy,
+    true,
+    "Covert Operation's second printed spy placement should remain mandatory when legal",
+  );
+  assert.equal(
+    state.finishPendingAction(covertFirstSpyPlaced),
+    covertFirstSpyPlaced,
+    "Covert Operation should not allow finishing after only one of two printed spies",
   );
   const covertPendings = state.pendingActionsForCard(
     covertOperation,
@@ -221,6 +250,89 @@ export function verifyCardEffectSpecRevealPending({
     ),
     [],
     "Covert Operation should not queue discard prompts when no opponent has hand cards",
+  );
+  const inHighPlacesRecallOwner = {
+    ...p2,
+    hand: [],
+    playArea: [inHighPlaces],
+    persuasion: 0,
+    spies: 0,
+  };
+  const inHighPlacesRecallFixture = {
+    ...game,
+    pendingAction: undefined,
+    pendingQueue: [],
+    players: game.players.map((player) => player.id === p2.id ? inHighPlacesRecallOwner : player),
+    spyPosts: {
+      ...game.spyPosts,
+      [state.spyObservationPostIdForSpace(deliverSupplies.id)]: p2.id,
+      [state.spyObservationPostIdForSpace(highCouncil.id)]: p2.id,
+    },
+  };
+  const [inHighPlacesRecallPending] = state.pendingActionsForReveal(
+    inHighPlacesRecallOwner,
+    inHighPlacesRecallFixture,
+    [inHighPlaces],
+    p2.id,
+  );
+  assert.deepEqual(
+    {
+      kind: inHighPlacesRecallPending?.kind,
+      remaining: inHighPlacesRecallPending?.remaining,
+      optional: inHighPlacesRecallPending?.optional,
+      persuasionReward: inHighPlacesRecallPending?.persuasionReward,
+      source: inHighPlacesRecallPending?.source,
+    },
+    {
+      kind: "recall-spy",
+      remaining: 2,
+      optional: true,
+      persuasionReward: 3,
+      source: "In High Places",
+    },
+    "In High Places should offer its printed optional recall-2-spies reveal payment",
+  );
+  const inHighPlacesRecallQueued = {
+    ...inHighPlacesRecallFixture,
+    pendingAction: inHighPlacesRecallPending,
+    pendingQueue: [],
+  };
+  const inHighPlacesOneSpyRecalled = state.recallSpyForPending(
+    inHighPlacesRecallQueued,
+    inHighPlacesRecallPending,
+    highCouncil.id,
+  );
+  assert.equal(
+    inHighPlacesOneSpyRecalled.pendingAction?.kind,
+    "recall-spy",
+    "In High Places should continue after recalling only one of two spies",
+  );
+  assert.equal(inHighPlacesOneSpyRecalled.pendingAction.remaining, 1);
+  assert.equal(
+    inHighPlacesOneSpyRecalled.pendingAction.optional,
+    false,
+    "In High Places recall payment should become mandatory after the player starts paying it",
+  );
+  assert.equal(playerById(inHighPlacesOneSpyRecalled, p2.id).persuasion, 0);
+  assert.equal(
+    state.skipRecallSpy(inHighPlacesOneSpyRecalled, inHighPlacesOneSpyRecalled.pendingAction),
+    inHighPlacesOneSpyRecalled,
+    "In High Places should not allow skipping after partially recalling spies",
+  );
+  assert.equal(
+    state.finishPendingAction(inHighPlacesOneSpyRecalled),
+    inHighPlacesOneSpyRecalled,
+    "In High Places should not allow generic finish after partially recalling spies",
+  );
+  const inHighPlacesSecondSpyRecalled = state.recallSpyForPending(
+    inHighPlacesOneSpyRecalled,
+    inHighPlacesOneSpyRecalled.pendingAction,
+    deliverSupplies.id,
+  );
+  assert.equal(
+    playerById(inHighPlacesSecondSpyRecalled, p2.id).persuasion,
+    3,
+    "In High Places should pay its persuasion reward only after both spies are recalled",
   );
   const stackedOpponentDiscardCard = {
     ...covertOperation,

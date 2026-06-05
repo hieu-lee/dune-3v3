@@ -231,6 +231,7 @@ export type PendingActionChoiceNestedPending =
       source: string;
       recallForSupply?: boolean;
       mustPlaceSpy?: boolean;
+      mustPlaceRecalledSpyOnly?: true;
       placementIcon?: IconId;
       placementIcons?: IconId[];
       allowSharedPost?: boolean;

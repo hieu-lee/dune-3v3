@@ -27,6 +27,17 @@ function effectLabel(effect) {
     if (effect.resource) parts.push(`resource=${effect.resource}`);
     if (effect.cost !== undefined) parts.push(`cost=${JSON.stringify(effect.cost)}`);
     if (effect.destination) parts.push(`destination=${effect.destination}`);
+    if (effect.paymentResource) parts.push(`paymentResource=${effect.paymentResource}`);
+    if (effect.placementIcon) parts.push(`placementIcon=${effect.placementIcon}`);
+    if (effect.placementIcons) parts.push(`placementIcons=${JSON.stringify(effect.placementIcons)}`);
+    if (effect.recallForSupply) parts.push("recallForSupply");
+    if (effect.mustPlace) parts.push("mustPlace");
+    if (effect.trashSource) parts.push("trashSource");
+    if (effect.requiredHandTrashTrait) parts.push(`requiredHandTrashTrait=${JSON.stringify(effect.requiredHandTrashTrait)}`);
+    if (effect.drawIntrigues !== undefined) parts.push(`drawIntrigues=${JSON.stringify(effect.drawIntrigues)}`);
+    if (effect.persuasionReward !== undefined) parts.push(`persuasionReward=${JSON.stringify(effect.persuasionReward)}`);
+    if (effect.strengthReward !== undefined) parts.push(`strengthReward=${JSON.stringify(effect.strengthReward)}`);
+    if (effect.vpReward !== undefined) parts.push(`vpReward=${JSON.stringify(effect.vpReward)}`);
     if (effect.optional) parts.push("optional");
     return parts.join(" ");
   }
@@ -54,6 +65,13 @@ function displayFields(card) {
       ["swords", card.swords],
       ["combatSwords", card.combatSwords],
       ["traits", card.traits],
+      ["acquired", card.acquired],
+      ["revealGain", card.revealGain],
+      ["trashOnPlay", card.trashOnPlay],
+      ["ignoreInfluenceRequirements", card.ignoreInfluenceRequirements],
+      ["sourceType", card.sourceType],
+      ["agentPlacementSpaceId", card.agentPlacementSpaceId],
+      ["agentPlacementTargetOwnerId", card.agentPlacementTargetOwnerId],
     ].filter(([, value]) => value !== undefined)
   );
 }

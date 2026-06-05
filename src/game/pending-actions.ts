@@ -13,6 +13,7 @@ function matchingSpyPendingDetails(first: SpyPendingAction, second: SpyPendingAc
     JSON.stringify(first.placementIcons ?? []) === JSON.stringify(second.placementIcons ?? []) &&
     first.recallForSupply === second.recallForSupply &&
     first.mustPlaceSpy === second.mustPlaceSpy &&
+    first.mustPlaceRecalledSpyOnly === second.mustPlaceRecalledSpyOnly &&
     first.allowSharedPost === second.allowSharedPost &&
     first.postPlacementAction === second.postPlacementAction
   );

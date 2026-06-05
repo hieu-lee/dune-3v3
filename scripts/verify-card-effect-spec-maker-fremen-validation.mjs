@@ -11,7 +11,7 @@ export function verifyCardEffectSpecMakerFremenValidation({
   turnActions,
   withActivePlayer,
 }) {
-  const { deliverSupplies, economicSupport, highCouncil, secrets } = boardSpaces;
+  const { deliverSupplies } = boardSpaces;
   const { capturedMentat, convincingArgument, makerKeeper, northernWatermaster, paracompass, reliableInformant, shishakli } = cards;
   const { fremenSupportCard } = fixtures;
   const { p2 } = players;
@@ -210,56 +210,48 @@ export function verifyCardEffectSpecMakerFremenValidation({
     3,
     "Paracompass should add 3 card persuasion with High Council and Swordmaster",
   );
-  for (const [space, label] of [
-    [economicSupport, "Great Houses"],
-    [secrets, "Bene Gesserit"],
-    [deliverSupplies, "Spacing Guild"],
-  ]) {
-    const reliableInformantSource = {
-      ...p2,
-      resources: { solari: 0, spice: 0, water: 0 },
-      playArea: [reliableInformant],
-    };
-    const [reliableInformantPending] = state.pendingActionsForCard(
-      reliableInformant,
-      reliableInformantSource,
-      {
-        ...game,
-        players: game.players.map((player) => player.id === p2.id ? reliableInformantSource : player),
-      },
-      p2,
-      space,
-    );
-    assert.deepEqual(
-      {
-        kind: reliableInformantPending?.kind,
-        remaining: reliableInformantPending?.remaining,
-        placementIcon: reliableInformantPending?.placementIcon,
-        source: reliableInformantPending?.source,
-      },
-      { kind: "spy", remaining: 1, placementIcon: space.icon, source: "Reliable Informant" },
-      `Reliable Informant should place 1 Agent spy on ${label} spaces`,
-    );
-  }
-  const reliableInformantLandsraadSource = {
+  const reliableInformantSource = {
     ...p2,
     resources: { solari: 0, spice: 0, water: 0 },
     playArea: [reliableInformant],
   };
-  const reliableInformantLandsraadPendings = state.pendingActionsForCard(
+  const reliableInformantState = {
+    ...game,
+    players: game.players.map((player) => player.id === p2.id ? reliableInformantSource : player),
+  };
+  const [reliableInformantPending] = state.pendingActionsForCard(
     reliableInformant,
-    reliableInformantLandsraadSource,
-    {
-      ...game,
-      players: game.players.map((player) => player.id === p2.id ? reliableInformantLandsraadSource : player),
-    },
+    reliableInformantSource,
+    reliableInformantState,
     p2,
-    highCouncil,
+    deliverSupplies,
   );
   assert.deepEqual(
-    reliableInformantLandsraadPendings,
-    [],
-    "Reliable Informant should not place an Agent spy on unrelated board-space icons",
+    {
+      kind: reliableInformantPending?.kind,
+      remaining: reliableInformantPending?.remaining,
+      placementIcon: reliableInformantPending?.placementIcon,
+      placementIcons: reliableInformantPending?.placementIcons,
+      source: reliableInformantPending?.source,
+      mustPlaceSpy: reliableInformantPending?.mustPlaceSpy,
+    },
+    {
+      kind: "spy",
+      remaining: 1,
+      placementIcon: undefined,
+      placementIcons: ["emperor", "bene", "spacing"],
+      source: "Reliable Informant",
+      mustPlaceSpy: true,
+    },
+    "Reliable Informant should place 1 Agent spy on any printed Emperor, Bene Gesserit, or Spacing Guild post",
+  );
+  const reliableInformantSpyChoiceIcons = [...new Set(
+    state.placeableSpySpaces(reliableInformantState, reliableInformantPending).map((space) => space.icon),
+  )].sort();
+  assert.deepEqual(
+    reliableInformantSpyChoiceIcons,
+    ["bene", "emperor", "spacing"],
+    "Reliable Informant should not narrow spy placement to the visited Spacing Guild icon",
   );
   const reliableInformantReveal = turnActions.revealTurnPlan(
     { ...p2, hand: [reliableInformant], highCouncilSeat: false },

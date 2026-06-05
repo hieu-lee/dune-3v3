@@ -1,4 +1,5 @@
 import type { Card, PendingAction, Player } from "../game/types";
+import { CardAssetPreview, cardAccessibleSummary } from "./CardAssetPreview";
 
 type PendingThroneRowPanelProps = {
   eligibleCards: Card[];
@@ -26,11 +27,18 @@ export function PendingThroneRowPanel({
             type="button"
             className="throne-choice-card"
             key={card.id}
-            aria-label={card.name}
+            aria-label={cardAccessibleSummary(
+              card,
+              `Move ${card.name} to the Throne Row`,
+              `${card.cost ?? 0} persuasion`,
+            )}
             onClick={() => onChoose(card.id)}
           >
-            {card.thumbnailPath && <img src={card.thumbnailPath} alt="" />}
-            <span>{card.name}</span>
+            <CardAssetPreview
+              card={card}
+              detailLabel="Throne choice"
+              metaLabel={`${card.cost ?? 0} persuasion`}
+            />
           </button>
         ))}
         {noEligible && (

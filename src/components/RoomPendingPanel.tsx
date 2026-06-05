@@ -1,6 +1,7 @@
 import { Clock, Crown } from "lucide-react";
 import { canMoveCardToThroneRow } from "../game/state";
 import type { GameState } from "../game/types";
+import { CardAssetPreview, cardAccessibleSummary } from "./CardAssetPreview";
 
 type RoomPendingPanelProps = {
   claimedPlayerId?: string;
@@ -60,12 +61,18 @@ export function RoomPendingPanel({ claimedPlayerId, game, onChooseThroneRowCard 
             data-testid={`room-throne-card-${card.id}`}
             disabled={!canChoose}
             key={card.id}
+            aria-label={cardAccessibleSummary(
+              card,
+              `Move ${card.name} to the Throne Row`,
+              `${card.cost ?? 0} persuasion`,
+            )}
             onClick={() => onChooseThroneRowCard(card.id)}
           >
-            {card.thumbnailPath && <img className="card-art" src={card.thumbnailPath} alt="" loading="lazy" />}
-            <span>{card.cost ?? 0} persuasion</span>
-            <strong>{card.name}</strong>
-            <p>{card.reveal}</p>
+            <CardAssetPreview
+              card={card}
+              detailLabel="Throne choice"
+              metaLabel={`${card.cost ?? 0} persuasion`}
+            />
           </button>
         ))}
       </div>

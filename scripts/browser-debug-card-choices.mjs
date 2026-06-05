@@ -82,7 +82,7 @@ export async function runCardChoicesSmoke({
   pendingText = await page.locator(".pending-panel").innerText();
   const acquireName = states.acquire.imperiumRow[0].name;
   assert.match(pendingText, /acquisition/i);
-  assert.match(pendingText, new RegExp(escapeRegExp(acquireName)));
+  await assertPendingButtonNamed(page, acquireName, "Acquire choice should expose the eligible Imperium Row card");
   await screenshot(page, captures, "pending-acquire-card.png");
   const acquireMobileViewport = { width: 390, height: 900 };
   await page.setViewportSize(acquireMobileViewport);
@@ -106,7 +106,7 @@ export async function runCardChoicesSmoke({
   await setDebugGameAndWait(page, states.acquireReserve);
   pendingText = await page.locator(".pending-panel").innerText();
   assert.match(pendingText, /acquisition/i);
-  assert.match(pendingText, /Prepare The Way/i);
+  await assertPendingButtonNamed(page, "Prepare The Way", "Reserve acquire choice should expose Prepare The Way");
   await screenshot(page, captures, "pending-acquire-prepare-the-way.png");
 
   before = await currentGame(page);
@@ -125,7 +125,7 @@ export async function runCardChoicesSmoke({
   const priceAcquireId = states.priceIsNoObjectAcquire.priceIsNoObjectAcquireCardId;
   const priceAcquireCost = states.priceIsNoObjectAcquire.priceIsNoObjectAcquireCardCost;
   assert.match(pendingText, /Price is No Object/i);
-  assert.match(pendingText, new RegExp(escapeRegExp(priceAcquireName)));
+  await assertPendingButtonNamed(page, priceAcquireName, "Price is No Object should expose the eligible acquisition card");
   assert.match(pendingText, /Skip/i);
   await screenshot(page, captures, "pending-price-is-no-object-acquire.png");
 
@@ -1034,4 +1034,9 @@ export async function runCardChoicesSmoke({
 
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+async function assertPendingButtonNamed(page, name, message) {
+  const count = await page.locator(".pending-panel").getByRole("button", { name }).count();
+  assert.equal(count, 1, message);
 }

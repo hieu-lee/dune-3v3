@@ -210,7 +210,7 @@ export async function runTableChoicesSmoke({
   });
   pendingText = await page.locator(".pending-panel").innerText();
   assert.match(pendingText, /Inspire Awe/i);
-  assert.match(pendingText, new RegExp(escapeRegExp(states.inspireAweAcquireCardName)));
+  await assertPendingButtonNamed(page, states.inspireAweAcquireCardName, "Ally Inspire Awe should expose its acquisition card");
   await screenshot(page, captures, "pending-inspire-awe-ally-acquire.png");
 
   await page.locator(".pending-panel").getByRole("button", { name: states.inspireAweAcquireCardName }).click();
@@ -253,7 +253,11 @@ export async function runTableChoicesSmoke({
   });
   pendingText = await page.locator(".pending-panel").innerText();
   assert.match(pendingText, /Inspire Awe/i);
-  assert.match(pendingText, new RegExp(escapeRegExp(states.inspireAweAcquireCardName)));
+  await assertPendingButtonNamed(
+    page,
+    states.inspireAweAcquireCardName,
+    "Commander Inspire Awe should expose its acquisition card",
+  );
   await screenshot(page, captures, "pending-inspire-awe-commander-acquire.png");
 
   await page.locator(".pending-panel").getByRole("button", { name: states.inspireAweAcquireCardName }).click();
@@ -788,14 +792,18 @@ export async function runTableChoicesSmoke({
     "Manipulate browser flow should discard the played Intrigue",
   );
   const manipulateMarketText = await page.locator(".market-panel").innerText();
-  assert.match(manipulateMarketText, new RegExp(escapeRegExp(states.manipulateRowCardName)));
+  assert.equal(
+    await page.locator(".market-panel").getByRole("button", { name: states.manipulateRowCardName }).count(),
+    1,
+    "Manipulate should expose the discounted row card as an accessible market button",
+  );
   assert.match(manipulateMarketText, /Manipulate/i);
   await screenshot(page, captures, "manipulate-after.png");
 
   await setDebugGameAndWait(page, states.throneRow);
   pendingText = await page.locator(".pending-panel").innerText();
   assert.match(pendingText, /Throne Row/i);
-  assert.match(pendingText, new RegExp(escapeRegExp(states.throneRowCardName)));
+  await assertPendingButtonNamed(page, states.throneRowCardName, "Throne Row should expose the eligible card");
   await screenshot(page, captures, "pending-throne-row.png");
   const throneRowMobileViewport = { width: 390, height: 900 };
   await page.setViewportSize(throneRowMobileViewport);
@@ -824,7 +832,11 @@ export async function runTableChoicesSmoke({
   await setDebugGameAndWait(page, states.imperialTentThroneRow);
   pendingText = await page.locator(".pending-panel").innerText();
   assert.match(pendingText, /Throne Row/i);
-  assert.match(pendingText, new RegExp(escapeRegExp(states.imperialTentThroneRowCardName)));
+  await assertPendingButtonNamed(
+    page,
+    states.imperialTentThroneRowCardName,
+    "Imperial Tent Throne Row should expose the eligible card",
+  );
   const imperialTentThroneBefore = await currentGame(page);
   assert.equal(
     imperialTentThroneBefore.pendingAction?.source,
@@ -906,4 +918,9 @@ async function waitForActiveIntrigue(page, cardName) {
 
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+async function assertPendingButtonNamed(page, name, message) {
+  const count = await page.locator(".pending-panel").getByRole("button", { name }).count();
+  assert.equal(count, 1, message);
 }

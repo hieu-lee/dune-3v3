@@ -1,5 +1,6 @@
 import { manipulateAcquisitionCost } from "../game/state";
 import type { Card, GameState, Player } from "../game/types";
+import { CardAssetPreview, cardAccessibleSummary } from "./CardAssetPreview";
 
 type MarketPanelProps = {
   activePlayer: Player;
@@ -42,17 +43,23 @@ export function MarketPanel({
               type="button"
               className="market-card"
               key={card.id}
+              aria-label={cardAccessibleSummary(
+                card,
+                `Acquire ${card.name}`,
+                `${cardCost} persuasion${manipulatedCard ? " after Manipulate" : ""}`,
+              )}
               onClick={() => onBuyCard(card)}
               disabled={!playingPhase || pendingLocked || !activePlayer.revealed || activePlayer.persuasion < cardCost}
             >
-              {card.thumbnailPath && <img className="card-art" src={card.thumbnailPath} alt="" loading="lazy" />}
-              <span>
-                {cardCost} persuasion
-                {manipulatedCard ? " - Manipulate" : ""}
-                {card.acquired ? ` - ${card.acquired} VP` : ""}
-              </span>
-              <strong>{card.name}</strong>
-              <p>{card.reveal}</p>
+              <CardAssetPreview
+                card={card}
+                detailLabel={manipulatedCard ? "Manipulate discount" : "Acquire after reveal"}
+                metaLabel={[
+                  `${cardCost} persuasion`,
+                  manipulatedCard ? "Manipulate" : undefined,
+                  card.acquired ? `${card.acquired} VP` : undefined,
+                ].filter((part): part is string => Boolean(part)).join(" / ")}
+              />
             </button>
           );
         })}
@@ -72,6 +79,11 @@ export function MarketPanel({
                 type="button"
                 className="market-card throne-card"
                 key={card.id}
+                aria-label={cardAccessibleSummary(
+                  card,
+                  `Acquire ${card.name} from Throne Row`,
+                  `${card.cost ?? 0} persuasion`,
+                )}
                 onClick={() => onBuyCard(card)}
                 disabled={
                   !playingPhase ||
@@ -81,10 +93,11 @@ export function MarketPanel({
                   activePlayer.persuasion < (card.cost ?? 0)
                 }
               >
-                {card.thumbnailPath && <img className="card-art" src={card.thumbnailPath} alt="" loading="lazy" />}
-                <span>{card.cost} persuasion</span>
-                <strong>{card.name}</strong>
-                <p>{card.reveal}</p>
+                <CardAssetPreview
+                  card={card}
+                  detailLabel="Throne Row"
+                  metaLabel={`${card.cost ?? 0} persuasion`}
+                />
               </button>
             ))}
           </div>

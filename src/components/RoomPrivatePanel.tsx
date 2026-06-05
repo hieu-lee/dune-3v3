@@ -1,6 +1,6 @@
-import { BookOpen, Eye, Swords } from "lucide-react";
-import { iconLabels } from "../game/data";
+import { Eye } from "lucide-react";
 import type { GamePhase, Player } from "../game/types";
+import { CardAssetPreview, cardAccessibleSummary } from "./CardAssetPreview";
 
 type RoomPrivatePanelProps = {
   compactForPending?: boolean;
@@ -41,22 +41,25 @@ export function RoomPrivatePanel({ compactForPending = false, phase = "playing",
           {player.hand.map((card) => {
             const hidden = card.name === "Hidden card";
             return (
-              <article className={`hand-card room-private-card ${hidden ? "hidden-hand-card" : ""}`} key={card.id}>
+              <article
+                className={`hand-card room-private-card ${hidden ? "hidden-hand-card" : ""}`}
+                key={card.id}
+                aria-label={hidden ? "Hidden private card" : cardAccessibleSummary(card)}
+                tabIndex={hidden ? undefined : 0}
+              >
                 {hidden ? (
                   <div className="hidden-card-back" aria-hidden="true">
                     <span>Dune</span>
                   </div>
                 ) : (
-                  card.thumbnailPath && <img className="card-art" src={card.thumbnailPath} alt="" loading="lazy" />
+                  <CardAssetPreview card={card} detailLabel="Your hand" />
                 )}
-                <span>{hidden ? "Private" : card.icons.map((icon) => iconLabels[icon]).join(" / ") || "Reveal"}</span>
-                <strong>{card.name}</strong>
-                <p>{hidden ? "Only visible to that player." : card.play}</p>
-                {!hidden && (
-                  <footer>
-                    <span><BookOpen size={13} /> {card.persuasion}</span>
-                    <span><Swords size={13} /> {card.swords}</span>
-                  </footer>
+                {hidden && (
+                  <>
+                    <span>Private</span>
+                    <strong>{card.name}</strong>
+                    <p>Only visible to that player.</p>
+                  </>
                 )}
               </article>
             );

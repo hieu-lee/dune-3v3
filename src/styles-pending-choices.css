@@ -27,7 +27,8 @@
   overflow-wrap: anywhere;
 }
 
-.pending-controls span,
+.pending-controls > span,
+.pending-controls button > span,
 .support-target strong {
   color: #f7e7c8;
   font-size: 0.8rem;
@@ -83,7 +84,7 @@
   color: #b8ab98;
 }
 
-.contract-choice button span {
+.contract-choice button > span {
   overflow-wrap: anywhere;
 }
 
@@ -183,7 +184,7 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.24);
 }
 
-.contract-choice-card span {
+.contract-choice-card > span {
   color: #fff3df;
   font-size: 0.78rem;
   font-weight: 900;
@@ -610,13 +611,13 @@
 }
 
 .acquire-card-choice .acquire-card-choice-cards {
-  grid-template-columns: repeat(auto-fit, minmax(88px, 96px));
+  grid-template-columns: repeat(auto-fit, minmax(112px, 128px));
 }
 
 .pending-panel .pending-controls.acquire-card-choice .acquire-card-choice-card {
-  width: 96px;
-  grid-template-rows: auto minmax(2.35em, auto) auto auto;
-  gap: 7px;
+  width: 128px;
+  grid-template-rows: auto;
+  gap: 0;
   border-color: rgba(166, 226, 220, 0.36);
   background:
     linear-gradient(180deg, rgba(32, 76, 70, 0.86), rgba(22, 36, 34, 0.88)),
@@ -633,38 +634,6 @@
 
 .pending-panel .pending-controls.acquire-card-choice .acquire-card-choice-card img {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.24);
-}
-
-.acquire-card-choice .acquire-card-choice-name {
-  color: #fff3df;
-  font-size: 0.78rem;
-  line-height: 1.15;
-}
-
-.acquire-card-choice .acquire-card-choice-meta,
-.acquire-card-choice .acquire-card-choice-destination {
-  min-width: 0;
-  display: inline-flex;
-  justify-content: center;
-  border-radius: 999px;
-  padding: 3px 6px;
-  font-size: 0.68rem;
-  font-weight: 900;
-  line-height: 1.1;
-  white-space: nowrap;
-  text-transform: none;
-}
-
-.acquire-card-choice .acquire-card-choice-meta {
-  border: 1px solid rgba(242, 184, 75, 0.32);
-  background: rgba(242, 184, 75, 0.13);
-  color: #f3d89d;
-}
-
-.acquire-card-choice .acquire-card-choice-destination {
-  border: 1px solid rgba(166, 226, 220, 0.26);
-  background: rgba(166, 226, 220, 0.1);
-  color: #d9f1ed;
 }
 
 .pending-panel .pending-controls.acquire-card-choice .acquire-card-choice-skip {
@@ -808,34 +777,24 @@
 .throne-choice-cards {
   min-width: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(106px, 112px));
+  grid-template-columns: repeat(auto-fit, minmax(112px, 128px));
   align-items: stretch;
   justify-content: start;
   gap: 8px;
 }
 
 .pending-panel .pending-controls .throne-choice-card {
-  width: 112px;
+  width: 128px;
   min-width: 0;
   min-height: 100%;
-  display: grid;
-  grid-template-rows: auto minmax(2.3em, auto);
-  align-content: start;
-  justify-items: stretch;
-  gap: 6px;
+  gap: 0;
   border-color: rgba(239, 180, 71, 0.34);
   padding: 8px;
   text-align: center;
   white-space: normal;
 }
 
-.pending-panel .pending-controls .throne-choice-card img {
-  width: 100%;
-  border-radius: 5px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.24);
-}
-
-.throne-choice-card span {
+.throne-choice-empty-card > span {
   color: #fff3df;
   font-size: 0.78rem;
   font-weight: 900;
@@ -843,7 +802,7 @@
   overflow-wrap: anywhere;
 }
 
-.throne-choice-card small {
+.throne-choice-empty-card > small {
   color: #cfe8df;
   font-size: 0.72rem;
   font-weight: 800;

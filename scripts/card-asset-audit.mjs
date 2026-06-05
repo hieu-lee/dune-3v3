@@ -17,28 +17,91 @@ function htmlAssetPath(imagePath) {
   return `../../public${imagePath}`;
 }
 
+function paidRewardLabel(reward) {
+  if (!reward || typeof reward !== "object") return JSON.stringify(reward);
+  if (reward.kind === "bundle" && Array.isArray(reward.rewards)) {
+    return `bundle[${reward.rewards.map(paidRewardLabel).join(" + ")}]`;
+  }
+
+  const parts = [reward.kind ?? JSON.stringify(reward)];
+  if (reward.selector) parts.push(`selector=${reward.selector}`);
+  if (reward.amount !== undefined) parts.push(`amount=${JSON.stringify(reward.amount)}`);
+  if (reward.resource) parts.push(`resource=${reward.resource}`);
+  if (reward.faction) parts.push(`faction=${reward.faction}`);
+  if (reward.destination) parts.push(`destination=${reward.destination}`);
+  if (reward.counter) parts.push(`counter=${reward.counter}`);
+  if (reward.troopSupplyCost !== undefined) {
+    parts.push(`troopSupplyCost=${JSON.stringify(reward.troopSupplyCost)}`);
+  }
+  return parts.join(" ");
+}
+
+function paidRewardOptionLabel(option) {
+  if (!option || typeof option !== "object") return JSON.stringify(option);
+
+  const parts = [option.id ?? JSON.stringify(option)];
+  if (option.resource) parts.push(`resource=${option.resource}`);
+  if (option.cost !== undefined) parts.push(`cost=${JSON.stringify(option.cost)}`);
+  if (option.reward) parts.push(`reward=${paidRewardLabel(option.reward)}`);
+  return parts.join(" ");
+}
+
+function paidRewardOptionsLabel(options) {
+  if (!Array.isArray(options)) return JSON.stringify(options);
+  return `[${options.map(paidRewardOptionLabel).join("; ")}]`;
+}
+
+function optionLabel(option) {
+  if (!option || typeof option !== "object") return JSON.stringify(option);
+
+  const parts = [];
+  if (option.id) parts.push(option.id);
+  if (option.label) parts.push(`label=${JSON.stringify(option.label)}`);
+  if (option.conditions?.length) {
+    parts.push(`if ${option.conditions.map(effectLabel).join("; ")}`);
+  }
+  if (option.effect) parts.push(`effect=${effectLabel(option.effect)}`);
+  appendRemainingFields(parts, option, new Set(["id", "label", "conditions", "effect"]));
+  return parts.join(" ");
+}
+
+function optionsLabel(options) {
+  if (!Array.isArray(options)) return JSON.stringify(options);
+  return `[${options.map(optionLabel).join("; ")}]`;
+}
+
+function appendRemainingFields(parts, value, handledFields) {
+  for (const [field, fieldValue] of Object.entries(value)) {
+    if (handledFields.has(field) || fieldValue === undefined) continue;
+    if (fieldValue === true) {
+      parts.push(field);
+      continue;
+    }
+    parts.push(`${field}=${JSON.stringify(fieldValue)}`);
+  }
+}
+
 function effectLabel(effect) {
   if (!effect || typeof effect !== "object") return String(effect);
   if (effect.kind) {
     const parts = [effect.kind];
     if (effect.source) parts.push(`source=${effect.source}`);
     if (effect.selector) parts.push(`selector=${effect.selector}`);
-    if (effect.amount !== undefined) parts.push(`amount=${JSON.stringify(effect.amount)}`);
-    if (effect.resource) parts.push(`resource=${effect.resource}`);
-    if (effect.cost !== undefined) parts.push(`cost=${JSON.stringify(effect.cost)}`);
-    if (effect.destination) parts.push(`destination=${effect.destination}`);
-    if (effect.paymentResource) parts.push(`paymentResource=${effect.paymentResource}`);
-    if (effect.placementIcon) parts.push(`placementIcon=${effect.placementIcon}`);
-    if (effect.placementIcons) parts.push(`placementIcons=${JSON.stringify(effect.placementIcons)}`);
-    if (effect.recallForSupply) parts.push("recallForSupply");
-    if (effect.mustPlace) parts.push("mustPlace");
-    if (effect.trashSource) parts.push("trashSource");
-    if (effect.requiredHandTrashTrait) parts.push(`requiredHandTrashTrait=${JSON.stringify(effect.requiredHandTrashTrait)}`);
-    if (effect.drawIntrigues !== undefined) parts.push(`drawIntrigues=${JSON.stringify(effect.drawIntrigues)}`);
-    if (effect.persuasionReward !== undefined) parts.push(`persuasionReward=${JSON.stringify(effect.persuasionReward)}`);
-    if (effect.strengthReward !== undefined) parts.push(`strengthReward=${JSON.stringify(effect.strengthReward)}`);
-    if (effect.vpReward !== undefined) parts.push(`vpReward=${JSON.stringify(effect.vpReward)}`);
-    if (effect.optional) parts.push("optional");
+    if (effect.requiredRecipient) parts.push(`requiredRecipient=${effect.requiredRecipient}`);
+    if (effect.requirePayableOption) parts.push("requirePayableOption");
+    if (effect.kind === "paid-reward-choice" && effect.options) {
+      parts.push(`options=${paidRewardOptionsLabel(effect.options)}`);
+    } else if (effect.options) {
+      parts.push(`options=${optionsLabel(effect.options)}`);
+    }
+    appendRemainingFields(parts, effect, new Set([
+      "kind",
+      "source",
+      "selector",
+      "requiredRecipient",
+      "requirePayableOption",
+      "options",
+    ]));
     return parts.join(" ");
   }
   return JSON.stringify(effect);
@@ -48,6 +111,55 @@ function specSummary(spec) {
   const choice = spec.choiceId ? ` choice=${spec.choiceId}` : "";
   const conditions = spec.conditions?.length ? ` if ${spec.conditions.map(effectLabel).join("; ")}` : "";
   return `${spec.trigger}${choice}${conditions}: ${spec.effects.map(effectLabel).join(" | ")}`;
+}
+
+function mapLabel(label, value) {
+  return value === undefined ? undefined : `${label}=${JSON.stringify(value)}`;
+}
+
+function conflictRewardLabel(rank, reward) {
+  if (!reward) return undefined;
+  const parts = [
+    mapLabel("fixedVp", reward.fixedVp),
+    mapLabel("contracts", reward.contracts),
+    mapLabel("influence", reward.influence),
+    mapLabel("influenceChoices", reward.influenceChoices),
+    mapLabel("influenceChoiceOptions", reward.influenceChoiceOptions),
+    mapLabel("intrigues", reward.intrigues),
+    mapLabel("resources", reward.resources),
+    mapLabel("spies", reward.spies),
+    mapLabel("trashCards", reward.trashCards),
+    mapLabel("troops", reward.troops),
+    mapLabel("conversion", reward.conversion),
+  ].filter(Boolean);
+  return `conflict-reward rank=${rank}: ${parts.join(" ")}`;
+}
+
+function bespokeImplementationSummary(group, card, context) {
+  if (group === "conflict") {
+    return [1, 2, 3]
+      .map((rank) => conflictRewardLabel(rank, context.conflictBattleRewardsBySourceId[card.sourceId]?.[rank]))
+      .filter(Boolean);
+  }
+
+  if (group === "intrigue") {
+    const summaries = [];
+    if (card.battleIcon) {
+      summaries.push(`plot/endgame-battle-icon battleIcon=${card.battleIcon}: Plot gains 1 spice; Ally Endgame flips a matching or wild won Conflict for 1 VP`);
+    }
+    if (card.sourceId === context.choamProfitsSourceId) {
+      summaries.push("endgame-conditional: completedContracts>=4 -> gain 1 VP");
+    }
+    if (card.sourceId === context.secureSpiceTradeSourceId) {
+      summaries.push("endgame-conditional: theSpiceMustFlowCount>=2 -> gain 1 VP and 2 spice");
+    }
+    if (card.sourceId === context.shadowAllianceSourceId) {
+      summaries.push("endgame-conditional: effectiveInfluence>=4 where opposing team owns Alliance -> gain 1 VP");
+    }
+    return summaries;
+  }
+
+  return [];
 }
 
 function displayFields(card) {
@@ -76,9 +188,10 @@ function displayFields(card) {
   );
 }
 
-function auditEntry(group, card, catalogById) {
+function auditEntry(group, card, catalogById, context) {
   const assetFile = localAssetFile(card.imagePath);
   const catalogCard = catalogById.get(card.sourceId);
+  const specSummaries = card.effects?.map(specSummary) ?? [];
   return {
     group,
     id: card.id,
@@ -90,7 +203,7 @@ function auditEntry(group, card, catalogById) {
     assetExists: assetFile ? existsSync(assetFile) : false,
     catalogAttributes: catalogCard?.attributes ?? [],
     display: displayFields(card),
-    effectSummary: card.effects?.map(specSummary) ?? [],
+    effectSummary: [...specSummaries, ...bespokeImplementationSummary(group, card, context)],
     effects: card.effects ?? [],
   };
 }
@@ -253,7 +366,15 @@ const server = await createServer({
 try {
   const data = await server.ssrLoadModule("/src/game/data.ts");
   const catalogData = await server.ssrLoadModule("/src/game/catalog-data.ts");
+  const conflictRewardData = await server.ssrLoadModule("/src/game/conflict-reward-data.ts");
+  const cardIdentifiers = await server.ssrLoadModule("/src/game/card-identifiers.ts");
   const catalogById = new Map(catalogData.catalog.cards.map((card) => [card.id, card]));
+  const context = {
+    conflictBattleRewardsBySourceId: conflictRewardData.conflictBattleRewardsBySourceId,
+    choamProfitsSourceId: cardIdentifiers.choamProfitsSourceId,
+    secureSpiceTradeSourceId: cardIdentifiers.secureSpiceTradeSourceId,
+    shadowAllianceSourceId: cardIdentifiers.shadowAllianceSourceId,
+  };
   const groups = [
     ["ally-starter", data.allyStarterCards],
     ["muad-dib-commander", data.muadDibCommanderCards],
@@ -269,7 +390,7 @@ try {
   const entries = groups.flatMap(([group, cards]) =>
     [...cards]
       .sort((left, right) => left.name.localeCompare(right.name) || String(left.id).localeCompare(String(right.id)))
-      .map((card) => auditEntry(group, card, catalogById))
+      .map((card) => auditEntry(group, card, catalogById, context))
   );
   const missingAssets = entries.filter((entry) => !entry.assetExists);
   mkdirSync(outDir, { recursive: true });

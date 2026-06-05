@@ -247,13 +247,18 @@ export function createCardChoiceDerivedStates({
   });
   assert.equal(
     corrinthCityHighCouncilState.pendingAction?.kind,
-    "pay-resource-for-high-council-seat",
-    "Expected Corrinth City Reveal to queue High Council payment",
+    "pending-action-choice",
+    "Expected Corrinth City Reveal to queue Solari or High Council branch choices",
+  );
+  assert.deepEqual(
+    corrinthCityHighCouncilState.pendingAction.options.map((option) => option.id),
+    ["solari", "high-council"],
+    "Expected Corrinth City Reveal to offer Solari and High Council branches",
   );
   assert.equal(
     corrinthCityHighCouncilState.players.find((player) => player.id === ownerId)?.persuasion,
-    5,
-    "Expected Corrinth City Reveal to add +5 persuasion before the High Council payment",
+    0,
+    "Expected Corrinth City Reveal to wait for a branch choice before adding persuasion",
   );
   const deliveryCompletedContracts = data.standardContracts.slice(0, 4).map((card, index) => ({
     card,

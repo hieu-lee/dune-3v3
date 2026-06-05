@@ -400,6 +400,20 @@ export type AgentPendingActionChoice = {
         id: string;
         label: string;
         effect: {
+          kind: "pay-resource-for-high-council-seat";
+          selector: "self";
+          resource: ResourceId;
+          cost: number;
+          optional: true;
+          persuasionCost: number;
+          persuasionReward: number;
+          source?: string;
+        };
+      }
+    | {
+        id: string;
+        label: string;
+        effect: {
           kind: "place-spies";
           selector: "self";
           amount: number;

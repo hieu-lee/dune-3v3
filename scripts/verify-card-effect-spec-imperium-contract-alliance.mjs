@@ -27,8 +27,8 @@ export function verifyCardEffectSpecImperiumContractAlliance({
   );
   assert.equal(
     corrinthCity.reveal,
-    "+5 persuasion, or spend 5 Solari to take your High Council seat.",
-    "Corrinth City reveal text should preserve its High Council branch",
+    "Gain 5 Solari, or spend 5 Solari to take your High Council seat.",
+    "Corrinth City reveal text should preserve its Solari or High Council branch",
   );
   assert.deepEqual(
     corrinthCity.effects?.filter((spec) => spec.trigger === "agent-play"),
@@ -50,14 +50,24 @@ export function verifyCardEffectSpecImperiumContractAlliance({
     hasRevealEffect(
       corrinthCity,
       (effect) =>
-        effect.kind === "pay-resource-for-high-council-seat" &&
-        effect.resource === "solari" &&
-        effect.cost === 5 &&
-        effect.persuasionCost === 5 &&
-        effect.persuasionReward === 2 &&
-        effect.source === "Corrinth City",
+        effect.kind === "pending-action-choice" &&
+        effect.source === "Corrinth City" &&
+        effect.options.some((option) =>
+          option.id === "solari" &&
+          option.effect.kind === "gain-resource" &&
+          option.effect.resource === "solari" &&
+          option.effect.amount === 5
+        ) &&
+        effect.options.some((option) =>
+          option.id === "high-council" &&
+          option.effect.kind === "pay-resource-for-high-council-seat" &&
+          option.effect.resource === "solari" &&
+          option.effect.cost === 5 &&
+          option.effect.persuasionReward === 2 &&
+          option.effect.source === "Corrinth City"
+        ),
     ),
-    "Corrinth City should model its paid High Council Reveal branch as a typed effect",
+    "Corrinth City should model its Solari or paid High Council Reveal branches as a typed choice",
   );
   assert.equal(
     deliveryAgreement.play,

@@ -628,10 +628,9 @@ export async function runCardChoicesSmoke({
   await setDebugGameAndWait(page, states.corrinthCityHighCouncil);
   pendingText = await page.locator(".pending-panel").innerText();
   assert.match(pendingText, /Corrinth City/i);
+  assert.match(pendingText, /\+5 Solari/i);
   assert.match(pendingText, /High Council seat/i);
   assert.match(pendingText, /Spend 5 Solari/i);
-  assert.match(pendingText, /forgo 5 persuasion/i);
-  assert.match(pendingText, /gain 2 persuasion/i);
   await screenshot(page, captures, "pending-corrinth-city-high-council.png");
 
   before = await currentGame(page);
@@ -642,7 +641,7 @@ export async function runCardChoicesSmoke({
   ownerAfter = after.players.find((player) => player.id === "p2");
   assert.equal(ownerAfter.highCouncilSeat, true, "Corrinth City Reveal should take the High Council seat");
   assert.equal(ownerAfter.resources.solari, ownerBefore.resources.solari - 5, "Corrinth City Reveal should spend 5 Solari");
-  assert.equal(ownerAfter.persuasion, 2, "Corrinth City Reveal should replace +5 persuasion with the current High Council +2");
+  assert.equal(ownerAfter.persuasion, 2, "Corrinth City Reveal should add the current High Council +2");
 
   await setDebugGameAndWait(page, states.deliveryAgreementRevealTrash);
   pendingText = await page.locator(".pending-panel").innerText();

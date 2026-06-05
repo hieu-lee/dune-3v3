@@ -118,23 +118,37 @@ export function verifyImperiumCardLateCatalogSpecs({
     corrinthCity.play,
     /Discard 2 cards.*spend 5 Solari.*gain 1 VP/i,
   );
-  assert.match(corrinthCity.reveal, /\+5 persuasion.*High Council/i);
+  assert.match(corrinthCity.reveal, /Gain 5 Solari.*High Council/i);
   assert.ok(
     corrinthCity.effects?.some(
       (spec) =>
         spec.trigger === "reveal" &&
         spec.effects.some(
           (effect) =>
-            effect.kind === "pay-resource-for-high-council-seat" &&
+            effect.kind === "pending-action-choice" &&
             effect.selector === "self" &&
-            effect.resource === "solari" &&
-            effect.cost === 5 &&
-            effect.persuasionCost === 5 &&
-            effect.persuasionReward === 2 &&
-            effect.source === "Corrinth City",
+            effect.source === "Corrinth City" &&
+            effect.options.some(
+              (option) =>
+                option.id === "solari" &&
+                option.effect.kind === "gain-resource" &&
+                option.effect.selector === "self" &&
+                option.effect.resource === "solari" &&
+                option.effect.amount === 5,
+            ) &&
+            effect.options.some(
+              (option) =>
+                option.id === "high-council" &&
+                option.effect.kind === "pay-resource-for-high-council-seat" &&
+                option.effect.selector === "self" &&
+                option.effect.resource === "solari" &&
+                option.effect.cost === 5 &&
+                option.effect.persuasionReward === 2 &&
+                option.effect.source === "Corrinth City",
+            ),
         ),
     ),
-    "Corrinth City should model its paid High Council Reveal branch as a typed effect",
+    "Corrinth City should model its Solari or paid High Council Reveal branches as a typed choice",
   );
   assert.equal(
     corrinthCity.acquired,

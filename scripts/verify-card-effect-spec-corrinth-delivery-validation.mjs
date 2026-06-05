@@ -16,7 +16,50 @@ export function verifyCardEffectSpecCorrinthDeliveryValidation({
     { ...p2, hand: [corrinthCity], highCouncilSeat: false },
     game,
   );
-  assert.equal(corrinthReveal.persuasion, 5, "Corrinth City should resolve its default +5 persuasion Reveal branch");
+  assert.equal(corrinthReveal.persuasion, 0, "Corrinth City should not resolve printed 5 Solari as persuasion");
+  assert.equal(corrinthReveal.revealGain.solari ?? 0, 0, "Corrinth City should not auto-gain Solari before its Reveal choice");
+  const corrinthSolariFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 0,
+    discard: [],
+    hand: [corrinthCity],
+    highCouncilSeat: false,
+    persuasion: 0,
+    playArea: [],
+    resources: { solari: 0, spice: 0, water: 0 },
+    revealed: false,
+  }));
+  const corrinthSolariPlan = turnActions.revealTurnPlan(
+    playerById(corrinthSolariFixture, p2.id),
+    corrinthSolariFixture,
+  );
+  const corrinthSolariRevealed = turnActions.revealTurnAction(corrinthSolariFixture, {
+    commanderTargets: {},
+    revealPlan: corrinthSolariPlan,
+  });
+  assert.equal(
+    corrinthSolariRevealed.pendingAction?.kind,
+    "pending-action-choice",
+    "Corrinth City should queue a Reveal branch choice",
+  );
+  assert.deepEqual(
+    corrinthSolariRevealed.pendingAction.options.map((option) => option.id),
+    ["solari"],
+    "Corrinth City should expose only the Solari branch when the High Council branch is not payable",
+  );
+  assert.equal(
+    state.skipPendingActionChoice(corrinthSolariRevealed, corrinthSolariRevealed.pendingAction),
+    corrinthSolariRevealed,
+    "Corrinth City's mandatory Reveal branch choice should not be skippable",
+  );
+  const corrinthSolariChosen = state.resolvePendingActionChoice(
+    corrinthSolariRevealed,
+    corrinthSolariRevealed.pendingAction,
+    "solari",
+  );
+  assert.equal(corrinthSolariChosen.pendingAction, undefined, "Corrinth City Solari branch should resolve its choice");
+  assert.equal(playerById(corrinthSolariChosen, p2.id).resources.solari, 5, "Corrinth City Solari branch should gain 5 Solari");
+  assert.equal(playerById(corrinthSolariChosen, p2.id).persuasion, 0, "Corrinth City Solari branch should not gain persuasion");
+  assert.equal(playerById(corrinthSolariChosen, p2.id).highCouncilSeat, false, "Corrinth City Solari branch should not take a High Council seat");
   const corrinthRevealFixture = withActivePlayer(game, p2.id, () => ({
     agentsReady: 0,
     discard: [],
@@ -35,62 +78,46 @@ export function verifyCardEffectSpecCorrinthDeliveryValidation({
     commanderTargets: {},
     revealPlan: corrinthRevealActionPlan,
   });
+  assert.equal(
+    corrinthRevealed.pendingAction?.kind,
+    "pending-action-choice",
+    "Corrinth City should queue payable Reveal branches",
+  );
   assert.deepEqual(
-    corrinthRevealed.pendingAction,
+    corrinthRevealed.pendingAction.options.map((option) => option.id),
+    ["solari", "high-council"],
+    "Corrinth City should offer Solari or High Council when the branch is payable",
+  );
+  assert.deepEqual(
+    corrinthRevealed.pendingAction.options.find((option) => option.id === "high-council")?.pending,
     {
       kind: "pay-resource-for-high-council-seat",
       ownerId: p2.id,
       resource: "solari",
       cost: 5,
       optional: true,
-      persuasionCost: 5,
+      persuasionCost: 0,
       persuasionReward: 2,
       source: "Corrinth City",
       cardId: corrinthCity.id,
     },
-    "Corrinth City should queue its paid High Council Reveal branch",
+    "Corrinth City High Council choice should require pre-existing Solari and award the current High Council persuasion",
   );
-  assert.equal(playerById(corrinthRevealed, p2.id).persuasion, 5, "Corrinth City should add +5 persuasion before branch payment");
-  const corrinthCouncilPaid = state.resolvePayResourceForHighCouncilSeatChoice(
+  assert.equal(playerById(corrinthRevealed, p2.id).persuasion, 0, "Corrinth City should not add persuasion before branch choice");
+  const corrinthCouncilPaid = state.resolvePendingActionChoice(
     corrinthRevealed,
     corrinthRevealed.pendingAction,
+    "high-council",
   );
-  assert.equal(corrinthCouncilPaid.pendingAction, undefined, "Corrinth City High Council payment should resolve its pending action");
+  assert.equal(corrinthCouncilPaid.pendingAction, undefined, "Corrinth City High Council branch should resolve its choice");
   assert.equal(playerById(corrinthCouncilPaid, p2.id).resources.solari, 0, "Corrinth City High Council branch should spend 5 Solari");
   assert.equal(playerById(corrinthCouncilPaid, p2.id).highCouncilSeat, true, "Corrinth City High Council branch should take a seat");
   assert.equal(
     playerById(corrinthCouncilPaid, p2.id).persuasion,
     2,
-    "Corrinth City High Council branch should replace +5 persuasion with the current High Council +2",
+    "Corrinth City High Council branch should add the current High Council +2 persuasion",
   );
-  assert.match(corrinthCouncilPaid.log[0], /spends 5 Solari.*takes a High Council seat.*gains 2 persuasion/i);
-  const corrinthCouncilSkipped = state.skipPayResourceForHighCouncilSeat(
-    corrinthRevealed,
-    corrinthRevealed.pendingAction,
-  );
-  assert.equal(playerById(corrinthCouncilSkipped, p2.id).resources.solari, 5, "Skipping Corrinth City High Council should keep Solari");
-  assert.equal(playerById(corrinthCouncilSkipped, p2.id).persuasion, 5, "Skipping Corrinth City High Council should keep +5 persuasion");
-  assert.equal(playerById(corrinthCouncilSkipped, p2.id).highCouncilSeat, false, "Skipping Corrinth City High Council should not take a seat");
-  const { cardId: _corrinthHighCouncilCardId, ...corrinthMissingCardPending } = corrinthRevealed.pendingAction;
-  const corrinthMissingCardIdState = {
-    ...corrinthRevealed,
-    pendingAction: corrinthMissingCardPending,
-    pendingQueue: [],
-  };
-  const corrinthMissingCardIdResolved = state.resolvePayResourceForHighCouncilSeatChoice(
-    corrinthMissingCardIdState,
-    corrinthMissingCardIdState.pendingAction,
-  );
-  assert.equal(
-    playerById(corrinthMissingCardIdResolved, p2.id).highCouncilSeat,
-    false,
-    "Corrinth City High Council payment should reject malformed pendings without a source card id",
-  );
-  assert.equal(
-    playerById(corrinthMissingCardIdResolved, p2.id).resources.solari,
-    5,
-    "Malformed Corrinth City High Council payment should not spend Solari",
-  );
+  assert.match(corrinthCouncilPaid.log[0], /chooses .*High Council.*spends 5 solari.*takes a High Council seat.*gains 2 persuasion/i);
   const corrinthFullCouncilFixture = {
     ...corrinthRevealFixture,
     players: corrinthRevealFixture.players.map((player) =>
@@ -109,7 +136,13 @@ export function verifyCardEffectSpecCorrinthDeliveryValidation({
     commanderTargets: {},
     revealPlan: corrinthFullCouncilPlan,
   });
-  assert.equal(corrinthFullCouncilRevealed.pendingAction, undefined, "Corrinth City should not queue High Council payment when seats are full");
+  assert.deepEqual(
+    corrinthFullCouncilRevealed.pendingAction?.kind === "pending-action-choice"
+      ? corrinthFullCouncilRevealed.pendingAction.options.map((option) => option.id)
+      : [],
+    ["solari"],
+    "Corrinth City should only offer the Solari branch when High Council seats are full",
+  );
   const deliveryReveal = turnActions.revealTurnPlan(
     { ...p2, hand: [deliveryAgreement], highCouncilSeat: false },
     game,

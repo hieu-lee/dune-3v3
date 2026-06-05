@@ -733,6 +733,47 @@ export function verifyCardEffectSpecChoiceValidation({
     },
     "Reveal pending action choice specs should not alter fixed reveal totals",
   );
+  const pendingActionChoiceHighCouncilOption = {
+    id: "high-council",
+    label: "Spend 5 Solari for High Council seat",
+    effect: {
+      kind: "pay-resource-for-high-council-seat",
+      selector: "self",
+      resource: "solari",
+      cost: 5,
+      persuasionReward: 2,
+      source: "Test Pending Choice",
+    },
+  };
+  assert.deepEqual(
+    effectResolver.resolveRevealPendingActionChoices(
+      [revealSpec([pendingActionChoiceEffect({ options: [pendingActionChoiceHighCouncilOption] })])],
+      { trigger: "reveal", source: p2, state: game },
+    ),
+    [
+      {
+        selector: "self",
+        source: "Test Pending Choice",
+        options: [
+          {
+            id: "high-council",
+            label: "Spend 5 Solari for High Council seat",
+            effect: {
+              kind: "pay-resource-for-high-council-seat",
+              selector: "self",
+              resource: "solari",
+              cost: 5,
+              optional: true,
+              persuasionCost: 0,
+              persuasionReward: 2,
+              source: "Test Pending Choice",
+            },
+          },
+        ],
+      },
+    ],
+    "Reveal pending action choice specs should support nested High Council payment branches",
+  );
   assert.throws(
     () => state.applyCardAgentEffect(
       pendingActionChoiceCard(
@@ -826,6 +867,18 @@ export function verifyCardEffectSpecChoiceValidation({
     ),
     /Unsupported pending-action-choice selector "opponent"/,
     "Pending action choice specs should reject unsupported nested selectors",
+  );
+  assert.throws(
+    () => state.applyCardAgentEffect(
+      pendingActionChoiceCard(
+        "effect-spec-invalid-pending-action-choice-high-council-trigger-card",
+        pendingActionChoiceEffect({ options: [pendingActionChoiceHighCouncilOption] }),
+      ),
+      p4,
+      p6,
+    ),
+    /Unsupported pending-action-choice pay-resource-for-high-council-seat for agent-play/,
+    "Pending action choice High Council branches should stay in Reveal effects",
   );
   assert.throws(
     () => state.applyCardAgentEffect(
@@ -935,6 +988,40 @@ export function verifyCardEffectSpecChoiceValidation({
     ),
     /Invalid pending-action-choice trash requiredTrait ""/,
     "Pending action choice trash branches should reject empty required traits",
+  );
+  assert.throws(
+    () => effectResolver.resolveRevealPendingActionChoices(
+      [
+        revealSpec([
+          pendingActionChoiceEffect({
+            options: [{
+              ...pendingActionChoiceHighCouncilOption,
+              effect: { ...pendingActionChoiceHighCouncilOption.effect, resource: "melange" },
+            }],
+          }),
+        ]),
+      ],
+      { trigger: "reveal", source: p2, state: game },
+    ),
+    /Unsupported effect resource "melange"/,
+    "Pending action choice High Council branches should reject unsupported payment resources",
+  );
+  assert.throws(
+    () => effectResolver.resolveRevealPendingActionChoices(
+      [
+        revealSpec([
+          pendingActionChoiceEffect({
+            options: [{
+              ...pendingActionChoiceHighCouncilOption,
+              effect: { ...pendingActionChoiceHighCouncilOption.effect, cost: 0 },
+            }],
+          }),
+        ]),
+      ],
+      { trigger: "reveal", source: p2, state: game },
+    ),
+    /Invalid pending-action-choice High Council cost "0"/,
+    "Pending action choice High Council branches should require positive payment costs",
   );
   assert.throws(
     () => state.applyCardAgentEffect(

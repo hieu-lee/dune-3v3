@@ -428,9 +428,10 @@ export function verifyImperiumCardMarketContractEffects({
   );
   assert.equal(
     corrinthReveal.persuasion,
-    5,
-    "Corrinth City should resolve its typed +5 persuasion Reveal branch",
+    0,
+    "Corrinth City should not treat its printed 5 Solari Reveal branch as persuasion",
   );
+  assert.equal(corrinthReveal.revealGain.solari ?? 0, 0, "Corrinth City should wait for its Reveal branch choice before gaining Solari");
   const corrinthRevealFixture = withActivePlayer(game, p2.id, () => ({
     hand: [corrinthCity],
     highCouncilSeat: false,
@@ -449,12 +450,18 @@ export function verifyImperiumCardMarketContractEffects({
   });
   assert.equal(
     corrinthRevealed.pendingAction?.kind,
-    "pay-resource-for-high-council-seat",
-    "Corrinth City should queue High Council payment on Reveal",
+    "pending-action-choice",
+    "Corrinth City should queue its Solari or High Council Reveal choice",
   );
-  const corrinthCouncilPaid = state.resolvePayResourceForHighCouncilSeatChoice(
+  assert.deepEqual(
+    corrinthRevealed.pendingAction.options.map((option) => option.id),
+    ["solari", "high-council"],
+    "Corrinth City should offer both branches when High Council is payable",
+  );
+  const corrinthCouncilPaid = state.resolvePendingActionChoice(
     corrinthRevealed,
     corrinthRevealed.pendingAction,
+    "high-council",
   );
   assert.equal(
     playerById(corrinthCouncilPaid, p2.id).highCouncilSeat,
@@ -469,7 +476,7 @@ export function verifyImperiumCardMarketContractEffects({
   assert.equal(
     playerById(corrinthCouncilPaid, p2.id).persuasion,
     2,
-    "Corrinth City Reveal payment should leave the current High Council +2 persuasion",
+    "Corrinth City High Council branch should add the current High Council +2 persuasion",
   );
   const deliveryReveal = turnActions.revealTurnPlan(
     { ...p2, hand: [deliveryAgreement], highCouncilSeat: false },

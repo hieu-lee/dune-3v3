@@ -102,7 +102,7 @@ export function hasRevealEffect(card, predicate) {
 
 export function expectedFixedReveal(card) {
   return {
-    persuasion: card.name === "Corrinth City" ? 5 : card.persuasion,
+    persuasion: card.persuasion,
     revealGain:
       card.name === "Junction Headquarters"
         ? { water: 1 }

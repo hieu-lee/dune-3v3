@@ -466,29 +466,41 @@ export function verifyCardEffectSpecMarketImperiumCatalog({
     hasRevealEffect(
       corrinthCity,
       (effect) =>
+        effect.kind === "pending-action-choice" &&
+        effect.selector === "self" &&
+        effect.source === "Corrinth City" &&
+        effect.options.some(
+          (option) =>
+            option.id === "solari" &&
+            option.effect.kind === "gain-resource" &&
+            option.effect.resource === "solari" &&
+            option.effect.amount === 5,
+        ) &&
+        effect.options.some(
+          (option) =>
+            option.id === "high-council" &&
+            option.effect.kind === "pay-resource-for-high-council-seat" &&
+            option.effect.resource === "solari" &&
+            option.effect.cost === 5 &&
+            option.effect.persuasionReward === 2 &&
+            option.effect.source === "Corrinth City",
+        ),
+    ),
+    "Corrinth City should carry its Solari or High Council Reveal branches as a typed choice",
+  );
+  assert.equal(
+    hasRevealEffect(
+      corrinthCity,
+      (effect) =>
         effect.kind === "gain-persuasion" &&
         effect.selector === "self" &&
         effect.amount === 5,
     ),
-    "Corrinth City should carry its default +5 persuasion Reveal branch as a typed effect",
-  );
-  assert.ok(
-    hasRevealEffect(
-      corrinthCity,
-      (effect) =>
-        effect.kind === "pay-resource-for-high-council-seat" &&
-        effect.selector === "self" &&
-        effect.resource === "solari" &&
-        effect.cost === 5 &&
-        effect.persuasionCost === 5 &&
-        effect.persuasionReward === 2 &&
-        effect.optional === true &&
-        effect.source === "Corrinth City",
-    ),
-    "Corrinth City should carry its paid High Council Reveal branch as a typed effect",
+    false,
+    "Corrinth City should not carry its printed Solari branch as a persuasion effect",
   );
   assert.deepEqual(
-    effectResolver.resolveRevealPayResourceForHighCouncilSeats(
+    effectResolver.resolveRevealPendingActionChoices(
       corrinthCity.effects,
       {
         trigger: "reveal",
@@ -499,15 +511,37 @@ export function verifyCardEffectSpecMarketImperiumCatalog({
     [
       {
         selector: "self",
-        resource: "solari",
-        cost: 5,
-        optional: true,
-        persuasionCost: 5,
-        persuasionReward: 2,
         source: "Corrinth City",
+        options: [
+          {
+            id: "solari",
+            label: "+5 Solari",
+            effect: {
+              kind: "gain-resource",
+              selector: "self",
+              resource: "solari",
+              amount: 5,
+              source: "Corrinth City",
+            },
+          },
+          {
+            id: "high-council",
+            label: "Spend 5 Solari for High Council seat",
+            effect: {
+              kind: "pay-resource-for-high-council-seat",
+              selector: "self",
+              resource: "solari",
+              cost: 5,
+              optional: true,
+              persuasionCost: 0,
+              persuasionReward: 2,
+              source: "Corrinth City",
+            },
+          },
+        ],
       },
     ],
-    "Corrinth City should resolve its paid High Council Reveal branch through the typed pending resolver",
+    "Corrinth City should resolve its Solari or High Council Reveal choice through the typed pending resolver",
   );
   assert.ok(
     hasAgentEffect(

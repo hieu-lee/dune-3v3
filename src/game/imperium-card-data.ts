@@ -113,7 +113,6 @@ import {
   revealRecallSpiesForPersuasion,
   revealGainResource,
   revealGainStrength,
-  revealPayResourceForHighCouncilSeat,
   revealPayResourceForSandworms,
   revealRetreatTroopsForStrength,
   revealRecruitTroops,
@@ -253,7 +252,7 @@ function imperiumRevealText(card: HubCard, persuasion: number, swords: number, p
     return "Gain 1 spice.";
   }
   if (card.id === corrinthCitySourceId) {
-    return "+5 persuasion, or spend 5 Solari to take your High Council seat.";
+    return "Gain 5 Solari, or spend 5 Solari to take your High Council seat.";
   }
   if (card.id === deliveryAgreementSourceId) {
     return "Gain 1 spice, or if you have completed four or more contracts, trash this card to gain 1 VP.";
@@ -547,12 +546,34 @@ function imperiumCardEffects(card: HubCard): CardEffectSpec[] | undefined {
         gainVp: 1,
         source: "Corrinth City",
       }),
-      revealGainPersuasion(5),
-      revealPayResourceForHighCouncilSeat("solari", 5, {
-        persuasionCost: 5,
-        persuasionReward: 2,
-        source: "Corrinth City",
-      }),
+      revealPendingActionChoice(
+        [
+          {
+            id: "solari",
+            label: "+5 Solari",
+            effect: {
+              kind: "gain-resource",
+              selector: "self",
+              resource: "solari",
+              amount: 5,
+              source: "Corrinth City",
+            },
+          },
+          {
+            id: "high-council",
+            label: "Spend 5 Solari for High Council seat",
+            effect: {
+              kind: "pay-resource-for-high-council-seat",
+              selector: "self",
+              resource: "solari",
+              cost: 5,
+              persuasionReward: 2,
+              source: "Corrinth City",
+            },
+          },
+        ],
+        { source: "Corrinth City" },
+      ),
     ];
   }
   if (card.id === deliveryAgreementSourceId) {

@@ -1,4 +1,4 @@
-import { BookOpen, Coins, Dumbbell, Eye, Gem, X } from "lucide-react";
+import { BookOpen, Coins, Dumbbell, Eye, Gem, Landmark, X } from "lucide-react";
 import {
   pendingActionChoiceOptionIsResolvable,
 } from "../game/state";
@@ -19,6 +19,7 @@ function optionIcon(kind: PendingActionChoicePendingAction["options"][number]["p
   if (kind === "gain-persuasion") return <Gem size={13} />;
   if (kind === "gain-resource") return <Coins size={13} />;
   if (kind === "gain-strength") return <Dumbbell size={13} />;
+  if (kind === "pay-resource-for-high-council-seat") return <Landmark size={13} />;
   if (kind === "spy") return <Eye size={13} />;
   return <BookOpen size={13} />;
 }
@@ -28,6 +29,7 @@ function optionKindLabel(kind: PendingActionChoicePendingAction["options"][numbe
   if (kind === "gain-persuasion") return "Persuasion";
   if (kind === "gain-resource") return "Resource";
   if (kind === "gain-strength") return "Strength";
+  if (kind === "pay-resource-for-high-council-seat") return "High Council";
   if (kind === "spy") return "Spy";
   return "Acquire";
 }

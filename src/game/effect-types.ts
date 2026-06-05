@@ -167,6 +167,16 @@ export type PendingActionChoiceEffect =
       source?: string;
     }
   | {
+      kind: "pay-resource-for-high-council-seat";
+      selector: "self";
+      resource: ResourceId;
+      cost: EffectAmountSpec;
+      optional?: true;
+      persuasionCost?: EffectAmountSpec;
+      persuasionReward?: EffectAmountSpec;
+      source?: string;
+    }
+  | {
       kind: "place-spies";
       selector: "self";
       amount: EffectAmountSpec;
@@ -239,6 +249,17 @@ export type PendingActionChoiceNestedPending =
       combatRecipientId: string;
       source: string;
       amount: number;
+    }
+  | {
+      kind: "pay-resource-for-high-council-seat";
+      ownerId: string;
+      resource: ResourceId;
+      cost: number;
+      optional: true;
+      persuasionCost: number;
+      persuasionReward: number;
+      source: string;
+      cardId: string;
     };
 export type PendingActionChoicePendingOption = {
   id: string;

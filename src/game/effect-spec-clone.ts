@@ -225,6 +225,22 @@ export function clonePendingActionChoiceOptions(options: PendingActionChoiceEffe
         },
       };
     }
+    if (option.effect.kind === "pay-resource-for-high-council-seat") {
+      return {
+        ...option,
+        ...(option.conditions ? { conditions: option.conditions.map((condition) => ({ ...condition })) } : {}),
+        effect: {
+          ...option.effect,
+          cost: cloneAmount(option.effect.cost),
+          ...(option.effect.persuasionCost !== undefined
+            ? { persuasionCost: cloneAmount(option.effect.persuasionCost) }
+            : {}),
+          ...(option.effect.persuasionReward !== undefined
+            ? { persuasionReward: cloneAmount(option.effect.persuasionReward) }
+            : {}),
+        },
+      };
+    }
     const effect = option.effect as { kind?: unknown };
     throw new Error(`Unsupported pending-action-choice effect "${String(effect.kind)}"`);
   });

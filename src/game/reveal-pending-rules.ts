@@ -406,6 +406,19 @@ function pendingActionsForRevealPendingActionChoice(
               }
             : undefined;
         }
+        if (option.effect.kind === "pay-resource-for-high-council-seat") {
+          return {
+            kind: "pay-resource-for-high-council-seat" as const,
+            ownerId: source.id,
+            resource: option.effect.resource,
+            cost: option.effect.cost,
+            optional: true as const,
+            persuasionCost: option.effect.persuasionCost,
+            persuasionReward: option.effect.persuasionReward,
+            source: sourceLabel,
+            cardId: card.id,
+          };
+        }
         if (option.effect.kind === "trash-card") {
           return {
             kind: "trash-card" as const,

@@ -253,6 +253,27 @@ export function validatePendingActionChoiceEffect(effect: PendingActionChoiceEff
       validateSourceLabel("pending-action-choice strength source", option.effect.source);
       return;
     }
+    if (option.effect.kind === "pay-resource-for-high-council-seat") {
+      if (trigger !== "reveal") {
+        throw new Error(`Unsupported pending-action-choice pay-resource-for-high-council-seat for ${trigger}`);
+      }
+      if (!supportedResources.has(option.effect.resource)) {
+        throw new Error(`Unsupported effect resource "${option.effect.resource}"`);
+      }
+      validatePositiveAmount("pending-action-choice High Council cost", option.effect.cost);
+      if (option.effect.persuasionCost !== undefined) {
+        validateAmount(option.effect.persuasionCost);
+      }
+      if (option.effect.persuasionReward !== undefined) {
+        validateAmount(option.effect.persuasionReward);
+      }
+      validateOptionalTrue(
+        "pending-action-choice High Council optional",
+        (option.effect as { optional?: unknown }).optional,
+      );
+      validateSourceLabel("pending-action-choice High Council source", option.effect.source);
+      return;
+    }
     if (option.effect.kind === "place-spies") {
       if (trigger !== "reveal") {
         throw new Error(`Unsupported pending-action-choice place-spies for ${trigger}`);

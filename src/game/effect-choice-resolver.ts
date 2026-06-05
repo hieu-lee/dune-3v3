@@ -257,6 +257,26 @@ function resolvePendingActionChoiceOption(
       },
     };
   }
+  if (option.effect.kind === "pay-resource-for-high-council-seat") {
+    return {
+      id: option.id,
+      label: option.label,
+      effect: {
+        kind: "pay-resource-for-high-council-seat",
+        selector: option.effect.selector,
+        resource: option.effect.resource,
+        cost: amountFor(option.effect.cost, context.source),
+        optional: true,
+        persuasionCost: option.effect.persuasionCost === undefined
+          ? 0
+          : amountFor(option.effect.persuasionCost, context.source),
+        persuasionReward: option.effect.persuasionReward === undefined
+          ? 0
+          : amountFor(option.effect.persuasionReward, context.source),
+        ...(option.effect.source ? { source: option.effect.source } : {}),
+      },
+    };
+  }
   const effect = option.effect as { kind?: unknown };
   throw new Error(`Unsupported pending-action-choice effect "${String(effect.kind)}"`);
 }

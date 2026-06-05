@@ -4,6 +4,10 @@ import {
 import {
   advancePendingAction,
 } from "./pending-actions";
+import {
+  canPay,
+  highCouncilSeatsTaken,
+} from "./board-rules";
 import { playerHasConflictUnits } from "./conflict-rules";
 import { scoreActiveGurneyAlwaysSmilingForRecipient } from "./leader-rewards";
 import {
@@ -43,6 +47,16 @@ export function pendingActionChoiceOptionIsResolvable(
   if (nestedPending.kind === "gain-strength") {
     const recipient = state.players.find((player) => player.id === nestedPending.combatRecipientId);
     return Boolean(recipient && nestedPending.amount > 0 && playerHasConflictUnits(recipient));
+  }
+  if (nestedPending.kind === "pay-resource-for-high-council-seat") {
+    const owner = state.players.find((player) => player.id === nestedPending.ownerId);
+    return Boolean(
+      owner &&
+        !owner.highCouncilSeat &&
+        highCouncilSeatsTaken(state.players) < 4 &&
+        canPay(owner, { [nestedPending.resource]: nestedPending.cost }) &&
+        owner.persuasion >= nestedPending.persuasionCost,
+    );
   }
   if (nestedPending.kind === "spy") {
     return placeableSpySpaces(state, nestedPending).length > 0 ||
@@ -116,6 +130,32 @@ export function resolvePendingActionChoice(
       ],
     };
     return scoreActiveGurneyAlwaysSmilingForRecipient(strengthenedState, nestedPending.combatRecipientId);
+  }
+  if (nestedPending.kind === "pay-resource-for-high-council-seat") {
+    const players = state.players.map((player) => {
+      if (player.id !== nestedPending.ownerId) return player;
+      return {
+        ...player,
+        highCouncilSeat: true,
+        persuasion: player.persuasion - nestedPending.persuasionCost + nestedPending.persuasionReward,
+        resources: {
+          ...player.resources,
+          [nestedPending.resource]: player.resources[nestedPending.resource] - nestedPending.cost,
+        },
+      };
+    });
+    const rewardText = nestedPending.persuasionReward > 0
+      ? ` and gains ${nestedPending.persuasionReward} persuasion`
+      : "";
+    return {
+      ...state,
+      players,
+      ...advancePendingAction(state),
+      log: [
+        `${owner.leader} chooses ${option.label} for ${pending.source}: spends ${nestedPending.cost} ${nestedPending.resource} and takes a High Council seat${rewardText}.`,
+        ...state.log,
+      ],
+    };
   }
   return {
     ...state,

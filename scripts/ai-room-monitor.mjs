@@ -37,10 +37,14 @@ function parseArgs(argv) {
     outDir: flags.get("out") ?? "artifacts/qa/ai-room-monitor",
     model: flags.get("model"),
     reasoningEffort: flags.get("reasoning-effort"),
+    timeoutMs: Number(flags.get("timeout-ms") ?? 120_000),
+    maxRetries: Number(flags.get("max-retries") ?? 5),
+    retryBaseMs: Number(flags.get("retry-base-ms") ?? 1_000),
     storageFile: flags.get("storage-file"),
     assertPrivacy: flags.get("assert-privacy") !== "false",
     aiTeam: flags.get("ai-team") ?? "all",
     waitMs: Number(flags.get("wait-ms") ?? 2_000),
+    verbose: flags.get("verbose") === "true",
   };
 }
 
@@ -156,6 +160,7 @@ async function chooseAndApplyAiStep({
   actionLog,
   assertPrivacy,
   aiPlayerIds,
+  log,
 }) {
   const room = runtime.server.rooms.get(roomId);
   assert.ok(room, `Expected room ${roomId}`);
@@ -211,9 +216,11 @@ async function chooseAndApplyAiStep({
       note: lastError ? `Previous action attempt failed: ${lastError}` : undefined,
     });
     if (assertPrivacy) assertAiSnapshotHasNoForeignPrivateCards(aiSnapshot, room.game);
+    log?.(`step ${actionLog.length + 1} r${room.game.round} ${room.game.phase} ${player.id}/${player.leader} legal=${legalActions.length} attempt=${attempt}`);
     const selected = await chooseAiAction({ aiClient, snapshot: aiSnapshot, legalActions, invalidActionIds });
     const { response, body } = await roomAction(baseUrl, roomId, player.id, tokenByPlayerId.get(player.id), selected.action.action);
     if (response.status === 200) {
+      log?.(`applied ${player.id}: ${selected.action.label}`);
       actionLog.push({
         step: actionLog.length + 1,
         round: body.snapshot.game.round,
@@ -249,10 +256,14 @@ export async function runAiRoomMonitor({
   outDir = "artifacts/qa/ai-room-monitor",
   model,
   reasoningEffort,
+  timeoutMs = 120_000,
+  maxRetries = 5,
+  retryBaseMs = 1_000,
   storageFile,
   assertPrivacy = true,
   aiTeam = "all",
   waitMs = 2_000,
+  verbose = false,
   server: providedServer,
   aiClient: providedAiClient,
 } = {}) {
@@ -267,9 +278,17 @@ export async function runAiRoomMonitor({
   const ownsServer = !providedServer;
   const baseUrl = server.resolvedUrls.local[0].replace(/\/$/, "");
   const runtime = await createAiRuntime(server);
+  const log = verbose ? (message) => console.log(`[ai-monitor] ${message}`) : () => {};
   const aiClient = providedAiClient ?? (mock
     ? createMockAiClient()
-    : createOpenAiResponseClient({ model, reasoningEffort }));
+    : createOpenAiResponseClient({
+        model,
+        reasoningEffort,
+        timeoutMs,
+        maxRetries,
+        retryBaseMs,
+        log: verbose ? (message) => console.log(`[openai] ${message}`) : undefined,
+      }));
   const tokenByPlayerId = new Map();
   const actionLog = [];
   const discussions = [];
@@ -336,6 +355,7 @@ export async function runAiRoomMonitor({
 
       const completedRound = room.game.round - 1;
       if (completedRound > lastDiscussedCompletedRound && room.game.phase === "playing") {
+        log(`discussing completed round ${completedRound} for next round ${room.game.round}`);
         const result = await discussAllTeams({
           baseUrl,
           room,
@@ -361,11 +381,13 @@ export async function runAiRoomMonitor({
         actionLog,
         assertPrivacy,
         aiPlayerIds,
+        log,
       });
       if (stepResult?.error) {
         if (normalizedAiTeam === "all" || !stepResult.waitForHuman) {
           throw new Error(JSON.stringify(stepResult, null, 2));
         }
+        log(`waiting for human-controlled seat: ${JSON.stringify(stepResult)}`);
         await sleep(waitMs);
         step -= 1;
       }

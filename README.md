@@ -115,6 +115,7 @@ pnpm run debug:room:vp-endgame
 - `pnpm run debug:room:marathon` drives a natural six-browser game through Conflict-deck Endgame and final team scoring.
 - `pnpm run debug:room:ai:mock` drives two deterministic AI teams through the room server without API calls.
 - `pnpm run debug:room:ai` drives two OpenAI-backed AI teams with `OPENAI_API_KEY`; override with `DUNE_AI_MODEL`, `--model=...`, `DUNE_AI_REASONING_EFFORT`, or `--reasoning-effort=medium`.
+- Add `--verbose`, `--timeout-ms=45000`, `--max-retries=3`, or `--retry-base-ms=2000` to inspect long OpenAI-backed runs and tune transient API retry behavior.
 - `pnpm run debug:room:ai -- --ai-team=shaddam` creates a room, claims the Shaddam team as AI, prints the room URL, and waits while humans claim and play the Muad'Dib seats (`p1`, `p3`, `p5`).
 - `pnpm run debug:room:vp-endgame` covers the 10 VP Endgame trigger before Conflict-deck exhaustion.
 

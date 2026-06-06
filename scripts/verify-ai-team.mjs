@@ -10,6 +10,7 @@ import {
   chooseAiAction,
   createAiRuntime,
   createMockAiClient,
+  createOpenAiResponseClient,
   discussRoundSummary,
   legalActionsForSeat,
 } from "./ai-team-driver.mjs";
@@ -134,6 +135,105 @@ async function verifyToolCallRetryPath() {
     maxToolRounds: 1,
   });
   assert.equal(multiChoice.actionId, "legal-a", "Responses handling should inspect multiple function calls");
+}
+
+async function verifyOpenAiResponseRetryPath() {
+  let calls = 0;
+  const client = createOpenAiResponseClient({
+    apiKey: "verifier-key",
+    model: "verifier-model",
+    reasoningEffort: "none",
+    maxRetries: 2,
+    retryBaseMs: 0,
+    sleepFn: async () => {},
+    async fetchFn() {
+      calls += 1;
+      if (calls === 1) {
+        return {
+          ok: false,
+          status: 503,
+          headers: { get: () => null },
+          async text() {
+            return "";
+          },
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        headers: { get: () => null },
+        async text() {
+          return JSON.stringify({ output: [{ type: "message", content: "ok" }] });
+        },
+      };
+    },
+  });
+  const response = await client.responsesCreate({ input: "retry verifier" });
+  assert.equal(calls, 2, "OpenAI Responses client should retry transient 5xx responses");
+  assert.equal(response.output[0].content, "ok", "OpenAI Responses client should return the successful retry response");
+
+  let bodyAbortCalls = 0;
+  const bodyAbortClient = createOpenAiResponseClient({
+    apiKey: "verifier-key",
+    maxRetries: 1,
+    retryBaseMs: 0,
+    sleepFn: async () => {},
+    async fetchFn() {
+      bodyAbortCalls += 1;
+      if (bodyAbortCalls === 1) {
+        return {
+          ok: true,
+          status: 200,
+          headers: { get: () => null },
+          async text() {
+            const error = new Error("body read aborted");
+            error.name = "AbortError";
+            throw error;
+          },
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        headers: { get: () => null },
+        async text() {
+          return JSON.stringify({ output: [{ type: "message", content: "body retry ok" }] });
+        },
+      };
+    },
+  });
+  const bodyAbortResponse = await bodyAbortClient.responsesCreate({ input: "body abort retry verifier" });
+  assert.equal(bodyAbortCalls, 2, "OpenAI Responses client should retry retryable body-read failures");
+  assert.equal(
+    bodyAbortResponse.output[0].content,
+    "body retry ok",
+    "OpenAI Responses client should not treat a failed body read as an empty successful response",
+  );
+
+  let badRequestCalls = 0;
+  const noRetryClient = createOpenAiResponseClient({
+    apiKey: "verifier-key",
+    maxRetries: 2,
+    retryBaseMs: 0,
+    sleepFn: async () => {},
+    async fetchFn() {
+      badRequestCalls += 1;
+      return {
+        ok: false,
+        status: 400,
+        headers: { get: () => null },
+        async text() {
+          return JSON.stringify({ error: "bad request" });
+        },
+      };
+    },
+  });
+  await assert.rejects(
+    () => noRetryClient.responsesCreate({ input: "do not retry" }),
+    /OpenAI Responses API failed \(400\)/,
+    "OpenAI Responses client should not retry non-transient request errors",
+  );
+  assert.equal(badRequestCalls, 1, "OpenAI Responses client should fail fast on non-retryable responses");
 }
 
 let server = await createRoomServer({ port: 0, log: false, storageFile: join(outDir, "rooms.json") });
@@ -376,6 +476,48 @@ try {
     "Generated trade transfer should spend the actor's selected good",
   );
 
+  const feydSignet = runtime.data.allyStarterCards.find((card) => card.name === "Signet Ring");
+  assert.ok(feydSignet, "Expected ally Signet Ring for Feyd training verification");
+  room.game = {
+    ...room.game,
+    pendingAction: {
+      kind: "feyd-training",
+      ownerId: "p2",
+      cardId: feydSignet.id,
+      source: "Personal Training",
+      nextPosition: 1,
+      options: [
+        { id: "pay-solari-trash", label: "Spend 1 Solari to trash a card", reward: "pay-solari-trash" },
+        { id: "spy", label: "Place 1 Spy", reward: "spy" },
+      ],
+    },
+    pendingQueue: [],
+    players: room.game.players.map((player) =>
+      player.id === "p2"
+        ? {
+            ...player,
+            feydTraining: 0,
+            resources: { ...player.resources, solari: 0 },
+            playArea: [feydSignet],
+            hand: [],
+            discard: [],
+          }
+        : player
+    ),
+  };
+  const feydTrainingActions = legalActionsForSeat(room, "p2", runtime);
+  assert.deepEqual(
+    feydTrainingActions.map((action) => action.action.command),
+    [{ kind: "choose-feyd-training", optionId: "spy" }],
+    "AI should expose later legal Feyd training options when earlier options are not currently resolvable",
+  );
+  const feydTrainingAfter = runtime.actions.applyRoomAction(room.game, "p2", feydTrainingActions[0].action);
+  assert.equal(
+    feydTrainingAfter.players.find((player) => player.id === "p2")?.feydTraining,
+    1,
+    "Generated Feyd training option should advance the training track",
+  );
+
   const p3RoomSnapshot = await seatSnapshot(baseUrl, roomId, tokens.get("p3"));
   const p5RoomSnapshot = await seatSnapshot(baseUrl, roomId, tokens.get("p5"));
   const mockClient = createMockAiClient();
@@ -447,6 +589,7 @@ try {
 }
 
 await verifyToolCallRetryPath();
+await verifyOpenAiResponseRetryPath();
 
 const monitorResult = await runAiRoomMonitor({
   mock: true,

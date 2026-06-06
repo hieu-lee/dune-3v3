@@ -21,34 +21,81 @@ export function createOpenAiResponseClient({
   model = DEFAULT_AI_MODEL,
   reasoningEffort = DEFAULT_AI_REASONING_EFFORT,
   timeoutMs = 120_000,
+  maxRetries = 5,
+  retryBaseMs = 1_000,
+  fetchFn = fetch,
+  sleepFn = sleep,
+  log = () => {},
 } = {}) {
   if (!apiKey) throw new Error("OPENAI_API_KEY is required for real AI team play");
   return {
     model,
     reasoningEffort,
     async responsesCreate(payload) {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), timeoutMs);
-      try {
-        const response = await fetch(RESPONSE_API_URL, {
-          method: "POST",
-          headers: {
-            authorization: `Bearer ${apiKey}`,
-            "content-type": "application/json",
-          },
-          body: JSON.stringify(payload),
-          signal: controller.signal,
-        });
-        const body = await response.json().catch(() => undefined);
-        if (!response.ok) {
-          throw new Error(`OpenAI Responses API failed (${response.status}): ${JSON.stringify(body)}`);
+      let lastError;
+      for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+          const response = await fetchFn(RESPONSE_API_URL, {
+            method: "POST",
+            headers: {
+              authorization: `Bearer ${apiKey}`,
+              "content-type": "application/json",
+            },
+            body: JSON.stringify(payload),
+            signal: controller.signal,
+          });
+          const text = await response.text();
+          const body = text ? parseJson(text) : undefined;
+          if (response.ok) return body;
+          lastError = new Error(`OpenAI Responses API failed (${response.status}): ${text || JSON.stringify(body)}`);
+          if (!shouldRetryOpenAiResponse(response.status) || attempt >= maxRetries) throw lastError;
+          const delayMs = retryDelayMs(response, retryBaseMs, attempt);
+          log(`retry ${attempt + 1}/${maxRetries} after HTTP ${response.status}; waiting ${delayMs}ms`);
+          await sleepFn(delayMs);
+        } catch (error) {
+          lastError = error;
+          if (!shouldRetryOpenAiError(error) || attempt >= maxRetries) throw error;
+          const delayMs = retryDelayMs(undefined, retryBaseMs, attempt);
+          log(`retry ${attempt + 1}/${maxRetries} after ${error?.name ?? "network error"}; waiting ${delayMs}ms`);
+          await sleepFn(delayMs);
+        } finally {
+          clearTimeout(timer);
         }
-        return body;
-      } finally {
-        clearTimeout(timer);
       }
+      throw lastError;
     },
   };
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function parseJson(text) {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+}
+
+function shouldRetryOpenAiResponse(status) {
+  return status === 429 || status >= 500;
+}
+
+function shouldRetryOpenAiError(error) {
+  return error?.name === "AbortError" || error instanceof TypeError;
+}
+
+function retryDelayMs(response, retryBaseMs, attempt) {
+  const retryAfter = response?.headers?.get?.("retry-after");
+  const retryAfterSeconds = retryAfter ? Number(retryAfter) : NaN;
+  if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds >= 0) {
+    return retryAfterSeconds * 1_000;
+  }
+  return retryBaseMs * 2 ** attempt;
 }
 
 export function createMockAiClient() {
@@ -550,6 +597,9 @@ function pendingTradeCommands(room, pending) {
 }
 
 function pendingCommands(room, pending, runtime, coverage = {}) {
+  if (pending.kind === "feyd-training") {
+    return (pending.options ?? []).map((option) => ({ kind: "choose-feyd-training", optionId: option.id }));
+  }
   if (pending.kind === "team-resource-payment") return pendingTeamResourcePaymentCommands(pending);
   if (pending.kind === "trade") return pendingTradeCommands(room, pending);
   const command = pendingCommand(room, pending, runtime, coverage);

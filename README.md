@@ -55,10 +55,10 @@ Seat layout:
 | Seat | Team | Role | Leader |
 | --- | --- | --- | --- |
 | `p1` | Muad'Dib | Commander | Muad'Dib |
-| `p2` | Muad'Dib | Ally | Feyd-Rautha Harkonnen |
+| `p2` | Shaddam | Ally | Feyd-Rautha Harkonnen |
 | `p3` | Muad'Dib | Ally | Gurney Halleck |
 | `p4` | Shaddam | Commander | Shaddam Corrino IV |
-| `p5` | Shaddam | Ally | Lady Jessica |
+| `p5` | Muad'Dib | Ally | Lady Jessica |
 | `p6` | Shaddam | Ally | Princess Irulan |
 
 ## Local Hotseat
@@ -101,6 +101,9 @@ pnpm run debug:room:online
 pnpm run debug:room:smoke
 pnpm run debug:room:complete
 pnpm run debug:room:marathon
+pnpm run debug:room:ai:mock
+pnpm run debug:room:ai -- --reasoning-effort=medium
+pnpm run debug:room:ai -- --ai-team=shaddam --reasoning-effort=medium
 pnpm run debug:room:vp-endgame
 ```
 
@@ -110,6 +113,9 @@ pnpm run debug:room:vp-endgame
 - `pnpm run debug:room:smoke` is the focused room/session smoke.
 - `pnpm run debug:room:complete` is the six-browser all-seat coordination smoke.
 - `pnpm run debug:room:marathon` drives a natural six-browser game through Conflict-deck Endgame and final team scoring.
+- `pnpm run debug:room:ai:mock` drives two deterministic AI teams through the room server without API calls.
+- `pnpm run debug:room:ai` drives two OpenAI-backed AI teams with `OPENAI_API_KEY`; override with `DUNE_AI_MODEL`, `--model=...`, `DUNE_AI_REASONING_EFFORT`, or `--reasoning-effort=medium`.
+- `pnpm run debug:room:ai -- --ai-team=shaddam` creates a room, claims the Shaddam team as AI, prints the room URL, and waits while humans claim and play the Muad'Dib seats (`p1`, `p3`, `p5`).
 - `pnpm run debug:room:vp-endgame` covers the 10 VP Endgame trigger before Conflict-deck exhaustion.
 
 ## Browser Debugging

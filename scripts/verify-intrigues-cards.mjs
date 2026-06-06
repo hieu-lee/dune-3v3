@@ -100,7 +100,7 @@ const summaryExpectations = {
     "Find Weakness should expose its base strength and optional spy recall",
   ],
   goToGround: [
-    "Retreat 1 or 2 troops, then optionally place a spy.",
+    "Retreat 1 or 2 troops, then place a spy.",
     "Go To Ground should expose its troop retreat and spy placement effect",
   ],
   imperiumPolitics: [
@@ -176,8 +176,8 @@ const summaryExpectations = {
     "Strategic Stockpiling should expose both VP conversion branches",
   ],
   unexpectedAllies: [
-    "Pay 2 water to deploy a sandworm to the Conflict; may remove the Shield Wall.",
-    "Unexpected Allies should expose its water, detonation, and sandworm effect",
+    "Pay 2 water to remove the Shield Wall and deploy a sandworm to the Conflict.",
+    "Unexpected Allies should expose its water, Shield Wall removal, and sandworm effect",
   ],
 };
 

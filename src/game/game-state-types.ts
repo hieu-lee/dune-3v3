@@ -163,6 +163,7 @@ export type PendingAction =
       resourceCost?: Partial<Resources>;
       combatRecipientId?: string;
       strengthReward?: number;
+      leadershipBonus?: true;
       drawCardsReward?: number;
       vpReward?: number;
     }
@@ -186,6 +187,7 @@ export type PendingAction =
       strength: number;
       source: string;
       optional: boolean;
+      leadershipBonus?: true;
     }
   | {
       kind: "lose-influence-for-influence";
@@ -214,6 +216,7 @@ export type PendingAction =
       source: string;
       optional: true;
       cardId?: string;
+      leadershipBonus?: true;
     }
   | {
       kind: "pay-resource-for-high-council-seat";
@@ -367,6 +370,7 @@ export type PendingAction =
       trashSource?: boolean;
       persuasionCost?: number;
       cardId?: string;
+      leadershipBonus?: true;
       source: string;
     }
   | {

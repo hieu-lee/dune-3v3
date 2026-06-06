@@ -250,6 +250,8 @@ export type PendingActionChoiceNestedPending =
       combatRecipientId: string;
       source: string;
       amount: number;
+      cardId?: string;
+      leadershipBonus?: true;
     }
   | {
       kind: "pay-resource-for-high-council-seat";

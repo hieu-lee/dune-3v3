@@ -39,7 +39,7 @@ export function playSpecialMissionPlotIntrigue(
       playerId,
       intrigueId,
       isSpecialMissionIntrigue,
-      (actor) => `${actor.leader} plays Special Mission and may place a spy on a City observation post.`,
+      (actor) => `${actor.leader} plays Special Mission and must place a spy on a City observation post.`,
       { choiceId: "place-spy" },
     );
   }
@@ -116,6 +116,7 @@ export function playUnexpectedAlliesIntrigue(
   removeShieldWall: boolean,
   sandwormOwnerId?: string,
 ): GameState {
+  if (!removeShieldWall) return state;
   const choiceId = removeShieldWall ? "remove-shield-wall" : "summon";
   const actor = state.players[state.activeSeat];
   return playTypedPlotIntrigue(

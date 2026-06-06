@@ -4,6 +4,9 @@ import {
   playerHasConflictUnits,
 } from "./conflict-rules";
 import {
+  leadershipSourceId,
+} from "./card-identifiers";
+import {
   canPay,
   highCouncilSeatsTaken,
 } from "./board-rules";
@@ -125,6 +128,7 @@ export function pendingActionsForRevealPayResourceForSandworms(
   source: Player,
   state: GameState,
   combatRecipientId: string,
+  leadershipBonus: boolean,
 ): PendingAction[] {
   const recipient = state.players.find((player) => player.id === combatRecipientId);
   if (!card.effects || !source.playArea.some((candidate) => candidate.id === card.id) || !recipient) return [];
@@ -156,6 +160,7 @@ export function pendingActionsForRevealPayResourceForSandworms(
       optional: effect.optional,
       ...(effect.trashSource ? { trashSource: true } : {}),
       ...(effect.persuasionCost > 0 ? { persuasionCost: effect.persuasionCost } : {}),
+      ...(leadershipBonus ? { leadershipBonus: true as const } : {}),
       source: effect.source ?? card.name,
       cardId: card.id,
     }];
@@ -167,6 +172,7 @@ export function pendingActionsForRevealPayResourceForStrength(
   source: Player,
   state: GameState,
   combatRecipientId: string,
+  leadershipBonus: boolean,
 ): PendingAction[] {
   const combatRecipient = state.players.find((player) => player.id === combatRecipientId);
   if (!card.effects || !source.playArea.some((candidate) => candidate.id === card.id) || !combatRecipient) return [];
@@ -194,6 +200,7 @@ export function pendingActionsForRevealPayResourceForStrength(
       optional: effect.optional,
       source: effect.source ?? card.name,
       cardId: card.id,
+      ...(leadershipBonus ? { leadershipBonus: true as const } : {}),
     }];
   });
 }
@@ -287,6 +294,7 @@ function pendingActionsForRevealTrashCards(
   source: Player,
   state: GameState,
   combatRecipientId: string,
+  leadershipBonus: boolean,
 ): PendingAction[] {
   const recipient = state.players.find((player) => player.id === combatRecipientId);
   return resolveRevealTrashCardEffects(card.effects, {
@@ -308,6 +316,7 @@ function pendingActionsForRevealTrashCards(
       ...(effect.strengthReward !== undefined && recipient ? {
         combatRecipientId: recipient.id,
         strengthReward: effect.strengthReward,
+        ...(leadershipBonus ? { leadershipBonus: true as const } : {}),
       } : {}),
       ...(effect.spiceRewardCostThreshold !== undefined ? {
         spiceRewardCostThreshold: effect.spiceRewardCostThreshold,
@@ -363,6 +372,7 @@ function pendingActionsForRevealPendingActionChoice(
   source: Player,
   state: GameState,
   combatRecipientId: string,
+  leadershipBonus: boolean,
 ): PendingAction[] {
   if (!card.effects || !source.playArea.some((candidate) => candidate.id === card.id)) return [];
   const recipient = state.players.find((player) => player.id === combatRecipientId);
@@ -403,6 +413,8 @@ function pendingActionsForRevealPendingActionChoice(
                 combatRecipientId: recipient.id,
                 source: sourceLabel,
                 amount: option.effect.amount,
+                cardId: card.id,
+                ...(leadershipBonus ? { leadershipBonus: true as const } : {}),
               }
             : undefined;
         }
@@ -503,6 +515,7 @@ function pendingActionsForRevealRetreatTroopsForStrength(
   source: Player,
   state: GameState,
   combatRecipientId: string,
+  leadershipBonus: boolean,
 ): PendingAction[] {
   const recipient = state.players.find((player) => player.id === combatRecipientId);
   if (!recipient || !playerHasConflictUnits(recipient)) return [];
@@ -523,6 +536,7 @@ function pendingActionsForRevealRetreatTroopsForStrength(
       strength: effect.strength,
       optional: effect.optional,
       source: card.name,
+      ...(leadershipBonus ? { leadershipBonus: true as const } : {}),
     }];
   });
 }
@@ -570,20 +584,22 @@ export function pendingActionsForReveal(
   revealedCards: Card[],
   combatRecipientId: string,
 ): PendingAction[] {
+  const leadershipRevealed = revealedCards.some((card) => card.sourceId === leadershipSourceId);
+  const leadershipBonusFor = (card: Card) => leadershipRevealed && card.sourceId !== leadershipSourceId;
   const revealTrashCardPendings = revealedCards.flatMap((card) =>
-    pendingActionsForRevealTrashCards(card, source, state, combatRecipientId)
+    pendingActionsForRevealTrashCards(card, source, state, combatRecipientId, leadershipBonusFor(card))
   );
   const revealSpyPlacementPendings = revealedCards
     .map((card) => pendingActionForRevealSpyPlacement(card, source, state))
     .filter((pending): pending is PendingAction => Boolean(pending));
   const payResourceStrengthPendings = revealedCards.flatMap((card) =>
-    pendingActionsForRevealPayResourceForStrength(card, source, state, combatRecipientId)
+    pendingActionsForRevealPayResourceForStrength(card, source, state, combatRecipientId, leadershipBonusFor(card))
   );
   const payResourceTroopPendings = revealedCards.flatMap((card) =>
     pendingActionsForRevealPayResourceForTroops(card, source, state)
   );
   const payResourceSandwormPendings = revealedCards.flatMap((card) =>
-    pendingActionsForRevealPayResourceForSandworms(card, source, state, combatRecipientId)
+    pendingActionsForRevealPayResourceForSandworms(card, source, state, combatRecipientId, leadershipBonusFor(card))
   );
   const payResourceHighCouncilSeatPendings = revealedCards.flatMap((card) =>
     pendingActionsForRevealPayResourceForHighCouncilSeat(card, source, state)
@@ -597,7 +613,7 @@ export function pendingActionsForReveal(
     ))
     .filter((pending): pending is PendingAction => Boolean(pending));
   const pendingActionChoicePendings = revealedCards.flatMap((card) =>
-    pendingActionsForRevealPendingActionChoice(card, source, state, combatRecipientId)
+    pendingActionsForRevealPendingActionChoice(card, source, state, combatRecipientId, leadershipBonusFor(card))
   );
   const influenceIntriguePendings = revealedCards.flatMap((card) =>
     pendingActionsForRevealInfluenceIntrigues(card, source, state, combatRecipientId)
@@ -609,7 +625,7 @@ export function pendingActionsForReveal(
     pendingActionsForRevealSpyRecallIntrigues(card, source, state, combatRecipientId)
   );
   const retreatTroopStrengthPendings = revealedCards.flatMap((card) =>
-    pendingActionsForRevealRetreatTroopsForStrength(card, source, state, combatRecipientId)
+    pendingActionsForRevealRetreatTroopsForStrength(card, source, state, combatRecipientId, leadershipBonusFor(card))
   );
   const deployOrRetreatTroopPendings = revealedCards.flatMap((card) =>
     pendingActionsForRevealDeployOrRetreatTroops(card, source, state, combatRecipientId)

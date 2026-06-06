@@ -10,7 +10,7 @@ export function verifyImperiumCardRevealTroopEffects({
   state,
   turnActions,
 }) {
-  const { chani, fremenBondSupport, unswervingLoyalty } = cards;
+  const { chani, fremenBondSupport, leadership, unswervingLoyalty } = cards;
   const { allyId, commanderId } = playerIds;
   const p2 = playerById(game, allyId);
   const p4 = playerById(game, commanderId);
@@ -124,6 +124,82 @@ export function verifyImperiumCardRevealTroopEffects({
   assert.equal(playerById(chaniRetreated, p2.id).garrison, 2, "Chani should return retreated troops to garrison");
   assert.equal(playerById(chaniRetreated, p2.id).conflict, 4, "Chani should replace the troops' strength with four Reveal strength");
   assert.equal(chaniRetreated.pendingAction, undefined, "Chani retreat should clear its pending action");
+
+  const leadershipChaniFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 0,
+    conflict: 4,
+    deployedTroops: 2,
+    discard: [],
+    garrison: 0,
+    hand: [leadership, chani],
+    playArea: [],
+    persuasion: 0,
+    resources: { solari: 0, spice: 0, water: 0 },
+  }));
+  const leadershipChaniPlan = turnActions.revealTurnPlan(
+    playerById(leadershipChaniFixture, p2.id),
+    leadershipChaniFixture,
+  );
+  assert.equal(
+    leadershipChaniPlan.swords,
+    1,
+    "Leadership should not pre-count Chani before its optional retreat strength resolves",
+  );
+  const leadershipChaniRevealed = turnActions.revealTurnAction(leadershipChaniFixture, {
+    commanderTargets: {},
+    revealPlan: leadershipChaniPlan,
+  });
+  assert.equal(
+    leadershipChaniRevealed.pendingAction?.kind,
+    "retreat-troops-for-strength",
+    "Leadership plus Chani should still queue Chani's reveal retreat",
+  );
+  const leadershipChaniRetreated = state.resolveRetreatTroopsForStrength(
+    leadershipChaniRevealed,
+    leadershipChaniRevealed.pendingAction,
+  );
+  assert.equal(
+    playerById(leadershipChaniRetreated, p2.id).conflict,
+    6,
+    "Leadership should add 1 strength after Chani actually provides reveal strength",
+  );
+  assert.match(
+    leadershipChaniRetreated.log.join("\n"),
+    /adds 1 strength from Leadership because Chani, Clever Tactician provided strength this turn/,
+  );
+  const agentPlayedLeadershipChaniFixture = withActivePlayer(game, p2.id, () => ({
+    agentsReady: 0,
+    conflict: 4,
+    deployedTroops: 2,
+    discard: [],
+    garrison: 0,
+    hand: [chani],
+    playArea: [leadership],
+    persuasion: 0,
+    resources: { solari: 0, spice: 0, water: 0 },
+  }));
+  const agentPlayedLeadershipChaniPlan = turnActions.revealTurnPlan(
+    playerById(agentPlayedLeadershipChaniFixture, p2.id),
+    agentPlayedLeadershipChaniFixture,
+  );
+  assert.equal(
+    agentPlayedLeadershipChaniPlan.swords,
+    0,
+    "Agent-played Leadership should not contribute reveal strength",
+  );
+  const agentPlayedLeadershipChaniRevealed = turnActions.revealTurnAction(agentPlayedLeadershipChaniFixture, {
+    commanderTargets: {},
+    revealPlan: agentPlayedLeadershipChaniPlan,
+  });
+  const agentPlayedLeadershipChaniRetreated = state.resolveRetreatTroopsForStrength(
+    agentPlayedLeadershipChaniRevealed,
+    agentPlayedLeadershipChaniRevealed.pendingAction,
+  );
+  assert.equal(
+    playerById(agentPlayedLeadershipChaniRetreated, p2.id).conflict,
+    4,
+    "Agent-played Leadership should not add a bonus when Chani provides reveal strength",
+  );
 
   const syntheticRetreatState = {
     ...chaniRetreatFixture,

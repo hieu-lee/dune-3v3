@@ -183,6 +183,48 @@ export function verifyCardEffectSpecDrawTopDeckValidation({
     longLiveResolved.log[0],
     /resolves Long Live the Fighters: draws 1 card, discards Long Live Draw, and trashes Long Live Trash\./,
   );
+  const sardaukarTriggerIntrigue = game.intrigueDeck[0];
+  assert.ok(sardaukarTriggerIntrigue, "Long Live Sardaukar trigger fixture should have an Intrigue to draw");
+  const longLiveSardaukarTrash = { ...sardaukarSoldier, id: "long-live-sardaukar-trash-card" };
+  const longLiveSardaukarPlaced = turnActions.placeAgentAction(
+    withActivePlayer(
+      { ...game, intrigueDeck: [sardaukarTriggerIntrigue], intrigueDiscard: [] },
+      p2.id,
+      () => ({
+        agentsReady: 1,
+        deck: [
+          { ...dagger, id: "long-live-sardaukar-draw-card", name: "Long Live Sardaukar Draw" },
+          { ...convincingArgument, id: "long-live-sardaukar-discard-card", name: "Long Live Sardaukar Discard" },
+          longLiveSardaukarTrash,
+          { ...dagger, id: "long-live-sardaukar-fourth-card", name: "Long Live Sardaukar Fourth" },
+        ],
+        discard: [],
+        hand: [longLiveTheFighters],
+        intrigues: [],
+        playArea: [],
+        resources: { solari: 0, spice: 0, water: 0 },
+      }),
+    ),
+    {
+      commanderTargets: {},
+      selectedCard: longLiveTheFighters,
+      selectedSpace: longLiveSpace,
+    },
+  );
+  const longLiveSardaukarResolved = state.resolveTopDeckSelectionChoice(
+    longLiveSardaukarPlaced,
+    longLiveSardaukarPlaced.pendingAction,
+    { drawIndex: 0, discardIndex: 1, trashIndex: 2 },
+  );
+  assert.equal(
+    playerById(longLiveSardaukarResolved, p2.id).intrigues.at(-1)?.id,
+    sardaukarTriggerIntrigue.id,
+    "Trashing Sardaukar Soldier from Long Live the Fighters should draw 1 Intrigue",
+  );
+  assert.match(
+    longLiveSardaukarResolved.log.join("\n"),
+    /draws an Intrigue card from Sardaukar Soldier/,
+  );
   const longLiveShortDeckPlaced = turnActions.placeAgentAction(
     withActivePlayer(game, p2.id, () => ({
       agentsReady: 1,

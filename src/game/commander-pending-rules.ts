@@ -11,6 +11,7 @@ import {
   playerTroopSupply,
 } from "./deck-utils";
 import { drawIntrigueCards } from "./intrigue-deck";
+import { addLeadershipBonusForResolvedRevealStrength } from "./leadership-reveal-bonus";
 import {
   ladyJessicaLeaderName,
 } from "./leader-constants";
@@ -474,7 +475,7 @@ export function resolvePayResourceForStrengthChoice(
     return next;
   });
 
-  return scoreActiveGurneyAlwaysSmilingForRecipient({
+  const resolvedState = scoreActiveGurneyAlwaysSmilingForRecipient({
     ...state,
     players,
     ...advancePendingAction(state),
@@ -483,6 +484,14 @@ export function resolvePayResourceForStrengthChoice(
       ...state.log,
     ],
   }, pending.combatRecipientId);
+  return addLeadershipBonusForResolvedRevealStrength(
+    resolvedState,
+    pending.ownerId,
+    pending.combatRecipientId,
+    pending.source,
+    pending.cardId,
+    pending.leadershipBonus,
+  );
 }
 
 export function skipPayResourceForStrength(state: GameState, pending: PayResourceForStrengthPendingAction): GameState {
@@ -646,7 +655,15 @@ export function resolvePayResourceForSandwormsChoice(
   };
   const deploymentState = recordTurnUnitDeployment(nextState, owner.id, pending.sandworms);
   const gurneyState = scoreActiveGurneyAlwaysSmilingForRecipient(deploymentState, pending.recipientId);
-  return resolveMuadDibUnpredictableFoe(gurneyState, pending.recipientId);
+  const muadDibState = resolveMuadDibUnpredictableFoe(gurneyState, pending.recipientId);
+  return addLeadershipBonusForResolvedRevealStrength(
+    muadDibState,
+    pending.ownerId,
+    pending.recipientId,
+    pending.source,
+    pending.cardId,
+    pending.leadershipBonus,
+  );
 }
 
 export function skipPayResourceForSandworms(state: GameState, pending: PayResourceForSandwormsPendingAction): GameState {

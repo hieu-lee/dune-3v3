@@ -657,7 +657,7 @@ try {
     ),
   };
   const gurneyAfterUnexpectedAllies = state.scoreGurneyAlwaysSmiling(
-    state.playUnexpectedAlliesIntrigue(gurneyUnexpectedAlliesState, muadDibAllyA.id, unexpectedAllies.id, false),
+    state.playUnexpectedAlliesIntrigue(gurneyUnexpectedAlliesState, muadDibAllyA.id, unexpectedAllies.id, true),
     muadDibAllyA.id,
   );
   assert.equal(
@@ -1116,7 +1116,7 @@ try {
     blockedPlotDeploymentGame,
     emperor.id,
     unexpectedAllies.id,
-    false,
+    true,
     shaddamAlly.id,
   );
   assert.equal(

@@ -5,6 +5,7 @@ import { playerHasConflictUnits } from "./conflict-rules";
 import { drawCards } from "./deck-utils";
 import { recordTurnSpiceGainAndCompleteHarvestContracts } from "./contract-rules";
 import { cardHasTrait } from "./card-traits";
+import { addLeadershipBonusForResolvedRevealStrength } from "./leadership-reveal-bonus";
 import type { Card, GameState, PendingAction, Player, TrashCardZone } from "./types";
 
 type TrashCardPendingAction = Extract<PendingAction, { kind: "trash-card" }>;
@@ -174,9 +175,18 @@ export function trashPlayerCard(
     ],
   };
   const spiceTrackedState = recordTurnSpiceGainAndCompleteHarvestContracts(nextState, owner.id, spiceReward).state;
-  return advancePastUnresolvableMandatoryTrash(
-    applyTrashedCardTriggers(spiceTrackedState, owner.id, card, { logAfterCurrentAction: true }),
-  );
+  const triggeredState = applyTrashedCardTriggers(spiceTrackedState, owner.id, card, { logAfterCurrentAction: true });
+  const leadershipState = strengthReward > 0 && pending.combatRecipientId
+    ? addLeadershipBonusForResolvedRevealStrength(
+        triggeredState,
+        pending.ownerId,
+        pending.combatRecipientId,
+        pending.source,
+        undefined,
+        pending.leadershipBonus,
+      )
+    : triggeredState;
+  return advancePastUnresolvableMandatoryTrash(leadershipState);
 }
 
 export function skipTrashCard(state: GameState, pending: TrashCardPendingAction): GameState {

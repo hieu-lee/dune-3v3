@@ -66,8 +66,10 @@ try {
     players: { p2, p4, p6 },
     spaces: { carthag, highCouncil, imperialBasin, secrets, shipping },
   } = verifyImperiumCardCatalogSpecs({ data, game, state });
+  const leadership = data.imperiumDeck.find((card) => card.name === "Leadership");
+  assert.ok(leadership, "Imperium deck should include Leadership");
   const { chaniFremenSupport } = verifyImperiumCardRevealTroopEffects({
-    cards: { chani, fremenBondSupport, unswervingLoyalty },
+    cards: { chani, fremenBondSupport, leadership, unswervingLoyalty },
     game,
     playerIds: { allyId: p2.id, commanderId: p4.id },
     state,

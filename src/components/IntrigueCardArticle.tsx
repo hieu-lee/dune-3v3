@@ -49,7 +49,6 @@ import {
   isUnexpectedAlliesIntrigue,
   isWeirdingCombatIntrigue,
 } from "../game/card-identifiers";
-import { conflictProtectedByShieldWall } from "../game/critical-locations";
 import { battleIconLabels, factionLabels } from "../game/data";
 import {
   buyAccessPairChoices,
@@ -125,10 +124,7 @@ export function IntrigueCardArticle({
   const mercenariesOwner = activePlayer.role === "Commander" ? activatedAlly : activePlayer;
   const departForArrakisOwner = activePlayer.role === "Commander" ? activatedAlly : activePlayer;
   const imperiumPoliticsOwner = activePlayer.role === "Commander" ? activatedAlly : activePlayer;
-  const currentConflictProtected = conflictProtectedByShieldWall(game.conflict);
   const unexpectedAlliesCanPay = activePlayer.resources.water >= 2;
-  const unexpectedAlliesBlockedByShieldWall = Boolean(game.conflict && game.shieldWall && currentConflictProtected);
-  const unexpectedAlliesCanSummonWithoutWall = Boolean(game.conflict && (!game.shieldWall || !currentConflictProtected));
   const unexpectedAlliesDisabled =
     plotIntrigueLocked || !game.conflict || !unexpectedAlliesCanPay || unexpectedAlliesDeploymentBlocked;
   const activeCombatStrength = combatIntrigueStrength(game, activePlayer, card);
@@ -276,7 +272,7 @@ export function IntrigueCardArticle({
           : isQuestionableMethodsIntrigue(card)
             ? "Combat / +1 / lose Ally/Cmdr personal Inf. for +4"
           : isGoToGroundIntrigue(card)
-            ? "Combat / retreat 1-2 troops / optional spy"
+            ? "Combat / retreat 1-2 troops / place spy"
           : isReachAgreementIntrigue(card)
             ? "Combat / retreat 1-2 troops / take contract"
           : isSpiceIsPowerIntrigue(card)
@@ -839,28 +835,16 @@ export function IntrigueCardArticle({
       )}
       {isUnexpectedAlliesIntrigue(card) && (
         <div className="intrigue-actions">
-          {unexpectedAlliesCanSummonWithoutWall && (
-            <button
-              type="button"
-              onClick={() => playUnexpectedAllies(card.id, false)}
-              disabled={unexpectedAlliesDisabled}
-              title={unexpectedAlliesDeploymentBlocked ? "Conflict deployment is blocked this turn" : undefined}
-            >
-              <Sparkles size={14} />
-              Worm{unexpectedAlliesOwner.id !== activePlayer.id ? `: ${unexpectedAlliesOwner.leader}` : ""}
-            </button>
-          )}
-          {game.shieldWall && (
-            <button
-              type="button"
-              onClick={() => playUnexpectedAllies(card.id, true)}
-              disabled={unexpectedAlliesDisabled}
-              title={unexpectedAlliesDeploymentBlocked ? "Conflict deployment is blocked this turn" : undefined}
-            >
-              <Shield size={14} />
-              {unexpectedAlliesBlockedByShieldWall ? "Wall + worm" : "Remove wall + worm"}
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => playUnexpectedAllies(card.id, true)}
+            disabled={unexpectedAlliesDisabled}
+            title={unexpectedAlliesDeploymentBlocked ? "Conflict deployment is blocked this turn" : undefined}
+          >
+            {game.shieldWall ? <Shield size={14} /> : <Sparkles size={14} />}
+            {game.shieldWall ? "Remove wall + worm" : "Worm"}
+            {unexpectedAlliesOwner.id !== activePlayer.id ? `: ${unexpectedAlliesOwner.leader}` : ""}
+          </button>
         </div>
       )}
     </article>

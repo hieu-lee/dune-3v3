@@ -703,6 +703,7 @@ try {
       dagger,
       desertPower,
       ecologicalTestingStation,
+      leadership,
       rebelSupplier,
       southernElders,
       stilgar,

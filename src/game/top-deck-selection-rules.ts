@@ -1,4 +1,5 @@
 import { advancePendingAction } from "./pending-actions";
+import { applyTrashedCardTriggers } from "./discard-trigger-rules";
 import type { Card, GameState, PendingAction, Player } from "./types";
 
 type TopDeckSelectionPendingAction = Extract<PendingAction, { kind: "top-deck-selection" }>;
@@ -68,7 +69,7 @@ export function resolveTopDeckSelection(
     discard: [...owner.discard, discardedCard],
   };
 
-  return {
+  const selectedState = {
     ...state,
     players: state.players.map((player) => player.id === owner.id ? ownerAfterSelection : player),
     ...advancePendingAction(state),
@@ -77,4 +78,5 @@ export function resolveTopDeckSelection(
       ...state.log,
     ],
   };
+  return applyTrashedCardTriggers(selectedState, owner.id, trashedCard, { logAfterCurrentAction: true });
 }

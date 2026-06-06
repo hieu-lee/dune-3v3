@@ -420,11 +420,11 @@ export function verifyCardEffectSpecCatalogIntrigues({
     [
       {
         count: 1,
-      recallForSupply: undefined,
-      mustPlace: undefined,
-      placementIcon: undefined,
-      placementIcons: undefined,
-      allowSharedPost: undefined,
+        recallForSupply: undefined,
+        mustPlace: true,
+        placementIcon: undefined,
+        placementIcons: undefined,
+        allowSharedPost: undefined,
         source: "Go To Ground",
         postPlacementAction: undefined,
       },

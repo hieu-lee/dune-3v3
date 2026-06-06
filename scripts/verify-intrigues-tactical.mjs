@@ -67,7 +67,7 @@ export function verifySpecialMissionPlotIntrigue({ cards, data, game, state }) {
   );
   assert.deepEqual(playerById(specialMissionSpyPending, "p2").intrigues, []);
   assert.equal(specialMissionSpyPending.intrigueDiscard.at(-1).id, specialMission.id);
-  assert.match(specialMissionSpyPending.log[0], /plays Special Mission and may place a spy on a City observation post/);
+  assert.match(specialMissionSpyPending.log[0], /plays Special Mission and must place a spy on a City observation post/);
   assert.ok(
     state.placeableSpySpaces(specialMissionSpyPending, specialMissionSpyPending.pendingAction)
       .every((space) => space.icon === "city"),

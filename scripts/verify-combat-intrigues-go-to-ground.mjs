@@ -73,6 +73,7 @@ export function verifyCombatIntrigueGoToGround({
     ownerId: "p2",
     remaining: 1,
     source: "Go To Ground",
+    mustPlaceSpy: true,
   });
   assert.equal(
     goToGroundPlayed.players[goToGroundPlayed.activeSeat].id,
@@ -84,12 +85,11 @@ export function verifyCombatIntrigueGoToGround({
     goToGroundPlayed,
     "Combat should stay locked while Go To Ground spy placement is pending",
   );
-  const goToGroundSkippedSpy = state.finishPendingAction(goToGroundPlayed);
-  assert.equal(goToGroundSkippedSpy.pendingAction, undefined, "Skipping the Go To Ground spy should clear the pending action");
-  assert.equal(goToGroundSkippedSpy.phase, "combat", "Skipping the Go To Ground spy should resume Combat when actors remain");
-  assert.equal(goToGroundSkippedSpy.players[goToGroundSkippedSpy.activeSeat].id, "p3");
-  assert.equal(playerById(goToGroundSkippedSpy, "p2").spies, playerById(goToGroundPlayed, "p2").spies);
-  assert.equal(goToGroundSkippedSpy.spyPosts[beneSpyPostId], undefined);
+  assert.equal(
+    state.finishPendingAction(goToGroundPlayed),
+    goToGroundPlayed,
+    "Go To Ground should not allow skipping mandatory spy placement",
+  );
   assert.ok(
     state.placeableSpySpaces(goToGroundPlayed, goToGroundPlayed.pendingAction).some((space) => space.id === beneSpySpace.id),
     "Go To Ground should offer legal spy posts to the recipient",
@@ -156,6 +156,7 @@ export function verifyCombatIntrigueGoToGround({
     ownerId: "p2",
     remaining: 1,
     source: "Go To Ground",
+    mustPlaceSpy: true,
   });
 
   const goToGroundWormOnlyFixture = combatFixture(state, data, (players) =>
@@ -312,6 +313,7 @@ export function verifyCombatIntrigueGoToGround({
     ownerId: "p2",
     remaining: 1,
     source: "Go To Ground",
+    mustPlaceSpy: true,
   });
   assert.deepEqual(
     state.combatIntrigueActorIds(goToGroundLastActorPlayed),
@@ -330,8 +332,9 @@ export function verifyCombatIntrigueGoToGround({
     goToGroundLastActorSpyPlaced.log.some((entry) => entry.includes("resolves with no winner")),
     "Go To Ground should resolve the Conflict with no winner after the last units retreat and the spy resolves",
   );
-  const goToGroundLastActorSkippedSpy = state.finishPendingAction(goToGroundLastActorPlayed);
-  assert.equal(goToGroundLastActorSkippedSpy.phase, "playing", "Skipping the pending spy should also resolve empty Combat");
-  assert.equal(goToGroundLastActorSkippedSpy.round, goToGroundLastActorFixture.round + 1);
-  assert.equal(goToGroundLastActorSkippedSpy.spyPosts[beneSpyPostId], undefined);
+  assert.equal(
+    state.finishPendingAction(goToGroundLastActorPlayed),
+    goToGroundLastActorPlayed,
+    "Go To Ground should reject skipping the mandatory pending spy",
+  );
 }

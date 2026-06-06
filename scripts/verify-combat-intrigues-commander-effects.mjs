@@ -272,6 +272,7 @@ export function verifyCombatIntrigueCommanderEffects({
     ownerId: "p6",
     remaining: 1,
     source: "Go To Ground",
+    mustPlaceSpy: true,
   });
   assert.equal(
     commanderGoToGroundPlayed.players[commanderGoToGroundPlayed.activeSeat].id,

@@ -125,7 +125,7 @@ export function verifyCardEffectSpecImperiumUtility({ cards }) {
   );
   assert.equal(
     reliableInformant.play,
-    "Place 1 spy on Emperor, Bene Gesserit, or Spacing Guild board spaces.",
+    "Place 1 spy on Emperor, Bene Gesserit, or Fremen board spaces.",
     "Reliable Informant play text should name its board-space icon condition",
   );
   assert.ok(
@@ -141,7 +141,7 @@ export function verifyCardEffectSpecImperiumUtility({ cards }) {
             effect.recallForSupply === true &&
             effect.mustPlace === true &&
             effect.placementIcon === undefined &&
-            JSON.stringify(effect.placementIcons) === JSON.stringify(["emperor", "bene", "spacing"]),
+            JSON.stringify(effect.placementIcons) === JSON.stringify(["emperor", "bene", "fremen"]),
         ),
     ),
     "Reliable Informant should carry one Agent spy-placement spec for the three printed board-space icons",

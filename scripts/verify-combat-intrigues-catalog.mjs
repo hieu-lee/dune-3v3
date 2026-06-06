@@ -83,7 +83,7 @@ export function verifyCombatIntrigueCatalog({ cards, data, state }) {
   assert.equal(goToGround.combatSwords, undefined, "Go To Ground should resolve through its structured retreat and spy flow");
   assert.equal(
     goToGround.summary,
-    "Retreat 1 or 2 troops, then optionally place a spy.",
+    "Retreat 1 or 2 troops, then place a spy.",
     "Go To Ground should expose its retreat and spy placement effect",
   );
   assert.ok(

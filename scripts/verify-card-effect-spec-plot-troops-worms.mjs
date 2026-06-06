@@ -194,25 +194,14 @@ export function verifyCardEffectSpecPlotTroopsWorms({
     "Detonation deploy branch should remain choice-gated",
   );
   assert.ok(
-    unexpectedAllies.effects?.some(
-      (spec) =>
-        spec.trigger === "plot-intrigue" &&
-        spec.choiceId === "summon" &&
-        spec.effects.some(
-          (effect) =>
-            effect.kind === "spend-resource" &&
-            effect.selector === "self" &&
-            effect.resource === "water" &&
-            effect.amount === 2,
-        ),
-    ),
-    "Unexpected Allies should carry a typed water-spend summon branch spec",
+    !unexpectedAllies.effects?.some((spec) => spec.trigger === "plot-intrigue" && spec.choiceId === "summon"),
+    "Unexpected Allies should not expose a summon-only branch",
   );
   assert.ok(
     unexpectedAllies.effects?.some(
       (spec) =>
         spec.trigger === "plot-intrigue" &&
-        spec.choiceId === "summon" &&
+        spec.choiceId === "remove-shield-wall" &&
         spec.conditions?.some(
           (condition) =>
             condition.kind === "has-role" && condition.role === "Ally",
@@ -225,13 +214,13 @@ export function verifyCardEffectSpecPlotTroopsWorms({
             effect.source === "Unexpected Allies",
         ),
     ),
-    "Unexpected Allies should carry a typed Ally sandworm summon spec",
+    "Unexpected Allies should carry a typed Ally sandworm summon spec on its combined branch",
   );
   assert.ok(
     unexpectedAllies.effects?.some(
       (spec) =>
         spec.trigger === "plot-intrigue" &&
-        spec.choiceId === "summon" &&
+        spec.choiceId === "remove-shield-wall" &&
         spec.conditions?.some(
           (condition) =>
             condition.kind === "has-role" && condition.role === "Commander",
@@ -244,7 +233,7 @@ export function verifyCardEffectSpecPlotTroopsWorms({
             effect.source === "Unexpected Allies",
         ),
     ),
-    "Unexpected Allies should carry a typed Commander activated-Ally sandworm summon spec",
+    "Unexpected Allies should carry a typed Commander activated-Ally sandworm summon spec on its combined branch",
   );
   assert.ok(
     unexpectedAllies.effects?.some(
@@ -270,7 +259,7 @@ export function verifyCardEffectSpecPlotTroopsWorms({
               effect.source === "Unexpected Allies",
           ),
       ),
-    "Unexpected Allies should carry a typed remove-Shield-Wall branch with water spend",
+    "Unexpected Allies should carry a typed combined remove-Shield-Wall branch with water spend",
   );
   assert.deepEqual(
     effectResolver.resolveGameEffects(unexpectedAllies.effects, {
@@ -279,8 +268,8 @@ export function verifyCardEffectSpecPlotTroopsWorms({
       source: p2,
       state: game,
     }).spentResources,
-    { water: 2 },
-    "Unexpected Allies summon branch should resolve the typed water cost",
+    {},
+    "Unexpected Allies obsolete summon branch should not resolve a water cost",
   );
   assert.equal(
     effectResolver.resolveGameEffects(unexpectedAllies.effects, {
@@ -290,7 +279,7 @@ export function verifyCardEffectSpecPlotTroopsWorms({
       state: game,
     }).removeShieldWall,
     false,
-    "Unexpected Allies summon branch should not remove the Shield Wall",
+    "Unexpected Allies obsolete summon branch should not remove the Shield Wall",
   );
   assert.deepEqual(
     effectResolver.resolvePlotSummonSandworms(unexpectedAllies.effects, {
@@ -299,8 +288,8 @@ export function verifyCardEffectSpecPlotTroopsWorms({
       source: p2,
       state: game,
     }),
-    [{ selector: "self", amount: 1, source: "Unexpected Allies" }],
-    "Unexpected Allies Ally summon branch should resolve a self sandworm summon effect",
+    [],
+    "Unexpected Allies obsolete summon branch should not resolve a sandworm summon effect",
   );
   const unexpectedAlliesWallResolved = effectResolver.resolveGameEffects(
     unexpectedAllies.effects,
@@ -321,6 +310,16 @@ export function verifyCardEffectSpecPlotTroopsWorms({
     unexpectedAlliesWallResolved.removeShieldWall,
     true,
     "Unexpected Allies remove-wall branch should resolve typed Shield Wall removal",
+  );
+  assert.deepEqual(
+    effectResolver.resolvePlotSummonSandworms(unexpectedAllies.effects, {
+      trigger: "plot-intrigue",
+      choiceId: "remove-shield-wall",
+      source: p2,
+      state: game,
+    }),
+    [{ selector: "self", amount: 1, source: "Unexpected Allies" }],
+    "Unexpected Allies Ally combined branch should resolve a self sandworm summon effect",
   );
   assert.deepEqual(
     effectResolver.resolvePlotSummonSandworms(unexpectedAllies.effects, {
@@ -350,7 +349,7 @@ export function verifyCardEffectSpecPlotTroopsWorms({
       state: game,
     }),
     [],
-    "Unexpected Allies summon branches should remain choice-gated",
+    "Unexpected Allies combined branch should remain choice-gated",
   );
   assert.ok(
     departForArrakis.effects?.some(

@@ -70,8 +70,8 @@ export async function runCombatIntriguesSmoke({
   );
   assert.deepEqual(
     afterGoToGround.pendingAction,
-    { kind: "spy", ownerId: "p3", remaining: 1, source: "Go To Ground" },
-    "Go To Ground should queue an optional spy-placement pending action for the chosen Ally",
+    { kind: "spy", ownerId: "p3", remaining: 1, source: "Go To Ground", mustPlaceSpy: true },
+    "Go To Ground should queue a mandatory spy-placement pending action for the chosen Ally",
   );
   await screenshot(page, captures, "combat-intrigues-go-to-ground-pending.png");
 

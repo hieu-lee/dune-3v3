@@ -281,8 +281,8 @@ const intrigueSummariesByCatalogId: Partial<Record<number, string>> = {
   153: "Recall 2 spies to add 7 strength.",
   155: "Add 2 strength OR retreat any number of your troops.",
   156: "Add 1 strength; the recipient may lose 1 Influence, or a Commander may lose personal Influence, to add 4 more strength.",
-  137: "Pay 2 water to deploy a sandworm to the Conflict; may remove the Shield Wall.",
-  146: "Retreat 1 or 2 troops, then optionally place a spy.",
+  137: "Pay 2 water to remove the Shield Wall and deploy a sandworm to the Conflict.",
+  146: "Retreat 1 or 2 troops, then place a spy.",
   151: "Add 2 strength; if the recipient has one or more sandworms in the Conflict, add 4 strength instead and they may trash a card.",
   154: "Add 3 strength; add 5 instead if you have at least 3 Bene Gesserit Influence.",
   157: "Gain 1 spice as a Plot Intrigue OR at Endgame, flip a face-up Desert Mouse or wild Conflict you won to gain 1 VP.",
@@ -395,9 +395,6 @@ function intrigueCardEffects(card: HubCard): CardEffectSpec[] | undefined {
   }
   if (card.id === unexpectedAlliesSourceId) {
     return [
-      plotSpendResource("water", 2, undefined, { choiceId: "summon" }),
-      plotSummonSandworms("self", 1, { source: "Unexpected Allies" }, [hasRole("Ally")], { choiceId: "summon" }),
-      plotSummonSandworms("activated-ally", 1, { source: "Unexpected Allies" }, [hasRole("Commander")], { choiceId: "summon" }),
       plotSpendResource("water", 2, undefined, { choiceId: "remove-shield-wall" }),
       plotRemoveShieldWall({ source: "Unexpected Allies" }, undefined, { choiceId: "remove-shield-wall" }),
       plotSummonSandworms("self", 1, { source: "Unexpected Allies" }, [hasRole("Ally")], { choiceId: "remove-shield-wall" }),
@@ -428,7 +425,7 @@ function intrigueCardEffects(card: HubCard): CardEffectSpec[] | undefined {
   if (card.id === goToGroundSourceId) {
     return [
       combatRetreatTroops(1, 2, { source: "Go To Ground" }, undefined, { choiceId: "retreat-troops" }),
-      combatPlaceSpies(1, { source: "Go To Ground" }, undefined, { choiceId: "retreat-troops" }),
+      combatPlaceSpies(1, { source: "Go To Ground", mustPlace: true }, undefined, { choiceId: "retreat-troops" }),
     ];
   }
   if (card.id === spiceIsPowerSourceId) {

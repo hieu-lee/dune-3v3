@@ -19,6 +19,7 @@ export function verifyCardEffectSpecRecruitResourceValidation({
     dagger,
     desertPower,
     ecologicalTestingStation,
+    leadership,
     rebelSupplier,
     southernElders,
     stilgar,
@@ -182,6 +183,54 @@ export function verifyCardEffectSpecRecruitResourceValidation({
   );
   assert.equal(playerById(desertPowerSkipped, p3.id).resources.water, 1, "Skipping Desert Power payment should keep water");
   assert.equal(playerById(desertPowerSkipped, p3.id).persuasion, 2, "Skipping Desert Power payment should keep persuasion");
+
+  const leadershipDesertPowerRevealFixture = withActivePlayer(game, p3.id, () => ({
+    agentsReady: 0,
+    conflict: 0,
+    deployedSandworms: 0,
+    hand: [leadership, desertPower],
+    makerHooks: true,
+    persuasion: 0,
+    playArea: [],
+    resources: { solari: 0, spice: 0, water: 1 },
+  }));
+  const leadershipDesertPowerRevealState = {
+    ...leadershipDesertPowerRevealFixture,
+    conflict: unprotectedConflict,
+    shieldWall: false,
+  };
+  const leadershipDesertPowerRevealPlan = turnActions.revealTurnPlan(
+    playerById(leadershipDesertPowerRevealState, p3.id),
+    leadershipDesertPowerRevealState,
+  );
+  const leadershipDesertPowerRevealed = turnActions.revealTurnAction(leadershipDesertPowerRevealState, {
+    commanderTargets: {},
+    revealPlan: leadershipDesertPowerRevealPlan,
+  });
+  assert.equal(
+    leadershipDesertPowerRevealed.pendingAction?.kind,
+    "pay-resource-for-sandworms",
+    "Leadership plus Desert Power should still queue the Reveal sandworm payment",
+  );
+  assert.equal(
+    leadershipDesertPowerRevealed.pendingAction?.leadershipBonus,
+    true,
+    "Desert Power should carry the deferred Leadership bonus when revealed with Leadership",
+  );
+  const leadershipDesertPowerWormed = state.resolvePayResourceForSandwormsChoice(
+    leadershipDesertPowerRevealed,
+    leadershipDesertPowerRevealed.pendingAction,
+  );
+  assert.equal(
+    playerById(leadershipDesertPowerWormed, p3.id).conflict,
+    4,
+    "Leadership should add 1 strength after Desert Power resolves its sandworm strength",
+  );
+  assert.match(
+    leadershipDesertPowerWormed.log.join("\n"),
+    /adds 1 strength from Leadership because Desert Power provided strength/,
+    "Leadership should log its deferred Desert Power bonus",
+  );
 
   const ecologicalSoloReveal = turnActions.revealTurnPlan(
     { ...p2, hand: [ecologicalTestingStation], playArea: [], highCouncilSeat: false },

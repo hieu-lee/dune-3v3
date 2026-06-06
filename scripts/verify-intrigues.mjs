@@ -773,11 +773,16 @@ try {
     true,
     "Unexpected Allies should be recognized as a structured Plot Intrigue",
   );
+  assert.equal(
+    state.playUnexpectedAlliesIntrigue(unexpectedAlliesFixture, "p3", unexpectedAllies.id, false),
+    unexpectedAlliesFixture,
+    "Unexpected Allies should reject the obsolete summon-only branch",
+  );
   const wormSummoned = state.playUnexpectedAlliesIntrigue(
     unexpectedAlliesFixture,
     "p3",
     unexpectedAllies.id,
-    false,
+    true,
   );
   assert.equal(playerById(wormSummoned, "p3").resources.water, 0, "Unexpected Allies should cost 2 water");
   assert.equal(
@@ -788,10 +793,10 @@ try {
   assert.equal(playerById(wormSummoned, "p3").deployedSandworms, 1, "Unexpected Allies should deploy a sandworm");
   assert.equal(playerById(wormSummoned, "p3").conflict, 3, "Unexpected Allies sandworms should add 3 strength");
   assert.equal(wormSummoned.turnUnitDeployments.p3, 1, "Unexpected Allies should track the sandworm as a unit deployed this turn");
-  assert.equal(wormSummoned.shieldWall, true, "Unexpected Allies should not force optional Shield Wall removal");
+  assert.equal(wormSummoned.shieldWall, false, "Unexpected Allies should remove the Shield Wall as part of its printed effect");
   assert.deepEqual(playerById(wormSummoned, "p3").intrigues, []);
   assert.equal(wormSummoned.intrigueDiscard.at(-1).id, unexpectedAllies.id);
-  assert.match(wormSummoned.log[0], /plays Unexpected Allies, spends 2 water, and summons 1 sandworm/);
+  assert.match(wormSummoned.log[0], /plays Unexpected Allies, spends 2 water, removes the Shield Wall, and summons 1 sandworm/);
 
   const protectedUnexpectedAllies = { ...unexpectedAlliesFixture, conflict: protectedConflict };
   assert.equal(
@@ -824,7 +829,7 @@ try {
     commanderUnexpectedAllies,
     "p4",
     unexpectedAllies.id,
-    false,
+    true,
     "p6",
   );
   assert.equal(playerById(commanderSummoned, "p4").resources.water, 0, "Commander should pay for Unexpected Allies");
@@ -854,7 +859,7 @@ try {
     lockedCommanderUnexpectedAllies,
     "p4",
     unexpectedAllies.id,
-    false,
+    true,
   );
   assert.equal(
     playerById(lockedCommanderSummoned, "p6").deployedSandworms,
@@ -867,7 +872,7 @@ try {
     "Revealed Commander Unexpected Allies should not use another same-team Ally",
   );
   assert.equal(
-    state.playUnexpectedAlliesIntrigue(lockedCommanderUnexpectedAllies, "p4", unexpectedAllies.id, false, "p2"),
+    state.playUnexpectedAlliesIntrigue(lockedCommanderUnexpectedAllies, "p4", unexpectedAllies.id, true, "p2"),
     lockedCommanderUnexpectedAllies,
     "Revealed Commander Unexpected Allies should reject a same-team Ally who was not activated for Reveal",
   );
@@ -881,7 +886,7 @@ try {
     ),
   };
   assert.equal(
-    state.playUnexpectedAlliesIntrigue(dryUnexpectedAllies, "p3", unexpectedAllies.id, false),
+    state.playUnexpectedAlliesIntrigue(dryUnexpectedAllies, "p3", unexpectedAllies.id, true),
     dryUnexpectedAllies,
     "Unexpected Allies should require 2 water",
   );
@@ -891,7 +896,7 @@ try {
     pendingAction: { kind: "spy", ownerId: "p3", remaining: 1, source: "Test" },
   };
   assert.equal(
-    state.playUnexpectedAlliesIntrigue(pendingUnexpectedAllies, "p3", unexpectedAllies.id, false),
+    state.playUnexpectedAlliesIntrigue(pendingUnexpectedAllies, "p3", unexpectedAllies.id, true),
     pendingUnexpectedAllies,
     "Unexpected Allies should wait for pending actions to resolve",
   );
@@ -900,7 +905,7 @@ try {
     pendingQueue: [{ kind: "spy", ownerId: "p3", remaining: 1, source: "Test" }],
   };
   assert.equal(
-    state.playUnexpectedAlliesIntrigue(queuedUnexpectedAllies, "p3", unexpectedAllies.id, false),
+    state.playUnexpectedAlliesIntrigue(queuedUnexpectedAllies, "p3", unexpectedAllies.id, true),
     queuedUnexpectedAllies,
     "Unexpected Allies should wait for queued pending actions to resolve",
   );

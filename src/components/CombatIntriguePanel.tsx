@@ -158,7 +158,7 @@ function CombatIntrigueTarget({
                               : `Retreat ${count}${targetCanPlaceSpy ? " + spy" : ""}`
                           }
                           onClick={() => onPlay(card.id, target.id, { kind: "retreat-troops", count })}
-                          title={`Retreat ${count} ${count === 1 ? "troop" : "troops"} from ${target.leader}${targetCanPlaceSpy ? ", then optionally place a spy" : ""}`}
+                          title={`Retreat ${count} ${count === 1 ? "troop" : "troops"} from ${target.leader}${targetCanPlaceSpy ? ", then place a spy" : ""}`}
                         >
                           {actor.role === "Commander"
                             ? `${combatTargetLabel(target)}: retreat ${count}${targetCanPlaceSpy ? " + spy" : ""}`
@@ -318,7 +318,7 @@ function combatCardSummaryTitle({
   if (questionableMethodsCard) {
     return "Add 1 strength; the recipient may lose Influence, or a Commander may lose personal Influence, for 4 more strength.";
   }
-  if (goToGroundCard) return "Retreat 1 or 2 troops from the chosen recipient, then optionally place a spy for that recipient.";
+  if (goToGroundCard) return "Retreat 1 or 2 troops from the chosen recipient, then place a spy for that recipient.";
   if (reachAgreementCard) return "Retreat 1 or 2 troops from the chosen recipient, then take a CHOAM contract for that recipient.";
   if (impressCard) return "Add 2 strength to the chosen recipient; that recipient acquires a card that costs 3 or less.";
   if (spiceIsPowerCard) return "Choose one branch: retreat 3 of the recipient's troops for 3 spice, or spend 3 spice for 6 strength.";
@@ -355,7 +355,7 @@ function combatCardStrengthLabel({
 }: CombatCardStrengthLabelFlags) {
   if (findWeaknessCard) return "+2 / recall spy for +3";
   if (questionableMethodsCard) return "+1 / lose Ally/Cmdr personal Inf. for +4";
-  if (goToGroundCard) return "Retreat 1-2 troops / optional spy";
+  if (goToGroundCard) return "Retreat 1-2 troops / place spy";
   if (reachAgreementCard) return "Retreat 1-2 troops / take contract";
   if (impressCard) return "+2 strength / acquire <=3";
   if (spiceIsPowerCard) return "Retreat 3 for +3 spice / spend 3 for +6";

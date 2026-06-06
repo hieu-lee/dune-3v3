@@ -1,4 +1,5 @@
 import { playerHasConflictUnits } from "./conflict-rules";
+import { addLeadershipBonusForResolvedRevealStrength } from "./leadership-reveal-bonus";
 import { advancePendingAction } from "./pending-actions";
 import type { GameState, PendingAction } from "./types";
 
@@ -26,7 +27,7 @@ export function resolveRetreatTroopsForStrength(
   const recipient = state.players.find((player) => player.id === pending.combatRecipientId);
   if (!owner || !recipient || !canResolveRetreatTroopsForStrength(state, pending)) return state;
 
-  return {
+  const resolvedState = {
     ...state,
     players: state.players.map((player) =>
       player.id === recipient.id
@@ -44,6 +45,14 @@ export function resolveRetreatTroopsForStrength(
       ...state.log,
     ],
   };
+  return addLeadershipBonusForResolvedRevealStrength(
+    resolvedState,
+    pending.ownerId,
+    pending.combatRecipientId,
+    pending.source,
+    undefined,
+    pending.leadershipBonus,
+  );
 }
 
 export function skipRetreatTroopsForStrength(

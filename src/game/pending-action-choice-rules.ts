@@ -9,6 +9,7 @@ import {
   highCouncilSeatsTaken,
 } from "./board-rules";
 import { playerHasConflictUnits } from "./conflict-rules";
+import { addLeadershipBonusForResolvedRevealStrength } from "./leadership-reveal-bonus";
 import { scoreActiveGurneyAlwaysSmilingForRecipient } from "./leader-rewards";
 import {
   trashableCardsForPending,
@@ -129,7 +130,15 @@ export function resolvePendingActionChoice(
         ...state.log,
       ],
     };
-    return scoreActiveGurneyAlwaysSmilingForRecipient(strengthenedState, nestedPending.combatRecipientId);
+    const gurneyState = scoreActiveGurneyAlwaysSmilingForRecipient(strengthenedState, nestedPending.combatRecipientId);
+    return addLeadershipBonusForResolvedRevealStrength(
+      gurneyState,
+      nestedPending.ownerId,
+      nestedPending.combatRecipientId,
+      nestedPending.source,
+      nestedPending.cardId,
+      nestedPending.leadershipBonus,
+    );
   }
   if (nestedPending.kind === "pay-resource-for-high-council-seat") {
     const players = state.players.map((player) => {

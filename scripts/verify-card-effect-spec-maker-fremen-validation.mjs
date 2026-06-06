@@ -239,19 +239,19 @@ export function verifyCardEffectSpecMakerFremenValidation({
       kind: "spy",
       remaining: 1,
       placementIcon: undefined,
-      placementIcons: ["emperor", "bene", "spacing"],
+      placementIcons: ["emperor", "bene", "fremen"],
       source: "Reliable Informant",
       mustPlaceSpy: true,
     },
-    "Reliable Informant should place 1 Agent spy on any printed Emperor, Bene Gesserit, or Spacing Guild post",
+    "Reliable Informant should place 1 Agent spy on any printed Emperor, Bene Gesserit, or Fremen post",
   );
   const reliableInformantSpyChoiceIcons = [...new Set(
     state.placeableSpySpaces(reliableInformantState, reliableInformantPending).map((space) => space.icon),
   )].sort();
   assert.deepEqual(
     reliableInformantSpyChoiceIcons,
-    ["bene", "emperor", "spacing"],
-    "Reliable Informant should not narrow spy placement to the visited Spacing Guild icon",
+    ["bene", "emperor", "fremen"],
+    "Reliable Informant should not narrow spy placement to the visited board-space icon",
   );
   const reliableInformantReveal = turnActions.revealTurnPlan(
     { ...p2, hand: [reliableInformant], highCouncilSeat: false },

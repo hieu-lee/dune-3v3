@@ -85,7 +85,7 @@ export function imperiumPlayText(card: HubCard) {
     return "If you have 2 or more Emperor/Great Houses Influence, gain 2 Solari. If you have 2 or more Spacing Guild Influence, gain 1 spice.";
   }
   if (card.id === reliableInformantSourceId) {
-    return "Place 1 spy on Emperor, Bene Gesserit, or Spacing Guild board spaces.";
+    return "Place 1 spy on Emperor, Bene Gesserit, or Fremen board spaces.";
   }
   if (card.id === smugglersHavenSourceId) {
     return "Pay 4 spice to gain 1 VP.";

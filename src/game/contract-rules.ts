@@ -26,6 +26,10 @@ import {
 } from "./leader-rewards";
 import { advancePendingAction, prependPendingAction } from "./pending-actions";
 import {
+  placeableSpySpaces,
+  recallableSpySupplySpaces,
+} from "./spy-choices";
+import {
   hasAcquiredCardThisTurn,
   hasVisitedMakerSpaceThisTurn,
   recordTurnAcquiredCard,
@@ -58,6 +62,7 @@ type ContractCompletionReward = {
   recruitTroops?: number;
   recallAgents?: number;
   influence?: Partial<Record<FactionId, number>>;
+  spies?: number;
 };
 type ContractCompletionSpec = {
   condition: ContractCompletionCondition;
@@ -82,14 +87,14 @@ const automatedContractCompletionSpecsBySourceId: Record<number, ContractComplet
   507: { condition: { kind: "harvest-spice", amount: 4 }, reward: { resources: { solari: 4 } } },
   508: { condition: { kind: "harvest-spice", amount: 3 }, reward: { resources: { solari: 3 } } },
   509: { condition: { kind: "board-space", spaceId: "research-station" }, reward: { resources: { solari: 3 } } },
-  510: { condition: { kind: "board-space", spaceId: "research-station" }, reward: { resources: { solari: 2 }, recruitTroops: 1 } },
-  511: { condition: { kind: "board-space", spaceId: "arrakeen" }, reward: { resources: { solari: 1 }, recruitTroops: 1 } },
+  510: { condition: { kind: "board-space", spaceId: "research-station" }, reward: { resources: { solari: 2 }, spies: 1 } },
+  511: { condition: { kind: "board-space", spaceId: "arrakeen" }, reward: { recruitTroops: 1, spies: 1 } },
   512: { condition: { kind: "board-space", spaceId: "arrakeen" }, reward: { resources: { water: 1 } } },
   513: { condition: { kind: "board-space", spaceId: "spice-refinery" }, reward: { drawCards: 2 } },
   514: { condition: { kind: "board-space", spaceId: "spice-refinery" }, reward: { resources: { water: 1 } } },
   515: { condition: { kind: "board-space", spaceId: "high-council" }, reward: { resources: { solari: 3 } } },
   516: { condition: { kind: "board-space", spaceId: "high-council" }, reward: { influence: { bene: 1 } } },
-  517: { condition: { kind: "acquire-card", sourceId: spiceMustFlowSourceId }, reward: { resources: { solari: 3 } } },
+  517: { condition: { kind: "acquire-card", sourceId: spiceMustFlowSourceId }, reward: { resources: { solari: 3 }, influence: { spacing: 1 } } },
   518: { condition: { kind: "board-space", spaceId: "deliver-supplies" }, reward: { resources: { solari: 3 } } },
 };
 
@@ -137,6 +142,35 @@ function gainRewardParts(reward: ContractCompletionReward, recruitedTroops: numb
   ].filter((part): part is string => Boolean(part));
 }
 
+function spyRewardActionPart(reward: ContractCompletionReward, spyPending: PendingAction | undefined) {
+  const spies = reward.spies ?? 0;
+  if (spies <= 0) return undefined;
+  if (!spyPending) return "has no legal Spy placement";
+  return `must place ${spies} ${spies === 1 ? "spy" : "spies"}`;
+}
+
+function pendingActionForContractSpyReward(
+  state: GameState,
+  owner: Player,
+  contract: ContractCard,
+  reward: ContractCompletionReward,
+): PendingAction | undefined {
+  const remaining = reward.spies ?? 0;
+  if (remaining <= 0) return undefined;
+  const pending: PendingAction = {
+    kind: "spy",
+    ownerId: owner.id,
+    remaining,
+    source: contract.name,
+    recallForSupply: true,
+    mustPlaceSpy: true,
+  };
+  return placeableSpySpaces(state, pending).length > 0 ||
+    recallableSpySupplySpaces(state, pending).length > 0
+    ? pending
+    : undefined;
+}
+
 function actionRewardParts(recalledAgents: number) {
   return [
     recalledAgents > 0
@@ -151,9 +185,12 @@ function completionLog(
   reward: ContractCompletionReward,
   recruitedTroops: number,
   recalledAgents: number,
+  spyPending: PendingAction | undefined,
 ) {
   const gainParts = gainRewardParts(reward, recruitedTroops);
   const actionParts = actionRewardParts(recalledAgents);
+  const spyActionPart = spyRewardActionPart(reward, spyPending);
+  if (spyActionPart) actionParts.push(spyActionPart);
   const gainOutcome = gainParts.length > 0 ? ` and gains ${gainParts.join(", ")}` : "";
   const actionOutcome = actionParts.length > 0
     ? `${gainParts.length > 0 ? ", and " : " and "}${actionParts.join(", ")}`
@@ -227,10 +264,13 @@ function applyContractCompletionReward(
   if (spiceGain > 0) {
     nextState = recordTurnSpiceGain(nextState, owner.id, spiceGain);
   }
+  const nextOwner = nextState.players.find((player) => player.id === owner.id) ?? owner;
+  const spyPending = pendingActionForContractSpyReward(nextState, nextOwner, contract, reward);
+  const stateWithSpyPending = spyPending ? prependPendingAction(nextState, spyPending) : nextState;
   return {
     state: {
-      ...nextState,
-      log: [completionLog(owner, contract, reward, recruitedTroops, recalledAgents), ...nextState.log],
+      ...stateWithSpyPending,
+      log: [completionLog(owner, contract, reward, recruitedTroops, recalledAgents, spyPending), ...stateWithSpyPending.log],
     },
     recruitedTroops,
     recalledAgents,

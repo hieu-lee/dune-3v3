@@ -265,6 +265,11 @@ export function verifyImperiumCardLateCatalogSpecs({
   assert.ok(priceIsNoObject, "Imperium deck should include Price is No Object");
   const guildSpy = data.imperiumDeck.find((card) => card.name === "Guild Spy");
   assert.ok(guildSpy, "Imperium deck should include Guild Spy");
+  assert.deepEqual(
+    guildSpy.traits,
+    ["Faction: Spacing Guild"],
+    "Guild Spy should expose its printed Spacing Guild card trait",
+  );
   const branchingPath = data.imperiumDeck.find(
     (card) => card.name === "Branching Path",
   );

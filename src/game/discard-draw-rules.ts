@@ -2,6 +2,7 @@ import { drawCards } from "./deck-utils";
 import { applyDiscardedFromHandTriggers } from "./discard-trigger-rules";
 import { drawIntrigueCards } from "./intrigue-deck";
 import { advancePendingAction } from "./pending-actions";
+import { cardHasTrait } from "./card-traits";
 import type { Card, GameState, PendingAction, Player } from "./types";
 
 type DiscardCardForDrawPendingAction = Extract<PendingAction, { kind: "discard-card-for-draw" }>;
@@ -23,14 +24,14 @@ function drawnCardsText(requested: number, actual: number) {
 
 function bonusDrawFor(discardedCard: Card, pending: DiscardCardForDrawPendingAction) {
   if (!pending.bonusDraw) return 0;
-  return discardedCard.traits?.includes(pending.bonusDraw.requiredDiscardTrait)
+  return cardHasTrait(discardedCard, pending.bonusDraw.requiredDiscardTrait)
     ? pending.bonusDraw.drawCards
     : 0;
 }
 
 function bonusIntriguesFor(discardedCard: Card, pending: DiscardCardForDrawPendingAction) {
   if (!pending.bonusIntrigues) return 0;
-  return discardedCard.traits?.includes(pending.bonusIntrigues.requiredDiscardTrait)
+  return cardHasTrait(discardedCard, pending.bonusIntrigues.requiredDiscardTrait)
     ? pending.bonusIntrigues.amount
     : 0;
 }

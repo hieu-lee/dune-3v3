@@ -2,6 +2,7 @@ import { boardSpaceInfluenceChoicesFor } from "./board-influence-effect-rules";
 import {
   canMoveCardToThroneRow,
 } from "./card-identifiers";
+import { cardHasTrait } from "./card-traits";
 import {
   canPayResourceCost,
   playersWithPendingCardEffect,
@@ -325,7 +326,7 @@ function pendingActionForAgentBoardSpaceInfluence(
       if (effect.trashSource && !source.playArea.some((candidate) => candidate.id === card.id)) return undefined;
       if (
         effect.requiredHandTrashTrait &&
-        !source.hand.some((candidate) => candidate.traits?.includes(effect.requiredHandTrashTrait ?? ""))
+        !source.hand.some((candidate) => cardHasTrait(candidate, effect.requiredHandTrashTrait ?? ""))
       ) {
         return undefined;
       }

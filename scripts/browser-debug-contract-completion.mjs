@@ -61,6 +61,8 @@ export async function runContractCompletionSmoke({
   await assertNoContractCompletionCheckboxes(page);
   await screenshot(page, captures, "contract-board-ready.png");
 
+  before = await currentGame(page);
+  ownerBefore = playerById(before, "p2");
   await page.getByTestId(`hand-card-${agentCard.id}`).click();
   await page.getByTestId("space-research-station").click();
   const placeAgent = page.getByTestId("place-agent");
@@ -80,9 +82,19 @@ export async function runContractCompletionSmoke({
   after = await currentGame(page);
   ownerAfter = playerById(after, "p2");
   assert.equal(contractByName(ownerAfter, "Research Station I").completed, true);
+  assert.equal(ownerAfter.resources.solari, ownerBefore.resources.solari + 2, "Research Station I should pay 2 Solari");
+  assert.ok(
+    [after.pendingAction, ...after.pendingQueue].some((pending) =>
+      pending?.kind === "spy" &&
+      pending.source === "Research Station I" &&
+      pending.recallForSupply === true &&
+      pending.mustPlaceSpy === true
+    ),
+    "Research Station I should queue its printed spy placement reward",
+  );
   assert.ok(
     [after.pendingAction, ...after.pendingQueue].some((pending) => pending?.kind === "deploy"),
-    "Research Station I troop reward should be available to the same Agent-turn deployment sequence",
+    "Research Station's board-space troop reward should remain deployable after the contract spy placement",
   );
   await assertContractChip(page, "Research Station I", "Done");
   await assertNoContractCompletionCheckboxes(page);

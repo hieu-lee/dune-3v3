@@ -557,6 +557,91 @@ try {
   assertVisibleObjectives(persistedBob.body, "p2");
   assertHiddenSharedDecks(persistedBob.body);
 
+  const legacyGuildSpyTraitRoom = await jsonFetch("/api/rooms", { method: "POST" });
+  assert.equal(legacyGuildSpyTraitRoom.response.status, 201, "Legacy Guild Spy trait room creation should succeed");
+  const legacyGuildSpyTraitRoomId = legacyGuildSpyTraitRoom.body.roomId;
+  const legacyGuildSpyTraitRecord = server.rooms.get(legacyGuildSpyTraitRoomId);
+  assert.ok(legacyGuildSpyTraitRecord, "Legacy Guild Spy trait room should be stored in memory");
+  const legacyGuildSpyTraitVersion = legacyGuildSpyTraitRecord.version;
+  const legacyGuildSpy = {
+    ...dataCardBySourceId(imperiumDeck, 43, "Guild Spy"),
+    id: "room-legacy-guild-spy-without-trait",
+    traits: [],
+  };
+  const legacySpaceTimeDrawOne = {
+    ...dataCardBySourceId(imperiumDeck, 12, "Space-time Folding draw fixture"),
+    id: "room-legacy-guild-spy-draw-one",
+  };
+  const legacySpaceTimeDrawTwo = {
+    ...dataCardBySourceId(imperiumDeck, 12, "Space-time Folding draw fixture"),
+    id: "room-legacy-guild-spy-draw-two",
+  };
+  legacyGuildSpyTraitRecord.game = {
+    ...legacyGuildSpyTraitRecord.game,
+    pendingAction: {
+      kind: "discard-card-for-draw",
+      ownerId: "p2",
+      source: "Space-time Folding",
+      drawCards: 1,
+      optional: false,
+      bonusDraw: {
+        requiredDiscardTrait: "Faction: Spacing Guild",
+        drawCards: 1,
+      },
+    },
+    pendingQueue: [],
+    players: legacyGuildSpyTraitRecord.game.players.map((candidate) =>
+      candidate.id === "p2"
+        ? {
+          ...candidate,
+          deck: [legacySpaceTimeDrawOne, legacySpaceTimeDrawTwo],
+          discard: [],
+          hand: [legacyGuildSpy],
+          playArea: [],
+        }
+        : candidate
+    ),
+  };
+  await restartServer();
+  const migratedLegacyGuildSpyTraitRecord = server.rooms.get(legacyGuildSpyTraitRoomId);
+  assert.ok(migratedLegacyGuildSpyTraitRecord, "Legacy Guild Spy trait room should load after restart");
+  assert.equal(
+    migratedLegacyGuildSpyTraitRecord.version,
+    legacyGuildSpyTraitVersion + 1,
+    "Legacy Guild Spy trait migration should bump the room version",
+  );
+  assert.deepEqual(
+    player({ game: migratedLegacyGuildSpyTraitRecord.game }, "p2").hand[0]?.traits,
+    ["Faction: Spacing Guild"],
+    "Legacy Guild Spy trait migration should restore the printed Spacing Guild trait",
+  );
+  const legacyGuildSpyTraitClaim = await jsonFetch(`/api/rooms/${legacyGuildSpyTraitRoomId}/seats/p2/claim`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: "Migrated Guild Spy Owner" }),
+  });
+  assert.equal(legacyGuildSpyTraitClaim.response.status, 200, "Migrated Guild Spy owner should be claimable");
+  const legacyGuildSpyTraitDiscard = await roomAction(
+    legacyGuildSpyTraitRoomId,
+    legacyGuildSpyTraitClaim.body.token,
+    legacyGuildSpyTraitClaim.body.snapshot.version,
+    {
+      kind: "pending",
+      command: { kind: "choose-discard-card-for-draw", discardCardId: legacyGuildSpy.id },
+    },
+  );
+  assert.equal(legacyGuildSpyTraitDiscard.response.status, 200, "Migrated Guild Spy discard should resolve after restart");
+  const legacyGuildSpyTraitOwner = player(legacyGuildSpyTraitDiscard.body.snapshot, "p2");
+  assert.ok(
+    legacyGuildSpyTraitOwner.hand.some((card) => card.id === legacySpaceTimeDrawOne.id) &&
+      legacyGuildSpyTraitOwner.hand.some((card) => card.id === legacySpaceTimeDrawTwo.id),
+    "Migrated Guild Spy should count as Spacing Guild for Space-time Folding's bonus draw after reconnect",
+  );
+  assert.match(
+    legacyGuildSpyTraitDiscard.body.snapshot.game.log[0],
+    /Space-time Folding: discards Guild Spy and draws 2 cards/,
+  );
+
   const staleRevealRoom = await jsonFetch("/api/rooms", { method: "POST" });
   assert.equal(staleRevealRoom.response.status, 201, "Stale reveal-adjust room creation should succeed");
   const staleRevealRoomId = staleRevealRoom.body.roomId;

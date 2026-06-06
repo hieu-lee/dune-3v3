@@ -9,6 +9,10 @@ export {
 } from "./alliance-rules";
 
 export {
+  normalizeGameCardTraits,
+} from "./card-traits";
+
+export {
   boardSpaceRewardApplies,
   canMeetInfluenceRequirement,
   canPay,

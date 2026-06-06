@@ -1093,7 +1093,11 @@ function toImperiumCard(card: HubCard): Card {
     sourceId: card.id,
     sourceSlug: card.slug,
     sourceType: card.type,
-    traits: card.id === unswervingLoyaltySourceId ? ["Faction: Fremen"] : catalogCardTraits(card),
+    traits: card.id === unswervingLoyaltySourceId
+      ? ["Faction: Fremen"]
+      : card.id === guildSpySourceId
+        ? ["Faction: Spacing Guild"]
+        : catalogCardTraits(card),
   };
 }
 

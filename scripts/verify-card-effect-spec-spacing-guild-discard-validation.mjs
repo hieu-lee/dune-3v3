@@ -23,6 +23,11 @@ export function verifyCardEffectSpecSpacingGuildDiscardValidation({
   } = cards;
   const { spaceTimeDrawOne, spaceTimeDrawTwo } = fixtures;
   const { p2 } = players;
+  assert.deepEqual(
+    guildSpy.traits,
+    ["Faction: Spacing Guild"],
+    "Guild Spy should carry its printed Spacing Guild trait for discard bonuses",
+  );
 
   const spaceTimeNonGuildDiscard = { ...dagger, id: "space-time-non-guild-discard-card" };
   const spaceTimeNonGuildFixture = withActivePlayer(game, p2.id, () => ({
@@ -100,6 +105,35 @@ export function verifyCardEffectSpecSpacingGuildDiscardValidation({
     "Space-time Folding should draw two cards when discarding a Spacing Guild card",
   );
   assert.match(spaceTimeGuildResolved.log[0], /Space-time Folding: discards .* and draws 2 cards/);
+
+  const spaceTimeGuildSpyDiscard = { ...guildSpy, id: "space-time-guild-spy-discard-card" };
+  const spaceTimeGuildSpyPlaced = turnActions.placeAgentAction(
+    withActivePlayer(game, p2.id, () => ({
+      agentsReady: 1,
+      deck: [spaceTimeDrawOne, spaceTimeDrawTwo],
+      discard: [],
+      hand: [spaceTimeFolding, spaceTimeGuildSpyDiscard],
+      playArea: [],
+      resources: { solari: 0, spice: 0, water: 0 },
+    })),
+    {
+      commanderTargets: {},
+      selectedCard: spaceTimeFolding,
+      selectedSpace: deliverSupplies,
+    },
+  );
+  const spaceTimeGuildSpyResolved = state.resolveDiscardCardForDrawChoice(
+    spaceTimeGuildSpyPlaced,
+    spaceTimeGuildSpyPlaced.pendingAction,
+    spaceTimeGuildSpyDiscard.id,
+  );
+  const spaceTimeGuildSpyOwner = playerById(spaceTimeGuildSpyResolved, p2.id);
+  assert.ok(
+    spaceTimeGuildSpyOwner.hand.some((card) => card.id === spaceTimeDrawOne.id) &&
+      spaceTimeGuildSpyOwner.hand.some((card) => card.id === spaceTimeDrawTwo.id),
+    "Space-time Folding should draw its bonus card when discarding Guild Spy",
+  );
+  assert.match(spaceTimeGuildSpyResolved.log[0], /Space-time Folding: discards Guild Spy and draws 2 cards/);
 
   const spaceTimeEmptyHandPlaced = turnActions.placeAgentAction(
     withActivePlayer(game, p2.id, () => ({

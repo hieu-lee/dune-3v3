@@ -39,7 +39,9 @@ export function CombatIntriguePanel({
     combatIntrigueStrength(game, actor, card) ||
     isDevourIntrigue(card) ||
     isGoToGroundIntrigue(card) ||
-    isReachAgreementIntrigue(card)
+    isReachAgreementIntrigue(card) ||
+    isSpiceIsPowerIntrigue(card) ||
+    isTacticalOptionIntrigue(card)
   );
 
   return (

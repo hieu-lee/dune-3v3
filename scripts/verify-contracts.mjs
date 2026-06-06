@@ -268,13 +268,14 @@ try {
   assert.equal(acquireOwner.vp, acquireBefore.vp + 1, "The Spice Must Flow acquire VP should still apply");
   assert.equal(acquireOwner.resources.spice, acquireBefore.resources.spice, "The Spice Must Flow should not gain spice on acquire");
   assert.equal(acquireOwner.resources.solari, acquireBefore.resources.solari + 3, "Acquire contract should pay 3 Solari");
+  assert.equal(acquireOwner.influence.spacing, acquireBefore.influence.spacing + 1, "Acquire contract should pay 1 Spacing Guild Influence");
   assert.equal(
     acquireCompleted.turnSpiceGains[ally.id] ?? 0,
     acquireHeld.turnSpiceGains?.[ally.id] ?? 0,
     "The Spice Must Flow acquisition should not be turn-spice tracked",
   );
   assert.match(acquireCompleted.log[0], /acquires The Spice Must Flow/);
-  assert.match(acquireCompleted.log[1], /completes the Acquire CHOAM contract and gains 3 Solari/);
+  assert.match(acquireCompleted.log[1], /completes the Acquire CHOAM contract and gains 3 Solari, 1 spacing Influence/);
 
   const acquireAlreadyCompleted = updatePlayer(acquireCompleted, ally.id, (player) => ({
     ...player,
@@ -339,6 +340,7 @@ try {
   assertCompleted(pendingAcquireCompleted, ally.id, "Acquire");
   assert.equal(pendingAcquireOwner.hand.at(-1)?.sourceId, spiceMustFlow.sourceId);
   assert.equal(pendingAcquireOwner.resources.solari, pendingAcquireBefore.resources.solari + 3);
+  assert.equal(pendingAcquireOwner.influence.spacing, pendingAcquireBefore.influence.spacing + 1);
 
   const arrakeenContract = contractByName("Arrakeen I");
   const arrakeenTakePending = {
@@ -753,8 +755,20 @@ try {
   );
   assert.equal(arrakeenCompleted.recruitedTroops, 1);
   assert.equal(arrakeenOwner.resources.water, ally.resources.water + 1);
-  assert.equal(arrakeenOwner.resources.solari, ally.resources.solari + 1);
+  assert.equal(arrakeenOwner.resources.solari, ally.resources.solari);
   assert.equal(arrakeenOwner.garrison, ally.garrison + 1);
+  assert.deepEqual(
+    arrakeenCompleted.state.pendingAction,
+    {
+      kind: "spy",
+      ownerId: ally.id,
+      remaining: 1,
+      source: "Arrakeen II",
+      recallForSupply: true,
+      mustPlaceSpy: true,
+    },
+    "Arrakeen II should queue its printed spy placement reward",
+  );
   assertCompleted(arrakeenCompleted.state, ally.id, "Arrakeen I");
   assertCompleted(arrakeenCompleted.state, ally.id, "Arrakeen II");
 
@@ -931,18 +945,31 @@ try {
   });
   const researchAfter = playerById(researchPlaced, ally.id);
   assertCompleted(researchPlaced, ally.id, "Research Station I");
+  assert.equal(researchAfter.resources.solari, researchBefore.resources.solari + 2);
   assert.equal(
     researchAfter.garrison,
-    researchBefore.garrison + 3,
-    "Research Station plus Research Station I should recruit all troops before deployment is queued",
+    researchBefore.garrison + 2,
+    "Research Station I should not recruit a troop beyond Research Station's printed troop reward",
+  );
+  assert.deepEqual(
+    researchPlaced.pendingAction,
+    {
+      kind: "spy",
+      ownerId: ally.id,
+      remaining: 1,
+      source: "Research Station I",
+      recallForSupply: true,
+      mustPlaceSpy: true,
+    },
+    "Research Station I should queue its printed spy placement reward before deployment",
   );
   const researchDeployPending = [researchPlaced.pendingAction, ...researchPlaced.pendingQueue]
     .find((pending) => pending?.kind === "deploy");
   assert.ok(researchDeployPending, "Research Station contract completion should queue a deployment");
   assert.equal(
     researchDeployPending.remaining,
-    Math.min(researchAfter.garrison, 5),
-    "Contract-recruited troops should be deployable during the same combat-space Agent turn",
+    Math.min(researchAfter.garrison, 4),
+    "Research Station's board-space troops should remain deployable after the contract spy placement",
   );
 
   const illegal = state.takeChoamContract(

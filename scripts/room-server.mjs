@@ -165,6 +165,17 @@ function migrateSpyObservationPosts(room, { normalizeSpyObservationPosts }) {
   };
 }
 
+function migrateCardTraits(room, { normalizeGameCardTraits }) {
+  const game = normalizeGameCardTraits(room.game);
+  if (game === room.game) return room;
+  return {
+    ...room,
+    version: room.version + 1,
+    updatedAt: migrationTimestamp(),
+    game,
+  };
+}
+
 function validStoredRoom(candidate) {
   return (
     candidate &&
@@ -232,10 +243,14 @@ export async function createRoomServer({
     const {
       advancePendingAction,
       normalizeSpyObservationPosts,
+      normalizeGameCardTraits,
       scoreGurneyAlwaysSmiling,
     } = await gameState();
     return migrateObsoleteRevealAdjust(
-      migrateSpyObservationPosts(room, { normalizeSpyObservationPosts }),
+      migrateCardTraits(
+        migrateSpyObservationPosts(room, { normalizeSpyObservationPosts }),
+        { normalizeGameCardTraits },
+      ),
       { advancePendingAction, scoreGurneyAlwaysSmiling },
     );
   }

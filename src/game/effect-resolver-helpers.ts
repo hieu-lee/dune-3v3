@@ -11,6 +11,7 @@ import {
   effectiveRequirementInfluence,
 } from "./board-rules";
 import { boardSpaces } from "./board-space-data";
+import { cardHasTrait } from "./card-traits";
 import { playerConflictUnitCount } from "./conflict-rules";
 import { playerHasSpyPost, spyPostCount } from "./spy-posts";
 import type { GameEffectContext } from "./effect-resolver-types";
@@ -81,7 +82,7 @@ function effectAmountMultiplier(amount: Exclude<EffectAmountSpec, number>) {
 }
 
 function cardTraitCount(cards: readonly Card[], trait: string) {
-  return cards.filter((card) => card.traits?.includes(trait)).length;
+  return cards.filter((card) => cardHasTrait(card, trait)).length;
 }
 
 function combatRecipientForAmount(context: GameEffectContext | undefined, source: Player) {
@@ -199,7 +200,7 @@ export function conditionApplies(condition: GameEffectConditionSpec, context: Ga
   }
   if (condition.kind === "has-card-trait-in-play") {
     const count = condition.count ?? 1;
-    return context.source.playArea.filter((card) => card.traits?.includes(condition.trait)).length >= count;
+    return context.source.playArea.filter((card) => cardHasTrait(card, condition.trait)).length >= count;
   }
   if (condition.kind === "has-team") {
     return context.source.team === condition.team;

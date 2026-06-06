@@ -5,6 +5,7 @@ import { boardSpaces, factionIds, factionLabels } from "./data";
 import { resolveAgentBoardSpaceInfluences, resolveGainInfluenceChoices } from "./effect-resolver";
 import { adjustInfluenceAndResolveThresholdRewards } from "./leader-rewards";
 import { pendingActionForBoardInfluenceChoice } from "./placement-rules";
+import { cardHasTrait } from "./card-traits";
 import {
   completeChoamContractsForCurrentTurnHarvests,
   recordTurnSpiceGainAndCompleteHarvestContracts,
@@ -237,7 +238,7 @@ function firstHandTrashCardForPending(
   if (!pending.requiredHandTrashTrait || !trashCardId) return undefined;
   return sourceOwner.hand.find((card) =>
     card.id === trashCardId &&
-    card.traits?.includes(pending.requiredHandTrashTrait ?? "")
+    cardHasTrait(card, pending.requiredHandTrashTrait ?? "")
   );
 }
 

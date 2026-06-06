@@ -4,6 +4,7 @@ import { canPay } from "./board-rules";
 import { playerHasConflictUnits } from "./conflict-rules";
 import { drawCards } from "./deck-utils";
 import { recordTurnSpiceGainAndCompleteHarvestContracts } from "./contract-rules";
+import { cardHasTrait } from "./card-traits";
 import type { Card, GameState, PendingAction, Player, TrashCardZone } from "./types";
 
 type TrashCardPendingAction = Extract<PendingAction, { kind: "trash-card" }>;
@@ -37,7 +38,7 @@ export function trashableCardsForPending(player: Player, pending: TrashCardPendi
       !pending.requiredAgentPlacementTargetOwnerId ||
       card.agentPlacementTargetOwnerId === pending.requiredAgentPlacementTargetOwnerId
     ) &&
-    (!pending.requiredTrait || card.traits?.includes(pending.requiredTrait))
+    (!pending.requiredTrait || cardHasTrait(card, pending.requiredTrait))
   );
 }
 

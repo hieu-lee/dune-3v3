@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
-import { mkdir, rm } from "node:fs/promises";
+import { access, mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { withActivePlayer } from "./verify-imperium-cards-fixtures.mjs";
 import { createRoomServer } from "./room-server.mjs";
@@ -16,7 +16,7 @@ import {
   legalActionsForSeat,
   nextActionSeats,
 } from "./ai-team-driver.mjs";
-import { runAiRoomMonitor } from "./ai-room-monitor.mjs";
+import { monitorLegalAction, runAiRoomMonitor } from "./ai-room-monitor.mjs";
 
 const outDir = "artifacts/qa/verify-ai-team";
 await rm(outDir, { force: true, recursive: true });
@@ -822,6 +822,42 @@ try {
 await verifyToolCallRetryPath();
 await verifyOpenAiResponseRetryPath();
 
+const visitedSpyRecallOffer = monitorLegalAction(
+  {
+    id: "pending:recall-spy:draw",
+    label: "Recall spy for visited space draw",
+    playerId: "p1",
+    action: { kind: "pending", command: { kind: "recall-spy", spaceId: "arrakeen" } },
+  },
+  { kind: "recall-spy", ownerId: "p1", source: "Arrakeen visit", remaining: 1, strength: 0, drawCards: 1 },
+);
+assert.equal(
+  visitedSpyRecallOffer.spyInteraction,
+  "visited-location-draw",
+  "Monitor should classify visited-location spy draw offers separately from generic recall offers",
+);
+const strengthSpyRecallOffer = monitorLegalAction(
+  {
+    id: "pending:recall-spy:strength",
+    label: "Recall spy for strength",
+    playerId: "p2",
+    action: { kind: "pending", command: { kind: "recall-spy", spaceId: "military-support" } },
+  },
+  { kind: "recall-spy", ownerId: "p2", source: "Devious Strength", remaining: 1, strength: 2 },
+);
+assert.equal(
+  strengthSpyRecallOffer.spyInteraction,
+  "strength-recall",
+  "Monitor should classify strength spy recall offers separately from visited-location draw offers",
+);
+const occupiedSpyEntryOffer = monitorLegalAction({
+  id: "place:card:arrakeen:self:arrakeen",
+  label: "Place card at Arrakeen",
+  playerId: "p3",
+  action: { kind: "place-agent", cardId: "card", spaceId: "arrakeen", spyEntrySpaceId: "arrakeen" },
+});
+assert.equal(occupiedSpyEntryOffer.spyInteraction, "occupied-entry", "Monitor should classify occupied-space spy entry offers");
+
 const monitorResult = await runAiRoomMonitor({
   mock: true,
   maxSteps: 950,
@@ -832,6 +868,29 @@ assert.equal(monitorResult.summary.finalPhase, "finished", "Mock AI teams should
 assert.ok(monitorResult.summary.finalRound >= 5, "Mock AI game should progress through multiple full rounds before finishing");
 assert.ok(monitorResult.summary.actionCount > 100, "Mock AI game should exercise many real room actions");
 assert.ok(monitorResult.summary.discussionCount >= 2, "Mock AI teams should discuss across rounds");
+assert.equal(monitorResult.actionLog.length, monitorResult.summary.actionCount, "Monitor action log should match summary count");
+assert.equal(monitorResult.decisionLog.length, monitorResult.summary.actionCount, "Monitor should capture one AI decision transcript per action");
+assert.equal(monitorResult.monitorReport.decisionCount, monitorResult.summary.actionCount, "Monitor report should count every decision");
+assert.equal(monitorResult.monitorReport.selectedNotOfferedCount, 0, "Every selected AI action should be present in the offered legal actions");
+assert.equal(monitorResult.monitorReport.finalStatus.phase, "finished", "Monitor report should include final game status");
+assert.ok(
+  monitorResult.decisionLog.every((decision) =>
+    decision.selectedActionWasLegal === true &&
+    decision.legalActionCount > 0 &&
+    decision.legalActions.some((action) => action.id === decision.selectedActionId)
+  ),
+  "Each decision transcript should preserve the offered legal action chosen by the AI",
+);
+assert.ok(
+  Object.values(monitorResult.monitorReport.legalOfferKindCounts).reduce((total, count) => total + count, 0) >= monitorResult.summary.actionCount,
+  "Monitor report should aggregate the legal offers shown to AIs",
+);
+assert.ok(monitorResult.monitorReport.spyInteractions, "Monitor report should include spy interaction aggregation");
+assert.equal(typeof monitorResult.monitorReport.spyInteractions.offerCounts, "object", "Monitor report should expose spy offer counts");
+assert.equal(typeof monitorResult.monitorReport.spyInteractions.selectedCounts, "object", "Monitor report should expose selected spy counts");
+assert.equal(typeof monitorResult.monitorReport.spyInteractions.logCounts, "object", "Monitor report should expose spy log counts");
+await access(join(outDir, "monitor", "decisions.json"));
+await access(join(outDir, "monitor", "monitor-report.json"));
 
 console.log("AI team verification passed");
 console.log(`mock monitor actions: ${monitorResult.summary.actionCount}`);

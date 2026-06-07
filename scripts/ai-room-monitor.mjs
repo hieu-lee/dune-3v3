@@ -93,6 +93,308 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function countBy(items, keyFn) {
+  const counts = {};
+  for (const item of items) {
+    const key = keyFn(item);
+    counts[key] = (counts[key] ?? 0) + 1;
+  }
+  return Object.fromEntries(Object.entries(counts).sort(([first], [second]) => first.localeCompare(second)));
+}
+
+function publicCardName(card) {
+  if (!card) return undefined;
+  return card.name ?? card.id;
+}
+
+function placementOwnerId(placement) {
+  if (!placement) return undefined;
+  return typeof placement === "string" ? placement : placement.playerId;
+}
+
+function placementCardName(placement) {
+  if (!placement || typeof placement === "string") return undefined;
+  return publicCardName(placement.card);
+}
+
+function definedEntries(object) {
+  return Object.fromEntries(Object.entries(object).filter(([, value]) => value !== undefined));
+}
+
+function compactMonitorPendingAction(pending) {
+  if (!pending) return undefined;
+  return definedEntries({
+    kind: pending.kind,
+    ownerId: pending.ownerId,
+    actorId: pending.actorId,
+    partnerId: pending.partnerId,
+    team: pending.team,
+    source: pending.source,
+    optional: pending.optional,
+    remaining: pending.remaining,
+    combatRecipientId: pending.combatRecipientId,
+    spaceId: pending.spaceId,
+    spaceIds: pending.spaceIds,
+    placementIcon: pending.placementIcon,
+    placementIcons: pending.placementIcons,
+    allowSharedPost: pending.allowSharedPost,
+    recallForSupply: pending.recallForSupply,
+    mustPlaceSpy: pending.mustPlaceSpy,
+    drawCards: pending.drawCards,
+    drawIntrigues: pending.drawIntrigues,
+    strength: pending.strength,
+    persuasionReward: pending.persuasionReward,
+    removeShieldWall: pending.removeShieldWall,
+    resources: pending.resources,
+    cost: pending.cost,
+    gain: pending.gain,
+    choices: pending.choices?.map((choice) => definedEntries({
+      id: choice.id,
+      optionId: choice.optionId,
+      label: choice.label,
+      faction: choice.faction,
+      ownerId: choice.ownerId,
+      choice: choice.choice,
+    })),
+  });
+}
+
+function playerMonitorStatus(player) {
+  return {
+    id: player.id,
+    leader: player.leader,
+    team: player.team,
+    role: player.role,
+    vp: player.vp,
+    resources: player.resources,
+    influence: player.influence,
+    agentsReady: player.agentsReady,
+    agentsTotal: player.agentsTotal,
+    garrison: player.garrison,
+    conflict: player.conflict,
+    deployedTroops: player.deployedTroops,
+    deployedSandworms: player.deployedSandworms,
+    spies: player.spies,
+    revealed: player.revealed,
+    persuasion: player.persuasion,
+    highCouncilSeat: player.highCouncilSeat,
+    handCount: player.hand.length,
+    intrigueCount: player.intrigues.length,
+    deckCount: player.deck.length,
+    discardCount: player.discard.length,
+    playArea: player.playArea.map(publicCardName),
+    discardTop: player.discard.slice(-3).map(publicCardName),
+    contracts: player.contracts.map((contract) => ({
+      name: contract.card.name,
+      completed: contract.completed,
+      takenRound: contract.takenRound,
+    })),
+  };
+}
+
+function compactGameStatus(game) {
+  return {
+    round: game.round,
+    phase: game.phase,
+    activePlayerId: game.players[game.activeSeat]?.id,
+    firstPlayerId: game.players[game.firstSeat]?.id,
+    agentTurnComplete: game.agentTurnComplete,
+    pendingAction: compactMonitorPendingAction(game.pendingAction),
+    pendingQueueKinds: game.pendingQueue.map((pending) => pending.kind),
+    teamScores: finalTeamScores(game),
+    conflict: game.conflict
+      ? {
+          id: game.conflict.id,
+          name: game.conflict.name,
+          level: game.conflict.level,
+          battleIcon: game.conflict.battleIcon,
+          stakes: game.conflict.stakes,
+        }
+      : undefined,
+    publicMarkets: {
+      imperiumRow: game.imperiumRow.map(publicCardName),
+      reserveMarket: game.reserveMarket.map(publicCardName),
+      throneRow: game.throneRow.map(publicCardName),
+      contractOffer: game.contractOffer.map(publicCardName),
+    },
+    boardOccupancy: Object.fromEntries(
+      Object.entries(game.spaces ?? {}).map(([spaceId, placement]) => [
+        spaceId,
+        {
+          playerId: placementOwnerId(placement),
+          cardName: placementCardName(placement),
+          coOwnerIds: game.agentPlacementCoOwners?.[spaceId] ?? [],
+        },
+      ]),
+    ),
+    spyPosts: game.spyPosts,
+    sharedSpyPosts: game.sharedSpyPosts,
+    players: game.players.map(playerMonitorStatus),
+  };
+}
+
+function trackedPlayerFields(player) {
+  return {
+    vp: player.vp,
+    spice: player.resources.spice,
+    solari: player.resources.solari,
+    water: player.resources.water,
+    emperorInfluence: player.influence.emperor,
+    spacingInfluence: player.influence.spacing,
+    beneInfluence: player.influence.bene,
+    fremenInfluence: player.influence.fremen,
+    greatHousesInfluence: player.influence.greatHouses,
+    fringeWorldsInfluence: player.influence.fringeWorlds,
+    agentsReady: player.agentsReady,
+    garrison: player.garrison,
+    conflict: player.conflict,
+    deployedTroops: player.deployedTroops,
+    deployedSandworms: player.deployedSandworms,
+    spies: player.spies,
+    persuasion: player.persuasion,
+    handCount: player.hand.length,
+    intrigueCount: player.intrigues.length,
+    deckCount: player.deck.length,
+    discardCount: player.discard.length,
+  };
+}
+
+function playerStatusDeltas(beforeGame, afterGame) {
+  const beforeById = new Map(beforeGame.players.map((player) => [player.id, player]));
+  return afterGame.players.flatMap((afterPlayer) => {
+    const beforePlayer = beforeById.get(afterPlayer.id);
+    if (!beforePlayer) return [];
+    const before = trackedPlayerFields(beforePlayer);
+    const after = trackedPlayerFields(afterPlayer);
+    const changes = Object.fromEntries(
+      Object.keys(after)
+        .filter((key) => before[key] !== after[key])
+        .map((key) => [key, { before: before[key], after: after[key], delta: after[key] - before[key] }]),
+    );
+    return Object.keys(changes).length > 0
+      ? [{ playerId: afterPlayer.id, leader: afterPlayer.leader, team: afterPlayer.team, role: afterPlayer.role, changes }]
+      : [];
+  });
+}
+
+function newLogsAfter(beforeGame, afterGame) {
+  const added = Math.max(0, afterGame.log.length - beforeGame.log.length);
+  return afterGame.log.slice(0, added);
+}
+
+function legalActionKind(entry) {
+  const action = entry.action;
+  if (!action) return "unknown";
+  if (action.kind === "pending") return `pending:${action.command?.kind ?? "unknown"}`;
+  if (action.kind === "plot-intrigue") return `plot:${action.command?.kind ?? "unknown"}`;
+  if (action.kind === "play-combat-intrigue") return `combat:${action.combatChoice ? "choice" : "auto"}`;
+  if (action.kind === "place-agent" && action.spyEntrySpaceId) return "place-agent:spy-entry";
+  return action.kind ?? "unknown";
+}
+
+function pendingRecallSpyInteraction(pendingAction) {
+  if (pendingAction?.kind !== "recall-spy") return "pending-recall";
+  if ((pendingAction.drawCards ?? 0) > 0) return "visited-location-draw";
+  if ((pendingAction.drawIntrigues ?? 0) > 0) return "intrigue-draw-recall";
+  if ((pendingAction.strength ?? 0) > 0) return "strength-recall";
+  if ((pendingAction.persuasionReward ?? 0) > 0) return "persuasion-recall";
+  if (pendingAction.removeShieldWall) return "shield-wall-recall";
+  if (pendingAction.resources || pendingAction.gain) return "resource-recall";
+  return "pending-recall";
+}
+
+function spyOfferKind(entry, pendingAction) {
+  if (entry.spyInteraction) return entry.spyInteraction;
+  const action = entry.action;
+  if (action?.kind === "place-agent" && action.spyEntrySpaceId) return "occupied-entry";
+  if (action?.kind === "pending" && action.command?.kind === "recall-spy") return pendingRecallSpyInteraction(pendingAction);
+  if (action?.kind === "pending" && action.command?.kind === "recall-spy-for-supply") return "recall-for-supply";
+  if (action?.kind === "pending" && action.command?.kind === "place-spy") return "pending-place";
+  if (action?.kind === "plot-intrigue" && action.command?.choice?.kind === "recall-spy") return "plot-recall";
+  if (action?.kind === "plot-intrigue" && action.command?.choice?.kind === "place-spy") return "plot-place";
+  return undefined;
+}
+
+export function monitorLegalAction(entry, pendingAction) {
+  const spyInteraction = spyOfferKind(entry, pendingAction);
+  return definedEntries({
+    id: entry.id,
+    label: entry.label,
+    playerId: entry.playerId,
+    kind: legalActionKind(entry),
+    action: entry.action,
+    spyInteraction,
+  });
+}
+
+function classifySpyLog(message) {
+  if (/recalls a spy from .* to enter occupied /.test(message)) return "occupied-entry";
+  if (/recalls a spy from .* for .* visit, drawing 1 card\./.test(message)) return "visited-location-draw";
+  if (/recalls a spy from .* adding \d+ strength/.test(message)) return "strength-recall";
+  if (/recalls a spy from /.test(message)) return "other-recall";
+  if (/places a spy near /.test(message)) return "place-spy";
+  return undefined;
+}
+
+function cappedExamples(existing, value, limit = 8) {
+  const next = existing ?? [];
+  if (next.length < limit && value) next.push(value);
+  return next;
+}
+
+function buildMonitorReport({ summary, decisionLog, discussions, finalGame }) {
+  const allOffers = decisionLog.flatMap((entry) => entry.legalActions ?? []);
+  const selectedActions = decisionLog
+    .map((entry) => entry.selectedAction)
+    .filter(Boolean);
+  const allNewLogs = decisionLog.flatMap((entry) => entry.newLogs ?? []);
+  const spyOfferCounts = {};
+  const spySelectedCounts = {};
+  const spyLogCounts = {};
+  const spyLogExamples = {};
+
+  for (const offer of allOffers) {
+    const kind = spyOfferKind(offer);
+    if (!kind) continue;
+    spyOfferCounts[kind] = (spyOfferCounts[kind] ?? 0) + 1;
+  }
+  for (const action of selectedActions) {
+    const kind = spyOfferKind(action);
+    if (!kind) continue;
+    spySelectedCounts[kind] = (spySelectedCounts[kind] ?? 0) + 1;
+  }
+  for (const message of allNewLogs) {
+    const kind = classifySpyLog(message);
+    if (!kind) continue;
+    spyLogCounts[kind] = (spyLogCounts[kind] ?? 0) + 1;
+    spyLogExamples[kind] = cappedExamples(spyLogExamples[kind], message);
+  }
+
+  return {
+    schema: "dune-3v3-ai-monitor-report-v1",
+    summary,
+    decisionCount: decisionLog.length,
+    discussionCount: discussions.length,
+    selectedActionKindCounts: countBy(selectedActions, legalActionKind),
+    legalOfferKindCounts: countBy(allOffers, legalActionKind),
+    phaseActionCounts: countBy(decisionLog, (entry) => entry.phase),
+    playerActionCounts: countBy(decisionLog, (entry) => `${entry.playerId}/${entry.leader}`),
+    pendingKindCounts: countBy(
+      decisionLog.filter((entry) => entry.pendingAction?.kind),
+      (entry) => entry.pendingAction.kind,
+    ),
+    selectedNotOfferedCount: decisionLog.filter((entry) => entry.selectedActionWasLegal !== true).length,
+    retryCount: decisionLog.reduce((total, entry) => total + (entry.failedAttempts?.length ?? 0), 0),
+    spyInteractions: {
+      offerCounts: Object.fromEntries(Object.entries(spyOfferCounts).sort(([first], [second]) => first.localeCompare(second))),
+      selectedCounts: Object.fromEntries(Object.entries(spySelectedCounts).sort(([first], [second]) => first.localeCompare(second))),
+      logCounts: Object.fromEntries(Object.entries(spyLogCounts).sort(([first], [second]) => first.localeCompare(second))),
+      logExamples: spyLogExamples,
+    },
+    finalStatus: compactGameStatus(finalGame),
+  };
+}
+
 async function buildTeamSeatSnapshots({
   baseUrl,
   room,
@@ -158,6 +460,7 @@ async function chooseAndApplyAiStep({
   tokenByPlayerId,
   teamSummaries,
   actionLog,
+  decisionLog,
   assertPrivacy,
   aiPlayerIds,
   log,
@@ -165,6 +468,7 @@ async function chooseAndApplyAiStep({
   const invalidActionIds = new Set();
   let lastError;
   let retryPlayerId;
+  let failedAttempts = [];
 
   for (let attempt = 1; attempt <= 5; attempt += 1) {
     const room = runtime.server.rooms.get(roomId);
@@ -198,8 +502,10 @@ async function chooseAndApplyAiStep({
     const player = candidate.player;
     if (retryPlayerId !== player.id) {
       invalidActionIds.clear();
+      failedAttempts = [];
       retryPlayerId = player.id;
     }
+    const beforeGame = structuredClone(room.game);
     const roomSnapshot = await seatSnapshot(baseUrl, roomId, tokenByPlayerId.get(player.id));
     const legalActions = candidate.legalActions.filter((action) => !invalidActionIds.has(action.id));
     if (legalActions.length === 0) {
@@ -213,6 +519,23 @@ async function chooseAndApplyAiStep({
         lastError,
       }, null, 2));
     }
+    const pendingAction = compactMonitorPendingAction(beforeGame.pendingAction);
+    const monitoredLegalActions = legalActions.map((entry) => monitorLegalAction(entry, beforeGame.pendingAction));
+    const decisionBase = {
+      step: actionLog.length + 1,
+      round: beforeGame.round,
+      phase: beforeGame.phase,
+      playerId: player.id,
+      leader: player.leader,
+      team: player.team,
+      role: player.role,
+      activePlayerId: beforeGame.players[beforeGame.activeSeat]?.id,
+      pendingAction,
+      legalActionCount: monitoredLegalActions.length,
+      legalActionKindCounts: countBy(monitoredLegalActions, legalActionKind),
+      legalActions: monitoredLegalActions,
+      gameStatusBefore: compactGameStatus(beforeGame),
+    };
     const aiSnapshot = buildAiSeatSnapshot({
       roomSnapshot,
       teamId: player.team,
@@ -226,6 +549,9 @@ async function chooseAndApplyAiStep({
     const { response, body } = await roomAction(baseUrl, roomId, player.id, tokenByPlayerId.get(player.id), selected.action.action);
     if (response.status === 200) {
       log?.(`applied ${player.id}: ${selected.action.label}`);
+      const selectedAction = monitorLegalAction(selected.action, beforeGame.pendingAction);
+      const afterGame = body.snapshot.game;
+      const logs = newLogsAfter(beforeGame, afterGame);
       actionLog.push({
         step: actionLog.length + 1,
         round: body.snapshot.game.round,
@@ -234,7 +560,24 @@ async function chooseAndApplyAiStep({
         team: player.team,
         actionId: selected.action.id,
         label: selected.action.label,
+        kind: legalActionKind(selected.action),
+        spyInteraction: selectedAction.spyInteraction,
         reason: selected.reason,
+        legalActionCount: monitoredLegalActions.length,
+        newLogs: logs,
+        version: body.snapshot.version,
+      });
+      decisionLog.push({
+        ...decisionBase,
+        attempt,
+        selectedActionId: selected.action.id,
+        selectedAction,
+        selectedActionWasLegal: monitoredLegalActions.some((action) => action.id === selected.action.id),
+        reason: selected.reason,
+        failedAttempts,
+        newLogs: logs,
+        playerDeltas: playerStatusDeltas(beforeGame, afterGame),
+        gameStatusAfter: compactGameStatus(afterGame),
         version: body.snapshot.version,
       });
       return body.snapshot;
@@ -244,6 +587,13 @@ async function chooseAndApplyAiStep({
       continue;
     }
     invalidActionIds.add(selected.action.id);
+    failedAttempts.push({
+      attempt,
+      actionId: selected.action.id,
+      label: selected.action.label,
+      status: response.status,
+      error: body?.error ?? body,
+    });
   }
   throw new Error(`AI failed after retries: ${lastError}`);
 }
@@ -299,6 +649,7 @@ export async function runAiRoomMonitor({
       }));
   const tokenByPlayerId = new Map();
   const actionLog = [];
+  const decisionLog = [];
   const discussions = [];
   const teamSummaries = {};
   const normalizedAiTeam = aiTeam === "all" ? "all" : aiTeam;
@@ -354,11 +705,21 @@ export async function runAiRoomMonitor({
           humanSeats,
           url: server.resolvedUrls.local[0],
           roomUrl: `${server.resolvedUrls.local[0]}?room=${roomId}`,
+          artifacts: {
+            actions: "actions.json",
+            decisions: "decisions.json",
+            discussions: "discussions.json",
+            monitorReport: "monitor-report.json",
+            roomStorage: "rooms.json",
+          },
         };
+        const monitorReport = buildMonitorReport({ summary, decisionLog, discussions, finalGame: room.game });
         await writeFile(join(outDir, "actions.json"), JSON.stringify(actionLog, null, 2));
+        await writeFile(join(outDir, "decisions.json"), JSON.stringify(decisionLog, null, 2));
         await writeFile(join(outDir, "discussions.json"), JSON.stringify(discussions, null, 2));
+        await writeFile(join(outDir, "monitor-report.json"), JSON.stringify(monitorReport, null, 2));
         await writeFile(join(outDir, "summary.json"), JSON.stringify(summary, null, 2));
-        return { summary, actionLog, discussions, server: ownsServer ? undefined : server };
+        return { summary, actionLog, decisionLog, discussions, monitorReport, server: ownsServer ? undefined : server };
       }
 
       const completedRound = room.game.round - 1;
@@ -387,6 +748,7 @@ export async function runAiRoomMonitor({
         tokenByPlayerId,
         teamSummaries,
         actionLog,
+        decisionLog,
         assertPrivacy,
         aiPlayerIds,
         log,

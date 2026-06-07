@@ -40,6 +40,11 @@ try {
     "state.ts should preserve the public normalizeSpyObservationPosts export",
   );
   assert.equal(
+    state.removeSpyPostOwnerFromObservedSpace,
+    spies.removeSpyPostOwnerFromObservedSpace,
+    "state.ts should preserve the public removeSpyPostOwnerFromObservedSpace export",
+  );
+  assert.equal(
     state.spyPostRecallCountForOwner,
     spies.spyPostRecallCountForOwner,
     "state.ts should preserve the public spyPostRecallCountForOwner export",
@@ -83,7 +88,10 @@ try {
   const habbanyaErg = spaceById(data, "habbanya-erg");
   const haggaBasin = spaceById(data, "hagga-basin");
   const deepDesert = spaceById(data, "deep-desert");
+  const hardyWarriors = spaceById(data, "hardy-warriors");
+  const desertMastery = spaceById(data, "desert-mastery");
   const vastWealth = spaceById(data, "vast-wealth");
+  const sardaukar = spaceById(data, "sardaukar");
 
   const sharedState = {
     spyPosts: { [arrakeen.id]: feyd.id },
@@ -164,6 +172,10 @@ try {
     { space: habbanyaErg, postId: "habbanya-erg", spaceIds: [habbanyaErg.id], label: "Habbanya Erg" },
     { space: haggaBasin, postId: "hagga-basin", spaceIds: [haggaBasin.id], label: "Hagga Basin" },
     { space: imperialBasin, postId: "imperial-basin", spaceIds: [imperialBasin.id], label: "Imperial Basin" },
+    { space: hardyWarriors, postId: "hardy-warriors", spaceIds: [hardyWarriors.id], label: "Hardy Warriors" },
+    { space: desertMastery, postId: "desert-mastery", spaceIds: [desertMastery.id], label: "Desert Mastery" },
+    { space: vastWealth, postId: "vast-wealth", spaceIds: [vastWealth.id], label: "Vast Wealth" },
+    { space: sardaukar, postId: "sardaukar", spaceIds: [sardaukar.id], label: "Sardaukar" },
   ];
   for (const expected of observationPostExpectations) {
     assert.equal(
@@ -220,6 +232,21 @@ try {
     [deliverSupplies.id, heighliner.id],
     "Heighliner should observe the same two-space post as Deliver Supplies",
   );
+  const removedObservedResearchSpy = spies.removeSpyPostOwnerFromObservedSpace({
+    spyPosts: { "sietch-tabr-research-station": feyd.id },
+    sharedSpyPosts: {},
+  }, researchStation.id, feyd.id);
+  assert.equal(
+    removedObservedResearchSpy.removedSpyCount,
+    1,
+    "Removing a spy from an observed split location should find any owned observing edge",
+  );
+  assert.equal(
+    removedObservedResearchSpy.recalledSpaceId,
+    sietchTabr.id,
+    "Observed-space removal should report the representative space for the recalled edge",
+  );
+  assert.deepEqual(removedObservedResearchSpy.spyPosts, {});
 
   const removedLegacyDuplicateArrakeen = spies.removeSpyPostOwner({
     spyPosts: { [arrakeen.id]: feyd.id, [spiceRefinery.id]: feyd.id },

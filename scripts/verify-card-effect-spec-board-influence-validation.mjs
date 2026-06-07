@@ -162,12 +162,20 @@ export function verifyCardEffectSpecBoardInfluenceValidation({
     dangerousRhetoricShippingBoardResolved.pendingAction,
     p2.id,
     "bene",
-  );
-  assert.equal(playerById(dangerousRhetoricShippingCardResolved, p2.id).influence.bene, 1);
-  assert.equal(dangerousRhetoricShippingCardResolved.pendingAction, undefined);
-  assert.equal(
-    playerById(dangerousRhetoricShippingCardResolved, p2.id).playArea.some((card) => card.id === dangerousRhetoric.id),
-    false,
+	  );
+	  assert.equal(playerById(dangerousRhetoricShippingCardResolved, p2.id).influence.bene, 1);
+	  assert.equal(dangerousRhetoricShippingCardResolved.pendingAction?.kind, "recall-spy");
+	  assert.equal(dangerousRhetoricShippingCardResolved.pendingAction?.source, "Shipping visit");
+	  assert.equal(dangerousRhetoricShippingCardResolved.pendingAction?.drawCards, 1);
+	  assert.deepEqual(dangerousRhetoricShippingCardResolved.pendingAction?.spaceIds, [shipping.id]);
+	  const dangerousRhetoricShippingVisitSkipped = state.skipRecallSpy(
+	    dangerousRhetoricShippingCardResolved,
+	    dangerousRhetoricShippingCardResolved.pendingAction,
+	  );
+	  assert.equal(dangerousRhetoricShippingVisitSkipped.pendingAction, undefined);
+	  assert.equal(
+	    playerById(dangerousRhetoricShippingVisitSkipped, p2.id).playArea.some((card) => card.id === dangerousRhetoric.id),
+	    false,
     "Dangerous Rhetoric should still resolve and trash after a separate Shipping board Influence choice",
   );
   const dangerousRhetoricCommanderPlaced = turnActions.placeAgentAction(
@@ -397,12 +405,13 @@ export function verifyCardEffectSpecBoardInfluenceValidation({
       selectedCard: subversiveAdvisor,
       selectedSpace: highCouncil,
     },
-  );
-  assert.equal(
-    subversiveNonFactionPlaced.pendingAction,
-    undefined,
-    "Subversive Advisor should not queue its Influence bonus outside Faction board spaces",
-  );
+	  );
+	  assert.equal(
+	    subversiveNonFactionPlaced.pendingAction?.kind,
+	    "recall-spy",
+	    "Subversive Advisor should not queue its Influence bonus outside Faction board spaces, but the generic spy visit recall may remain",
+	  );
+	  assert.equal(subversiveNonFactionPlaced.pendingAction?.source, "High Council visit");
   assert.equal(
     playerById(subversiveNonFactionPlaced, p2.id).playArea.some((card) => card.id === subversiveAdvisor.id),
     true,

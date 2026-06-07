@@ -37,6 +37,30 @@ export function iconCanReach(
   return false;
 }
 
+export function canEnterOccupiedSpaceWithSpy(
+  state: Pick<GameState, "agentPlacementCoOwners" | "agentPlacementOwners" | "sharedSpyPosts" | "spaces" | "spyPosts">,
+  space: BoardSpace,
+  player: Player,
+) {
+  const primaryOwnerId = state.agentPlacementOwners?.[space.id] ?? state.spaces[space.id];
+  const alreadyOwnsAgentAtSpace =
+    primaryOwnerId === player.id ||
+    state.agentPlacementCoOwners?.[space.id]?.includes(player.id);
+  return Boolean(
+    state.spaces[space.id] &&
+      !alreadyOwnsAgentAtSpace &&
+      playerHasSpyPost(state, space.id, player.id)
+  );
+}
+
+export function agentSpaceAvailable(
+  state: Pick<GameState, "agentPlacementCoOwners" | "agentPlacementOwners" | "sharedSpyPosts" | "spaces" | "spyPosts">,
+  space: BoardSpace,
+  player: Player,
+) {
+  return !state.spaces[space.id] || canEnterOccupiedSpaceWithSpy(state, space, player);
+}
+
 export function defaultActivatedAllyId(player: Player, players: Player[]) {
   return players.find((candidate) => candidate.team === player.team && candidate.role === "Ally")?.id ?? player.id;
 }
@@ -144,25 +168,30 @@ export function pendingActionForBoardCardDraw(
 }
 
 export function boardAgentRecallSpaceIds(
-  state: Pick<GameState, "agentPlacementOwners" | "spaces">,
+  state: Pick<GameState, "agentPlacementCoOwners" | "agentPlacementOwners" | "spaces">,
   pending: Pick<Extract<PendingAction, { kind: "recall-agent-from-board" }>, "ownerId" | "spaceIds">,
 ) {
   return pending.spaceIds.filter((spaceId) =>
     state.spaces[spaceId] !== undefined &&
-    state.agentPlacementOwners?.[spaceId] === pending.ownerId
+    (
+      state.agentPlacementOwners?.[spaceId] === pending.ownerId ||
+      state.agentPlacementCoOwners?.[spaceId]?.includes(pending.ownerId)
+    )
   );
 }
 
 export function pendingActionForBoardAgentRecall(
-  state: Pick<GameState, "agentPlacementOwners" | "spaces">,
+  state: Pick<GameState, "agentPlacementCoOwners" | "agentPlacementOwners" | "spaces">,
   space: BoardSpace,
   source: Player,
 ): PendingAction | undefined {
   if (!space.recallAgent) return undefined;
-  const spaceIds = Object.keys(state.agentPlacementOwners ?? {}).filter((spaceId) =>
-    spaceId !== space.id &&
-    state.spaces[spaceId] !== undefined &&
-    state.agentPlacementOwners?.[spaceId] === source.id
+  const ownedSpaceIds = new Set([
+    ...Object.keys(state.agentPlacementOwners ?? {}).filter((spaceId) => state.agentPlacementOwners?.[spaceId] === source.id),
+    ...Object.keys(state.agentPlacementCoOwners ?? {}).filter((spaceId) => state.agentPlacementCoOwners?.[spaceId]?.includes(source.id)),
+  ]);
+  const spaceIds = [...ownedSpaceIds].filter((spaceId) =>
+    spaceId !== space.id && state.spaces[spaceId] !== undefined
   );
   if (spaceIds.length === 0) return undefined;
   return {

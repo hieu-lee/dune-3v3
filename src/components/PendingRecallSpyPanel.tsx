@@ -29,6 +29,9 @@ export function PendingRecallSpyPanel({
     pending.strength > 0
       ? `add +${pending.strength} strength${recipient ? ` to ${recipient.leader}` : ""}`
       : undefined,
+    pending.drawCards
+      ? `draw ${pending.drawCards} card${pending.drawCards === 1 ? "" : "s"}`
+      : undefined,
     pending.drawIntrigues
       ? `draw ${pending.drawIntrigues} Intrigue ${pending.drawIntrigues === 1 ? "card" : "cards"}`
       : undefined,

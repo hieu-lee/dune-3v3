@@ -10,6 +10,7 @@ import {
   adjustInfluence,
   applyBoardEffect,
   applyCardAgentEffect,
+  canEnterOccupiedSpaceWithSpy,
   collectMakerSpice,
   completeChoamContractsForCurrentTurnHarvests,
   completeChoamContractsForBoardSpace,
@@ -33,6 +34,7 @@ import {
   playerHasConflictUnits,
   playerTroopSupply,
   queuePendingActions,
+  recordTurnSpyRecall,
   recordRoundMakerSpaceVisit,
   recordTurnMakerSpaceVisit,
   recordTurnSpiceGainAndCompleteHarvestContracts,
@@ -41,6 +43,11 @@ import {
   resolveLeaderInfluenceThresholdRewards,
   resolveLocationControlIncome,
   resolveStabanSmuggleSpice,
+  removeSpyPostOwnerFromObservedSpace,
+  spyEntrySpaceIdsForOccupiedSpace,
+  spyObservationPostChoiceSpaceIdsForObservedSpace,
+  spyObservationPostLabelForSpace,
+  spyObservationPostOwnerIds,
   markMuadDibUnpredictableFoeResolved,
   scoreGurneyAlwaysSmiling,
 } from "./game/state";
@@ -93,6 +100,7 @@ type PlaceAgentInput = {
   commanderTargets: CommanderTargets;
   selectedCard: Card;
   selectedSpace: BoardSpace;
+  spyEntrySpaceId?: string;
 };
 
 function postDeployIntrigueDrawFor(
@@ -199,7 +207,9 @@ function agentPlacementSpaces(
   selectedSpace: BoardSpace,
   target: Player,
   recalledAgents: number | undefined,
+  spyEntry: boolean,
 ) {
+  if (spyEntry) return currentSpaces;
   if (!recalledAgents) return { ...currentSpaces, [selectedSpace.id]: target.id };
   const { [selectedSpace.id]: _recalledSpace, ...spaces } = currentSpaces;
   return spaces;
@@ -210,10 +220,122 @@ function agentPlacementOwners(
   selectedSpace: BoardSpace,
   source: Player,
   recalledAgents: number | undefined,
+  spyEntry: boolean,
 ) {
+  if (spyEntry) return currentOwners;
   if (!recalledAgents) return { ...currentOwners, [selectedSpace.id]: source.id };
   const { [selectedSpace.id]: _recalledSpace, ...owners } = currentOwners;
   return owners;
+}
+
+function setCoLocatedOwners(
+  currentOwners: NonNullable<GameState["agentPlacementCoOwners"]>,
+  selectedSpace: BoardSpace,
+  owners: string[],
+) {
+  if (owners.length === 0) {
+    const { [selectedSpace.id]: _removed, ...remainingOwners } = currentOwners;
+    return remainingOwners;
+  }
+  return { ...currentOwners, [selectedSpace.id]: owners };
+}
+
+function agentPlacementCoOwners(
+  currentOwners: NonNullable<GameState["agentPlacementCoOwners"]>,
+  selectedSpace: BoardSpace,
+  source: Player,
+  recalledAgents: number | undefined,
+  spyEntry: boolean,
+) {
+  const existingOwners = currentOwners[selectedSpace.id] ?? [];
+  const ownersWithoutSource = existingOwners.filter((ownerId) => ownerId !== source.id);
+  if (recalledAgents) return setCoLocatedOwners(currentOwners, selectedSpace, ownersWithoutSource);
+  if (!spyEntry) return currentOwners;
+  return setCoLocatedOwners(currentOwners, selectedSpace, [...ownersWithoutSource, source.id]);
+}
+
+function setCoLocatedOwnerTargets(
+  currentTargets: NonNullable<GameState["agentPlacementCoOwnerTargets"]>,
+  selectedSpace: BoardSpace,
+  targets: Record<string, string>,
+) {
+  if (Object.keys(targets).length === 0) {
+    const { [selectedSpace.id]: _removed, ...remainingTargets } = currentTargets;
+    return remainingTargets;
+  }
+  return { ...currentTargets, [selectedSpace.id]: targets };
+}
+
+function agentPlacementCoOwnerTargets(
+  currentTargets: NonNullable<GameState["agentPlacementCoOwnerTargets"]>,
+  selectedSpace: BoardSpace,
+  source: Player,
+  target: Player,
+  recalledAgents: number | undefined,
+  spyEntry: boolean,
+) {
+  const existingTargets = currentTargets[selectedSpace.id] ?? {};
+  const { [source.id]: _sourceTarget, ...targetsWithoutSource } = existingTargets;
+  if (recalledAgents) return setCoLocatedOwnerTargets(currentTargets, selectedSpace, targetsWithoutSource);
+  if (!spyEntry) return currentTargets;
+  return setCoLocatedOwnerTargets(currentTargets, selectedSpace, {
+    ...targetsWithoutSource,
+    [source.id]: target.id,
+  });
+}
+
+function spyEntryStateFor(current: GameState, selectedSpace: BoardSpace, player: Player, spyEntrySpaceId?: string) {
+  if (!current.spaces[selectedSpace.id]) {
+    return { state: current, usedSpyEntry: false, blocked: false, log: undefined };
+  }
+  if (!canEnterOccupiedSpaceWithSpy(current, selectedSpace, player)) {
+    return { state: current, usedSpyEntry: false, blocked: true, log: undefined };
+  }
+
+  const choices = spyEntrySpaceIdsForOccupiedSpace(current, selectedSpace.id, player.id);
+  const selectedSpyEntrySpaceId = spyEntrySpaceId ?? (choices.length === 1 ? choices[0] : undefined);
+  if (!selectedSpyEntrySpaceId || !choices.includes(selectedSpyEntrySpaceId)) {
+    return { state: current, usedSpyEntry: false, blocked: true, log: undefined };
+  }
+
+  const { spyPosts, sharedSpyPosts, removedSpyCount, recalledSpaceId } = removeSpyPostOwnerFromObservedSpace(current, selectedSpace.id, player.id, selectedSpyEntrySpaceId);
+  if (removedSpyCount <= 0) return { state: current, usedSpyEntry: false, blocked: true, log: undefined };
+
+  const stateWithRecalledSpy: GameState = {
+    ...current,
+    spyPosts,
+    sharedSpyPosts,
+    players: current.players.map((candidate) =>
+      candidate.id === player.id ? { ...candidate, spies: candidate.spies + removedSpyCount } : candidate
+    ),
+  };
+  return {
+    state: recordTurnSpyRecall(stateWithRecalledSpy, player.id, removedSpyCount),
+    usedSpyEntry: true,
+    blocked: false,
+    log: `${player.leader} recalls a spy from ${spyObservationPostLabelForSpace(recalledSpaceId ?? selectedSpace.id)} to enter occupied ${selectedSpace.name}.`,
+  };
+}
+
+function pendingActionForSpyVisitCardDraw(
+  state: GameState,
+  selectedSpace: BoardSpace,
+  source: Player,
+): PendingAction | undefined {
+  const spaceIds = spyObservationPostChoiceSpaceIdsForObservedSpace(selectedSpace.id)
+    .filter((spaceId) => spyObservationPostOwnerIds(state, spaceId).includes(source.id));
+  if (spaceIds.length === 0) return undefined;
+  return {
+    kind: "recall-spy",
+    ownerId: source.id,
+    combatRecipientId: source.id,
+    remaining: 1,
+    strength: 0,
+    source: `${selectedSpace.name} visit`,
+    optional: true,
+    drawCards: 1,
+    spaceIds,
+  };
 }
 
 function futureSourceIntriguesBeforePendingChoice(
@@ -234,14 +356,18 @@ function futureSourceIntriguesBeforePendingChoice(
 
 export function placeAgentAction(
   current: GameState,
-  { commanderTargets, selectedCard, selectedSpace }: PlaceAgentInput,
+  { commanderTargets, selectedCard, selectedSpace, spyEntrySpaceId }: PlaceAgentInput,
 ): GameState {
-  const player = current.players[current.activeSeat];
+  const initialPlayer = current.players[current.activeSeat];
+  const spyEntry = spyEntryStateFor(current, selectedSpace, initialPlayer, spyEntrySpaceId);
+  if (spyEntry.blocked) return current;
+  const placementState = spyEntry.state;
+  const player = placementState.players[placementState.activeSeat];
   const targetId =
     player.role === "Commander"
-      ? activatedAllyIdFor(player, current.players, commanderTargets)
+      ? activatedAllyIdFor(player, placementState.players, commanderTargets)
       : player.id;
-  const target = current.players.find((candidate) => candidate.id === targetId) ?? player;
+  const target = placementState.players.find((candidate) => candidate.id === targetId) ?? player;
   const selectedCardIndexByReference = player.hand.findIndex((card) => card === selectedCard);
   const selectedCardIndex = selectedCardIndexByReference >= 0
     ? selectedCardIndexByReference
@@ -255,12 +381,12 @@ export function placeAgentAction(
     agentPlacementTargetOwnerId: target.id,
   };
   const playArea = selectedCard.trashOnPlay ? player.playArea : [...player.playArea, playedCard];
-  const cost = effectiveCost(selectedSpace, current.players);
-  const makerBonus = selectedSpace.maker ? current.makerSpice[selectedSpace.id] ?? 0 : 0;
+  const cost = effectiveCost(selectedSpace, placementState.players);
+  const makerBonus = selectedSpace.maker ? placementState.makerSpice[selectedSpace.id] ?? 0 : 0;
   const makerChoiceOwner = player.role === "Commander" ? target : player;
-  const makerChoicePending = pendingActionForMakerChoice(current, selectedSpace, makerChoiceOwner, player);
+  const makerChoicePending = pendingActionForMakerChoice(placementState, selectedSpace, makerChoiceOwner, player);
   const spiceGain = boardSpaceSpiceGainFor(selectedSpace, player, makerBonus, Boolean(makerChoicePending));
-  const sietchTabrPending = pendingActionForSietchTabr(current, selectedSpace, makerChoiceOwner, player);
+  const sietchTabrPending = pendingActionForSietchTabr(placementState, selectedSpace, makerChoiceOwner, player);
   const spendsSwordmasterAgent = player.swordmasterBonus &&
     !player.swordmasterAgentSpent &&
     player.agentsTotal > 2 &&
@@ -283,13 +409,13 @@ export function placeAgentAction(
     selectedCard,
     source,
     player.role === "Commander" ? effectedTarget : source,
-    current,
+    placementState,
     selectedSpace,
   );
   source = cardAgentEffect.source;
   effectedTarget = cardAgentEffect.target;
-  let players = current.players.map((candidate, index) => {
-    if (index === current.activeSeat) return source;
+  let players = placementState.players.map((candidate, index) => {
+    if (index === placementState.activeSeat) return source;
     if (candidate.id === effectedTarget.id) return effectedTarget;
     return candidate;
   });
@@ -298,7 +424,7 @@ export function placeAgentAction(
     ? { actorId: source.id, ownerId: deploymentOwner.id, source: selectedCard.name }
     : undefined;
   const controlledPostEffectState = resolveLocationControlIncome(
-    { ...current, players, conflictDeploymentBlock },
+    { ...placementState, players, conflictDeploymentBlock },
     selectedSpace,
   );
   players = controlledPostEffectState.players;
@@ -372,8 +498,9 @@ export function placeAgentAction(
   const boardInfluencePending = pendingActionForBoardInfluenceChoice(selectedSpace, source, effectedTarget);
   const combinedBoardInfluence = combinedBoardInfluenceChoicePending(boardInfluencePending, firstCardPending);
   const boardIntrigueSwapPending = pendingActionForBoardIntrigueSwap(selectedSpace, source, futureSourceIntrigues);
-  const boardAgentRecallPending = pendingActionForBoardAgentRecall(current, selectedSpace, source);
+  const boardAgentRecallPending = pendingActionForBoardAgentRecall(placementState, selectedSpace, source);
   const boardCardDrawPending = pendingActionForBoardCardDraw(selectedSpace, source);
+  const spyVisitCardDrawPending = pendingActionForSpyVisitCardDraw(postEffectState, selectedSpace, source);
   const boardTrashPending = pendingActionForBoardTrash(selectedSpace, source);
   const boardChoicePendings = [
     optionalSpacePaymentPending,
@@ -386,7 +513,7 @@ export function placeAgentAction(
   const paidRewardWater = paidRewardResourceGain(combinedBoardInfluence.cardPending, source.id, "water");
   const jessicaRepeatDeferredWater = paidRewardWater;
   const jessicaReverendMotherPending = pendingActionForReverendMotherJessicaRepeat(
-    current,
+    placementState,
     source,
     selectedSpace,
     jessicaRepeatDeferredWater,
@@ -406,6 +533,7 @@ export function placeAgentAction(
         ...remainingCardPendings,
         ...remainingLeaderPlacementPendings,
         ...[boardTrashPending].filter((action): action is PendingAction => Boolean(action)),
+        ...[spyVisitCardDrawPending].filter((action): action is PendingAction => Boolean(action)),
       ]
     : [
         ...boardChoicePendings,
@@ -413,6 +541,7 @@ export function placeAgentAction(
         ...remainingCardPendings,
         ...remainingLeaderPlacementPendings,
         ...[boardTrashPending].filter((action): action is PendingAction => Boolean(action)),
+        ...[spyVisitCardDrawPending].filter((action): action is PendingAction => Boolean(action)),
       ];
   if (sietchTabrPending) {
     const sietchAction = {
@@ -446,15 +575,31 @@ export function placeAgentAction(
     ...stateAfterTopDeckReservations,
     agentTurnComplete: true,
     players,
-    spaces: agentPlacementSpaces(current.spaces, selectedSpace, target, totalRecalledAgents),
+    spaces: agentPlacementSpaces(placementState.spaces, selectedSpace, target, totalRecalledAgents, spyEntry.usedSpyEntry),
     agentPlacementOwners: agentPlacementOwners(
-      current.agentPlacementOwners ?? {},
+      placementState.agentPlacementOwners ?? {},
       selectedSpace,
       player,
       totalRecalledAgents,
+      spyEntry.usedSpyEntry,
     ),
-    makerSpice: collectMakerSpice(current, selectedSpace),
-    swordmasterClaimed: current.swordmasterClaimed || selectedSpace.id === "swordmaster",
+    agentPlacementCoOwners: agentPlacementCoOwners(
+      placementState.agentPlacementCoOwners ?? {},
+      selectedSpace,
+      player,
+      totalRecalledAgents,
+      spyEntry.usedSpyEntry,
+    ),
+    agentPlacementCoOwnerTargets: agentPlacementCoOwnerTargets(
+      placementState.agentPlacementCoOwnerTargets ?? {},
+      selectedSpace,
+      player,
+      target,
+      totalRecalledAgents,
+      spyEntry.usedSpyEntry,
+    ),
+    makerSpice: collectMakerSpice(placementState, selectedSpace),
+    swordmasterClaimed: placementState.swordmasterClaimed || selectedSpace.id === "swordmaster",
     conflictDeploymentBlock,
     ...pending,
     log: [
@@ -465,12 +610,13 @@ export function placeAgentAction(
         ? `${player.leader} collects ${makerBonus} bonus spice from ${selectedSpace.name}.`
         : undefined,
       cardAgentEffect.log,
+      spyEntry.log,
       agentPlacementLog,
       ...postEffectState.log,
     ].filter((entry): entry is string => Boolean(entry)),
   };
   const intrigueGain = boardSpaceIntrigueGainFor(selectedSpace, player);
-  const influenceThresholdState = resolveLeaderInfluenceThresholdRewards(nextState, current.players);
+  const influenceThresholdState = resolveLeaderInfluenceThresholdRewards(nextState, placementState.players);
   const boardIntrigueState = intrigueGain > 0
     ? drawIntrigueCards(influenceThresholdState, source.id, intrigueGain, selectedSpace.name)
     : influenceThresholdState;
@@ -503,7 +649,7 @@ type RevealTurnPlan = {
 
 export function revealTurnPlan(
   activePlayer: Player,
-  state?: Pick<GameState, "agentPlacementOwners" | "roundMakerSpaceVisits" | "spaces" | "spyPosts" | "sharedSpyPosts"> &
+  state?: Pick<GameState, "agentPlacementCoOwners" | "agentPlacementOwners" | "roundMakerSpaceVisits" | "spaces" | "spyPosts" | "sharedSpyPosts"> &
     Partial<Pick<GameState, "players" | "turnAcquiredCardIds">>,
   combatRecipient?: Player,
 ): RevealTurnPlan {

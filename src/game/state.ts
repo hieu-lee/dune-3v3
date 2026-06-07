@@ -296,6 +296,8 @@ export {
 } from "./player-setup";
 
 export {
+  agentSpaceAvailable,
+  canEnterOccupiedSpaceWithSpy,
   defaultActivatedAllyId,
   iconCanReach,
   pendingActionForBoardAgentRecall,
@@ -316,6 +318,11 @@ export {
 export {
   canPlaceSpyPost,
   normalizeSpyObservationPosts,
+  removeSpyPostOwner,
+  removeSpyPostOwnerFromObservedSpace,
+  spyEntrySpaceIdsForOccupiedSpace,
+  spyObservationPosts,
+  spyObservationPostChoiceSpaceIdsForObservedSpace,
   spyObservationPostChoiceSpaces,
   spyObservationPostDetailForSpace,
   spyObservationPostIdForSpace,
@@ -354,6 +361,7 @@ export {
   recordRoundMakerSpaceVisit,
   recordTurnAcquiredCard,
   recordTurnMakerSpaceVisit,
+  recordTurnSpyRecall,
   hasUsedReverendMotherJessicaRepeat,
   recordTurnSpiceGain,
   recordTurnUnitDeployment,

@@ -39,6 +39,7 @@ const server = await createRoomServer({ port: 0, log: false, storageFile: join(o
 const browser = await chromium.launch({ headless: true });
 const {
   canPay,
+  agentSpaceAvailable,
   boardAgentRecallSpacesForPending,
   discardCardForDrawChoices,
   discardCardsForRewardChoices,
@@ -50,6 +51,7 @@ const {
   placeableSpySpaces,
   playerTroopSupply,
   recallableSpySupplySpaces,
+  spyEntrySpaceIdsForOccupiedSpace,
   trashableCardsForPending,
 } = await server.ssrLoadModule("/src/game/state.ts");
 const { boardSpaces, teams } = await server.ssrLoadModule("/src/game/data.ts");
@@ -324,16 +326,21 @@ function legalAgentPlacement(game, player) {
   const commanderTargets = commanderTargetsFor(player, game.players);
   for (const card of player.hand) {
     for (const space of boardSpaces) {
-      if (game.spaces[space.id]) continue;
+      if (!agentSpaceAvailable(game, space, player)) continue;
       if (!canPay(player, effectiveCost(space, game.players))) continue;
       if (!iconCanReach(card, space, player, game.swordmasterClaimed, game.spyPosts, game.players, game.sharedSpyPosts)) {
         continue;
       }
+      const spyEntrySpaceIds = game.spaces[space.id]
+        ? spyEntrySpaceIdsForOccupiedSpace(game, space.id, player.id)
+        : [undefined];
+      const spyEntrySpaceId = spyEntrySpaceIds[0];
       return {
         action: {
           kind: "place-agent",
           cardId: card.id,
           spaceId: space.id,
+          ...(spyEntrySpaceId ? { spyEntrySpaceId } : {}),
           ...(commanderTargets ? { commanderTargets } : {}),
         },
       };
@@ -384,8 +391,14 @@ function pendingCommand(room, pending, coverage) {
       return { kind: "choose-commander-resource-split", optionIndex: 0 };
     case "paid-reward-choice":
       return { kind: "skip-paid-reward" };
-    case "pending-action-choice":
-      return { kind: "skip-pending-action-choice" };
+    case "pending-action-choice": {
+      const optionId = firstChoiceId(pending.choices ?? pending.options);
+      return optionId ? { kind: "choose-pending-action-choice", optionId } : { kind: "skip-pending-action-choice" };
+    }
+    case "feyd-training": {
+      const optionId = firstChoiceId(pending.options);
+      return optionId ? { kind: "choose-feyd-training", optionId } : undefined;
+    }
     case "trash-card": {
       if (pending.optional) return { kind: "skip-trash" };
       const owner = room.game.players.find((player) => player.id === pending.ownerId);

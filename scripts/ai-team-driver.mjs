@@ -798,21 +798,27 @@ export function legalActionsForSeat(room, playerId, runtime, coverage = {}) {
     if (!player.revealed && player.agentsReady > 0) {
       for (const card of player.hand) {
         for (const space of runtime.data.boardSpaces) {
-          if (game.spaces[space.id]) continue;
+          if (!runtime.state.agentSpaceAvailable(game, space, player)) continue;
           if (!runtime.state.canPay(player, runtime.state.effectiveCost(space, game.players))) continue;
           if (!runtime.state.iconCanReach(card, space, player, game.swordmasterClaimed, game.spyPosts, game.players, game.sharedSpyPosts)) continue;
+          const spyEntrySpaceIds = game.spaces[space.id]
+            ? runtime.state.spyEntrySpaceIdsForOccupiedSpace(game, space.id, player.id)
+            : [undefined];
           for (const target of targetVariants) {
-            legalActions.push(actionEntry(
-              `place:${card.id}:${space.id}:${target.value?.[player.id] ?? "self"}`,
-              `Place ${card.name} at ${space.name}${target.label}`,
-              playerId,
-              {
-                kind: "place-agent",
-                cardId: card.id,
-                spaceId: space.id,
-                ...(target.value ? { commanderTargets: target.value } : {}),
-              },
-            ));
+            for (const spyEntrySpaceId of spyEntrySpaceIds) {
+              legalActions.push(actionEntry(
+                `place:${card.id}:${space.id}:${target.value?.[player.id] ?? "self"}:${spyEntrySpaceId ?? "open"}`,
+                `Place ${card.name} at ${space.name}${target.label}`,
+                playerId,
+                {
+                  kind: "place-agent",
+                  cardId: card.id,
+                  spaceId: space.id,
+                  ...(spyEntrySpaceId ? { spyEntrySpaceId } : {}),
+                  ...(target.value ? { commanderTargets: target.value } : {}),
+                },
+              ));
+            }
           }
         }
       }

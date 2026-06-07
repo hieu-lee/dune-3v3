@@ -101,11 +101,13 @@ export type PendingAction =
       combatRecipientId: string;
       remaining: number;
       strength: number;
-      persuasionReward?: number;
-      source: string;
-      optional: boolean;
-      drawIntrigues?: number;
-    }
+	      persuasionReward?: number;
+	      source: string;
+	      optional: boolean;
+	      spaceIds?: string[];
+	      drawCards?: number;
+	      drawIntrigues?: number;
+	    }
   | {
       kind: "lose-influence";
       ownerId: string;
@@ -552,6 +554,8 @@ export type GameState = {
   players: Player[];
   spaces: Record<string, string>;
   agentPlacementOwners?: Record<string, string>;
+  agentPlacementCoOwners?: Record<string, string[]>;
+  agentPlacementCoOwnerTargets?: Record<string, Record<string, string>>;
   spyPosts: Record<string, string>;
   sharedSpyPosts: Record<string, string[]>;
   alliances: AllianceOwners;

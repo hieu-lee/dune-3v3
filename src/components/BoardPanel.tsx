@@ -1,9 +1,18 @@
-import type { CSSProperties } from "react";
+import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Crown, FileText, Hexagon, Sparkles, Swords, Users } from "lucide-react";
 import { costLabel, factionShortLabels } from "../app-helpers";
 import { locationControlOwnerId } from "../game/critical-locations";
 import { boardSpaces, factionLabels as factionFullLabels, iconLabels, teams } from "../game/data";
-import { effectiveCost, spyPostOwnerIds } from "../game/state";
+import {
+  effectiveCost,
+  spyObservationPostChoiceSpaces,
+  spyObservationPostDetailForSpace,
+  spyObservationPostIdForSpace,
+  spyObservationPostLabelForSpace,
+  spyObservationPostOwnerIds,
+  spyObservationPostSpaceIdsForSpace,
+  spyPostOwnerIds,
+} from "../game/state";
 import type { BoardSpace, FactionId, GameState, Player, ResourceId, TeamId } from "../game/types";
 import {
   boardLayoutSpaceIds,
@@ -19,7 +28,17 @@ type BoardPanelProps = {
   placementDecisionActive: boolean;
   playingPhase: boolean;
   selectedSpaceId: string | null;
+  spySlotChoices?: BoardSpySlotChoices;
   onSelectSpace: (spaceId: string) => void;
+  onSelectSpySlot?: (spaceId: string) => void;
+};
+
+export type BoardSpySlotMode = "place" | "recall" | "supply-recall" | "conflict-recall" | "agent-entry";
+
+export type BoardSpySlotChoices = {
+  mode: BoardSpySlotMode;
+  legalSpaceIds: ReadonlySet<string>;
+  selectedSpaceId?: string;
 };
 
 const resourceLabels: Record<ResourceId, string> = {
@@ -45,6 +64,30 @@ const influenceTrackByRegionId: Partial<Record<string, FactionId>> = {
   "shaddam-command": "emperor",
 };
 const influenceTrackSteps = [0, 1, 2, 3, 4] as const;
+
+type SpaceMeasurement = {
+  centerX: number;
+  centerY: number;
+  width: number;
+  height: number;
+};
+
+type BoardStageMeasurements = {
+  width: number;
+  height: number;
+  spaces: Record<string, SpaceMeasurement>;
+};
+
+type Point = {
+  x: number;
+  y: number;
+};
+
+const emptyBoardStageMeasurements: BoardStageMeasurements = {
+  width: 0,
+  height: 0,
+  spaces: {},
+};
 
 function classToken(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -99,25 +142,420 @@ function conflictDeploymentOrder(players: readonly Player[]) {
     );
 }
 
+function spySlotModeLabel(mode: BoardSpySlotMode) {
+  if (mode === "place") return "Place spy";
+  if (mode === "agent-entry") return "Recall spy to enter";
+  if (mode === "supply-recall") return "Recall spy for supply";
+  if (mode === "conflict-recall") return "Recall spy for conflict reward";
+  return "Recall spy";
+}
+
+function spySlotModeClass(mode: BoardSpySlotMode) {
+  if (mode === "place") return "is-placeable";
+  if (mode === "agent-entry") return "is-agent-entry";
+  if (mode === "supply-recall") return "is-supply-recall";
+  if (mode === "conflict-recall") return "is-conflict-recall";
+  return "is-recallable";
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
+const singletonSpySlotVectors: Partial<Record<string, Point>> = {
+  carthag: { x: -1, y: -0.1 },
+  "deep-desert": { x: 0, y: -1 },
+  "habbanya-erg": { x: 0, y: -1 },
+  "hagga-basin": { x: 0, y: -1 },
+  "imperial-basin": { x: 0, y: -1 },
+  "hardy-warriors": { x: 0, y: -1 },
+  "desert-mastery": { x: 0, y: -1 },
+  "vast-wealth": { x: 0, y: -1 },
+  sardaukar: { x: 0, y: -1 },
+};
+
+function slotBoundsOverlapMeasurement(point: Point, measurement: SpaceMeasurement) {
+  const radius = 14;
+  return (
+    point.x + radius > measurement.centerX - measurement.width / 2 &&
+    point.x - radius < measurement.centerX + measurement.width / 2 &&
+    point.y + radius > measurement.centerY - measurement.height / 2 &&
+    point.y - radius < measurement.centerY + measurement.height / 2
+  );
+}
+
+function pointOverlapsAnySpace(point: Point, stage: BoardStageMeasurements) {
+  return Object.values(stage.spaces).some((measurement) => slotBoundsOverlapMeasurement(point, measurement));
+}
+
+function singletonCandidatePoint(vector: Point, measurement: SpaceMeasurement, stage: BoardStageMeasurements): Point {
+  const gap = 18;
+  const x = measurement.centerX + vector.x * (measurement.width / 2 + gap);
+  const y = measurement.centerY + vector.y * (measurement.height / 2 + gap);
+  return {
+    x: clamp(x, 20, Math.max(20, stage.width - 20)),
+    y: clamp(y, 20, Math.max(20, stage.height - 20)),
+  };
+}
+
+function singletonSpySlotPoint(spaceId: string, measurement: SpaceMeasurement, stage: BoardStageMeasurements): Point {
+  const preferredVector = singletonSpySlotVectors[spaceId] ?? { x: 0, y: -1 };
+  const vectors = [
+    preferredVector,
+    { x: 0, y: -1 },
+    { x: 1, y: 0 },
+    { x: -1, y: 0 },
+    { x: 0, y: 1 },
+  ];
+  for (const vector of vectors) {
+    const point = singletonCandidatePoint(vector, measurement, stage);
+    if (!pointOverlapsAnySpace(point, stage)) return point;
+  }
+  return singletonCandidatePoint(preferredVector, measurement, stage);
+}
+
+function pushPointOutsideMeasurement(point: Point, measurement: SpaceMeasurement, stage: BoardStageMeasurements): Point {
+  const margin = 18;
+  const left = measurement.centerX - measurement.width / 2 - margin;
+  const right = measurement.centerX + measurement.width / 2 + margin;
+  const top = measurement.centerY - measurement.height / 2 - margin;
+  const bottom = measurement.centerY + measurement.height / 2 + margin;
+  if (point.x < left || point.x > right || point.y < top || point.y > bottom) return point;
+
+  const distances = [
+    { side: "left", distance: point.x - left },
+    { side: "right", distance: right - point.x },
+    { side: "top", distance: point.y - top },
+    { side: "bottom", distance: bottom - point.y },
+  ].sort((a, b) => a.distance - b.distance);
+  const nearestSide = distances[0]?.side;
+  const pushed = { ...point };
+  if (nearestSide === "left") pushed.x = left;
+  if (nearestSide === "right") pushed.x = right;
+  if (nearestSide === "top") pushed.y = top;
+  if (nearestSide === "bottom") pushed.y = bottom;
+  return {
+    x: clamp(pushed.x, 20, Math.max(20, stage.width - 20)),
+    y: clamp(pushed.y, 20, Math.max(20, stage.height - 20)),
+  };
+}
+
+function multiSpaceSpySlotPoint(measurements: readonly SpaceMeasurement[], stage: BoardStageMeasurements): Point {
+  const center = measurements.reduce(
+    (total, measurement) => ({
+      x: total.x + measurement.centerX,
+      y: total.y + measurement.centerY,
+    }),
+    { x: 0, y: 0 },
+  );
+  let point = {
+    x: center.x / measurements.length,
+    y: center.y / measurements.length,
+  };
+  for (let index = 0; index < 3; index += 1) {
+    point = measurements.reduce((current, measurement) => pushPointOutsideMeasurement(current, measurement, stage), point);
+  }
+  return point;
+}
+
+function measurementTop(measurement: SpaceMeasurement) {
+  return measurement.centerY - measurement.height / 2;
+}
+
+function measurementRight(measurement: SpaceMeasurement) {
+  return measurement.centerX + measurement.width / 2;
+}
+
+function measurementBottom(measurement: SpaceMeasurement) {
+  return measurement.centerY + measurement.height / 2;
+}
+
+function measurementLeft(measurement: SpaceMeasurement) {
+  return measurement.centerX - measurement.width / 2;
+}
+
+function rangesOverlap(firstStart: number, firstEnd: number, secondStart: number, secondEnd: number) {
+  return firstStart <= secondEnd && secondStart <= firstEnd;
+}
+
+function overlappingRangeMidpoint(firstStart: number, firstEnd: number, secondStart: number, secondEnd: number) {
+  return (Math.max(firstStart, secondStart) + Math.min(firstEnd, secondEnd)) / 2;
+}
+
+function pairSpySlotPoint(
+  first: SpaceMeasurement,
+  second: SpaceMeasurement,
+  stage: BoardStageMeasurements,
+): Point {
+  const firstLeft = measurementLeft(first);
+  const firstRight = measurementRight(first);
+  const firstTop = measurementTop(first);
+  const firstBottom = measurementBottom(first);
+  const secondLeft = measurementLeft(second);
+  const secondRight = measurementRight(second);
+  const secondTop = measurementTop(second);
+  const secondBottom = measurementBottom(second);
+  const x = rangesOverlap(firstLeft, firstRight, secondLeft, secondRight)
+    ? overlappingRangeMidpoint(firstLeft, firstRight, secondLeft, secondRight)
+    : second.centerX >= first.centerX
+      ? (firstRight + secondLeft) / 2
+      : (firstLeft + secondRight) / 2;
+  const y = rangesOverlap(firstTop, firstBottom, secondTop, secondBottom)
+    ? overlappingRangeMidpoint(firstTop, firstBottom, secondTop, secondBottom)
+    : second.centerY >= first.centerY
+      ? (firstBottom + secondTop) / 2
+      : (firstTop + secondBottom) / 2;
+  return {
+    x: clamp(x, 20, Math.max(20, stage.width - 20)),
+    y: clamp(y, 20, Math.max(20, stage.height - 20)),
+  };
+}
+
+function spySlotPointForPost(
+  postId: string,
+  representativeSpaceId: string,
+  measuredSpaces: readonly { spaceId: string; measurement: SpaceMeasurement }[],
+  stage: BoardStageMeasurements,
+): Point {
+  if (measuredSpaces.length === 1) {
+    return singletonSpySlotPoint(representativeSpaceId, measuredSpaces[0].measurement, stage);
+  }
+
+  if (postId === "high-council-imperial-privilege-swordmaster") {
+    const bySpaceId = new Map(measuredSpaces.map(({ spaceId, measurement }) => [spaceId, measurement] as const));
+    const highCouncil = bySpaceId.get("high-council");
+    const imperialPrivilege = bySpaceId.get("imperial-privilege");
+    const swordmaster = bySpaceId.get("swordmaster");
+    if (highCouncil && imperialPrivilege && swordmaster) {
+      return {
+        x: clamp(
+          (measurementRight(imperialPrivilege) + measurementLeft(swordmaster)) / 2,
+          20,
+          Math.max(20, stage.width - 20),
+        ),
+        y: clamp(
+          (measurementBottom(highCouncil) + Math.min(measurementTop(imperialPrivilege), measurementTop(swordmaster))) / 2,
+          20,
+          Math.max(20, stage.height - 20),
+        ),
+      };
+    }
+  }
+
+  if (measuredSpaces.length === 2) {
+    return pairSpySlotPoint(measuredSpaces[0].measurement, measuredSpaces[1].measurement, stage);
+  }
+
+  return multiSpaceSpySlotPoint(measuredSpaces.map(({ measurement }) => measurement), stage);
+}
+
+function edgePointToward(measurement: SpaceMeasurement, target: Point): Point {
+  const dx = target.x - measurement.centerX;
+  const dy = target.y - measurement.centerY;
+  if (Math.abs(dx) < 0.001 && Math.abs(dy) < 0.001) {
+    return { x: measurement.centerX, y: measurement.centerY };
+  }
+  const padding = 5;
+  const widthScale = dx === 0 ? Number.POSITIVE_INFINITY : (measurement.width / 2 + padding) / Math.abs(dx);
+  const heightScale = dy === 0 ? Number.POSITIVE_INFINITY : (measurement.height / 2 + padding) / Math.abs(dy);
+  const scale = Math.min(widthScale, heightScale);
+  return {
+    x: measurement.centerX + dx * scale,
+    y: measurement.centerY + dy * scale,
+  };
+}
+
 export function BoardPanel({
   game,
   legalSpaceIds,
   placementDecisionActive,
   playingPhase,
   selectedSpaceId,
+  spySlotChoices,
   onSelectSpace,
+  onSelectSpySlot,
 }: BoardPanelProps) {
+  const boardStageRef = useRef<HTMLDivElement | null>(null);
+  const [stageMeasurements, setStageMeasurements] = useState<BoardStageMeasurements>(emptyBoardStageMeasurements);
   const conflictSlots = conflictDeploymentOrder(game.players);
   const conflictSummary = conflictSlots
     .map(({ player }) => (
       `${player.leader}: ${player.conflict} strength, ${plural(player.deployedTroops, "troop")}, ${plural(player.deployedSandworms, "worm")}`
     ))
     .join("; ");
+  const spySlotLayouts = useMemo(() => {
+    return spyObservationPostChoiceSpaces()
+      .map((space) => {
+        const representativeSpaceId = space.id;
+        const observedSpaceIds = spyObservationPostSpaceIdsForSpace(representativeSpaceId);
+        const measuredSpaces = observedSpaceIds
+          .map((spaceId) => {
+            const measurement = stageMeasurements.spaces[spaceId];
+            return measurement ? { spaceId, measurement } : null;
+          })
+          .filter((entry): entry is { spaceId: string; measurement: SpaceMeasurement } => Boolean(entry));
+        if (!representativeSpaceId || measuredSpaces.length === 0) return null;
+
+        const singleton = measuredSpaces.length === 1;
+        const postId = spyObservationPostIdForSpace(representativeSpaceId);
+        const slotPoint = spySlotPointForPost(postId, representativeSpaceId, measuredSpaces, stageMeasurements);
+        const segments = measuredSpaces.map(({ measurement }) => ({
+          from: edgePointToward(measurement, slotPoint),
+          to: slotPoint,
+        }));
+        const ownerIds = spyObservationPostOwnerIds(game, representativeSpaceId);
+        const owners = ownerIds
+          .map((ownerId) => game.players.find((player) => player.id === ownerId))
+          .filter((player): player is Player => Boolean(player));
+        const legal = Boolean(spySlotChoices?.legalSpaceIds.has(representativeSpaceId));
+        const label = spyObservationPostLabelForSpace(representativeSpaceId);
+        const detail = spyObservationPostDetailForSpace(representativeSpaceId);
+
+        return {
+          detail,
+          label,
+          legal,
+          owners,
+          postId,
+          representativeSpaceId,
+          segments,
+          singleton,
+          x: slotPoint.x,
+          y: slotPoint.y,
+        };
+      })
+      .filter((slot): slot is NonNullable<typeof slot> => Boolean(slot));
+  }, [game, spySlotChoices, stageMeasurements]);
+
+  useLayoutEffect(() => {
+    const stage = boardStageRef.current;
+    if (!stage) return undefined;
+
+    const measure = () => {
+      const stageRect = stage.getBoundingClientRect();
+      const spaces: Record<string, SpaceMeasurement> = {};
+      stage.querySelectorAll<HTMLElement>("[data-space-id]").forEach((element) => {
+        const spaceId = element.dataset.spaceId;
+        if (!spaceId) return;
+        const rect = element.getBoundingClientRect();
+        spaces[spaceId] = {
+          centerX: rect.left + rect.width / 2 - stageRect.left,
+          centerY: rect.top + rect.height / 2 - stageRect.top,
+          height: rect.height,
+          width: rect.width,
+        };
+      });
+      setStageMeasurements({
+        height: stageRect.height,
+        spaces,
+        width: stageRect.width,
+      });
+    };
+
+    measure();
+    const resizeObserver = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(measure);
+    resizeObserver?.observe(stage);
+    stage.querySelectorAll<HTMLElement>("[data-space-id]").forEach((element) => resizeObserver?.observe(element));
+    window.addEventListener("resize", measure);
+    return () => {
+      resizeObserver?.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [game.players, game.spaces, game.spyPosts, game.sharedSpyPosts]);
+
+  function renderSpyNetwork() {
+    if (stageMeasurements.width <= 0 || stageMeasurements.height <= 0 || spySlotLayouts.length === 0) return null;
+    const slotActionLabel = spySlotChoices ? spySlotModeLabel(spySlotChoices.mode) : "Spy post";
+    const modeClass = spySlotChoices ? spySlotModeClass(spySlotChoices.mode) : "";
+
+    return (
+      <div className={`spy-network ${spySlotChoices ? "is-active" : ""}`} aria-label="Spy post network">
+        <svg
+          className="spy-network-lines"
+          width={stageMeasurements.width}
+          height={stageMeasurements.height}
+          viewBox={`0 0 ${stageMeasurements.width} ${stageMeasurements.height}`}
+          aria-hidden="true"
+        >
+          {spySlotLayouts.flatMap((slot) =>
+            slot.segments.map((segment, index) => {
+              return (
+                <line
+                  className={slot.legal ? "is-legal" : ""}
+                  key={`${slot.postId}-${index}`}
+                  x1={segment.from.x}
+                  y1={segment.from.y}
+                  x2={segment.to.x}
+                  y2={segment.to.y}
+                />
+              );
+            })
+          )}
+        </svg>
+        <div className="spy-slot-layer">
+          {spySlotLayouts.map((slot) => {
+            const selected = spySlotChoices?.selectedSpaceId === slot.representativeSpaceId;
+            const title = slot.legal
+              ? `${slotActionLabel}: ${slot.label}. ${slot.detail}`
+              : `${slot.label}. ${slot.detail}`;
+            return (
+              <button
+                className={[
+                  "spy-network-slot",
+                  slot.singleton ? "is-singleton" : "",
+                  slot.owners.length > 0 ? "is-occupied" : "",
+                  slot.legal ? "is-legal" : "",
+                  selected ? "is-selected" : "",
+                  slot.legal ? modeClass : "",
+                ].filter(Boolean).join(" ")}
+                type="button"
+                key={slot.postId}
+                data-spy-post-id={slot.postId}
+                data-spy-space-id={slot.representativeSpaceId}
+                aria-label={title}
+                disabled={!slot.legal || !onSelectSpySlot}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  if (!slot.legal) return;
+                  onSelectSpySlot?.(slot.representativeSpaceId);
+                }}
+                style={{
+                  "--spy-slot-x": `${slot.x}px`,
+                  "--spy-slot-y": `${slot.y}px`,
+                } as CSSProperties}
+                title={title}
+              >
+                <span className="spy-network-slot-ring" aria-hidden="true" />
+                {slot.owners.length > 0 && (
+                  <span className="spy-network-slot-owners" aria-hidden="true">
+                    {slot.owners.map((owner) => (
+                      <span
+                        className="spy-network-slot-owner"
+                        key={owner.id}
+                        style={{ "--spy-owner-color": owner.color } as CSSProperties}
+                      />
+                    ))}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
 
   function renderSpaceTile(space: BoardSpace) {
     const occupant = game.players.find((player) => player.id === game.spaces[space.id]);
     const agentOwnerId = game.agentPlacementOwners?.[space.id] ?? game.spaces[space.id];
     const agentOwner = agentOwnerId ? game.players.find((player) => player.id === agentOwnerId) ?? occupant : undefined;
+    const coAgentOwners = (game.agentPlacementCoOwners?.[space.id] ?? [])
+      .map((ownerId) => game.players.find((player) => player.id === ownerId))
+      .filter((player): player is Player => Boolean(player));
+    const agentOwners = [
+      ...(agentOwner ? [agentOwner] : []),
+      ...coAgentOwners.filter((owner) => owner.id !== agentOwner?.id),
+    ];
     const spyOwners = spyPostOwnerIds(game, space.id)
       .map((ownerId) => game.players.find((player) => player.id === ownerId))
       .filter((player): player is Player => Boolean(player));
@@ -163,12 +601,16 @@ export function BoardPanel({
           {occupant ? "Occupied" : "Open"}
         </span>
         <span className="space-hover-details">
-          {agentOwner && (
-            <span className="agent-marker">
+          {agentOwners.map((owner, index) => (
+            <span
+              className={`agent-marker ${index > 0 ? "agent-marker--co-located" : ""}`}
+              key={owner.id}
+              style={{ "--occupant-color": owner.color } as CSSProperties}
+            >
               <span className="agent-marker-piece" aria-hidden="true" />
-              {agentOwner.leader}
+              {owner.leader}{index > 0 ? " spy entry" : ""}
             </span>
-          )}
+          ))}
           <span className="space-zone">{space.zone}</span>
           <strong>{space.name}</strong>
           <small>{iconLabels[space.icon]}</small>
@@ -303,7 +745,7 @@ export function BoardPanel({
         </div>
       </div>
 
-      <div className="board-stage">
+      <div className="board-stage" ref={boardStageRef}>
         <aside className="board-faction-rail" aria-label="Faction board columns">
           {factionRegions.map((region) => renderRegion(region, "faction"))}
         </aside>
@@ -376,6 +818,7 @@ export function BoardPanel({
           )}
         </div>
 
+        {renderSpyNetwork()}
       </div>
     </section>
   );

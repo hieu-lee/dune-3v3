@@ -3,6 +3,7 @@ import {
   stabanUnseenNetworkSource,
 } from "./card-pending-rules";
 import { boardSpaces } from "./data";
+import { drawCards } from "./deck-utils";
 import { drawIntrigueCards } from "./intrigue-deck";
 import { scoreActiveGurneyAlwaysSmilingForRecipient } from "./leader-rewards";
 import { advancePendingAction } from "./pending-actions";
@@ -305,19 +306,31 @@ export function recallSpyForPending(
   const persuasionText = finalRecall && (pending.persuasionReward ?? 0) > 0
     ? `, gaining ${pending.persuasionReward} persuasion`
     : "";
+  const drawCardsText = finalRecall && (pending.drawCards ?? 0) > 0
+    ? `, drawing ${pending.drawCards} card${pending.drawCards === 1 ? "" : "s"}`
+    : "";
   let recalledState = recordTurnSpyRecall({
     ...state,
     players,
     spyPosts,
     sharedSpyPosts,
     ...(finalRecall ? advancePendingAction(state) : { pendingAction: { ...pending, remaining, optional: false } }),
-    log: [`${owner.leader} recalls a spy from ${spyObservationPostLabelForSpace(space.id)} for ${pending.source}${strengthText}${persuasionText}.`, ...state.log],
+    log: [`${owner.leader} recalls a spy from ${spyObservationPostLabelForSpace(space.id)} for ${pending.source}${strengthText}${persuasionText}${drawCardsText}.`, ...state.log],
   }, owner.id, recalledSpyCount);
   if (finalRecall) recalledState = normalizeSpyObservationPosts(recalledState);
 
-  const resolvedState = finalRecall && pending.drawIntrigues
-    ? drawIntrigueCards(recalledState, owner.id, pending.drawIntrigues, pending.source)
+  const cardsToDraw = pending.drawCards ?? 0;
+  const cardDrawState = finalRecall && cardsToDraw > 0
+    ? {
+        ...recalledState,
+        players: recalledState.players.map((player) =>
+          player.id === owner.id ? drawCards(player, player.hand.length + cardsToDraw) : player
+        ),
+      }
     : recalledState;
+  const resolvedState = finalRecall && pending.drawIntrigues
+    ? drawIntrigueCards(cardDrawState, owner.id, pending.drawIntrigues, pending.source)
+    : cardDrawState;
   return finalRecall && pending.strength > 0
     ? scoreActiveGurneyAlwaysSmilingForRecipient(resolvedState, pending.combatRecipientId)
     : resolvedState;

@@ -42,13 +42,17 @@ export function verifyCardEffectSpecAgentSpyRevealValidation({
     state.placeableSpySpaces(doubleAgentSpiedSpace, doubleAgentSpiedSpace.pendingAction).map((space) => space.id),
     [beneSpySpace.id],
     "Double Agent should only allow sharing another player's observation post",
-  );
-  const doubleAgentSkipped = state.finishPendingAction(doubleAgentSpiedSpace);
-  assert.equal(doubleAgentSkipped.pendingAction, undefined, "Double Agent optional spy placement should be skippable");
-  assert.equal(playerById(doubleAgentSkipped, p2.id).spies, playerById(doubleAgentSpiedSpace, p2.id).spies);
-  const doubleAgentPlacedSpy = state.placeSpyForPending(doubleAgentSpiedSpace, doubleAgentSpiedSpace.pendingAction, beneSpySpace.id);
-  assert.equal(doubleAgentPlacedSpy.pendingAction, undefined, "Placing Double Agent's spy should clear the pending action");
-  assert.equal(doubleAgentPlacedSpy.spyPosts[benePostId], p3.id, "Double Agent should leave the original spy owner in place");
+	  );
+	  const doubleAgentSkipped = state.finishPendingAction(doubleAgentSpiedSpace);
+	  assert.equal(doubleAgentSkipped.pendingAction?.kind, "recall-spy", "Skipping Double Agent should advance to the generic visited-spy recall");
+	  assert.equal(doubleAgentSkipped.pendingAction?.source, "High Council visit");
+	  const doubleAgentVisitSkipped = state.skipRecallSpy(doubleAgentSkipped, doubleAgentSkipped.pendingAction);
+	  assert.equal(doubleAgentVisitSkipped.pendingAction, undefined, "Double Agent optional spy placement and visit recall should both be skippable");
+	  assert.equal(playerById(doubleAgentVisitSkipped, p2.id).spies, playerById(doubleAgentSpiedSpace, p2.id).spies);
+	  const doubleAgentPlacedSpy = state.placeSpyForPending(doubleAgentSpiedSpace, doubleAgentSpiedSpace.pendingAction, beneSpySpace.id);
+	  assert.equal(doubleAgentPlacedSpy.pendingAction?.kind, "recall-spy", "Placing Double Agent's spy should advance to the generic visited-spy recall");
+	  assert.equal(doubleAgentPlacedSpy.pendingAction?.source, "High Council visit");
+	  assert.equal(doubleAgentPlacedSpy.spyPosts[benePostId], p3.id, "Double Agent should leave the original spy owner in place");
   assert.deepEqual(doubleAgentPlacedSpy.sharedSpyPosts[benePostId], [p2.id], "Double Agent should share the chosen spy post");
   assert.equal(playerById(doubleAgentPlacedSpy, p2.id).spies, playerById(doubleAgentSpiedSpace, p2.id).spies - 1);
   assert.match(doubleAgentPlacedSpy.log[0], /places a spy near Espionage \/ Secrets from Double Agent/);
@@ -74,12 +78,12 @@ export function verifyCardEffectSpecAgentSpyRevealValidation({
       spaces: {},
     },
     { commanderTargets: {}, selectedCard: doubleAgent, selectedSpace: highCouncil },
-  );
-  assert.equal(
-    doubleAgentNoSharedTarget.pendingAction,
-    undefined,
-    "Double Agent should not pause when no other player's spy post can be shared",
-  );
+	  );
+	  assert.equal(
+	    doubleAgentNoSharedTarget.pendingAction?.source,
+	    "High Council visit",
+	    "Double Agent should not pause for shared-spy placement when no other player's spy post can be shared",
+	  );
   const hiddenMissiveDraw = { ...dagger, id: "hidden-missive-agent-draw-fixture" };
   const hiddenMissiveEffect = state.applyCardAgentEffect(
     hiddenMissive,

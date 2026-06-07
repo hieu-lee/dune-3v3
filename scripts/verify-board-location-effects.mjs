@@ -92,10 +92,14 @@ try {
     espionage: spaceById(data, "espionage"),
     expedition: spaceById(data, "expedition"),
     gatherSupport: spaceById(data, "gather-support"),
+    highCouncil: spaceById(data, "high-council"),
+    researchStation: spaceById(data, "research-station"),
     secrets: spaceById(data, "secrets"),
     shipping: spaceById(data, "shipping"),
+    sietchTabr: spaceById(data, "sietch-tabr"),
     spiceRefinery: spaceById(data, "spice-refinery"),
     swordmaster: spaceById(data, "swordmaster"),
+    vastWealth: spaceById(data, "vast-wealth"),
   };
 
   assert.equal(spaces.arrakeen.gain, undefined, "Arrakeen should not pay Solari to the visitor");
@@ -126,6 +130,9 @@ try {
   const beneCard = testCard("test-bene", "bene");
   const landsraadCard = testCard("test-landsraad", "landsraad");
   const spiceCard = testCard("test-spice", "spice");
+  const emperorCard = testCard("test-emperor", "emperor");
+  const spyEntryCard = testCard("test-spy-entry-city", "city");
+  const spyVisitCard = testCard("test-spy-visit-landsraad", "landsraad");
   const dangerousRhetoric = data.imperiumDeck.find((card) => card.name === "Dangerous Rhetoric");
   const makerKeeper = data.imperiumDeck.find((card) => card.name === "Maker Keeper");
   const steersman = data.imperiumDeck.find((card) => card.name === "Steersman");
@@ -134,6 +141,307 @@ try {
   assert.ok(makerKeeper, "Maker Keeper should exist for optional-payment timing tests");
   assert.ok(steersman, "Steersman should exist for Assembly Hall Recall Agent tests");
   assert.ok(demandAttention, "Demand Attention should exist for Controversial Technology timing tests");
+
+  const researchStationSpyEntryBase = {
+    ...playableGame(state, "p2", spyEntryCard, (player) => ({
+      ...player,
+      deck: [testCard("spy-entry-draw-1", "city"), testCard("spy-entry-draw-2", "city")],
+      discard: [],
+      garrison: 0,
+      resources: { ...player.resources, water: 2 },
+      spies: 0,
+    })),
+    spaces: { [spaces.researchStation.id]: "p3" },
+    agentPlacementOwners: { [spaces.researchStation.id]: "p3" },
+    spyPosts: {
+      "sietch-tabr-research-station": "p2",
+      "research-station-spice-refinery": "p2",
+    },
+    sharedSpyPosts: {},
+  };
+  assert.equal(
+    state.agentSpaceAvailable(researchStationSpyEntryBase, spaces.researchStation, playerById(researchStationSpyEntryBase, "p2")),
+    true,
+    "An occupied location should be enterable when the active player has a spy observing it",
+  );
+  assert.deepEqual(
+    state.spyEntrySpaceIdsForOccupiedSpace(researchStationSpyEntryBase, spaces.researchStation.id, "p2"),
+    [spaces.sietchTabr.id, spaces.researchStation.id],
+    "Occupied Research Station spy entry should expose both observing spy slots",
+  );
+  assert.equal(
+    place(turnActions, researchStationSpyEntryBase, spyEntryCard, spaces.researchStation),
+    researchStationSpyEntryBase,
+    "Occupied spy entry with multiple observing slots should require an explicit spy post choice",
+  );
+  const researchStationSpyEntry = turnActions.placeAgentAction(
+    researchStationSpyEntryBase,
+    {
+      commanderTargets: {},
+      selectedCard: spyEntryCard,
+      selectedSpace: spaces.researchStation,
+      spyEntrySpaceId: spaces.sietchTabr.id,
+    },
+  );
+  assert.equal(
+    researchStationSpyEntry.spaces[spaces.researchStation.id],
+    "p3",
+    "Spy entry should preserve the original occupied-space Agent",
+  );
+  assert.equal(
+    researchStationSpyEntry.agentPlacementOwners?.[spaces.researchStation.id],
+    "p3",
+    "Spy entry should preserve the original placement owner",
+  );
+  assert.deepEqual(
+    researchStationSpyEntry.agentPlacementCoOwners?.[spaces.researchStation.id],
+    ["p2"],
+    "Spy entry should record the entering player as a co-located Agent owner",
+  );
+  assert.equal(
+    researchStationSpyEntry.spyPosts["sietch-tabr-research-station"],
+    undefined,
+    "Spy entry should recall the spy from the observing edge used to enter",
+  );
+  assert.equal(
+    researchStationSpyEntry.spyPosts["research-station-spice-refinery"],
+    "p2",
+    "Spy entry should preserve unchosen observing spy edges",
+  );
+  assert.equal(playerById(researchStationSpyEntry, "p2").spies, 1, "Spy entry should return the recalled spy to supply");
+  assert.equal(researchStationSpyEntry.turnSpyRecalls.p2, 1, "Spy entry should count as recalling a spy this turn");
+
+  const sameOwnerSpyEntryBase = {
+    ...researchStationSpyEntryBase,
+    spaces: { [spaces.researchStation.id]: "p2" },
+    agentPlacementOwners: { [spaces.researchStation.id]: "p2" },
+    agentPlacementCoOwners: {},
+    spyPosts: { "sietch-tabr-research-station": "p2" },
+  };
+  assert.equal(
+    state.agentSpaceAvailable(sameOwnerSpyEntryBase, spaces.researchStation, playerById(sameOwnerSpyEntryBase, "p2")),
+    false,
+    "A player should not spy-enter a location where they already own the Agent",
+  );
+  assert.equal(
+    place(turnActions, sameOwnerSpyEntryBase, spyEntryCard, spaces.researchStation),
+    sameOwnerSpyEntryBase,
+    "Direct placement should reject same-owner occupied spy entry",
+  );
+  const sameCoOwnerSpyEntryBase = {
+    ...researchStationSpyEntryBase,
+    spaces: { [spaces.researchStation.id]: "p3" },
+    agentPlacementOwners: { [spaces.researchStation.id]: "p3" },
+    agentPlacementCoOwners: { [spaces.researchStation.id]: ["p2"] },
+    spyPosts: { "sietch-tabr-research-station": "p2" },
+  };
+  assert.equal(
+    state.agentSpaceAvailable(sameCoOwnerSpyEntryBase, spaces.researchStation, playerById(sameCoOwnerSpyEntryBase, "p2")),
+    false,
+    "A player should not spy-enter a location where they already have a co-located Agent",
+  );
+  assert.equal(
+    place(turnActions, sameCoOwnerSpyEntryBase, spyEntryCard, spaces.researchStation),
+    sameCoOwnerSpyEntryBase,
+    "Direct placement should reject duplicate co-located spy entry",
+  );
+
+  const standaloneSpyEntryBase = {
+    ...playableGame(state, "p4", emperorCard, (player) => ({
+      ...player,
+      spies: 0,
+    })),
+    spaces: { [spaces.vastWealth.id]: "p3" },
+    agentPlacementOwners: { [spaces.vastWealth.id]: "p3" },
+    spyPosts: { [spaces.vastWealth.id]: "p4" },
+    sharedSpyPosts: {},
+  };
+  assert.deepEqual(
+    state.spyEntrySpaceIdsForOccupiedSpace(standaloneSpyEntryBase, spaces.vastWealth.id, "p4"),
+    [spaces.vastWealth.id],
+    "Occupied standalone spy-post spaces should expose their own spy slot for entry",
+  );
+  const standaloneSpyEntry = place(turnActions, standaloneSpyEntryBase, emperorCard, spaces.vastWealth);
+  assert.equal(standaloneSpyEntry.spaces[spaces.vastWealth.id], "p3", "Standalone spy entry should preserve the original Agent");
+  assert.deepEqual(
+    standaloneSpyEntry.agentPlacementCoOwners?.[spaces.vastWealth.id],
+    ["p4"],
+    "Standalone spy entry should record the entering Commander as co-located",
+  );
+  assert.equal(standaloneSpyEntry.spyPosts[spaces.vastWealth.id], undefined, "Standalone spy entry should recall the spy");
+  assert.equal(playerById(standaloneSpyEntry, "p4").spies, 1, "Standalone spy entry should return the spy to supply");
+
+  const occupiedShippingSpyEntryBase = {
+    ...playableGame(state, "p2", spiceCard, (player) => ({
+      ...player,
+      influence: { ...player.influence, spacing: 2, bene: 0 },
+      resources: { ...player.resources, spice: 3, solari: 0 },
+      spies: 0,
+    })),
+    spaces: { [spaces.shipping.id]: "p3" },
+    agentPlacementOwners: { [spaces.shipping.id]: "p3" },
+    spyPosts: { "shipping-accept-contract": "p2" },
+    sharedSpyPosts: {},
+  };
+  const occupiedShippingSpyEntry = turnActions.placeAgentAction(
+    occupiedShippingSpyEntryBase,
+    {
+      commanderTargets: {},
+      selectedCard: spiceCard,
+      selectedSpace: spaces.shipping,
+      spyEntrySpaceId: spaces.shipping.id,
+    },
+  );
+  assert.equal(
+    occupiedShippingSpyEntry.pendingAction?.kind,
+    "board-influence-choice",
+    "Occupied Shipping spy entry should still queue Shipping's board Influence choice",
+  );
+  assert.equal(
+    occupiedShippingSpyEntry.pendingAction?.targetOwnerId,
+    "p2",
+    "Occupied Shipping spy entry should route board Influence to the entering player",
+  );
+  const occupiedShippingInfluenceResolved = state.resolveBoardInfluenceChoice(
+    occupiedShippingSpyEntry,
+    occupiedShippingSpyEntry.pendingAction,
+    "p2",
+    "bene",
+  );
+  assert.notEqual(
+    occupiedShippingInfluenceResolved,
+    occupiedShippingSpyEntry,
+    "Occupied Shipping board Influence should resolve instead of being rejected as same-state",
+  );
+  assert.equal(playerById(occupiedShippingInfluenceResolved, "p2").influence.bene, 1);
+  assert.equal(playerById(occupiedShippingInfluenceResolved, "p3").influence.bene, 0);
+
+  const commanderOccupiedShippingSpyEntryBase = {
+    ...playableGame(state, "p4", spiceCard, (player) => ({
+      ...player,
+      influence: { ...player.influence, emperor: 2, spacing: 2 },
+      resources: { ...player.resources, spice: 3, solari: 0 },
+      spies: 0,
+    })),
+    spaces: { [spaces.shipping.id]: "p3" },
+    agentPlacementOwners: { [spaces.shipping.id]: "p3" },
+    spyPosts: { "shipping-accept-contract": "p4" },
+    sharedSpyPosts: {},
+  };
+  const commanderOccupiedShippingSpyEntry = turnActions.placeAgentAction(
+    commanderOccupiedShippingSpyEntryBase,
+    {
+      commanderTargets: { p4: "p2" },
+      selectedCard: spiceCard,
+      selectedSpace: spaces.shipping,
+      spyEntrySpaceId: spaces.shipping.id,
+    },
+  );
+  assert.deepEqual(
+    commanderOccupiedShippingSpyEntry.agentPlacementCoOwners?.[spaces.shipping.id],
+    ["p4"],
+    "Commander spy entry should track the Commander as co-located placement owner",
+  );
+  assert.deepEqual(
+    commanderOccupiedShippingSpyEntry.agentPlacementCoOwnerTargets?.[spaces.shipping.id],
+    { p4: "p2" },
+    "Commander spy entry should remember the activated Ally Agent piece for later promotion",
+  );
+  const primaryShippingRecallPending = {
+    kind: "recall-agent-from-board",
+    ownerId: "p3",
+    source: "promotion test",
+    spaceIds: [spaces.shipping.id],
+  };
+  const commanderShippingAfterPrimaryRecall = state.resolveBoardAgentRecallChoice(
+    {
+      ...commanderOccupiedShippingSpyEntry,
+      pendingAction: primaryShippingRecallPending,
+      pendingQueue: [],
+    },
+    primaryShippingRecallPending,
+    spaces.shipping.id,
+  );
+  assert.equal(
+    commanderShippingAfterPrimaryRecall.spaces[spaces.shipping.id],
+    "p2",
+    "Promoting a Commander spy-entry Agent should show the activated Ally as the board occupant",
+  );
+  assert.equal(
+    commanderShippingAfterPrimaryRecall.agentPlacementOwners?.[spaces.shipping.id],
+    "p4",
+    "Promoting a Commander spy-entry Agent should keep the Commander as placement owner",
+  );
+  assert.equal(
+    commanderShippingAfterPrimaryRecall.agentPlacementCoOwners?.[spaces.shipping.id],
+    undefined,
+    "Promoted spy-entry Agent should no longer be stored as co-located",
+  );
+  assert.equal(
+    commanderShippingAfterPrimaryRecall.agentPlacementCoOwnerTargets?.[spaces.shipping.id],
+    undefined,
+    "Promoted spy-entry target metadata should be consumed",
+  );
+
+  const standaloneSpyVisitDrawBase = {
+    ...playableGame(state, "p4", emperorCard, (player) => ({
+      ...player,
+      deck: [testCard("standalone-spy-visit-drawn-card", "emperor")],
+      discard: [],
+      spies: 0,
+    })),
+    spyPosts: { [spaces.vastWealth.id]: "p4" },
+    sharedSpyPosts: {},
+  };
+  const standaloneSpyVisitDrawPending = place(turnActions, standaloneSpyVisitDrawBase, emperorCard, spaces.vastWealth);
+  assert.equal(
+    standaloneSpyVisitDrawPending.pendingAction?.kind,
+    "recall-spy",
+    "Visiting a standalone spy-post space with your spy still there should offer a recall",
+  );
+  assert.deepEqual(
+    standaloneSpyVisitDrawPending.pendingAction?.spaceIds,
+    [spaces.vastWealth.id],
+    "Standalone spy visit draw should recall from that standalone space",
+  );
+  assert.equal(standaloneSpyVisitDrawPending.pendingAction?.drawCards, 1);
+
+  const spyVisitDrawBase = {
+    ...playableGame(state, "p2", spyVisitCard, (player) => ({
+      ...player,
+      deck: [testCard("spy-visit-drawn-card", "city")],
+      discard: [],
+      garrison: 0,
+      spies: 0,
+    })),
+    spyPosts: { "high-council-imperial-privilege-swordmaster": "p2" },
+    sharedSpyPosts: {},
+  };
+  const spyVisitDrawPending = place(turnActions, spyVisitDrawBase, spyVisitCard, spaces.highCouncil);
+  assert.equal(spyVisitDrawPending.pendingAction?.kind, "recall-spy", "Visiting a location with your spy still there should offer a recall");
+  assert.deepEqual(
+    spyVisitDrawPending.pendingAction?.spaceIds,
+    [spaces.highCouncil.id],
+    "Spy visit draw should restrict recall choices to the visited location's spy post",
+  );
+  assert.equal(spyVisitDrawPending.pendingAction?.drawCards, 1, "Spy visit recall should draw one normal card");
+  assert.equal(spyVisitDrawPending.pendingAction?.optional, true, "Spy visit recall should be optional");
+  const spyVisitDrawResolved = state.recallSpyForPending(
+    spyVisitDrawPending,
+    spyVisitDrawPending.pendingAction,
+    spaces.highCouncil.id,
+  );
+  assert.equal(
+    spyVisitDrawResolved.spyPosts["high-council-imperial-privilege-swordmaster"],
+    undefined,
+    "Spy visit draw should remove the recalled spy",
+  );
+  assert.equal(playerById(spyVisitDrawResolved, "p2").spies, 1, "Spy visit draw should return the recalled spy to supply");
+  assert.equal(
+    playerById(spyVisitDrawResolved, "p2").hand.some((card) => card.id === "spy-visit-drawn-card"),
+    true,
+    "Spy visit draw should draw one normal card",
+  );
 
   const arrakeenNoControl = place(
     turnActions,
@@ -373,6 +681,39 @@ try {
   assert.equal(controversialTech.pendingAction?.kind, "trash-card", "Controversial Technology should queue mandatory trash");
   assert.equal(controversialTech.pendingAction?.optional, false, "Controversial Technology trash should be mandatory");
   assert.equal(playerById(controversialTech, "p3").intrigues.length, 1, "Controversial Technology should draw 1 Intrigue");
+
+  const controversialTechSpyVisit = place(
+    turnActions,
+    {
+      ...playableGame(state, "p3", fremenCard, (player) => ({
+        ...player,
+        deck: [testCard("controversial-tech-spy-visit-drawn-card", "fremen")],
+        discard: [],
+        resources: { ...player.resources, spice: 2 },
+        spies: 0,
+      })),
+      spyPosts: { "controversial-tech-expedition": "p3" },
+      sharedSpyPosts: {},
+    },
+    fremenCard,
+    spaces.controversialTech,
+  );
+  assert.equal(
+    controversialTechSpyVisit.pendingAction?.kind,
+    "trash-card",
+    "Controversial Technology trash should stay before spy visit draw",
+  );
+  assert.equal(
+    controversialTechSpyVisit.pendingQueue[0]?.kind,
+    "recall-spy",
+    "Spy visit draw should remain queued until after mandatory Controversial Technology trash",
+  );
+  assert.equal(controversialTechSpyVisit.pendingQueue[0]?.drawCards, 1);
+  assert.equal(
+    controversialTechSpyVisit.spyPosts["controversial-tech-expedition"],
+    "p3",
+    "Spy visit draw should not recall the spy before mandatory Controversial Technology trash resolves",
+  );
 
   const trashOnPlayFremenCard = { ...fremenCard, id: "test-fremen-trash-on-play", trashOnPlay: true };
   const controversialTechNoTrashables = place(

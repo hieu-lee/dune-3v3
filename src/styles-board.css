@@ -39,14 +39,14 @@
   isolation: isolate;
   position: relative;
   display: grid;
-  grid-template-columns: minmax(128px, 0.46fr) minmax(0, 2.7fr);
-  gap: 10px;
-  min-width: 690px;
+  grid-template-columns: minmax(164px, 0.46fr) minmax(0, 2.9fr);
+  gap: 18px;
+  min-width: 960px;
   border: 1px solid rgba(255, 246, 230, 0.16);
   border-radius: 8px;
   background: #161411;
   overflow: hidden;
-  padding: 10px;
+  padding: 14px;
 }
 
 .board-stage::before,
@@ -68,6 +68,155 @@
   background:
     linear-gradient(90deg, rgba(18, 15, 13, 0.74), rgba(21, 17, 14, 0.38) 34%, rgba(18, 15, 13, 0.78)),
     linear-gradient(180deg, rgba(18, 15, 13, 0.18), rgba(18, 15, 13, 0.66));
+}
+
+.spy-network {
+  position: absolute;
+  inset: 0;
+  z-index: 18;
+  pointer-events: none;
+}
+
+.spy-network-lines {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.spy-network-lines line {
+  stroke: rgba(255, 255, 255, 0.62);
+  stroke-dasharray: none;
+  stroke-linecap: round;
+  stroke-width: 2;
+  opacity: 0.52;
+  filter:
+    drop-shadow(0 1px 3px rgba(0, 0, 0, 0.62))
+    drop-shadow(0 0 4px rgba(255, 255, 255, 0.18));
+}
+
+.spy-network-lines line.is-legal {
+  stroke: rgba(255, 255, 255, 0.96);
+  stroke-width: 3;
+  opacity: 1;
+}
+
+.spy-network.is-active .spy-network-lines line:not(.is-legal) {
+  opacity: 0.18;
+}
+
+.spy-slot-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.spy-network-slot {
+  --spy-slot-size: 22px;
+  position: absolute;
+  left: var(--spy-slot-x);
+  top: var(--spy-slot-y);
+  width: var(--spy-slot-size);
+  height: var(--spy-slot-size);
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  cursor: default;
+  padding: 0;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+.spy-network-slot-ring {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 2px solid rgba(255, 255, 255, 0.78);
+  border-radius: inherit;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.22) 0 36%, rgba(8, 7, 6, 0.9) 42% 100%);
+  box-shadow:
+    0 0 0 2px rgba(8, 7, 6, 0.72),
+    0 0 0 4px rgba(255, 255, 255, 0.08),
+    0 6px 16px rgba(0, 0, 0, 0.36);
+}
+
+.spy-network-slot.is-occupied .spy-network-slot-ring {
+  border-color: rgba(255, 255, 255, 0.88);
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.28) 0 36%, rgba(8, 7, 6, 0.9) 42% 100%);
+}
+
+.spy-network-slot.is-legal {
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.spy-network-slot.is-legal .spy-network-slot-ring {
+  border-color: #fff;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.82) 0 32%, rgba(20, 18, 16, 0.96) 40% 100%);
+  box-shadow:
+    0 0 0 3px rgba(8, 7, 6, 0.74),
+    0 0 0 5px rgba(255, 255, 255, 0.2),
+    0 9px 22px rgba(0, 0, 0, 0.44);
+}
+
+.spy-network-slot.is-placeable .spy-network-slot-ring {
+  border-color: #fff;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.82) 0 32%, rgba(20, 18, 16, 0.96) 40% 100%);
+  box-shadow:
+    0 0 0 3px rgba(8, 7, 6, 0.74),
+    0 0 0 5px rgba(255, 255, 255, 0.2),
+    0 9px 22px rgba(0, 0, 0, 0.44);
+}
+
+.spy-network-slot.is-recallable .spy-network-slot-ring,
+.spy-network-slot.is-agent-entry .spy-network-slot-ring,
+.spy-network-slot.is-supply-recall .spy-network-slot-ring,
+.spy-network-slot.is-conflict-recall .spy-network-slot-ring {
+  border-color: #fff;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.82) 0 32%, rgba(20, 18, 16, 0.96) 40% 100%);
+  box-shadow:
+    0 0 0 3px rgba(8, 7, 6, 0.74),
+    0 0 0 5px rgba(255, 255, 255, 0.2),
+    0 9px 22px rgba(0, 0, 0, 0.44);
+}
+
+.spy-network-slot.is-legal:hover .spy-network-slot-ring,
+.spy-network-slot.is-legal:focus-visible .spy-network-slot-ring,
+.spy-network-slot.is-selected .spy-network-slot-ring {
+  outline: 2px solid #fff6e6;
+  outline-offset: 2px;
+  transform: scale(1.14);
+}
+
+.spy-network-slot-owners {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  max-width: 34px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 246, 230, 0.38);
+  border-radius: 999px;
+  background: rgba(8, 7, 6, 0.82);
+  padding: 2px;
+}
+
+.spy-network-slot-owner {
+  --spy-owner-color: #f2b84b;
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--spy-owner-color);
+  box-shadow: 0 0 0 1px rgba(255, 246, 230, 0.24);
 }
 
 .board-faction-rail,
@@ -97,41 +246,41 @@
 .board-faction-rail {
   align-content: start;
   grid-template-rows: repeat(4, auto);
-  gap: 8px;
+  gap: 18px;
 }
 
 .board-map {
   grid-template-rows: auto auto auto;
-  gap: 10px;
+  gap: 18px;
 }
 
 .board-top-band {
   display: grid;
-  grid-template-columns: minmax(0, 1.58fr) minmax(126px, 0.42fr);
-  gap: 8px;
+  grid-template-columns: minmax(0, 1.58fr) minmax(158px, 0.42fr);
+  gap: 18px;
 }
 
 .board-center-band {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto auto auto;
-  gap: 8px;
+  gap: 18px;
 }
 
 .board-commander-dock {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: 18px;
 }
 
 .board-region {
   --region-color: #c8a766;
   position: relative;
   align-content: start;
-  gap: 6px;
+  gap: 10px;
   z-index: 0;
   border-radius: 8px;
-  padding: 7px;
+  padding: 10px;
 }
 
 .board-region:has(.space-tile:hover),
@@ -360,7 +509,7 @@
 }
 
 .board-region-spaces {
-  gap: 6px;
+  gap: 24px;
   align-items: stretch;
   grid-auto-rows: minmax(128px, 1fr);
 }
@@ -378,6 +527,10 @@
 [data-region-id="desert"] .board-region-spaces,
 .board-region--commander .board-region-spaces {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+[data-region-id="landsraad"] .board-region-spaces {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 [data-region-id="cities"] {
@@ -399,8 +552,54 @@
 }
 
 .space-tile[data-space-id="high-council"] {
-  grid-column: span 2;
+  grid-column: 1 / span 2;
+  grid-row: 1;
   min-height: 112px;
+}
+
+.space-tile[data-space-id="imperial-privilege"] {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.space-tile[data-space-id="assembly-hall"] {
+  grid-column: 3;
+  grid-row: 1;
+}
+
+.space-tile[data-space-id="swordmaster"] {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.space-tile[data-space-id="gather-support"] {
+  grid-column: 3;
+  grid-row: 2;
+}
+
+.space-tile[data-space-id="carthag"] {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.space-tile[data-space-id="spice-refinery"] {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.space-tile[data-space-id="arrakeen"] {
+  grid-column: 3;
+  grid-row: 1;
+}
+
+.space-tile[data-space-id="sietch-tabr"] {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.space-tile[data-space-id="research-station"] {
+  grid-column: 2;
+  grid-row: 2;
 }
 
 .board-region--fallback {
@@ -707,6 +906,10 @@
     0 2px 5px rgba(0, 0, 0, 0.28);
 }
 
+.agent-marker--co-located {
+  border-style: dashed;
+}
+
 .space-tile:disabled {
   cursor: default;
 }
@@ -919,7 +1122,7 @@
 
   [data-region-id="landsraad"] .board-region-spaces,
   [data-region-id="cities"] .board-region-spaces {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
@@ -945,20 +1148,29 @@
   }
 
   .board-stage {
-    gap: 8px;
+    grid-template-columns: minmax(164px, 0.46fr) minmax(0, 2.9fr);
+    gap: 18px;
+    min-width: 960px;
     min-height: 0;
-    padding: 8px;
+    padding: 14px;
   }
 
-  .board-faction-rail,
-  .board-top-band,
-  .board-center-band,
-  .board-commander-dock {
-    grid-template-columns: 1fr;
+  .board-faction-rail {
+    grid-template-columns: none;
+    grid-template-rows: repeat(4, auto);
+  }
+
+  .board-top-band {
+    grid-template-columns: minmax(0, 1.58fr) minmax(158px, 0.42fr);
   }
 
   .board-center-band {
-    grid-template-rows: none;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
+  }
+
+  .board-commander-dock {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   [data-region-id="cities"],
@@ -972,18 +1184,32 @@
     padding: 6px;
   }
 
+  .board-region-spaces {
+    gap: 24px;
+  }
+
   .board-region--faction .board-region-spaces,
+  [data-region-id="choam"] .board-region-spaces {
+    grid-template-columns: 1fr;
+  }
+
   [data-region-id="landsraad"] .board-region-spaces,
-  [data-region-id="choam"] .board-region-spaces,
-  [data-region-id="cities"] .board-region-spaces,
+  [data-region-id="cities"] .board-region-spaces {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   [data-region-id="desert"] .board-region-spaces,
-  .board-region--commander .board-region-spaces,
   .board-region--fallback .board-region-spaces {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .board-region--commander .board-region-spaces {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .space-tile[data-space-id="high-council"] {
-    grid-column: span 2;
+    grid-column: 1 / span 2;
+    grid-row: 1;
   }
 
   .board-conflict-field {
@@ -999,7 +1225,7 @@
   }
 
   .space-tile {
-    min-height: 106px;
+    min-height: 120px;
   }
 
   .space-tile strong {
@@ -1026,17 +1252,7 @@
 }
 
 @media (max-width: 430px) {
-  .board-region--faction .board-region-spaces,
-  [data-region-id="landsraad"] .board-region-spaces,
-  [data-region-id="choam"] .board-region-spaces,
-  [data-region-id="cities"] .board-region-spaces,
-  [data-region-id="desert"] .board-region-spaces,
-  .board-region--commander .board-region-spaces,
-  .board-region--fallback .board-region-spaces {
-    grid-template-columns: 1fr;
-  }
-
-  .space-tile[data-space-id="high-council"] {
-    grid-column: 1;
+  .board-stage {
+    min-width: 960px;
   }
 }

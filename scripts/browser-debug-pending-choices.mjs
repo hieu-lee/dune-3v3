@@ -22,11 +22,16 @@ export async function runPendingChoicesSmoke({
   assert.match(pendingText, /recall spy/i);
   assert.match(pendingText, /Arrakeen/i);
   assert.match(pendingText, /Imperial Basin/i);
+  assert.equal(await page.locator(".board-panel .spy-network-slot").count(), 19, "Board should render all spy post slots");
+  assert.equal(await page.locator(".board-panel .spy-network-lines line").count(), 30, "Board should render spy post connection edges");
+  assert.equal(await page.locator(".board-panel .spy-network-slot.is-legal").count(), 2, "Recall spy pending should make owned board slots actionable");
   await screenshot(page, captures, "pending-recall-spy.png");
 
   const recallBefore = await currentGame(page);
   const recallOwnerBefore = recallBefore.players.find((player) => player.id === "p2");
-  await page.locator(".pending-panel").getByRole("button", { name: "Arrakeen" }).click();
+  const arrakeenRecallSlot = page.locator('.board-panel .spy-network-slot.is-legal[data-spy-space-id="arrakeen"]');
+  assert.equal(await arrakeenRecallSlot.count(), 1, "Arrakeen board spy slot should be actionable for recall");
+  await arrakeenRecallSlot.click();
   await waitForNoPending(page);
   const recallAfter = await currentGame(page);
   const recallOwnerAfter = recallAfter.players.find((player) => player.id === "p2");
@@ -41,6 +46,8 @@ export async function runPendingChoicesSmoke({
   const firstCoverageText = await page.locator(".pending-panel .spy-choice-coverage").first().innerText();
   assert.match(firstCoverageText, /Military Support/i);
   assert.match(firstCoverageText, /Economic Support/i);
+  assert.equal(await page.locator(".board-panel .spy-network-slot").count(), 19, "Board should render all spy post slots during placement");
+  assert.equal(await page.locator(".board-panel .spy-network-slot.is-legal").count(), 15, "Spy placement should make every legal Ally board slot actionable");
   await screenshot(page, captures, "pending-place-spy.png");
   const spyPlacementMobileViewport = { width: 390, height: 900 };
   await page.setViewportSize(spyPlacementMobileViewport);
@@ -51,6 +58,22 @@ export async function runPendingChoicesSmoke({
   );
   await screenshot(page, captures, "pending-place-spy-mobile-390.png");
   await page.setViewportSize({ width: 1440, height: 1100 });
+
+  await setDebugGameAndWait(page, pendingChoiceStates.placeSpy);
+  const boardSpyBefore = await currentGame(page);
+  const boardSpyOwnerBefore = boardSpyBefore.players.find((player) => player.id === "p2");
+  const researchStationSpySlot = page.locator('.board-panel .spy-network-slot.is-legal[data-spy-space-id="research-station"]');
+  assert.equal(await researchStationSpySlot.count(), 1, "Research Station / Spice Refinery board spy slot should be actionable");
+  await researchStationSpySlot.click();
+  await waitForNoPending(page);
+  const boardSpyAfter = await currentGame(page);
+  const boardSpyOwnerAfter = boardSpyAfter.players.find((player) => player.id === "p2");
+  assert.equal(
+    boardSpyAfter.spyPosts["research-station-spice-refinery"],
+    "p2",
+    "Clicking a board spy slot should place the spy on that observation post",
+  );
+  assert.equal(boardSpyOwnerAfter.spies, boardSpyOwnerBefore.spies - 1, "Board spy placement should spend one supply spy");
 
   await setDebugGameAndWait(page, pendingChoiceStates.loseInfluence);
   pendingText = await page.locator(".pending-panel").innerText();

@@ -9,6 +9,7 @@ import * as gameRules from "../game/state";
 import {
   acquireMarketCard,
   advanceSeat,
+  agentSpaceAvailable,
   canMoveCardToThroneRow,
   canPay,
   effectiveCost,
@@ -156,6 +157,7 @@ export type RoomActionCommand =
       kind: "place-agent";
       cardId: string;
       spaceId: string;
+      spyEntrySpaceId?: string;
       commanderTargets?: Record<string, string>;
     }
   | {
@@ -285,7 +287,14 @@ function applyPlaceAgent(state: GameState, playerId: string, command: Extract<Ro
   if (!selectedCard) throw new RoomActionError(404, "Card is not in the active player's hand");
   const selectedSpace = boardSpaces.find((space) => space.id === command.spaceId);
   if (!selectedSpace) throw new RoomActionError(404, "Board space not found");
-  if (state.spaces[selectedSpace.id]) throw new RoomActionError(409, "Board space is occupied");
+  if (!agentSpaceAvailable(state, selectedSpace, player)) throw new RoomActionError(409, "Board space is occupied");
+  const spyEntrySpaceIds = state.spaces[selectedSpace.id]
+    ? gameRules.spyEntrySpaceIdsForOccupiedSpace(state, selectedSpace.id, player.id)
+    : [];
+  const spyEntrySpaceId = command.spyEntrySpaceId ?? (spyEntrySpaceIds.length === 1 ? spyEntrySpaceIds[0] : undefined);
+  if (spyEntrySpaceIds.length > 0 && (!spyEntrySpaceId || !spyEntrySpaceIds.includes(spyEntrySpaceId))) {
+    throw new RoomActionError(409, "Choose a spy post to enter that occupied space");
+  }
   if (!iconCanReach(selectedCard, selectedSpace, player, state.swordmasterClaimed, state.spyPosts, state.players, state.sharedSpyPosts)) {
     throw new RoomActionError(409, "Selected card cannot reach that board space");
   }
@@ -297,6 +306,7 @@ function applyPlaceAgent(state: GameState, playerId: string, command: Extract<Ro
     commanderTargets: commanderTargetsFor(player, state.players, command.commanderTargets),
     selectedCard,
     selectedSpace,
+    spyEntrySpaceId,
   });
   return nextState === state ? sameStateError() : nextState;
 }

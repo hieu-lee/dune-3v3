@@ -55,13 +55,16 @@ export function selectedFactionChoice(selected: FactionId | undefined, choices: 
   return selected && choices.includes(selected) ? selected : choices[0];
 }
 
-export function boardSpaceRevealPersuasionFor(player: Player, state?: Pick<GameState, "agentPlacementOwners" | "spaces">) {
+export function boardSpaceRevealPersuasionFor(player: Player, state?: Pick<GameState, "agentPlacementCoOwners" | "agentPlacementOwners" | "spaces">) {
   if (!state) return 0;
   return boardSpaces.reduce(
     (total, space) => {
       const revealPersuasion = space.revealPersuasion ?? 0;
       if (revealPersuasion <= 0 || !state.spaces[space.id]) return total;
-      return state.agentPlacementOwners?.[space.id] === player.id ? total + revealPersuasion : total;
+      return state.agentPlacementOwners?.[space.id] === player.id ||
+        state.agentPlacementCoOwners?.[space.id]?.includes(player.id)
+        ? total + revealPersuasion
+        : total;
     },
     0,
   );
@@ -69,7 +72,7 @@ export function boardSpaceRevealPersuasionFor(player: Player, state?: Pick<GameS
 
 export function revealPersuasionFor(
   player: Player,
-  state?: Pick<GameState, "agentPlacementOwners" | "roundMakerSpaceVisits" | "sharedSpyPosts" | "spaces" | "spyPosts">,
+  state?: Pick<GameState, "agentPlacementCoOwners" | "agentPlacementOwners" | "roundMakerSpaceVisits" | "sharedSpyPosts" | "spaces" | "spyPosts">,
 ) {
   const highCouncilPersuasion = player.highCouncilSeat ? 2 : 0;
   return resolveCardRevealEffects(player.hand, player, state).persuasion +

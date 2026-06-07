@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActiveHandPanel } from "./components/ActiveHandPanel";
-import { BoardPanel } from "./components/BoardPanel";
+import { BoardPanel, type BoardSpySlotChoices } from "./components/BoardPanel";
 import { CommandBar } from "./components/CommandBar";
 import { CombatIntriguePanel } from "./components/CombatIntriguePanel";
 import { EndgamePanel } from "./components/EndgamePanel";
@@ -30,7 +30,9 @@ import { boardSpaces } from "./game/data";
 import {
   advanceSeat,
   acquireMarketCard,
+  agentSpaceAvailable,
   canPay,
+  conflictVpConversionSpyChoices,
   endgameBattleIconChoices,
   endgameConditionalIntrigueChoices,
   effectiveCost,
@@ -41,11 +43,15 @@ import {
   manipulateAcquisitionCost,
   maybeStartCombatPhase,
   passCombatIntrigue,
+  placeableSpySpaces,
   playCombatIntrigue,
+  recallableSpySpaces,
+  recallableSpySupplySpaces,
   scoreEndgameBattleIconIntrigue,
   scoreEndgameConditionalIntrigue,
   setMakerHooks,
   setShieldWall,
+  spyEntrySpaceIdsForOccupiedSpace,
 } from "./game/state";
 import type {
   Card,
@@ -70,12 +76,12 @@ declare global {
   interface Window {
     __DUNE_DEBUG__?: {
       capture: (label?: string) => Promise<unknown>;
-	      getCommanderTargets: () => Record<string, string>;
-	      getGame: () => GameState;
-	      getRoomSnapshot: () => RoomSnapshot | null;
-	      getRoomSyncMode: () => "events" | "poll";
-	      setGame: (game: GameState) => void;
-	      setCommanderTarget: (commanderId: string, allyId: string) => void;
+      getCommanderTargets: () => Record<string, string>;
+      getGame: () => GameState;
+      getRoomSnapshot: () => RoomSnapshot | null;
+      getRoomSyncMode: () => "events" | "poll";
+      setGame: (game: GameState) => void;
+      setCommanderTarget: (commanderId: string, allyId: string) => void;
     };
     __DUNE_DEBUG_CAPTURE__?: (request: { label?: string; game: GameState }) => Promise<unknown>;
   }
@@ -89,6 +95,7 @@ export default function App() {
   const [game, setGame] = useState<GameState>(() => initialGame());
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [selectedSpaceId, setSelectedSpaceId] = useState<string | null>(null);
+  const [selectedSpyEntrySpaceId, setSelectedSpyEntrySpaceId] = useState<string | null>(null);
   const [selectedLeaderId, setSelectedLeaderId] = useState<string | null>(null);
   const [commanderTargets, setCommanderTargets] = useState<Record<string, string>>({});
   const [changeAllegiancesSelections, setChangeAllegiancesSelections] = useState<Record<string, ChangeAllegiancesSelection>>({});
@@ -115,20 +122,20 @@ export default function App() {
       void window.__DUNE_DEBUG__?.capture("hotkey");
     }
     window.__DUNE_DEBUG__ = {
-	      capture,
-	      getCommanderTargets: () => commanderTargets,
-	      getGame: () => game,
-	      getRoomSnapshot: () => roomSession.snapshot,
-	      getRoomSyncMode: () => roomSession.syncMode,
-	      setCommanderTarget: (commanderId, allyId) => setCommanderTargets((current) => ({ ...current, [commanderId]: allyId })),
-	      setGame: (nextGame) => setGame(nextGame),
-	    };
+      capture,
+      getCommanderTargets: () => commanderTargets,
+      getGame: () => game,
+      getRoomSnapshot: () => roomSession.snapshot,
+      getRoomSyncMode: () => roomSession.syncMode,
+      setCommanderTarget: (commanderId, allyId) => setCommanderTargets((current) => ({ ...current, [commanderId]: allyId })),
+      setGame: (nextGame) => setGame(nextGame),
+    };
     window.addEventListener("keydown", handleDebugCaptureKeydown);
     return () => {
       window.removeEventListener("keydown", handleDebugCaptureKeydown);
       delete window.__DUNE_DEBUG__;
     };
-	  }, [commanderTargets, game, roomSession.snapshot, roomSession.syncMode]);
+  }, [commanderTargets, game, roomSession.snapshot, roomSession.syncMode]);
 
   useEffect(() => {
     if (!roomSession.snapshot) {
@@ -137,6 +144,7 @@ export default function App() {
         setGame(localGameRef.current ?? initialGame());
         setSelectedCardId(null);
         setSelectedSpaceId(null);
+        setSelectedSpyEntrySpaceId(null);
       }
       return;
     }
@@ -147,6 +155,7 @@ export default function App() {
     setGame(roomSession.snapshot.game);
     setSelectedCardId(null);
     setSelectedSpaceId(null);
+    setSelectedSpyEntrySpaceId(null);
   }, [roomSession.inRoom, roomSession.snapshot]);
 
   const activePlayer = game.players[game.activeSeat];
@@ -177,14 +186,25 @@ export default function App() {
     if (!canControlActivePlayer || game.phase !== "playing" || game.agentTurnComplete || !selectedCard || activePlayer.agentsReady <= 0 || game.pendingAction) return new Set<string>();
     return new Set(
       boardSpaces
-        .filter((space) => !game.spaces[space.id])
+        .filter((space) => agentSpaceAvailable(game, space, activePlayer))
         .filter((space) => iconCanReach(selectedCard, space, activePlayer, game.swordmasterClaimed, game.spyPosts, game.players, game.sharedSpyPosts))
         .filter((space) => canPay(activePlayer, effectiveCost(space, game.players)))
         .map((space) => space.id),
     );
   }, [activePlayer, canControlActivePlayer, game.agentTurnComplete, game.pendingAction, game.phase, game.players, game.sharedSpyPosts, game.spaces, game.spyPosts, game.swordmasterClaimed, selectedCard]);
 
-  const canPlayAgent = Boolean(canControlActivePlayer && game.phase === "playing" && !game.agentTurnComplete && selectedCard && selectedSpace && legalSpaces.has(selectedSpace.id) && !game.pendingAction);
+  const spyEntrySpaceIds = useMemo(() => {
+    if (!selectedSpace || !game.spaces[selectedSpace.id]) return [];
+    return spyEntrySpaceIdsForOccupiedSpace(game, selectedSpace.id, activePlayer.id);
+  }, [activePlayer.id, game, selectedSpace]);
+  const activeSpyEntrySpaceId = spyEntrySpaceIds.length === 1
+    ? spyEntrySpaceIds[0]
+    : selectedSpyEntrySpaceId && spyEntrySpaceIds.includes(selectedSpyEntrySpaceId)
+      ? selectedSpyEntrySpaceId
+      : undefined;
+  const spyEntryChoiceReady = spyEntrySpaceIds.length === 0 || Boolean(activeSpyEntrySpaceId);
+
+  const canPlayAgent = Boolean(canControlActivePlayer && game.phase === "playing" && !game.agentTurnComplete && selectedCard && selectedSpace && legalSpaces.has(selectedSpace.id) && spyEntryChoiceReady && !game.pendingAction);
 
   function playAgent() {
     if (game.phase !== "playing" || !canPlayAgent || !selectedCard || !selectedSpace) return;
@@ -193,17 +213,20 @@ export default function App() {
         kind: "place-agent",
         cardId: selectedCard.id,
         spaceId: selectedSpace.id,
+        ...(activeSpyEntrySpaceId ? { spyEntrySpaceId: activeSpyEntrySpaceId } : {}),
         commanderTargets,
       }).then((applied) => {
         if (!applied) return;
         setSelectedCardId(null);
         setSelectedSpaceId(null);
+        setSelectedSpyEntrySpaceId(null);
       });
       return;
     }
-    setGame((current) => placeAgentAction(current, { commanderTargets, selectedCard, selectedSpace }));
+    setGame((current) => placeAgentAction(current, { commanderTargets, selectedCard, selectedSpace, spyEntrySpaceId: activeSpyEntrySpaceId }));
     setSelectedCardId(null);
     setSelectedSpaceId(null);
+    setSelectedSpyEntrySpaceId(null);
   }
 
   function endAgentTurn() {
@@ -397,6 +420,51 @@ export default function App() {
     setGame,
   });
   const roomPendingActionHandlers = createRoomPendingActionHandlers(roomSession.sendAction);
+  const boardSpySlotChoices = useMemo<BoardSpySlotChoices | undefined>(() => {
+    const pending = game.pendingAction;
+    if (!pending && placementDecisionActive && spyEntrySpaceIds.length > 0) {
+      return {
+        mode: "agent-entry",
+        legalSpaceIds: new Set(spyEntrySpaceIds),
+        selectedSpaceId: activeSpyEntrySpaceId,
+      };
+    }
+    if (!pending || (roomSession.inRoom && !canResolveRoomPending)) return undefined;
+    if (pending.kind === "spy") {
+      const placementSpaces = placeableSpySpaces(game, pending);
+      if (placementSpaces.length > 0) {
+        return {
+          mode: "place",
+          legalSpaceIds: new Set(placementSpaces.map((space) => space.id)),
+        };
+      }
+      const supplyRecallSpaces = recallableSpySupplySpaces(game, pending);
+      if (supplyRecallSpaces.length > 0) {
+        return {
+          mode: "supply-recall",
+          legalSpaceIds: new Set(supplyRecallSpaces.map((space) => space.id)),
+        };
+      }
+      return undefined;
+    }
+    if (pending.kind === "recall-spy") {
+      const recallSpaces = recallableSpySpaces(game, pending);
+      if (recallSpaces.length === 0) return undefined;
+      return {
+        mode: "recall",
+        legalSpaceIds: new Set(recallSpaces.map((space) => space.id)),
+      };
+    }
+    if (pending.kind === "conflict-vp-conversion") {
+      const recallSpaces = conflictVpConversionSpyChoices(game, pending);
+      if (recallSpaces.length === 0) return undefined;
+      return {
+        mode: "conflict-recall",
+        legalSpaceIds: new Set(recallSpaces.map((space) => space.id)),
+      };
+    }
+    return undefined;
+  }, [activeSpyEntrySpaceId, canResolveRoomPending, game, placementDecisionActive, roomSession.inRoom, spyEntrySpaceIds]);
   const plotActionHandlers = createPlotActionHandlers({
     commanderTargets,
     setChangeAllegiancesSelections,
@@ -407,6 +475,35 @@ export default function App() {
     commanderTargets,
     setChangeAllegiancesSelections,
   );
+  const selectBoardSpySlot = (spaceId: string) => {
+    if (!boardSpySlotChoices) return;
+    if (boardSpySlotChoices.mode === "agent-entry") {
+      setSelectedSpyEntrySpaceId(spaceId);
+      return;
+    }
+    const handlers = roomSession.inRoom ? roomPendingActionHandlers : pendingActionHandlers;
+    if (boardSpySlotChoices.mode === "place") {
+      handlers.placeSpy(spaceId);
+      return;
+    }
+    if (boardSpySlotChoices.mode === "supply-recall") {
+      handlers.recallSpyForSupply(spaceId);
+      return;
+    }
+    if (boardSpySlotChoices.mode === "conflict-recall") {
+      handlers.recallConflictRewardSpy(spaceId);
+      return;
+    }
+    handlers.recallSpy(spaceId);
+  };
+  const selectBoardSpace = (spaceId: string) => {
+    setSelectedSpaceId(spaceId);
+    setSelectedSpyEntrySpaceId(null);
+  };
+  const selectHandCard = (cardId: string | null) => {
+    setSelectedCardId(cardId);
+    setSelectedSpyEntrySpaceId(null);
+  };
 
   return (
     <main className="app-shell">
@@ -459,7 +556,9 @@ export default function App() {
           placementDecisionActive={placementDecisionActive}
           playingPhase={playingPhase && !roomActionLocked}
           selectedSpaceId={selectedSpaceId}
-          onSelectSpace={setSelectedSpaceId}
+          spySlotChoices={boardSpySlotChoices}
+          onSelectSpace={selectBoardSpace}
+          onSelectSpySlot={selectBoardSpySlot}
         />
 
         <PlayerColumn
@@ -520,7 +619,7 @@ export default function App() {
           onEndReveal={endReveal}
           onPlaceAgent={playAgent}
           onRevealTurn={revealTurn}
-          onSelectCard={setSelectedCardId}
+          onSelectCard={selectHandCard}
           onSelectCommanderTarget={(commanderId, allyId) =>
             setCommanderTargets((current) => ({
               ...current,

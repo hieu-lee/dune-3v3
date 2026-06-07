@@ -61,6 +61,8 @@ export function initialGame(): GameState {
     players,
     spaces: {},
     agentPlacementOwners: {},
+    agentPlacementCoOwners: {},
+    agentPlacementCoOwnerTargets: {},
     spyPosts: {},
     sharedSpyPosts: {},
     alliances: {},

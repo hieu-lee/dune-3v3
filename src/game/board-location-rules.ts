@@ -83,7 +83,7 @@ function boardInfluenceChoiceMatchesCurrentBoardSpace(
   const source = state.players[state.activeSeat];
   const space = boardSpaces.find((candidate) => candidate.id === pending.spaceId);
   const placedTargetOwnerId = space ? state.spaces[space.id] : undefined;
-  const targetOwnerId = placedTargetOwnerId ?? pending.targetOwnerId;
+  const targetOwnerId = pending.targetOwnerId ?? placedTargetOwnerId;
   const target = targetOwnerId ? state.players.find((player) => player.id === targetOwnerId) : undefined;
   if (!source || !space || !target) return false;
   if (pending.targetOwnerId !== undefined && pending.targetOwnerId !== target.id) return false;

@@ -397,8 +397,44 @@ export function resolveBoardAgentRecallChoice(
   if (!boardAgentRecallSpaceIds(state, pending).includes(spaceId)) return state;
   const owner = state.players.find((player) => player.id === pending.ownerId);
   if (!owner) return state;
-  const { [spaceId]: _recalledOccupant, ...spaces } = state.spaces;
-  const { [spaceId]: _recalledOwner, ...agentPlacementOwners } = state.agentPlacementOwners ?? {};
+  const coOwners = state.agentPlacementCoOwners?.[spaceId] ?? [];
+  const remainingCoOwners = coOwners.filter((ownerId) => ownerId !== owner.id);
+  const ownerIsPrimary = state.agentPlacementOwners?.[spaceId] === owner.id;
+  const ownerIsCoLocated = coOwners.includes(owner.id);
+  const promotedOwnerId = ownerIsCoLocated && !ownerIsPrimary ? undefined : remainingCoOwners[0];
+  const promotedPlacement = promotedOwnerId
+    ? {
+        occupantId: state.agentPlacementCoOwnerTargets?.[spaceId]?.[promotedOwnerId] ?? promotedOwnerId,
+        ownerId: promotedOwnerId,
+      }
+    : undefined;
+  const spaces = ownerIsCoLocated && !ownerIsPrimary
+    ? state.spaces
+    : promotedPlacement
+      ? { ...state.spaces, [spaceId]: promotedPlacement.occupantId }
+      : (({ [spaceId]: _recalledOccupant, ...remainingSpaces }) => remainingSpaces)(state.spaces);
+  const agentPlacementOwners = ownerIsCoLocated && !ownerIsPrimary
+    ? state.agentPlacementOwners ?? {}
+    : promotedPlacement
+      ? { ...(state.agentPlacementOwners ?? {}), [spaceId]: promotedPlacement.ownerId }
+      : (({ [spaceId]: _recalledOwner, ...remainingOwners }) => remainingOwners)(state.agentPlacementOwners ?? {});
+  const agentPlacementCoOwners = remainingCoOwners.length > (ownerIsPrimary ? 1 : 0)
+    ? {
+        ...(state.agentPlacementCoOwners ?? {}),
+        [spaceId]: ownerIsPrimary ? remainingCoOwners.slice(1) : remainingCoOwners,
+      }
+    : (({ [spaceId]: _removedCoOwners, ...remainingOwners }) => remainingOwners)(state.agentPlacementCoOwners ?? {});
+  const currentCoOwnerTargets = state.agentPlacementCoOwnerTargets?.[spaceId] ?? {};
+  const nextCoOwnerTargets = Object.fromEntries(
+    Object.entries(currentCoOwnerTargets).filter(([ownerId]) =>
+      ownerId !== owner.id &&
+      ownerId !== promotedPlacement?.ownerId &&
+      (agentPlacementCoOwners[spaceId] ?? []).includes(ownerId)
+    ),
+  );
+  const agentPlacementCoOwnerTargets = Object.keys(nextCoOwnerTargets).length > 0
+    ? { ...(state.agentPlacementCoOwnerTargets ?? {}), [spaceId]: nextCoOwnerTargets }
+    : (({ [spaceId]: _removedCoOwnerTargets, ...remainingTargets }) => remainingTargets)(state.agentPlacementCoOwnerTargets ?? {});
   const recalledSpaceName = boardSpaces.find((space) => space.id === spaceId)?.name ??
     criticalLocationNames[spaceId as keyof typeof criticalLocationNames] ??
     spaceId;
@@ -411,6 +447,8 @@ export function resolveBoardAgentRecallChoice(
     ),
     spaces,
     agentPlacementOwners,
+    agentPlacementCoOwners,
+    agentPlacementCoOwnerTargets,
     ...advancePendingAction(state),
     log: [
       `${owner.leader} recalls an Agent from ${recalledSpaceName} for ${pending.source}.`,

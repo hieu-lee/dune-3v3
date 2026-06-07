@@ -12,7 +12,9 @@ type RecallSpyPendingAction = Extract<PendingAction, { kind: "recall-spy" }>;
 type SpyPendingAction = Extract<PendingAction, { kind: "spy" }>;
 
 export function recallableSpySpaces(state: GameState, pending: RecallSpyPendingAction) {
+  const allowedSpaceIds = pending.spaceIds ? new Set(pending.spaceIds) : undefined;
   return uniqueSpyPostSpaces(spyObservationPostChoiceSpaces().filter((space) =>
+    (!allowedSpaceIds || allowedSpaceIds.has(space.id)) &&
     spyObservationPostOwnerIds(state, space.id).includes(pending.ownerId)
   ));
 }

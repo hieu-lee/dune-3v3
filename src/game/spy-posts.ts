@@ -183,6 +183,21 @@ export function spyPostRecallCountForOwner(
   }, 0);
 }
 
+export function spyObservationPostChoiceSpaceIdsForObservedSpace(spaceId: string) {
+  const posts = observationPostsByObservedSpaceId.get(spaceId) ?? [];
+  return posts.length > 0 ? posts.map(spyObservationPostRepresentativeSpaceId) : [spaceId];
+}
+
+export function spyEntrySpaceIdsForOccupiedSpace(
+  state: SpyPostState,
+  spaceId: string,
+  ownerId: string,
+) {
+  return spyObservationPostChoiceSpaceIdsForObservedSpace(spaceId).filter((choiceSpaceId) =>
+    spyObservationPostOwnerIds(state, choiceSpaceId).includes(ownerId)
+  );
+}
+
 export function normalizeSpyObservationPosts(state: GameState): GameState {
   const spyPosts = { ...state.spyPosts };
   const sharedSpyPosts = { ...state.sharedSpyPosts };
@@ -272,6 +287,53 @@ export function removeSpyPostOwner(
     }
   }
   return { spyPosts, sharedSpyPosts, removedSpyCount };
+}
+
+export function removeSpyPostOwnerFromObservedSpace(
+  state: SpyPostState,
+  spaceId: string,
+  ownerId: string,
+  preferredSpaceId?: string,
+) {
+  const defaultPost = spyObservationPostForSpace(spaceId);
+  const observedPosts = observationPostsByObservedSpaceId.get(spaceId) ?? [];
+  const availablePosts = uniqueValues([
+    defaultPost,
+    ...observedPosts,
+  ].filter((post): post is SpyObservationPost => Boolean(post)));
+  const posts = preferredSpaceId
+    ? availablePosts.filter((post) =>
+        spyObservationPostRepresentativeSpaceId(post) === preferredSpaceId ||
+        post.id === preferredSpaceId
+      )
+    : availablePosts;
+
+  if (posts.length === 0) {
+    const recalledSpaceId = preferredSpaceId ?? spaceId;
+    const result = removeSpyPostOwner(state, recalledSpaceId, ownerId);
+    return {
+      ...result,
+      recalledSpaceId: result.removedSpyCount > 0 ? recalledSpaceId : undefined,
+    };
+  }
+
+  for (const post of posts) {
+    const representativeSpaceId = spyObservationPostRepresentativeSpaceId(post);
+    const result = removeSpyPostOwner(state, representativeSpaceId, ownerId);
+    if (result.removedSpyCount > 0) {
+      return {
+        ...result,
+        recalledSpaceId: representativeSpaceId,
+      };
+    }
+  }
+
+  return {
+    spyPosts: { ...state.spyPosts },
+    sharedSpyPosts: { ...state.sharedSpyPosts },
+    removedSpyCount: 0,
+    recalledSpaceId: undefined,
+  };
 }
 
 export function canUseSpyPost(

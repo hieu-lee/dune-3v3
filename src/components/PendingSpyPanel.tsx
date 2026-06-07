@@ -1,7 +1,9 @@
-import { RotateCcw } from "lucide-react";
+import { MapPinned, RotateCcw } from "lucide-react";
+import { boardSpaces } from "../game/data";
 import {
   spyObservationPostDetailForSpace,
   spyObservationPostLabelForSpace,
+  spyObservationPostSpaceIdsForSpace,
 } from "../game/state";
 import type { BoardSpace, PendingAction, Player } from "../game/types";
 
@@ -16,6 +18,8 @@ type PendingSpyPanelProps = {
   onPlaceSpy: (spaceId: string) => void;
   onRecallSupplySpy: (spaceId: string) => void;
 };
+
+const boardSpaceNameById = new Map(boardSpaces.map((space) => [space.id, space.name]));
 
 export function PendingSpyPanel({
   owner,
@@ -61,8 +65,8 @@ export function PendingSpyPanel({
                   title={`Recall spy from ${spyObservationPostLabelForSpace(space.id)} for no effect`}
                 >
                   <span className="spy-choice-badge"><RotateCcw size={13} /> Recall</span>
-                  <strong>{spyObservationPostLabelForSpace(space.id)}</strong>
-                  <small>{spyObservationPostDetailForSpace(space.id)}</small>
+                  <SpyChoiceTitle spaceId={space.id} />
+                  <SpyCoverageMap spaceId={space.id} />
                 </button>
               ))}
             </div>
@@ -85,8 +89,8 @@ export function PendingSpyPanel({
                   onClick={() => onPlaceSpy(space.id)}
                 >
                   <span className="spy-choice-badge">Place</span>
-                  <strong>{spyObservationPostLabelForSpace(space.id)}</strong>
-                  <small>{spyObservationPostDetailForSpace(space.id)}</small>
+                  <SpyChoiceTitle spaceId={space.id} />
+                  <SpyCoverageMap spaceId={space.id} />
                 </button>
               ))}
             </div>
@@ -110,4 +114,33 @@ export function PendingSpyPanel({
       </button>
     </div>
   );
+}
+
+function SpyChoiceTitle({ spaceId }: { spaceId: string }) {
+  const coveredSpaces = coveredSpaceNames(spaceId);
+  return (
+    <span className="spy-choice-title">
+      <strong>{spyObservationPostLabelForSpace(spaceId)}</strong>
+      <span>{coveredSpaces.length === 1 ? "1 location" : `${coveredSpaces.length} linked locations`}</span>
+    </span>
+  );
+}
+
+function SpyCoverageMap({ spaceId }: { spaceId: string }) {
+  const coveredSpaces = coveredSpaceNames(spaceId);
+  return (
+    <span className="spy-choice-coverage" aria-label={spyObservationPostDetailForSpace(spaceId)}>
+      <MapPinned size={14} aria-hidden="true" />
+      <span>
+        {coveredSpaces.map((name) => (
+          <span className="spy-choice-location" key={name}>{name}</span>
+        ))}
+      </span>
+    </span>
+  );
+}
+
+function coveredSpaceNames(spaceId: string) {
+  return spyObservationPostSpaceIdsForSpace(spaceId)
+    .map((observedSpaceId) => boardSpaceNameById.get(observedSpaceId) ?? observedSpaceId);
 }

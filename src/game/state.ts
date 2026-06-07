@@ -321,6 +321,7 @@ export {
   spyObservationPostIdForSpace,
   spyObservationPostLabelForSpace,
   spyObservationPostOwnerIds,
+  spyObservationPostSpaceIdsForSpace,
   spyPostCount,
   spyPostOwnerIds,
   spyPostRecallCountForOwner,

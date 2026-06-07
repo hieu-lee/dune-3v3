@@ -131,6 +131,8 @@ const generatedScreenshotNames = [
   "pending-conflict-influence.png",
   "pending-conflict-influence-fixed.png",
   "pending-recall-spy.png",
+  "pending-place-spy.png",
+  "pending-place-spy-mobile-390.png",
   "pending-lose-influence.png",
   "pending-lose-influence-mobile-390.png",
   "pending-maker-choice.png",

@@ -34,6 +34,24 @@ export async function runPendingChoicesSmoke({
   assert.equal(recallOwnerAfter.spies, recallOwnerBefore.spies + 1, "Recall spy should return one spy to supply");
   assert.equal(recallOwnerAfter.conflict, recallOwnerBefore.conflict + 2, "Recall spy should add pending strength");
 
+  await setDebugGameAndWait(page, pendingChoiceStates.placeSpy);
+  pendingText = await page.locator(".pending-panel").innerText();
+  assert.match(pendingText, /Spy placement/i);
+  assert.match(pendingText, /linked locations/i);
+  const firstCoverageText = await page.locator(".pending-panel .spy-choice-coverage").first().innerText();
+  assert.match(firstCoverageText, /Military Support/i);
+  assert.match(firstCoverageText, /Economic Support/i);
+  await screenshot(page, captures, "pending-place-spy.png");
+  const spyPlacementMobileViewport = { width: 390, height: 900 };
+  await page.setViewportSize(spyPlacementMobileViewport);
+  const spyPlacementMobileScrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+  assert(
+    spyPlacementMobileScrollWidth <= spyPlacementMobileViewport.width,
+    `Spy placement mobile pending panel should not overflow horizontally (${spyPlacementMobileScrollWidth}px)`,
+  );
+  await screenshot(page, captures, "pending-place-spy-mobile-390.png");
+  await page.setViewportSize({ width: 1440, height: 1100 });
+
   await setDebugGameAndWait(page, pendingChoiceStates.loseInfluence);
   pendingText = await page.locator(".pending-panel").innerText();
   assert.match(pendingText, /influence choice/i);
@@ -132,6 +150,21 @@ async function createPendingChoiceStates(server, initialPlayableGame) {
         combatRecipientId: ownerId,
         remaining: 1,
         strength: 2,
+        source: "Browser debug",
+        optional: true,
+      },
+    },
+    placeSpy: {
+      ...base,
+      spyPosts: {},
+      sharedSpyPosts: {},
+      players: base.players.map((player) =>
+        player.id === ownerId ? { ...player, spies: Math.max(2, player.spies) } : player
+      ),
+      pendingAction: {
+        kind: "spy",
+        ownerId,
+        remaining: 1,
         source: "Browser debug",
         optional: true,
       },

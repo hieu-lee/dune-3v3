@@ -1,7 +1,15 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 export const DEFAULT_AI_MODEL = process.env.DUNE_AI_MODEL || "gpt-5.4-mini";
 export const DEFAULT_AI_REASONING_EFFORT = process.env.DUNE_AI_REASONING_EFFORT || "high";
+
+export const AI_HOW_TO_PLAY = readFileSync(
+  resolve(dirname(fileURLToPath(import.meta.url)), "../docs/ai-how-to-play.md"),
+  "utf8",
+).trim();
 
 const RESPONSE_API_URL = "https://api.openai.com/v1/responses";
 const MAX_ACTION_SNAPSHOT_LOGS = 16;
@@ -912,8 +920,9 @@ export async function chooseAiAction({
   maxToolRounds = 5,
 }) {
   if (legalActions.length === 0) throw new Error("No legal actions available for AI choice");
+  const { howToPlay, ...promptSnapshot } = snapshot;
   if (typeof aiClient.chooseAction === "function") {
-    const selected = await aiClient.chooseAction({ snapshot, legalActions, invalidActionIds });
+    const selected = await aiClient.chooseAction({ howToPlay: AI_HOW_TO_PLAY, snapshot: promptSnapshot, legalActions, invalidActionIds });
     const action = legalActions.find((candidate) => candidate.id === selected.actionId);
     if (!action) throw new Error(`Mock AI selected illegal action id ${selected.actionId}`);
     return { ...selected, action };
@@ -929,8 +938,9 @@ export async function chooseAiAction({
     role: "user",
     content: JSON.stringify({
       task: "Choose this seat's next legal action.",
+      howToPlay: AI_HOW_TO_PLAY,
       invalidActionIds: [...invalidActionIds],
-      snapshot,
+      snapshot: promptSnapshot,
     }),
   }];
 
@@ -1055,22 +1065,23 @@ function redactSharedPrivateNames(text, privateNames) {
 }
 
 function publicOnlyDiscussionSnapshot(snapshot) {
+  const { howToPlay, ...gameSnapshot } = snapshot;
   return {
-    ...snapshot,
+    ...gameSnapshot,
     legalActions: [],
-    pendingAction: snapshot.pendingAction
+    pendingAction: gameSnapshot.pendingAction
       ? {
-          kind: snapshot.pendingAction.kind,
-          ownerId: snapshot.pendingAction.ownerId,
-          actorId: snapshot.pendingAction.actorId,
-          partnerId: snapshot.pendingAction.partnerId,
-          team: snapshot.pendingAction.team,
-          source: snapshot.pendingAction.source,
-          optional: snapshot.pendingAction.optional,
-          remaining: snapshot.pendingAction.remaining,
+          kind: gameSnapshot.pendingAction.kind,
+          ownerId: gameSnapshot.pendingAction.ownerId,
+          actorId: gameSnapshot.pendingAction.actorId,
+          partnerId: gameSnapshot.pendingAction.partnerId,
+          team: gameSnapshot.pendingAction.team,
+          source: gameSnapshot.pendingAction.source,
+          optional: gameSnapshot.pendingAction.optional,
+          remaining: gameSnapshot.pendingAction.remaining,
         }
       : undefined,
-    players: snapshot.players.map((player) => {
+    players: gameSnapshot.players.map((player) => {
       const {
         hand,
         intrigues,
@@ -1149,6 +1160,7 @@ export async function discussRoundSummary({
         iteration,
         previousSummary,
         currentSummary: summary,
+        howToPlay: AI_HOW_TO_PLAY,
         seatSnapshots: discussionSnapshots,
       });
     } else {
@@ -1169,6 +1181,7 @@ export async function discussRoundSummary({
           iteration,
           previousSummary,
           currentSummary: summary,
+          howToPlay: AI_HOW_TO_PLAY,
           commanderSnapshot,
           transcript,
         },
@@ -1181,7 +1194,7 @@ export async function discussRoundSummary({
     for (const voterSnapshot of voterSnapshots) {
       let vote;
       if (typeof aiClient.voteSummary === "function") {
-        vote = await aiClient.voteSummary({ teamId, summary, voterSnapshot, transcript });
+        vote = await aiClient.voteSummary({ teamId, summary, howToPlay: AI_HOW_TO_PLAY, voterSnapshot, transcript });
       } else {
         vote = await callSingleTool({
           aiClient,
@@ -1196,7 +1209,7 @@ export async function discussRoundSummary({
             "Vote DISAGREE only for a real issue; include a public-safe reason in natural language.",
             "Do not mention private hand, Intrigue, objective, manipulated, reserved, or hidden-card details.",
           ].join("\n"),
-          inputPayload: { teamId, summary, voterSnapshot, transcript },
+          inputPayload: { teamId, summary, howToPlay: AI_HOW_TO_PLAY, voterSnapshot, transcript },
         });
       }
       votes.push(sharedVote(voterSnapshot.viewerPlayerId, {

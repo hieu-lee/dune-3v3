@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { withActivePlayer } from "./verify-imperium-cards-fixtures.mjs";
 import { createRoomServer } from "./room-server.mjs";
 import {
+  AI_HOW_TO_PLAY,
   assertAiSnapshotHasNoForeignPrivateCards,
   buildAiSeatSnapshot,
   chooseAiAction,
@@ -97,11 +98,22 @@ async function verifyToolCallRetryPath() {
   };
   const retryChoice = await chooseAiAction({
     aiClient: retryClient,
-    snapshot: { legalActions },
+    snapshot: { howToPlay: "legacy nested rules doc", legalActions },
     legalActions,
     maxToolRounds: 3,
   });
   assert.equal(retryChoice.actionId, "legal-b", "Responses retry should recover after an invalid action id");
+  const initialActionPayload = JSON.parse(payloads[0].input[0].content);
+  assert.equal(
+    initialActionPayload.howToPlay,
+    AI_HOW_TO_PLAY,
+    "AI action payload should include the how-to-play rules document alongside the snapshot",
+  );
+  assert.equal(
+    Object.hasOwn(initialActionPayload.snapshot, "howToPlay"),
+    false,
+    "AI action payload should not duplicate the how-to-play document inside the snapshot",
+  );
   assert.ok(
     payloads[1].input.some((item) => item.type === "function_call_output" && item.call_id === "bad-call"),
     "Responses retry should return function_call_output for invalid tool calls",
@@ -262,7 +274,60 @@ try {
   });
   assert.equal(p1AiSnapshot.viewerPlayerId, "p1");
   assert.equal(p1AiSnapshot.teamId, "muaddib");
+  assert.equal(
+    Object.hasOwn(p1AiSnapshot, "howToPlay"),
+    false,
+    "AI seat snapshot should stay focused on game state; how-to-play is sent beside it",
+  );
+  assert.ok(
+    AI_HOW_TO_PLAY.split(/\s+/).length < 1100,
+    "AI how-to-play document should stay concise enough for every round prompt",
+  );
   assert.ok(p1AiSnapshot.players.length === 6, "AI snapshot should include public status for all seats");
+  const p1SnapshotPlayer = p1AiSnapshot.players.find((player) => player.id === p1AiSnapshot.viewerPlayerId);
+  assert.deepEqual(
+    {
+      viewerRole: p1AiSnapshot.viewerRole,
+      leader: p1SnapshotPlayer?.leader,
+      team: p1SnapshotPlayer?.team,
+      role: p1SnapshotPlayer?.role,
+    },
+    {
+      viewerRole: "Commander",
+      leader: "Muad'Dib",
+      team: "muaddib",
+      role: "Commander",
+    },
+    "AI snapshot should identify which character, team, and role the viewer is using",
+  );
+  assert.deepEqual(
+    Object.fromEntries(p1AiSnapshot.players.map((player) => [player.id, { leader: player.leader, team: player.team, role: player.role }])),
+    {
+      p1: { leader: "Muad'Dib", team: "muaddib", role: "Commander" },
+      p2: { leader: "Feyd-Rautha Harkonnen", team: "shaddam", role: "Ally" },
+      p3: { leader: "Gurney Halleck", team: "muaddib", role: "Ally" },
+      p4: { leader: "Shaddam Corrino IV", team: "shaddam", role: "Commander" },
+      p5: { leader: "Lady Jessica", team: "muaddib", role: "Ally" },
+      p6: { leader: "Princess Irulan", team: "shaddam", role: "Ally" },
+    },
+    "AI snapshot should expose every public seat's character, team, and role",
+  );
+  const mockPromptChoice = await chooseAiAction({
+    aiClient: {
+      async chooseAction({ howToPlay, snapshot, legalActions }) {
+        assert.equal(howToPlay, AI_HOW_TO_PLAY, "Mock AI action hook should receive the same top-level how-to-play document as the real API path");
+        assert.equal(
+          Object.hasOwn(snapshot, "howToPlay"),
+          false,
+          "Mock AI action hook should not receive a duplicated how-to-play document inside the snapshot",
+        );
+        return { actionId: legalActions[0].id, reason: "Verifier prompt contract check." };
+      },
+    },
+    snapshot: { ...p1AiSnapshot, howToPlay: "legacy nested rules doc" },
+    legalActions: [{ id: "prompt-contract", label: "Prompt contract", playerId: "p1", action: { kind: "prompt-contract" } }],
+  });
+  assert.equal(mockPromptChoice.actionId, "prompt-contract", "Mock prompt contract check should return a legal action");
   assert.deepEqual(
     Object.keys(p1AiSnapshot.players[0].influence).sort(),
     ["bene", "emperor", "fremen", "fringeWorlds", "greatHouses", "spacing"].sort(),
@@ -302,7 +367,13 @@ try {
   );
   await discussRoundSummary({
     aiClient: {
-      async proposeSummary({ seatSnapshots }) {
+      async proposeSummary({ howToPlay, seatSnapshots }) {
+        assert.equal(howToPlay, AI_HOW_TO_PLAY, "Round discussion proposal should include the how-to-play document");
+        assert.equal(
+          seatSnapshots.every((snapshot) => !Object.hasOwn(snapshot, "howToPlay")),
+          true,
+          "Public discussion snapshots should not duplicate the separately supplied how-to-play document",
+        );
         const viewer = seatSnapshots[0].players.find((player) => player.id === seatSnapshots[0].viewerPlayerId);
         assert.equal(
           seatSnapshots[0].pendingAction.inspectedCards,
@@ -316,13 +387,18 @@ try {
         );
         return "Public-safe top-deck discussion.";
       },
-      async voteSummary() {
+      async voteSummary({ howToPlay }) {
+        assert.equal(howToPlay, AI_HOW_TO_PLAY, "Round discussion vote should include the how-to-play document");
         return { vote: "AGREE", reason: "Public-safe." };
       },
     },
     teamId: "muaddib",
     previousSummary: "",
-    seatSnapshots: [p1TopDeckAiSnapshot, p1TopDeckAiSnapshot, p1TopDeckAiSnapshot],
+    seatSnapshots: [
+      { ...p1TopDeckAiSnapshot, howToPlay: "legacy nested rules doc" },
+      { ...p1TopDeckAiSnapshot, howToPlay: "legacy nested rules doc" },
+      { ...p1TopDeckAiSnapshot, howToPlay: "legacy nested rules doc" },
+    ],
     maxIterations: 1,
   });
 

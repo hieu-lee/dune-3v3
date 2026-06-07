@@ -162,39 +162,44 @@ async function chooseAndApplyAiStep({
   aiPlayerIds,
   log,
 }) {
-  const room = runtime.server.rooms.get(roomId);
-  assert.ok(room, `Expected room ${roomId}`);
-  const allCandidates = nextActionSeats(room, runtime);
-  const candidates = allCandidates.filter((entry) => aiPlayerIds.has(entry.player.id));
-  if (candidates.length === 0) {
-    const activePlayerId = room.game.players[room.game.activeSeat]?.id;
-    const aiResolvers = room.game.players
-      .filter((player) => aiPlayerIds.has(player.id) && runtime.actions.roomPendingActionCanResolve(room.game, player.id))
-      .map((player) => player.id);
-    const aiExpectedToAct =
-      aiResolvers.length > 0 ||
-      ((room.game.phase === "playing" || room.game.phase === "combat") && aiPlayerIds.has(activePlayerId)) ||
-      (room.game.phase === "endgame" && room.game.players.some((player) => aiPlayerIds.has(player.id) && !room.endgameReady?.[player.id]));
-    return {
-      error: aiExpectedToAct ? "AI controlled seat has no generated legal actions" : "Waiting for human-controlled seat",
-      waitForHuman: !aiExpectedToAct,
-      phase: room.game.phase,
-      round: room.game.round,
-      activeSeat: room.game.activeSeat,
-      activePlayerId,
-      agentTurnComplete: room.game.agentTurnComplete,
-      pendingKind: room.game.pendingAction?.kind,
-      pendingQueueKinds: room.game.pendingQueue.map((pending) => pending.kind),
-      pendingAiResolverIds: aiResolvers,
-      humanCandidateIds: allCandidates.filter((entry) => !aiPlayerIds.has(entry.player.id)).map((entry) => entry.player.id),
-    };
-  }
-  const candidate = candidates[0];
-  const player = candidate.player;
   const invalidActionIds = new Set();
   let lastError;
+  let retryPlayerId;
 
   for (let attempt = 1; attempt <= 5; attempt += 1) {
+    const room = runtime.server.rooms.get(roomId);
+    assert.ok(room, `Expected room ${roomId}`);
+    const allCandidates = nextActionSeats(room, runtime);
+    const candidates = allCandidates.filter((entry) => aiPlayerIds.has(entry.player.id));
+    if (candidates.length === 0) {
+      const activePlayerId = room.game.players[room.game.activeSeat]?.id;
+      const aiResolvers = room.game.players
+        .filter((player) => aiPlayerIds.has(player.id) && runtime.actions.roomPendingActionCanResolve(room.game, player.id))
+        .map((player) => player.id);
+      const aiExpectedToAct =
+        aiResolvers.length > 0 ||
+        ((room.game.phase === "playing" || room.game.phase === "combat") && aiPlayerIds.has(activePlayerId)) ||
+        (room.game.phase === "endgame" && room.game.players.some((player) => aiPlayerIds.has(player.id) && !room.endgameReady?.[player.id]));
+      return {
+        error: aiExpectedToAct ? "AI controlled seat has no generated legal actions" : "Waiting for human-controlled seat",
+        waitForHuman: !aiExpectedToAct,
+        phase: room.game.phase,
+        round: room.game.round,
+        activeSeat: room.game.activeSeat,
+        activePlayerId,
+        agentTurnComplete: room.game.agentTurnComplete,
+        pendingKind: room.game.pendingAction?.kind,
+        pendingQueueKinds: room.game.pendingQueue.map((pending) => pending.kind),
+        pendingAiResolverIds: aiResolvers,
+        humanCandidateIds: allCandidates.filter((entry) => !aiPlayerIds.has(entry.player.id)).map((entry) => entry.player.id),
+      };
+    }
+    const candidate = candidates[0];
+    const player = candidate.player;
+    if (retryPlayerId !== player.id) {
+      invalidActionIds.clear();
+      retryPlayerId = player.id;
+    }
     const roomSnapshot = await seatSnapshot(baseUrl, roomId, tokenByPlayerId.get(player.id));
     const legalActions = candidate.legalActions.filter((action) => !invalidActionIds.has(action.id));
     if (legalActions.length === 0) {
@@ -234,10 +239,13 @@ async function chooseAndApplyAiStep({
       });
       return body.snapshot;
     }
-    invalidActionIds.add(selected.action.id);
     lastError = `${response.status} ${JSON.stringify(body)}`;
+    if (response.status === 409 && body?.error === "Room state changed; refresh and try again") {
+      continue;
+    }
+    invalidActionIds.add(selected.action.id);
   }
-  throw new Error(`AI failed after retries for ${player.id}: ${lastError}`);
+  throw new Error(`AI failed after retries: ${lastError}`);
 }
 
 function finalTeamScores(game) {

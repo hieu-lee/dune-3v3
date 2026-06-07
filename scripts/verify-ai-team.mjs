@@ -13,6 +13,7 @@ import {
   createOpenAiResponseClient,
   discussRoundSummary,
   legalActionsForSeat,
+  nextActionSeats,
 } from "./ai-team-driver.mjs";
 import { runAiRoomMonitor } from "./ai-room-monitor.mjs";
 
@@ -379,6 +380,37 @@ try {
     "Required spy recall should choose a legal recall space instead of skipping",
   );
 
+  const throneAcquireCard = runtime.data.imperiumDeck.find((card) => card.cost === 1);
+  assert.ok(throneAcquireCard, "Expected a cost-1 Imperium card for acquire-card verification");
+  room.game = {
+    ...room.game,
+    pendingAction: {
+      kind: "acquire-card",
+      ownerId: "p6",
+      source: "Verifier Throne Acquire",
+      minCost: 1,
+      maxCost: 1,
+      destination: "hand",
+      optional: false,
+    },
+    pendingQueue: [],
+    imperiumRow: room.game.imperiumRow.map((card, index) => ({ ...card, cost: Math.max(card.cost ?? 0, 2), id: `ai-acquire-row-${index}` })),
+    reserveMarket: room.game.reserveMarket.map((card, index) => ({ ...card, cost: Math.max(card.cost ?? 0, 2), id: `ai-acquire-reserve-${index}` })),
+    throneRow: [{ ...throneAcquireCard, id: "ai-acquire-throne-cost-one", cost: 1 }],
+  };
+  const p6AcquireActions = legalActionsForSeat(room, "p6", runtime);
+  assert.deepEqual(
+    p6AcquireActions[0]?.action,
+    { kind: "pending", command: { kind: "acquire-pending-card", cardId: "ai-acquire-throne-cost-one" } },
+    "AI should use shared acquire-card eligibility, including Shaddam Throne Row cards",
+  );
+  const acquiredFromThrone = runtime.actions.applyRoomAction(room.game, "p6", p6AcquireActions[0].action);
+  assert.equal(acquiredFromThrone.pendingAction, undefined, "Generated Throne Row acquire-card action should resolve");
+  assert.ok(
+    acquiredFromThrone.players.find((player) => player.id === "p6")?.hand.some((card) => card.id === "ai-acquire-throne-cost-one"),
+    "Generated Throne Row acquire-card action should acquire the card to the configured destination",
+  );
+
   const threatenSpiceProduction = runtime.data.muadDibCommanderCards.find((card) => card.name === "Threaten Spice Production");
   assert.ok(threatenSpiceProduction, "Expected Threaten Spice Production for team-resource verification");
   room.game = {
@@ -408,6 +440,23 @@ try {
       return player;
     }),
   };
+  const p1InitialPaymentActions = legalActionsForSeat(room, "p1", runtime);
+  assert.equal(
+    p1InitialPaymentActions.some((action) =>
+      action.action.command?.kind === "adjust-team-resource-payment" &&
+      action.action.command.delta < 0
+    ),
+    false,
+    "AI should not expose negative team-resource adjustments while payment is underfunded",
+  );
+  assert.equal(
+    p1InitialPaymentActions.some((action) =>
+      action.action.command?.kind === "choose-team-resource-payment" ||
+      action.action.command?.kind === "skip-team-resource-payment"
+    ),
+    false,
+    "AI should keep team-resource payments moving toward funding while legal contributors remain",
+  );
   const p3PaymentActions = legalActionsForSeat(room, "p3", runtime);
   const p3Contribute = p3PaymentActions.find((action) =>
     action.action.command?.kind === "adjust-team-resource-payment" &&
@@ -429,6 +478,11 @@ try {
     },
   };
   const p1PaymentActions = legalActionsForSeat(room, "p1", runtime);
+  assert.equal(
+    p1PaymentActions.every((action) => action.action.command?.kind === "choose-team-resource-payment"),
+    true,
+    "AI should expose only the resolve action once team-resource payment is fully funded",
+  );
   const p1Pay = p1PaymentActions.find((action) => action.action.command?.kind === "choose-team-resource-payment");
   assert.ok(p1Pay, "AI should expose payable team-resource resolution for the commander");
   const paidTeamResource = runtime.actions.applyRoomAction(room.game, "p1", p1Pay.action);
@@ -458,6 +512,11 @@ try {
     ),
   };
   const p2TradeActions = legalActionsForSeat(room, "p2", runtime);
+  assert.equal(
+    p2TradeActions.some((action) => action.action.command?.kind === "update-trade"),
+    false,
+    "AI should not expose trade updates once the current selection has a transferable good",
+  );
   const p2TradeSpice = p2TradeActions.find((action) =>
     action.action.command?.kind === "transfer-trade" &&
     action.action.command.fromId === "p2" &&
@@ -474,6 +533,102 @@ try {
     tradeAfterP2.players.find((player) => player.id === "p2")?.resources.spice,
     0,
     "Generated trade transfer should spend the actor's selected good",
+  );
+
+  room.game = {
+    ...room.game,
+    pendingAction: {
+      kind: "trade",
+      actorId: "p2",
+      partnerId: "p4",
+      resource: "spice",
+      actorGiven: 0,
+      partnerGiven: 0,
+      source: "Verifier Partner Trade",
+    },
+    pendingQueue: [],
+    players: room.game.players.map((player) => {
+      if (player.id === "p2") {
+        return { ...player, resources: { ...player.resources, spice: 0, water: 1, solari: 0 } };
+      }
+      if (player.id === "p4") {
+        return { ...player, resources: { ...player.resources, spice: 1, water: 0, solari: 0 } };
+      }
+      return player;
+    }),
+  };
+  const p2PartnerTransferActions = legalActionsForSeat(room, "p2", runtime);
+  assert.equal(
+    p2PartnerTransferActions.some((action) => action.action.command?.kind === "clear-pending-action"),
+    false,
+    "AI should not let the actor clear a trade while the partner can transfer the selected good",
+  );
+  const partnerTransferCandidates = nextActionSeats(room, runtime);
+  assert.equal(
+    partnerTransferCandidates[0]?.player.id,
+    "p4",
+    "AI should advance to the partner transfer instead of letting the earlier actor clear the trade",
+  );
+  assert.ok(
+    partnerTransferCandidates[0]?.legalActions.some((action) =>
+      action.action.command?.kind === "transfer-trade" &&
+      action.action.command.fromId === "p4" &&
+      action.action.command.toId === "p2"
+    ),
+    "AI should expose the partner's selected-good transfer before the trade can be cleared",
+  );
+  const p4TradeSpice = partnerTransferCandidates[0]?.legalActions.find((action) =>
+    action.action.command?.kind === "transfer-trade" &&
+    action.action.command.fromId === "p4" &&
+    action.action.command.toId === "p2"
+  );
+  assert.ok(p4TradeSpice, "Verifier should find the partner's selected-good transfer");
+  room.game = runtime.actions.applyRoomAction(room.game, "p4", p4TradeSpice.action);
+  const p2AfterPartnerTransferActions = legalActionsForSeat(room, "p2", runtime);
+  assert.ok(
+    p2AfterPartnerTransferActions.some((action) => action.action.command?.kind === "clear-pending-action"),
+    "AI should let the actor finish after the partner has made a one-way trade transfer",
+  );
+  assert.equal(
+    p2AfterPartnerTransferActions.some((action) =>
+      action.action.command?.kind === "transfer-trade" &&
+      action.action.command.fromId === "p2" &&
+      action.action.command.toId === "p4"
+    ),
+    false,
+    "AI should not force the actor to send the received selected good back before finishing",
+  );
+
+  room.game = {
+    ...room.game,
+    pendingAction: {
+      kind: "trade",
+      actorId: "p2",
+      partnerId: "p4",
+      resource: "spice",
+      actorGiven: 0,
+      partnerGiven: 0,
+      source: "Verifier Trade Update",
+    },
+    pendingQueue: [],
+    players: room.game.players.map((player) => {
+      if (player.id === "p2" || player.id === "p4") {
+        return { ...player, resources: { ...player.resources, spice: 0, water: 0, solari: 0 } };
+      }
+      if (player.id === "p6") {
+        return { ...player, resources: { ...player.resources, water: 1 } };
+      }
+      return player;
+    }),
+  };
+  const p2TradeUpdateActions = legalActionsForSeat(room, "p2", runtime);
+  assert.ok(
+    p2TradeUpdateActions.some((action) =>
+      action.action.command?.kind === "update-trade" &&
+      action.action.command.resource === "water" &&
+      action.action.command.partnerId === "p6"
+    ),
+    "AI should still expose trade updates when the current selection cannot transfer but another teammate/resource can",
   );
 
   const feydSignet = runtime.data.allyStarterCards.find((card) => card.name === "Signet Ring");

@@ -527,9 +527,7 @@ function pendingCommand(room, pending, runtime, coverage = {}) {
       return { kind: "collect-contract-fallback" };
     case "acquire-card": {
       if (pending.optional) return { kind: "clear-pending-action" };
-      const card = [...room.game.reserveMarket, ...room.game.imperiumRow].find((candidate) =>
-        !pending.maxCost || (candidate.cost ?? 0) <= pending.maxCost
-      );
+      const card = runtime.state.acquirableCardsForPending(room.game, pending)[0];
       return card ? { kind: "acquire-pending-card", cardId: card.id } : undefined;
     }
     case "staban-unseen-network":
@@ -559,17 +557,56 @@ function pendingCommand(room, pending, runtime, coverage = {}) {
 
 const tradeGoods = ["spice", "solari", "water", "intrigue"];
 
-function pendingTeamResourcePaymentCommands(pending) {
+function contributionAmount(pending, contributorId) {
+  const amount = pending.contributions?.[contributorId] ?? 0;
+  return Number.isInteger(amount) ? amount : 0;
+}
+
+function contributionTotal(pending) {
+  return (pending.contributorIds ?? []).reduce((total, contributorId) => total + contributionAmount(pending, contributorId), 0);
+}
+
+function pendingTeamResourcePaymentCommands(room, pending) {
   const commands = [];
-  for (const contributorId of pending.contributorIds ?? []) {
-    commands.push({ kind: "adjust-team-resource-payment", contributorId, delta: 1 });
+  const total = contributionTotal(pending);
+  if (total === pending.cost) return [{ kind: "choose-team-resource-payment" }];
+  if (total > pending.cost) {
+    for (const contributorId of pending.contributorIds ?? []) {
+      if (contributionAmount(pending, contributorId) > 0) {
+        commands.push({ kind: "adjust-team-resource-payment", contributorId, delta: -1 });
+      }
+    }
+    return commands.length > 0 ? commands : [{ kind: "skip-team-resource-payment" }];
   }
-  commands.push({ kind: "choose-team-resource-payment" });
-  commands.push({ kind: "skip-team-resource-payment" });
   for (const contributorId of pending.contributorIds ?? []) {
-    commands.push({ kind: "adjust-team-resource-payment", contributorId, delta: -1 });
+    const contributor = room.game.players.find((player) => player.id === contributorId);
+    if (!contributor) continue;
+    const current = contributionAmount(pending, contributorId);
+    if (current < (contributor.resources?.[pending.resource] ?? 0)) {
+      commands.push({ kind: "adjust-team-resource-payment", contributorId, delta: 1 });
+    }
   }
-  return commands;
+  return commands.length > 0 ? commands : [{ kind: "skip-team-resource-payment" }];
+}
+
+function canTransferSelectedTradeGood(player, resource) {
+  if (!player) return false;
+  if (resource === "intrigue") return player.intrigues.length > 0;
+  return (player.resources?.[resource] ?? 0) > 0;
+}
+
+function currentTradeCanTransfer(actor, partner, pending) {
+  const actorCanMove = pending.actorGiven === 0 && canTransferSelectedTradeGood(actor, pending.resource);
+  const partnerCanMove = pending.partnerGiven === 0 && canTransferSelectedTradeGood(partner, pending.resource);
+  return actorCanMove || partnerCanMove;
+}
+
+function tradeSelectionCanTransfer(actor, teammate, resource) {
+  return canTransferSelectedTradeGood(actor, resource) || canTransferSelectedTradeGood(teammate, resource);
+}
+
+function tradeCanBeCleared(actor, partner, pending) {
+  return pending.actorGiven + pending.partnerGiven > 0 || !currentTradeCanTransfer(actor, partner, pending);
 }
 
 function pendingTradeCommands(room, pending) {
@@ -577,22 +614,30 @@ function pendingTradeCommands(room, pending) {
   const partner = room.game.players.find((player) => player.id === pending.partnerId);
   const teammates = room.game.players.filter((player) => actor && player.team === actor.team && player.id !== actor.id);
   const commands = [];
-  for (const [from, to] of [[actor, partner], [partner, actor]]) {
-    if (!from || !to) continue;
-    if (pending.resource === "intrigue") {
-      for (const intrigue of from.intrigues) {
-        commands.push({ kind: "transfer-trade", fromId: from.id, toId: to.id, intrigueId: intrigue.id });
+  const transfersStarted = pending.actorGiven + pending.partnerGiven > 0;
+  if (!transfersStarted) {
+    for (const [from, to] of [[actor, partner], [partner, actor]]) {
+      if (!from || !to) continue;
+      if (pending.resource === "intrigue") {
+        for (const intrigue of from.intrigues) {
+          commands.push({ kind: "transfer-trade", fromId: from.id, toId: to.id, intrigueId: intrigue.id });
+        }
+      } else {
+        commands.push({ kind: "transfer-trade", fromId: from.id, toId: to.id });
       }
-    } else {
-      commands.push({ kind: "transfer-trade", fromId: from.id, toId: to.id });
     }
   }
-  for (const teammate of teammates) {
-    for (const resource of tradeGoods) {
-      commands.push({ kind: "update-trade", resource, partnerId: teammate.id });
+  if (tradeCanBeCleared(actor, partner, pending) && !transfersStarted) {
+    for (const teammate of teammates) {
+      for (const resource of tradeGoods) {
+        if (!tradeSelectionCanTransfer(actor, teammate, resource)) continue;
+        commands.push({ kind: "update-trade", resource, partnerId: teammate.id });
+      }
     }
   }
-  commands.push({ kind: "clear-pending-action" });
+  if (tradeCanBeCleared(actor, partner, pending)) {
+    commands.push({ kind: "clear-pending-action" });
+  }
   return commands;
 }
 
@@ -600,7 +645,7 @@ function pendingCommands(room, pending, runtime, coverage = {}) {
   if (pending.kind === "feyd-training") {
     return (pending.options ?? []).map((option) => ({ kind: "choose-feyd-training", optionId: option.id }));
   }
-  if (pending.kind === "team-resource-payment") return pendingTeamResourcePaymentCommands(pending);
+  if (pending.kind === "team-resource-payment") return pendingTeamResourcePaymentCommands(room, pending);
   if (pending.kind === "trade") return pendingTradeCommands(room, pending);
   const command = pendingCommand(room, pending, runtime, coverage);
   return command ? [command] : [];

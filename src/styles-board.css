@@ -39,14 +39,14 @@
   isolation: isolate;
   position: relative;
   display: grid;
-  grid-template-columns: minmax(164px, 0.46fr) minmax(0, 2.9fr);
-  gap: 18px;
-  min-width: 960px;
+  grid-template-columns: minmax(188px, 0.48fr) minmax(0, 3fr);
+  gap: 26px;
+  min-width: 1120px;
   border: 1px solid rgba(255, 246, 230, 0.16);
   border-radius: 8px;
   background: #161411;
   overflow: hidden;
-  padding: 14px;
+  padding: 18px;
 }
 
 .board-stage::before,
@@ -85,19 +85,19 @@
 }
 
 .spy-network-lines line {
-  stroke: rgba(255, 255, 255, 0.62);
+  stroke: rgba(255, 255, 255, 0.86);
   stroke-dasharray: none;
   stroke-linecap: round;
-  stroke-width: 2;
-  opacity: 0.52;
+  stroke-width: 2.4;
+  opacity: 0.76;
   filter:
     drop-shadow(0 1px 3px rgba(0, 0, 0, 0.62))
-    drop-shadow(0 0 4px rgba(255, 255, 255, 0.18));
+    drop-shadow(0 0 4px rgba(255, 255, 255, 0.24));
 }
 
 .spy-network-lines line.is-legal {
-  stroke: rgba(255, 255, 255, 0.96);
-  stroke-width: 3;
+  stroke: #fff;
+  stroke-width: 3.2;
   opacity: 1;
 }
 
@@ -112,7 +112,7 @@
 }
 
 .spy-network-slot {
-  --spy-slot-size: 22px;
+  --spy-slot-size: 28px;
   position: absolute;
   left: var(--spy-slot-x);
   top: var(--spy-slot-y);
@@ -132,20 +132,20 @@
   display: block;
   width: 100%;
   height: 100%;
-  border: 2px solid rgba(255, 255, 255, 0.78);
+  border: 2px solid rgba(255, 255, 255, 0.94);
   border-radius: inherit;
   background:
-    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.22) 0 36%, rgba(8, 7, 6, 0.9) 42% 100%);
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.32) 0 32%, rgba(8, 7, 6, 0.92) 39% 100%);
   box-shadow:
-    0 0 0 2px rgba(8, 7, 6, 0.72),
-    0 0 0 4px rgba(255, 255, 255, 0.08),
+    0 0 0 3px rgba(8, 7, 6, 0.72),
+    0 0 0 5px rgba(255, 255, 255, 0.12),
     0 6px 16px rgba(0, 0, 0, 0.36);
 }
 
 .spy-network-slot.is-occupied .spy-network-slot-ring {
-  border-color: rgba(255, 255, 255, 0.88);
+  border-color: #fff;
   background:
-    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.28) 0 36%, rgba(8, 7, 6, 0.9) 42% 100%);
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.38) 0 32%, rgba(8, 7, 6, 0.92) 39% 100%);
 }
 
 .spy-network-slot.is-legal {
@@ -156,20 +156,20 @@
 .spy-network-slot.is-legal .spy-network-slot-ring {
   border-color: #fff;
   background:
-    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.82) 0 32%, rgba(20, 18, 16, 0.96) 40% 100%);
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.9) 0 30%, rgba(20, 18, 16, 0.96) 38% 100%);
   box-shadow:
     0 0 0 3px rgba(8, 7, 6, 0.74),
-    0 0 0 5px rgba(255, 255, 255, 0.2),
+    0 0 0 6px rgba(255, 255, 255, 0.22),
     0 9px 22px rgba(0, 0, 0, 0.44);
 }
 
 .spy-network-slot.is-placeable .spy-network-slot-ring {
   border-color: #fff;
   background:
-    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.82) 0 32%, rgba(20, 18, 16, 0.96) 40% 100%);
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.9) 0 30%, rgba(20, 18, 16, 0.96) 38% 100%);
   box-shadow:
     0 0 0 3px rgba(8, 7, 6, 0.74),
-    0 0 0 5px rgba(255, 255, 255, 0.2),
+    0 0 0 6px rgba(255, 255, 255, 0.22),
     0 9px 22px rgba(0, 0, 0, 0.44);
 }
 
@@ -179,10 +179,10 @@
 .spy-network-slot.is-conflict-recall .spy-network-slot-ring {
   border-color: #fff;
   background:
-    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.82) 0 32%, rgba(20, 18, 16, 0.96) 40% 100%);
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.9) 0 30%, rgba(20, 18, 16, 0.96) 38% 100%);
   box-shadow:
     0 0 0 3px rgba(8, 7, 6, 0.74),
-    0 0 0 5px rgba(255, 255, 255, 0.2),
+    0 0 0 6px rgba(255, 255, 255, 0.22),
     0 9px 22px rgba(0, 0, 0, 0.44);
 }
 
@@ -246,41 +246,41 @@
 .board-faction-rail {
   align-content: start;
   grid-template-rows: repeat(4, auto);
-  gap: 18px;
+  gap: 26px;
 }
 
 .board-map {
   grid-template-rows: auto auto auto;
-  gap: 18px;
+  gap: 30px;
 }
 
 .board-top-band {
   display: grid;
   grid-template-columns: minmax(0, 1.58fr) minmax(158px, 0.42fr);
-  gap: 18px;
+  gap: 30px;
 }
 
 .board-center-band {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto auto auto;
-  gap: 18px;
+  gap: 30px;
 }
 
 .board-commander-dock {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
+  gap: 30px;
 }
 
 .board-region {
   --region-color: #c8a766;
   position: relative;
   align-content: start;
-  gap: 10px;
+  gap: 12px;
   z-index: 0;
   border-radius: 8px;
-  padding: 10px;
+  padding: 12px;
 }
 
 .board-region:has(.space-tile:hover),
@@ -509,9 +509,9 @@
 }
 
 .board-region-spaces {
-  gap: 24px;
+  gap: 40px;
   align-items: stretch;
-  grid-auto-rows: minmax(128px, 1fr);
+  grid-auto-rows: minmax(142px, 1fr);
 }
 
 .board-region--faction .board-region-spaces,
@@ -520,7 +520,7 @@
 }
 
 .board-region--faction .board-region-spaces {
-  grid-auto-rows: minmax(92px, 1fr);
+  grid-auto-rows: minmax(106px, 1fr);
 }
 
 [data-region-id="landsraad"] .board-region-spaces,
@@ -1148,11 +1148,11 @@
   }
 
   .board-stage {
-    grid-template-columns: minmax(164px, 0.46fr) minmax(0, 2.9fr);
-    gap: 18px;
-    min-width: 960px;
+    grid-template-columns: minmax(188px, 0.48fr) minmax(0, 3fr);
+    gap: 26px;
+    min-width: 1120px;
     min-height: 0;
-    padding: 14px;
+    padding: 18px;
   }
 
   .board-faction-rail {
@@ -1181,11 +1181,11 @@
   }
 
   .board-region {
-    padding: 6px;
+    padding: 10px;
   }
 
   .board-region-spaces {
-    gap: 24px;
+    gap: 40px;
   }
 
   .board-region--faction .board-region-spaces,

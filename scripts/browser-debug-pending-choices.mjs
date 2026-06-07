@@ -25,6 +25,7 @@ export async function runPendingChoicesSmoke({
   assert.equal(await page.locator(".board-panel .spy-network-slot").count(), 19, "Board should render all spy post slots");
   assert.equal(await page.locator(".board-panel .spy-network-lines line").count(), 30, "Board should render spy post connection edges");
   assert.equal(await page.locator(".board-panel .spy-network-slot.is-legal").count(), 2, "Recall spy pending should make owned board slots actionable");
+  await assertSpyNetworkGeometry(page, "Recall spy");
   await screenshot(page, captures, "pending-recall-spy.png");
 
   const recallBefore = await currentGame(page);
@@ -48,9 +49,11 @@ export async function runPendingChoicesSmoke({
   assert.match(firstCoverageText, /Economic Support/i);
   assert.equal(await page.locator(".board-panel .spy-network-slot").count(), 19, "Board should render all spy post slots during placement");
   assert.equal(await page.locator(".board-panel .spy-network-slot.is-legal").count(), 15, "Spy placement should make every legal Ally board slot actionable");
+  await assertSpyNetworkGeometry(page, "Spy placement");
   await screenshot(page, captures, "pending-place-spy.png");
   const spyPlacementMobileViewport = { width: 390, height: 900 };
   await page.setViewportSize(spyPlacementMobileViewport);
+  await assertSpyNetworkGeometry(page, "Mobile spy placement");
   const spyPlacementMobileScrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
   assert(
     spyPlacementMobileScrollWidth <= spyPlacementMobileViewport.width,
@@ -140,6 +143,95 @@ export async function runPendingChoicesSmoke({
   const fixedOwnerAfter = fixedAfter.players.find((player) => player.id === "p2");
   assert.equal(fixedOwnerAfter.influence.emperor, 2);
   assert.equal(fixedOwnerAfter.influence.fremen, 1);
+}
+
+async function assertSpyNetworkGeometry(page, label) {
+  const geometry = await page.locator(".board-panel .board-stage").evaluate((stage) => {
+    const stageRect = stage.getBoundingClientRect();
+    const rectFor = (element) => {
+      const rect = element.getBoundingClientRect();
+      return {
+        bottom: rect.bottom,
+        height: rect.height,
+        left: rect.left,
+        right: rect.right,
+        top: rect.top,
+        width: rect.width,
+      };
+    };
+    const tiles = Array.from(stage.querySelectorAll(".space-tile[data-space-id]")).map((element) => ({
+      id: element.dataset.spaceId,
+      rect: rectFor(element),
+    }));
+    const slots = Array.from(stage.querySelectorAll(".spy-network-slot[data-spy-post-id]")).map((element) => ({
+      postId: element.dataset.spyPostId,
+      rect: rectFor(element),
+      spaceId: element.dataset.spySpaceId,
+    }));
+    const lines = Array.from(stage.querySelectorAll(".spy-network-lines line"));
+    const overlaps = [];
+    const lineOverlaps = [];
+    const intersects = (first, second) =>
+      first.left < second.right - 1 &&
+      first.right > second.left + 1 &&
+      first.top < second.bottom - 1 &&
+      first.bottom > second.top + 1;
+    const insetRect = (rect, amount) => ({
+      bottom: rect.bottom - amount,
+      left: rect.left + amount,
+      right: rect.right - amount,
+      top: rect.top + amount,
+    });
+    const pointInside = (point, rect) =>
+      point.x > rect.left &&
+      point.x < rect.right &&
+      point.y > rect.top &&
+      point.y < rect.bottom;
+
+    for (const slot of slots) {
+      for (const tile of tiles) {
+        if (intersects(slot.rect, tile.rect)) {
+          overlaps.push(`${slot.postId} (${slot.spaceId}) overlaps ${tile.id}`);
+        }
+      }
+    }
+
+    for (const line of lines) {
+      const x1 = Number(line.getAttribute("x1"));
+      const y1 = Number(line.getAttribute("y1"));
+      const x2 = Number(line.getAttribute("x2"));
+      const y2 = Number(line.getAttribute("y2"));
+      const postId = line.dataset.spyPostId;
+      if (![x1, y1, x2, y2].every(Number.isFinite)) continue;
+      for (const tile of tiles) {
+        const tileInterior = insetRect(tile.rect, 4);
+        for (let step = 1; step < 24; step += 1) {
+          const ratio = step / 24;
+          const point = {
+            x: stageRect.left + x1 + (x2 - x1) * ratio,
+            y: stageRect.top + y1 + (y2 - y1) * ratio,
+          };
+          if (pointInside(point, tileInterior)) {
+            lineOverlaps.push(`${postId} crosses ${tile.id}`);
+            break;
+          }
+        }
+      }
+    }
+
+    return { lineOverlaps, overlaps };
+  });
+
+  assert.deepEqual(
+    geometry.overlaps,
+    [],
+    `${label} spy circles should not overlap board location tiles`,
+  );
+  assert.deepEqual(
+    geometry.lineOverlaps,
+    [],
+    `${label} spy connection edges should not cross board location interiors`,
+  );
 }
 
 async function createPendingChoiceStates(server, initialPlayableGame) {

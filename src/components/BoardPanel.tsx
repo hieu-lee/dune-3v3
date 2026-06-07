@@ -83,6 +83,12 @@ type Point = {
   y: number;
 };
 
+const spySlotCollisionRadius = 18;
+const spySlotLineStopRadius = 15;
+const spySlotClampPadding = 30;
+const spySlotOutsideGap = 34;
+const spySlotOccupiedMargin = 36;
+
 const emptyBoardStageMeasurements: BoardStageMeasurements = {
   width: 0,
   height: 0,
@@ -175,7 +181,7 @@ const singletonSpySlotVectors: Partial<Record<string, Point>> = {
 };
 
 function slotBoundsOverlapMeasurement(point: Point, measurement: SpaceMeasurement) {
-  const radius = 14;
+  const radius = spySlotCollisionRadius;
   return (
     point.x + radius > measurement.centerX - measurement.width / 2 &&
     point.x - radius < measurement.centerX + measurement.width / 2 &&
@@ -189,12 +195,12 @@ function pointOverlapsAnySpace(point: Point, stage: BoardStageMeasurements) {
 }
 
 function singletonCandidatePoint(vector: Point, measurement: SpaceMeasurement, stage: BoardStageMeasurements): Point {
-  const gap = 18;
+  const gap = spySlotOutsideGap;
   const x = measurement.centerX + vector.x * (measurement.width / 2 + gap);
   const y = measurement.centerY + vector.y * (measurement.height / 2 + gap);
   return {
-    x: clamp(x, 20, Math.max(20, stage.width - 20)),
-    y: clamp(y, 20, Math.max(20, stage.height - 20)),
+    x: clamp(x, spySlotClampPadding, Math.max(spySlotClampPadding, stage.width - spySlotClampPadding)),
+    y: clamp(y, spySlotClampPadding, Math.max(spySlotClampPadding, stage.height - spySlotClampPadding)),
   };
 }
 
@@ -215,7 +221,7 @@ function singletonSpySlotPoint(spaceId: string, measurement: SpaceMeasurement, s
 }
 
 function pushPointOutsideMeasurement(point: Point, measurement: SpaceMeasurement, stage: BoardStageMeasurements): Point {
-  const margin = 18;
+  const margin = spySlotOccupiedMargin;
   const left = measurement.centerX - measurement.width / 2 - margin;
   const right = measurement.centerX + measurement.width / 2 + margin;
   const top = measurement.centerY - measurement.height / 2 - margin;
@@ -235,8 +241,8 @@ function pushPointOutsideMeasurement(point: Point, measurement: SpaceMeasurement
   if (nearestSide === "top") pushed.y = top;
   if (nearestSide === "bottom") pushed.y = bottom;
   return {
-    x: clamp(pushed.x, 20, Math.max(20, stage.width - 20)),
-    y: clamp(pushed.y, 20, Math.max(20, stage.height - 20)),
+    x: clamp(pushed.x, spySlotClampPadding, Math.max(spySlotClampPadding, stage.width - spySlotClampPadding)),
+    y: clamp(pushed.y, spySlotClampPadding, Math.max(spySlotClampPadding, stage.height - spySlotClampPadding)),
   };
 }
 
@@ -306,8 +312,8 @@ function pairSpySlotPoint(
       ? (firstBottom + secondTop) / 2
       : (firstTop + secondBottom) / 2;
   return {
-    x: clamp(x, 20, Math.max(20, stage.width - 20)),
-    y: clamp(y, 20, Math.max(20, stage.height - 20)),
+    x: clamp(x, spySlotClampPadding, Math.max(spySlotClampPadding, stage.width - spySlotClampPadding)),
+    y: clamp(y, spySlotClampPadding, Math.max(spySlotClampPadding, stage.height - spySlotClampPadding)),
   };
 }
 
@@ -330,13 +336,13 @@ function spySlotPointForPost(
       return {
         x: clamp(
           (measurementRight(imperialPrivilege) + measurementLeft(swordmaster)) / 2,
-          20,
-          Math.max(20, stage.width - 20),
+          spySlotClampPadding,
+          Math.max(spySlotClampPadding, stage.width - spySlotClampPadding),
         ),
         y: clamp(
           (measurementBottom(highCouncil) + Math.min(measurementTop(imperialPrivilege), measurementTop(swordmaster))) / 2,
-          20,
-          Math.max(20, stage.height - 20),
+          spySlotClampPadding,
+          Math.max(spySlotClampPadding, stage.height - spySlotClampPadding),
         ),
       };
     }
@@ -362,6 +368,18 @@ function edgePointToward(measurement: SpaceMeasurement, target: Point): Point {
   return {
     x: measurement.centerX + dx * scale,
     y: measurement.centerY + dy * scale,
+  };
+}
+
+function slotEdgePointToward(slotPoint: Point, measurement: SpaceMeasurement): Point {
+  const dx = measurement.centerX - slotPoint.x;
+  const dy = measurement.centerY - slotPoint.y;
+  const distance = Math.hypot(dx, dy);
+  if (distance <= spySlotLineStopRadius) return slotPoint;
+  const scale = spySlotLineStopRadius / distance;
+  return {
+    x: slotPoint.x + dx * scale,
+    y: slotPoint.y + dy * scale,
   };
 }
 
@@ -401,7 +419,7 @@ export function BoardPanel({
         const slotPoint = spySlotPointForPost(postId, representativeSpaceId, measuredSpaces, stageMeasurements);
         const segments = measuredSpaces.map(({ measurement }) => ({
           from: edgePointToward(measurement, slotPoint),
-          to: slotPoint,
+          to: slotEdgePointToward(slotPoint, measurement),
         }));
         const ownerIds = spyObservationPostOwnerIds(game, representativeSpaceId);
         const owners = ownerIds
@@ -483,6 +501,8 @@ export function BoardPanel({
                 <line
                   className={slot.legal ? "is-legal" : ""}
                   key={`${slot.postId}-${index}`}
+                  data-spy-post-id={slot.postId}
+                  data-spy-space-id={slot.representativeSpaceId}
                   x1={segment.from.x}
                   y1={segment.from.y}
                   x2={segment.to.x}

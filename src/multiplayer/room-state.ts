@@ -39,6 +39,18 @@ export type PublicSeatClaim = {
   role: Role;
   claimedBy?: string;
   connected: boolean;
+  ai?: boolean;
+};
+
+export type RoomAiStatus = "idle" | "running" | "error";
+
+export type PublicRoomAiState = {
+  enabled: boolean;
+  team: TeamId;
+  status: RoomAiStatus;
+  actionCount: number;
+  error?: string;
+  lastActiveAt?: number;
 };
 
 export type RoomSnapshot = {
@@ -50,6 +62,7 @@ export type RoomSnapshot = {
   endgameChoices: RoomEndgameChoices;
   viewerPlayerId?: string;
   seats: PublicSeatClaim[];
+  ai?: PublicRoomAiState;
   game: GameState;
 };
 
@@ -58,6 +71,12 @@ export type StoredSeatClaim = {
   name: string;
   token: string;
   connected: boolean;
+  ai?: boolean;
+};
+
+export type StoredRoomAiState = PublicRoomAiState & {
+  previousSummaries?: Partial<Record<TeamId, string>>;
+  lastDiscussedCompletedRound?: number;
 };
 
 export type StoredRoom = {
@@ -68,6 +87,7 @@ export type StoredRoom = {
   game: GameState;
   endgameReady: Record<string, boolean | undefined>;
   seats: Record<string, StoredSeatClaim | undefined>;
+  ai?: StoredRoomAiState;
 };
 
 function hiddenCard(playerId: string, index: number): Card {
@@ -175,6 +195,14 @@ export function roomSnapshotFor(room: StoredRoom, viewerToken?: string): RoomSna
     endgameReady: { ...room.endgameReady },
     endgameChoices: endgameChoicesForViewer(room.game, viewerPlayerId),
     viewerPlayerId,
+    ai: room.ai ? {
+      enabled: room.ai.enabled,
+      team: room.ai.team,
+      status: room.ai.status,
+      actionCount: room.ai.actionCount,
+      error: room.ai.error,
+      lastActiveAt: room.ai.lastActiveAt,
+    } : undefined,
     seats: room.game.players.map((player) => {
       const claim = room.seats[player.id];
       return {
@@ -185,6 +213,7 @@ export function roomSnapshotFor(room: StoredRoom, viewerToken?: string): RoomSna
         role: player.role,
         claimedBy: claim?.name,
         connected: claim?.connected ?? false,
+        ai: claim?.ai ?? false,
       };
     }),
     game: sanitizeGameForSeat(room.game, viewerPlayerId),

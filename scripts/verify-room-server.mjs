@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { mkdir, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
+import { createMockAiClient } from "./ai-team-driver.mjs";
 import { createRoomServer } from "./room-server.mjs";
 
 const outDir = "artifacts/qa/verify-room-server";
@@ -115,6 +116,217 @@ async function assertPollHeartbeatDisconnects() {
     assert.notEqual(reclaimed.body.token, token, "Offline poll-mode reclaim should issue a new reconnect token");
   } finally {
     await pollServer.close();
+  }
+}
+
+async function assertAiFillOpponents() {
+  const mockClient = createMockAiClient();
+  let releaseFirstChoice = () => {};
+  let firstChoiceReleased = false;
+  let choiceStarted = false;
+  const firstChoiceGate = new Promise((resolve) => {
+    releaseFirstChoice = () => {
+      firstChoiceReleased = true;
+      resolve();
+    };
+  });
+  const delayedClient = {
+    ...mockClient,
+    async chooseAction(args) {
+      if (!firstChoiceReleased) {
+        choiceStarted = true;
+        await firstChoiceGate;
+      }
+      return mockClient.chooseAction(args);
+    },
+  };
+  const aiServer = await createRoomServer({
+    port: 0,
+    log: false,
+    storageFile: false,
+    aiClient: delayedClient,
+  });
+  const aiBaseUrl = aiServer.resolvedUrls.local[0].replace(/\/$/, "");
+  async function aiJsonFetch(path, options = {}) {
+    const response = await fetch(`${aiBaseUrl}${path}`, options);
+    const body = await response.json().catch(() => undefined);
+    return { response, body };
+  }
+  try {
+    let created;
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      created = await aiJsonFetch("/api/rooms", { method: "POST" });
+      assert.equal(created.response.status, 201, "AI fill test room creation should succeed");
+      if (created.body.game.pendingAction?.kind === "throne-row") break;
+    }
+    assert.equal(created.body.game.pendingAction?.kind, "throne-row", "AI fill test should start with Shaddam setup pending");
+    const roomId = created.body.roomId;
+    const p1Claim = await aiJsonFetch(`/api/rooms/${roomId}/seats/p1/claim`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "Human Muad'Dib" }),
+    });
+    assert.equal(p1Claim.response.status, 200, "AI fill owner should claim a human seat");
+    const earlyFill = await aiJsonFetch(`/api/rooms/${roomId}/ai/fill`, {
+      method: "POST",
+      headers: { "x-room-token": p1Claim.body.token },
+    });
+    assert.equal(earlyFill.response.status, 409, "AI fill should require all three human team seats");
+
+    for (const [playerId, name] of [["p3", "Human Gurney"], ["p5", "Human Jessica"]]) {
+      const claim = await aiJsonFetch(`/api/rooms/${roomId}/seats/${playerId}/claim`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      assert.equal(claim.response.status, 200, `${playerId} should be claimable for AI fill`);
+    }
+
+    const fill = await aiJsonFetch(`/api/rooms/${roomId}/ai/fill`, {
+      method: "POST",
+      headers: { "x-room-token": p1Claim.body.token },
+    });
+    assert.equal(fill.response.status, 200, "AI fill should succeed once one team is fully human-claimed");
+    assert.equal(fill.body.snapshot.ai?.enabled, true, "AI fill should enable room AI state");
+    assert.equal(fill.body.snapshot.ai?.team, "shaddam", "AI should control the opposing team");
+    for (const playerId of ["p2", "p4", "p6"]) {
+      const seat = fill.body.snapshot.seats.find((candidate) => candidate.playerId === playerId);
+      assert.equal(seat?.ai, true, `${playerId} should be marked as an AI seat`);
+      assert.equal(seat?.connected, true, `${playerId} AI seat should stay connected`);
+      assert.match(seat?.claimedBy ?? "", /^AI /, `${playerId} should expose an AI seat name`);
+    }
+    for (const playerId of ["p1", "p3", "p5"]) {
+      assert.equal(
+        fill.body.snapshot.seats.find((candidate) => candidate.playerId === playerId)?.ai,
+        false,
+        `${playerId} should remain a human seat`,
+      );
+    }
+    assert.equal(
+      JSON.stringify(fill.body.snapshot).includes(p1Claim.body.token),
+      false,
+      "AI fill snapshot should not expose human reconnect tokens",
+    );
+
+    let runningStatus;
+    const runningDeadline = Date.now() + 5_000;
+    while (Date.now() < runningDeadline) {
+      runningStatus = await aiJsonFetch(`/api/rooms/${roomId}`, {
+        headers: { "x-room-token": p1Claim.body.token },
+      });
+      if (choiceStarted && runningStatus.body.ai?.status === "running") break;
+      await sleep(50);
+    }
+    assert.equal(runningStatus.body.ai?.status, "running", "Room AI status should broadcast while an AI choice is in progress");
+    releaseFirstChoice();
+
+    let latest = fill;
+    const deadline = Date.now() + 5_000;
+    while (Date.now() < deadline) {
+      latest = await aiJsonFetch(`/api/rooms/${roomId}`, {
+        headers: { "x-room-token": p1Claim.body.token },
+      });
+      if (latest.body.ai?.actionCount >= 1 && latest.body.game.pendingAction?.kind !== "throne-row") break;
+      await sleep(50);
+    }
+    assert.ok(latest.body.ai?.actionCount >= 1, "Mock room AI should apply at least one action");
+    assert.notEqual(latest.body.game.pendingAction?.kind, "throne-row", "Mock room AI should resolve Shaddam setup");
+  } finally {
+    releaseFirstChoice();
+    await aiServer.close();
+  }
+}
+
+async function assertAiRoundDiscussionUsesSeatSnapshots() {
+  const storageFile = join(outDir, "ai-discussion-rooms.json");
+  await rm(storageFile, { force: true });
+  const mockClient = createMockAiClient();
+  const discussionCalls = [];
+  let releaseDiscussion = () => {};
+  let discussionStarted = false;
+  const discussionGate = new Promise((resolve) => {
+    releaseDiscussion = () => {
+      resolve();
+    };
+  });
+  const discussionClient = {
+    ...mockClient,
+    async proposeSummary(args) {
+      discussionCalls.push({ seatSnapshotCount: args.seatSnapshots?.length });
+      discussionStarted = true;
+      await discussionGate;
+      return mockClient.proposeSummary(args);
+    },
+  };
+  const seedServer = await createRoomServer({ port: 0, log: false, storageFile, aiClient: discussionClient });
+  const seedBaseUrl = seedServer.resolvedUrls.local[0].replace(/\/$/, "");
+  try {
+    const response = await fetch(`${seedBaseUrl}/api/rooms`, { method: "POST" });
+    assert.equal(response.status, 201, "AI discussion seed room creation should succeed");
+    const created = await response.json();
+    const room = seedServer.rooms.get(created.roomId);
+    assert.ok(room, "AI discussion seed room should be stored");
+    for (const player of room.game.players) {
+      room.seats[player.id] = {
+        playerId: player.id,
+        name: player.team === "shaddam" ? `AI ${player.leader}` : `Human ${player.leader}`,
+        token: `discussion-token-${player.id}`,
+        connected: true,
+        ai: player.team === "shaddam",
+      };
+    }
+    room.ai = {
+      enabled: true,
+      team: "shaddam",
+      status: "idle",
+      actionCount: 0,
+      previousSummaries: {},
+      lastDiscussedCompletedRound: 0,
+    };
+    room.game = {
+      ...room.game,
+      phase: "playing",
+      round: 2,
+      activeSeat: room.game.players.findIndex((player) => player.id === "p5"),
+      agentTurnComplete: false,
+      pendingAction: undefined,
+      pendingQueue: [],
+    };
+  } finally {
+    await seedServer.close();
+  }
+
+  const discussionServer = await createRoomServer({ port: 0, log: false, storageFile, aiClient: discussionClient });
+  const discussionBaseUrl = discussionServer.resolvedUrls.local[0].replace(/\/$/, "");
+  async function discussionJsonFetch(path, options = {}) {
+    const response = await fetch(`${discussionBaseUrl}${path}`, options);
+    const body = await response.json().catch(() => undefined);
+    return { response, body };
+  }
+  try {
+    const runningDeadline = Date.now() + 5_000;
+    let runningStatus;
+    while (Date.now() < runningDeadline) {
+      runningStatus = await discussionJsonFetch(`/api/rooms/${[...discussionServer.rooms.keys()][0]}`, {
+        headers: { "x-room-token": "discussion-token-p1" },
+      });
+      if (discussionStarted && runningStatus.body.ai?.status === "running") break;
+      await sleep(50);
+    }
+    assert.equal(runningStatus.body.ai?.status, "running", "Room AI status should broadcast while round discussion is in progress");
+    releaseDiscussion();
+    const deadline = Date.now() + 5_000;
+    while (Date.now() < deadline && !discussionServer.rooms.values().next().value?.ai?.previousSummaries?.shaddam) {
+      await sleep(50);
+    }
+    assert.equal(discussionCalls[0]?.seatSnapshotCount, 3, "Room AI discussion should pass exactly three seatSnapshots");
+    const room = [...discussionServer.rooms.values()][0];
+    assert.ok(room?.ai?.previousSummaries?.shaddam, "Room AI discussion should store a Shaddam team summary");
+    assert.notEqual(room?.ai?.status, "error", "Room AI discussion should not mark the room AI as errored");
+  } finally {
+    releaseDiscussion();
+    await discussionServer.close();
+    await rm(storageFile, { force: true });
   }
 }
 
@@ -355,6 +567,8 @@ try {
     "/public/qa-room-server-public-storage.json",
   ]);
   await assertPollHeartbeatDisconnects();
+  await assertAiFillOpponents();
+  await assertAiRoundDiscussionUsesSeatSnapshots();
 
   const recovered = await jsonFetch(`/api/rooms/${roomId}`, {
     headers: { "x-room-token": p1Claim.body.token },
@@ -480,6 +694,7 @@ try {
   );
   await closeRoomEventStream(secondP1Stream);
   await sleep(100);
+  assert.equal(server.rooms.has(roomId), true, "Room should still be stored before restart");
 
   await restartServer();
 

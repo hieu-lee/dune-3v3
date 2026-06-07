@@ -270,6 +270,26 @@ export function useRoomSession() {
     return true;
   }, [identity?.token, roomId]);
 
+  const fillAiOpponents = useCallback(async () => {
+    if (!roomId || !identity?.token) return false;
+    setError(null);
+    const response = await fetch(`/api/rooms/${roomId}/ai/fill`, {
+      method: "POST",
+      headers: { "x-room-token": identity.token },
+    });
+    const body = await response.json().catch(() => undefined) as { error?: string; snapshot?: RoomSnapshot } | undefined;
+    if (!response.ok) {
+      if (body?.snapshot) setSnapshot(body.snapshot);
+      setStatus("error");
+      setError(body?.error ?? "Unable to fill AI opponents");
+      return false;
+    }
+    if (body?.snapshot) setSnapshot(body.snapshot);
+    setStatus("ready");
+    setError(null);
+    return true;
+  }, [identity?.token, roomId]);
+
   const sendAction = useCallback(async (action: RoomActionCommand) => {
     if (!roomId || !identity?.token || !snapshot) return false;
     setError(null);
@@ -311,6 +331,7 @@ export function useRoomSession() {
     claimedPlayerId: snapshot?.viewerPlayerId,
     createRoom,
     error,
+    fillAiOpponents,
     inRoom: Boolean(roomId),
     joinRoom,
     leaveRoom,
@@ -320,5 +341,5 @@ export function useRoomSession() {
     snapshot,
     status,
     syncMode,
-  }), [claimSeat, createRoom, error, joinRoom, leaveRoom, releaseSeat, roomId, sendAction, snapshot, status, syncMode]);
+  }), [claimSeat, createRoom, error, fillAiOpponents, joinRoom, leaveRoom, releaseSeat, roomId, sendAction, snapshot, status, syncMode]);
 }

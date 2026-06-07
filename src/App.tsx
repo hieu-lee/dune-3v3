@@ -419,6 +419,7 @@ export default function App() {
         status={roomSession.status}
         onClaimSeat={roomSession.claimSeat}
         onCreateRoom={roomSession.createRoom}
+        onFillAiOpponents={roomSession.fillAiOpponents}
         onJoinRoom={roomSession.joinRoom}
         onLeaveRoom={roomSession.leaveRoom}
         onReleaseSeat={roomSession.releaseSeat}

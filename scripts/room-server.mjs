@@ -7,6 +7,16 @@ import { homedir } from "node:os";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createServer as createViteServer } from "vite";
+import {
+  assertAiSnapshotHasNoForeignPrivateCards,
+  buildAiSeatSnapshot,
+  chooseAiAction,
+  createAiRuntime,
+  createMockAiClient,
+  createOpenAiResponseClient,
+  discussRoundSummary,
+  nextActionSeats,
+} from "./ai-team-driver.mjs";
 
 const jsonHeaders = {
   "content-type": "application/json; charset=utf-8",
@@ -106,7 +116,7 @@ function disconnectLoadedSeats(room) {
     seats: Object.fromEntries(
       Object.entries(room.seats ?? {}).map(([playerId, seat]) => [
         playerId,
-        seat ? { ...seat, connected: false } : undefined,
+        seat ? { ...seat, connected: Boolean(seat.ai) } : undefined,
       ]),
     ),
   };
@@ -209,6 +219,7 @@ async function loadStoredRooms(storageFile, migrateRoom = (room) => room) {
 
 export async function createRoomServer({
   allowedHosts = roomAllowedHosts(),
+  aiClient: providedAiClient,
   host = "127.0.0.1",
   port = 5188,
   log = true,
@@ -226,6 +237,8 @@ export async function createRoomServer({
   let roomStateModule;
   let gameStateModule;
   let roomActionsModule;
+  let aiRuntimePromise;
+  let aiClientInstance;
   let saveChain = Promise.resolve();
   let saveSerial = 0;
 
@@ -259,10 +272,34 @@ export async function createRoomServer({
   const streams = new Map();
   const pollDisconnectTimers = new Map();
   const roomWriteChains = new Map();
+  const aiRuns = new Set();
+  const aiRunPromises = new Set();
 
   async function roomActions() {
     roomActionsModule ??= await vite.ssrLoadModule("/src/multiplayer/room-actions.ts");
     return roomActionsModule;
+  }
+
+  function aiClient() {
+    if (providedAiClient) return providedAiClient;
+    if (process.env.DUNE_ROOM_AI_MODE === "mock") {
+      aiClientInstance ??= createMockAiClient();
+      return aiClientInstance;
+    }
+    aiClientInstance ??= createOpenAiResponseClient({
+      model: process.env.DUNE_ROOM_AI_MODEL,
+      reasoningEffort: process.env.DUNE_ROOM_AI_REASONING_EFFORT,
+      log: log ? (...args) => console.log("[room-ai]", ...args) : undefined,
+    });
+    return aiClientInstance;
+  }
+
+  function aiRuntime() {
+    aiRuntimePromise ??= createAiRuntime({
+      rooms,
+      ssrLoadModule: (...args) => vite.ssrLoadModule(...args),
+    });
+    return aiRuntimePromise;
   }
 
   async function snapshotFor(room, token) {
@@ -392,6 +429,230 @@ export async function createRoomServer({
     await broadcast(room);
   }
 
+  async function applyInternalRoomAction(room, actorId, action) {
+    const {
+      applyRoomAction,
+      assertPlayerCanMarkEndgameReady,
+      finishEndgameAfterReady,
+    } = await roomActions();
+    if (action?.kind === "finalize-endgame") {
+      assertPlayerCanMarkEndgameReady(room.game, actorId);
+      if (room.endgameReady[actorId]) {
+        const error = new Error("You are already ready for Endgame finalization");
+        error.status = 409;
+        throw error;
+      }
+      room.endgameReady = { ...room.endgameReady, [actorId]: true };
+      if (allPlayersEndgameReady(room)) {
+        room.game = finishEndgameAfterReady(room.game);
+        room.endgameReady = {};
+      }
+      return;
+    }
+    const previousPhase = room.game.phase;
+    room.game = applyRoomAction(room.game, actorId, action);
+    clearEndgameReadyForAction(room, action, actorId, previousPhase);
+  }
+
+  function roomTeamIds(room) {
+    return [...new Set(room.game.players.map((player) => player.team))];
+  }
+
+  function opponentTeamFor(room, teamId) {
+    return roomTeamIds(room).find((candidate) => candidate !== teamId);
+  }
+
+  function aiPlayerIds(room) {
+    if (!room.ai?.enabled) return new Set();
+    return new Set(room.game.players.filter((player) => player.team === room.ai.team).map((player) => player.id));
+  }
+
+  function previousSummaryFor(room, teamId) {
+    return room.ai?.previousSummaries?.[teamId] ?? "";
+  }
+
+  async function aiTeamSeatSnapshots(room, runtime, teamId, note) {
+    const legalCandidates = nextActionSeats(room, runtime);
+    const snapshots = [];
+    for (const player of room.game.players.filter((candidate) => candidate.team === teamId)) {
+      const token = room.seats[player.id]?.token;
+      if (!token) continue;
+      const legalActions = legalCandidates.find((candidate) => candidate.player.id === player.id)?.legalActions ?? [];
+      const roomSnapshot = await snapshotFor(room, token);
+      const aiSnapshot = buildAiSeatSnapshot({
+        roomSnapshot,
+        teamId,
+        legalActions,
+        previousSummary: previousSummaryFor(room, teamId),
+        note,
+      });
+      assertAiSnapshotHasNoForeignPrivateCards(aiSnapshot, room.game);
+      snapshots.push(aiSnapshot);
+    }
+    return snapshots;
+  }
+
+  async function maybeDiscussAiRound(room, runtime, client) {
+    if (!room.ai?.enabled || room.game.phase !== "playing") return;
+    const completedRound = room.game.round - 1;
+    if (completedRound < 1 || completedRound <= (room.ai.lastDiscussedCompletedRound ?? 0)) return;
+    const teamId = room.ai.team;
+    const snapshots = await aiTeamSeatSnapshots(room, runtime, teamId, `Review completed round ${completedRound}.`);
+    if (!snapshots.length) return;
+    const discussion = await discussRoundSummary({
+      aiClient: client,
+      completedRound,
+      previousSummary: previousSummaryFor(room, teamId),
+      seatSnapshots: snapshots,
+      teamId,
+    });
+    await enqueueRoomWrite(room.id, async () => {
+      const latest = rooms.get(room.id);
+      if (!latest?.ai?.enabled || latest.ai.team !== teamId) return;
+      if (latest.game.phase !== "playing" || latest.game.round - 1 !== completedRound) return;
+      if (completedRound <= (latest.ai.lastDiscussedCompletedRound ?? 0)) return;
+      latest.ai.previousSummaries = { ...(latest.ai.previousSummaries ?? {}), [teamId]: discussion.summary };
+      latest.ai.lastDiscussedCompletedRound = completedRound;
+      await persistAndBroadcastRoom(latest);
+    });
+  }
+
+  function aiRoundDiscussionIsPending(room) {
+    if (!room.ai?.enabled || room.game.phase !== "playing") return false;
+    const completedRound = room.game.round - 1;
+    return completedRound >= 1 && completedRound > (room.ai.lastDiscussedCompletedRound ?? 0);
+  }
+
+  function aiActionIsPending(room, runtime) {
+    const controlledIds = aiPlayerIds(room);
+    if (controlledIds.size === 0) return false;
+    return nextActionSeats(room, runtime).some((entry) => controlledIds.has(entry.player.id));
+  }
+
+  async function markAiStatus(roomId, status, error) {
+    await enqueueRoomWrite(roomId, async () => {
+      const room = rooms.get(roomId);
+      if (!room?.ai?.enabled) return;
+      if (room.ai.status === status && room.ai.error === error) return;
+      room.ai.status = status;
+      room.ai.error = error;
+      await persistAndBroadcastRoom(room);
+    });
+  }
+
+  async function chooseAndApplyAiStep(roomId, runtime, client) {
+    const invalidActionIds = new Set();
+    let lastError = "";
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      const room = rooms.get(roomId);
+      if (!room?.ai?.enabled || room.game.phase === "finished") return false;
+      const baseVersion = room.version;
+      const controlledIds = aiPlayerIds(room);
+      const candidate = nextActionSeats(room, runtime).find((entry) => controlledIds.has(entry.player.id));
+      if (!candidate) return false;
+      if (room.ai.status !== "running" || room.ai.error) {
+        await markAiStatus(roomId, "running", undefined);
+        continue;
+      }
+      const token = room.seats[candidate.player.id]?.token;
+      if (!token) {
+        throw new Error(`AI seat ${candidate.player.id} is missing its reconnect token`);
+      }
+      const legalActions = candidate.legalActions.filter((action) => !invalidActionIds.has(action.id));
+      if (!legalActions.length) {
+        throw new Error(`AI ${candidate.player.name} has no remaining legal action after rejected attempts`);
+      }
+      const roomSnapshot = await snapshotFor(room, token);
+      const aiSnapshot = buildAiSeatSnapshot({
+        roomSnapshot,
+        teamId: room.ai.team,
+        legalActions,
+        previousSummary: previousSummaryFor(room, room.ai.team),
+        note: lastError ? `Previous selected action was rejected: ${lastError}` : undefined,
+      });
+      assertAiSnapshotHasNoForeignPrivateCards(aiSnapshot, room.game);
+      const selected = await chooseAiAction({
+        aiClient: client,
+        snapshot: aiSnapshot,
+        legalActions,
+        invalidActionIds,
+      });
+      const result = await enqueueRoomWrite(roomId, async () => {
+        const latest = rooms.get(roomId);
+        if (!latest?.ai?.enabled) return { applied: false };
+        if (latest.version !== baseVersion) return { retry: true };
+        try {
+          await applyInternalRoomAction(latest, candidate.player.id, selected.action.action);
+        } catch (error) {
+          return {
+            invalidActionId: selected.action.id,
+            error: error instanceof Error ? error.message : "Unable to apply AI action",
+          };
+        }
+        latest.ai.status = "running";
+        latest.ai.error = undefined;
+        latest.ai.actionCount = (latest.ai.actionCount ?? 0) + 1;
+        latest.ai.lastActiveAt = Date.now();
+        await persistAndBroadcastRoom(latest);
+        return { applied: true };
+      });
+      if (result.applied) return true;
+      if (result.retry) continue;
+      if (result.invalidActionId) {
+        invalidActionIds.add(result.invalidActionId);
+        lastError = result.error;
+        continue;
+      }
+      return false;
+    }
+    throw new Error(lastError || "AI could not find a valid action");
+  }
+
+  function scheduleAiRoom(roomId) {
+    if (aiRuns.has(roomId)) return;
+    setTimeout(() => {
+      const runPromise = runAiRoom(roomId).catch((error) => {
+        console.error(`room AI loop failed for ${roomId}:`, error);
+      }).finally(() => aiRunPromises.delete(runPromise));
+      aiRunPromises.add(runPromise);
+    }, 0).unref?.();
+  }
+
+  async function runAiRoom(roomId) {
+    if (aiRuns.has(roomId)) return;
+    aiRuns.add(roomId);
+    try {
+      const runtime = await aiRuntime();
+      const client = aiClient();
+      let acted = false;
+      for (let steps = 0; steps < 200; steps += 1) {
+        const room = rooms.get(roomId);
+        if (!room?.ai?.enabled) return;
+        if (room.game.phase === "finished") {
+          await markAiStatus(roomId, "idle", undefined);
+          return;
+        }
+        if (
+          (room.ai.status !== "running" || room.ai.error) &&
+          (aiRoundDiscussionIsPending(room) || aiActionIsPending(room, runtime))
+        ) {
+          await markAiStatus(roomId, "running", undefined);
+        }
+        await maybeDiscussAiRound(room, runtime, client);
+        acted = await chooseAndApplyAiStep(roomId, runtime, client);
+        if (!acted) {
+          await markAiStatus(roomId, "idle", undefined);
+          return;
+        }
+      }
+      if (acted) scheduleAiRoom(roomId);
+    } catch (error) {
+      await markAiStatus(roomId, "error", error instanceof Error ? error.message : "AI automation failed");
+    } finally {
+      aiRuns.delete(roomId);
+    }
+  }
+
   async function handleApi(request, response, url) {
     const createRoomMatch = request.method === "POST" && url.pathname === "/api/rooms";
     if (createRoomMatch) {
@@ -479,6 +740,55 @@ export async function createRoomServer({
       });
     }
 
+    const aiFillMatch = url.pathname.match(/^\/api\/rooms\/([A-Z0-9]+)\/ai\/fill$/);
+    if (request.method === "POST" && aiFillMatch) {
+      const room = rooms.get(aiFillMatch[1]);
+      if (!room) return sendError(response, 404, "Room not found");
+      const token = tokenFromRequest(request, url);
+      try {
+        aiClient();
+      } catch (error) {
+        return sendError(response, 503, error instanceof Error ? error.message : "AI client is not available");
+      }
+      return await enqueueRoomWrite(room.id, async () => {
+        const claim = Object.values(room.seats).find((seat) => seat?.token === token);
+        if (!claim || claim.ai) return sendError(response, 401, "Claim a human seat before filling AI opponents");
+        if (room.ai?.enabled) return sendError(response, 409, "AI opponents are already filled");
+        const player = room.game.players.find((candidate) => candidate.id === claim.playerId);
+        if (!player) return sendError(response, 404, "Claimed player is no longer in this room");
+        const aiTeam = opponentTeamFor(room, player.team);
+        if (!aiTeam) return sendError(response, 409, "This room does not have an opposing team");
+        const humanTeamSeats = room.game.players.filter((candidate) => candidate.team === player.team);
+        const opponentSeats = room.game.players.filter((candidate) => candidate.team === aiTeam);
+        if (!humanTeamSeats.every((candidate) => room.seats[candidate.id] && !room.seats[candidate.id]?.ai)) {
+          return sendError(response, 409, "Claim all three seats on your team before filling AI opponents");
+        }
+        if (!opponentSeats.every((candidate) => !room.seats[candidate.id] || room.seats[candidate.id]?.ai)) {
+          return sendError(response, 409, "The opposing team already has a human player");
+        }
+        for (const opponent of opponentSeats) {
+          room.seats[opponent.id] = {
+            playerId: opponent.id,
+            name: `AI ${opponent.leader}`,
+            token: reconnectToken(),
+            connected: true,
+            ai: true,
+          };
+        }
+        room.ai = {
+          enabled: true,
+          team: aiTeam,
+          status: "idle",
+          actionCount: room.ai?.actionCount ?? 0,
+          previousSummaries: room.ai?.previousSummaries ?? {},
+          lastDiscussedCompletedRound: room.ai?.lastDiscussedCompletedRound ?? 0,
+        };
+        await persistAndBroadcastRoom(room);
+        scheduleAiRoom(room.id);
+        return sendJson(response, 200, { snapshot: await snapshotFor(room, token) });
+      });
+    }
+
     const actionMatch = url.pathname.match(/^\/api\/rooms\/([A-Z0-9]+)\/actions$/);
     if (request.method === "POST" && actionMatch) {
       const room = rooms.get(actionMatch[1]);
@@ -495,36 +805,14 @@ export async function createRoomServer({
           });
         }
         try {
-          const action = body.action;
-          const {
-            applyRoomAction,
-            assertPlayerCanMarkEndgameReady,
-            finishEndgameAfterReady,
-          } = await roomActions();
-          if (action?.kind === "finalize-endgame") {
-            assertPlayerCanMarkEndgameReady(room.game, claim.playerId);
-            if (room.endgameReady[claim.playerId]) {
-              return sendError(response, 409, "You are already ready for Endgame finalization");
-            }
-            room.endgameReady = { ...room.endgameReady, [claim.playerId]: true };
-            if (allPlayersEndgameReady(room)) {
-              room.game = finishEndgameAfterReady(room.game);
-              room.endgameReady = {};
-            }
-          } else {
-            const previousPhase = room.game.phase;
-            room.game = applyRoomAction(room.game, claim.playerId, action);
-            clearEndgameReadyForAction(room, action, claim.playerId, previousPhase);
-          }
+          await applyInternalRoomAction(room, claim.playerId, body.action);
         } catch (error) {
           const status = Number.isInteger(error?.status) ? error.status : 500;
           const message = error instanceof Error ? error.message : "Unable to apply room action";
           return sendError(response, status, message);
         }
-        room.version += 1;
-        room.updatedAt = Date.now();
-        await persistRooms();
-        await broadcast(room);
+        await persistAndBroadcastRoom(room);
+        scheduleAiRoom(room.id);
         return sendJson(response, 200, { snapshot: await snapshotFor(room, token) });
       });
     }
@@ -617,6 +905,9 @@ export async function createRoomServer({
   const address = server.address();
   assert.ok(address && typeof address === "object", "Room server should listen on a TCP port");
   const url = `http://${address.address === "::" ? "127.0.0.1" : address.address}:${address.port}/`;
+  for (const room of rooms.values()) {
+    if (room.ai?.enabled) scheduleAiRoom(room.id);
+  }
 
   return {
     rooms,
@@ -628,6 +919,7 @@ export async function createRoomServer({
       for (const roomStreams of streams.values()) {
         for (const client of roomStreams) client.response.end();
       }
+      await Promise.allSettled([...aiRunPromises]);
       await Promise.allSettled([...roomWriteChains.values()]);
       await persistRooms();
       await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));

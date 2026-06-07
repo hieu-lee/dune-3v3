@@ -1,7 +1,7 @@
-import { Link, LogOut, PlugZap, UserCheck, UserMinus } from "lucide-react";
+import { Bot, Link, LogOut, PlugZap, UserCheck, UserMinus } from "lucide-react";
 import { useState } from "react";
 import { teams } from "../game/data";
-import type { RoomSnapshot } from "../multiplayer/room-state";
+import type { PublicRoomAiState, RoomSnapshot } from "../multiplayer/room-state";
 
 type RoomPanelProps = {
   claimedPlayerId?: string;
@@ -12,6 +12,7 @@ type RoomPanelProps = {
   status: "idle" | "loading" | "ready" | "error";
   onClaimSeat: (playerId: string, name: string) => void;
   onCreateRoom: () => void;
+  onFillAiOpponents: () => void;
   onJoinRoom: (roomId: string) => void;
   onLeaveRoom: () => void;
   onReleaseSeat: (playerId: string) => void;
@@ -26,6 +27,7 @@ export function RoomPanel({
   status,
   onClaimSeat,
   onCreateRoom,
+  onFillAiOpponents,
   onJoinRoom,
   onLeaveRoom,
   onReleaseSeat,
@@ -33,6 +35,18 @@ export function RoomPanel({
   const [joinCode, setJoinCode] = useState("");
   const [playerName, setPlayerName] = useState("");
   const claimedSeat = snapshot?.seats.find((seat) => seat.playerId === claimedPlayerId);
+  const teammateSeats = claimedSeat ? snapshot?.seats.filter((seat) => seat.team === claimedSeat.team) ?? [] : [];
+  const opponentSeats = claimedSeat ? snapshot?.seats.filter((seat) => seat.team !== claimedSeat.team) ?? [] : [];
+  const canFillAiOpponents = Boolean(
+    inRoom &&
+    snapshot &&
+    claimedSeat &&
+    !snapshot.ai?.enabled &&
+    teammateSeats.length > 0 &&
+    teammateSeats.every((seat) => seat.claimedBy && !seat.ai) &&
+    opponentSeats.length > 0 &&
+    opponentSeats.every((seat) => !seat.claimedBy || seat.ai),
+  );
   return (
     <section
       className={[
@@ -80,6 +94,18 @@ export function RoomPanel({
                 Release
               </button>
             )}
+            {snapshot && (
+              <button
+                type="button"
+                className="ai-action"
+                disabled={!canFillAiOpponents}
+                title={canFillAiOpponents ? "Fill the opposing team with AI" : "Claim all three seats on one team first"}
+                onClick={onFillAiOpponents}
+              >
+                <Bot size={16} />
+                AI opponents
+              </button>
+            )}
             <button type="button" onClick={onLeaveRoom}>
               <LogOut size={16} />
               Local
@@ -90,18 +116,28 @@ export function RoomPanel({
 
       {error && <p className="room-error">{error}</p>}
 
+      {snapshot?.ai?.enabled && (
+        <div className="room-ai-status">
+          <Bot size={16} />
+          <span>AI controls {teams[snapshot.ai.team].name}</span>
+          <small>{aiStatusLabel(snapshot.ai)}</small>
+        </div>
+      )}
+
       {snapshot && (
         <div className="room-seat-grid">
           {snapshot.seats.map((seat) => {
             const claimed = Boolean(seat.claimedBy);
             const mine = seat.playerId === claimedPlayerId;
-            const canRecoverOffline = claimed && !seat.connected && !claimedPlayerId;
+            const canRecoverOffline = claimed && !seat.ai && !seat.connected && !claimedPlayerId;
             const canSwitch = !claimed && Boolean(claimedPlayerId);
             const unavailable = !mine && !canRecoverOffline && !canSwitch && claimed;
             const pendingName = playerName.trim();
             const canUpdateName = mine && pendingName && pendingName !== seat.claimedBy;
             const seatAction = mine
               ? canUpdateName ? "Update name" : "Your seat"
+              : seat.ai
+                ? "AI"
               : seat.claimedBy
                 ? seat.connected
                   ? seat.claimedBy
@@ -119,6 +155,7 @@ export function RoomPanel({
                   unavailable ? "claimed" : "",
                   canSwitch ? "switchable" : "",
                   canRecoverOffline ? "recoverable" : "",
+                  seat.ai ? "ai" : "",
                   !claimed ? "open" : "",
                 ]
                   .filter(Boolean)
@@ -149,4 +186,10 @@ function statusLabel(status: RoomPanelProps["status"], leader?: string) {
   if (status === "loading") return "Connecting";
   if (status === "error") return "Room unavailable";
   return "Claim a seat to store a reconnect token";
+}
+
+function aiStatusLabel(ai: PublicRoomAiState) {
+  if (ai.status === "error") return ai.error ?? "AI stopped";
+  if (ai.status === "running") return ai.actionCount ? `Thinking (${ai.actionCount} actions played)` : "Thinking";
+  return ai.actionCount ? `${ai.actionCount} actions played` : "Waiting for turn";
 }

@@ -3,8 +3,8 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-export const DEFAULT_AI_MODEL = process.env.DUNE_AI_MODEL || "gpt-5.4-mini";
-export const DEFAULT_AI_REASONING_EFFORT = process.env.DUNE_AI_REASONING_EFFORT || "high";
+export const DEFAULT_AI_MODEL = process.env.DUNE_AI_MODEL || "gpt-5.5";
+export const DEFAULT_AI_REASONING_EFFORT = process.env.DUNE_AI_REASONING_EFFORT || "low";
 
 export const AI_HOW_TO_PLAY = readFileSync(
   resolve(dirname(fileURLToPath(import.meta.url)), "../docs/ai-how-to-play.md"),
@@ -13,7 +13,7 @@ export const AI_HOW_TO_PLAY = readFileSync(
 
 const RESPONSE_API_URL = "https://api.openai.com/v1/responses";
 const MAX_ACTION_SNAPSHOT_LOGS = 16;
-const MAX_DISCUSSION_WORDS = 1000;
+const MAX_DISCUSSION_WORDS = 2000;
 
 export async function createAiRuntime(server) {
   const state = await server.ssrLoadModule("/src/game/state.ts");
@@ -118,12 +118,6 @@ export function createMockAiClient() {
         reason: "Mock AI selected the first currently legal action.",
         rawResponse: { mock: true },
       };
-    },
-    async proposeSummary({ teamId, iteration, previousSummary, seatSnapshots }) {
-      return mockSummary(teamId, iteration, previousSummary, seatSnapshots);
-    },
-    async voteSummary() {
-      return { vote: "AGREE", reason: "Mock reviewer accepts the commander summary." };
     },
   };
 }
@@ -1012,7 +1006,7 @@ const submitSummaryTool = {
     properties: {
       summary: {
         type: "string",
-        description: "Shared team summary and future strategy under 1000 words.",
+        description: "Detailed commander after-action summary and future strategy under 2000 words.",
       },
     },
     required: ["summary"],
@@ -1103,27 +1097,12 @@ function publicOnlyDiscussionSnapshot(snapshot) {
 
 function sharedVote(voterPlayerId, vote) {
   const normalizedVote = vote?.vote === "DISAGREE" ? "DISAGREE" : "AGREE";
+  const reason = String(vote?.reason ?? "").trim();
   return {
     voterPlayerId,
     vote: normalizedVote,
-    reason: normalizedVote === "AGREE"
-      ? "Summary accepted."
-      : "Revision requested; private-seat feedback is not shared in S.",
+    reason: reason || (normalizedVote === "AGREE" ? "Summary accepted." : "Revision requested."),
   };
-}
-
-function mockSummary(teamId, iteration, previousSummary, discussionSnapshots) {
-  const commander = discussionSnapshots.find((snapshot) => snapshot.viewerRole === "Commander") ?? discussionSnapshots[0];
-  const teamPlayers = commander.players.filter((player) => player.team === teamId);
-  const enemyPlayers = commander.players.filter((player) => player.team !== teamId);
-  const teamVp = teamPlayers.reduce((sum, player) => sum + player.vp, 0);
-  const enemyVp = enemyPlayers.reduce((sum, player) => sum + player.vp, 0);
-  const text = [
-    `Round ${commander.round} ${teamId} plan v${iteration}: team VP ${teamVp}, opponent VP ${enemyVp}.`,
-    `Prior summary: ${previousSummary || "none"}.`,
-    "Keep resolving legal actions, prioritize reachable VP and influence, buy useful non-Spice-Must-Flow cards before reserve cards, and avoid optional spends unless they clearly advance VP or conflict position.",
-  ].join(" ");
-  return truncateWords(text, MAX_DISCUSSION_WORDS);
 }
 
 async function callSingleTool({ aiClient, model, reasoningEffort, instructions, inputPayload, tool, toolName }) {
@@ -1151,6 +1130,11 @@ export async function discussRoundSummary({
   reasoningEffort = aiClient.reasoningEffort ?? DEFAULT_AI_REASONING_EFFORT,
   maxIterations = 5,
 }) {
+  const canPropose = typeof aiClient.proposeSummary === "function" || typeof aiClient.responsesCreate === "function";
+  const canVote = typeof aiClient.voteSummary === "function" || typeof aiClient.responsesCreate === "function";
+  if (!canPropose || !canVote) {
+    throw new Error("Commander summary generation requires a real AI client or explicit proposeSummary and voteSummary handlers");
+  }
   assert.ok(seatSnapshots.length === 3, "Round discussion expects exactly three team seat snapshots");
   const sharedPrivateNames = privateNamesFromSeatSnapshots(seatSnapshots);
   const discussionSnapshots = seatSnapshots.map(publicOnlyDiscussionSnapshot);
@@ -1178,8 +1162,13 @@ export async function discussRoundSummary({
         toolName: "submit_summary",
         instructions: [
           "You are the commander AI for one Dune: Imperium - Uprising team.",
+          "You generate the shared commander after-action summary for your team.",
           "Use only the public discussion snapshot, prior summary, and public-safe voter signals.",
-          "Return a concise public-safe situation summary and future strategy under 1000 words.",
+          "Write a detailed but public-safe review and future plan under 2000 words.",
+          "Do not paste the prior summary or create recursive 'Prior summary' chains; carry forward only still-actionable points.",
+          "Avoid generic advice. Use concrete public state: VP gap, conflict, resources, influence, agents, troops, spies, board occupancy, public offers, and recent public logs.",
+          "Include these sections in natural language: what happened this round, what failed or was missed, how to adapt to turn the table or widen the lead, seat-by-seat assignments for Commander and both Allies, how the Commander will help teammates, and key risks/denials next round.",
+          "Examples of acceptable specificity: who should rebuild resources after spending combat cards, who should contest the next combat, who can pay for Highliner or another major space, which teammate needs water/Solari/spice, and which public VP/influence path matters next.",
           "Do not mention private hand, Intrigue, objective, manipulated, reserved, or hidden-card details.",
         ].join("\n"),
         inputPayload: {
@@ -1211,9 +1200,10 @@ export async function discussRoundSummary({
           instructions: [
             "You are a teammate AI reviewing the commander's Dune: Imperium - Uprising team summary.",
             "Use only the public discussion snapshot.",
-            "Vote AGREE if it is accurate enough and strategically usable from public state.",
-            "Vote DISAGREE only for a real issue; include a public-safe reason in natural language.",
-            "Do not mention private hand, Intrigue, objective, manipulated, reserved, or hidden-card details.",
+            "Vote AGREE only if it gives a concrete after-action review and actionable next-round assignments from public state.",
+            "Vote DISAGREE if it is generic filler, recursively repeats old summaries, misses failures/adaptation, lacks seat-by-seat jobs, or leaks private information.",
+            "Include feedback in the reason field using round-end public state.",
+            "No intrigue info should be revealed in the feedback; do not name Intrigue cards, describe hidden Intrigue contents, or reveal private Intrigue holdings.",
           ].join("\n"),
           inputPayload: { teamId, summary, howToPlay: AI_HOW_TO_PLAY, voterSnapshot, transcript },
         });

@@ -255,7 +255,16 @@ async function assertAiRoundDiscussionUsesSeatSnapshots() {
       discussionCalls.push({ seatSnapshotCount: args.seatSnapshots?.length });
       discussionStarted = true;
       await discussionGate;
-      return mockClient.proposeSummary(args);
+      return [
+        "Commander review: Shaddam has completed a round and must adapt from public board state.",
+        "What happened: the team reached the next round with AI seats ready to coordinate.",
+        "What failed or may fail: generic plans are not enough; the next S must assign concrete jobs from public resources, conflict, and influence.",
+        "Next-round assignments: Shaddam should route commander help, Feyd should decide whether to rebuild or fight, and Irulan should support the strongest public VP line.",
+        "Commander support: Shaddam will use commander routing and first-player timing to help the teammate with the clearest scoring path.",
+      ].join("\n");
+    },
+    async voteSummary() {
+      return { vote: "AGREE", reason: "Concrete public commander summary." };
     },
   };
   const seedServer = await createRoomServer({ port: 0, log: false, storageFile, aiClient: discussionClient });

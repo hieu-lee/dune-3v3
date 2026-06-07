@@ -93,6 +93,11 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function canGenerateCommanderSummary(aiClient) {
+  return typeof aiClient.responsesCreate === "function"
+    || (typeof aiClient.proposeSummary === "function" && typeof aiClient.voteSummary === "function");
+}
+
 function countBy(items, keyFn) {
   const counts = {};
   for (const item of items) {
@@ -429,6 +434,9 @@ async function discussAllTeams({
   controlledTeamIds,
 }) {
   const results = {};
+  if (!canGenerateCommanderSummary(aiClient)) {
+    return results;
+  }
   for (const teamId of teamsFromGame(room.game).filter((teamId) => controlledTeamIds.has(teamId))) {
     const seatSnapshots = await buildTeamSeatSnapshots({
       baseUrl,
@@ -736,7 +744,9 @@ export async function runAiRoomMonitor({
           assertPrivacy,
           controlledTeamIds,
         });
-        discussions.push({ completedRound, nextRound: room.game.round, result });
+        if (Object.keys(result).length > 0) {
+          discussions.push({ completedRound, nextRound: room.game.round, result });
+        }
         lastDiscussedCompletedRound = completedRound;
       }
 

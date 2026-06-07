@@ -401,6 +401,25 @@ try {
     ],
     maxIterations: 1,
   });
+  await assert.rejects(
+    () => discussRoundSummary({
+      aiClient: {
+        async proposeSummary() {
+          return "Incomplete explicit discussion client.";
+        },
+      },
+      teamId: "muaddib",
+      previousSummary: "",
+      seatSnapshots: [
+        { ...p1TopDeckAiSnapshot, howToPlay: "legacy nested rules doc" },
+        { ...p1TopDeckAiSnapshot, howToPlay: "legacy nested rules doc" },
+        { ...p1TopDeckAiSnapshot, howToPlay: "legacy nested rules doc" },
+      ],
+      maxIterations: 1,
+    }),
+    /requires a real AI client or explicit proposeSummary and voteSummary handlers/,
+    "Explicit commander summary clients should provide both proposal and vote feedback handlers",
+  );
 
   const turnActions = await server.ssrLoadModule("/src/app-turn-actions.ts");
   const boardInfluenceOwnerId = "p2";
@@ -751,9 +770,21 @@ try {
 
   const p3RoomSnapshot = await seatSnapshot(baseUrl, roomId, tokens.get("p3"));
   const p5RoomSnapshot = await seatSnapshot(baseUrl, roomId, tokens.get("p5"));
-  const mockClient = createMockAiClient();
   const discussion = await discussRoundSummary({
-    aiClient: mockClient,
+    aiClient: {
+      async proposeSummary() {
+        return [
+          "Commander review: public VP and board state show the team must convert resources into a concrete VP route next round.",
+          "What happened: the team gained tempo but left a few resource conversions unresolved.",
+          "What failed or may fail: if we spend troops or combat cards without winning VP, we need to rebuild water, spice, and Solari before fighting again.",
+          "Next-round assignments: Muad'Dib should use commander routing to open the best VP line; Gurney should rebuild resources or take the conflict seat if the reward is worth it; Lady Jessica should collect missing water/Solari and protect influence.",
+          "Commander support: Muad'Dib will use first-player timing and routing to help the teammate with the clearest scoring line.",
+        ].join("\n");
+      },
+      async voteSummary() {
+        return { vote: "AGREE", reason: "Concrete public after-action review with seat assignments." };
+      },
+    },
     teamId: "muaddib",
     previousSummary: "",
     seatSnapshots: [
@@ -763,7 +794,18 @@ try {
     ],
   });
   assert.equal(discussion.agreed, true, "Mock AI discussion should reach two AGREE votes");
-  assert.ok(discussion.wordCount <= 1000, "AI summary should stay under 1000 words");
+  assert.equal(
+    discussion.transcript[0].votes.every((vote) => vote.reason === "Concrete public after-action review with seat assignments."),
+    true,
+    "AI discussion should preserve model-generated vote feedback",
+  );
+  assert.ok(discussion.wordCount <= 2000, "AI summary should stay under 2000 words");
+  assert.match(discussion.summary, /What happened:/, "AI summary should include a round outcome section");
+  assert.match(discussion.summary, /What failed or may fail:/, "AI summary should include failures or missed-risk analysis");
+  assert.match(discussion.summary, /Next-round assignments:/, "AI summary should include concrete next-round assignments");
+  assert.match(discussion.summary, /Commander support:/, "AI summary should explain how the Commander will help teammates");
+  assert.equal(discussion.summary.includes("Keep resolving legal actions"), false, "AI summary should not use generic filler advice");
+  assert.equal((discussion.summary.match(/Prior summary/g) ?? []).length, 0, "AI summary should not recursively paste prior summaries");
   const privateName = p1AiSnapshot.players.find((player) => player.id === "p1").hand[0]?.name;
   assert.ok(privateName, "Verifier needs a private card name for redaction coverage");
   const leakyDiscussion = await discussRoundSummary({
@@ -867,7 +909,7 @@ const monitorResult = await runAiRoomMonitor({
 assert.equal(monitorResult.summary.finalPhase, "finished", "Mock AI teams should finish a full game");
 assert.ok(monitorResult.summary.finalRound >= 5, "Mock AI game should progress through multiple full rounds before finishing");
 assert.ok(monitorResult.summary.actionCount > 100, "Mock AI game should exercise many real room actions");
-assert.ok(monitorResult.summary.discussionCount >= 2, "Mock AI teams should discuss across rounds");
+assert.equal(monitorResult.summary.discussionCount, 0, "Mock action-only monitor should not fabricate commander S summaries");
 assert.equal(monitorResult.actionLog.length, monitorResult.summary.actionCount, "Monitor action log should match summary count");
 assert.equal(monitorResult.decisionLog.length, monitorResult.summary.actionCount, "Monitor should capture one AI decision transcript per action");
 assert.equal(monitorResult.monitorReport.decisionCount, monitorResult.summary.actionCount, "Monitor report should count every decision");

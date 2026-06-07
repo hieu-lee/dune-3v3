@@ -294,6 +294,11 @@ export async function createRoomServer({
     return aiClientInstance;
   }
 
+  function aiClientCanGenerateSummary(client) {
+    return typeof client.responsesCreate === "function"
+      || (typeof client.proposeSummary === "function" && typeof client.voteSummary === "function");
+  }
+
   function aiRuntime() {
     aiRuntimePromise ??= createAiRuntime({
       rooms,
@@ -493,6 +498,7 @@ export async function createRoomServer({
   }
 
   async function maybeDiscussAiRound(room, runtime, client) {
+    if (!aiClientCanGenerateSummary(client)) return;
     if (!room.ai?.enabled || room.game.phase !== "playing") return;
     const completedRound = room.game.round - 1;
     if (completedRound < 1 || completedRound <= (room.ai.lastDiscussedCompletedRound ?? 0)) return;

@@ -40,6 +40,11 @@ function sendError(response, status, message) {
   sendJson(response, status, { error: message });
 }
 
+function sendNoContent(response) {
+  response.writeHead(204, { "cache-control": "no-store" });
+  response.end();
+}
+
 async function readJson(request) {
   const chunks = [];
   for await (const chunk of request) chunks.push(chunk);
@@ -56,6 +61,11 @@ function tokenFromRequest(request, url) {
 function sseWrite(response, event, data) {
   response.write(`event: ${event}\n`);
   response.write(`data: ${JSON.stringify(data)}\n\n`);
+}
+
+function sseWriteSerialized(response, event, serializedData) {
+  response.write(`event: ${event}\n`);
+  response.write(`data: ${serializedData}\n\n`);
 }
 
 function clearEndgameReadyForAction(room, action, actorId, previousPhase) {
@@ -341,6 +351,12 @@ export async function createRoomServer({
     });
   }
 
+  async function drainRoomWrites() {
+    while (roomWriteChains.size > 0) {
+      await Promise.allSettled([...roomWriteChains.values()]);
+    }
+  }
+
   async function createRoom() {
     const { initialGame } = await gameState();
     let id = roomCode();
@@ -364,9 +380,16 @@ export async function createRoomServer({
     const roomStreams = streams.get(room.id);
     if (!roomStreams) return;
     const stale = [];
+    const serializedSnapshotsByToken = new Map();
     for (const client of roomStreams) {
       try {
-        sseWrite(client.response, "room", await snapshotFor(room, client.token));
+        const cacheKey = client.token ?? "";
+        let serializedSnapshot = serializedSnapshotsByToken.get(cacheKey);
+        if (!serializedSnapshot) {
+          serializedSnapshot = JSON.stringify(await snapshotFor(room, client.token));
+          serializedSnapshotsByToken.set(cacheKey, serializedSnapshot);
+        }
+        sseWriteSerialized(client.response, "room", serializedSnapshot);
       } catch {
         stale.push(client);
       }
@@ -420,6 +443,13 @@ export async function createRoomServer({
   function requestIsPollSync(request, url) {
     return request.headers["x-room-sync"]?.toString().toLowerCase() === "poll" ||
       url.searchParams.get("sync")?.toLowerCase() === "poll";
+  }
+
+  function roomVersionFromRequest(request, url) {
+    const rawVersion = request.headers["x-room-version"]?.toString() ?? url.searchParams.get("since");
+    if (!rawVersion) return undefined;
+    const version = Number(rawVersion);
+    return Number.isInteger(version) && version > 0 ? version : undefined;
   }
 
   function seatClaimForToken(room, token) {
@@ -671,6 +701,7 @@ export async function createRoomServer({
       const room = rooms.get(roomMatch[1]);
       if (!room) return sendError(response, 404, "Room not found");
       const token = tokenFromRequest(request, url);
+      const knownVersion = roomVersionFromRequest(request, url);
       const claim = Object.values(room.seats).find((seat) => seat?.token === token);
       if (claim) {
         await enqueueRoomWrite(room.id, async () => {
@@ -684,6 +715,9 @@ export async function createRoomServer({
           await persistRooms();
           await broadcast(room);
         });
+      }
+      if (requestIsPollSync(request, url) && knownVersion === room.version && (!token || claim)) {
+        return sendNoContent(response);
       }
       return sendJson(response, 200, await snapshotFor(room, token));
     }
@@ -926,9 +960,10 @@ export async function createRoomServer({
         for (const client of roomStreams) client.response.end();
       }
       await Promise.allSettled([...aiRunPromises]);
-      await Promise.allSettled([...roomWriteChains.values()]);
-      await persistRooms();
+      await drainRoomWrites();
       await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+      await drainRoomWrites();
+      await persistRooms();
       await vite.close();
     },
   };

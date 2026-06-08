@@ -93,6 +93,32 @@ async function assertPollHeartbeatDisconnects() {
       headers: { "x-room-sync": "poll", "x-room-token": token },
     });
     assert.equal(refreshed.response.status, 200, "Poll heartbeat refresh should succeed");
+    const unchanged = await pollJson(`/api/rooms/${roomId}`, {
+      headers: {
+        "x-room-sync": "poll",
+        "x-room-token": token,
+        "x-room-version": String(refreshed.body.version),
+      },
+    });
+    assert.equal(unchanged.response.status, 204, "Unchanged poll heartbeat should avoid returning a full snapshot");
+    assert.equal(unchanged.body, undefined, "Unchanged poll heartbeat should not return a response body");
+    const invalidTokenRefresh = await pollJson(`/api/rooms/${roomId}`, {
+      headers: {
+        "x-room-sync": "poll",
+        "x-room-token": "invalid-token",
+        "x-room-version": String(refreshed.body.version),
+      },
+    });
+    assert.equal(
+      invalidTokenRefresh.response.status,
+      200,
+      "Unchanged poll shortcut should not hide an invalid reconnect token",
+    );
+    assert.equal(
+      invalidTokenRefresh.body.viewerPlayerId,
+      undefined,
+      "Invalid reconnect token refresh should return a public snapshot",
+    );
     await sleep(70);
     const stillConnected = await pollJson(`/api/rooms/${roomId}`);
     assert.equal(

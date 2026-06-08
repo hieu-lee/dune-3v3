@@ -64,17 +64,19 @@ function roomIdFromJoinInput(input: string) {
   }
 }
 
-function roomHeaders(token: string | undefined, syncMode?: RoomSyncMode) {
+function roomHeaders(token: string | undefined, syncMode?: RoomSyncMode, roomVersion?: number) {
   const headers: Record<string, string> = {};
   if (token) headers["x-room-token"] = token;
   if (syncMode === "poll") headers["x-room-sync"] = "poll";
+  if (syncMode === "poll" && roomVersion !== undefined) headers["x-room-version"] = String(roomVersion);
   return Object.keys(headers).length ? headers : undefined;
 }
 
-async function fetchRoom(roomId: string, token?: string, syncMode?: RoomSyncMode) {
+async function fetchRoom(roomId: string, token?: string, syncMode?: RoomSyncMode, roomVersion?: number) {
   const response = await fetch(`/api/rooms/${roomId}`, {
-    headers: roomHeaders(token, syncMode),
+    headers: roomHeaders(token, syncMode, roomVersion),
   });
+  if (response.status === 204) return undefined;
   if (!response.ok) throw new Error((await response.json().catch(() => undefined))?.error ?? "Room not found");
   return await response.json() as RoomSnapshot;
 }
@@ -86,19 +88,84 @@ export function useRoomSession() {
   const [snapshot, setSnapshot] = useState<RoomSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
+  const roomIdRef = useRef(roomId);
+  const snapshotRef = useRef<RoomSnapshot | null>(null);
   const syncGenerationRef = useRef(0);
   const loadGenerationRef = useRef(0);
+  const mutationGenerationRef = useRef(0);
   const [identity, setIdentity] = useState<StoredRoomIdentity | undefined>(() => {
     const initialRoomId = roomIdFromLocation();
     return initialRoomId ? readStoredIdentity(initialRoomId) : undefined;
   });
+  const identityRef = useRef<StoredRoomIdentity | undefined>(identity);
+
+  function storeSnapshot(nextSnapshot: RoomSnapshot | null) {
+    snapshotRef.current = nextSnapshot;
+    setSnapshot(nextSnapshot);
+  }
+
+  function storeRoomId(nextRoomId: string) {
+    roomIdRef.current = nextRoomId;
+    setRoomId(nextRoomId);
+  }
+
+  function storeIdentity(nextIdentity: StoredRoomIdentity | undefined) {
+    identityRef.current = nextIdentity;
+    setIdentity(nextIdentity);
+  }
+
+  function startRoomMutation() {
+    const generation = mutationGenerationRef.current + 1;
+    mutationGenerationRef.current = generation;
+    return generation;
+  }
+
+  function mutationIsCurrent(generation: number, mutationRoomId: string) {
+    return mutationGenerationRef.current === generation && roomIdRef.current === mutationRoomId;
+  }
 
   const acceptSnapshot = useCallback((snapshotRoomId: string, token: string | undefined, nextSnapshot: RoomSnapshot) => {
-    if (token && !nextSnapshot.viewerPlayerId) {
+    const tokenClearsCurrentIdentity = Boolean(token && token === identityRef.current?.token && !nextSnapshot.viewerPlayerId);
+    if (tokenClearsCurrentIdentity) {
       removeStoredIdentity(snapshotRoomId);
-      setIdentity(undefined);
+      storeIdentity(undefined);
     }
-    setSnapshot(nextSnapshot);
+    setSnapshot((currentSnapshot) => {
+      const currentIdentity = identityRef.current;
+      if (
+        currentSnapshot &&
+        currentSnapshot.roomId === nextSnapshot.roomId &&
+        nextSnapshot.version < currentSnapshot.version
+      ) {
+        snapshotRef.current = currentSnapshot;
+        return currentSnapshot;
+      }
+      if (
+        currentSnapshot &&
+        currentSnapshot.roomId === nextSnapshot.roomId &&
+        currentSnapshot.viewerPlayerId !== nextSnapshot.viewerPlayerId &&
+        !tokenClearsCurrentIdentity &&
+        (
+          currentSnapshot.version >= nextSnapshot.version ||
+          currentSnapshot.viewerPlayerId === currentIdentity?.playerId ||
+          nextSnapshot.viewerPlayerId !== currentIdentity?.playerId
+        )
+      ) {
+        snapshotRef.current = currentSnapshot;
+        return currentSnapshot;
+      }
+      if (
+        currentSnapshot &&
+        currentSnapshot.roomId === nextSnapshot.roomId &&
+        currentSnapshot.version === nextSnapshot.version &&
+        currentSnapshot.viewerPlayerId === nextSnapshot.viewerPlayerId
+      ) {
+        snapshotRef.current = currentSnapshot;
+        return currentSnapshot;
+      }
+      snapshotRef.current = nextSnapshot;
+      return nextSnapshot;
+    });
     setStatus("ready");
     setError(null);
   }, []);
@@ -106,19 +173,23 @@ export function useRoomSession() {
   const loadRoom = useCallback(async (nextRoomId: string, nextIdentity = readStoredIdentity(nextRoomId)) => {
     const generation = loadGenerationRef.current + 1;
     loadGenerationRef.current = generation;
+    syncGenerationRef.current += 1;
+    mutationGenerationRef.current += 1;
     setStatus("loading");
     setError(null);
     const nextSyncMode = roomSyncModeFromLocation();
     setSyncMode(nextSyncMode);
-    setRoomId(nextRoomId);
-    setIdentity(nextIdentity);
+    storeRoomId(nextRoomId);
+    storeIdentity(nextIdentity);
+    storeSnapshot(null);
     try {
       const nextSnapshot = await fetchRoom(nextRoomId, nextIdentity?.token, nextSyncMode);
       if (loadGenerationRef.current !== generation) return;
+      if (!nextSnapshot) return;
       acceptSnapshot(nextRoomId, nextIdentity?.token, nextSnapshot);
     } catch (loadError) {
       if (loadGenerationRef.current !== generation) return;
-      setSnapshot(null);
+      storeSnapshot(null);
       setStatus("error");
       setError(loadError instanceof Error ? loadError.message : "Unable to load room");
     }
@@ -130,9 +201,11 @@ export function useRoomSession() {
       setSyncMode(roomSyncModeFromLocation());
       if (!nextRoomId) {
         loadGenerationRef.current += 1;
-        setRoomId("");
-        setSnapshot(null);
-        setIdentity(undefined);
+        syncGenerationRef.current += 1;
+        mutationGenerationRef.current += 1;
+        storeRoomId("");
+        storeSnapshot(null);
+        storeIdentity(undefined);
         setStatus("idle");
         setError(null);
         return;
@@ -145,6 +218,10 @@ export function useRoomSession() {
     // loadRoom intentionally owns the async refresh behavior for the initial URL room.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    snapshotRef.current = snapshot;
+  }, [snapshot]);
 
   useEffect(() => {
     if (!roomId || syncMode !== "events") return undefined;
@@ -177,45 +254,66 @@ export function useRoomSession() {
     if (!roomId || syncMode !== "poll") return undefined;
     const token = identity?.token;
     let active = true;
+    let pollTimeoutId: number | undefined;
     const generation = syncGenerationRef.current + 1;
     syncGenerationRef.current = generation;
     const pollRoom = async () => {
       try {
-        const nextSnapshot = await fetchRoom(roomId, token, "poll");
+        const currentSnapshot = snapshotRef.current;
+        const knownVersion =
+          currentSnapshot?.roomId === roomId &&
+          currentSnapshot.viewerPlayerId === identity?.playerId
+            ? currentSnapshot.version
+            : undefined;
+        const nextSnapshot = await fetchRoom(roomId, token, "poll", knownVersion);
         if (!active || syncGenerationRef.current !== generation) return;
+        if (!nextSnapshot) {
+          setStatus("ready");
+          setError(null);
+          return;
+        }
         acceptSnapshot(roomId, token, nextSnapshot);
       } catch (pollError) {
         if (!active || syncGenerationRef.current !== generation) return;
         setStatus("error");
         setError(pollError instanceof Error ? pollError.message : "Unable to refresh room");
+      } finally {
+        if (active && syncGenerationRef.current === generation) {
+          pollTimeoutId = window.setTimeout(() => {
+            void pollRoom();
+          }, roomPollIntervalMs);
+        }
       }
     };
     void pollRoom();
-    const intervalId = window.setInterval(() => {
-      void pollRoom();
-    }, roomPollIntervalMs);
     return () => {
       active = false;
-      window.clearInterval(intervalId);
+      if (pollTimeoutId !== undefined) window.clearTimeout(pollTimeoutId);
     };
-  }, [acceptSnapshot, identity?.token, roomId, syncMode]);
+  }, [acceptSnapshot, identity?.playerId, identity?.token, roomId, syncMode]);
 
   const createRoom = useCallback(async () => {
     loadGenerationRef.current += 1;
+    syncGenerationRef.current += 1;
+    const mutationGeneration = startRoomMutation();
+    const mutationRoomId = roomIdRef.current;
     setStatus("loading");
     setError(null);
     setSyncMode(roomSyncModeFromLocation());
+    storeSnapshot(null);
     const response = await fetch("/api/rooms", { method: "POST" });
+    if (!mutationIsCurrent(mutationGeneration, mutationRoomId)) return;
     if (!response.ok) {
       setStatus("error");
       setError("Room server is not available");
       return;
     }
     const nextSnapshot = await response.json() as RoomSnapshot;
+    if (!mutationIsCurrent(mutationGeneration, mutationRoomId)) return;
     setRoomUrl(nextSnapshot.roomId);
-    setRoomId(nextSnapshot.roomId);
-    setSnapshot(nextSnapshot);
-    setIdentity(undefined);
+    storeRoomId(nextSnapshot.roomId);
+    storeSnapshot(nextSnapshot);
+    storeIdentity(undefined);
     setStatus("ready");
     setError(null);
   }, []);
@@ -230,21 +328,27 @@ export function useRoomSession() {
   const claimSeat = useCallback(async (playerId: string, name: string) => {
     if (!roomId) return;
     loadGenerationRef.current += 1;
+    const mutationGeneration = startRoomMutation();
+    const mutationRoomId = roomId;
     const response = await fetch(`/api/rooms/${roomId}/seats/${encodeURIComponent(playerId)}/claim`, {
       method: "POST",
       headers: { "content-type": "application/json", ...(syncMode === "poll" ? { "x-room-sync": "poll" } : {}) },
       body: JSON.stringify({ name, token: identity?.token }),
     });
+    if (!mutationIsCurrent(mutationGeneration, mutationRoomId)) return;
     if (!response.ok) {
+      const body = await response.json().catch(() => undefined) as { error?: string } | undefined;
+      if (!mutationIsCurrent(mutationGeneration, mutationRoomId)) return;
       setStatus("error");
-      setError((await response.json().catch(() => undefined))?.error ?? "Unable to claim seat");
+      setError(body?.error ?? "Unable to claim seat");
       return;
     }
     const body = await response.json() as { token: string; snapshot: RoomSnapshot };
+    if (!mutationIsCurrent(mutationGeneration, mutationRoomId)) return;
     const nextIdentity = { playerId, token: body.token };
     writeStoredIdentity(roomId, nextIdentity);
-    setIdentity(nextIdentity);
-    setSnapshot(body.snapshot);
+    storeIdentity(nextIdentity);
+    storeSnapshot(body.snapshot);
     setStatus("ready");
     setError(null);
   }, [identity?.token, roomId, syncMode]);
@@ -252,19 +356,22 @@ export function useRoomSession() {
   const releaseSeat = useCallback(async (playerId: string) => {
     if (!roomId || !identity?.token) return false;
     loadGenerationRef.current += 1;
+    const mutationGeneration = startRoomMutation();
+    const mutationRoomId = roomId;
     const response = await fetch(`/api/rooms/${roomId}/seats/${encodeURIComponent(playerId)}/release`, {
       method: "POST",
       headers: { "x-room-token": identity.token },
     });
     const body = await response.json().catch(() => undefined) as { error?: string; snapshot?: RoomSnapshot } | undefined;
+    if (!mutationIsCurrent(mutationGeneration, mutationRoomId)) return false;
     if (!response.ok) {
       setStatus("error");
       setError(body?.error ?? "Unable to release seat");
       return false;
     }
     removeStoredIdentity(roomId);
-    setIdentity(undefined);
-    if (body?.snapshot) setSnapshot(body.snapshot);
+    storeIdentity(undefined);
+    if (body?.snapshot) storeSnapshot(body.snapshot);
     setStatus("ready");
     setError(null);
     return true;
@@ -272,26 +379,40 @@ export function useRoomSession() {
 
   const fillAiOpponents = useCallback(async () => {
     if (!roomId || !identity?.token) return false;
+    const mutationGeneration = startRoomMutation();
+    const mutationRoomId = roomId;
     setError(null);
     const response = await fetch(`/api/rooms/${roomId}/ai/fill`, {
       method: "POST",
       headers: { "x-room-token": identity.token },
     });
     const body = await response.json().catch(() => undefined) as { error?: string; snapshot?: RoomSnapshot } | undefined;
+    if (!mutationIsCurrent(mutationGeneration, mutationRoomId)) return false;
     if (!response.ok) {
-      if (body?.snapshot) setSnapshot(body.snapshot);
+      if (body?.snapshot) storeSnapshot(body.snapshot);
       setStatus("error");
       setError(body?.error ?? "Unable to fill AI opponents");
       return false;
     }
-    if (body?.snapshot) setSnapshot(body.snapshot);
+    if (body?.snapshot) storeSnapshot(body.snapshot);
     setStatus("ready");
     setError(null);
     return true;
   }, [identity?.token, roomId]);
 
   const sendAction = useCallback(async (action: RoomActionCommand) => {
-    if (!roomId || !identity?.token || !snapshot) return false;
+    if (
+      !roomId ||
+      !identity?.token ||
+      !identity.playerId ||
+      !snapshot ||
+      snapshot.roomId !== roomId ||
+      snapshot.viewerPlayerId !== identity.playerId
+    ) {
+      return false;
+    }
+    const mutationGeneration = startRoomMutation();
+    const mutationRoomId = roomId;
     setError(null);
     const response = await fetch(`/api/rooms/${roomId}/actions`, {
       method: "POST",
@@ -302,26 +423,29 @@ export function useRoomSession() {
       body: JSON.stringify({ baseVersion: snapshot.version, action }),
     });
     const body = await response.json().catch(() => undefined) as { error?: string; snapshot?: RoomSnapshot } | undefined;
+    if (!mutationIsCurrent(mutationGeneration, mutationRoomId)) return false;
     if (!response.ok) {
-      if (body?.snapshot) setSnapshot(body.snapshot);
+      if (body?.snapshot) storeSnapshot(body.snapshot);
       setStatus("error");
       setError(body?.error ?? "Unable to apply room action");
       return false;
     }
     if (body?.snapshot) {
-      setSnapshot(body.snapshot);
+      storeSnapshot(body.snapshot);
       setStatus("ready");
       setError(null);
     }
     return true;
-  }, [identity?.token, roomId, snapshot]);
+  }, [identity?.playerId, identity?.token, roomId, snapshot]);
 
   const leaveRoom = useCallback(() => {
     loadGenerationRef.current += 1;
+    syncGenerationRef.current += 1;
+    mutationGenerationRef.current += 1;
     setRoomUrl();
-    setRoomId("");
-    setSnapshot(null);
-    setIdentity(undefined);
+    storeRoomId("");
+    storeSnapshot(null);
+    storeIdentity(undefined);
     setStatus("idle");
     setError(null);
   }, []);

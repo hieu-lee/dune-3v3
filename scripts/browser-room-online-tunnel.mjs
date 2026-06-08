@@ -19,6 +19,7 @@ await mkdir(outDir, { recursive: true });
 const cloudflaredBin = process.env.CLOUDFLARED_BIN ?? "cloudflared";
 const cloudflaredLog = [];
 const consoleMessages = [];
+const pollAbortRequests = [];
 const requestFailures = [];
 const screenshots = [];
 let server;
@@ -33,6 +34,16 @@ function observePage(page) {
   page.on("requestfailed", (request) => {
     const failure = request.failure()?.errorText;
     if (request.resourceType() === "image" && failure === "net::ERR_ABORTED") return;
+    // Quick tunnels can abort in-flight poll refreshes during context churn; state assertions below verify sync health.
+    if (roomPollRequestWasAborted(request, failure)) {
+      pollAbortRequests.push({
+        method: request.method(),
+        resourceType: request.resourceType(),
+        url: request.url(),
+        failure,
+      });
+      return;
+    }
     requestFailures.push({
       method: request.method(),
       resourceType: request.resourceType(),
@@ -53,6 +64,15 @@ function observePage(page) {
       statusText: response.statusText(),
     });
   });
+}
+
+function roomPollRequestWasAborted(request, failure) {
+  return (
+    request.resourceType() === "fetch" &&
+    request.method() === "GET" &&
+    failure === "net::ERR_ABORTED" &&
+    /^\/api\/rooms\/[A-F0-9]{8}$/.test(new URL(request.url()).pathname)
+  );
 }
 
 async function capture(page, name) {
@@ -108,6 +128,12 @@ async function waitForVisiblePrivateHand(page, playerId) {
     const owner = game?.players.find((player) => player.id === ownerId);
     return Boolean(owner?.hand.length && owner.hand.some((card) => card.name !== "Hidden card"));
   }, playerId);
+}
+
+async function stopRoomPolling(page) {
+  await page.evaluate(() => window.__DUNE_DEBUG__?.leaveRoom?.());
+  await page.waitForFunction(() => !new URL(window.location.href).searchParams.has("room"));
+  await page.waitForTimeout(250);
 }
 
 try {
@@ -167,6 +193,7 @@ try {
   assert.ok(aliceForBob.hand.every((card) => card.name === "Hidden card"), "Public tunnel viewer should not receive another player's hand");
   assert.ok(bobForBob.hand.some((card) => card.name !== "Hidden card"), "Public tunnel viewer should receive their own hand");
   await capture(bobPage, "online-tunnel-bob-claimed.png");
+  await stopRoomPolling(bobPage);
   await bobContext.close();
 
   await alicePage.waitForFunction(() => {
@@ -185,6 +212,7 @@ try {
     window.__DUNE_DEBUG__?.getRoomSnapshot?.()?.seats.find((seat) => seat.playerId === "p2")?.claimedBy === "Bob Reopened"
   );
   await capture(bobRecoveryPage, "online-tunnel-bob-reclaimed.png");
+  await stopRoomPolling(bobRecoveryPage);
   await bobRecoveryContext.close();
 
   await alicePage.reload({ waitUntil: "domcontentloaded", timeout: 60_000 });
@@ -194,6 +222,7 @@ try {
   await waitForVisiblePrivateHand(alicePage, "p1");
   await capture(alicePage, "online-tunnel-alice-reconnected.png");
 
+  await stopRoomPolling(alicePage);
   await aliceContext.close();
 
   const consoleFailures = consoleMessages.filter((message) => message.type === "error" || message.type === "pageerror");
@@ -204,6 +233,7 @@ try {
     cloudflaredVersion,
     consoleErrorCount: consoleFailures.length,
     inviteUrl,
+    pollAbortCount: pollAbortRequests.length,
     publicBaseUrl,
     publicReady,
     requestFailureCount: requestFailures.length,
@@ -213,6 +243,7 @@ try {
   };
   await writeFile(join(outDir, "cloudflared.log"), cloudflaredLog.join("\n"));
   await writeFile(join(outDir, "console.json"), JSON.stringify(consoleMessages, null, 2));
+  await writeFile(join(outDir, "poll-aborts.json"), JSON.stringify(pollAbortRequests, null, 2));
   await writeFile(join(outDir, "request-failures.json"), JSON.stringify(requestFailures, null, 2));
   await writeFile(join(outDir, "summary.json"), JSON.stringify(summary, null, 2));
 
@@ -221,6 +252,7 @@ try {
   console.log(`room ID: ${roomId}`);
   console.log(`screenshot count: ${summary.screenshots.length}`);
   console.log(`console error count: ${summary.consoleErrorCount}`);
+  console.log(`poll abort count: ${summary.pollAbortCount}`);
   console.log(`request failure count: ${summary.requestFailureCount}`);
   console.log(`summary: ${join(outDir, "summary.json")}`);
 } finally {

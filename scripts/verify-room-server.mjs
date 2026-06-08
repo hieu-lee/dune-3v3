@@ -11,7 +11,7 @@ await rm(outDir, { force: true, recursive: true });
 await rm(rootStorageDir, { force: true, recursive: true });
 await rm(publicStorageFile, { force: true });
 await mkdir(outDir, { recursive: true });
-const storageFile = join(outDir, "rooms.json");
+const storageFile = resolve(outDir, "rooms.json");
 
 let server = await createRoomServer({ port: 0, log: false, storageFile });
 let baseUrl = server.resolvedUrls.local[0].replace(/\/$/, "");
@@ -1022,6 +1022,228 @@ try {
     server.rooms.get(legacySpyRoomId)?.version,
     migratedLegacySpyVersion,
     "Canonical spy-post rooms should not be remigrated on the next restart",
+  );
+
+  const legacyPersonalSpyRoom = await jsonFetch("/api/rooms", { method: "POST" });
+  assert.equal(legacyPersonalSpyRoom.response.status, 201, "Legacy personal spy-post room creation should succeed");
+  const legacyPersonalSpyRoomId = legacyPersonalSpyRoom.body.roomId;
+  const legacyPersonalSpyRecord = server.rooms.get(legacyPersonalSpyRoomId);
+  assert.ok(legacyPersonalSpyRecord, "Legacy personal spy-post room should be stored in memory");
+  const legacyPersonalSpyVersion = legacyPersonalSpyRecord.version;
+  legacyPersonalSpyRecord.game = {
+    ...legacyPersonalSpyRecord.game,
+    spyPosts: {
+      ...legacyPersonalSpyRecord.game.spyPosts,
+      "vast-wealth": "p4",
+    },
+    sharedSpyPosts: {
+      ...legacyPersonalSpyRecord.game.sharedSpyPosts,
+      "hardy-warriors": ["p1"],
+    },
+    players: legacyPersonalSpyRecord.game.players.map((candidate) =>
+      candidate.id === "p1" || candidate.id === "p4" ? { ...candidate, spies: 0 } : candidate
+    ),
+  };
+  await restartServer();
+  const migratedLegacyPersonalSpyRecord = server.rooms.get(legacyPersonalSpyRoomId);
+  assert.ok(migratedLegacyPersonalSpyRecord, "Legacy personal spy-post room should load after restart");
+  assert.equal(
+    migratedLegacyPersonalSpyRecord.version,
+    legacyPersonalSpyVersion + 1,
+    "Legacy personal spy-post migration should bump the room version",
+  );
+  assert.equal(
+    migratedLegacyPersonalSpyRecord.game.spyPosts["vast-wealth"],
+    undefined,
+    "Legacy personal spy-post migration should delete primary Commander personal-board spies",
+  );
+  assert.equal(
+    migratedLegacyPersonalSpyRecord.game.sharedSpyPosts["hardy-warriors"],
+    undefined,
+    "Legacy personal spy-post migration should delete shared Commander personal-board spies",
+  );
+  assert.equal(
+    player({ game: migratedLegacyPersonalSpyRecord.game }, "p4").spies,
+    1,
+    "Legacy personal spy-post migration should refund primary Commander personal-board spies",
+  );
+  assert.equal(
+    player({ game: migratedLegacyPersonalSpyRecord.game }, "p1").spies,
+    1,
+    "Legacy personal spy-post migration should refund shared Commander personal-board spies",
+  );
+  assert.equal(
+    spyPostCount(migratedLegacyPersonalSpyRecord.game, "p4"),
+    0,
+    "Legacy personal spy-post migration should not preserve Commander personal-board spy counts",
+  );
+
+  const activeLegacyPersonalSpyRecallRoom = await jsonFetch("/api/rooms", { method: "POST" });
+  assert.equal(
+    activeLegacyPersonalSpyRecallRoom.response.status,
+    201,
+    "Active legacy personal spy-recall room creation should succeed",
+  );
+  const activeLegacyPersonalSpyRecallRoomId = activeLegacyPersonalSpyRecallRoom.body.roomId;
+  const activeLegacyPersonalSpyRecallRecord = server.rooms.get(activeLegacyPersonalSpyRecallRoomId);
+  assert.ok(activeLegacyPersonalSpyRecallRecord, "Active legacy personal spy-recall room should be stored in memory");
+  const activeLegacyPersonalSpyRecallVersion = activeLegacyPersonalSpyRecallRecord.version;
+  activeLegacyPersonalSpyRecallRecord.game = {
+    ...activeLegacyPersonalSpyRecallRecord.game,
+    spyPosts: {
+      ...activeLegacyPersonalSpyRecallRecord.game.spyPosts,
+      "vast-wealth": "p4",
+    },
+    sharedSpyPosts: {},
+    pendingAction: {
+      kind: "recall-spy",
+      ownerId: "p4",
+      combatRecipientId: "p4",
+      remaining: 1,
+      strength: 0,
+      source: "Verifier Legacy Personal Spy Recall",
+      optional: false,
+      spaceIds: ["vast-wealth"],
+    },
+    pendingQueue: [],
+    players: activeLegacyPersonalSpyRecallRecord.game.players.map((candidate) =>
+      candidate.id === "p4" ? { ...candidate, spies: 0 } : candidate
+    ),
+  };
+  await restartServer();
+  const migratedActiveLegacyPersonalSpyRecallRecord = server.rooms.get(activeLegacyPersonalSpyRecallRoomId);
+  assert.ok(migratedActiveLegacyPersonalSpyRecallRecord, "Active legacy personal spy-recall room should load after restart");
+  assert.equal(
+    migratedActiveLegacyPersonalSpyRecallRecord.version,
+    activeLegacyPersonalSpyRecallVersion + 1,
+    "Active legacy personal spy-recall migration should bump the room version",
+  );
+  assert.equal(
+    migratedActiveLegacyPersonalSpyRecallRecord.game.pendingAction,
+    undefined,
+    "Active legacy personal spy-recall migration should clear impossible personal-board recall pending actions",
+  );
+  assert.equal(
+    player({ game: migratedActiveLegacyPersonalSpyRecallRecord.game }, "p4").spies,
+    1,
+    "Active legacy personal spy-recall migration should still refund the deleted personal-board spy",
+  );
+
+  const activePartialLegacyPersonalSpyRecallRoom = await jsonFetch("/api/rooms", { method: "POST" });
+  assert.equal(
+    activePartialLegacyPersonalSpyRecallRoom.response.status,
+    201,
+    "Active partial legacy personal spy-recall room creation should succeed",
+  );
+  const activePartialLegacyPersonalSpyRecallRoomId = activePartialLegacyPersonalSpyRecallRoom.body.roomId;
+  const activePartialLegacyPersonalSpyRecallRecord = server.rooms.get(activePartialLegacyPersonalSpyRecallRoomId);
+  assert.ok(
+    activePartialLegacyPersonalSpyRecallRecord,
+    "Active partial legacy personal spy-recall room should be stored in memory",
+  );
+  const activePartialLegacyPersonalSpyRecallVersion = activePartialLegacyPersonalSpyRecallRecord.version;
+  activePartialLegacyPersonalSpyRecallRecord.game = {
+    ...activePartialLegacyPersonalSpyRecallRecord.game,
+    spyPosts: {
+      ...activePartialLegacyPersonalSpyRecallRecord.game.spyPosts,
+      "vast-wealth": "p4",
+      arrakeen: "p4",
+    },
+    sharedSpyPosts: {},
+    pendingAction: {
+      kind: "recall-spy",
+      ownerId: "p4",
+      combatRecipientId: "p4",
+      remaining: 2,
+      strength: 7,
+      source: "Verifier Partial Legacy Personal Spy Recall",
+      optional: false,
+    },
+    pendingQueue: [],
+    players: activePartialLegacyPersonalSpyRecallRecord.game.players.map((candidate) =>
+      candidate.id === "p4" ? { ...candidate, spies: 0 } : candidate
+    ),
+  };
+  await restartServer();
+  const migratedActivePartialLegacyPersonalSpyRecallRecord = server.rooms.get(activePartialLegacyPersonalSpyRecallRoomId);
+  assert.ok(
+    migratedActivePartialLegacyPersonalSpyRecallRecord,
+    "Active partial legacy personal spy-recall room should load after restart",
+  );
+  assert.equal(
+    migratedActivePartialLegacyPersonalSpyRecallRecord.version,
+    activePartialLegacyPersonalSpyRecallVersion + 1,
+    "Active partial legacy personal spy-recall migration should bump the room version",
+  );
+  assert.equal(
+    migratedActivePartialLegacyPersonalSpyRecallRecord.game.pendingAction,
+    undefined,
+    "Active partial legacy personal spy-recall migration should clear multi-spy recalls with too few remaining choices",
+  );
+  assert.equal(
+    player({ game: migratedActivePartialLegacyPersonalSpyRecallRecord.game }, "p4").spies,
+    1,
+    "Active partial legacy personal spy-recall migration should refund only the deleted personal-board spy",
+  );
+  assert.equal(
+    migratedActivePartialLegacyPersonalSpyRecallRecord.game.spyPosts["arrakeen-spice-refinery"],
+    "p4",
+    "Active partial legacy personal spy-recall migration should preserve the still-valid spy post",
+  );
+
+  const activePersonalSpyConflictConversionRoom = await jsonFetch("/api/rooms", { method: "POST" });
+  assert.equal(
+    activePersonalSpyConflictConversionRoom.response.status,
+    201,
+    "Active personal spy VP-conversion room creation should succeed",
+  );
+  const activePersonalSpyConflictConversionRoomId = activePersonalSpyConflictConversionRoom.body.roomId;
+  const activePersonalSpyConflictConversionRecord = server.rooms.get(activePersonalSpyConflictConversionRoomId);
+  assert.ok(
+    activePersonalSpyConflictConversionRecord,
+    "Active personal spy VP-conversion room should be stored in memory",
+  );
+  const activePersonalSpyConflictConversionVersion = activePersonalSpyConflictConversionRecord.version;
+  activePersonalSpyConflictConversionRecord.game = {
+    ...activePersonalSpyConflictConversionRecord.game,
+    spyPosts: {
+      ...activePersonalSpyConflictConversionRecord.game.spyPosts,
+      "vast-wealth": "p4",
+    },
+    sharedSpyPosts: {},
+    pendingAction: {
+      kind: "conflict-vp-conversion",
+      ownerId: "p4",
+      source: "Verifier Partial Personal Spy Conversion",
+      remaining: 1,
+      vp: 1,
+      cost: { kind: "recall-spies", count: 2, recalled: 1 },
+    },
+    pendingQueue: [],
+    players: activePersonalSpyConflictConversionRecord.game.players.map((candidate) =>
+      candidate.id === "p4" ? { ...candidate, spies: 0 } : candidate
+    ),
+  };
+  await restartServer();
+  const migratedActivePersonalSpyConflictConversionRecord = server.rooms.get(activePersonalSpyConflictConversionRoomId);
+  assert.ok(
+    migratedActivePersonalSpyConflictConversionRecord,
+    "Active personal spy VP-conversion room should load after restart",
+  );
+  assert.equal(
+    migratedActivePersonalSpyConflictConversionRecord.version,
+    activePersonalSpyConflictConversionVersion + 1,
+    "Active personal spy VP-conversion migration should bump the room version",
+  );
+  assert.equal(
+    migratedActivePersonalSpyConflictConversionRecord.game.pendingAction,
+    undefined,
+    "Active personal spy VP-conversion migration should clear partial conversions with no remaining recall choices",
+  );
+  assert.equal(
+    player({ game: migratedActivePersonalSpyConflictConversionRecord.game }, "p4").spies,
+    1,
+    "Active personal spy VP-conversion migration should refund the deleted personal-board spy",
   );
 
   const activeLegacySpyRoom = await jsonFetch("/api/rooms", { method: "POST" });

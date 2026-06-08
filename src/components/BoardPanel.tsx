@@ -1,5 +1,5 @@
 import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { Crown, FileText, Hexagon, Sparkles, Swords, Users } from "lucide-react";
+import { Crown, FileText, Sparkles, Swords, Users } from "lucide-react";
 import { costLabel, factionShortLabels } from "../app-helpers";
 import { locationControlOwnerId } from "../game/critical-locations";
 import { boardSpaces, factionLabels as factionFullLabels, iconLabels, teams } from "../game/data";
@@ -77,6 +77,7 @@ type BoardStageMeasurements = {
   width: number;
   height: number;
   spaces: Record<string, SpaceMeasurement>;
+  blockers: readonly SpaceMeasurement[];
 };
 
 type Point = {
@@ -91,6 +92,7 @@ const spySlotOutsideGap = 34;
 const spySlotOccupiedMargin = 36;
 
 const emptyBoardStageMeasurements: BoardStageMeasurements = {
+  blockers: [],
   width: 0,
   height: 0,
   spaces: {},
@@ -175,10 +177,6 @@ const singletonSpySlotVectors: Partial<Record<string, Point>> = {
   "habbanya-erg": { x: 0, y: -1 },
   "hagga-basin": { x: 0, y: -1 },
   "imperial-basin": { x: 0, y: -1 },
-  "hardy-warriors": { x: 0, y: -1 },
-  "desert-mastery": { x: 0, y: -1 },
-  "vast-wealth": { x: 0, y: -1 },
-  sardaukar: { x: 0, y: -1 },
 };
 
 function slotBoundsOverlapMeasurement(point: Point, measurement: SpaceMeasurement) {
@@ -192,7 +190,8 @@ function slotBoundsOverlapMeasurement(point: Point, measurement: SpaceMeasuremen
 }
 
 function pointOverlapsAnySpace(point: Point, stage: BoardStageMeasurements) {
-  return Object.values(stage.spaces).some((measurement) => slotBoundsOverlapMeasurement(point, measurement));
+  return [...Object.values(stage.spaces), ...stage.blockers]
+    .some((measurement) => slotBoundsOverlapMeasurement(point, measurement));
 }
 
 function singletonCandidatePoint(vector: Point, measurement: SpaceMeasurement, stage: BoardStageMeasurements): Point {
@@ -209,9 +208,9 @@ function singletonSpySlotPoint(spaceId: string, measurement: SpaceMeasurement, s
   const preferredVector = singletonSpySlotVectors[spaceId] ?? { x: 0, y: -1 };
   const vectors = [
     preferredVector,
-    { x: 0, y: -1 },
     { x: 1, y: 0 },
     { x: -1, y: 0 },
+    { x: 0, y: -1 },
     { x: 0, y: 1 },
   ];
   for (const vector of vectors) {
@@ -247,6 +246,66 @@ function pushPointOutsideMeasurement(point: Point, measurement: SpaceMeasurement
   };
 }
 
+function pushPointOutsideMeasurements(
+  point: Point,
+  measurements: readonly SpaceMeasurement[],
+  stage: BoardStageMeasurements,
+): Point {
+  let pushed = point;
+  for (let index = 0; index < 3; index += 1) {
+    pushed = measurements.reduce((current, measurement) => pushPointOutsideMeasurement(current, measurement, stage), pushed);
+  }
+  return pushed;
+}
+
+function groupedMeasurementBounds(measurements: readonly SpaceMeasurement[]) {
+  const left = Math.min(...measurements.map(measurementLeft));
+  const right = Math.max(...measurements.map(measurementRight));
+  const top = Math.min(...measurements.map(measurementTop));
+  const bottom = Math.max(...measurements.map(measurementBottom));
+  return {
+    bottom,
+    centerX: (left + right) / 2,
+    centerY: (top + bottom) / 2,
+    left,
+    right,
+    top,
+  };
+}
+
+function clampSpySlotPoint(point: Point, stage: BoardStageMeasurements): Point {
+  return {
+    x: clamp(point.x, spySlotClampPadding, Math.max(spySlotClampPadding, stage.width - spySlotClampPadding)),
+    y: clamp(point.y, spySlotClampPadding, Math.max(spySlotClampPadding, stage.height - spySlotClampPadding)),
+  };
+}
+
+function cleanGroupedSpySlotPoint(
+  preferredPoint: Point,
+  measurements: readonly SpaceMeasurement[],
+  stage: BoardStageMeasurements,
+): Point {
+  const bounds = groupedMeasurementBounds(measurements);
+  const gap = spySlotOutsideGap;
+  const candidates = [
+    preferredPoint,
+    { x: bounds.centerX, y: bounds.top - gap },
+    { x: bounds.right + gap, y: bounds.centerY },
+    { x: bounds.left - gap, y: bounds.centerY },
+    { x: bounds.centerX, y: bounds.bottom + gap },
+    { x: bounds.right + gap, y: bounds.top - gap },
+    { x: bounds.left - gap, y: bounds.top - gap },
+    { x: bounds.right + gap, y: bounds.bottom + gap },
+    { x: bounds.left - gap, y: bounds.bottom + gap },
+  ].map((candidate) => clampSpySlotPoint(candidate, stage));
+
+  for (const candidate of candidates) {
+    if (!pointOverlapsAnySpace(candidate, stage)) return candidate;
+  }
+
+  return pushPointOutsideMeasurements(preferredPoint, [...measurements, ...stage.blockers], stage);
+}
+
 function multiSpaceSpySlotPoint(measurements: readonly SpaceMeasurement[], stage: BoardStageMeasurements): Point {
   const center = measurements.reduce(
     (total, measurement) => ({
@@ -255,14 +314,11 @@ function multiSpaceSpySlotPoint(measurements: readonly SpaceMeasurement[], stage
     }),
     { x: 0, y: 0 },
   );
-  let point = {
+  const point = {
     x: center.x / measurements.length,
     y: center.y / measurements.length,
   };
-  for (let index = 0; index < 3; index += 1) {
-    point = measurements.reduce((current, measurement) => pushPointOutsideMeasurement(current, measurement, stage), point);
-  }
-  return point;
+  return cleanGroupedSpySlotPoint(point, measurements, stage);
 }
 
 function measurementTop(measurement: SpaceMeasurement) {
@@ -334,7 +390,8 @@ function spySlotPointForPost(
     const imperialPrivilege = bySpaceId.get("imperial-privilege");
     const swordmaster = bySpaceId.get("swordmaster");
     if (highCouncil && imperialPrivilege && swordmaster) {
-      return {
+      const measurements = measuredSpaces.map(({ measurement }) => measurement);
+      return cleanGroupedSpySlotPoint({
         x: clamp(
           (measurementRight(imperialPrivilege) + measurementLeft(swordmaster)) / 2,
           spySlotClampPadding,
@@ -345,15 +402,21 @@ function spySlotPointForPost(
           spySlotClampPadding,
           Math.max(spySlotClampPadding, stage.height - spySlotClampPadding),
         ),
-      };
+      }, measurements, stage);
     }
   }
 
   if (measuredSpaces.length === 2) {
-    return pairSpySlotPoint(measuredSpaces[0].measurement, measuredSpaces[1].measurement, stage);
+    const measurements = measuredSpaces.map(({ measurement }) => measurement);
+    return cleanGroupedSpySlotPoint(
+      pairSpySlotPoint(measuredSpaces[0].measurement, measuredSpaces[1].measurement, stage),
+      measurements,
+      stage,
+    );
   }
 
-  return multiSpaceSpySlotPoint(measuredSpaces.map(({ measurement }) => measurement), stage);
+  const measurements = measuredSpaces.map(({ measurement }) => measurement);
+  return cleanGroupedSpySlotPoint(multiSpaceSpySlotPoint(measurements, stage), measurements, stage);
 }
 
 function edgePointToward(measurement: SpaceMeasurement, target: Point): Point {
@@ -453,18 +516,22 @@ export function BoardPanel({
     const measure = () => {
       const stageRect = stage.getBoundingClientRect();
       const spaces: Record<string, SpaceMeasurement> = {};
-      stage.querySelectorAll<HTMLElement>("[data-space-id]").forEach((element) => {
-        const spaceId = element.dataset.spaceId;
-        if (!spaceId) return;
+      const measureElement = (element: HTMLElement): SpaceMeasurement => {
         const rect = element.getBoundingClientRect();
-        spaces[spaceId] = {
+        return {
           centerX: rect.left + rect.width / 2 - stageRect.left,
           centerY: rect.top + rect.height / 2 - stageRect.top,
           height: rect.height,
           width: rect.width,
         };
+      };
+      stage.querySelectorAll<HTMLElement>("[data-space-id]").forEach((element) => {
+        const spaceId = element.dataset.spaceId;
+        if (!spaceId) return;
+        spaces[spaceId] = measureElement(element);
       });
       setStageMeasurements({
+        blockers: Array.from(stage.querySelectorAll<HTMLElement>("[data-spy-blocker]")).map(measureElement),
         height: stageRect.height,
         spaces,
         width: stageRect.width,
@@ -475,6 +542,7 @@ export function BoardPanel({
     const resizeObserver = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(measure);
     resizeObserver?.observe(stage);
     stage.querySelectorAll<HTMLElement>("[data-space-id]").forEach((element) => resizeObserver?.observe(element));
+    stage.querySelectorAll<HTMLElement>("[data-spy-blocker]").forEach((element) => resizeObserver?.observe(element));
     window.addEventListener("resize", measure);
     return () => {
       resizeObserver?.disconnect();
@@ -619,7 +687,14 @@ export function BoardPanel({
             {legal ? "Legal placement" : "Unavailable placement"}
           </span>
         )}
-        {artPath && <img className="space-art" src={artPath} alt="" loading="lazy" />}
+        {artPath && (
+          <span className="space-art-frame" aria-hidden="true">
+            <img className="space-art" src={space.thumbnailPath ?? artPath} alt="" loading="lazy" />
+            {artPath !== space.thumbnailPath && (
+              <img key={artPath} className="space-art space-art--bonus" src={artPath} alt="" loading="lazy" />
+            )}
+          </span>
+        )}
         <span className="space-occupancy" aria-hidden="true">
           {occupant ? "Occupied" : "Open"}
         </span>
@@ -690,7 +765,7 @@ export function BoardPanel({
     const fullLabel = factionFullLabels[faction];
 
     return (
-      <div className="influence-track" data-faction-id={faction}>
+      <div className="influence-track" data-faction-id={faction} data-spy-blocker="">
         <div className="influence-track-header">
           <span>{factionShortLabels[faction]}</span>
           <strong>{fullLabel}</strong>
@@ -742,7 +817,7 @@ export function BoardPanel({
         data-region-id={region.id}
         aria-label={region.title}
       >
-        <header className="board-region-header">
+        <header className="board-region-header" data-spy-blocker="">
           <span>{region.subtitle}</span>
           <strong>{region.title}</strong>
         </header>
@@ -756,18 +831,6 @@ export function BoardPanel({
 
   return (
     <section className="board-panel" aria-label="Six-player board spaces">
-      <div className="board-header">
-        <div>
-          <p className="eyebrow">6p board side</p>
-          <h2>Agent Placement</h2>
-        </div>
-        <div className="legend">
-          <span><Hexagon size={14} /> legal</span>
-          <span><Users size={14} /> team</span>
-          <span><Swords size={14} /> combat</span>
-        </div>
-      </div>
-
       <div className="board-stage" ref={boardStageRef}>
         <aside className="board-faction-rail" aria-label="Faction board columns">
           {factionRegions.map((region) => renderRegion(region, "faction"))}

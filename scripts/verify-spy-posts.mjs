@@ -172,10 +172,6 @@ try {
     { space: habbanyaErg, postId: "habbanya-erg", spaceIds: [habbanyaErg.id], label: "Habbanya Erg" },
     { space: haggaBasin, postId: "hagga-basin", spaceIds: [haggaBasin.id], label: "Hagga Basin" },
     { space: imperialBasin, postId: "imperial-basin", spaceIds: [imperialBasin.id], label: "Imperial Basin" },
-    { space: hardyWarriors, postId: "hardy-warriors", spaceIds: [hardyWarriors.id], label: "Hardy Warriors" },
-    { space: desertMastery, postId: "desert-mastery", spaceIds: [desertMastery.id], label: "Desert Mastery" },
-    { space: vastWealth, postId: "vast-wealth", spaceIds: [vastWealth.id], label: "Vast Wealth" },
-    { space: sardaukar, postId: "sardaukar", spaceIds: [sardaukar.id], label: "Sardaukar" },
   ];
   for (const expected of observationPostExpectations) {
     assert.equal(
@@ -201,6 +197,275 @@ try {
       .filter((spaceId) => !observationChoiceSpaceIds.includes(spaceId)),
     [],
     "Every physical observation post should expose its representative board space as a choice",
+  );
+  assert.deepEqual(
+    [hardyWarriors, desertMastery, vastWealth, sardaukar]
+      .map((space) => space.id)
+      .filter((spaceId) => observationChoiceSpaceIds.includes(spaceId)),
+    [],
+    "Commander personal-board spaces should not appear as spy-post choices",
+  );
+  const legacyPersonalSpyState = {
+    ...game,
+    spyPosts: { [vastWealth.id]: shaddam.id },
+    sharedSpyPosts: { [hardyWarriors.id]: [muaddib.id, feyd.id] },
+  };
+  assert.deepEqual(
+    spies.spyPostOwnerIds(legacyPersonalSpyState, vastWealth.id),
+    [],
+    "Legacy personal-board spy records should not count as active spy owners",
+  );
+  assert.equal(
+    spies.playerHasSpyPost(legacyPersonalSpyState, vastWealth.id, shaddam.id),
+    false,
+    "Legacy personal-board spy records should not enable spy entry",
+  );
+  assert.equal(
+    spies.spyPostRecallCountForOwner(legacyPersonalSpyState, vastWealth.id, shaddam.id),
+    0,
+    "Legacy personal-board spy records should not count as recallable spies",
+  );
+  assert.deepEqual(
+    spies.spyEntrySpaceIdsForOccupiedSpace(legacyPersonalSpyState, vastWealth.id, shaddam.id),
+    [],
+    "Legacy personal-board spy records should not expose spy-entry choices",
+  );
+  const normalizedLegacyPersonalSpyState = spies.normalizeSpyObservationPosts(legacyPersonalSpyState);
+  assert.equal(
+    normalizedLegacyPersonalSpyState.spyPosts[vastWealth.id],
+    undefined,
+    "Normalization should delete legacy primary spies from Commander personal-board spaces",
+  );
+  assert.equal(
+    normalizedLegacyPersonalSpyState.sharedSpyPosts[hardyWarriors.id],
+    undefined,
+    "Normalization should delete legacy shared spies from Commander personal-board spaces",
+  );
+  assert.equal(
+    playerById(normalizedLegacyPersonalSpyState, shaddam.id).spies,
+    shaddam.spies + 1,
+    "Normalization should refund a legacy personal-board primary spy",
+  );
+  assert.equal(
+    playerById(normalizedLegacyPersonalSpyState, muaddib.id).spies,
+    muaddib.spies + 1,
+    "Normalization should refund a legacy personal-board shared spy",
+  );
+  assert.equal(
+    playerById(normalizedLegacyPersonalSpyState, feyd.id).spies,
+    feyd.spies + 1,
+    "Normalization should refund every legacy personal-board shared spy owner",
+  );
+  const legacyPersonalSpyRecallState = spies.normalizeSpyObservationPosts({
+    ...legacyPersonalSpyState,
+    spyPosts: { [vastWealth.id]: shaddam.id, [arrakeen.id]: shaddam.id },
+    pendingAction: {
+      kind: "recall-spy",
+      ownerId: shaddam.id,
+      combatRecipientId: shaddam.id,
+      remaining: 1,
+      strength: 0,
+      source: "legacy personal spy recall",
+      optional: false,
+      spaceIds: [vastWealth.id],
+    },
+    pendingQueue: [{
+      kind: "recall-spy",
+      ownerId: shaddam.id,
+      combatRecipientId: shaddam.id,
+      remaining: 1,
+      strength: 0,
+      source: "queued deleted recall",
+      optional: false,
+      spaceIds: [vastWealth.id],
+    }, {
+      kind: "recall-spy",
+      ownerId: shaddam.id,
+      combatRecipientId: shaddam.id,
+      remaining: 1,
+      strength: 0,
+      source: "queued valid recall",
+      optional: false,
+      spaceIds: [arrakeen.id],
+    }],
+  });
+  assert.deepEqual(
+    legacyPersonalSpyRecallState.pendingAction?.spaceIds,
+    [arrakeen.id],
+    "Normalization should advance past active recall pendings that only targeted deleted personal-board spies",
+  );
+  assert.deepEqual(
+    legacyPersonalSpyRecallState.pendingQueue,
+    [],
+    "Normalization should remove the consumed queued pending after advancing a deleted personal-board spy recall",
+  );
+  const strandedPersonalSpyRecallState = spies.normalizeSpyObservationPosts({
+    ...legacyPersonalSpyState,
+    spyPosts: { [arrakeen.id]: shaddam.id },
+    sharedSpyPosts: {},
+    pendingAction: {
+      kind: "recall-spy",
+      ownerId: shaddam.id,
+      combatRecipientId: shaddam.id,
+      remaining: 1,
+      strength: 0,
+      source: "stranded personal spy recall",
+      optional: false,
+      spaceIds: [vastWealth.id],
+    },
+    pendingQueue: [{
+      kind: "recall-spy",
+      ownerId: shaddam.id,
+      combatRecipientId: shaddam.id,
+      remaining: 1,
+      strength: 0,
+      source: "stranded queued valid recall",
+      optional: false,
+      spaceIds: [arrakeen.id],
+    }],
+  });
+  assert.deepEqual(
+    strandedPersonalSpyRecallState.pendingAction?.spaceIds,
+    [arrakeen.id],
+    "Normalization should advance stranded personal-board recall pendings even after spy records were already deleted",
+  );
+  assert.deepEqual(
+    strandedPersonalSpyRecallState.pendingQueue,
+    [],
+    "Normalization should consume the queued valid recall after clearing a stranded personal-board recall",
+  );
+  const partialMultiSpyRecallState = spies.normalizeSpyObservationPosts({
+    ...legacyPersonalSpyState,
+    spyPosts: { [vastWealth.id]: shaddam.id, [arrakeen.id]: shaddam.id },
+    sharedSpyPosts: {},
+    pendingAction: {
+      kind: "recall-spy",
+      ownerId: shaddam.id,
+      combatRecipientId: shaddam.id,
+      remaining: 2,
+      strength: 7,
+      source: "partial multi-spy recall",
+      optional: false,
+    },
+    pendingQueue: [{
+      kind: "recall-spy",
+      ownerId: shaddam.id,
+      combatRecipientId: shaddam.id,
+      remaining: 1,
+      strength: 0,
+      source: "queued valid recall after partial",
+      optional: false,
+      spaceIds: [arrakeen.id],
+    }],
+  });
+  assert.deepEqual(
+    partialMultiSpyRecallState.pendingAction?.spaceIds,
+    [arrakeen.id],
+    "Normalization should drop active multi-spy recall pendings when deleted personal-board spies leave too few recallable spies",
+  );
+  assert.deepEqual(
+    partialMultiSpyRecallState.pendingQueue,
+    [],
+    "Normalization should promote the queued valid recall after dropping an insufficient multi-spy recall",
+  );
+  const partialPersonalSpyConflictConversionState = spies.normalizeSpyObservationPosts({
+    ...legacyPersonalSpyState,
+    spyPosts: { [vastWealth.id]: shaddam.id, [arrakeen.id]: shaddam.id },
+    sharedSpyPosts: {},
+    pendingAction: {
+      kind: "conflict-vp-conversion",
+      ownerId: shaddam.id,
+      source: "partial personal spy conversion",
+      remaining: 1,
+      vp: 1,
+      cost: { kind: "recall-spies", count: 3, recalled: 1 },
+    },
+    pendingQueue: [{
+      kind: "recall-spy",
+      ownerId: shaddam.id,
+      combatRecipientId: shaddam.id,
+      remaining: 1,
+      strength: 0,
+      source: "queued recall after impossible conversion",
+      optional: false,
+      spaceIds: [arrakeen.id],
+    }],
+  });
+  assert.deepEqual(
+    partialPersonalSpyConflictConversionState.pendingAction?.spaceIds,
+    [arrakeen.id],
+    "Normalization should advance stranded partial spy VP conversions after deleting personal-board spies",
+  );
+  assert.deepEqual(
+    partialPersonalSpyConflictConversionState.pendingQueue,
+    [],
+    "Normalization should consume the queued recall after clearing a stranded partial spy VP conversion",
+  );
+  const legacyPersonalSpyRecallWithoutQueue = {
+    ...legacyPersonalSpyState,
+    spyPosts: { [vastWealth.id]: shaddam.id },
+    sharedSpyPosts: {},
+    pendingAction: {
+      kind: "recall-spy",
+      ownerId: shaddam.id,
+      combatRecipientId: shaddam.id,
+      remaining: 1,
+      strength: 0,
+      source: "legacy missing pending queue",
+      optional: false,
+      spaceIds: [vastWealth.id],
+    },
+  };
+  delete legacyPersonalSpyRecallWithoutQueue.pendingQueue;
+  const normalizedLegacyPersonalSpyRecallWithoutQueue = spies.normalizeSpyObservationPosts(
+    legacyPersonalSpyRecallWithoutQueue,
+  );
+  assert.equal(
+    normalizedLegacyPersonalSpyRecallWithoutQueue.pendingAction,
+    undefined,
+    "Normalization should clear an impossible personal-board recall even when legacy state has no pendingQueue",
+  );
+  assert.deepEqual(
+    normalizedLegacyPersonalSpyRecallWithoutQueue.pendingQueue,
+    [],
+    "Normalization should restore a missing legacy pendingQueue when clearing an impossible personal-board recall",
+  );
+  const duplicateWithDroppedPersonalRecall = spies.normalizeSpyObservationPosts({
+    ...legacyPersonalSpyState,
+    players: game.players.map((player) => player.id === feyd.id ? { ...player, spies: 0 } : player),
+    spyPosts: { [vastWealth.id]: feyd.id, [arrakeen.id]: feyd.id, [spiceRefinery.id]: feyd.id },
+    sharedSpyPosts: {},
+    pendingAction: {
+      kind: "recall-spy",
+      ownerId: feyd.id,
+      combatRecipientId: feyd.id,
+      remaining: 1,
+      strength: 0,
+      source: "deleted personal-board recall with separate duplicate",
+      optional: false,
+      spaceIds: [vastWealth.id],
+    },
+    pendingQueue: [],
+  });
+  assert.equal(
+    duplicateWithDroppedPersonalRecall.pendingAction,
+    undefined,
+    "Normalization should drop an impossible personal-board recall before preserving duplicate spy credits",
+  );
+  assert.equal(
+    duplicateWithDroppedPersonalRecall.spyPosts[spies.spyObservationPostIdForSpace(arrakeen.id)],
+    feyd.id,
+    "A valid duplicate post should still canonicalize after the personal-board recall is dropped",
+  );
+  assert.equal(
+    duplicateWithDroppedPersonalRecall.sharedSpyPosts[spies.spyObservationPostIdForSpace(arrakeen.id)],
+    undefined,
+    "Dropped personal-board recalls should not preserve duplicate recall credit on unrelated valid posts",
+  );
+  assert.equal(
+    playerById(duplicateWithDroppedPersonalRecall, feyd.id).spies,
+    2,
+    "Dropping the impossible recall should refund both the deleted personal spy and the unrelated duplicate token",
   );
   assert.equal(
     observationChoiceSpaceIds.includes(spiceRefinery.id),
@@ -883,9 +1148,14 @@ try {
     "Swordmaster observation post should stay usable because the space remains available to unclaimed players",
   );
 
-  assert.equal(spies.canPlaceSpyPost(game, vastWealth, shaddam), true, "Shaddam Commander can use Shaddam personal spaces");
+  assert.equal(spies.canPlaceSpyPost(game, vastWealth, shaddam), false, "Commander personal spaces should not allow spy placement");
   assert.equal(spies.canPlaceSpyPost(game, vastWealth, feyd), false, "Allies cannot use Commander personal spaces");
   assert.equal(spies.canPlaceSpyPost(game, vastWealth, muaddib), false, "Opposing Commanders cannot use personal spaces");
+  assert.equal(
+    spies.canPlaceSharedSpyPost({ ...game, spyPosts: { [vastWealth.id]: feyd.id } }, vastWealth, shaddam),
+    false,
+    "Commander personal spaces should not allow shared spy placement",
+  );
 
   const occupiedArrakeen = { ...game, spyPosts: { [arrakeen.id]: "p3" } };
   assert.equal(

@@ -162,6 +162,7 @@ export async function runBoardStatesSmoke({
   );
   assert.equal(compactStats.scoreRails, 0, "Board should not render the old vertical VP rail");
   assert.equal(compactStats.conflictStrengthTracks, 0, "Board should not render the unused conflict strength number rail");
+  assert.equal(compactStats.boardHeaders, 0, "Board should not render the redundant board title and legend row");
   assert.equal(compactStats.logOpen, false, "Table log should start collapsed by default");
   assert.equal(compactStats.vpChips, 6, "Each player seat should render a VP chip");
   assert.ok(compactStats.vpChipLabels.some((label) => label.includes("4 VP")), "Seat VP chips should expose player VP values");
@@ -204,6 +205,16 @@ export async function runBoardStatesSmoke({
     "Commander personal influence tracks should render in the Commander dock",
   );
   assert.ok(denseStats.makerMarkers >= 4, "Dense board state should include all Maker space markers");
+  assert.equal(
+    denseStats.spySlotBlockerOverlaps,
+    0,
+    "Spy observation post rings should not overlap board region headers or influence tracks",
+  );
+  assert.equal(
+    denseStats.commanderSpySlots,
+    0,
+    "Commander personal-board spaces should not render spy observation post rings",
+  );
   assert.deepEqual(
     denseStats.makerSpaceArtSources,
     expectedMakerArtPaths,
@@ -481,8 +492,10 @@ async function waitForBoardLocationArt(page, expectedBoardSpaceCount) {
   });
   await page.waitForFunction(
     ({ expectedCount }) => {
+      const frames = Array.from(document.querySelectorAll(".space-art-frame"));
       const images = Array.from(document.querySelectorAll(".space-art"));
-      return images.length === expectedCount &&
+      return frames.length === expectedCount &&
+        images.length >= expectedCount &&
         images.every((image) =>
           image instanceof HTMLImageElement &&
           image.complete &&
@@ -495,30 +508,47 @@ async function waitForBoardLocationArt(page, expectedBoardSpaceCount) {
 }
 
 async function boardMarkerStats(page) {
-  return page.evaluate(() => ({
-    agentMarkerLabels: Array.from(document.querySelectorAll(".agent-marker")).map((marker) => marker.textContent ?? ""),
-    agentMarkers: document.querySelectorAll(".agent-marker").length,
-    allianceHolderLabels: Object.fromEntries(Array.from(document.querySelectorAll(".influence-track")).map((track) => [
-      track.getAttribute("data-faction-id") ?? "",
-      track.querySelector(".influence-track-marker.holds-alliance")?.getAttribute("aria-label") ?? "",
-    ])),
-    allianceMarkers: document.querySelectorAll(".influence-track-marker.holds-alliance").length,
-    controlMarkers: document.querySelectorAll(".control-marker").length,
-    highCouncilAgentMarker: document.querySelector('[data-testid="space-high-council"] .agent-marker')?.textContent ?? "",
-    influenceFactions: Array.from(document.querySelectorAll(".influence-track"))
-      .map((track) => track.getAttribute("data-faction-id") ?? "")
-      .sort(),
-    influenceTrackLabels: Array.from(document.querySelectorAll(".influence-track")).map((track) => track.textContent ?? ""),
-    influenceTracks: document.querySelectorAll(".influence-track").length,
-    makerMarkers: document.querySelectorAll(".maker-marker").length,
-    makerSpaceArtSources: Object.fromEntries(Array.from(document.querySelectorAll(".space-tile.maker")).map((tile) => [
-      tile.getAttribute("data-space-id") ?? "",
-      tile.querySelector(".space-art")?.getAttribute("src") ?? "",
-    ]).sort(([first], [second]) => first.localeCompare(second))),
-    occupied: document.querySelectorAll(".space-tile.occupied").length,
-    personalOccupied: document.querySelectorAll(".space-tile.personal.occupied").length,
-    spyMarkers: document.querySelectorAll(".spy-marker").length,
-  }));
+  return page.evaluate(() => {
+    const rectsOverlap = (first, second) =>
+      first.left < second.right &&
+      first.right > second.left &&
+      first.top < second.bottom &&
+      first.bottom > second.top;
+    const spySlots = Array.from(document.querySelectorAll(".spy-network-slot"));
+    const blockers = Array.from(document.querySelectorAll("[data-spy-blocker]"));
+    return {
+      agentMarkerLabels: Array.from(document.querySelectorAll(".agent-marker")).map((marker) => marker.textContent ?? ""),
+      agentMarkers: document.querySelectorAll(".agent-marker").length,
+      allianceHolderLabels: Object.fromEntries(Array.from(document.querySelectorAll(".influence-track")).map((track) => [
+        track.getAttribute("data-faction-id") ?? "",
+        track.querySelector(".influence-track-marker.holds-alliance")?.getAttribute("aria-label") ?? "",
+      ])),
+      allianceMarkers: document.querySelectorAll(".influence-track-marker.holds-alliance").length,
+      commanderSpySlots: document.querySelectorAll(
+        '[data-spy-space-id="hardy-warriors"], [data-spy-space-id="desert-mastery"], [data-spy-space-id="vast-wealth"], [data-spy-space-id="sardaukar"]',
+      ).length,
+      controlMarkers: document.querySelectorAll(".control-marker").length,
+      highCouncilAgentMarker: document.querySelector('[data-testid="space-high-council"] .agent-marker')?.textContent ?? "",
+      influenceFactions: Array.from(document.querySelectorAll(".influence-track"))
+        .map((track) => track.getAttribute("data-faction-id") ?? "")
+        .sort(),
+      influenceTrackLabels: Array.from(document.querySelectorAll(".influence-track")).map((track) => track.textContent ?? ""),
+      influenceTracks: document.querySelectorAll(".influence-track").length,
+      makerMarkers: document.querySelectorAll(".maker-marker").length,
+      makerSpaceArtSources: Object.fromEntries(Array.from(document.querySelectorAll(".space-tile.maker")).map((tile) => [
+        tile.getAttribute("data-space-id") ?? "",
+        tile.querySelector(".space-art--bonus")?.getAttribute("src") ??
+          tile.querySelector(".space-art")?.getAttribute("src") ?? "",
+      ]).sort(([first], [second]) => first.localeCompare(second))),
+      occupied: document.querySelectorAll(".space-tile.occupied").length,
+      personalOccupied: document.querySelectorAll(".space-tile.personal.occupied").length,
+      spyMarkers: document.querySelectorAll(".spy-marker").length,
+      spySlotBlockerOverlaps: spySlots.reduce((count, slot) => {
+        const slotRect = slot.getBoundingClientRect();
+        return count + blockers.filter((blocker) => rectsOverlap(slotRect, blocker.getBoundingClientRect())).length;
+      }, 0),
+    };
+  });
 }
 
 async function boardPlacementStats(page) {
@@ -537,7 +567,7 @@ async function compactBoardStats(page) {
   return page.evaluate(() => {
     const tile = document.querySelector('[data-testid="space-imperial-privilege"]');
     const details = tile?.querySelector(".space-hover-details");
-    const art = tile?.querySelector(".space-art");
+    const art = tile?.querySelector(".space-art-frame");
     const tileRect = tile?.getBoundingClientRect();
     const artRect = art?.getBoundingClientRect();
     const artRatio = tileRect && artRect
@@ -545,6 +575,7 @@ async function compactBoardStats(page) {
       : 0;
     return {
       conflictStrengthTracks: document.querySelectorAll(".conflict-strength-track").length,
+      boardHeaders: document.querySelectorAll(".board-header").length,
       imperialPrivilegeArtRatio: artRatio,
       imperialPrivilegeDetailVisible: details
         ? Number.parseFloat(getComputedStyle(details).opacity) > 0.9
@@ -566,13 +597,15 @@ async function boardAssetFitStats(page) {
     return tiles.reduce(
       (stats, tile) => {
         const tileRect = tile.getBoundingClientRect();
+        const frames = Array.from(tile.querySelectorAll(".space-art-frame"));
         const images = Array.from(tile.querySelectorAll(".space-art"));
         stats.tileCount += 1;
-        if (images.length === 0) {
+        stats.artFrameCount += frames.length;
+        if (frames.length === 0) {
           stats.missingArtTileCount += 1;
           return stats;
         }
-        if (images.length > 1) stats.multipleArtTileCount += 1;
+        if (frames.length > 1) stats.multipleArtFrameTileCount += 1;
         for (const art of images) {
           const style = getComputedStyle(art);
           const artRect = art.getBoundingClientRect();
@@ -594,12 +627,13 @@ async function boardAssetFitStats(page) {
         return stats;
       },
       {
+        artFrameCount: 0,
         artOverflowTileCount: 0,
         croppedArtCount: 0,
         imageCount: 0,
         missingArtTileCount: 0,
         missingNaturalSizeCount: 0,
-        multipleArtTileCount: 0,
+        multipleArtFrameTileCount: 0,
         tileCount: 0,
         transformedArtCount: 0,
       },
@@ -614,9 +648,13 @@ function assertBoardAssetFitStats(stats, expectedBoardSpaceCount, phaseLabel) {
     `${phaseLabel} should render every board-space tile`,
   );
   assert.equal(
-    stats.imageCount,
+    stats.artFrameCount,
     expectedBoardSpaceCount,
-    `${phaseLabel} should render exactly one location art image for every board space`,
+    `${phaseLabel} should render exactly one location art frame for every board space`,
+  );
+  assert.ok(
+    stats.imageCount >= expectedBoardSpaceCount,
+    `${phaseLabel} should render at least one loaded location art image for every board space`,
   );
   assert.equal(
     stats.missingArtTileCount,
@@ -624,9 +662,9 @@ function assertBoardAssetFitStats(stats, expectedBoardSpaceCount, phaseLabel) {
     `${phaseLabel} should not have board spaces without location art`,
   );
   assert.equal(
-    stats.multipleArtTileCount,
+    stats.multipleArtFrameTileCount,
     0,
-    `${phaseLabel} should not render duplicate location art images in a board space`,
+    `${phaseLabel} should not render duplicate location art frames in a board space`,
   );
   assert.equal(
     stats.croppedArtCount,

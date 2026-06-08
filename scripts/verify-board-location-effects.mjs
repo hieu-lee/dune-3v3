@@ -258,18 +258,20 @@ try {
   };
   assert.deepEqual(
     state.spyEntrySpaceIdsForOccupiedSpace(standaloneSpyEntryBase, spaces.vastWealth.id, "p4"),
-    [spaces.vastWealth.id],
-    "Occupied standalone spy-post spaces should expose their own spy slot for entry",
+    [],
+    "Legacy Commander personal-board spy records should not expose spy-entry choices",
+  );
+  assert.equal(
+    state.agentSpaceAvailable(standaloneSpyEntryBase, spaces.vastWealth, playerById(standaloneSpyEntryBase, "p4")),
+    false,
+    "Legacy Commander personal-board spy records should not make occupied personal spaces available",
   );
   const standaloneSpyEntry = place(turnActions, standaloneSpyEntryBase, emperorCard, spaces.vastWealth);
-  assert.equal(standaloneSpyEntry.spaces[spaces.vastWealth.id], "p3", "Standalone spy entry should preserve the original Agent");
-  assert.deepEqual(
-    standaloneSpyEntry.agentPlacementCoOwners?.[spaces.vastWealth.id],
-    ["p4"],
-    "Standalone spy entry should record the entering Commander as co-located",
+  assert.equal(
+    standaloneSpyEntry,
+    standaloneSpyEntryBase,
+    "Direct placement should reject occupied Commander personal spaces with only a legacy personal-board spy",
   );
-  assert.equal(standaloneSpyEntry.spyPosts[spaces.vastWealth.id], undefined, "Standalone spy entry should recall the spy");
-  assert.equal(playerById(standaloneSpyEntry, "p4").spies, 1, "Standalone spy entry should return the spy to supply");
 
   const occupiedShippingSpyEntryBase = {
     ...playableGame(state, "p2", spiceCard, (player) => ({
@@ -394,17 +396,11 @@ try {
     sharedSpyPosts: {},
   };
   const standaloneSpyVisitDrawPending = place(turnActions, standaloneSpyVisitDrawBase, emperorCard, spaces.vastWealth);
-  assert.equal(
+  assert.notEqual(
     standaloneSpyVisitDrawPending.pendingAction?.kind,
     "recall-spy",
-    "Visiting a standalone spy-post space with your spy still there should offer a recall",
+    "Visiting a Commander personal-board space with only a legacy personal spy should not offer a recall",
   );
-  assert.deepEqual(
-    standaloneSpyVisitDrawPending.pendingAction?.spaceIds,
-    [spaces.vastWealth.id],
-    "Standalone spy visit draw should recall from that standalone space",
-  );
-  assert.equal(standaloneSpyVisitDrawPending.pendingAction?.drawCards, 1);
 
   const spyVisitDrawBase = {
     ...playableGame(state, "p2", spyVisitCard, (player) => ({

@@ -57,6 +57,7 @@ for (const post of spyObservationPosts) {
 }
 const observedSpaceIds = new Set(spyObservationPosts.flatMap((post) => post.spaceIds));
 const boardSpaceNameById = new Map(boardSpaces.map((space) => [space.id, space.name]));
+const personalBoardSpaceIds = new Set(boardSpaces.filter((space) => space.personal).map((space) => space.id));
 
 function uniqueValues<T>(values: readonly T[]) {
   return Array.from(new Set(values));
@@ -86,13 +87,17 @@ function spyObservationPostStorageIdsForPost(post: SpyObservationPost) {
 }
 
 function spyObservationPostStorageIdsForSpace(spaceId: string) {
+  if (personalBoardSpaceIds.has(spaceId)) return [];
   const post = spyObservationPostForSpace(spaceId);
   return post ? spyObservationPostStorageIdsForPost(post) : [spaceId];
 }
 
 export function spyObservationPostChoiceSpaces() {
   const representativeSpaceIds = new Set(spyObservationPosts.map(spyObservationPostRepresentativeSpaceId));
-  return boardSpaces.filter((space) => representativeSpaceIds.has(space.id) || !observedSpaceIds.has(space.id));
+  return boardSpaces.filter((space) =>
+    !space.personal &&
+    (representativeSpaceIds.has(space.id) || !observedSpaceIds.has(space.id))
+  );
 }
 
 function arraysEqual(first: readonly string[], second: readonly string[]) {
@@ -112,11 +117,61 @@ function pendingSpyRecallOwnerId(action: GameState["pendingAction"]) {
 }
 
 function pendingSpyRecallOwnerIds(state: GameState) {
+  const pendingQueue = Array.isArray(state.pendingQueue) ? state.pendingQueue : [];
   return new Set(
-    [state.pendingAction, ...(state.pendingQueue ?? [])]
+    [state.pendingAction, ...pendingQueue]
       .map(pendingSpyRecallOwnerId)
       .filter((ownerId): ownerId is string => Boolean(ownerId)),
   );
+}
+
+function recallableSpyPostCountForOwner(
+  state: SpyPostState,
+  ownerId: string,
+  allowedSpaceIds?: ReadonlySet<string>,
+) {
+  return spyObservationPostChoiceSpaces().reduce((count, space) => {
+    if (allowedSpaceIds && !allowedSpaceIds.has(space.id)) return count;
+    return count + spyPostRecallCountForOwner(state, space.id, ownerId);
+  }, 0);
+}
+
+function spyRecallPendingHasChoices(state: SpyPostState, action: GameState["pendingAction"]) {
+  if (action?.kind === "recall-spy") {
+    const allowedSpaceIds = action.spaceIds ? new Set(action.spaceIds) : undefined;
+    return recallableSpyPostCountForOwner(state, action.ownerId, allowedSpaceIds) >= action.remaining;
+  }
+
+  if (action?.kind === "conflict-vp-conversion" && action.cost.kind === "recall-spies") {
+    const needed = action.cost.count - action.cost.recalled;
+    if (needed <= 0 || action.cost.recalled <= 0) return true;
+    return recallableSpyPostCountForOwner(state, action.ownerId) >= needed;
+  }
+
+  return true;
+}
+
+function advancePastUnresolvableSpyRecalls(state: GameState) {
+  const previousPendingQueue = Array.isArray(state.pendingQueue) ? state.pendingQueue : [];
+  const pendingQueue = previousPendingQueue.filter((action) => spyRecallPendingHasChoices(state, action));
+  let nextState =
+    pendingQueue.length === previousPendingQueue.length && state.pendingQueue === previousPendingQueue
+      ? state
+      : { ...state, pendingQueue };
+  let changed = nextState !== state;
+
+  while (!spyRecallPendingHasChoices(nextState, nextState.pendingAction)) {
+    const [pendingAction, ...pendingQueue] = nextState.pendingQueue;
+    nextState = {
+      ...nextState,
+      pendingAction,
+      pendingQueue,
+      ...(!pendingAction ? { conflictDeploymentBlock: undefined } : {}),
+    };
+    changed = true;
+  }
+
+  return changed ? nextState : state;
 }
 
 export function spyObservationPostLabelForSpace(spaceId: string) {
@@ -137,6 +192,7 @@ export function spyPostOwnerIds(
   state: SpyPostState,
   spaceId: string,
 ) {
+  if (personalBoardSpaceIds.has(spaceId)) return [];
   const posts = observationPostsByObservedSpaceId.get(spaceId);
   const storageIds = posts
     ? posts.flatMap(spyObservationPostStorageIdsForPost)
@@ -184,6 +240,7 @@ export function spyPostRecallCountForOwner(
 }
 
 export function spyObservationPostChoiceSpaceIdsForObservedSpace(spaceId: string) {
+  if (personalBoardSpaceIds.has(spaceId)) return [];
   const posts = observationPostsByObservedSpaceId.get(spaceId) ?? [];
   return posts.length > 0 ? posts.map(spyObservationPostRepresentativeSpaceId) : [spaceId];
 }
@@ -202,8 +259,26 @@ export function normalizeSpyObservationPosts(state: GameState): GameState {
   const spyPosts = { ...state.spyPosts };
   const sharedSpyPosts = { ...state.sharedSpyPosts };
   const refundedSpies = new Map<string, number>();
-  const deferredRecallOwnerIds = pendingSpyRecallOwnerIds(state);
   let changed = false;
+
+  for (const spaceId of personalBoardSpaceIds) {
+    const primaryOwner = state.spyPosts[spaceId];
+    const sharedOwners = state.sharedSpyPosts[spaceId] ?? [];
+    if (!primaryOwner && sharedOwners.length === 0) continue;
+
+    changed = true;
+    if (primaryOwner) refundedSpies.set(primaryOwner, (refundedSpies.get(primaryOwner) ?? 0) + 1);
+    for (const ownerId of sharedOwners) {
+      refundedSpies.set(ownerId, (refundedSpies.get(ownerId) ?? 0) + 1);
+    }
+    delete spyPosts[spaceId];
+    delete sharedSpyPosts[spaceId];
+  }
+
+  const personalNormalizedState = changed ? { ...state, spyPosts, sharedSpyPosts } : state;
+  const pendingBaseline = advancePastUnresolvableSpyRecalls(personalNormalizedState);
+  const deferredRecallOwnerIds = pendingSpyRecallOwnerIds(pendingBaseline);
+  changed = changed || pendingBaseline !== personalNormalizedState;
 
   for (const post of spyObservationPosts) {
     const storageIds = spyObservationPostStorageIdsForPost(post);
@@ -252,17 +327,17 @@ export function normalizeSpyObservationPosts(state: GameState): GameState {
     if (finalSharedOwners.length > 0) sharedSpyPosts[post.id] = finalSharedOwners;
   }
 
-  if (!changed) return state;
+  if (!changed) return advancePastUnresolvableSpyRecalls(state);
 
-  return {
-    ...state,
+  return advancePastUnresolvableSpyRecalls({
+    ...pendingBaseline,
     players: state.players.map((player) => {
       const refund = refundedSpies.get(player.id) ?? 0;
       return refund > 0 ? { ...player, spies: player.spies + refund } : player;
     }),
     spyPosts,
     sharedSpyPosts,
-  };
+  });
 }
 
 export function removeSpyPostOwner(
@@ -342,8 +417,8 @@ export function canUseSpyPost(
   owner: Player,
 ) {
   void state;
-  if (!space.personal) return true;
-  return owner.role === "Commander" && owner.team === space.personal;
+  void owner;
+  return !space.personal;
 }
 
 export function canPlaceSpyPost(

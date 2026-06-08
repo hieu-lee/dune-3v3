@@ -22,8 +22,8 @@ export async function runPendingChoicesSmoke({
   assert.match(pendingText, /recall spy/i);
   assert.match(pendingText, /Arrakeen/i);
   assert.match(pendingText, /Imperial Basin/i);
-  assert.equal(await page.locator(".board-panel .spy-network-slot").count(), 19, "Board should render all spy post slots");
-  assert.equal(await page.locator(".board-panel .spy-network-lines line").count(), 30, "Board should render spy post connection edges");
+  assert.equal(await page.locator(".board-panel .spy-network-slot").count(), 15, "Board should render all non-personal spy post slots");
+  assert.equal(await page.locator(".board-panel .spy-network-lines line").count(), 26, "Board should render non-personal spy post connection edges");
   assert.equal(await page.locator(".board-panel .spy-network-slot.is-legal").count(), 2, "Recall spy pending should make owned board slots actionable");
   await assertSpyNetworkGeometry(page, "Recall spy");
   await screenshot(page, captures, "pending-recall-spy.png");
@@ -47,7 +47,7 @@ export async function runPendingChoicesSmoke({
   const firstCoverageText = await page.locator(".pending-panel .spy-choice-coverage").first().innerText();
   assert.match(firstCoverageText, /Military Support/i);
   assert.match(firstCoverageText, /Economic Support/i);
-  assert.equal(await page.locator(".board-panel .spy-network-slot").count(), 19, "Board should render all spy post slots during placement");
+  assert.equal(await page.locator(".board-panel .spy-network-slot").count(), 15, "Board should render all non-personal spy post slots during placement");
   assert.equal(await page.locator(".board-panel .spy-network-slot.is-legal").count(), 15, "Spy placement should make every legal Ally board slot actionable");
   await assertSpyNetworkGeometry(page, "Spy placement");
   await screenshot(page, captures, "pending-place-spy.png");

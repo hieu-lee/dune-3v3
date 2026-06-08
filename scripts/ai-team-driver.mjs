@@ -4,7 +4,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const DEFAULT_AI_MODEL = process.env.DUNE_AI_MODEL || "gpt-5.5";
-export const DEFAULT_AI_REASONING_EFFORT = process.env.DUNE_AI_REASONING_EFFORT || "low";
+export const DEFAULT_AI_REASONING_EFFORT = process.env.DUNE_AI_REASONING_EFFORT || "medium";
 
 export const AI_HOW_TO_PLAY = readFileSync(
   resolve(dirname(fileURLToPath(import.meta.url)), "../docs/ai-how-to-play.md"),

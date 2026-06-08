@@ -97,6 +97,7 @@ const emptyBoardStageMeasurements: BoardStageMeasurements = {
   height: 0,
   spaces: {},
 };
+const measurementTolerancePx = 0.5;
 
 function classToken(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -104,6 +105,38 @@ function classToken(value: string) {
 
 function plural(value: number, singular: string) {
   return `${value} ${singular}${value === 1 ? "" : "s"}`;
+}
+
+function measurementsMatch(first: SpaceMeasurement, second: SpaceMeasurement) {
+  return (
+    Math.abs(first.centerX - second.centerX) <= measurementTolerancePx &&
+    Math.abs(first.centerY - second.centerY) <= measurementTolerancePx &&
+    Math.abs(first.width - second.width) <= measurementTolerancePx &&
+    Math.abs(first.height - second.height) <= measurementTolerancePx
+  );
+}
+
+function spaceMeasurementsMatch(
+  first: Record<string, SpaceMeasurement>,
+  second: Record<string, SpaceMeasurement>,
+) {
+  const firstKeys = Object.keys(first);
+  const secondKeys = Object.keys(second);
+  if (firstKeys.length !== secondKeys.length) return false;
+  return firstKeys.every((spaceId) => {
+    const secondMeasurement = second[spaceId];
+    return Boolean(secondMeasurement) && measurementsMatch(first[spaceId], secondMeasurement);
+  });
+}
+
+function boardStageMeasurementsMatch(first: BoardStageMeasurements, second: BoardStageMeasurements) {
+  return (
+    Math.abs(first.width - second.width) <= measurementTolerancePx &&
+    Math.abs(first.height - second.height) <= measurementTolerancePx &&
+    first.blockers.length === second.blockers.length &&
+    first.blockers.every((blocker, index) => measurementsMatch(blocker, second.blockers[index])) &&
+    spaceMeasurementsMatch(first.spaces, second.spaces)
+  );
 }
 
 function rewardBadges(space: BoardSpace) {
@@ -530,12 +563,15 @@ export function BoardPanel({
         if (!spaceId) return;
         spaces[spaceId] = measureElement(element);
       });
-      setStageMeasurements({
+      const nextMeasurements = {
         blockers: Array.from(stage.querySelectorAll<HTMLElement>("[data-spy-blocker]")).map(measureElement),
         height: stageRect.height,
         spaces,
         width: stageRect.width,
-      });
+      };
+      setStageMeasurements((currentMeasurements) =>
+        boardStageMeasurementsMatch(currentMeasurements, nextMeasurements) ? currentMeasurements : nextMeasurements
+      );
     };
 
     measure();
@@ -548,7 +584,7 @@ export function BoardPanel({
       resizeObserver?.disconnect();
       window.removeEventListener("resize", measure);
     };
-  }, [game.players, game.spaces, game.spyPosts, game.sharedSpyPosts]);
+  }, []);
 
   function renderSpyNetwork() {
     if (stageMeasurements.width <= 0 || stageMeasurements.height <= 0 || spySlotLayouts.length === 0) return null;

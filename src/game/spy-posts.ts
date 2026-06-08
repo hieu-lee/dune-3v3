@@ -58,6 +58,11 @@ for (const post of spyObservationPosts) {
 const observedSpaceIds = new Set(spyObservationPosts.flatMap((post) => post.spaceIds));
 const boardSpaceNameById = new Map(boardSpaces.map((space) => [space.id, space.name]));
 const personalBoardSpaceIds = new Set(boardSpaces.filter((space) => space.personal).map((space) => space.id));
+const representativeSpaceIds = new Set(spyObservationPosts.map(spyObservationPostRepresentativeSpaceId));
+const spyObservationPostChoiceSpaceList: readonly BoardSpace[] = boardSpaces.filter((space) =>
+  !space.personal &&
+  (representativeSpaceIds.has(space.id) || !observedSpaceIds.has(space.id))
+);
 
 function uniqueValues<T>(values: readonly T[]) {
   return Array.from(new Set(values));
@@ -93,11 +98,7 @@ function spyObservationPostStorageIdsForSpace(spaceId: string) {
 }
 
 export function spyObservationPostChoiceSpaces() {
-  const representativeSpaceIds = new Set(spyObservationPosts.map(spyObservationPostRepresentativeSpaceId));
-  return boardSpaces.filter((space) =>
-    !space.personal &&
-    (representativeSpaceIds.has(space.id) || !observedSpaceIds.has(space.id))
-  );
+  return spyObservationPostChoiceSpaceList;
 }
 
 function arraysEqual(first: readonly string[], second: readonly string[]) {

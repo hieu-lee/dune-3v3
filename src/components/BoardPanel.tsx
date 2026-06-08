@@ -21,6 +21,7 @@ import {
   factionRegions,
   type BoardRegionSpec,
 } from "./board-layout";
+import { makerSpiceAssetPathFor } from "./maker-spice-assets";
 
 type BoardPanelProps = {
   game: GameState;
@@ -584,6 +585,8 @@ export function BoardPanel({
     const legal = legalSpaceIds.has(space.id);
     const selected = playingPhase && selectedSpaceId === space.id;
     const unavailable = placementDecisionActive && !legal;
+    const makerBonusSpice = space.maker ? game.makerSpice[space.id] ?? 0 : 0;
+    const artPath = makerSpiceAssetPathFor(space.id, makerBonusSpice) ?? space.thumbnailPath;
     const badges = rewardBadges(space);
     const spaceClass = [
       "space-tile",
@@ -616,7 +619,7 @@ export function BoardPanel({
             {legal ? "Legal placement" : "Unavailable placement"}
           </span>
         )}
-        {space.thumbnailPath && <img className="space-art" src={space.thumbnailPath} alt="" loading="lazy" />}
+        {artPath && <img className="space-art" src={artPath} alt="" loading="lazy" />}
         <span className="space-occupancy" aria-hidden="true">
           {occupant ? "Occupied" : "Open"}
         </span>

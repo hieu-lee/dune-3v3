@@ -33,11 +33,25 @@ const locationControl = {
 };
 
 const makerSpice = {
-  "imperial-basin": 2,
+  "imperial-basin": 0,
   "habbanya-erg": 3,
-  "hagga-basin": 1,
-  "deep-desert": 4,
+  "hagga-basin": 4,
+  "deep-desert": 1,
 };
+
+const originalMakerArtPaths = {
+  "deep-desert": "/assets/dune-cards-hub/location/uprising-location-deet-desert.webp",
+  "habbanya-erg": "/assets/dune-cards-hub/location/uprising-location-habbanya-erg.webp",
+  "hagga-basin": "/assets/dune-cards-hub/location/uprising-location-hagga-basin.webp",
+  "imperial-basin": "/assets/dune-cards-hub/location/uprising-location-imperial-basin.webp",
+};
+
+const expectedMakerArtPaths = Object.fromEntries(Object.entries(makerSpice).map(([spaceId, bonusSpice]) => [
+  spaceId,
+  bonusSpice >= 1 && bonusSpice <= 5
+    ? `/assets/dune-cards-hub/location/maker-spice/uprising-location-${spaceId}-${bonusSpice}-extra-spice.webp`
+    : originalMakerArtPaths[spaceId],
+]));
 
 const influenceByPlayerId = {
   p1: { fremen: 4, fringeWorlds: 2 },
@@ -130,13 +144,15 @@ export async function runBoardStatesSmoke({
     },
     { occupiedSpaceIds: Object.keys(occupiedSpaces) },
   );
+  await waitForBoardLocationArt(page, fixture.boardSpaceCount);
 
   const denseStats = await boardMarkerStats(page);
   const compactStats = await compactBoardStats(page);
   const assetStats = await boardAssetFitStats(page);
   const groupSizingStats = await boardGroupSizingStats(page);
-  const landsraadText = await page.locator('[data-region-id="landsraad"]').innerText();
-  const imperialPrivilegeText = await page.getByTestId("space-imperial-privilege").innerText();
+  const landsraadText = await page.locator('[data-region-id="landsraad"]').evaluate((element) => element.textContent ?? "");
+  const imperialPrivilegeText = await page.getByTestId("space-imperial-privilege")
+    .evaluate((element) => element.textContent ?? "");
   assert.equal(denseStats.occupied, Object.keys(occupiedSpaces).length, "Dense board state should render all occupied spaces");
   assertBoardAssetFitStats(assetStats, fixture.boardSpaceCount, "Idle board");
   assert.equal(groupSizingStats.unequalGroupCount, 0, "Board locations in the same group should have equal tile sizes, except High Council");
@@ -188,9 +204,21 @@ export async function runBoardStatesSmoke({
     "Commander personal influence tracks should render in the Commander dock",
   );
   assert.ok(denseStats.makerMarkers >= 4, "Dense board state should include all Maker space markers");
+  assert.deepEqual(
+    denseStats.makerSpaceArtSources,
+    expectedMakerArtPaths,
+    "Maker spaces should use generated art only for bonus spice 1-5 and original art at zero",
+  );
   await screenshot(page, captures, "board-states-dense-ready.png");
 
   await page.getByTestId("space-imperial-privilege").hover();
+  await page.waitForTimeout(120);
+  const delayedHoverStats = await compactBoardStats(page);
+  assert.equal(
+    delayedHoverStats.imperialPrivilegeDetailVisible,
+    false,
+    "Board location hover details should stay hidden during the hover delay",
+  );
   await page.waitForFunction(() => {
     const details = document.querySelector('[data-testid="space-imperial-privilege"] .space-hover-details');
     return details && Number.parseFloat(getComputedStyle(details).opacity) > 0.9;
@@ -301,6 +329,7 @@ export async function runBoardStatesSmoke({
 
   await page.setViewportSize({ width: 1440, height: 1100 });
   await setDebugGameAndWait(page, fixture.combatGame);
+  await waitForBoardLocationArt(page, fixture.boardSpaceCount);
   await page.waitForFunction(() =>
     Boolean(
       document.querySelectorAll(".conflict-slot").length === 6 &&
@@ -444,6 +473,27 @@ function preferredDuneSeat(game) {
   return fallbackSeat;
 }
 
+async function waitForBoardLocationArt(page, expectedBoardSpaceCount) {
+  await page.evaluate(() => {
+    Array.from(document.querySelectorAll(".space-art")).forEach((image) => {
+      if (image instanceof HTMLImageElement) image.loading = "eager";
+    });
+  });
+  await page.waitForFunction(
+    ({ expectedCount }) => {
+      const images = Array.from(document.querySelectorAll(".space-art"));
+      return images.length === expectedCount &&
+        images.every((image) =>
+          image instanceof HTMLImageElement &&
+          image.complete &&
+          image.naturalWidth > 0 &&
+          image.naturalHeight > 0
+        );
+    },
+    { expectedCount: expectedBoardSpaceCount },
+  );
+}
+
 async function boardMarkerStats(page) {
   return page.evaluate(() => ({
     agentMarkerLabels: Array.from(document.querySelectorAll(".agent-marker")).map((marker) => marker.textContent ?? ""),
@@ -461,6 +511,10 @@ async function boardMarkerStats(page) {
     influenceTrackLabels: Array.from(document.querySelectorAll(".influence-track")).map((track) => track.textContent ?? ""),
     influenceTracks: document.querySelectorAll(".influence-track").length,
     makerMarkers: document.querySelectorAll(".maker-marker").length,
+    makerSpaceArtSources: Object.fromEntries(Array.from(document.querySelectorAll(".space-tile.maker")).map((tile) => [
+      tile.getAttribute("data-space-id") ?? "",
+      tile.querySelector(".space-art")?.getAttribute("src") ?? "",
+    ]).sort(([first], [second]) => first.localeCompare(second))),
     occupied: document.querySelectorAll(".space-tile.occupied").length,
     personalOccupied: document.querySelectorAll(".space-tile.personal.occupied").length,
     spyMarkers: document.querySelectorAll(".spy-marker").length,

@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
 import { createServer } from "vite";
 
 const server = await createServer({
@@ -10,11 +12,47 @@ const server = await createServer({
 try {
   const data = await server.ssrLoadModule("/src/game/data.ts");
   const state = await server.ssrLoadModule("/src/game/state.ts");
+  const makerSpiceAssets = await server.ssrLoadModule("/src/components/maker-spice-assets.ts");
 
   const expectedMakerIds = ["deep-desert", "habbanya-erg", "hagga-basin", "imperial-basin"];
-  assert.deepEqual([...state.makerSpaceIds].sort(), expectedMakerIds);
-
   const makerSpaces = data.boardSpaces.filter((space) => space.maker);
+  const makerSpaceArtById = Object.fromEntries(
+    makerSpaces.map((space) => [space.id, space.thumbnailPath ?? space.imagePath]),
+  );
+  assert.deepEqual([...state.makerSpaceIds].sort(), expectedMakerIds);
+  for (const spaceId of expectedMakerIds) {
+    for (const count of makerSpiceAssets.makerSpiceAssetCounts) {
+      const assetPath = makerSpiceAssets.makerSpiceAssetPathFor(spaceId, count);
+      assert.ok(assetPath, `${spaceId} should resolve a maker-spice asset for ${count}`);
+      const assetFile = path.join(process.cwd(), "public", assetPath.replace(/^\//, ""));
+      assert.equal(existsSync(assetFile), true, `${spaceId} maker-spice ${count} asset should exist`);
+      const originalDimensions = webpDimensions(
+        path.join(process.cwd(), "public", makerSpaceArtById[spaceId].replace(/^\//, "")),
+      );
+      const assetDimensions = webpDimensions(assetFile);
+      assert.deepEqual(
+        assetDimensions,
+        originalDimensions,
+        `${spaceId} maker-spice ${count} asset should match the original location art dimensions`,
+      );
+    }
+    assert.equal(
+      makerSpiceAssets.makerSpiceAssetPathFor(spaceId, 0),
+      undefined,
+      `${spaceId} should use its original asset at zero bonus spice`,
+    );
+    assert.equal(
+      makerSpiceAssets.makerSpiceAssetPathFor(spaceId, 6),
+      undefined,
+      `${spaceId} should use its original asset above the generated range`,
+    );
+  }
+  assert.equal(
+    makerSpiceAssets.makerSpiceAssetPathFor("high-council", 1),
+    undefined,
+    "Non-Maker spaces should not resolve maker-spice replacement assets",
+  );
+
   assert.deepEqual(
     makerSpaces.map((space) => space.id).sort(),
     expectedMakerIds,
@@ -122,4 +160,41 @@ try {
   console.log("maker spice verification passed");
 } finally {
   await server.close();
+}
+
+function webpDimensions(filePath) {
+  const buffer = readFileSync(filePath);
+  assert.equal(buffer.toString("ascii", 0, 4), "RIFF", `${filePath} should be a RIFF WebP`);
+  assert.equal(buffer.toString("ascii", 8, 12), "WEBP", `${filePath} should be a WebP`);
+  let offset = 12;
+  while (offset + 8 <= buffer.length) {
+    const chunkType = buffer.toString("ascii", offset, offset + 4);
+    const chunkSize = buffer.readUInt32LE(offset + 4);
+    const payloadOffset = offset + 8;
+    if (chunkType === "VP8X") {
+      return {
+        width: 1 + readUInt24LE(buffer, payloadOffset + 4),
+        height: 1 + readUInt24LE(buffer, payloadOffset + 7),
+      };
+    }
+    if (chunkType === "VP8 ") {
+      return {
+        width: buffer.readUInt16LE(payloadOffset + 6) & 0x3fff,
+        height: buffer.readUInt16LE(payloadOffset + 8) & 0x3fff,
+      };
+    }
+    if (chunkType === "VP8L") {
+      const bits = buffer.readUInt32LE(payloadOffset + 1);
+      return {
+        width: 1 + (bits & 0x3fff),
+        height: 1 + ((bits >> 14) & 0x3fff),
+      };
+    }
+    offset += 8 + chunkSize + (chunkSize % 2);
+  }
+  throw new Error(`${filePath} should contain a VP8, VP8L, or VP8X WebP chunk`);
+}
+
+function readUInt24LE(buffer, offset) {
+  return buffer[offset] | (buffer[offset + 1] << 8) | (buffer[offset + 2] << 16);
 }

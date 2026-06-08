@@ -7,6 +7,17 @@ const verifyScripts = Object.keys(packageJson.scripts)
   .filter((name) => name.startsWith("verify:") && name !== "verify:all")
   .sort();
 
+function commandForScript(scriptName) {
+  const scriptCommand = packageJson.scripts[scriptName];
+  const nodeScriptMatch = /^node\s+(\S+)(?:\s+(.*))?$/.exec(scriptCommand);
+  if (!nodeScriptMatch) return { command: "pnpm", args: ["run", scriptName], label: `pnpm run ${scriptName}` };
+  return {
+    command: process.execPath,
+    args: [nodeScriptMatch[1], ...(nodeScriptMatch[2]?.trim().split(/\s+/).filter(Boolean) ?? [])],
+    label: scriptCommand,
+  };
+}
+
 if (process.argv.includes("--list")) {
   console.log(verifyScripts.join("\n"));
   process.exit(0);
@@ -17,8 +28,9 @@ console.log(`running ${verifyScripts.length} verifier scripts`);
 
 for (const [index, scriptName] of verifyScripts.entries()) {
   const label = `${index + 1}/${verifyScripts.length}`;
-  console.log(`\n[${label}] pnpm run ${scriptName}`);
-  const result = spawnSync("pnpm", ["run", scriptName], { stdio: "inherit" });
+  const command = commandForScript(scriptName);
+  console.log(`\n[${label}] ${command.label}`);
+  const result = spawnSync(command.command, command.args, { stdio: "inherit" });
 
   if (result.error) {
     console.error(`\n${scriptName} failed to start: ${result.error.message}`);

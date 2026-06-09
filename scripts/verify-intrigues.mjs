@@ -68,6 +68,7 @@ const server = await createServer({
 try {
   const data = await server.ssrLoadModule("/src/game/data.ts");
   const state = await server.ssrLoadModule("/src/game/state.ts");
+  const { createPlotActionHandlers } = await server.ssrLoadModule("/src/app-plot-actions.ts");
 
   assert.equal(data.intrigueCards.length, 39, "Uprising Intrigue deck should expose 39 cards");
   assertUnique(data.intrigueCards, "Intrigue ids", (card) => card.id);
@@ -585,6 +586,34 @@ try {
     backedNoInfluence.activeSeat,
     "Agent turn should not auto-end when held Intrigues have no playable Plot action",
   );
+  const plotHandlerAutoEndFixture = {
+    ...game,
+    activeSeat: game.players.findIndex((candidate) => candidate.id === "p2"),
+    agentTurnComplete: true,
+    pendingAction: undefined,
+    pendingQueue: [],
+    players: game.players.map((candidate) =>
+      candidate.id === "p2"
+        ? { ...candidate, intrigues: [contingencyPlan] }
+        : { ...candidate, intrigues: [] },
+    ),
+  };
+  let plotHandlerState = plotHandlerAutoEndFixture;
+  const plotHandlers = createPlotActionHandlers({
+    commanderTargets: {},
+    setChangeAllegiancesSelections: () => undefined,
+    setGame: (update) => {
+      plotHandlerState = typeof update === "function" ? update(plotHandlerState) : update;
+    },
+  });
+  plotHandlers.playContingencyPlanPlot(contingencyPlan.id);
+  assert.deepEqual(playerById(plotHandlerState, "p2").intrigues, [], "Local Plot Intrigue handler should play the active player's last Intrigue");
+  assert.equal(
+    plotHandlerState.activeSeat,
+    state.advanceSeat(plotHandlerAutoEndFixture),
+    "Local Plot Intrigue handler should auto-end an agent turn when the active player has no Intrigues left",
+  );
+  assert.equal(plotHandlerState.agentTurnComplete, false, "Auto-ended Plot Intrigue turn should reset agentTurnComplete for the next player");
   const commanderForExhaustedAllyPlot = playerById(game, "p4");
   const exhaustedAllyIds = game.players
     .filter((candidate) => candidate.team === commanderForExhaustedAllyPlot.team && candidate.role === "Ally")

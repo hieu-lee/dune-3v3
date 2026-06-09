@@ -26,6 +26,7 @@ import {
   playSpecialMissionPlotIntrigue,
   playStrategicStockpilingPlotIntrigue,
   playUnexpectedAlliesIntrigue,
+  maybeStartCombatPhase,
   scoreGurneyAlwaysSmiling,
 } from "./game/state";
 import type {
@@ -59,50 +60,60 @@ function routedCommanderTargetId(current: GameState, commanderTargets: Commander
     : undefined;
 }
 
+function finishPlotIntrigueAction(current: GameState, next: GameState) {
+  return next === current ? current : maybeStartCombatPhase(next);
+}
+
 export function createPlotActionHandlers({
   commanderTargets,
   setChangeAllegiancesSelections,
   setGame,
 }: PlotActionHandlersInput) {
+  const playPlot = (play: (current: GameState) => GameState) => {
+    setGame((current) => finishPlotIntrigueAction(current, play(current)));
+  };
+
   return {
     scorePlotIntrigue(intrigueId: string) {
-      setGame((current) => playPlotBattleIconIntrigue(current, activePlayerId(current), intrigueId));
+      playPlot((current) => playPlotBattleIconIntrigue(current, activePlayerId(current), intrigueId));
     },
 
     playContingencyPlanPlot(intrigueId: string) {
-      setGame((current) => playContingencyPlanPlotIntrigue(current, activePlayerId(current), intrigueId));
+      playPlot((current) => playContingencyPlanPlotIntrigue(current, activePlayerId(current), intrigueId));
     },
 
     playCallToArmsPlot(intrigueId: string) {
-      setGame((current) => playCallToArmsPlotIntrigue(current, activePlayerId(current), intrigueId));
+      playPlot((current) => playCallToArmsPlotIntrigue(current, activePlayerId(current), intrigueId));
     },
 
     playIntelligenceReportPlot(intrigueId: string) {
-      setGame((current) => playIntelligenceReportPlotIntrigue(current, activePlayerId(current), intrigueId));
+      playPlot((current) => playIntelligenceReportPlotIntrigue(current, activePlayerId(current), intrigueId));
     },
 
     playInspireAwePlot(intrigueId: string) {
-      setGame((current) => playInspireAwePlotIntrigue(current, activePlayerId(current), intrigueId, routedCommanderTargetId(current, commanderTargets)));
+      playPlot((current) =>
+        playInspireAwePlotIntrigue(current, activePlayerId(current), intrigueId, routedCommanderTargetId(current, commanderTargets))
+      );
     },
 
     playManipulatePlot(intrigueId: string, cardId: string) {
-      setGame((current) => playManipulatePlotIntrigue(current, activePlayerId(current), intrigueId, cardId));
+      playPlot((current) => playManipulatePlotIntrigue(current, activePlayerId(current), intrigueId, cardId));
     },
 
     playLeveragePlot(intrigueId: string) {
-      setGame((current) => playLeveragePlotIntrigue(current, activePlayerId(current), intrigueId));
+      playPlot((current) => playLeveragePlotIntrigue(current, activePlayerId(current), intrigueId));
     },
 
     playDistractionPlot(intrigueId: string) {
-      setGame((current) => playDistractionPlotIntrigue(current, activePlayerId(current), intrigueId));
+      playPlot((current) => playDistractionPlotIntrigue(current, activePlayerId(current), intrigueId));
     },
 
     playCunningPlot(intrigueId: string, choice: "draw" | "paid-trash") {
-      setGame((current) => playCunningPlotIntrigue(current, activePlayerId(current), intrigueId, choice));
+      playPlot((current) => playCunningPlotIntrigue(current, activePlayerId(current), intrigueId, choice));
     },
 
     playSietchRitualPlot(intrigueId: string, discardCardId: string, faction: SietchRitualChoice) {
-      setGame((current) => {
+      playPlot((current) => {
         const player = current.players[current.activeSeat];
         const personalFaction = player.role === "Commander" && player.team === "muaddib" ? "fremen" : undefined;
         const influenceOwnerId = player.role === "Commander" && faction !== personalFaction
@@ -120,25 +131,27 @@ export function createPlotActionHandlers({
     },
 
     playChangeAllegiancesPlot(intrigueId: string, choice: ChangeAllegiancesChoice) {
-      setGame((current) => playChangeAllegiancesPlotIntrigue(
-        current,
-        activePlayerId(current),
-        intrigueId,
-        choice,
-        routedCommanderTargetId(current, commanderTargets),
-      ));
+      playPlot((current) =>
+        playChangeAllegiancesPlotIntrigue(
+          current,
+          activePlayerId(current),
+          intrigueId,
+          choice,
+          routedCommanderTargetId(current, commanderTargets),
+        )
+      );
     },
 
     playSpecialMissionPlot(intrigueId: string, choice: SpecialMissionChoice) {
-      setGame((current) => playSpecialMissionPlotIntrigue(current, activePlayerId(current), intrigueId, choice));
+      playPlot((current) => playSpecialMissionPlotIntrigue(current, activePlayerId(current), intrigueId, choice));
     },
 
     playOpportunismPlot(intrigueId: string, choice: InfluenceLossPair) {
-      setGame((current) => playOpportunismPlotIntrigue(current, activePlayerId(current), intrigueId, choice));
+      playPlot((current) => playOpportunismPlotIntrigue(current, activePlayerId(current), intrigueId, choice));
     },
 
     playImperiumPoliticsPlot(intrigueId: string, faction: ImperiumPoliticsChoice) {
-      setGame((current) => {
+      playPlot((current) => {
         const player = current.players[current.activeSeat];
         const influenceOwnerId = player.role === "Commander" && faction !== "emperor"
           ? legalActivatedAllyIdFor(player, current.players, commanderTargets)
@@ -148,57 +161,73 @@ export function createPlotActionHandlers({
     },
 
     playBuyAccessPlot(intrigueId: string, choice: BuyAccessChoice) {
-      setGame((current) => playBuyAccessPlotIntrigue(
-        current,
-        activePlayerId(current),
-        intrigueId,
-        choice,
-        routedCommanderTargetId(current, commanderTargets),
-      ));
+      playPlot((current) =>
+        playBuyAccessPlotIntrigue(
+          current,
+          activePlayerId(current),
+          intrigueId,
+          choice,
+          routedCommanderTargetId(current, commanderTargets),
+        )
+      );
     },
 
     playDepartForArrakisPlot(intrigueId: string, choice: "draw" | "spend-spice") {
-      setGame((current) => playDepartForArrakisPlotIntrigue(
-        current,
-        activePlayerId(current),
-        intrigueId,
-        choice,
-        routedCommanderTargetId(current, commanderTargets),
-      ));
+      playPlot((current) =>
+        playDepartForArrakisPlotIntrigue(
+          current,
+          activePlayerId(current),
+          intrigueId,
+          choice,
+          routedCommanderTargetId(current, commanderTargets),
+        )
+      );
     },
 
     playCouncilorsAmbitionPlot(intrigueId: string) {
-      setGame((current) => playCouncilorsAmbitionPlotIntrigue(current, activePlayerId(current), intrigueId));
+      playPlot((current) => playCouncilorsAmbitionPlotIntrigue(current, activePlayerId(current), intrigueId));
     },
 
     playStrategicStockpilingPlot(intrigueId: string, choice: "spice" | "water" | "both") {
-      setGame((current) => playStrategicStockpilingPlotIntrigue(current, activePlayerId(current), intrigueId, choice));
+      playPlot((current) => playStrategicStockpilingPlotIntrigue(current, activePlayerId(current), intrigueId, choice));
     },
 
     playShaddamsFavorPlot(intrigueId: string) {
-      setGame((current) => playShaddamsFavorPlotIntrigue(current, activePlayerId(current), intrigueId, routedCommanderTargetId(current, commanderTargets)));
+      playPlot((current) =>
+        playShaddamsFavorPlotIntrigue(current, activePlayerId(current), intrigueId, routedCommanderTargetId(current, commanderTargets))
+      );
     },
 
     playMarketOpportunityPlot(intrigueId: string, choice: "spice-to-solari" | "solari-to-spice") {
-      setGame((current) => playMarketOpportunityPlotIntrigue(current, activePlayerId(current), intrigueId, choice));
+      playPlot((current) => playMarketOpportunityPlotIntrigue(current, activePlayerId(current), intrigueId, choice));
     },
 
     playMercenariesPlot(intrigueId: string) {
-      setGame((current) => playMercenariesPlotIntrigue(current, activePlayerId(current), intrigueId, routedCommanderTargetId(current, commanderTargets)));
+      playPlot((current) =>
+        playMercenariesPlotIntrigue(current, activePlayerId(current), intrigueId, routedCommanderTargetId(current, commanderTargets))
+      );
     },
 
     playBackedByChoamPlot(intrigueId: string, faction: FactionId) {
-      setGame((current) => playBackedByChoamPlotIntrigue(current, activePlayerId(current), intrigueId, faction));
+      playPlot((current) => playBackedByChoamPlotIntrigue(current, activePlayerId(current), intrigueId, faction));
     },
 
     playDetonation(intrigueId: string, choice: "shield-wall" | "deploy") {
-      setGame((current) => playDetonationIntrigue(current, activePlayerId(current), intrigueId, choice, routedCommanderTargetId(current, commanderTargets)));
+      playPlot((current) =>
+        playDetonationIntrigue(current, activePlayerId(current), intrigueId, choice, routedCommanderTargetId(current, commanderTargets))
+      );
     },
 
     playUnexpectedAllies(intrigueId: string, removeShieldWall: boolean) {
-      setGame((current) => {
+      playPlot((current) => {
         const playerId = activePlayerId(current);
-        const resolved = playUnexpectedAlliesIntrigue(current, playerId, intrigueId, removeShieldWall, routedCommanderTargetId(current, commanderTargets));
+        const resolved = playUnexpectedAlliesIntrigue(
+          current,
+          playerId,
+          intrigueId,
+          removeShieldWall,
+          routedCommanderTargetId(current, commanderTargets),
+        );
         return scoreGurneyAlwaysSmiling(resolved, playerId);
       });
     },

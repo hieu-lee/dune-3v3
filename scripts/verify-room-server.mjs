@@ -2592,10 +2592,12 @@ try {
   const plotOwnerId = "p2";
   const plotOwnerInitial = plotRecord.game.players.find((candidate) => candidate.id === plotOwnerId);
   assert.ok(plotOwnerInitial, "Plot owner should exist");
+  const plotOwnerSeat = plotRecord.game.players.findIndex((candidate) => candidate.id === plotOwnerId);
   plotRecord.game = {
     ...plotRecord.game,
     phase: "playing",
-    activeSeat: plotRecord.game.players.findIndex((candidate) => candidate.id === plotOwnerId),
+    activeSeat: plotOwnerSeat,
+    agentTurnComplete: true,
     pendingAction: undefined,
     pendingQueue: [],
     players: plotRecord.game.players.map((candidate) =>
@@ -2630,6 +2632,12 @@ try {
   assert.equal(plotOwnerAfter.resources.solari, plotOwnerInitial.resources.solari + 2, "Room Plot Intrigue should apply rewards");
   assert.deepEqual(plotOwnerAfter.intrigues, [], "Room Plot Intrigue should leave the owner's Intrigue hand");
   assert.equal(plotAction.body.snapshot.game.intrigueDiscard.at(-1).id, contingencyPlan.id, "Room Plot Intrigue should discard the card");
+  assert.equal(
+    plotAction.body.snapshot.game.activeSeat,
+    (plotOwnerSeat + 1) % plotAction.body.snapshot.game.players.length,
+    "Room Plot Intrigue should auto-end an agent turn when the active player has no Intrigues left",
+  );
+  assert.equal(plotAction.body.snapshot.game.agentTurnComplete, false, "Room Plot Intrigue auto-end should reset agentTurnComplete for the next player");
 
   const cunning = intrigueBySourceId(133);
   const cunningDrawCard = imperiumDeck[0];

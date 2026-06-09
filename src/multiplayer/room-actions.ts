@@ -512,7 +512,7 @@ function applyPlotIntrigue(
       throw new RoomActionError(400, "Unsupported room Plot Intrigue action");
   }
 
-  return nextState === state ? sameStateError() : nextState;
+  return nextState === state ? sameStateError() : maybeStartCombatPhase(nextState);
 }
 
 function applyPassCombat(state: GameState, playerId: string) {

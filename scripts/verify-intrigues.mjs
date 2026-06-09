@@ -580,10 +580,10 @@ try {
     ...backedNoInfluence,
     agentTurnComplete: true,
   });
-  assert.notEqual(
+  assert.equal(
     unplayablePlotAgentDone.activeSeat,
     backedNoInfluence.activeSeat,
-    "Agent turn should auto-end when held Intrigues have no playable Plot action",
+    "Agent turn should not auto-end when held Intrigues have no playable Plot action",
   );
   const commanderForExhaustedAllyPlot = playerById(game, "p4");
   const exhaustedAllyIds = game.players
@@ -614,10 +614,10 @@ try {
     "Commander Plot Intrigues that require an activated Ally should reject already activated Allies",
   );
   const exhaustedAllyPlotAutoEnd = state.maybeStartCombatPhase(exhaustedAllyPlotFixture);
-  assert.notEqual(
+  assert.equal(
     exhaustedAllyPlotAutoEnd.activeSeat,
     exhaustedAllyPlotFixture.activeSeat,
-    "Agent turn should auto-end when a Commander's only held Plot Intrigue has no legal Ally target",
+    "Agent turn should not auto-end when a Commander's only held Plot Intrigue has no legal Ally target",
   );
   const commanderBackedPlot = {
     ...backedPlotFixture,

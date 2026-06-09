@@ -37,7 +37,7 @@ function canPayCombatSpentResources(actor: Player, target: Player | undefined, s
 
 export function combatIntrigueActorIds(state: GameState) {
   if (!state.conflict) return [];
-  return state.players.filter((player) => canActInCombat(state, player)).map((player) => player.id);
+  return state.players.filter((player) => player.intrigues.length > 0 && canActInCombat(state, player)).map((player) => player.id);
 }
 
 export function combatIntrigueStrength(

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { combatFixture, playerById, starterCard } from "./verify-combat-intrigues-fixtures.mjs";
+import { combatFixture, intrigueBySourceId, playerById, starterCard } from "./verify-combat-intrigues-fixtures.mjs";
 
 export function verifyCombatIntriguePendingActions({
   cards: { devour, questionableMethods, springTheTrap, verifierCombat },
@@ -7,6 +7,7 @@ export function verifyCombatIntriguePendingActions({
   spaces: { espionageSpace, secretsSpace },
   state,
 }) {
+  const plotIntrigue = intrigueBySourceId(data, 143);
   const arrakeenSpace = data.boardSpaces.find((space) => space.id === "arrakeen");
   assert.ok(arrakeenSpace, "Arrakeen should exist for Spring The Trap spy fixtures");
   const arrakeenPostId = state.spyObservationPostIdForSpace(arrakeenSpace.id);
@@ -15,8 +16,8 @@ export function verifyCombatIntriguePendingActions({
     players.map((player) =>
       player.id === "p2"
         ? { ...player, conflict: 2, deployedTroops: 1, intrigues: [questionableMethods] }
-        : player.id === "p3"
-          ? { ...player, conflict: 4, deployedTroops: 1 }
+      : player.id === "p3"
+          ? { ...player, conflict: 4, deployedTroops: 1, intrigues: [plotIntrigue] }
           : player,
     ),
   );
@@ -258,8 +259,8 @@ export function verifyCombatIntriguePendingActions({
     players.map((player) =>
       player.id === "p2"
         ? { ...player, conflict: 2, deployedTroops: 1, deployedSandworms: 0, intrigues: [devour] }
-        : player.id === "p3"
-          ? { ...player, conflict: 4, deployedTroops: 1 }
+      : player.id === "p3"
+          ? { ...player, conflict: 4, deployedTroops: 1, intrigues: [plotIntrigue] }
           : player,
     ),
   );
@@ -288,7 +289,7 @@ export function verifyCombatIntriguePendingActions({
             intrigues: [devour],
           }
         : player.id === "p3"
-          ? { ...player, conflict: 4, deployedTroops: 1 }
+          ? { ...player, conflict: 4, deployedTroops: 1, intrigues: [plotIntrigue] }
           : player,
     ),
   );
@@ -346,7 +347,7 @@ export function verifyCombatIntriguePendingActions({
             intrigues: [devour],
           }
         : player.id === "p3"
-          ? { ...player, conflict: 4, deployedTroops: 1 }
+          ? { ...player, conflict: 4, deployedTroops: 1, intrigues: [plotIntrigue] }
           : player,
     ),
   );

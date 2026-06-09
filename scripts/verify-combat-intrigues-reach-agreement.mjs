@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
-import { combatFixture, playerById } from "./verify-combat-intrigues-fixtures.mjs";
+import { combatFixture, intrigueBySourceId, playerById } from "./verify-combat-intrigues-fixtures.mjs";
 
 export function verifyCombatIntrigueReachAgreement({ cards: { reachAgreement }, data, state }) {
+  const plotIntrigue = intrigueBySourceId(data, 143);
   const reachAgreementContract = data.standardContracts[0];
   const reachAgreementReplacement = data.standardContracts[1];
   const reachAgreementFixture = {
@@ -10,7 +11,7 @@ export function verifyCombatIntrigueReachAgreement({ cards: { reachAgreement }, 
         player.id === "p2"
           ? { ...player, conflict: 4, deployedTroops: 2, garrison: 0, intrigues: [reachAgreement] }
           : player.id === "p3"
-            ? { ...player, conflict: 4, deployedTroops: 1 }
+            ? { ...player, conflict: 4, deployedTroops: 1, intrigues: [plotIntrigue] }
             : player,
       ),
     ),
@@ -102,7 +103,7 @@ export function verifyCombatIntrigueReachAgreement({ cards: { reachAgreement }, 
         player.id === "p2"
           ? { ...player, conflict: 7, deployedTroops: 2, garrison: 1, intrigues: [reachAgreement] }
           : player.id === "p3"
-            ? { ...player, conflict: 4, deployedTroops: 1 }
+            ? { ...player, conflict: 4, deployedTroops: 1, intrigues: [plotIntrigue] }
             : player,
       ),
     ),

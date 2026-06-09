@@ -1,11 +1,18 @@
 import assert from "node:assert/strict";
-import { combatFixture, passCurrent, playerById } from "./verify-combat-intrigues-fixtures.mjs";
+import { combatFixture, intrigueBySourceId, passCurrent, playerById } from "./verify-combat-intrigues-fixtures.mjs";
 
 export function verifyCombatIntriguePhaseFlow({ data, state }) {
+  const plotIntrigue = intrigueBySourceId(data, 143);
   const twoTeamConflict = combatFixture(state, data, (players) =>
     players.map((player) => {
-      if (player.id === "p2") return { ...player, conflict: 2, deployedTroops: 1 };
-      if (player.id === "p3") return { ...player, conflict: 4, deployedTroops: 1 };
+      if (["p1", "p2", "p3", "p4"].includes(player.id)) {
+        return {
+          ...player,
+          ...(player.id === "p2" ? { conflict: 2, deployedTroops: 1 } : {}),
+          ...(player.id === "p3" ? { conflict: 4, deployedTroops: 1 } : {}),
+          intrigues: [plotIntrigue],
+        };
+      }
       return player;
     }),
   );
@@ -19,6 +26,67 @@ export function verifyCombatIntriguePhaseFlow({ data, state }) {
   );
   assert.deepEqual(combat.combatPasses, [], "Starting Combat should clear stale pass state");
   assert.equal(playerById(combat, "p3").wonConflicts.length, 0, "Conflict should not resolve before Combat passes");
+
+  const agentCompleteBase = {
+    ...state.initialGame(),
+    phase: "playing",
+    activeSeat: 1,
+    agentTurnComplete: true,
+    pendingAction: undefined,
+    pendingQueue: [],
+  };
+  const agentCompleteWithIntrigue = {
+    ...agentCompleteBase,
+    players: agentCompleteBase.players.map((player, index) =>
+      index === agentCompleteBase.activeSeat ? { ...player, intrigues: [plotIntrigue] } : player
+    ),
+  };
+  assert.equal(
+    state.maybeStartCombatPhase(agentCompleteWithIntrigue).activeSeat,
+    agentCompleteWithIntrigue.activeSeat,
+    "Agent turn should not auto-advance after resolution when the player has any Intrigue",
+  );
+  assert.equal(
+    state.maybeStartCombatPhase(agentCompleteWithIntrigue).agentTurnComplete,
+    true,
+    "Agent turn should remain complete so the player can inspect or manually end after drawing an Intrigue",
+  );
+  assert.notEqual(
+    state.maybeStartCombatPhase(agentCompleteBase).activeSeat,
+    agentCompleteBase.activeSeat,
+    "Agent turn should still auto-advance after resolution when the player has no Intrigues",
+  );
+
+  const noIntrigueConflict = combatFixture(state, data, (players) =>
+    players.map((player) => {
+      if (player.id === "p2") return { ...player, conflict: 2, deployedTroops: 1 };
+      if (player.id === "p3") return { ...player, conflict: 4, deployedTroops: 1 };
+      return player;
+    }),
+  );
+  assert.deepEqual(
+    state.combatIntrigueActorIds(noIntrigueConflict),
+    [],
+    "Combat should not require pass opportunities from players with no Intrigues",
+  );
+  assert.equal(
+    state.startCombatPhase(noIntrigueConflict).phase,
+    "playing",
+    "Combat should auto-skip when no eligible conflict actor has any Intrigue",
+  );
+
+  const nonCombatIntrigueConflict = combatFixture(state, data, (players) =>
+    players.map((player) => {
+      if (player.id === "p2") return { ...player, conflict: 2, deployedTroops: 1, intrigues: [plotIntrigue] };
+      if (player.id === "p4") return { ...player, intrigues: [plotIntrigue] };
+      return player;
+    }),
+  );
+  assert.deepEqual(
+    state.combatIntrigueActorIds(nonCombatIntrigueConflict),
+    ["p2", "p4"],
+    "Any Intrigue should require a manual Combat pass even when it is not a Combat Intrigue",
+  );
 
   const pendingCombat = {
     ...twoTeamConflict,

@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
-import { combatFixture, passCurrent, playerById } from "./verify-combat-intrigues-fixtures.mjs";
+import { combatFixture, intrigueBySourceId, passCurrent, playerById } from "./verify-combat-intrigues-fixtures.mjs";
 
 export function verifyCombatIntrigueCommanderBasics({
   cards: { verifierCombat },
   data,
   state,
 }) {
+  const plotIntrigue = intrigueBySourceId(data, 143);
   const resetPassFixture = combatFixture(state, data, (players) =>
     players.map((player) => {
       if (player.id === "p2") return { ...player, conflict: 2, deployedTroops: 1 };
@@ -25,7 +26,7 @@ export function verifyCombatIntrigueCommanderBasics({
       players.map((player) => {
         if (player.id === "p2") return { ...player, conflict: 5, deployedTroops: 1 };
         if (player.id === "p4") return { ...player, intrigues: [verifierCombat] };
-        if (player.id === "p6") return { ...player, conflict: 1, deployedTroops: 1 };
+        if (player.id === "p6") return { ...player, conflict: 1, deployedTroops: 1, intrigues: [plotIntrigue] };
         return player;
       }),
     3,

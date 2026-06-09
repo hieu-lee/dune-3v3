@@ -1,13 +1,14 @@
 import assert from "node:assert/strict";
-import { combatFixture, playerById } from "./verify-combat-intrigues-fixtures.mjs";
+import { combatFixture, intrigueBySourceId, playerById } from "./verify-combat-intrigues-fixtures.mjs";
 
 export function verifyCombatIntrigueRetreatBranches({ cards: { spiceIsPower, tacticalOption }, data, state }) {
+  const plotIntrigue = intrigueBySourceId(data, 143);
   const spiceSpendFixture = combatFixture(state, data, (players) =>
     players.map((player) =>
       player.id === "p2"
         ? { ...player, conflict: 2, deployedTroops: 1, resources: { ...player.resources, spice: 3 }, intrigues: [spiceIsPower] }
-        : player.id === "p3"
-          ? { ...player, conflict: 4, deployedTroops: 1 }
+      : player.id === "p3"
+          ? { ...player, conflict: 4, deployedTroops: 1, intrigues: [plotIntrigue] }
           : player,
     ),
   );
@@ -76,8 +77,8 @@ export function verifyCombatIntrigueRetreatBranches({ cards: { spiceIsPower, tac
     players.map((player) =>
       player.id === "p2"
         ? { ...player, conflict: 9, deployedTroops: 3, garrison: 1, resources: { ...player.resources, spice: 0 }, intrigues: [spiceIsPower] }
-        : player.id === "p3"
-          ? { ...player, conflict: 4, deployedTroops: 1 }
+      : player.id === "p3"
+          ? { ...player, conflict: 4, deployedTroops: 1, intrigues: [plotIntrigue] }
           : player,
     ),
   );
@@ -131,8 +132,8 @@ export function verifyCombatIntrigueRetreatBranches({ cards: { spiceIsPower, tac
     players.map((player) =>
       player.id === "p2"
         ? { ...player, conflict: 2, deployedTroops: 1, intrigues: [tacticalOption] }
-        : player.id === "p3"
-          ? { ...player, conflict: 4, deployedTroops: 1 }
+      : player.id === "p3"
+          ? { ...player, conflict: 4, deployedTroops: 1, intrigues: [plotIntrigue] }
           : player,
     ),
   );
@@ -162,8 +163,8 @@ export function verifyCombatIntrigueRetreatBranches({ cards: { spiceIsPower, tac
     players.map((player) =>
       player.id === "p2"
         ? { ...player, conflict: 10, deployedTroops: 4, garrison: 1, intrigues: [tacticalOption] }
-        : player.id === "p3"
-          ? { ...player, conflict: 4, deployedTroops: 1 }
+      : player.id === "p3"
+          ? { ...player, conflict: 4, deployedTroops: 1, intrigues: [plotIntrigue] }
           : player,
     ),
   );
@@ -203,7 +204,7 @@ export function verifyCombatIntrigueRetreatBranches({ cards: { spiceIsPower, tac
   const tacticalWormFixture = combatFixture(state, data, (players) =>
     players.map((player) =>
       player.id === "p2"
-        ? { ...player, conflict: 10, deployedTroops: 2, deployedSandworms: 1, garrison: 0, intrigues: [tacticalOption] }
+        ? { ...player, conflict: 10, deployedTroops: 2, deployedSandworms: 1, garrison: 0, intrigues: [tacticalOption, plotIntrigue] }
         : player.id === "p3"
           ? { ...player, conflict: 4, deployedTroops: 1 }
           : player,

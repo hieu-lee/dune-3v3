@@ -2844,7 +2844,7 @@ try {
       if (candidate.id === "p2") {
         return { ...candidate, conflict: 2, deployedTroops: 1, intrigues: [verifierCombat] };
       }
-      if (candidate.id === "p3") return { ...candidate, conflict: 3, deployedTroops: 1 };
+      if (candidate.id === "p3") return { ...candidate, conflict: 3, deployedTroops: 1, intrigues: [manipulate] };
       return candidate;
     }),
   );
@@ -2886,8 +2886,8 @@ try {
   assert.ok(combatPassRecord, "Combat pass test room should be stored in memory");
   combatPassRecord.game = combatRoomState(combatPassRecord, (players) =>
     players.map((candidate) => {
-      if (candidate.id === "p2") return { ...candidate, conflict: 2, deployedTroops: 1 };
-      if (candidate.id === "p3") return { ...candidate, conflict: 3, deployedTroops: 1 };
+      if (candidate.id === "p2") return { ...candidate, conflict: 2, deployedTroops: 1, intrigues: [manipulate] };
+      if (candidate.id === "p3") return { ...candidate, conflict: 3, deployedTroops: 1, intrigues: [manipulate] };
       return candidate;
     }),
   );

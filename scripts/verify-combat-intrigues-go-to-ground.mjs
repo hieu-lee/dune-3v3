@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { combatFixture, passCurrent, playerById } from "./verify-combat-intrigues-fixtures.mjs";
+import { combatFixture, intrigueBySourceId, passCurrent, playerById } from "./verify-combat-intrigues-fixtures.mjs";
 
 export function verifyCombatIntrigueGoToGround({
   cards: { goToGround },
@@ -7,6 +7,7 @@ export function verifyCombatIntrigueGoToGround({
   spaces: { secretsSpace, vastWealthSpace },
   state,
 }) {
+  const plotIntrigue = intrigueBySourceId(data, 143);
   const beneSpySpace = data.boardSpaces.find((space) => space.id === "espionage");
   assert.ok(beneSpySpace, "Espionage should be the Bene spy-post representative");
   const beneSpyPostId = state.spyObservationPostIdForSpace(secretsSpace.id);
@@ -14,8 +15,8 @@ export function verifyCombatIntrigueGoToGround({
     players.map((player) =>
       player.id === "p2"
         ? { ...player, conflict: 4, deployedTroops: 2, garrison: 0, intrigues: [goToGround] }
-        : player.id === "p3"
-          ? { ...player, conflict: 4, deployedTroops: 1 }
+      : player.id === "p3"
+          ? { ...player, conflict: 4, deployedTroops: 1, intrigues: [plotIntrigue] }
           : player,
     ),
   );
@@ -120,8 +121,8 @@ export function verifyCombatIntrigueGoToGround({
     players.map((player) =>
       player.id === "p2"
         ? { ...player, conflict: 7, deployedTroops: 2, garrison: 1, intrigues: [goToGround] }
-        : player.id === "p3"
-          ? { ...player, conflict: 4, deployedTroops: 1 }
+      : player.id === "p3"
+          ? { ...player, conflict: 4, deployedTroops: 1, intrigues: [plotIntrigue] }
           : player,
     ),
   );
@@ -130,8 +131,8 @@ export function verifyCombatIntrigueGoToGround({
     players.map((player) =>
       player.id === "p2"
         ? { ...player, conflict: 5, deployedTroops: 1, garrison: 0, intrigues: [goToGround] }
-        : player.id === "p3"
-          ? { ...player, conflict: 4, deployedTroops: 1 }
+      : player.id === "p3"
+          ? { ...player, conflict: 4, deployedTroops: 1, intrigues: [plotIntrigue] }
           : player,
     ),
   );
@@ -182,10 +183,10 @@ export function verifyCombatIntrigueGoToGround({
             deployedTroops: 1,
             deployedSandworms: 1,
             spies: 0,
-            intrigues: [goToGround],
+            intrigues: [goToGround, plotIntrigue],
           }
         : player.id === "p3"
-          ? { ...player, conflict: 1, deployedTroops: 1 }
+          ? { ...player, conflict: 1, deployedTroops: 1, intrigues: [plotIntrigue] }
           : player,
     ),
   );
@@ -219,8 +220,8 @@ export function verifyCombatIntrigueGoToGround({
     players.map((player) =>
       player.id === "p2"
         ? { ...player, conflict: 4, deployedTroops: 2, garrison: 0, spies: 0, intrigues: [goToGround] }
-        : player.id === "p3"
-          ? { ...player, conflict: 4, deployedTroops: 1 }
+      : player.id === "p3"
+          ? { ...player, conflict: 4, deployedTroops: 1, intrigues: [plotIntrigue] }
           : player,
     ),
   );
@@ -245,8 +246,8 @@ export function verifyCombatIntrigueGoToGround({
       players.map((player) =>
         player.id === "p2"
           ? { ...player, conflict: 4, deployedTroops: 2, garrison: 0, spies: 3, intrigues: [goToGround] }
-          : player.id === "p3"
-            ? { ...player, conflict: 4, deployedTroops: 1 }
+        : player.id === "p3"
+            ? { ...player, conflict: 4, deployedTroops: 1, intrigues: [plotIntrigue] }
             : player,
       ),
     ),

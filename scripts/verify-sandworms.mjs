@@ -29,6 +29,8 @@ try {
   const data = await server.ssrLoadModule("/src/game/data.ts");
   const state = await server.ssrLoadModule("/src/game/state.ts");
   const criticalLocations = await server.ssrLoadModule("/src/game/critical-locations.ts");
+  const plotIntrigue = data.intrigueCards.find((card) => card.sourceId === 143);
+  assert.ok(plotIntrigue, "Sandworm combat verifier needs a non-combat Intrigue");
 
   const game = state.initialGame();
   const hagga = spaceById(data, "hagga-basin");
@@ -169,6 +171,9 @@ try {
     phase: "playing",
     pendingAction: undefined,
     pendingQueue: [],
+    players: summoned.players.map((player) =>
+      player.id === "p1" ? { ...player, intrigues: [plotIntrigue] } : player
+    ),
   });
   assert.equal(combat.phase, "combat", "A worm-only Ally should open the Combat phase");
   assert.deepEqual(

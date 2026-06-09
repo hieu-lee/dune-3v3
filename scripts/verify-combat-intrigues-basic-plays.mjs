@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { combatFixture, playerById } from "./verify-combat-intrigues-fixtures.mjs";
+import { combatFixture, intrigueBySourceId, playerById } from "./verify-combat-intrigues-fixtures.mjs";
 
 export function verifyCombatIntrigueBasicPlays({
   cards: { contingencyPlan, impress, verifierCombat },
@@ -7,10 +7,11 @@ export function verifyCombatIntrigueBasicPlays({
   marketCards: { lowCostImperiumCard, replacementImperiumCard },
   state,
 }) {
+  const plotIntrigue = intrigueBySourceId(data, 143);
   const allyPlayFixture = combatFixture(state, data, (players) =>
     players.map((player) => {
       if (player.id === "p2") return { ...player, conflict: 2, deployedTroops: 1, intrigues: [verifierCombat] };
-      if (player.id === "p3") return { ...player, conflict: 3, deployedTroops: 1 };
+      if (player.id === "p3") return { ...player, conflict: 3, deployedTroops: 1, intrigues: [plotIntrigue] };
       return player;
     }),
   );
@@ -29,7 +30,7 @@ export function verifyCombatIntrigueBasicPlays({
       player.id === "p2"
         ? { ...player, conflict: 2, deployedTroops: 1, intrigues: [impress] }
         : player.id === "p3"
-          ? { ...player, conflict: 4, deployedTroops: 1 }
+          ? { ...player, conflict: 4, deployedTroops: 1, intrigues: [plotIntrigue] }
         : player,
     ),
   );
@@ -72,7 +73,7 @@ export function verifyCombatIntrigueBasicPlays({
         player.id === "p4"
           ? { ...player, intrigues: [impress] }
           : player.id === "p6"
-            ? { ...player, conflict: 2, deployedTroops: 1 }
+            ? { ...player, conflict: 2, deployedTroops: 1, intrigues: [plotIntrigue] }
             : player,
       ),
     3,
@@ -107,7 +108,7 @@ export function verifyCombatIntrigueBasicPlays({
       player.id === "p2"
         ? { ...player, conflict: 2, deployedTroops: 1, intrigues: [contingencyPlan] }
         : player.id === "p3"
-          ? { ...player, conflict: 4, deployedTroops: 1 }
+          ? { ...player, conflict: 4, deployedTroops: 1, intrigues: [plotIntrigue] }
           : player,
     ),
   );

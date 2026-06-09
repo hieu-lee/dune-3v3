@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { combatFixture, completedContract, playerById, starterCard } from "./verify-combat-intrigues-fixtures.mjs";
+import { combatFixture, completedContract, intrigueBySourceId, playerById, starterCard } from "./verify-combat-intrigues-fixtures.mjs";
 
 export function verifyCombatIntrigueCommanderEffects({
   cards: {
@@ -18,6 +18,7 @@ export function verifyCombatIntrigueCommanderEffects({
   spaces: { espionageSpace, secretsSpace },
   state,
 }) {
+  const plotIntrigue = intrigueBySourceId(data, 143);
   const arrakeenSpace = data.boardSpaces.find((space) => space.id === "arrakeen");
   assert.ok(arrakeenSpace, "Arrakeen should exist for Commander spy fixtures");
   const arrakeenPostId = state.spyObservationPostIdForSpace(arrakeenSpace.id);
@@ -27,12 +28,12 @@ export function verifyCombatIntrigueCommanderEffects({
     data,
     (players) =>
       players.map((player) => {
-        if (player.id === "p2") return { ...player, conflict: 5, deployedTroops: 1 };
+        if (player.id === "p2") return { ...player, conflict: 5, deployedTroops: 1, intrigues: [plotIntrigue] };
         if (player.id === "p4") {
           return { ...player, resources: { ...player.resources, spice: 5 }, intrigues: [spiceIsPower] };
         }
         if (player.id === "p6") {
-          return { ...player, conflict: 1, deployedTroops: 1, resources: { ...player.resources, spice: 3 } };
+          return { ...player, conflict: 1, deployedTroops: 1, resources: { ...player.resources, spice: 3 }, intrigues: [plotIntrigue] };
         }
         return player;
       }),
@@ -84,7 +85,7 @@ export function verifyCombatIntrigueCommanderEffects({
     data,
     (players) =>
       players.map((player) => {
-        if (player.id === "p2") return { ...player, conflict: 5, deployedTroops: 1 };
+        if (player.id === "p2") return { ...player, conflict: 5, deployedTroops: 1, intrigues: [plotIntrigue] };
         if (player.id === "p4") return { ...player, intrigues: [spiceIsPower] };
         if (player.id === "p6") {
           return { ...player, conflict: 8, deployedTroops: 3, garrison: 0, resources: { ...player.resources, spice: 0 } };
@@ -115,7 +116,7 @@ export function verifyCombatIntrigueCommanderEffects({
       players.map((player) => {
         if (player.id === "p2") return { ...player, conflict: 5, deployedTroops: 1 };
         if (player.id === "p4") return { ...player, intrigues: [tacticalOption] };
-        if (player.id === "p6") return { ...player, conflict: 7, deployedTroops: 3, garrison: 0 };
+        if (player.id === "p6") return { ...player, conflict: 7, deployedTroops: 3, garrison: 0, intrigues: [plotIntrigue] };
         return player;
       }),
     3,
@@ -154,7 +155,7 @@ export function verifyCombatIntrigueCommanderEffects({
     data,
     (players) =>
       players.map((player) => {
-        if (player.id === "p2") return { ...player, conflict: 5, deployedTroops: 1 };
+        if (player.id === "p2") return { ...player, conflict: 5, deployedTroops: 1, intrigues: [plotIntrigue] };
         if (player.id === "p4") return { ...player, intrigues: [tacticalOption] };
         if (player.id === "p6") return { ...player, conflict: 6, deployedTroops: 3, garrison: 0 };
         return player;
@@ -185,7 +186,7 @@ export function verifyCombatIntrigueCommanderEffects({
       data,
       (players) =>
         players.map((player) => {
-          if (player.id === "p2") return { ...player, conflict: 5, deployedTroops: 1 };
+          if (player.id === "p2") return { ...player, conflict: 5, deployedTroops: 1, intrigues: [plotIntrigue] };
           if (player.id === "p4") return { ...player, intrigues: [reachAgreement] };
           if (player.id === "p6") return { ...player, conflict: 4, deployedTroops: 2, garrison: 0 };
           return player;
@@ -242,7 +243,7 @@ export function verifyCombatIntrigueCommanderEffects({
     data,
     (players) =>
       players.map((player) => {
-        if (player.id === "p2") return { ...player, conflict: 5, deployedTroops: 1 };
+        if (player.id === "p2") return { ...player, conflict: 5, deployedTroops: 1, intrigues: [plotIntrigue] };
         if (player.id === "p4") return { ...player, intrigues: [goToGround] };
         if (player.id === "p6") return { ...player, conflict: 4, deployedTroops: 2, garrison: 0 };
         return player;
@@ -297,9 +298,9 @@ export function verifyCombatIntrigueCommanderEffects({
       data,
       (players) =>
         players.map((player) => {
-          if (player.id === "p2") return { ...player, conflict: 5, deployedTroops: 1 };
+          if (player.id === "p2") return { ...player, conflict: 5, deployedTroops: 1, intrigues: [plotIntrigue] };
           if (player.id === "p4") return { ...player, spies: 2, intrigues: [findWeakness] };
-          if (player.id === "p6") return { ...player, conflict: 1, deployedTroops: 1 };
+          if (player.id === "p6") return { ...player, conflict: 1, deployedTroops: 1, intrigues: [plotIntrigue] };
           return player;
         }),
       3,
@@ -341,7 +342,7 @@ export function verifyCombatIntrigueCommanderEffects({
         players.map((player) => {
           if (player.id === "p2") return { ...player, conflict: 5, deployedTroops: 1 };
           if (player.id === "p4") return { ...player, intrigues: [findWeakness] };
-          if (player.id === "p6") return { ...player, conflict: 1, deployedTroops: 1, spies: 2 };
+          if (player.id === "p6") return { ...player, conflict: 1, deployedTroops: 1, spies: 2, intrigues: [plotIntrigue] };
           return player;
         }),
       3,
@@ -370,14 +371,15 @@ export function verifyCombatIntrigueCommanderEffects({
       players.map((player) => {
         if (player.id === "p2") return { ...player, conflict: 5, deployedTroops: 1 };
         if (player.id === "p4") return { ...player, intrigues: [questionableMethods] };
-        if (player.id === "p6") {
-          return {
-            ...player,
-            conflict: 1,
-            deployedTroops: 1,
-            influence: { ...player.influence, fringeWorlds: 2 },
-            vp: 1,
-          };
+          if (player.id === "p6") {
+            return {
+              ...player,
+              conflict: 1,
+              deployedTroops: 1,
+              influence: { ...player.influence, fringeWorlds: 2 },
+              intrigues: [plotIntrigue],
+              vp: 1,
+            };
         }
         return player;
       }),
@@ -437,7 +439,7 @@ export function verifyCombatIntrigueCommanderEffects({
         if (player.id === "p4") {
           return { ...player, intrigues: [questionableMethods], influence: { ...player.influence, emperor: 2 }, vp: 1 };
         }
-        if (player.id === "p6") return { ...player, conflict: 1, deployedTroops: 1 };
+        if (player.id === "p6") return { ...player, conflict: 1, deployedTroops: 1, intrigues: [plotIntrigue] };
         return player;
       }),
     3,
@@ -501,7 +503,7 @@ export function verifyCombatIntrigueCommanderEffects({
         if (player.id === "p1") {
           return { ...player, intrigues: [questionableMethods], influence: { ...player.influence, fremen: 2 }, vp: 1 };
         }
-        if (player.id === "p3") return { ...player, conflict: 1, deployedTroops: 1 };
+        if (player.id === "p3") return { ...player, conflict: 1, deployedTroops: 1, intrigues: [plotIntrigue] };
         if (player.id === "p5") return { ...player, conflict: 5, deployedTroops: 1 };
         return player;
       }),
@@ -543,14 +545,15 @@ export function verifyCombatIntrigueCommanderEffects({
         if (player.id === "p4") {
           return { ...player, intrigues: [questionableMethods], influence: { ...player.influence, emperor: 2 }, vp: 1 };
         }
-        if (player.id === "p6") {
-          return {
-            ...player,
-            conflict: 1,
-            deployedTroops: 1,
-            influence: { ...player.influence, fringeWorlds: 2 },
-            vp: 1,
-          };
+          if (player.id === "p6") {
+            return {
+              ...player,
+              conflict: 1,
+              deployedTroops: 1,
+              influence: { ...player.influence, fringeWorlds: 2 },
+              intrigues: [plotIntrigue],
+              vp: 1,
+            };
         }
         return player;
       }),
@@ -613,7 +616,7 @@ export function verifyCombatIntrigueCommanderEffects({
           return { ...player, conflict: 5, deployedTroops: 1, influence: { ...player.influence, bene: 2 }, vp: 1 };
         }
         if (player.id === "p4") return { ...player, intrigues: [questionableMethods] };
-        if (player.id === "p6") return { ...player, conflict: 1, deployedTroops: 1 };
+        if (player.id === "p6") return { ...player, conflict: 1, deployedTroops: 1, intrigues: [plotIntrigue] };
         return player;
       }),
     3,
@@ -641,7 +644,7 @@ export function verifyCombatIntrigueCommanderEffects({
       data,
       (players) =>
         players.map((player) => {
-          if (player.id === "p2") return { ...player, conflict: 5, deployedTroops: 1 };
+          if (player.id === "p2") return { ...player, conflict: 5, deployedTroops: 1, intrigues: [plotIntrigue] };
           if (player.id === "p4") return { ...player, spies: 1, intrigues: [springTheTrap] };
           if (player.id === "p6") return { ...player, conflict: 1, deployedTroops: 1 };
           return player;
@@ -693,7 +696,7 @@ export function verifyCombatIntrigueCommanderEffects({
       data,
       (players) =>
         players.map((player) => {
-          if (player.id === "p2") return { ...player, conflict: 5, deployedTroops: 1 };
+          if (player.id === "p2") return { ...player, conflict: 5, deployedTroops: 1, intrigues: [plotIntrigue] };
           if (player.id === "p4") return { ...player, intrigues: [springTheTrap] };
           if (player.id === "p6") return { ...player, conflict: 1, deployedTroops: 1, spies: 1 };
           return player;
@@ -729,6 +732,7 @@ export function verifyCombatIntrigueCommanderEffects({
             deployedTroops: 1,
             deployedSandworms: 1,
             discard: [commanderDevourTrashChoice],
+            intrigues: [plotIntrigue],
           };
         }
         return player;
@@ -783,7 +787,7 @@ export function verifyCombatIntrigueCommanderEffects({
           return { ...player, conflict: 5, deployedTroops: 1, influence: { ...player.influence, bene: 3 } };
         }
         if (player.id === "p4") return { ...player, intrigues: [weirdingCombat] };
-        if (player.id === "p6") return { ...player, conflict: 1, deployedTroops: 1 };
+        if (player.id === "p6") return { ...player, conflict: 1, deployedTroops: 1, intrigues: [plotIntrigue] };
         return player;
       }),
     3,
@@ -812,7 +816,7 @@ export function verifyCombatIntrigueCommanderEffects({
             intrigues: [backedByChoam],
           };
         }
-        if (player.id === "p6") return { ...player, conflict: 1, deployedTroops: 1 };
+        if (player.id === "p6") return { ...player, conflict: 1, deployedTroops: 1, intrigues: [plotIntrigue] };
         return player;
       }),
     3,

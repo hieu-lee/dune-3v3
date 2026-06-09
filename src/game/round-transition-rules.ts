@@ -15,7 +15,6 @@ import {
 import { pendingActionForControlDefense } from "./location-control";
 import { resolvePlayCombatIntrigue } from "./combat-intrigue-play-rules";
 import { advancePastUnresolvableMandatoryTrash } from "./trash-rules";
-import { playerHasPlayablePlotIntrigue } from "./plot-intrigue-playability";
 import type { CombatIntrigueChoice } from "./combat-intrigue-play-rules";
 import type { GameState } from "./types";
 
@@ -166,7 +165,7 @@ export function maybeStartCombatPhase(state: GameState): GameState {
     activePlayer &&
     resolvedState.agentTurnComplete &&
     !activePlayer.revealed &&
-    !playerHasPlayablePlotIntrigue(resolvedState, activePlayer)
+    activePlayer.intrigues.length === 0
   ) {
     return maybeStartCombatPhase({
       ...resolvedState,

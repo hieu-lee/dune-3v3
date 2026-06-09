@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   combatFixture,
   completedContract,
+  intrigueBySourceId,
   incompleteContract,
   playerById,
 } from "./verify-combat-intrigues-fixtures.mjs";
@@ -12,6 +13,7 @@ export function verifyCombatIntrigueStrengthAndSpies({
   spaces: { arrakeenSpace, secretsSpace },
   state,
 }) {
+  const plotIntrigue = intrigueBySourceId(data, 143);
   const beneSpySpace = data.boardSpaces.find((space) => space.id === "espionage");
   assert.ok(beneSpySpace, "Espionage should be the Bene spy-post representative");
   const beneSpyPostId = state.spyObservationPostIdForSpace(secretsSpace.id);
@@ -19,8 +21,8 @@ export function verifyCombatIntrigueStrengthAndSpies({
     players.map((player) =>
       player.id === "p2"
         ? { ...player, conflict: 2, deployedTroops: 1, intrigues: [weirdingCombat] }
-        : player.id === "p3"
-          ? { ...player, conflict: 4, deployedTroops: 1 }
+      : player.id === "p3"
+          ? { ...player, conflict: 4, deployedTroops: 1, intrigues: [plotIntrigue] }
           : player,
     ),
   );
@@ -46,7 +48,7 @@ export function verifyCombatIntrigueStrengthAndSpies({
             intrigues: [weirdingCombat],
           }
         : player.id === "p3"
-          ? { ...player, conflict: 4, deployedTroops: 1 }
+          ? { ...player, conflict: 4, deployedTroops: 1, intrigues: [plotIntrigue] }
           : player,
     ),
   );
@@ -110,7 +112,7 @@ export function verifyCombatIntrigueStrengthAndSpies({
             intrigues: [backedByChoam],
           }
         : player.id === "p3"
-          ? { ...player, conflict: 4, deployedTroops: 1 }
+          ? { ...player, conflict: 4, deployedTroops: 1, intrigues: [plotIntrigue] }
           : player,
     ),
   );
@@ -129,8 +131,8 @@ export function verifyCombatIntrigueStrengthAndSpies({
     players.map((player) =>
       player.id === "p2"
         ? { ...player, conflict: 2, deployedTroops: 1, intrigues: [findWeakness] }
-        : player.id === "p3"
-          ? { ...player, conflict: 4, deployedTroops: 1 }
+      : player.id === "p3"
+          ? { ...player, conflict: 4, deployedTroops: 1, intrigues: [plotIntrigue] }
           : player,
     ),
   );

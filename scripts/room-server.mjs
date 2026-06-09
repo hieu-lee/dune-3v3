@@ -22,6 +22,7 @@ const jsonHeaders = {
   "content-type": "application/json; charset=utf-8",
   "cache-control": "no-store",
 };
+const maxJsonBodyBytes = 1024 * 1024;
 
 function roomCode() {
   return randomBytes(4).toString("hex").toUpperCase();
@@ -45,13 +46,34 @@ function sendNoContent(response) {
   response.end();
 }
 
+function requestError(status, message) {
+  const error = new Error(message);
+  error.status = status;
+  return error;
+}
+
 async function readJson(request) {
   const chunks = [];
-  for await (const chunk of request) chunks.push(chunk);
+  let byteLength = 0;
+  let bodyTooLarge = false;
+  for await (const chunk of request) {
+    byteLength += chunk.length;
+    if (bodyTooLarge) continue;
+    if (byteLength <= maxJsonBodyBytes) {
+      chunks.push(chunk);
+    } else {
+      bodyTooLarge = true;
+    }
+  }
+  if (bodyTooLarge) throw requestError(413, "JSON request body is too large");
   if (chunks.length === 0) return {};
   const text = Buffer.concat(chunks).toString("utf8");
   if (!text.trim()) return {};
-  return JSON.parse(text);
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw requestError(400, "Malformed JSON request body");
+  }
 }
 
 function tokenFromRequest(request, url) {
@@ -983,8 +1005,9 @@ export async function createRoomServer({
       try {
         await handleApi(request, response, url);
       } catch (error) {
+        const status = Number.isInteger(error?.status) ? error.status : 500;
         const message = error instanceof Error ? error.message : "Unexpected room server error";
-        sendError(response, 500, message);
+        sendError(response, status, message);
       }
       return;
     }

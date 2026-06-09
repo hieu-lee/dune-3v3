@@ -631,6 +631,25 @@ try {
   assertHiddenReservedContracts(created.body, "p4");
   assertHiddenSharedDecks(created.body);
 
+  const parseGuardRoom = await jsonFetch("/api/rooms", { method: "POST" });
+  assert.equal(parseGuardRoom.response.status, 201, "Request parsing guard room creation should succeed");
+  const malformedClaim = await fetch(`${baseUrl}/api/rooms/${parseGuardRoom.body.roomId}/seats/p1/claim`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: "{",
+  });
+  const malformedClaimBody = await malformedClaim.json().catch(() => undefined);
+  assert.equal(malformedClaim.status, 400, "Malformed room JSON should return a client error");
+  assert.equal(malformedClaimBody?.error, "Malformed JSON request body");
+  const oversizedClaim = await fetch(`${baseUrl}/api/rooms/${parseGuardRoom.body.roomId}/seats/p2/claim`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: "x".repeat(2 * 1024 * 1024) }),
+  });
+  const oversizedClaimBody = await oversizedClaim.json().catch(() => undefined);
+  assert.equal(oversizedClaim.status, 413, "Oversized room JSON should be rejected before parsing");
+  assert.equal(oversizedClaimBody?.error, "JSON request body is too large");
+
   const p1Claim = await jsonFetch(`/api/rooms/${roomId}/seats/p1/claim`, {
     method: "POST",
     headers: { "content-type": "application/json" },

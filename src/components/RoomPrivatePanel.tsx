@@ -194,12 +194,13 @@ export function RoomPrivatePanel({ compactForPending = false, phase = "playing",
   const hasPrivateActions = player.intrigues.length > 0;
   const trash = player.trash ?? [];
   const contracts = player.contracts.map((contract) => contract.card);
-  const emptyPanel = !hasHandCards && !hasPrivateActions && player.discard.length === 0 && trash.length === 0 && contracts.length === 0;
+  const graveyard = [...player.discard, ...player.playArea];
+  const emptyPanel = !hasHandCards && !hasPrivateActions && graveyard.length === 0 && trash.length === 0 && contracts.length === 0;
   const compactPrivate = compactForPending || phase === "endgame" || phase === "finished";
   const compactNote = compactForPending
     ? `${player.hand.length} hand cards compacted while the team payment resolves.`
     : `${player.hand.length} hand cards hidden during final scoring.`;
-  const privateZoneCount = player.discard.length + trash.length + player.intrigues.length + contracts.length;
+  const privateZoneCount = graveyard.length + trash.length + player.intrigues.length + contracts.length;
 
   return (
     <section
@@ -258,9 +259,9 @@ export function RoomPrivatePanel({ compactForPending = false, phase = "playing",
         </summary>
         <div className="private-zone-grid">
           <section>
-            <strong><Archive size={14} />Graveyard ({player.discard.length})</strong>
+            <strong><Archive size={14} />Graveyard ({graveyard.length})</strong>
             <div>
-              <PrivateZoneCardList cards={player.discard} playerId={player.id} zoneLabel="Graveyard" onInspect={setInspectedCard} />
+              <PrivateZoneCardList cards={graveyard} playerId={player.id} zoneLabel="Graveyard" onInspect={setInspectedCard} />
             </div>
           </section>
           <section>

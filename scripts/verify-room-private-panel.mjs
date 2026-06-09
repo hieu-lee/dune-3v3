@@ -37,7 +37,36 @@ try {
   await server.listen();
   const url = server.resolvedUrls?.local?.[0] ?? "http://127.0.0.1:5173/";
   const state = await server.ssrLoadModule("/src/game/state.ts");
+  const boardRules = await server.ssrLoadModule("/src/game/board-rules.ts");
+  const placementRules = await server.ssrLoadModule("/src/game/placement-rules.ts");
+  const turnActions = await server.ssrLoadModule("/src/app-turn-actions.ts");
+  const { boardSpaces } = await server.ssrLoadModule("/src/game/data.ts");
   const baseGame = state.initialGame();
+  const activePlayer = baseGame.players[baseGame.activeSeat];
+  const playable = activePlayer.hand.flatMap((card) =>
+    boardSpaces.map((space) => ({ card, space }))
+  ).find(({ card, space }) =>
+    placementRules.agentSpaceAvailable(baseGame, space, activePlayer) &&
+    placementRules.iconCanReach(card, space, activePlayer, baseGame.swordmasterClaimed, baseGame.spyPosts, baseGame.players, baseGame.sharedSpyPosts) &&
+    boardRules.canPay(activePlayer, boardRules.effectiveCost(space, baseGame.players))
+  );
+  assert.ok(playable, "Initial game should have a legal Agent placement");
+  const placedAgentState = turnActions.placeAgentAction(baseGame, {
+    commanderTargets: {},
+    selectedCard: playable.card,
+    selectedSpace: playable.space,
+  });
+  const placedAgentPlayer = placedAgentState.players.find((player) => player.id === activePlayer.id);
+  assert.ok(
+    placedAgentPlayer?.playArea.some((card) => card.id === playable.card.id),
+    "Agent placement should move the played card into playArea before round cleanup",
+  );
+  assert.equal(
+    placedAgentPlayer?.discard.some((card) => card.id === playable.card.id),
+    false,
+    "Agent placement should not add played cards to the true discard pile before cleanup",
+  );
+
   const cleanupPlayer = baseGame.players[0];
   const cleanupHandCard = { ...cleanupPlayer.hand[0], id: "graveyard-cleanup-hand-card" };
   const cleanupPlayCard = { ...cleanupPlayer.hand[1], id: "graveyard-cleanup-play-card" };
@@ -70,15 +99,26 @@ try {
     const debug = window.__DUNE_DEBUG__;
     const game = debug.getGame();
     const activePlayer = game.players[game.activeSeat];
-    const graveyardCard = activePlayer.hand.find((card) => card.imagePath) ?? activePlayer.hand[0];
-    const trashCard = activePlayer.hand.find((card) => card.id !== graveyardCard.id && card.imagePath) ?? activePlayer.hand[1];
+    const privateZoneCards = activePlayer.hand.filter((card) => card.imagePath);
+    if (privateZoneCards.length < 3) throw new Error("Private-zone fixture needs three asset-backed hand cards");
+    const graveyardDiscardCard = privateZoneCards[0] ?? activePlayer.hand[0];
+    const graveyardPlayCard = privateZoneCards.find((card) => card.id !== graveyardDiscardCard.id) ?? activePlayer.hand[1];
+    const trashCard = privateZoneCards.find((card) =>
+      card.id !== graveyardDiscardCard.id &&
+      card.id !== graveyardPlayCard.id
+    ) ?? activePlayer.hand[2];
     const intrigue = game.intrigueDeck.find((card) => card.name === "Spring the Trap") ?? game.intrigueDeck.find((card) => card.imagePath) ?? game.intrigueDeck[0];
     const contract = game.contractOffer.find((card) => card.imagePath) ?? game.contractDeck.find((card) => card.imagePath) ?? game.contractOffer[0];
-    if (!graveyardCard || !trashCard || !intrigue || !contract) throw new Error("Private-zone fixture cards unavailable");
+    if (!graveyardDiscardCard || !graveyardPlayCard || !trashCard || !intrigue || !contract) throw new Error("Private-zone fixture cards unavailable");
     const nextPlayer = {
       ...activePlayer,
-      hand: activePlayer.hand.filter((card) => card.id !== graveyardCard.id && card.id !== trashCard.id),
-      discard: [graveyardCard],
+      hand: activePlayer.hand.filter((card) =>
+        card.id !== graveyardDiscardCard.id &&
+        card.id !== graveyardPlayCard.id &&
+        card.id !== trashCard.id
+      ),
+      discard: [graveyardDiscardCard],
+      playArea: [graveyardPlayCard],
       trash: [trashCard],
       intrigues: [intrigue],
       contracts: [{ card: contract, completed: false, takenRound: game.round }],
@@ -92,11 +132,16 @@ try {
     return {
       contractName: contract.name,
       contractEffect: "Complete this contract for its printed reward.",
-      graveyardEffect: [
-        graveyardCard.play ? `Agent: ${graveyardCard.play}` : undefined,
-        graveyardCard.reveal ? `Reveal: ${graveyardCard.reveal}` : undefined,
+      graveyardDiscardEffect: [
+        graveyardDiscardCard.play ? `Agent: ${graveyardDiscardCard.play}` : undefined,
+        graveyardDiscardCard.reveal ? `Reveal: ${graveyardDiscardCard.reveal}` : undefined,
       ].filter(Boolean).join(" "),
-      graveyardName: graveyardCard.name,
+      graveyardDiscardName: graveyardDiscardCard.name,
+      graveyardPlayEffect: [
+        graveyardPlayCard.play ? `Agent: ${graveyardPlayCard.play}` : undefined,
+        graveyardPlayCard.reveal ? `Reveal: ${graveyardPlayCard.reveal}` : undefined,
+      ].filter(Boolean).join(" "),
+      graveyardPlayName: graveyardPlayCard.name,
       intrigueName: intrigue.name,
       intrigueSummary: intrigue.summary,
       trashEffect: [
@@ -106,19 +151,25 @@ try {
       trashName: trashCard.name,
     };
   });
-  await page.waitForFunction(() => document.querySelectorAll(".private-zone-card").length >= 4);
+  await page.waitForFunction(() => document.querySelectorAll(".private-zone-card").length >= 5);
   await waitForImages(page);
 
-  assert.equal(await page.getByText("Graveyard (1)", { exact: true }).count(), 1, "Private zone should rename Discard to Graveyard");
-  assert.equal(await page.getByText("Discard (1)", { exact: true }).count(), 0, "Private zone should not show Discard label");
-  assert.equal(await page.locator(".private-zone-card").count(), 4, "Private zone should render asset-backed cards");
-  assert.equal(await page.locator(".private-zone-card img").count(), 4, "Private zone cards should use card assets");
+  assert.equal(await page.getByText("Graveyard (2)", { exact: true }).count(), 1, "Private zone should combine true discard and played cards as Graveyard");
+  assert.equal(await page.getByText("Discard (2)", { exact: true }).count(), 0, "Private zone should not show Discard label");
+  assert.equal(await page.locator(".private-zone-card").count(), 5, "Private zone should render asset-backed cards");
+  assert.equal(await page.locator(".private-zone-card img").count(), 5, "Private zone cards should use card assets");
 
   assert.equal(await page.locator(".private-zone-card strong").count(), 0, "Private zone tiles should not add visible card-name labels");
   const effectTexts = await page.locator(".private-zone-card-effect").allTextContents();
   assert.deepEqual(
     effectTexts.sort(),
-    [fixture.contractEffect, fixture.graveyardEffect, fixture.intrigueSummary, fixture.trashEffect].sort(),
+    [
+      fixture.contractEffect,
+      fixture.graveyardDiscardEffect,
+      fixture.graveyardPlayEffect,
+      fixture.intrigueSummary,
+      fixture.trashEffect,
+    ].sort(),
     "Private zone tiles should show effect text for each card",
   );
   await page.screenshot({ path: new URL("private-zone-cards.png", outDir).pathname, fullPage: false });

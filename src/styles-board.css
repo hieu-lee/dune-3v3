@@ -21,7 +21,7 @@
   min-width: 1120px;
   border: 1px solid rgba(255, 246, 230, 0.16);
   border-radius: 8px;
-  background: #161411;
+  background: rgba(22, 20, 17, 0.58);
   overflow: hidden;
   padding: 18px;
 }
@@ -37,14 +37,14 @@
 .board-stage::before {
   z-index: -2;
   background: url("/assets/dune-cards-hub/full-board-image.png") center / cover no-repeat;
-  opacity: 0.22;
+  opacity: 0.33;
 }
 
 .board-stage::after {
   z-index: -1;
   background:
-    linear-gradient(90deg, rgba(18, 15, 13, 0.74), rgba(21, 17, 14, 0.38) 34%, rgba(18, 15, 13, 0.78)),
-    linear-gradient(180deg, rgba(18, 15, 13, 0.18), rgba(18, 15, 13, 0.66));
+    linear-gradient(90deg, rgba(18, 15, 13, 0.44), rgba(21, 17, 14, 0.18) 34%, rgba(18, 15, 13, 0.47)),
+    linear-gradient(180deg, rgba(18, 15, 13, 0.1), rgba(18, 15, 13, 0.4));
 }
 
 .spy-network {
@@ -268,8 +268,8 @@
   border-left-width: 3px;
   border-radius: inherit;
   background:
-    linear-gradient(135deg, color-mix(in srgb, var(--region-color), transparent 86%), rgba(16, 14, 12, 0.64)),
-    rgba(16, 14, 12, 0.46);
+    linear-gradient(135deg, color-mix(in srgb, var(--region-color), transparent 90%), rgba(16, 14, 12, 0.38)),
+    rgba(16, 14, 12, 0.28);
 }
 
 .board-region--emperor {
@@ -332,8 +332,8 @@
   border: 1px solid color-mix(in srgb, var(--region-color), transparent 58%);
   border-radius: 7px;
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--region-color), transparent 88%), rgba(8, 7, 6, 0.22)),
-    rgba(8, 7, 6, 0.24);
+    linear-gradient(180deg, color-mix(in srgb, var(--region-color), transparent 91%), rgba(8, 7, 6, 0.14)),
+    rgba(8, 7, 6, 0.14);
   padding: 5px;
 }
 
@@ -844,8 +844,8 @@
   border: 1px solid color-mix(in srgb, var(--space-color), transparent 54%);
   border-radius: 8px;
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--space-color), transparent 86%), rgba(22, 18, 15, 0.82)),
-    rgba(22, 18, 15, 0.78);
+    linear-gradient(180deg, color-mix(in srgb, var(--space-color), transparent 90%), rgba(22, 18, 15, 0.58)),
+    rgba(22, 18, 15, 0.52);
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
   color: #fff3df;
   cursor: pointer;
@@ -864,7 +864,7 @@
   inset: 0;
   z-index: -1;
   background:
-    linear-gradient(180deg, transparent 38%, rgba(8, 7, 6, 0.5) 72%, rgba(8, 7, 6, 0.84)),
+    linear-gradient(180deg, transparent 38%, rgba(8, 7, 6, 0.32) 72%, rgba(8, 7, 6, 0.56)),
     radial-gradient(circle at top right, color-mix(in srgb, var(--space-color), transparent 72%), transparent 58%);
   pointer-events: none;
   border-radius: inherit;

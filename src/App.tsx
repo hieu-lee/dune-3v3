@@ -314,7 +314,9 @@ export default function App() {
         : activePlayer.id;
     const revealTarget = game.players.find((player) => player.id === targetId);
     const revealPlan = revealTurnPlan(activePlayer, game, revealTarget);
-    setGame((current) => revealTurnAction(current, { commanderTargets: effectiveCommanderTargets, revealPlan }));
+    setGame((current) =>
+      revealTurnAction(current, { commanderTargets: effectiveCommanderTargets, playerId: activePlayer.id, revealPlan })
+    );
   }
 
   function buyCard(card: Card) {
@@ -391,7 +393,7 @@ export default function App() {
       void roomSession.sendAction({ kind: "pass-combat" });
       return;
     }
-    setGame((current) => passCombatIntrigue(current, current.players[current.activeSeat].id));
+    setGame((current) => passCombatIntrigue(current, activePlayer.id));
   }
 
   function scoreEndgameIntrigue(playerId: string, intrigueId: string, conflictId: string) {

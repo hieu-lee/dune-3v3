@@ -720,6 +720,7 @@ export function revealTurnPlan(
 
 type RevealTurnInput = {
   commanderTargets: CommanderTargets;
+  playerId?: string;
   revealPlan: RevealTurnPlan;
 };
 
@@ -759,7 +760,7 @@ function applyRevealInfluenceGains(
 
 export function revealTurnAction(
   current: GameState,
-  { commanderTargets, revealPlan }: RevealTurnInput,
+  { commanderTargets, playerId, revealPlan }: RevealTurnInput,
 ): GameState {
   const {
     influenceGains = {},
@@ -771,6 +772,17 @@ export function revealTurnAction(
     swords,
   } = revealPlan;
   const player = current.players[current.activeSeat];
+  if (
+    current.phase !== "playing" ||
+    current.pendingAction ||
+    current.pendingQueue.length > 0 ||
+    current.agentTurnComplete ||
+    !player ||
+    player.revealed ||
+    (playerId !== undefined && player.id !== playerId)
+  ) {
+    return current;
+  }
   const targetId =
     player.role === "Commander"
       ? legalActivatedAllyIdFor(player, current.players, commanderTargets)

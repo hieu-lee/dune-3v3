@@ -51,6 +51,7 @@
     "verify:imperium-cards": "node scripts/verify-imperium-cards.mjs",
     "verify:intrigues": "node scripts/verify-intrigues.mjs",
     "verify:leaders": "node scripts/verify-leaders.mjs",
+    "verify:local-action-idempotency": "node scripts/verify-local-action-idempotency.mjs",
     "verify:maker-spice": "node scripts/verify-maker-spice.mjs",
     "verify:objectives": "node scripts/verify-objectives.mjs",
     "verify:pending-resolution-overlay": "node scripts/verify-pending-resolution-overlay.mjs",

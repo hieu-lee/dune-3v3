@@ -298,6 +298,7 @@ export {
 export {
   agentSpaceAvailable,
   canEnterOccupiedSpaceWithSpy,
+  commanderCanActivateAlly,
   defaultActivatedAllyId,
   iconCanReach,
   pendingActionForBoardAgentRecall,

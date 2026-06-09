@@ -142,17 +142,22 @@ export function ActiveHandPanel({
       {showTurnActions && activePlayer.role === "Commander" && (
         <div className="activation-strip">
           <span>Activating</span>
-          {activeAllies.map((ally) => (
-            <button
-              type="button"
-              key={ally.id}
-              className={activatedAlly.id === ally.id ? "selected" : ""}
-              disabled={!playingPhase || activePlayer.revealed}
-              onClick={() => onSelectCommanderTarget(activePlayer.id, ally.id)}
-            >
-              {ally.leader}
-            </button>
-          ))}
+          {activeAllies.map((ally) => {
+            const alreadyActivated = !activePlayer.swordmasterBonus &&
+              (activePlayer.commanderActivatedAllyIds ?? []).includes(ally.id);
+            return (
+              <button
+                type="button"
+                key={ally.id}
+                className={activatedAlly.id === ally.id ? "selected" : ""}
+                disabled={!playingPhase || activePlayer.revealed || alreadyActivated}
+                onClick={() => onSelectCommanderTarget(activePlayer.id, ally.id)}
+                title={alreadyActivated ? "Requires Swordmaster to activate again" : undefined}
+              >
+                {ally.leader}
+              </button>
+            );
+          })}
         </div>
       )}
       {hasHandCards ? allHandCardsHidden ? (

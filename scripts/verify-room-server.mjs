@@ -38,10 +38,26 @@ const {
   roomPendingActionCanResolve,
 } = await server.ssrLoadModule("/src/multiplayer/room-actions.ts");
 
+async function jsonFetchFrom(base, path, options = {}) {
+  const method = (options.method ?? "GET").toUpperCase();
+  const attempts = method === "GET" || method === "HEAD" ? 3 : 1;
+  let lastError;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      const response = await fetch(`${base}${path}`, options);
+      const body = await response.json().catch(() => undefined);
+      return { response, body };
+    } catch (error) {
+      lastError = error;
+      if (attempt === attempts) break;
+      await sleep(50 * attempt);
+    }
+  }
+  throw lastError;
+}
+
 async function jsonFetch(path, options = {}) {
-  const response = await fetch(`${baseUrl}${path}`, options);
-  const body = await response.json().catch(() => undefined);
-  return { response, body };
+  return jsonFetchFrom(baseUrl, path, options);
 }
 
 async function assertConfiguredStorageIsPrivate(storagePath, publicPaths) {
@@ -174,9 +190,7 @@ async function assertAiFillOpponents() {
   });
   const aiBaseUrl = aiServer.resolvedUrls.local[0].replace(/\/$/, "");
   async function aiJsonFetch(path, options = {}) {
-    const response = await fetch(`${aiBaseUrl}${path}`, options);
-    const body = await response.json().catch(() => undefined);
-    return { response, body };
+    return jsonFetchFrom(aiBaseUrl, path, options);
   }
   try {
     let created;
@@ -1506,7 +1520,13 @@ try {
   });
   assert.equal(placeAgent.response.status, 200, "Claimed active player should place an Agent through the room action endpoint");
   const placedSnapshot = placeAgent.body.snapshot;
-  assert.equal(placedSnapshot.game.agentTurnComplete, true, "Room Agent placement should complete the Agent action");
+  assert.equal(
+    placedSnapshot.game.agentTurnComplete ||
+      placedSnapshot.game.players[placedSnapshot.game.activeSeat].id !== agentPlayerId ||
+      placedSnapshot.game.phase !== "playing",
+    true,
+    "Room Agent placement should complete the Agent action or auto-advance when no Plot Intrigue is playable",
+  );
   assert.equal(
     Boolean(placedSnapshot.game.spaces[legalMove.space.id]),
     true,

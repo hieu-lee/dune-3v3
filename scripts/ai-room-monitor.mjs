@@ -49,9 +49,19 @@ function parseArgs(argv) {
 }
 
 async function jsonFetch(baseUrl, path, options = {}) {
-  const response = await fetch(`${baseUrl}${path}`, options);
-  const body = await response.json().catch(() => undefined);
-  return { response, body };
+  let lastError;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      const response = await fetch(`${baseUrl}${path}`, options);
+      const body = await response.json().catch(() => undefined);
+      return { response, body };
+    } catch (error) {
+      lastError = error;
+      if (attempt === 3) break;
+      await sleep(50 * attempt);
+    }
+  }
+  throw lastError;
 }
 
 async function claimSeat(baseUrl, roomId, playerId, name) {

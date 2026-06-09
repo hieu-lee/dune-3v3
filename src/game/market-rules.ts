@@ -18,7 +18,7 @@ import {
   adjustInfluenceAndResolveThresholdRewards,
 } from "./leader-rewards";
 import { advancePendingAction, queuePendingActions } from "./pending-actions";
-import { defaultActivatedAllyId } from "./placement-rules";
+import { legalActivatedAlliesForCommander } from "./placement-rules";
 import { pendingActionForSpyPlacements } from "./spy-effect-pending-rules";
 import { hasAcquiredCardThisTurn, recordTurnAcquiredCard, recordTurnSpiceGain } from "./turn-trackers";
 import { factionLabels } from "./data";
@@ -272,20 +272,25 @@ export function activatedAllyEffectOwner(state: GameState, player: Player, owner
   if (lockedOwnerId && ownerId && ownerId !== lockedOwnerId) {
     return { valid: false, owner: undefined };
   }
-  const resolvedOwnerId = lockedOwnerId ?? ownerId ?? defaultActivatedAllyId(player, state.players);
-  const owner = state.players.find(
-    (candidate) =>
-      candidate.id === resolvedOwnerId &&
-      candidate.team === player.team &&
-      candidate.role === "Ally",
-  );
+  const owner = lockedOwnerId
+    ? state.players.find(
+        (candidate) =>
+          candidate.id === lockedOwnerId &&
+          candidate.team === player.team &&
+          candidate.role === "Ally",
+      )
+    : ownerId
+      ? legalActivatedAlliesForCommander(player, state.players).find((candidate) => candidate.id === ownerId)
+      : legalActivatedAlliesForCommander(player, state.players)[0];
   return { valid: Boolean(owner), owner };
 }
 
 export function callToArmsRecruitOwner(state: GameState, buyer: Player, recruitOwnerId?: string) {
   if (!buyer.callToArmsActive) return { valid: true, owner: undefined };
   if (buyer.role !== "Commander") return { valid: true, owner: buyer };
-  return activatedAllyEffectOwner(state, buyer, recruitOwnerId);
+  const recruitOwner = activatedAllyEffectOwner(state, buyer, recruitOwnerId);
+  if (recruitOwner.valid || recruitOwnerId) return recruitOwner;
+  return { valid: true, owner: undefined };
 }
 
 export function acquireMarketCard(

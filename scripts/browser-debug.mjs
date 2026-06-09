@@ -246,11 +246,6 @@ async function runAgentPlacementSmoke(page, url, server, captures) {
   await spaceButton.click();
   await screenshot(page, captures, "agent-placement-selected.png");
 
-  const placeAgent = page.getByTestId("place-agent");
-  assert.equal(await placeAgent.count(), 1, "Expected one Place Agent button");
-  assert.equal(await placeAgent.isEnabled(), true, "Place Agent should be enabled after selecting a legal card and space");
-  await placeAgent.click();
-
   await page.waitForFunction(
     ({ playerId, cardId, spaceId }) => {
       const game = window.__DUNE_DEBUG__?.getGame();

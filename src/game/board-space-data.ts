@@ -99,8 +99,8 @@ const boardSpaceSpecs: BoardSpace[] = [
     cost: { spice: 2 },
     influence: "greatHouses",
     troops: 3,
-    team: "reinforce",
-    detail: "Recruit three troops split across allied teammates.",
+    combat: true,
+    detail: "Recruit three troops to the activated Ally; up to three can be deployed immediately.",
   },
   {
     id: "vast-wealth",

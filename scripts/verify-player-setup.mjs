@@ -43,7 +43,8 @@ try {
   assert.equal(shaddam.hand.length, 5);
   assert.equal(shaddam.deck.length, 5);
   assert.equal(shaddam.reservedContracts.length, 2, "Shaddam Commander should start with reserved contracts");
-  assert.deepEqual(shaddam.resources, { solari: 2, spice: 0, water: 1 });
+  assert.deepEqual(shaddam.resources, { solari: 0, spice: 0, water: 1 });
+  assert.deepEqual(shaddam.commanderActivatedAllyIds, []);
   assert.deepEqual(shaddam.influence, setup.emptyInfluence());
 
   const staban = setup.makePlayer("p7", "Seat 7", "Staban Tuek", "muaddib", "Ally", "#5cb85c");

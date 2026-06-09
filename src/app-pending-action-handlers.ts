@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from "react";
-import { activatedAllyIdFor } from "./app-turn-actions";
+import { legalActivatedAllyIdFor } from "./app-turn-actions";
 import {
   acquireCardForPending,
   adjustTeamResourcePaymentContribution,
@@ -255,7 +255,7 @@ export function createPendingActionHandlers({ commanderTargets, game, setGame }:
   const acquirePendingCard = (cardId: string) =>
     runPending("acquire-card", (current, pending) => {
       const owner = current.players.find((player) => player.id === pending.ownerId);
-      const recruitOwnerId = owner?.role === "Commander" ? activatedAllyIdFor(owner, current.players, commanderTargets) : undefined;
+      const recruitOwnerId = owner?.role === "Commander" ? legalActivatedAllyIdFor(owner, current.players, commanderTargets) : undefined;
       return maybeStartCombatPhase(acquireCardForPending(current, pending, cardId, recruitOwnerId));
     });
   const chooseDiscardCardForInfluenceAndDraw = (discardCardId: string, faction: FactionId) =>

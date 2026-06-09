@@ -1,5 +1,5 @@
 import {
-  activatedAllyIdFor,
+  legalActivatedAllyIdFor,
   placeAgentAction,
   revealTurnAction,
   revealTurnPlan,
@@ -12,6 +12,7 @@ import {
   agentSpaceAvailable,
   canMoveCardToThroneRow,
   canPay,
+  commanderCanActivateAlly,
   effectiveCost,
   finishRevealTurn,
   iconCanReach,
@@ -258,8 +259,7 @@ function commanderTargetsFor(player: Player, players: Player[], commanderTargets
   const requestedTargetId = commanderTargets?.[player.id];
   const requestedTarget = players.find((candidate) =>
     candidate.id === requestedTargetId &&
-    candidate.team === player.team &&
-    candidate.role === "Ally"
+    gameRules.commanderCanActivateAlly(player, candidate)
   );
   return requestedTarget ? { [player.id]: requestedTarget.id } : {};
 }
@@ -270,7 +270,7 @@ function routedCommanderTargetIdFor(
   commanderTargets: Record<string, string> | undefined,
 ) {
   if (player.role !== "Commander") return undefined;
-  return activatedAllyIdFor(player, state.players, commanderTargetsFor(player, state.players, commanderTargets));
+  return legalActivatedAllyIdFor(player, state.players, commanderTargetsFor(player, state.players, commanderTargets));
 }
 
 function sameStateError(): never {
@@ -301,6 +301,11 @@ function applyPlaceAgent(state: GameState, playerId: string, command: Extract<Ro
   if (!canPay(player, effectiveCost(selectedSpace, state.players))) {
     throw new RoomActionError(409, "Active player cannot pay that board-space cost");
   }
+  const routedTargetId = routedCommanderTargetIdFor(state, player, command.commanderTargets);
+  const routedTarget = routedTargetId ? state.players.find((candidate) => candidate.id === routedTargetId) : undefined;
+  if (player.role === "Commander" && (!routedTarget || !commanderCanActivateAlly(player, routedTarget))) {
+    throw new RoomActionError(409, "Commander cannot activate that Ally again without Swordmaster");
+  }
 
   const nextState = placeAgentAction(state, {
     commanderTargets: commanderTargetsFor(player, state.players, command.commanderTargets),
@@ -308,7 +313,7 @@ function applyPlaceAgent(state: GameState, playerId: string, command: Extract<Ro
     selectedSpace,
     spyEntrySpaceId,
   });
-  return nextState === state ? sameStateError() : nextState;
+  return nextState === state ? sameStateError() : maybeStartCombatPhase(nextState);
 }
 
 function applyEndAgent(state: GameState, playerId: string) {
@@ -338,7 +343,7 @@ function applyRevealTurn(state: GameState, playerId: string, command: Extract<Ro
   const commanderTargets = commanderTargetsFor(player, state.players, command.commanderTargets);
   const targetId =
     player.role === "Commander"
-      ? activatedAllyIdFor(player, state.players, commanderTargets)
+      ? legalActivatedAllyIdFor(player, state.players, commanderTargets)
       : player.id;
   const target = state.players.find((candidate) => candidate.id === targetId);
   return revealTurnAction(state, {
@@ -354,7 +359,7 @@ function applyBuyCard(state: GameState, playerId: string, command: Extract<RoomA
   const commanderTargets = commanderTargetsFor(player, state.players, command.commanderTargets);
   const callToArmsRecruitOwnerId =
     player.callToArmsActive && player.role === "Commander"
-      ? activatedAllyIdFor(player, state.players, commanderTargets)
+      ? legalActivatedAllyIdFor(player, state.players, commanderTargets)
       : undefined;
   const nextState = acquireMarketCard(state, player.id, command.cardId, callToArmsRecruitOwnerId);
   return nextState === state ? sameStateError() : nextState;
@@ -875,7 +880,7 @@ function applyRoomPendingAction(state: GameState, playerId: string, command: Roo
     case "acquire-pending-card": {
       const pending = pendingOf(state, "acquire-card");
       const owner = state.players.find((candidate) => candidate.id === pending.ownerId);
-      const recruitOwnerId = owner?.role === "Commander" ? activatedAllyIdFor(owner, state.players, {}) : undefined;
+      const recruitOwnerId = owner?.role === "Commander" ? legalActivatedAllyIdFor(owner, state.players, {}) : undefined;
       return maybeStartCombatPhase(gameRules.acquireCardForPending(state, pending, command.cardId, recruitOwnerId));
     }
     case "choose-discard-card-for-influence-and-draw":

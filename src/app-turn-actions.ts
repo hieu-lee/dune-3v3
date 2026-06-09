@@ -11,6 +11,7 @@ import {
   applyBoardEffect,
   applyCardAgentEffect,
   canEnterOccupiedSpaceWithSpy,
+  commanderCanActivateAlly,
   collectMakerSpice,
   completeChoamContractsForCurrentTurnHarvests,
   completeChoamContractsForBoardSpace,
@@ -56,6 +57,7 @@ import {
   resolveDeferredAgentConflictUnitIntrigueDraws,
   resolveGameEffects,
 } from "./game/effect-resolver";
+import { muadDibLeaderName } from "./game/leader-constants";
 import { leaderRevealEffectSpecs } from "./game/leader-effect-data";
 import type {
   BoardSpace,
@@ -91,9 +93,15 @@ function reserveTopDeckSelectionCards(
 }
 
 export function activatedAllyIdFor(player: Player, players: Player[], commanderTargets: CommanderTargets) {
+  return legalActivatedAllyIdFor(player, players, commanderTargets) ?? defaultActivatedAllyId(player, players);
+}
+
+export function legalActivatedAllyIdFor(player: Player, players: Player[], commanderTargets: CommanderTargets) {
   if (player.role !== "Commander") return player.id;
   if (player.revealed && player.revealActivatedAllyId) return player.revealActivatedAllyId;
-  return commanderTargets[player.id] ?? defaultActivatedAllyId(player, players);
+  const requested = players.find((candidate) => candidate.id === commanderTargets[player.id]);
+  if (requested && commanderCanActivateAlly(player, requested)) return requested.id;
+  return players.find((candidate) => commanderCanActivateAlly(player, candidate))?.id;
 }
 
 type PlaceAgentInput = {
@@ -368,6 +376,7 @@ export function placeAgentAction(
       ? activatedAllyIdFor(player, placementState.players, commanderTargets)
       : player.id;
   const target = placementState.players.find((candidate) => candidate.id === targetId) ?? player;
+  if (player.role === "Commander" && !commanderCanActivateAlly(player, target)) return current;
   const selectedCardIndexByReference = player.hand.findIndex((card) => card === selectedCard);
   const selectedCardIndex = selectedCardIndexByReference >= 0
     ? selectedCardIndexByReference
@@ -574,7 +583,14 @@ export function placeAgentAction(
   const nextState: GameState = {
     ...stateAfterTopDeckReservations,
     agentTurnComplete: true,
-    players,
+    players: players.map((candidate) =>
+      candidate.id === player.id && player.role === "Commander"
+        ? {
+            ...candidate,
+            commanderActivatedAllyIds: [...(candidate.commanderActivatedAllyIds ?? []), target.id],
+          }
+        : candidate
+    ),
     spaces: agentPlacementSpaces(placementState.spaces, selectedSpace, target, totalRecalledAgents, spyEntry.usedSpyEntry),
     agentPlacementOwners: agentPlacementOwners(
       placementState.agentPlacementOwners ?? {},
@@ -656,14 +672,22 @@ export function revealTurnPlan(
   const statePlayers = state?.players;
   const revealCombatRecipient = combatRecipient ??
     (activePlayer.role === "Commander" && statePlayers
-      ? statePlayers.find((player) => player.id === activatedAllyIdFor(activePlayer, statePlayers, {}))
+      ? statePlayers.find((player) => player.id === legalActivatedAllyIdFor(activePlayer, statePlayers, {}))
       : undefined);
+  const leaderEffectTarget =
+    activePlayer.role === "Commander" && activePlayer.leader === muadDibLeaderName && statePlayers
+      ? statePlayers.find((player) =>
+          player.role === "Ally" &&
+          player.team === activePlayer.team &&
+          player.deployedSandworms > 0
+        ) ?? revealCombatRecipient
+      : revealCombatRecipient;
   const effectResult = resolveCardRevealEffects(activePlayer.hand, activePlayer, state, revealCombatRecipient);
   const leaderEffectResult = resolveGameEffects(leaderRevealEffectSpecs, {
     trigger: "reveal",
     source: activePlayer,
     state,
-    target: revealCombatRecipient,
+    target: leaderEffectTarget,
   });
   const highCouncilPersuasion = activePlayer.highCouncilSeat ? 2 : 0;
   const persuasion = effectResult.persuasion + highCouncilPersuasion + boardSpaceRevealPersuasionFor(activePlayer, state);
@@ -739,7 +763,7 @@ export function revealTurnAction(
   const player = current.players[current.activeSeat];
   const targetId =
     player.role === "Commander"
-      ? activatedAllyIdFor(player, current.players, commanderTargets)
+      ? legalActivatedAllyIdFor(player, current.players, commanderTargets)
       : player.id;
   const target = current.players.find((candidate) => candidate.id === targetId);
   const combatRecipient = player.role === "Commander" ? target : player;
@@ -789,7 +813,7 @@ export function revealTurnAction(
       revealedPlayer,
       influenceState,
       player.hand,
-      player.role === "Commander" ? targetId : player.id,
+      player.role === "Commander" ? targetId ?? player.id : player.id,
     ),
   );
   const pendingRevealState: GameState = { ...influenceState, ...pending };

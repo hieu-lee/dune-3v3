@@ -54,6 +54,30 @@ function removeCardInstance(cards: Card[], card: Card) {
   });
 }
 
+export function addCardsToTrash(player: Player, cards: Card[]) {
+  return cards.length > 0 ? { ...player, trash: [...(player.trash ?? []), ...cards] } : player;
+}
+
+export function trashOnePlayAreaCardById(player: Player, cardId: string | undefined) {
+  if (!cardId) return player;
+  const trashed = player.playArea.find((card) => card.id === cardId);
+  return {
+    ...addCardsToTrash(player, trashed ? [trashed] : []),
+    playArea: removeOneCardById(player.playArea, cardId),
+  };
+}
+
+export function removeOneCardById(cards: Card[], cardId: string) {
+  let removed = false;
+  return cards.filter((card) => {
+    if (!removed && card.id === cardId) {
+      removed = true;
+      return false;
+    }
+    return true;
+  });
+}
+
 function drawnCardsText(requested: number, actual: number) {
   if (requested === 0) return "";
   if (actual === 0) return requested === 1 ? "has no card to draw" : "has no cards to draw";
@@ -143,6 +167,7 @@ export function trashPlayerCard(
     if (player.id === owner.id) {
       const ownerAfterTrash = {
         ...updateTrashZone(player, zone, removeCardInstance(cards, card)),
+        trash: [...(player.trash ?? []), card],
         resources: {
           ...player.resources,
           solari: player.resources.solari - (resourceCost.solari ?? 0),

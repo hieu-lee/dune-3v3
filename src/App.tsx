@@ -22,6 +22,7 @@ import { createPendingActionHandlers } from "./app-pending-action-handlers";
 import { createPlotActionHandlers } from "./app-plot-actions";
 import {
   activatedAllyIdFor,
+  legalActivatedAllyIdFor,
   placeAgentAction,
   revealTurnAction,
   revealTurnPlan,
@@ -32,6 +33,7 @@ import {
   acquireMarketCard,
   agentSpaceAvailable,
   canPay,
+  commanderCanActivateAlly,
   conflictVpConversionSpyChoices,
   endgameBattleIconChoices,
   endgameConditionalIntrigueChoices,
@@ -169,6 +171,7 @@ export default function App() {
     activePlayer.role === "Commander"
       ? activeAllies.find((player) => player.id === activatedAllyIdFor(activePlayer, game.players, commanderTargets)) ?? activeAllies[0]
       : activePlayer;
+  const canUseActivatedAlly = activePlayer.role !== "Commander" || commanderCanActivateAlly(activePlayer, activatedAlly);
   const selectedCard = activePlayer.hand.find((card) => card.id === selectedCardId) ?? null;
   const selectedSpace = boardSpaces.find((space) => space.id === selectedSpaceId) ?? null;
   const selectedLeader = game.players.find((player) => player.id === selectedLeaderId) ?? null;
@@ -206,16 +209,15 @@ export default function App() {
       : undefined;
   const spyEntryChoiceReady = spyEntrySpaceIds.length === 0 || Boolean(activeSpyEntrySpaceId);
 
-  const canPlayAgent = Boolean(canControlActivePlayer && game.phase === "playing" && !game.agentTurnComplete && selectedCard && selectedSpace && legalSpaces.has(selectedSpace.id) && spyEntryChoiceReady && !game.pendingAction);
+  const canPlayAgent = Boolean(canControlActivePlayer && canUseActivatedAlly && game.phase === "playing" && !game.agentTurnComplete && selectedCard && selectedSpace && legalSpaces.has(selectedSpace.id) && spyEntryChoiceReady && !game.pendingAction);
 
-  function playAgent() {
-    if (game.phase !== "playing" || !canPlayAgent || !selectedCard || !selectedSpace) return;
+  function placeAgentWith(card: Card, space: (typeof boardSpaces)[number], spyEntrySpaceId?: string) {
     if (roomSession.inRoom) {
       void roomSession.sendAction({
         kind: "place-agent",
-        cardId: selectedCard.id,
-        spaceId: selectedSpace.id,
-        ...(activeSpyEntrySpaceId ? { spyEntrySpaceId: activeSpyEntrySpaceId } : {}),
+        cardId: card.id,
+        spaceId: space.id,
+        ...(spyEntrySpaceId ? { spyEntrySpaceId } : {}),
         commanderTargets,
       }).then((applied) => {
         if (!applied) return;
@@ -225,10 +227,15 @@ export default function App() {
       });
       return;
     }
-    setGame((current) => placeAgentAction(current, { commanderTargets, selectedCard, selectedSpace, spyEntrySpaceId: activeSpyEntrySpaceId }));
+    setGame((current) => maybeStartCombatPhase(placeAgentAction(current, { commanderTargets, selectedCard: card, selectedSpace: space, spyEntrySpaceId })));
     setSelectedCardId(null);
     setSelectedSpaceId(null);
     setSelectedSpyEntrySpaceId(null);
+  }
+
+  function playAgent() {
+    if (game.phase !== "playing" || !canPlayAgent || !selectedCard || !selectedSpace) return;
+    placeAgentWith(selectedCard, selectedSpace, activeSpyEntrySpaceId);
   }
 
   function endAgentTurn() {
@@ -274,7 +281,7 @@ export default function App() {
     }
     const targetId =
       activePlayer.role === "Commander"
-        ? activatedAllyIdFor(activePlayer, game.players, commanderTargets)
+        ? legalActivatedAllyIdFor(activePlayer, game.players, commanderTargets)
         : activePlayer.id;
     const revealTarget = game.players.find((player) => player.id === targetId);
     const revealPlan = revealTurnPlan(activePlayer, game, revealTarget);
@@ -295,7 +302,7 @@ export default function App() {
       const buyer = current.players[current.activeSeat];
       const callToArmsRecruitOwnerId =
         buyer.callToArmsActive && buyer.role === "Commander"
-          ? activatedAllyIdFor(buyer, current.players, commanderTargets)
+          ? legalActivatedAllyIdFor(buyer, current.players, commanderTargets)
           : undefined;
       return acquireMarketCard(current, buyer.id, card.id, callToArmsRecruitOwnerId);
     });
@@ -480,6 +487,10 @@ export default function App() {
   const selectBoardSpySlot = (spaceId: string) => {
     if (!boardSpySlotChoices) return;
     if (boardSpySlotChoices.mode === "agent-entry") {
+      if (selectedCard && selectedSpace && legalSpaces.has(selectedSpace.id) && canUseActivatedAlly) {
+        placeAgentWith(selectedCard, selectedSpace, spaceId);
+        return;
+      }
       setSelectedSpyEntrySpaceId(spaceId);
       return;
     }
@@ -499,8 +510,28 @@ export default function App() {
     handlers.recallSpy(spaceId);
   };
   const selectBoardSpace = (spaceId: string) => {
+    const space = boardSpaces.find((candidate) => candidate.id === spaceId);
     setSelectedSpaceId(spaceId);
     setSelectedSpyEntrySpaceId(null);
+    if (
+      !space ||
+      !selectedCard ||
+      !canControlActivePlayer ||
+      !canUseActivatedAlly ||
+      !playingPhase ||
+      game.agentTurnComplete ||
+      activePlayer.agentsReady <= 0 ||
+      game.pendingAction ||
+      game.pendingQueue.length > 0 ||
+      !legalSpaces.has(space.id)
+    ) {
+      return;
+    }
+    const entrySpaceIds = game.spaces[space.id]
+      ? spyEntrySpaceIdsForOccupiedSpace(game, space.id, activePlayer.id)
+      : [];
+    if (entrySpaceIds.length > 1) return;
+    placeAgentWith(selectedCard, space, entrySpaceIds[0]);
   };
   const selectHandCard = (cardId: string | null) => {
     setSelectedCardId(cardId);
@@ -523,13 +554,12 @@ export default function App() {
         onLeaveRoom={roomSession.leaveRoom}
         onReleaseSeat={roomSession.releaseSeat}
       />
-      {roomSession.inRoom && (
-        <RoomPrivatePanel
-          compactForPending={game.pendingAction?.kind === "team-resource-payment"}
-          phase={game.phase}
-          player={claimedPlayer}
-        />
-      )}
+      <RoomPrivatePanel
+        compactForPending={game.pendingAction?.kind === "team-resource-payment"}
+        phase={game.phase}
+        player={roomSession.inRoom ? claimedPlayer : activePlayer}
+        showHand={roomSession.inRoom}
+      />
       {roomSession.inRoom && !canResolveRoomPending && (
         <RoomPendingPanel
           claimedPlayerId={roomSession.claimedPlayerId}

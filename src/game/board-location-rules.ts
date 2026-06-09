@@ -13,6 +13,11 @@ import {
 import {
   applyTrashedCardTriggers,
 } from "./discard-trigger-rules";
+import {
+  addCardsToTrash,
+  removeOneCardById,
+  trashOnePlayAreaCardById,
+} from "./trash-rules";
 import { changeAllegiancesGainChoices } from "./influence-choices";
 import { influenceEffectOwnerForChoice } from "./influence-loss-rules";
 import type { GameEffectTrigger } from "./types";
@@ -111,8 +116,9 @@ function sourceCardInfluenceChoicesMatchCurrentRouting(
   sourceOwner: Player,
   pending: BoardInfluenceChoicePendingAction,
 ) {
-  const expectedChoices = changeAllegiancesGainChoices(sourceOwner).flatMap((faction) => {
-    const ownerResult = influenceEffectOwnerForChoice(state, sourceOwner, faction, pending.targetOwnerId);
+  const routingSourceOwner = sourceOwnerForPendingRouting(sourceOwner, pending);
+  const expectedChoices = changeAllegiancesGainChoices(routingSourceOwner).flatMap((faction) => {
+    const ownerResult = influenceEffectOwnerForChoice(state, routingSourceOwner, faction, pending.targetOwnerId);
     return ownerResult.valid && ownerResult.owner ? [{ ownerId: ownerResult.owner.id, faction }] : [];
   });
   return boardInfluenceChoiceArraysMatch(expectedChoices, pending.choices);
@@ -137,6 +143,19 @@ function sourceCardPlacementMetadataMatches(
   }
   return pending.targetOwnerId === undefined &&
     (sourceCard.agentPlacementTargetOwnerId === undefined || sourceCard.agentPlacementTargetOwnerId === sourceOwner.id);
+}
+
+function sourceOwnerForPendingRouting(
+  sourceOwner: Player,
+  pending: BoardInfluenceChoicePendingAction,
+) {
+  if (sourceOwner.role !== "Commander" || !pending.targetOwnerId) return sourceOwner;
+  const activatedAllyIds = sourceOwner.commanderActivatedAllyIds ?? [];
+  if (!activatedAllyIds.includes(pending.targetOwnerId)) return sourceOwner;
+  return {
+    ...sourceOwner,
+    commanderActivatedAllyIds: activatedAllyIds.filter((allyId) => allyId !== pending.targetOwnerId),
+  };
 }
 
 function sourceCardSupportsInfluenceChoice(
@@ -209,11 +228,12 @@ function sourceCardSupportsSourceInfluenceChoice(
   sourceCard: Card,
   amount: number,
 ) {
+  const routingSourceOwner = sourceOwnerForPendingRouting(sourceOwner, pending);
   const supportsOpenInfluenceChoice =
     sourceCardSupportsInfluenceChoice(state, pending, sourceOwner, sourceCard, amount) &&
     sourceCardInfluenceChoicesMatchCurrentRouting(state, sourceOwner, pending) &&
     pending.choices.every((choice) =>
-      boardInfluenceChoiceMatchesCurrentRouting(state, sourceOwner, pending.targetOwnerId, choice)
+      boardInfluenceChoiceMatchesCurrentRouting(state, routingSourceOwner, pending.targetOwnerId, choice)
     );
   return supportsOpenInfluenceChoice ||
     sourceCardSupportsBoardSpaceInfluenceChoice(state, pending, sourceOwner, sourceCard, amount);
@@ -240,17 +260,6 @@ function firstHandTrashCardForPending(
     card.id === trashCardId &&
     cardHasTrait(card, pending.requiredHandTrashTrait ?? "")
   );
-}
-
-function removeOneCardById(cards: Card[], cardId: string) {
-  let removed = false;
-  return cards.filter((card) => {
-    if (!removed && card.id === cardId) {
-      removed = true;
-      return false;
-    }
-    return true;
-  });
 }
 
 export function resolveBoardInfluenceChoice(
@@ -297,15 +306,15 @@ export function resolveBoardInfluenceChoice(
     ...state,
     players: state.players.map((player) => {
       if (player.id !== pending.cardOwnerId) return player;
-      return {
-        ...player,
-        ...(pending.trashSource && pending.cardId
-          ? { playArea: removeOneCardById(player.playArea, pending.cardId) }
-          : {}),
-        ...(requiredHandTrashCard
-          ? { hand: removeOneCardById(player.hand, requiredHandTrashCard.id) }
-          : {}),
-      };
+      const sourceTrashed = pending.trashSource && pending.cardId
+        ? trashOnePlayAreaCardById(player, pending.cardId)
+        : player;
+      return requiredHandTrashCard
+        ? addCardsToTrash(
+            { ...sourceTrashed, hand: removeOneCardById(sourceTrashed.hand, requiredHandTrashCard.id) },
+            [requiredHandTrashCard],
+          )
+        : sourceTrashed;
     }),
     ...advancePendingAction(state),
     log: [

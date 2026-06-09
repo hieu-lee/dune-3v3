@@ -305,47 +305,61 @@ export function verifyCardEffectSpecTroopDeploymentValidation({
       ? { ...player, deployedTroops: 0, garrison: 12, jessicaMemories: 0 }
       : player
   );
+  const militarySupportNoSupplyEffect = state.applyBoardEffect(
+    p4,
+    { ...p6, deployedTroops: 0, garrison: 12, jessicaMemories: 0 },
+    militarySupport,
+  );
   assert.equal(
-    state.pendingActionForSpace(militarySupport, p4, p6, militarySupportNoSupplyPlayers),
-    undefined,
-    "Military Support should not queue reinforcement when the team has no Ally troop supply",
+    militarySupportNoSupplyEffect.recruitedTroops,
+    0,
+    "Military Support should not recruit beyond the activated Ally troop supply",
+  );
+  assert.deepEqual(
+    state.pendingActionForSpace(
+      militarySupport,
+      militarySupportNoSupplyEffect.source,
+      militarySupportNoSupplyEffect.target,
+      militarySupportNoSupplyPlayers,
+      0,
+      false,
+      militarySupportNoSupplyEffect.recruitedTroops,
+    ),
+    {
+      kind: "deploy",
+      ownerId: p6.id,
+      remaining: 2,
+      source: "Military Support",
+    },
+    "Military Support should still allow the combat-space base deployment from existing garrison",
   );
   const militarySupportLimitedPlayers = game.players.map((player) => {
     if (player.id === p2.id) return { ...player, deployedTroops: 0, garrison: 11, jessicaMemories: 0 };
     if (player.id === p6.id) return { ...player, deployedTroops: 0, garrison: 12, jessicaMemories: 0 };
     return player;
   });
+  const militarySupportLimitedEffect = state.applyBoardEffect(
+    p4,
+    { ...p2, deployedTroops: 0, garrison: 11, jessicaMemories: 0 },
+    militarySupport,
+  );
+  assert.equal(
+    militarySupportLimitedEffect.target.garrison,
+    12,
+    "Military Support should recruit the last available troop to the activated Ally",
+  );
   const militarySupportLimitedPending = state.pendingActionForSpace(
     militarySupport,
-    p4,
-    p6,
+    militarySupportLimitedEffect.source,
+    militarySupportLimitedEffect.target,
     militarySupportLimitedPlayers,
+    0,
+    false,
+    militarySupportLimitedEffect.recruitedTroops,
   );
   assert.equal(
     militarySupportLimitedPending?.remaining,
-    1,
-    "Military Support should cap pending reinforcements to available team troop supply",
-  );
-  const militarySupportLimitedState = {
-    ...game,
-    pendingAction: militarySupportLimitedPending,
-    pendingQueue: [],
-    players: militarySupportLimitedPlayers,
-  };
-  const militarySupportLimitedResolved = state.reinforceTroop(
-    militarySupportLimitedState,
-    militarySupportLimitedPending,
-    p2.id,
-    "garrison",
-  );
-  assert.equal(
-    playerById(militarySupportLimitedResolved, p2.id).garrison,
-    12,
-    "Military Support should recruit the last available troop into garrison",
-  );
-  assert.equal(
-    militarySupportLimitedResolved.pendingAction,
-    undefined,
-    "Military Support should finish after the team's troop supply is exhausted",
+    3,
+    "Military Support should deploy the actual recruit plus the combat-space base deployment",
   );
 }

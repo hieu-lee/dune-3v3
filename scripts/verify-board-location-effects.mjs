@@ -93,6 +93,7 @@ try {
     expedition: spaceById(data, "expedition"),
     gatherSupport: spaceById(data, "gather-support"),
     highCouncil: spaceById(data, "high-council"),
+    militarySupport: spaceById(data, "military-support"),
     researchStation: spaceById(data, "research-station"),
     secrets: spaceById(data, "secrets"),
     shipping: spaceById(data, "shipping"),
@@ -109,6 +110,8 @@ try {
   assert.equal(spaces.gatherSupport.cost, undefined, "Gather Support should be free unless the optional Solari cost is chosen");
   assert.equal(spaces.assemblyHall.gain?.intrigue, 1, "Assembly Hall should draw one Intrigue on placement");
   assert.equal(spaces.assemblyHall.revealPersuasion, 1, "Assembly Hall should mark its Reveal-turn persuasion bonus");
+  assert.equal(spaces.militarySupport.combat, true, "Military Support should allow direct deployment");
+  assert.equal(spaces.militarySupport.team, undefined, "Military Support should not use split reinforcement");
   assert.deepEqual(spaces.imperialPrivilege.cost, { solari: 3 }, "Imperial Privilege should cost 3 Solari");
   assert.deepEqual(
     spaces.imperialPrivilege.requirement,
@@ -530,6 +533,39 @@ try {
     1,
     "Assembly Hall should still add Reveal persuasion after the placement source card leaves play",
   );
+  const commanderRhetoricAssemblyBase = {
+    ...playableGame(state, "p1", dangerousRhetoric),
+    intrigueDeck: [testIntrigue("commander-rhetoric-assembly")],
+    intrigueDiscard: [],
+  };
+  const commanderRhetoricAssembly = place(
+    turnActions,
+    commanderRhetoricAssemblyBase,
+    dangerousRhetoric,
+    spaces.assemblyHall,
+    { p1: "p3" },
+  );
+  assert.equal(
+    playerById(commanderRhetoricAssembly, "p1").commanderActivatedAllyIds?.includes("p3"),
+    true,
+    "Commander placement should record the activated Ally before Dangerous Rhetoric resolves",
+  );
+  const commanderRhetoricChoice = commanderRhetoricAssembly.pendingAction?.choices.find((choice) =>
+    choice.ownerId === "p3" &&
+    choice.faction === "greatHouses"
+  );
+  assert.ok(commanderRhetoricChoice, "Commander Dangerous Rhetoric should expose the activated Ally's influence choices");
+  const commanderRhetoricResolved = state.resolveBoardInfluenceChoice(
+    commanderRhetoricAssembly,
+    commanderRhetoricAssembly.pendingAction,
+    commanderRhetoricChoice.ownerId,
+    commanderRhetoricChoice.faction,
+  );
+  assert.equal(
+    playerById(commanderRhetoricResolved, "p3").influence.greatHouses,
+    playerById(commanderRhetoricAssembly, "p3").influence.greatHouses + 1,
+    "Dangerous Rhetoric should still resolve for the activated Ally after the Commander target is marked used",
+  );
 
   const steersmanAssemblyBase = {
     ...playableGame(state, "p2", steersman, (player) => ({
@@ -665,7 +701,7 @@ try {
   );
 
   const expedition = place(turnActions, playableGame(state, "p3", fremenCard), fremenCard, spaces.expedition);
-  assert.equal(playerById(expedition, "p3").resources.solari, 2, "Expedition should not add fallback Solari while contracts exist");
+  assert.equal(playerById(expedition, "p3").resources.solari, 0, "Expedition should not add fallback Solari while contracts exist");
   assert.equal(expedition.pendingAction?.kind, "contract", "Expedition should queue a CHOAM contract choice");
 
   const controversialTech = place(
@@ -765,6 +801,11 @@ try {
     false,
     "Demand Attention should trash itself when resolved",
   );
+  assert.equal(
+    playerById(demandAttentionResolved, "p1").trash.some((card) => card.id === demandAttention.id),
+    true,
+    "Demand Attention should appear in the visible trash pile when it trashes itself",
+  );
   const demandAttentionAfterEmptyTrash = state.maybeStartCombatPhase(demandAttentionResolved);
   assert.equal(
     demandAttentionAfterEmptyTrash.pendingAction,
@@ -819,6 +860,30 @@ try {
   const makerKeeperRefineryPaid = state.resolveOptionalSpacePayment(makerKeeperRefinery, makerKeeperRefinery.pendingAction);
   assert.equal(playerById(makerKeeperRefineryPaid, "p2").resources.spice, 0);
   assert.equal(playerById(makerKeeperRefineryPaid, "p2").resources.solari, 4);
+
+  const militarySupportBase = playableGame(state, "p4", emperorCard, (player) => ({
+    ...player,
+    resources: { ...player.resources, spice: 2 },
+  }));
+  const militarySupport = place(
+    turnActions,
+    {
+      ...militarySupportBase,
+      players: militarySupportBase.players.map((player) =>
+        player.id === "p2" ? { ...player, garrison: 0 } : player,
+      ),
+    },
+    emperorCard,
+    spaces.militarySupport,
+    { p4: "p2" },
+  );
+  assert.equal(playerById(militarySupport, "p4").resources.spice, 0, "Military Support should spend 2 spice");
+  assert.equal(playerById(militarySupport, "p2").garrison, 3, "Military Support should recruit 3 troops to the activated Ally");
+  assert.deepEqual(
+    militarySupport.pendingAction,
+    { kind: "deploy", ownerId: "p2", remaining: 3, source: "Military Support" },
+    "Military Support should allow its 3 recruited troops to deploy directly",
+  );
 
   const shippingBase = playableGame(state, "p4", spiceCard, (player) => ({
     ...player,

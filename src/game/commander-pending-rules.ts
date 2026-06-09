@@ -31,6 +31,9 @@ import {
 import {
   recordTurnUnitDeployment,
 } from "./turn-trackers";
+import {
+  trashOnePlayAreaCardById,
+} from "./trash-rules";
 import type {
   GameState,
   PendingAction,
@@ -330,11 +333,8 @@ export function resolvePayResourceForTroopsChoice(
     let next = player;
     if (player.id === owner.id) {
       next = {
-        ...player,
+        ...(pending.trashSource && pending.cardId ? trashOnePlayAreaCardById(player, pending.cardId) : player),
         resources: { ...player.resources, [pending.resource]: availableResource - pending.cost },
-        ...(pending.trashSource && pending.cardId
-          ? { playArea: player.playArea.filter((card) => card.id !== pending.cardId) }
-          : {}),
       };
     }
     if (recipientSet.has(player.id)) {
@@ -538,11 +538,8 @@ export function resolvePayResourceForInfluenceChoice(
     let next = player;
     if (player.id === owner.id) {
       next = {
-        ...next,
+        ...(pending.trashSource && pending.cardId ? trashOnePlayAreaCardById(next, pending.cardId) : next),
         resources: { ...next.resources, [pending.resource]: availableResource - pending.cost },
-        ...(pending.trashSource && pending.cardId
-          ? { playArea: next.playArea.filter((card) => card.id !== pending.cardId) }
-          : {}),
       };
     }
     if (player.id === recipient.id) {
@@ -626,12 +623,9 @@ export function resolvePayResourceForSandwormsChoice(
     let next = player;
     if (player.id === owner.id) {
       next = {
-        ...next,
+        ...(pending.trashSource && pending.cardId ? trashOnePlayAreaCardById(next, pending.cardId) : next),
         resources: { ...next.resources, [pending.resource]: availableResource - pending.cost },
         persuasion: next.persuasion - persuasionCost,
-        ...(pending.trashSource && pending.cardId
-          ? { playArea: next.playArea.filter((card) => card.id !== pending.cardId) }
-          : {}),
       };
     }
     if (player.id === recipient.id) {

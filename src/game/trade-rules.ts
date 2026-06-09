@@ -81,7 +81,14 @@ export function resolveTrashSourceForTradeChoice(
 
   const players = state.players.map((player) =>
     player.id === owner.id
-      ? { ...player, playArea: player.playArea.filter((card) => card.id !== pending.cardId) }
+      ? {
+          ...player,
+          playArea: player.playArea.filter((card) => card.id !== pending.cardId),
+          trash: [
+            ...(player.trash ?? []),
+            ...player.playArea.filter((card) => card.id === pending.cardId).slice(0, 1),
+          ],
+        }
       : player,
   );
   const tradePending: PendingAction = {

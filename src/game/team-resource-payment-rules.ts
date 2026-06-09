@@ -1,6 +1,7 @@
 import { boardSpaces } from "./data";
 import { resolveAgentPayTeamResourceForVps } from "./effect-resolver";
 import { advancePendingAction } from "./pending-actions";
+import { trashOnePlayAreaCardById } from "./trash-rules";
 import type { GameState, PendingAction, Player, ResourceId } from "./types";
 
 type TeamResourcePaymentPendingAction = Extract<PendingAction, { kind: "team-resource-payment" }>;
@@ -189,11 +190,8 @@ export function resolveTeamResourcePaymentChoice(
       : player;
     if (player.id === owner.id) {
       next = {
-        ...next,
+        ...(pending.trashSource ? trashOnePlayAreaCardById(next, pending.cardId) : next),
         vp: next.vp + pending.vp,
-        ...(pending.trashSource
-          ? { playArea: next.playArea.filter((card) => card.id !== pending.cardId) }
-          : {}),
       };
     }
     return next;

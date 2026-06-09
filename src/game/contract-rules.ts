@@ -35,6 +35,7 @@ import {
   recordTurnAcquiredCard,
   recordTurnSpiceGain,
 } from "./turn-trackers";
+import { trashOnePlayAreaCardById } from "./trash-rules";
 import type {
   Card,
   ContractCard,
@@ -555,11 +556,8 @@ export function resolvePayResourceForContractsChoice(
   const players = state.players.map((player) => {
     if (player.id === owner.id) {
       return {
-        ...player,
+        ...(pending.trashSource ? trashOnePlayAreaCardById(player, pending.cardId) : player),
         resources: { ...player.resources, [pending.resource]: availableResource - pending.cost },
-        ...(pending.trashSource
-          ? { playArea: player.playArea.filter((card) => card.id !== pending.cardId) }
-          : {}),
       };
     }
     const assignment = assigned.find(({ recipient }) => recipient.id === player.id);

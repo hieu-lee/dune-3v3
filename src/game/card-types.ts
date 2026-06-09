@@ -144,6 +144,7 @@ export type Player = {
   deck: Card[];
   hand: Card[];
   discard: Card[];
+  trash?: Card[];
   playArea: Card[];
   manipulatedCards: Card[];
   intrigues: IntrigueCard[];
@@ -159,6 +160,7 @@ export type Player = {
   persuasion: number;
   highCouncilSeat: boolean;
   revealActivatedAllyId?: string;
+  commanderActivatedAllyIds?: string[];
   callToArmsActive: boolean;
   gurneyAlwaysSmilingScored?: boolean;
   muadDibUnpredictableFoeResolved?: boolean;

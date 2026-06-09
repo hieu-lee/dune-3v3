@@ -319,7 +319,12 @@ function addIfLegal(entries, room, playerId, id, label, action, runtime) {
 
 function commanderTargetVariants(player, players) {
   if (player.role !== "Commander") return [{ label: "", value: undefined }];
-  const allies = players.filter((candidate) => candidate.team === player.team && candidate.role === "Ally");
+  const allies = players.filter((candidate) =>
+    candidate.team === player.team &&
+    candidate.role === "Ally" &&
+    (player.swordmasterBonus || !(player.commanderActivatedAllyIds ?? []).includes(candidate.id))
+  );
+  if (allies.length === 0) return [{ label: "", value: undefined }];
   return allies.map((ally) => ({
     label: ` for ${ally.leader}`,
     value: { [player.id]: ally.id },
@@ -501,18 +506,6 @@ function pendingCommand(room, pending, runtime, coverage = {}) {
       return { kind: "choose-maker-reward", choice: "spice" };
     case "sietch-tabr":
       return { kind: "choose-sietch-tabr", choice: "shield-wall" };
-    case "board-influence-choice": {
-      const choice = pending.choices[0];
-      if (!choice) return undefined;
-      if (pending.requiredHandTrashTrait) {
-        const sourceOwner = room.game.players.find((player) => player.id === pending.cardOwnerId);
-        const trashCard = sourceOwner?.hand.find((card) => runtime.cardTraits.cardHasTrait(card, pending.requiredHandTrashTrait));
-        return trashCard
-          ? { kind: "choose-board-influence", ownerId: choice.ownerId, faction: choice.faction, trashCardId: trashCard.id }
-          : undefined;
-      }
-      return { kind: "choose-board-influence", ownerId: choice.ownerId, faction: choice.faction };
-    }
     case "conflict-influence":
       return { kind: "choose-conflict-influence", faction: firstFaction(pending.choices, mainBoardInfluenceChoices[0]) };
     case "conflict-vp-conversion":
@@ -643,12 +636,32 @@ function pendingTradeCommands(room, pending) {
   return commands;
 }
 
+function pendingBoardInfluenceCommands(room, pending, runtime) {
+  if (pending.requiredHandTrashTrait) {
+    const sourceOwner = room.game.players.find((player) => player.id === pending.cardOwnerId);
+    const trashCard = sourceOwner?.hand.find((card) => runtime.cardTraits.cardHasTrait(card, pending.requiredHandTrashTrait));
+    if (!trashCard) return [];
+    return pending.choices.map((choice) => ({
+      kind: "choose-board-influence",
+      ownerId: choice.ownerId,
+      faction: choice.faction,
+      trashCardId: trashCard.id,
+    }));
+  }
+  return pending.choices.map((choice) => ({
+    kind: "choose-board-influence",
+    ownerId: choice.ownerId,
+    faction: choice.faction,
+  }));
+}
+
 function pendingCommands(room, pending, runtime, coverage = {}) {
   if (pending.kind === "feyd-training") {
     return (pending.options ?? []).map((option) => ({ kind: "choose-feyd-training", optionId: option.id }));
   }
   if (pending.kind === "team-resource-payment") return pendingTeamResourcePaymentCommands(room, pending);
   if (pending.kind === "trade") return pendingTradeCommands(room, pending);
+  if (pending.kind === "board-influence-choice") return pendingBoardInfluenceCommands(room, pending, runtime);
   const command = pendingCommand(room, pending, runtime, coverage);
   return command ? [command] : [];
 }
@@ -800,10 +813,12 @@ export function legalActionsForSeat(room, playerId, runtime, coverage = {}) {
             : [undefined];
           for (const target of targetVariants) {
             for (const spyEntrySpaceId of spyEntrySpaceIds) {
-              legalActions.push(actionEntry(
+              addIfLegal(
+                legalActions,
+                room,
+                playerId,
                 `place:${card.id}:${space.id}:${target.value?.[player.id] ?? "self"}:${spyEntrySpaceId ?? "open"}`,
                 `Place ${card.name} at ${space.name}${target.label}`,
-                playerId,
                 {
                   kind: "place-agent",
                   cardId: card.id,
@@ -811,7 +826,8 @@ export function legalActionsForSeat(room, playerId, runtime, coverage = {}) {
                   ...(spyEntrySpaceId ? { spyEntrySpaceId } : {}),
                   ...(target.value ? { commanderTargets: target.value } : {}),
                 },
-              ));
+                runtime,
+              );
             }
           }
         }

@@ -62,7 +62,19 @@ export function agentSpaceAvailable(
 }
 
 export function defaultActivatedAllyId(player: Player, players: Player[]) {
-  return players.find((candidate) => candidate.team === player.team && candidate.role === "Ally")?.id ?? player.id;
+  return legalActivatedAlliesForCommander(player, players)[0]?.id ??
+    players.find((candidate) => candidate.team === player.team && candidate.role === "Ally")?.id ??
+    player.id;
+}
+
+export function commanderCanActivateAlly(commander: Player, ally: Player) {
+  if (commander.role !== "Commander") return commander.id === ally.id;
+  if (ally.role !== "Ally" || ally.team !== commander.team) return false;
+  return commander.swordmasterBonus || !(commander.commanderActivatedAllyIds ?? []).includes(ally.id);
+}
+
+export function legalActivatedAlliesForCommander(commander: Player, players: Player[]) {
+  return players.filter((candidate) => commanderCanActivateAlly(commander, candidate));
 }
 
 function influenceChoiceOwnerId(source: Player, target: Player, faction: FactionId) {

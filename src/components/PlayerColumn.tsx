@@ -61,6 +61,7 @@ export function PlayerColumn({
                 <span>{player.name}</span>
                 <strong>{player.leader}</strong>
                 <small>{player.role} - {teams[player.team].name}</small>
+                {index === game.firstSeat && <span className="round-starter-chip">Round starter</span>}
                 {activeTurn && <span className="active-turn-chip">{activeTurnLabel}</span>}
               </div>
             </div>
@@ -94,6 +95,14 @@ export function PlayerColumn({
               <span className={["primary-stat", "combat-strength-stat", player.conflict === 0 ? "is-zero" : ""].filter(Boolean).join(" ")}>
                 {player.conflict} strength
               </span>
+              {player.swordmasterBonus && (
+                <span
+                  className="secondary-stat"
+                  title="Permanent +2 strength on Reveal"
+                >
+                  Swordmaster +2 reveal
+                </span>
+              )}
               {player.highCouncilSeat && <span className="secondary-stat">High Council</span>}
               {player.makerHooks && <span className="secondary-stat">Maker Hooks</span>}
               {player.leader === feydRauthaLeaderName && (

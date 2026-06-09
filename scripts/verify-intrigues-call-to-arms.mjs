@@ -161,6 +161,41 @@ export function verifyCallToArmsPlotIntrigue({ cards, data, game, state }) {
     commanderArmed,
     "Commander Call to Arms should reject recruiting for the Commander",
   );
+  const exhaustedCommanderCallToArms = {
+    ...game,
+    activeSeat: game.players.findIndex((candidate) => candidate.id === "p4"),
+    pendingAction: undefined,
+    pendingQueue: [],
+    intrigueDiscard: [],
+    players: game.players.map((candidate) => {
+      if (candidate.id === "p4") {
+        return {
+          ...candidate,
+          revealed: true,
+          revealActivatedAllyId: undefined,
+          commanderActivatedAllyIds: ["p2", "p6"],
+          callToArmsActive: true,
+          persuasion: 9,
+          intrigues: [],
+        };
+      }
+      if (candidate.id === "p2" || candidate.id === "p6") return { ...candidate, garrison: 2, intrigues: [] };
+      return { ...candidate, intrigues: [] };
+    }),
+  };
+  const exhaustedCommanderBought = state.acquireMarketCard(exhaustedCommanderCallToArms, "p4", spiceMustFlow.id);
+  assert.equal(
+    playerById(exhaustedCommanderBought, "p4").persuasion,
+    0,
+    "Commander Call to Arms should still allow acquisition when no legal Ally can receive the recruit",
+  );
+  assert.equal(playerById(exhaustedCommanderBought, "p2").garrison, 2, "Exhausted Ally should not receive the Call to Arms troop");
+  assert.equal(playerById(exhaustedCommanderBought, "p6").garrison, 2, "Exhausted reveal Ally should not receive the Call to Arms troop");
+  assert.equal(
+    exhaustedCommanderBought.log[0].includes("recruits 1 troop"),
+    false,
+    "Commander Call to Arms without a legal recruit target should not log recruitment",
+  );
 
   const callToArmsNoPersuasion = {
     ...callToArmsRevealed,

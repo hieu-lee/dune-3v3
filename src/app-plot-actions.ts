@@ -1,6 +1,6 @@
 import type { Dispatch, SetStateAction } from "react";
 import type { ChangeAllegiancesSelection } from "./app-helpers";
-import { activatedAllyIdFor } from "./app-turn-actions";
+import { legalActivatedAllyIdFor } from "./app-turn-actions";
 import {
   playBackedByChoamPlotIntrigue,
   playBuyAccessPlotIntrigue,
@@ -55,7 +55,7 @@ function activePlayerId(current: GameState) {
 function routedCommanderTargetId(current: GameState, commanderTargets: CommanderTargets) {
   const player = current.players[current.activeSeat];
   return player.role === "Commander"
-    ? activatedAllyIdFor(player, current.players, commanderTargets)
+    ? legalActivatedAllyIdFor(player, current.players, commanderTargets)
     : undefined;
 }
 
@@ -106,7 +106,7 @@ export function createPlotActionHandlers({
         const player = current.players[current.activeSeat];
         const personalFaction = player.role === "Commander" && player.team === "muaddib" ? "fremen" : undefined;
         const influenceOwnerId = player.role === "Commander" && faction !== personalFaction
-          ? activatedAllyIdFor(player, current.players, commanderTargets)
+          ? legalActivatedAllyIdFor(player, current.players, commanderTargets)
           : undefined;
         return playSietchRitualPlotIntrigue(current, player.id, intrigueId, discardCardId, faction, influenceOwnerId);
       });
@@ -141,7 +141,7 @@ export function createPlotActionHandlers({
       setGame((current) => {
         const player = current.players[current.activeSeat];
         const influenceOwnerId = player.role === "Commander" && faction !== "emperor"
-          ? activatedAllyIdFor(player, current.players, commanderTargets)
+          ? legalActivatedAllyIdFor(player, current.players, commanderTargets)
           : undefined;
         return playImperiumPoliticsPlotIntrigue(current, player.id, intrigueId, faction, influenceOwnerId);
       });

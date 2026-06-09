@@ -399,6 +399,74 @@ try {
     0,
     "Unpredictable Foe should not use invalid Commander-owned sandworms when no reveal target is supplied",
   );
+  const muadDibAllyB = game.players.find((player) =>
+    player.team === muadDib.team &&
+    player.role === "Ally" &&
+    player.id !== muadDibAllyA.id
+  );
+  assert.ok(muadDibAllyB, "Verifier needs Muad'Dib's second Ally");
+  const muadDibRevealUsedAllyState = {
+    ...muadDibUnpredictableFoeBase,
+    players: muadDibUnpredictableFoeBase.players.map((player) => {
+      if (player.id === muadDib.id) return { ...player, commanderActivatedAllyIds: [muadDibAllyA.id] };
+      if (player.id === muadDibAllyA.id) return { ...player, deployedSandworms: 0 };
+      if (player.id === muadDibAllyB.id) return { ...player, deployedSandworms: 0 };
+      return player;
+    }),
+  };
+  const muadDibRevealUsedAllyPlan = appTurnActions.revealTurnPlan(
+    playerById(muadDibRevealUsedAllyState, muadDib.id),
+    muadDibRevealUsedAllyState,
+    playerById(muadDibRevealUsedAllyState, muadDibAllyB.id),
+  );
+  const muadDibRevealFallsBackToLegalAlly = appTurnActions.revealTurnAction(muadDibRevealUsedAllyState, {
+    commanderTargets: { [muadDib.id]: muadDibAllyA.id },
+    revealPlan: muadDibRevealUsedAllyPlan,
+  });
+  assert.equal(
+    playerById(muadDibRevealFallsBackToLegalAlly, muadDib.id).revealActivatedAllyId,
+    muadDibAllyB.id,
+    "Commander Reveal should not reuse an already activated Ally when another Ally is legal",
+  );
+  const muadDibRevealNoLegalAllyState = {
+    ...muadDibRevealUsedAllyState,
+    players: muadDibRevealUsedAllyState.players.map((player) =>
+      player.id === muadDib.id
+        ? { ...player, commanderActivatedAllyIds: [muadDibAllyA.id, muadDibAllyB.id] }
+        : player
+    ),
+  };
+  const muadDibRevealNoLegalAllyPlan = appTurnActions.revealTurnPlan(
+    playerById(muadDibRevealNoLegalAllyState, muadDib.id),
+    muadDibRevealNoLegalAllyState,
+  );
+  const muadDibRevealWithoutAlly = appTurnActions.revealTurnAction(muadDibRevealNoLegalAllyState, {
+    commanderTargets: { [muadDib.id]: muadDibAllyA.id },
+    revealPlan: muadDibRevealNoLegalAllyPlan,
+  });
+  assert.equal(
+    playerById(muadDibRevealWithoutAlly, muadDib.id).revealActivatedAllyId,
+    undefined,
+    "Commander Reveal should not force an illegal Ally target when every Ally has already been activated",
+  );
+  const muadDibOtherAllySandwormState = {
+    ...muadDibUnpredictableFoeBase,
+    players: muadDibUnpredictableFoeBase.players.map((player) => {
+      if (player.id === muadDibAllyA.id) return { ...player, deployedSandworms: 0 };
+      if (player.id === muadDibAllyB.id) return { ...player, deployedSandworms: 1 };
+      return player;
+    }),
+  };
+  const muadDibOtherAllySandwormPlan = appTurnActions.revealTurnPlan(
+    playerById(muadDibOtherAllySandwormState, muadDib.id),
+    muadDibOtherAllySandwormState,
+    playerById(muadDibOtherAllySandwormState, muadDibAllyA.id),
+  );
+  assert.equal(
+    muadDibOtherAllySandwormPlan.intriguesToDraw,
+    1,
+    "Unpredictable Foe should draw if any same-team Ally has sandworms in the Conflict",
+  );
   const feydSandwormPlan = appTurnActions.revealTurnPlan(
     { ...feyd, hand: [], deployedSandworms: 1 },
     {
@@ -525,7 +593,7 @@ try {
     ),
   };
   const gurneyScored = state.scoreGurneyAlwaysSmiling(gurneyRevealBase, muadDibAllyA.id);
-  assert.equal(playerById(gurneyScored, muadDibAllyA.id).vp, 2, "Gurney should gain 1 VP at 10+ strength in six-player mode");
+  assert.equal(playerById(gurneyScored, muadDibAllyA.id).persuasion, 1, "Gurney should gain 1 persuasion at 10+ strength in six-player mode");
   assert.equal(
     playerById(gurneyScored, muadDibAllyA.id).gurneyAlwaysSmilingScored,
     true,
@@ -533,7 +601,7 @@ try {
   );
   assert.match(gurneyScored.log[0], /Always Smiling/, "Gurney's Reveal ability should log when it scores");
   const gurneyNoDouble = state.scoreGurneyAlwaysSmiling(gurneyScored, muadDibAllyA.id);
-  assert.equal(playerById(gurneyNoDouble, muadDibAllyA.id).vp, 2, "Always Smiling should score at most once per Reveal turn");
+  assert.equal(playerById(gurneyNoDouble, muadDibAllyA.id).persuasion, 1, "Always Smiling should score at most once per Reveal turn");
   const gurneyUnderThreshold = state.scoreGurneyAlwaysSmiling(
     {
       ...gurneyRevealBase,
@@ -543,12 +611,12 @@ try {
     },
     muadDibAllyA.id,
   );
-  assert.equal(playerById(gurneyUnderThreshold, muadDibAllyA.id).vp, 1, "Gurney should not score below 10 strength in six-player mode");
+  assert.equal(playerById(gurneyUnderThreshold, muadDibAllyA.id).persuasion, 0, "Gurney should not score below 10 strength in six-player mode");
   const gurneyInactiveTurn = state.scoreGurneyAlwaysSmiling(
     { ...gurneyRevealBase, activeSeat: game.players.findIndex((player) => player.id === muadDib.id) },
     muadDibAllyA.id,
   );
-  assert.equal(playerById(gurneyInactiveTurn, muadDibAllyA.id).vp, 1, "Always Smiling should only score on Gurney's own active Reveal turn");
+  assert.equal(playerById(gurneyInactiveTurn, muadDibAllyA.id).persuasion, 0, "Always Smiling should only score on Gurney's own active Reveal turn");
   const gurneyNoUnits = state.scoreGurneyAlwaysSmiling(
     {
       ...gurneyRevealBase,
@@ -558,7 +626,7 @@ try {
     },
     muadDibAllyA.id,
   );
-  assert.equal(playerById(gurneyNoUnits, muadDibAllyA.id).vp, 1, "Gurney should not score from swords alone with no Conflict units");
+  assert.equal(playerById(gurneyNoUnits, muadDibAllyA.id).persuasion, 0, "Gurney should not score from swords alone with no Conflict units");
   const gurneyFivePlayerPlayers = gurneyRevealBase.players.filter((player) => player.id !== muadDib.id);
   const gurneyFivePlayerBase = {
     ...gurneyRevealBase,
@@ -571,8 +639,8 @@ try {
   };
   const gurneyNonSixPlayer = state.scoreGurneyAlwaysSmiling(gurneyFivePlayerBase, muadDibAllyA.id);
   assert.equal(
-    playerById(gurneyNonSixPlayer, muadDibAllyA.id).vp,
-    2,
+    playerById(gurneyNonSixPlayer, muadDibAllyA.id).persuasion,
+    1,
     "Gurney should score at 6+ strength outside six-player mode",
   );
   const gurneyNonSixUnderThreshold = state.scoreGurneyAlwaysSmiling(
@@ -585,8 +653,8 @@ try {
     muadDibAllyA.id,
   );
   assert.equal(
-    playerById(gurneyNonSixUnderThreshold, muadDibAllyA.id).vp,
-    1,
+    playerById(gurneyNonSixUnderThreshold, muadDibAllyA.id).persuasion,
+    0,
     "Gurney should not score below 6 strength outside six-player mode",
   );
   const deployCrossingPending = { kind: "deploy", ownerId: muadDibAllyA.id, remaining: 1, source: "Reveal-turn Detonation" };
@@ -607,8 +675,8 @@ try {
     muadDibAllyA.id,
   );
   assert.equal(
-    playerById(gurneyAfterRevealDeployment, muadDibAllyA.id).vp,
-    2,
+    playerById(gurneyAfterRevealDeployment, muadDibAllyA.id).persuasion,
+    1,
     "Always Smiling should score after a Reveal-turn deployment brings Gurney to 10 strength",
   );
   const deployOrRetreatCrossingPending = {
@@ -634,8 +702,8 @@ try {
     "deploy",
   );
   assert.equal(
-    playerById(gurneyAfterDeployOrRetreatChoice, muadDibAllyA.id).vp,
-    2,
+    playerById(gurneyAfterDeployOrRetreatChoice, muadDibAllyA.id).persuasion,
+    1,
     "Always Smiling should score after a deploy-or-retreat choice brings Gurney to 10 strength",
   );
   const gurneyUnexpectedAlliesState = {
@@ -661,8 +729,8 @@ try {
     muadDibAllyA.id,
   );
   assert.equal(
-    playerById(gurneyAfterUnexpectedAllies, muadDibAllyA.id).vp,
-    2,
+    playerById(gurneyAfterUnexpectedAllies, muadDibAllyA.id).persuasion,
+    1,
     "Always Smiling should score after Reveal-turn Unexpected Allies brings Gurney to 10 strength",
   );
   const gurneyPendingCrossingState = (playerPatch, pendingAction, statePatch = {}) => ({
@@ -699,8 +767,8 @@ try {
     retreatStrengthCrossingPending,
   );
   assert.equal(
-    playerById(gurneyAfterRetreatStrength, muadDibAllyA.id).vp,
-    2,
+    playerById(gurneyAfterRetreatStrength, muadDibAllyA.id).persuasion,
+    1,
     "Always Smiling should score after a Reveal pending troop retreat brings Gurney to 10 strength",
   );
   const gurneyTrashStrengthCard = { ...leadTheWayDraw, id: "gurney-trash-strength-card" };
@@ -720,8 +788,8 @@ try {
     gurneyTrashStrengthCard.id,
   );
   assert.equal(
-    playerById(gurneyAfterTrashStrength, muadDibAllyA.id).vp,
-    2,
+    playerById(gurneyAfterTrashStrength, muadDibAllyA.id).persuasion,
+    1,
     "Always Smiling should score after a Reveal pending trash strength reward brings Gurney to 10 strength",
   );
   const conflictTrashCard = { ...leadTheWayDraw, id: "gurney-conflict-trash-card" };
@@ -749,8 +817,8 @@ try {
     conflictTrashCard.id,
   );
   assert.equal(
-    playerById(gurneyAfterPlainTrashReward, muadDibAllyA.id).vp,
-    1,
+    playerById(gurneyAfterPlainTrashReward, muadDibAllyA.id).persuasion,
+    0,
     "Always Smiling should not score from an unrelated plain trash reward after Reveal timing",
   );
   assert.equal(
@@ -778,8 +846,8 @@ try {
     "espionage",
   );
   assert.equal(
-    playerById(gurneyAfterSpyStrength, muadDibAllyA.id).vp,
-    2,
+    playerById(gurneyAfterSpyStrength, muadDibAllyA.id).persuasion,
+    1,
     "Always Smiling should score after a Reveal pending spy recall brings Gurney to 10 strength",
   );
   const payStrengthCrossingPending = {
@@ -800,8 +868,8 @@ try {
     payStrengthCrossingPending,
   );
   assert.equal(
-    playerById(gurneyAfterPayStrength, muadDibAllyA.id).vp,
-    2,
+    playerById(gurneyAfterPayStrength, muadDibAllyA.id).persuasion,
+    1,
     "Always Smiling should score after a Reveal pending resource strength payment brings Gurney to 10 strength",
   );
   const paySandwormCrossingPending = {
@@ -829,8 +897,8 @@ try {
     paySandwormCrossingPending,
   );
   assert.equal(
-    playerById(gurneyAfterPaySandworms, muadDibAllyA.id).vp,
-    2,
+    playerById(gurneyAfterPaySandworms, muadDibAllyA.id).persuasion,
+    1,
     "Always Smiling should score after a Reveal pending sandworm payment brings Gurney to 10 strength",
   );
 
@@ -1004,49 +1072,18 @@ try {
   );
   const militarySupport = data.boardSpaces.find((space) => space.id === "military-support");
   assert.ok(militarySupport, "Military Support should exist for Shaddam Signet reinforcement regression");
-  const blockedReinforcePending = state.pendingActionForSpace(
-    militarySupport,
-    shaddamSignetEffect.source,
-    shaddamSignetEffect.target,
-    game.players,
-    0,
-    shaddamSignetEffect.blocksDeploymentsThisTurn,
-  );
-  assert.deepEqual(blockedReinforcePending, {
-    kind: "reinforce",
-    team: "shaddam",
-    remaining: 3,
-    source: "Military Support",
-    conflictBlocked: true,
-  });
-  const blockedReinforceGame = {
-    ...game,
-    pendingAction: blockedReinforcePending,
-    pendingQueue: [],
-    players: game.players.map((player) =>
-      player.id === shaddamAlly.id ? { ...player, garrison: 0, conflict: 0, deployedTroops: 0 } : player,
-    ),
-  };
-  const rejectedConflictReinforce = state.reinforceTroop(
-    blockedReinforceGame,
-    blockedReinforcePending,
-    shaddamAlly.id,
-    "conflict",
-  );
-  assert.equal(playerById(rejectedConflictReinforce, shaddamAlly.id).conflict, 0, "Blocked reinforcement should not enter Conflict");
   assert.equal(
-    rejectedConflictReinforce.pendingAction?.kind,
-    "reinforce",
-    "Blocked reinforcement should keep the pending action for a garrison choice",
+    state.pendingActionForSpace(
+      militarySupport,
+      shaddamSignetEffect.source,
+      shaddamSignetEffect.target,
+      game.players,
+      0,
+      shaddamSignetEffect.blocksDeploymentsThisTurn,
+    ),
+    undefined,
+    "Shaddam Signet should suppress Military Support's same-turn deployment",
   );
-  const garrisonReinforce = state.reinforceTroop(
-    blockedReinforceGame,
-    blockedReinforcePending,
-    shaddamAlly.id,
-    "garrison",
-  );
-  assert.equal(playerById(garrisonReinforce, shaddamAlly.id).garrison, 1, "Blocked reinforcement should still allow garrison recruitment");
-  assert.equal(garrisonReinforce.pendingAction?.remaining, 2, "Garrison reinforcement should consume one blocked reinforce choice");
   const blockedSietchPending = {
     kind: "sietch-tabr",
     ownerId: shaddamAlly.id,

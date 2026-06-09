@@ -15,6 +15,7 @@ import {
 import { pendingActionForControlDefense } from "./location-control";
 import { resolvePlayCombatIntrigue } from "./combat-intrigue-play-rules";
 import { advancePastUnresolvableMandatoryTrash } from "./trash-rules";
+import { playerHasPlayablePlotIntrigue } from "./plot-intrigue-playability";
 import type { CombatIntrigueChoice } from "./combat-intrigue-play-rules";
 import type { GameState } from "./types";
 
@@ -63,6 +64,7 @@ export function startNextRound(state: GameState): GameState {
         persuasion: 0,
         highCouncilSeat: player.highCouncilSeat,
         revealActivatedAllyId: undefined,
+        commanderActivatedAllyIds: [],
         callToArmsActive: false,
         gurneyAlwaysSmilingScored: false,
         muadDibUnpredictableFoeResolved: false,
@@ -159,6 +161,26 @@ export function maybeStartCombatPhase(state: GameState): GameState {
   const resolvedState = advancePastUnresolvableMandatoryTrash(state);
   if (resolvedState.phase !== "playing") return resolvedState;
   if (resolvedState.pendingAction || resolvedState.pendingQueue.length > 0) return resolvedState;
+  const activePlayer = resolvedState.players[resolvedState.activeSeat];
+  if (
+    activePlayer &&
+    resolvedState.agentTurnComplete &&
+    !activePlayer.revealed &&
+    !playerHasPlayablePlotIntrigue(resolvedState, activePlayer)
+  ) {
+    return maybeStartCombatPhase({
+      ...resolvedState,
+      agentTurnComplete: false,
+      turnHarvestContractIds: {},
+      turnMakerSpaceVisits: {},
+      turnAcquiredCardIds: {},
+      turnSpiceGains: {},
+      turnReverendMotherJessicaRepeats: {},
+      turnSpyRecalls: {},
+      turnUnitDeployments: {},
+      activeSeat: advanceSeat(resolvedState),
+    });
+  }
   if (resolvedState.players[resolvedState.activeSeat]?.revealed) return resolvedState;
   if (!allPlayersDone(resolvedState.players)) return resolvedState;
   return startCombatPhase(resolvedState);

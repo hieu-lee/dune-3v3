@@ -39,11 +39,11 @@ export function scoreGurneyAlwaysSmiling(state: GameState, playerId: string): Ga
     ...state,
     players: state.players.map((candidate) =>
       candidate.id === player.id
-        ? { ...candidate, vp: candidate.vp + 1, gurneyAlwaysSmilingScored: true }
+        ? { ...candidate, persuasion: candidate.persuasion + 1, gurneyAlwaysSmilingScored: true }
         : candidate,
     ),
     log: [
-      `${player.leader} resolves Always Smiling with ${player.conflict} strength in the Conflict and gains 1 VP.`,
+      `${player.leader} resolves Always Smiling with ${player.conflict} strength in the Conflict and gains 1 persuasion.`,
       ...state.log,
     ],
   };
@@ -76,13 +76,18 @@ export function resolveMuadDibUnpredictableFoe(state: GameState, recipientId?: s
     return state;
   }
 
-  const recipient = state.players.find((player) => player.id === (recipientId ?? source.revealActivatedAllyId));
-  if (
-    !recipient ||
-    recipient.role !== "Ally" ||
-    recipient.team !== source.team ||
-    recipient.deployedSandworms < 1
-  ) {
+  const requestedRecipient = state.players.find((player) => player.id === (recipientId ?? source.revealActivatedAllyId));
+  const sandwormAlly =
+    requestedRecipient?.role === "Ally" &&
+    requestedRecipient.team === source.team &&
+    requestedRecipient.deployedSandworms >= 1
+      ? requestedRecipient
+      : state.players.find((player) =>
+          player.role === "Ally" &&
+          player.team === source.team &&
+          player.deployedSandworms >= 1
+        );
+  if (!sandwormAlly) {
     return state;
   }
 

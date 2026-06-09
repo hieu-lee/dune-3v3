@@ -33,10 +33,11 @@ export async function runMilitaryChoicesSmoke({
   assert.equal(ownerAfter.deployedTroops, ownerBefore.deployedTroops + 1, "Deploy choice should add one deployed troop");
   assert.equal(ownerAfter.conflict, ownerBefore.conflict + 2, "Deploy choice should add troop strength");
 
-  await setDebugGameAndWait(page, states.reinforce);
+  await setDebugGameAndWait(page, states.militarySupportDeploy);
   pendingText = await page.locator(".pending-panel").innerText();
-  assert.match(pendingText, /Military Support - 1 troops/i);
-  assert.match(pendingText, /Gurney Halleck/i);
+  assert.match(pendingText, /Gurney Halleck deployment/i);
+  assert.match(pendingText, /deployment/i);
+  assert.match(pendingText, /3 deployable/i);
   await screenshot(page, captures, "pending-reinforce.png");
   const reinforceMobileViewport = { width: 390, height: 900 };
   await page.setViewportSize(reinforceMobileViewport);
@@ -50,12 +51,15 @@ export async function runMilitaryChoicesSmoke({
 
   before = await currentGame(page);
   ownerBefore = before.players.find((player) => player.id === "p3");
-  await reinforceTarget(page, "Gurney Halleck").getByRole("button", { name: "Garrison" }).click();
+  for (let index = 0; index < 3; index += 1) {
+    await page.locator(".pending-panel").getByRole("button", { name: "Deploy 1" }).click();
+  }
   await waitForNoPending(page);
   after = await currentGame(page);
   ownerAfter = after.players.find((player) => player.id === "p3");
-  assert.equal(ownerAfter.garrison, ownerBefore.garrison + 1, "Reinforce garrison choice should add one garrison troop");
-  assert.equal(ownerAfter.conflict, ownerBefore.conflict, "Reinforce garrison choice should not add strength");
+  assert.equal(ownerAfter.garrison, ownerBefore.garrison - 3, "Military Support deploy choice should spend three garrison troops");
+  assert.equal(ownerAfter.deployedTroops, ownerBefore.deployedTroops + 3, "Military Support deploy choice should deploy three troops");
+  assert.equal(ownerAfter.conflict, ownerBefore.conflict + 6, "Military Support deploy choice should add troop strength");
 
   await setDebugGameAndWait(page, states.reinforceBlocked);
   pendingText = await page.locator(".pending-panel").innerText();
@@ -109,13 +113,16 @@ async function createMilitaryChoiceStates(server, initialPlayableGame) {
         source: "Browser debug deploy",
       },
     },
-    reinforce: {
+    militarySupportDeploy: {
       ...base,
+      players: base.players.map((player) =>
+        player.id === "p3" ? { ...player, garrison: 3 } : player,
+      ),
       pendingAction: {
-        kind: "reinforce",
-        team: "muaddib",
-        remaining: 1,
-        source: "Browser debug reinforce",
+        kind: "deploy",
+        ownerId: "p3",
+        remaining: 3,
+        source: "Military Support",
       },
     },
     reinforceBlocked: {

@@ -567,6 +567,58 @@ try {
     backedNoInfluence,
     "Backed by CHOAM Plot should require at least one positive Influence track",
   );
+  const playablePlotAgentDone = state.maybeStartCombatPhase({
+    ...backedPlotFixture,
+    agentTurnComplete: true,
+  });
+  assert.equal(
+    playablePlotAgentDone.activeSeat,
+    backedPlotFixture.activeSeat,
+    "Agent turn should not auto-end while a Plot Intrigue is playable",
+  );
+  const unplayablePlotAgentDone = state.maybeStartCombatPhase({
+    ...backedNoInfluence,
+    agentTurnComplete: true,
+  });
+  assert.notEqual(
+    unplayablePlotAgentDone.activeSeat,
+    backedNoInfluence.activeSeat,
+    "Agent turn should auto-end when held Intrigues have no playable Plot action",
+  );
+  const commanderForExhaustedAllyPlot = playerById(game, "p4");
+  const exhaustedAllyIds = game.players
+    .filter((candidate) => candidate.team === commanderForExhaustedAllyPlot.team && candidate.role === "Ally")
+    .map((candidate) => candidate.id);
+  assert.equal(exhaustedAllyIds.length, 2, "Verifier needs both Commander Allies");
+  const exhaustedAllyPlotFixture = {
+    ...game,
+    activeSeat: game.players.findIndex((candidate) => candidate.id === commanderForExhaustedAllyPlot.id),
+    agentTurnComplete: true,
+    pendingAction: undefined,
+    pendingQueue: [],
+    intrigueDiscard: [],
+    players: game.players.map((candidate) =>
+      candidate.id === commanderForExhaustedAllyPlot.id
+        ? {
+            ...candidate,
+            resources: { ...candidate.resources, solari: 3 },
+            commanderActivatedAllyIds: exhaustedAllyIds,
+            intrigues: [mercenaries],
+          }
+        : { ...candidate, intrigues: [] },
+    ),
+  };
+  assert.equal(
+    state.playMercenariesPlotIntrigue(exhaustedAllyPlotFixture, commanderForExhaustedAllyPlot.id, mercenaries.id),
+    exhaustedAllyPlotFixture,
+    "Commander Plot Intrigues that require an activated Ally should reject already activated Allies",
+  );
+  const exhaustedAllyPlotAutoEnd = state.maybeStartCombatPhase(exhaustedAllyPlotFixture);
+  assert.notEqual(
+    exhaustedAllyPlotAutoEnd.activeSeat,
+    exhaustedAllyPlotFixture.activeSeat,
+    "Agent turn should auto-end when a Commander's only held Plot Intrigue has no legal Ally target",
+  );
   const commanderBackedPlot = {
     ...backedPlotFixture,
     activeSeat: game.players.findIndex((candidate) => candidate.id === "p4"),

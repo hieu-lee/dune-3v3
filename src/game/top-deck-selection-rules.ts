@@ -67,6 +67,7 @@ export function resolveTopDeckSelection(
     deck: owner.deck.filter((card) => !inspectedCardIds.has(card.id)),
     hand: [...owner.hand, drawnCard],
     discard: [...owner.discard, discardedCard],
+    trash: [...(owner.trash ?? []), trashedCard],
   };
 
   const selectedState = {

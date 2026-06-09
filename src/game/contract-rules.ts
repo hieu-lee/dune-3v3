@@ -218,6 +218,26 @@ function withPrimaryLogBeforeCompletionLogs(state: GameState, primaryLog: string
   };
 }
 
+function drawIntrigueCardsAfterCurrentActionLog(
+  state: GameState,
+  ownerId: string,
+  count: number,
+  source: string,
+): GameState {
+  const previousLog = state.log;
+  const drawnState = drawIntrigueCards(state, ownerId, count, source);
+  const addedLogCount = drawnState.log.length - previousLog.length;
+  if (previousLog.length === 0 || addedLogCount <= 0) return drawnState;
+  return {
+    ...drawnState,
+    log: [
+      previousLog[0],
+      ...drawnState.log.slice(0, addedLogCount),
+      ...previousLog.slice(1),
+    ],
+  };
+}
+
 function applyContractCompletionReward(
   state: GameState,
   ownerId: string,
@@ -256,23 +276,24 @@ function applyContractCompletionReward(
       return nextPlayer;
     }),
   };
-  if (Object.keys(reward.influence ?? {}).length > 0) {
-    nextState = resolveLeaderInfluenceThresholdRewards(nextState, previousPlayers);
-  }
-  if (reward.drawIntrigues) {
-    nextState = drawIntrigueCards(nextState, owner.id, reward.drawIntrigues, contract.name);
-  }
-  if (spiceGain > 0) {
-    nextState = recordTurnSpiceGain(nextState, owner.id, spiceGain);
-  }
   const nextOwner = nextState.players.find((player) => player.id === owner.id) ?? owner;
   const spyPending = pendingActionForContractSpyReward(nextState, nextOwner, contract, reward);
-  const stateWithSpyPending = spyPending ? prependPendingAction(nextState, spyPending) : nextState;
+  const loggedState: GameState = {
+    ...nextState,
+    log: [completionLog(owner, contract, reward, recruitedTroops, recalledAgents, spyPending), ...nextState.log],
+  };
+  let rewardState = Object.keys(reward.influence ?? {}).length > 0
+    ? resolveLeaderInfluenceThresholdRewards(loggedState, previousPlayers)
+    : loggedState;
+  if (reward.drawIntrigues) {
+    rewardState = drawIntrigueCardsAfterCurrentActionLog(rewardState, owner.id, reward.drawIntrigues, contract.name);
+  }
+  if (spiceGain > 0) {
+    rewardState = recordTurnSpiceGain(rewardState, owner.id, spiceGain);
+  }
+  const stateWithSpyPending = spyPending ? prependPendingAction(rewardState, spyPending) : rewardState;
   return {
-    state: {
-      ...stateWithSpyPending,
-      log: [completionLog(owner, contract, reward, recruitedTroops, recalledAgents, spyPending), ...stateWithSpyPending.log],
-    },
+    state: stateWithSpyPending,
     recruitedTroops,
     recalledAgents,
     completedContractIds: [contract.id],

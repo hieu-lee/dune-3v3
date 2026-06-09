@@ -80,6 +80,7 @@ async function startRoom(baseUrl, roomId, token) {
     headers: { "x-room-token": token, "x-room-sync": "poll" },
   });
   assert.equal(response.status, 200, `AI monitor room should start: ${JSON.stringify(body)}`);
+  assert.equal(body.snapshot?.started, true, "AI monitor room should expose started state");
   return body.snapshot;
 }
 

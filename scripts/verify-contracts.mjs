@@ -778,6 +778,14 @@ try {
   assert.equal(espionageOwner.resources.solari, ally.resources.solari + 1);
   assert.equal(espionageOwner.intrigues.length, ally.intrigues.length + 1);
   assertCompleted(espionageCompleted.state, ally.id, "Espionage II");
+  const espionageCompletionLogIndex = espionageCompleted.state.log.findIndex((entry) =>
+    /completes the Espionage II CHOAM contract/.test(entry)
+  );
+  const espionageDrawLogIndex = espionageCompleted.state.log.findIndex((entry) =>
+    /draws an Intrigue card from Espionage II/.test(entry)
+  );
+  assert.ok(espionageCompletionLogIndex >= 0, "Espionage II completion log should be present");
+  assert.ok(espionageDrawLogIndex > espionageCompletionLogIndex, "Espionage II draw log should follow completion");
 
   const highCouncilHeld = withHeldContracts(
     updatePlayer(game, ally.id, (player) => ({
@@ -792,6 +800,111 @@ try {
   assert.equal(highCouncilOwner.influence.bene, 2);
   assert.equal(highCouncilOwner.vp, playerById(highCouncilHeld, ally.id).vp + 1);
   assertCompleted(highCouncilCompleted.state, ally.id, "High Council I");
+
+  const highCouncilThresholdIntrigue = intrigueByName("Cunning");
+  const highCouncilThresholdHeld = withHeldContracts(
+    updatePlayer({
+      ...game,
+      intrigueDeck: [highCouncilThresholdIntrigue],
+      intrigueDiscard: [],
+      log: ["Previous action log."],
+    }, ally.id, (player) => ({
+      ...player,
+      influence: { ...player.influence, bene: 3 },
+    })),
+    ally.id,
+    ["High Council I"],
+  );
+  const highCouncilThresholdCompleted = state.completeChoamContractsForBoardSpace(
+    highCouncilThresholdHeld,
+    ally.id,
+    "high-council",
+  );
+  const highCouncilThresholdOwner = playerById(highCouncilThresholdCompleted.state, ally.id);
+  assert.equal(highCouncilThresholdOwner.influence.bene, 4);
+  assert.equal(
+    highCouncilThresholdOwner.intrigues.some((card) => card.id === highCouncilThresholdIntrigue.id),
+    true,
+    "High Council contract Bene-4 threshold reward should draw an Intrigue",
+  );
+  const highCouncilCompletionLogIndex = highCouncilThresholdCompleted.state.log.findIndex((entry) =>
+    /completes the High Council I CHOAM contract/.test(entry)
+  );
+  const highCouncilThresholdLogIndex = highCouncilThresholdCompleted.state.log.findIndex((entry) =>
+    /draws an Intrigue card from 4 Bene Gesserit Influence/.test(entry)
+  );
+  const previousActionLogIndex = highCouncilThresholdCompleted.state.log.indexOf("Previous action log.");
+  assert.ok(highCouncilCompletionLogIndex >= 0, "High Council completion log should be present");
+  assert.ok(highCouncilThresholdLogIndex >= 0, "High Council Bene-4 reward log should be present");
+  assert.ok(
+    highCouncilThresholdLogIndex > highCouncilCompletionLogIndex,
+    "High Council Bene-4 reward log should follow the contract completion log",
+  );
+  assert.ok(
+    previousActionLogIndex < 0 || previousActionLogIndex > highCouncilThresholdLogIndex,
+    "High Council Bene-4 reward log should not be separated from completion by an older action log",
+  );
+
+  const highCouncilPlacementCard = {
+    id: "verify-contract-high-council-card",
+    name: "Verify Contract High Council Card",
+    icons: ["landsraad"],
+    persuasion: 0,
+    swords: 0,
+    play: "",
+    reveal: "",
+  };
+  const highCouncilPlacementIntrigue = data.intrigueCards[0];
+  const highCouncilPlacementBackupIntrigue = data.intrigueCards[1];
+  assert.ok(highCouncilPlacementIntrigue, "High Council placement regression needs an Intrigue fixture");
+  assert.ok(highCouncilPlacementBackupIntrigue, "High Council placement regression needs a backup Intrigue fixture");
+  const highCouncilPlacementActiveSeat = game.players.findIndex((player) => player.id === ally.id);
+  const highCouncilPlacementHeld = withHeldContracts(
+    updatePlayer(
+      {
+        ...game,
+        activeSeat: highCouncilPlacementActiveSeat,
+        intrigueDeck: [highCouncilPlacementIntrigue, highCouncilPlacementBackupIntrigue],
+        intrigueDiscard: [],
+        pendingAction: undefined,
+        pendingQueue: [],
+        spaces: {},
+      },
+      ally.id,
+      (player) => ({
+        ...player,
+        hand: [highCouncilPlacementCard],
+        playArea: [],
+        agentsReady: Math.max(1, player.agentsReady),
+        influence: { ...player.influence, bene: 3 },
+        resources: { ...player.resources, solari: Math.max(player.resources.solari, 5) },
+      }),
+    ),
+    ally.id,
+    ["High Council I"],
+  );
+  const highCouncilPlacementCompleted = turnActions.placeAgentAction(highCouncilPlacementHeld, {
+    commanderTargets: {},
+    selectedCard: highCouncilPlacementCard,
+    selectedSpace: boardSpaceById("high-council"),
+  });
+  const highCouncilPlacementOwner = playerById(highCouncilPlacementCompleted, ally.id);
+  assertCompleted(highCouncilPlacementCompleted, ally.id, "High Council I");
+  assert.equal(highCouncilPlacementOwner.influence.bene, 4);
+  assert.equal(
+    highCouncilPlacementOwner.intrigues.filter((card) =>
+      card.id === highCouncilPlacementIntrigue.id || card.id === highCouncilPlacementBackupIntrigue.id
+    ).length,
+    1,
+    "High Council I placement should draw exactly one Bene-4 threshold Intrigue",
+  );
+  assert.equal(
+    highCouncilPlacementCompleted.log.filter((entry) =>
+      /draws an Intrigue card from 4 Bene Gesserit Influence/.test(entry)
+    ).length,
+    1,
+    "High Council I placement should log the Bene-4 threshold reward exactly once",
+  );
 
   const sardaukarHeld = withHeldContracts(game, shaddam.id, ["Sardaukar I"]);
   const sardaukarCompleted = state.completeChoamContractsForBoardSpace(sardaukarHeld, shaddam.id, "sardaukar");

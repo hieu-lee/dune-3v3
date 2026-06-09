@@ -458,6 +458,105 @@ export function verifyChangeAllegiancesPlotIntrigue({ cards, game, state }) {
   assert.equal(playerById(shaddamChangeBoth, "p4").resources.spice, 0);
   assert.equal(playerById(shaddamChangeBoth, "p4").influence.emperor, 1, "Commander personal loss and personal gain should net correctly");
   assert.equal(playerById(shaddamChangeBoth, "p6").influence.bene, 2, "Both rows should still route main-board gains to the activated Ally");
+  const shaddamChangeSameThresholdFixture = {
+    ...shaddamChangeAllegiancesFixture,
+    players: shaddamChangeAllegiancesFixture.players.map((candidate) => {
+      if (candidate.id === "p4") {
+        return {
+          ...candidate,
+          resources: { ...candidate.resources, spice: 3 },
+          influence: { ...candidate.influence, emperor: 3 },
+          intrigues: [changeAllegiances],
+          spies: 0,
+        };
+      }
+      if (candidate.team === "shaddam") return { ...candidate, spies: 0, intrigues: [] };
+      return candidate;
+    }),
+  };
+  const shaddamChangeSameThreshold = state.playChangeAllegiancesPlotIntrigue(
+    shaddamChangeSameThresholdFixture,
+    "p4",
+    changeAllegiances.id,
+    { kind: "both", loseFaction: "emperor", shiftGainFaction: "emperor", spiceGainFaction: "emperor" },
+    "p6",
+  );
+  assert.equal(playerById(shaddamChangeSameThreshold, "p4").influence.emperor, 4);
+  assert.equal(
+    shaddamChangeSameThreshold.players
+      .filter((candidate) => candidate.team === "shaddam")
+      .every((candidate) => candidate.spies === 0),
+    true,
+    "Same-card Emperor loss and regain from an already reached threshold should not grant another team spy",
+  );
+  const fringeChangeSameThresholdFixture = {
+    ...changeAllegiancesFixture,
+    players: changeAllegiancesFixture.players.map((candidate) =>
+      candidate.id === "p2"
+        ? {
+            ...candidate,
+            resources: { ...candidate.resources, spice: 3 },
+            influence: { ...candidate.influence, fringeWorlds: 4, greatHouses: 1 },
+            intrigues: [changeAllegiances],
+            spies: 1,
+          }
+        : { ...candidate, intrigues: [] }
+    ),
+  };
+  const fringeChangeSameThreshold = state.playChangeAllegiancesPlotIntrigue(
+    fringeChangeSameThresholdFixture,
+    "p2",
+    changeAllegiances.id,
+    { kind: "shift", loseFaction: "fringeWorlds", gainFaction: "fringeWorlds" },
+  );
+  assert.equal(playerById(fringeChangeSameThreshold, "p2").influence.fringeWorlds, 4);
+  assert.equal(
+    fringeChangeSameThreshold.pendingAction,
+    undefined,
+    "Same-card Fringe Worlds loss and regain from an already reached threshold should not queue another spy",
+  );
+  const shaddamChangeSpySupplyFixture = {
+    ...shaddamChangeAllegiancesFixture,
+    players: shaddamChangeAllegiancesFixture.players.map((candidate) => {
+      if (candidate.id === "p4") {
+        return {
+          ...candidate,
+          influence: { ...candidate.influence, emperor: 2 },
+          intrigues: [changeAllegiances],
+        };
+      }
+      if (candidate.id === "p6") {
+        return {
+          ...candidate,
+          influence: { ...candidate.influence, bene: 1, fringeWorlds: 3 },
+          spies: 0,
+          intrigues: [],
+        };
+      }
+      return candidate;
+    }),
+  };
+  const shaddamChangeSpySupply = state.playChangeAllegiancesPlotIntrigue(
+    shaddamChangeSpySupplyFixture,
+    "p4",
+    changeAllegiances.id,
+    { kind: "both", loseFaction: "bene", shiftGainFaction: "fringeWorlds", spiceGainFaction: "emperor" },
+    "p6",
+  );
+  assert.equal(playerById(shaddamChangeSpySupply, "p4").influence.emperor, 3);
+  assert.equal(playerById(shaddamChangeSpySupply, "p6").influence.fringeWorlds, 4);
+  assert.equal(
+    playerById(shaddamChangeSpySupply, "p6").spies,
+    1,
+    "Shaddam Emperor 3 should give the activated Ally spy supply before Fringe Worlds 4 placement resolves",
+  );
+  assert.equal(
+    shaddamChangeSpySupply.pendingAction?.kind,
+    "spy",
+    "Change Allegiances should queue Fringe Worlds 4 spy placement after Shaddam's team spy reward makes it legal",
+  );
+  assert.equal(shaddamChangeSpySupply.pendingAction?.ownerId, "p6");
+  assert.equal(shaddamChangeSpySupply.pendingAction?.source, "4 Fringe Worlds Influence");
   assert.equal(
     state.playChangeAllegiancesPlotIntrigue(
       shaddamChangeAllegiancesFixture,

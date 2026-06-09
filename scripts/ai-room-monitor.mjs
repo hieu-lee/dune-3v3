@@ -74,6 +74,15 @@ async function claimSeat(baseUrl, roomId, playerId, name) {
   return body.token;
 }
 
+async function startRoom(baseUrl, roomId, token) {
+  const { response, body } = await jsonFetch(baseUrl, `/api/rooms/${roomId}/start`, {
+    method: "POST",
+    headers: { "x-room-token": token, "x-room-sync": "poll" },
+  });
+  assert.equal(response.status, 200, `AI monitor room should start: ${JSON.stringify(body)}`);
+  return body.snapshot;
+}
+
 async function seatSnapshot(baseUrl, roomId, token) {
   const { response, body } = await jsonFetch(baseUrl, `/api/rooms/${roomId}`, {
     headers: { "x-room-token": token, "x-room-sync": "poll" },
@@ -695,6 +704,11 @@ export async function runAiRoomMonitor({
     for (const [playerId, name] of defaultSeats) {
       if (!aiPlayerIds.has(playerId)) continue;
       tokenByPlayerId.set(playerId, await claimSeat(baseUrl, roomId, playerId, name));
+    }
+    if (normalizedAiTeam === "all") {
+      const starterToken = tokenByPlayerId.values().next().value;
+      assert.ok(starterToken, "AI monitor should have a claimed seat token before starting the room");
+      await startRoom(baseUrl, roomId, starterToken);
     }
     if (humanSeats.length > 0) {
       console.log(`AI team monitor room: ${server.resolvedUrls.local[0]}?room=${roomId}`);

@@ -54,6 +54,7 @@
     "verify:pending-resolution-overlay": "node scripts/verify-pending-resolution-overlay.mjs",
     "verify:player-setup": "node scripts/verify-player-setup.mjs",
     "verify:room-server": "node scripts/verify-room-server.mjs",
+    "verify:room-private-panel": "node scripts/verify-room-private-panel.mjs",
     "verify:sandworms": "node scripts/verify-sandworms.mjs",
     "verify:sietch-tabr": "node scripts/verify-sietch-tabr.mjs",
     "verify:spy-posts": "node scripts/verify-spy-posts.mjs",

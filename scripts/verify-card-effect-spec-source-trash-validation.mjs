@@ -97,6 +97,34 @@ export function verifyCardEffectSpecSourceTrashValidation({
   );
   assert.equal(calculusAgentTrashed.pendingAction, undefined);
   assert.match(calculusAgentTrashed.log[0], /trashes Calculus Agent Hand Trash from Calculus of Power/);
+  const staleTrashActivePending = {
+    kind: "draw-cards",
+    ownerId: "p3",
+    source: "Active pending",
+    amount: 1,
+  };
+  const staleTrashPending = {
+    kind: "trash-card",
+    ownerId: p2.id,
+    source: "Stale trash pending",
+    optional: false,
+  };
+  const staleTrashBase = {
+    ...game,
+    pendingAction: staleTrashActivePending,
+    pendingQueue: [],
+    players: game.players.map((player) =>
+      player.id === p2.id
+        ? { ...player, hand: [calculusAgentHandTrash], discard: [], playArea: [], trash: [] }
+        : player,
+    ),
+  };
+  assert.equal(
+    state.trashPlayerCard(staleTrashBase, staleTrashPending, "hand", calculusAgentHandTrash.id),
+    staleTrashBase,
+    "Stale trash-card pending objects should leave state unchanged",
+  );
+
   const desertSurvivalOtherPlayCard = { ...dagger, id: "desert-survival-other-play-card" };
   const desertSurvivalFixture = withActivePlayer(game, p2.id, () => ({
     agentsReady: 1,
@@ -660,14 +688,19 @@ export function verifyCardEffectSpecSourceTrashValidation({
   const genericDuplicateTrashState = withActivePlayer(game, p2.id, () => ({
     playArea: [genericDuplicateTrashCardA, genericDuplicateTrashCardB],
   }));
+  const genericDuplicateTrashActiveState = {
+    ...genericDuplicateTrashState,
+    pendingAction: genericDuplicateTrashPending,
+    pendingQueue: [],
+  };
   assert.deepEqual(
-    state.trashableCardsForPending(playerById(genericDuplicateTrashState, p2.id), genericDuplicateTrashPending)
+    state.trashableCardsForPending(playerById(genericDuplicateTrashActiveState, p2.id), genericDuplicateTrashPending)
       .map(({ card }) => card.name),
     ["Generic Duplicate Trash A", "Generic Duplicate Trash B"],
     "Generic duplicate trash choices should preserve both visible choices",
   );
   const genericDuplicateTrashResolved = state.trashPlayerCard(
-    genericDuplicateTrashState,
+    genericDuplicateTrashActiveState,
     genericDuplicateTrashPending,
     "playArea",
     genericDuplicateTrashCardB.id,

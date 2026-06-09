@@ -335,7 +335,7 @@ export function resolveOptionalSpacePayment(
   state: GameState,
   pending: OptionalSpacePaymentPendingAction,
 ): GameState {
-  if (state.pendingAction?.kind !== "optional-space-payment") return state;
+  if (state.pendingAction !== pending) return state;
   const owner = state.players.find((player) => player.id === pending.ownerId);
   if (!owner || !canPay(owner, pending.cost)) return state;
   let nextState: GameState = {
@@ -366,7 +366,7 @@ export function skipOptionalSpacePayment(
   state: GameState,
   pending: OptionalSpacePaymentPendingAction,
 ): GameState {
-  if (state.pendingAction?.kind !== "optional-space-payment") return state;
+  if (state.pendingAction !== pending) return state;
   const owner = state.players.find((player) => player.id === pending.ownerId);
   return {
     ...state,

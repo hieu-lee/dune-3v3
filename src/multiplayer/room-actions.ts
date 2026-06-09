@@ -767,6 +767,9 @@ function applyRoomPendingAction(state: GameState, playerId: string, command: Roo
       return maybeStartCombatPhase(gameRules.skipDeployOrRetreatTroopsChoice(state, pendingOf(state, "deploy-or-retreat-troops")));
     case "choose-maker-reward": {
       const pending = pendingOf(state, "maker-choice");
+      if (command.choice !== "spice" && command.choice !== "sandworms") {
+        throw new RoomActionError(409, "Invalid Maker reward choice");
+      }
       const choiceOwnerId = command.choice === "spice" ? pending.spiceOwnerId : pending.ownerId;
       if (choiceOwnerId !== playerId) {
         throw new RoomActionError(403, "You can only choose the Maker reward for your own seat");
@@ -779,11 +782,15 @@ function applyRoomPendingAction(state: GameState, playerId: string, command: Roo
     }
     case "choose-sietch-tabr": {
       const pending = pendingOf(state, "sietch-tabr");
+      if (command.choice !== "hooks" && command.choice !== "shield-wall") {
+        throw new RoomActionError(409, "Invalid Sietch Tabr reward choice");
+      }
       const choiceOwnerId = command.choice === "hooks" ? pending.ownerId : pending.waterOwnerId;
       if (choiceOwnerId !== playerId) {
         throw new RoomActionError(403, "You can only choose the Sietch Tabr reward for your own seat");
       }
-      return maybeStartCombatPhase(gameRules.resolveSietchTabrChoice(state, pending, command.choice));
+      const nextState = gameRules.resolveSietchTabrChoice(state, pending, command.choice);
+      return nextState === state ? sameStateError() : maybeStartCombatPhase(nextState);
     }
     case "choose-commander-resource-split":
       return maybeStartCombatPhase(gameRules.resolveCommanderResourceSplitChoice(state, pendingOf(state, "commander-resource-split"), command.optionIndex));

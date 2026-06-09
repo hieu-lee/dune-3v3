@@ -88,6 +88,24 @@ try {
     },
     "Commander Sietch Tabr should split Hooks/troop owner from water owner",
   );
+  const invalidSietchBase = {
+    ...fringeReady,
+    shieldWall: true,
+    pendingAction: commanderPending,
+    pendingQueue: [],
+    players: fringeReady.players.map((player) =>
+      player.id === "p3"
+        ? { ...player, resources: { ...player.resources, water: 0 }, makerHooks: false }
+        : player.id === "p1"
+          ? { ...player, resources: { ...player.resources, water: 0 } }
+          : player,
+    ),
+  };
+  assert.equal(
+    state.resolveSietchTabrChoice(invalidSietchBase, commanderPending, "bogus"),
+    invalidSietchBase,
+    "Invalid Sietch Tabr choice values should leave state unchanged",
+  );
 
   const hooksChoice = state.resolveSietchTabrChoice(
     { ...fringeReady, pendingAction: commanderPending, pendingQueue: [] },

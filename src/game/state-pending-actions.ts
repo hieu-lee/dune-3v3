@@ -671,6 +671,8 @@ export function resolveMakerChoice(
   pending: MakerChoicePendingAction,
   choice: "spice" | "sandworms",
 ): GameState {
+  if (state.pendingAction !== pending) return state;
+  if (choice !== "spice" && choice !== "sandworms") return state;
   const owner = state.players.find((player) => player.id === pending.ownerId);
   const spiceOwner = state.players.find((player) => player.id === pending.spiceOwnerId);
   if (!owner) return { ...state, ...advancePendingAction(state) };
@@ -718,6 +720,8 @@ export function resolveSietchTabrChoice(
   pending: SietchTabrPendingAction,
   choice: "hooks" | "shield-wall",
 ): GameState {
+  if (state.pendingAction !== pending) return state;
+  if (choice !== "hooks" && choice !== "shield-wall") return state;
   const owner = state.players.find((player) => player.id === pending.ownerId);
   const waterOwner = state.players.find((player) => player.id === pending.waterOwnerId);
   if (!owner || !waterOwner) return { ...state, ...advancePendingAction(state) };

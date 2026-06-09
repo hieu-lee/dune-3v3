@@ -92,52 +92,117 @@ export type StoredRoom = {
   ai?: StoredRoomAiState;
 };
 
+function cachedHidden<T>(cache: Map<string, T>, key: string, create: () => T): T {
+  const existing = cache.get(key);
+  if (existing) return existing;
+  const value = Object.freeze(create()) as T;
+  cache.set(key, value);
+  return value;
+}
+
+const hiddenCardCache = new Map<string, Card>();
+const hiddenIntrigueCache = new Map<string, IntrigueCard>();
+const hiddenContractCache = new Map<string, ContractCard>();
+const hiddenConflictCache = new Map<string, ConflictCard>();
+const hiddenObjectiveCache = new Map<string, ObjectiveCard>();
+const hiddenCardArrayCache = new Map<string, Card[]>();
+const hiddenIntrigueArrayCache = new Map<string, IntrigueCard[]>();
+const hiddenContractArrayCache = new Map<string, ContractCard[]>();
+const hiddenConflictArrayCache = new Map<number, ConflictCard[]>();
+const hiddenObjectiveArrayCache = new Map<string, ObjectiveCard[]>();
+const hiddenCardIcons = Object.freeze([]) as unknown as Card["icons"];
+const hiddenConflictRewards = Object.freeze([]) as unknown as ConflictCard["rewards"];
+
 function hiddenCard(playerId: string, index: number): Card {
-  return {
+  return cachedHidden(hiddenCardCache, `${playerId}:${index}`, () => ({
     id: `hidden-hand-${playerId}-${index}`,
     name: "Hidden card",
-    icons: [],
+    icons: hiddenCardIcons,
     persuasion: 0,
     swords: 0,
     play: "",
     reveal: "",
-  };
+  }));
 }
 
 function hiddenIntrigue(playerId: string, index: number): IntrigueCard {
-  return {
+  return cachedHidden(hiddenIntrigueCache, `${playerId}:${index}`, () => ({
     id: `hidden-intrigue-${playerId}-${index}`,
     name: "Hidden Intrigue",
     summary: "",
-  };
+  }));
 }
 
-function hiddenContract(index: number): ContractCard {
-  return {
-    id: `hidden-contract-${index}`,
+function hiddenContract(index: number, scope = "contract"): ContractCard {
+  return cachedHidden(hiddenContractCache, `${scope}:${index}`, () => ({
+    id: scope === "contract" ? `hidden-contract-${index}` : `hidden-contract-${scope}-${index}`,
     name: "Hidden CHOAM contract",
-  };
+  }));
 }
 
 function hiddenConflict(index: number): ConflictCard {
-  return {
+  return cachedHidden(hiddenConflictCache, String(index), () => ({
     id: `hidden-conflict-${index}`,
     name: "Hidden Conflict",
     level: 1,
     battleIcon: "wild",
-    rewards: [],
+    rewards: hiddenConflictRewards,
     stakes: "",
-  };
+  }));
 }
 
 function hiddenObjective(playerId: string, index: number, objective: ObjectiveCard): ObjectiveCard {
-  return {
+  const key = `${playerId}:${index}:${objective.scored ? "scored" : "hidden"}:${objective.playerCount}`;
+  return cachedHidden(hiddenObjectiveCache, key, () => ({
     id: `hidden-objective-${playerId}-${index}`,
     name: objective.scored ? "Scored Objective" : "Hidden Objective",
     battleIcon: "crysknife",
     playerCount: objective.playerCount,
     scored: objective.scored,
-  };
+  }));
+}
+
+function cachedHiddenArray<T>(cache: Map<string, T[]>, key: string, create: () => T[]): T[] {
+  const existing = cache.get(key);
+  if (existing) return existing;
+  const value = Object.freeze(create()) as T[];
+  cache.set(key, value);
+  return value;
+}
+
+function hiddenCards(scope: string, count: number): Card[] {
+  return cachedHiddenArray(hiddenCardArrayCache, `${scope}:${count}`, () =>
+    Array.from({ length: count }, (_card, index) => hiddenCard(scope, index)),
+  );
+}
+
+function hiddenIntrigues(scope: string, count: number): IntrigueCard[] {
+  return cachedHiddenArray(hiddenIntrigueArrayCache, `${scope}:${count}`, () =>
+    Array.from({ length: count }, (_card, index) => hiddenIntrigue(scope, index)),
+  );
+}
+
+function hiddenContracts(scope: string, count: number): ContractCard[] {
+  return cachedHiddenArray(hiddenContractArrayCache, `${scope}:${count}`, () =>
+    Array.from({ length: count }, (_card, index) => hiddenContract(index, scope)),
+  );
+}
+
+function hiddenConflicts(count: number): ConflictCard[] {
+  const existing = hiddenConflictArrayCache.get(count);
+  if (existing) return existing;
+  const value = Object.freeze(Array.from({ length: count }, (_card, index) => hiddenConflict(index))) as ConflictCard[];
+  hiddenConflictArrayCache.set(count, value);
+  return value;
+}
+
+function hiddenObjectives(playerId: string, objectives: ObjectiveCard[]): ObjectiveCard[] {
+  const key = `${playerId}:${objectives.map((objective, index) =>
+    `${index}:${objective.scored ? "scored" : "hidden"}:${objective.playerCount}`,
+  ).join("|")}`;
+  return cachedHiddenArray(hiddenObjectiveArrayCache, key, () =>
+    objectives.map((objective, index) => hiddenObjective(playerId, index, objective)),
+  );
 }
 
 function sanitizePendingAction(action: PendingAction | undefined, viewerPlayerId?: string): PendingAction | undefined {
@@ -153,15 +218,17 @@ function sanitizePlayer(player: Player, viewerPlayerId?: string): Player {
   if (player.id === viewerPlayerId) {
     return {
       ...player,
-      deck: player.deck.map((_card, index) => hiddenCard(`${player.id}-deck`, index)),
+      deck: hiddenCards(`${player.id}-deck`, player.deck.length),
     };
   }
   return {
     ...player,
-    deck: player.deck.map((_card, index) => hiddenCard(`${player.id}-deck`, index)),
-    hand: player.hand.map((_card, index) => hiddenCard(player.id, index)),
-    intrigues: player.intrigues.map((_card, index) => hiddenIntrigue(player.id, index)),
-    objectives: player.objectives.map((objective, index) => hiddenObjective(player.id, index, objective)),
+    deck: hiddenCards(`${player.id}-deck`, player.deck.length),
+    hand: hiddenCards(player.id, player.hand.length),
+    manipulatedCards: hiddenCards(`${player.id}-manipulated`, player.manipulatedCards.length),
+    intrigues: hiddenIntrigues(player.id, player.intrigues.length),
+    objectives: hiddenObjectives(player.id, player.objectives),
+    reservedContracts: hiddenContracts(`${player.id}-reserved`, player.reservedContracts.length),
   };
 }
 
@@ -181,10 +248,10 @@ function roomStartedForSnapshot(room: StoredRoom) {
 export function sanitizeGameForSeat(game: GameState, viewerPlayerId?: string): GameState {
   return {
     ...game,
-    marketDeck: game.marketDeck.map((_card, index) => hiddenCard("market-deck", index)),
-    contractDeck: game.contractDeck.map((_card, index) => hiddenContract(index)),
-    intrigueDeck: game.intrigueDeck.map((_card, index) => hiddenIntrigue("deck", index)),
-    conflictDeck: game.conflictDeck.map((_card, index) => hiddenConflict(index)),
+    marketDeck: hiddenCards("market-deck", game.marketDeck.length),
+    contractDeck: hiddenContracts("contract", game.contractDeck.length),
+    intrigueDeck: hiddenIntrigues("deck", game.intrigueDeck.length),
+    conflictDeck: hiddenConflicts(game.conflictDeck.length),
     pendingAction: sanitizePendingAction(game.pendingAction, viewerPlayerId),
     pendingQueue: game.pendingQueue.map((action) => sanitizePendingAction(action, viewerPlayerId) ?? action),
     players: game.players.map((player) => sanitizePlayer(player, viewerPlayerId)),

@@ -60,6 +60,32 @@ try {
   );
 
   const game = state.initialGame();
+  const invalidMakerPending = {
+    kind: "maker-choice",
+    ownerId: "p3",
+    spiceOwnerId: "p3",
+    source: "Invalid Maker choice test",
+    spaceId: "hagga-basin",
+    spice: 2,
+    sandworms: 1,
+    canSummonSandworms: true,
+  };
+  const invalidMakerBase = {
+    ...game,
+    pendingAction: invalidMakerPending,
+    pendingQueue: [],
+    players: game.players.map((player) =>
+      player.id === "p3"
+        ? { ...player, resources: { ...player.resources, spice: 0 }, deployedSandworms: 0 }
+        : player,
+    ),
+  };
+  assert.equal(
+    state.resolveMakerChoice(invalidMakerBase, invalidMakerPending, "bogus"),
+    invalidMakerBase,
+    "Invalid Maker choice values should leave state unchanged",
+  );
+
   assert.deepEqual(
     Object.fromEntries(Object.entries(game.makerSpice).sort()),
     Object.fromEntries(expectedMakerIds.map((spaceId) => [spaceId, 0]).sort()),

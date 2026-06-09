@@ -463,6 +463,24 @@ function assertHiddenObjectives(snapshot, playerId) {
   );
 }
 
+function assertHiddenReservedContracts(snapshot, playerId) {
+  const owner = player(snapshot, playerId);
+  assert.ok(owner.reservedContracts.length > 0, `${playerId} reserved contract count should be preserved`);
+  assert.ok(
+    owner.reservedContracts.every((contract) => contract.name === "Hidden CHOAM contract"),
+    `${playerId} reserved contract identities should be hidden from non-owners`,
+  );
+}
+
+function assertHiddenManipulatedCards(snapshot, playerId) {
+  const owner = player(snapshot, playerId);
+  assert.ok(owner.manipulatedCards.length > 0, `${playerId} manipulated card count should be preserved`);
+  assert.ok(
+    owner.manipulatedCards.every((card) => card.name === "Hidden card"),
+    `${playerId} manipulated cards should be hidden from non-owners`,
+  );
+}
+
 function assertVisibleObjectives(snapshot, playerId) {
   const owner = player(snapshot, playerId);
   if (owner.objectives.length === 0) return;
@@ -610,6 +628,7 @@ try {
   assertHiddenHand(created.body, "p1");
   assertHiddenHand(created.body, "p2");
   assertHiddenObjectives(created.body, "p2");
+  assertHiddenReservedContracts(created.body, "p4");
   assertHiddenSharedDecks(created.body);
 
   const p1Claim = await jsonFetch(`/api/rooms/${roomId}/seats/p1/claim`, {
@@ -629,6 +648,7 @@ try {
   assertHiddenDrawDeck(p1Claim.body.snapshot, "p1");
   assertHiddenHand(p1Claim.body.snapshot, "p2");
   assertHiddenObjectives(p1Claim.body.snapshot, "p2");
+  assertHiddenReservedContracts(p1Claim.body.snapshot, "p4");
   assertHiddenSharedDecks(p1Claim.body.snapshot);
   assert.equal(p1Claim.body.snapshot.started, false, "Claiming a seat should not start the room");
   assert.equal(p1Claim.body.snapshot.game.pendingAction, undefined, "Claiming a seat should not queue setup choices");
@@ -1801,6 +1821,38 @@ try {
     forgedSplitMakerSandwormsVersion,
     "Rejected split Maker spice choice should not advance the room version",
   );
+  const invalidSplitMakerSpiceOwnerChoice = await roomAction(
+    splitMakerRoom.body.roomId,
+    splitMakerSpiceOwnerClaim.body.token,
+    forgedSplitMakerSandwormsVersion,
+    { kind: "pending", command: { kind: "choose-maker-reward", choice: "bogus" } },
+  );
+  assert.equal(
+    invalidSplitMakerSpiceOwnerChoice.response.status,
+    409,
+    "Room Maker spice owners should get a conflict for invalid runtime choice values",
+  );
+  assert.equal(
+    server.rooms.get(splitMakerRoom.body.roomId).version,
+    forgedSplitMakerSandwormsVersion,
+    "Rejected invalid split Maker spice-owner choices should not advance the room version",
+  );
+  const invalidSplitMakerOwnerChoice = await roomAction(
+    splitMakerRoom.body.roomId,
+    splitMakerOwnerClaim.body.token,
+    forgedSplitMakerSandwormsVersion,
+    { kind: "pending", command: { kind: "choose-maker-reward", choice: "bogus" } },
+  );
+  assert.equal(
+    invalidSplitMakerOwnerChoice.response.status,
+    409,
+    "Room Maker sandworm owners should get a conflict for invalid runtime choice values",
+  );
+  assert.equal(
+    server.rooms.get(splitMakerRoom.body.roomId).version,
+    forgedSplitMakerSandwormsVersion,
+    "Rejected invalid split Maker owner choices should not advance the room version",
+  );
   const splitMakerSpice = await roomAction(
     splitMakerRoom.body.roomId,
     splitMakerSpiceOwnerClaim.body.token,
@@ -1873,6 +1925,34 @@ try {
     server.rooms.get(splitSietchRoom.body.roomId).version,
     forgedSplitSietchHooksVersion,
     "Rejected split Sietch shield-wall choice should not advance the room version",
+  );
+  const invalidSplitSietchChoice = await roomAction(
+    splitSietchRoom.body.roomId,
+    splitSietchWaterOwnerClaim.body.token,
+    forgedSplitSietchHooksVersion,
+    { kind: "pending", command: { kind: "choose-sietch-tabr", choice: "bogus" } },
+  );
+  assert.equal(invalidSplitSietchChoice.response.status, 409, "Room Sietch should reject invalid runtime choice values");
+  assert.equal(
+    server.rooms.get(splitSietchRoom.body.roomId).version,
+    forgedSplitSietchHooksVersion,
+    "Rejected invalid Sietch choices should not advance the room version",
+  );
+  const invalidSplitSietchOwnerChoice = await roomAction(
+    splitSietchRoom.body.roomId,
+    splitSietchOwnerClaim.body.token,
+    forgedSplitSietchHooksVersion,
+    { kind: "pending", command: { kind: "choose-sietch-tabr", choice: "bogus" } },
+  );
+  assert.equal(
+    invalidSplitSietchOwnerChoice.response.status,
+    409,
+    "Room Sietch hooks owners should get a conflict for invalid runtime choice values",
+  );
+  assert.equal(
+    server.rooms.get(splitSietchRoom.body.roomId).version,
+    forgedSplitSietchHooksVersion,
+    "Rejected invalid Sietch owner choices should not advance the room version",
   );
   const splitSietchShieldWall = await roomAction(
     splitSietchRoom.body.roomId,
@@ -2776,6 +2856,14 @@ try {
     manipulateAction.body.snapshot.game.imperiumRow.some((card) => card.id === replacementRowCard.id),
     true,
     "Room Manipulate should refill the Imperium Row",
+  );
+  const publicManipulate = await jsonFetch(`/api/rooms/${manipulateRoom.body.roomId}`);
+  assert.equal(publicManipulate.response.status, 200, "Public Manipulate snapshot should load");
+  assertHiddenManipulatedCards(publicManipulate.body, plotOwnerId);
+  assert.equal(
+    JSON.stringify(player(publicManipulate.body, plotOwnerId).manipulatedCards).includes(manipulatedRowCard.name),
+    false,
+    "Public Manipulate snapshot should not expose the removed row card name",
   );
 
   const mercenaries = intrigueBySourceId(128);

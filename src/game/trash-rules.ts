@@ -127,6 +127,7 @@ export function trashPlayerCard(
   cardId: string,
   choiceIndex?: number,
 ): GameState {
+  if (state.pendingAction !== pending) return state;
   const owner = state.players.find((player) => player.id === pending.ownerId);
   if (!owner) return advancePastUnresolvableMandatoryTrash({ ...state, ...advancePendingAction(state) });
   const choices = trashableCardsForPending(owner, pending);
@@ -215,6 +216,7 @@ export function trashPlayerCard(
 }
 
 export function skipTrashCard(state: GameState, pending: TrashCardPendingAction): GameState {
+  if (state.pendingAction !== pending) return state;
   const owner = state.players.find((player) => player.id === pending.ownerId);
   if (!pending.optional && owner && trashableCardsForPending(owner, pending).length > 0) return state;
   return advancePastUnresolvableMandatoryTrash({

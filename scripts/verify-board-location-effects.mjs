@@ -860,6 +860,38 @@ try {
   const makerKeeperRefineryPaid = state.resolveOptionalSpacePayment(makerKeeperRefinery, makerKeeperRefinery.pendingAction);
   assert.equal(playerById(makerKeeperRefineryPaid, "p2").resources.spice, 0);
   assert.equal(playerById(makerKeeperRefineryPaid, "p2").resources.solari, 4);
+  const activeOptionalPayment = {
+    kind: "optional-space-payment",
+    ownerId: "p3",
+    source: "Active optional payment",
+    cost: { spice: 1 },
+    gain: { solari: 2 },
+  };
+  const staleOptionalPayment = {
+    kind: "optional-space-payment",
+    ownerId: "p2",
+    source: "Stale optional payment",
+    cost: { solari: 2 },
+    gain: { water: 1 },
+  };
+  const staleOptionalGame = state.initialGame();
+  const staleOptionalPaymentBase = {
+    ...staleOptionalGame,
+    pendingAction: activeOptionalPayment,
+    pendingQueue: [],
+    players: staleOptionalGame.players.map((player) =>
+      player.id === "p2"
+        ? { ...player, resources: { ...player.resources, solari: 2, water: 0 } }
+        : player.id === "p3"
+          ? { ...player, resources: { ...player.resources, spice: 1, solari: 0 } }
+          : player,
+    ),
+  };
+  assert.equal(
+    state.resolveOptionalSpacePayment(staleOptionalPaymentBase, staleOptionalPayment),
+    staleOptionalPaymentBase,
+    "Stale optional-space-payment objects should leave state unchanged",
+  );
 
   const militarySupportBase = playableGame(state, "p4", emperorCard, (player) => ({
     ...player,

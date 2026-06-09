@@ -167,9 +167,16 @@ export default function App() {
     ? game.players.find((player) => player.id === roomSession.claimedPlayerId)
     : undefined;
   const activeAllies = game.players.filter((player) => player.team === activePlayer.team && player.role === "Ally");
+  const activatedAllyId = activePlayer.role === "Commander"
+    ? activatedAllyIdFor(activePlayer, game.players, commanderTargets) ??
+      legalActivatedAllyIdFor(activePlayer, game.players, commanderTargets)
+    : activePlayer.id;
+  const effectiveCommanderTargets = activePlayer.role === "Commander" && activatedAllyId
+    ? { ...commanderTargets, [activePlayer.id]: activatedAllyId }
+    : commanderTargets;
   const activatedAlly =
     activePlayer.role === "Commander"
-      ? activeAllies.find((player) => player.id === activatedAllyIdFor(activePlayer, game.players, commanderTargets)) ?? activeAllies[0]
+      ? activeAllies.find((player) => player.id === activatedAllyId) ?? activeAllies[0]
       : activePlayer;
   const canUseActivatedAlly = activePlayer.role !== "Commander" || commanderCanActivateAlly(activePlayer, activatedAlly);
   const selectedCard = activePlayer.hand.find((card) => card.id === selectedCardId) ?? null;
@@ -218,7 +225,7 @@ export default function App() {
         cardId: card.id,
         spaceId: space.id,
         ...(spyEntrySpaceId ? { spyEntrySpaceId } : {}),
-        commanderTargets,
+        commanderTargets: effectiveCommanderTargets,
       }).then((applied) => {
         if (!applied) return;
         setSelectedCardId(null);
@@ -227,7 +234,12 @@ export default function App() {
       });
       return;
     }
-    setGame((current) => maybeStartCombatPhase(placeAgentAction(current, { commanderTargets, selectedCard: card, selectedSpace: space, spyEntrySpaceId })));
+    setGame((current) => maybeStartCombatPhase(placeAgentAction(current, {
+      commanderTargets: effectiveCommanderTargets,
+      selectedCard: card,
+      selectedSpace: space,
+      spyEntrySpaceId,
+    })));
     setSelectedCardId(null);
     setSelectedSpaceId(null);
     setSelectedSpyEntrySpaceId(null);
@@ -276,16 +288,16 @@ export default function App() {
     if (game.agentTurnComplete) return;
     if (activePlayer.revealed) return;
     if (roomSession.inRoom) {
-      void roomSession.sendAction({ kind: "reveal-turn", commanderTargets });
+      void roomSession.sendAction({ kind: "reveal-turn", commanderTargets: effectiveCommanderTargets });
       return;
     }
     const targetId =
       activePlayer.role === "Commander"
-        ? legalActivatedAllyIdFor(activePlayer, game.players, commanderTargets)
+        ? legalActivatedAllyIdFor(activePlayer, game.players, effectiveCommanderTargets)
         : activePlayer.id;
     const revealTarget = game.players.find((player) => player.id === targetId);
     const revealPlan = revealTurnPlan(activePlayer, game, revealTarget);
-    setGame((current) => revealTurnAction(current, { commanderTargets, revealPlan }));
+    setGame((current) => revealTurnAction(current, { commanderTargets: effectiveCommanderTargets, revealPlan }));
   }
 
   function buyCard(card: Card) {
@@ -295,14 +307,14 @@ export default function App() {
     const cardCost = manipulatedCard ? manipulateAcquisitionCost(card) : card.cost ?? 0;
     if (!activePlayer.revealed || activePlayer.persuasion < cardCost) return;
     if (roomSession.inRoom) {
-      void roomSession.sendAction({ kind: "buy-card", cardId: card.id, commanderTargets });
+      void roomSession.sendAction({ kind: "buy-card", cardId: card.id, commanderTargets: effectiveCommanderTargets });
       return;
     }
     setGame((current) => {
       const buyer = current.players[current.activeSeat];
       const callToArmsRecruitOwnerId =
         buyer.callToArmsActive && buyer.role === "Commander"
-          ? legalActivatedAllyIdFor(buyer, current.players, commanderTargets)
+          ? legalActivatedAllyIdFor(buyer, current.players, effectiveCommanderTargets)
           : undefined;
       return acquireMarketCard(current, buyer.id, card.id, callToArmsRecruitOwnerId);
     });
@@ -424,7 +436,7 @@ export default function App() {
   const debugCaptureAvailable = browserDebugEnabled && typeof window.__DUNE_DEBUG_CAPTURE__ === "function";
   const canResolveRoomPending = roomSession.inRoom && roomPendingActionCanResolve(game, roomSession.claimedPlayerId);
   const pendingActionHandlers = createPendingActionHandlers({
-    commanderTargets,
+    commanderTargets: effectiveCommanderTargets,
     game,
     setGame,
   });
@@ -475,13 +487,13 @@ export default function App() {
     return undefined;
   }, [activeSpyEntrySpaceId, canResolveRoomPending, game, placementDecisionActive, roomSession.inRoom, spyEntrySpaceIds]);
   const plotActionHandlers = createPlotActionHandlers({
-    commanderTargets,
+    commanderTargets: effectiveCommanderTargets,
     setChangeAllegiancesSelections,
     setGame,
   });
   const roomPlotActionHandlers = createRoomPlotActionHandlers(
     roomSession.sendAction,
-    commanderTargets,
+    effectiveCommanderTargets,
     setChangeAllegiancesSelections,
   );
   const selectBoardSpySlot = (spaceId: string) => {

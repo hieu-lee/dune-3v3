@@ -93,13 +93,21 @@ function reserveTopDeckSelectionCards(
 }
 
 export function activatedAllyIdFor(player: Player, players: Player[], commanderTargets: CommanderTargets) {
-  return legalActivatedAllyIdFor(player, players, commanderTargets) ?? defaultActivatedAllyId(player, players);
+  if (player.role !== "Commander") return player.id;
+  if (player.revealed && player.revealActivatedAllyId) return player.revealActivatedAllyId;
+  const requestedTargetId = commanderTargets[player.id];
+  if (requestedTargetId) {
+    const requested = players.find((candidate) => candidate.id === requestedTargetId);
+    return requested && commanderCanActivateAlly(player, requested) ? requested.id : undefined;
+  }
+  return defaultActivatedAllyId(player, players);
 }
 
 export function legalActivatedAllyIdFor(player: Player, players: Player[], commanderTargets: CommanderTargets) {
   if (player.role !== "Commander") return player.id;
   if (player.revealed && player.revealActivatedAllyId) return player.revealActivatedAllyId;
-  const requested = players.find((candidate) => candidate.id === commanderTargets[player.id]);
+  const requestedTargetId = commanderTargets[player.id];
+  const requested = players.find((candidate) => candidate.id === requestedTargetId);
   if (requested && commanderCanActivateAlly(player, requested)) return requested.id;
   return players.find((candidate) => commanderCanActivateAlly(player, candidate))?.id;
 }
@@ -396,10 +404,12 @@ export function placeAgentAction(
   const makerChoicePending = pendingActionForMakerChoice(placementState, selectedSpace, makerChoiceOwner, player);
   const spiceGain = boardSpaceSpiceGainFor(selectedSpace, player, makerBonus, Boolean(makerChoicePending));
   const sietchTabrPending = pendingActionForSietchTabr(placementState, selectedSpace, makerChoiceOwner, player);
+  const commanderDuplicateActivation = player.role === "Commander" &&
+    (player.commanderActivatedAllyIds ?? []).includes(target.id);
   const spendsSwordmasterAgent = player.swordmasterBonus &&
     !player.swordmasterAgentSpent &&
     player.agentsTotal > 2 &&
-    player.agentsReady === 1;
+    (player.agentsReady === 1 || commanderDuplicateActivation);
   let { recruitedTroops: boardRecruitedTroops, source, target: effectedTarget } = applyBoardEffect(
     {
       ...player,

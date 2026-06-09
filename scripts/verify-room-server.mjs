@@ -1534,6 +1534,71 @@ try {
   );
   assertHiddenSharedDecks(placedSnapshot);
 
+  const staleCommanderTargetRoom = await jsonFetch("/api/rooms", { method: "POST" });
+  assert.equal(staleCommanderTargetRoom.response.status, 201, "Stale Commander target room creation should succeed");
+  const staleCommanderTargetRecord = server.rooms.get(staleCommanderTargetRoom.body.roomId);
+  assert.ok(staleCommanderTargetRecord, "Stale Commander target room should be stored in memory");
+  const staleCommanderCard = {
+    id: "room-stale-commander-city",
+    name: "Room stale Commander city",
+    icons: ["city"],
+    persuasion: 0,
+    swords: 0,
+    play: "",
+    reveal: "",
+  };
+  const staleCommanderSpace = boardSpaces.find((space) => space.id === "carthag");
+  assert.ok(staleCommanderSpace, "Stale Commander target test needs Carthag");
+  staleCommanderTargetRecord.game = {
+    ...staleCommanderTargetRecord.game,
+    phase: "playing",
+    activeSeat: staleCommanderTargetRecord.game.players.findIndex((candidate) => candidate.id === "p1"),
+    agentTurnComplete: false,
+    pendingAction: undefined,
+    pendingQueue: [],
+    spaces: {},
+    players: staleCommanderTargetRecord.game.players.map((candidate) =>
+      candidate.id === "p1"
+        ? {
+            ...candidate,
+            hand: [staleCommanderCard],
+            agentsReady: 1,
+            agentsTotal: 2,
+            swordmasterBonus: false,
+            swordmasterAgentSpent: false,
+            commanderActivatedAllyIds: ["p3"],
+          }
+        : candidate
+    ),
+  };
+  const staleCommanderTargetClaim = await jsonFetch(`/api/rooms/${staleCommanderTargetRoom.body.roomId}/seats/p1/claim`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: "Stale Commander Target Owner" }),
+  });
+  assert.equal(staleCommanderTargetClaim.response.status, 200, "Stale Commander target owner should be claimable");
+  const staleCommanderTargetAction = await roomAction(
+    staleCommanderTargetRoom.body.roomId,
+    staleCommanderTargetClaim.body.token,
+    staleCommanderTargetClaim.body.snapshot.version,
+    {
+      kind: "place-agent",
+      cardId: staleCommanderCard.id,
+      spaceId: staleCommanderSpace.id,
+      commanderTargets: { p1: "p3" },
+    },
+  );
+  assert.equal(
+    staleCommanderTargetAction.response.status,
+    200,
+    "Room Agent placement should sanitize stale Commander targets to the legal Ally",
+  );
+  assert.deepEqual(
+    player(staleCommanderTargetAction.body.snapshot, "p1").commanderActivatedAllyIds,
+    ["p3", "p5"],
+    "Room Agent placement should route stale Commander target selection to the remaining legal Ally",
+  );
+
   const endAgentRoom = await jsonFetch("/api/rooms", { method: "POST" });
   assert.equal(endAgentRoom.response.status, 201, "End-Agent action test room creation should succeed");
   const endAgentRoomRecord = server.rooms.get(endAgentRoom.body.roomId);

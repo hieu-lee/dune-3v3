@@ -319,10 +319,22 @@ function addIfLegal(entries, room, playerId, id, label, action, runtime) {
 
 function commanderTargetVariants(player, players) {
   if (player.role !== "Commander") return [{ label: "", value: undefined }];
+  const activatedAllyIds = player.commanderActivatedAllyIds ?? [];
+  const hasDuplicateActivation = activatedAllyIds.some((allyId, _index, allIds) =>
+    allIds.filter((candidateId) => candidateId === allyId).length > 1
+  );
   const allies = players.filter((candidate) =>
     candidate.team === player.team &&
     candidate.role === "Ally" &&
-    (player.swordmasterBonus || !(player.commanderActivatedAllyIds ?? []).includes(candidate.id))
+    (
+      !activatedAllyIds.includes(candidate.id) ||
+      (
+        player.swordmasterBonus &&
+        !player.swordmasterAgentSpent &&
+        !hasDuplicateActivation &&
+        activatedAllyIds.filter((allyId) => allyId === candidate.id).length === 1
+      )
+    )
   );
   if (allies.length === 0) return [{ label: "", value: undefined }];
   return allies.map((ally) => ({

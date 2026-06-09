@@ -1,5 +1,6 @@
 import { BookOpen, EyeOff, HandCoins, SkipForward } from "lucide-react";
 import type { ReactNode } from "react";
+import { commanderCanActivateAlly } from "../game/state";
 import type { GamePhase, Player } from "../game/types";
 import { CardAssetPreview, cardAccessibleSummary } from "./CardAssetPreview";
 
@@ -143,16 +144,20 @@ export function ActiveHandPanel({
         <div className="activation-strip">
           <span>Activating</span>
           {activeAllies.map((ally) => {
-            const alreadyActivated = !activePlayer.swordmasterBonus &&
-              (activePlayer.commanderActivatedAllyIds ?? []).includes(ally.id);
+            const canActivateAlly = commanderCanActivateAlly(activePlayer, ally);
+            const disabledTitle = !canActivateAlly
+              ? activePlayer.swordmasterBonus
+                ? "Swordmaster extra activation already used"
+                : "Requires Swordmaster to activate again"
+              : undefined;
             return (
               <button
                 type="button"
                 key={ally.id}
                 className={activatedAlly.id === ally.id ? "selected" : ""}
-                disabled={!playingPhase || activePlayer.revealed || alreadyActivated}
+                disabled={!playingPhase || activePlayer.revealed || !canActivateAlly}
                 onClick={() => onSelectCommanderTarget(activePlayer.id, ally.id)}
-                title={alreadyActivated ? "Requires Swordmaster to activate again" : undefined}
+                title={disabledTitle}
               >
                 {ally.leader}
               </button>

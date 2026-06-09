@@ -1091,6 +1091,133 @@ try {
     true,
     "Other players should still be able to claim Swordmaster",
   );
+  const commanderSwordmasterActivationFixture = (activatedAllyIds, targetCard = cityCard) => ({
+    ...swordmasterClaim,
+    activeSeat: swordmasterClaim.players.findIndex((player) => player.id === "p1"),
+    agentTurnComplete: false,
+    pendingAction: undefined,
+    pendingQueue: [],
+    spaces: {},
+    players: swordmasterClaim.players.map((player) =>
+      player.id === "p1"
+        ? {
+            ...player,
+            hand: [targetCard],
+            agentsReady: 1,
+            agentsTotal: 3,
+            swordmasterBonus: true,
+            swordmasterAgentSpent: false,
+            commanderActivatedAllyIds: activatedAllyIds,
+          }
+        : player,
+    ),
+  });
+  const commanderThirdActivationForFirstAllyBase = commanderSwordmasterActivationFixture(["p3", "p5"]);
+  assert.equal(
+    turnActions.activatedAllyIdFor(
+      playerById(commanderThirdActivationForFirstAllyBase, "p1"),
+      commanderThirdActivationForFirstAllyBase.players,
+      { p1: "p3" },
+    ),
+    "p3",
+    "Commander Swordmaster strict Agent target resolver should accept a legal duplicate Ally",
+  );
+  const commanderThirdActivationForFirstAlly = place(
+    turnActions,
+    commanderThirdActivationForFirstAllyBase,
+    cityCard,
+    spaces.carthag,
+    { p1: "p3" },
+  );
+  assert.deepEqual(
+    playerById(commanderThirdActivationForFirstAlly, "p1").commanderActivatedAllyIds,
+    ["p3", "p5", "p3"],
+    "Commander Swordmaster third activation should be usable for the first already activated Ally",
+  );
+  assert.equal(
+    playerById(commanderThirdActivationForFirstAlly, "p1").swordmasterAgentSpent,
+    true,
+    "Commander Swordmaster third activation should spend the one-use third Agent",
+  );
+  const commanderEarlyDuplicateBase = commanderSwordmasterActivationFixture(["p3"]);
+  const commanderEarlyDuplicate = place(
+    turnActions,
+    {
+      ...commanderEarlyDuplicateBase,
+      players: commanderEarlyDuplicateBase.players.map((player) =>
+        player.id === "p1" ? { ...player, agentsReady: 2 } : player
+      ),
+    },
+    cityCard,
+    spaces.carthag,
+    { p1: "p3" },
+  );
+  assert.equal(
+    playerById(commanderEarlyDuplicate, "p1").swordmasterAgentSpent,
+    true,
+    "Commander duplicate Swordmaster activation should spend the one-use Agent even before the last ready Agent",
+  );
+  const commanderThirdActivationForSecondAllyBase = commanderSwordmasterActivationFixture(["p3", "p5"]);
+  const commanderThirdActivationForSecondAlly = place(
+    turnActions,
+    commanderThirdActivationForSecondAllyBase,
+    cityCard,
+    spaces.carthag,
+    { p1: "p5" },
+  );
+  assert.deepEqual(
+    playerById(commanderThirdActivationForSecondAlly, "p1").commanderActivatedAllyIds,
+    ["p3", "p5", "p5"],
+    "Commander Swordmaster third activation should be usable for the second already activated Ally",
+  );
+  const commanderTripleSameAllyBase = commanderSwordmasterActivationFixture(["p3", "p3"]);
+  assert.equal(
+    turnActions.activatedAllyIdFor(
+      playerById(commanderTripleSameAllyBase, "p1"),
+      commanderTripleSameAllyBase.players,
+      { p1: "p3" },
+    ),
+    undefined,
+    "Commander strict Agent target resolver should reject stale illegal targets",
+  );
+  assert.equal(
+    turnActions.legalActivatedAllyIdFor(
+      playerById(commanderTripleSameAllyBase, "p1"),
+      commanderTripleSameAllyBase.players,
+      { p1: "p3" },
+    ),
+    "p5",
+    "Commander legal target resolver should fall back from a stale illegal target to the other Ally",
+  );
+  assert.equal(
+    place(turnActions, commanderTripleSameAllyBase, cityCard, spaces.carthag, { p1: "p3" }),
+    commanderTripleSameAllyBase,
+    "Commander Swordmaster should not allow all three activations to use the same Ally",
+  );
+  const commanderSpentSwordmasterFixture = commanderSwordmasterActivationFixture(["p3"]);
+  const commanderSpentSwordmasterBase = {
+    ...commanderSpentSwordmasterFixture,
+    players: commanderSpentSwordmasterFixture.players.map((player) =>
+      player.id === "p1" ? { ...player, swordmasterAgentSpent: true } : player
+    ),
+  };
+  assert.equal(
+    place(turnActions, commanderSpentSwordmasterBase, cityCard, spaces.carthag, { p1: "p3" }),
+    commanderSpentSwordmasterBase,
+    "Commander Swordmaster should not grant another duplicate activation after the one-use Agent is spent",
+  );
+  const commanderPermanentOtherAllyAfterDuplicate = place(
+    turnActions,
+    commanderTripleSameAllyBase,
+    cityCard,
+    spaces.carthag,
+    { p1: "p5" },
+  );
+  assert.deepEqual(
+    playerById(commanderPermanentOtherAllyAfterDuplicate, "p1").commanderActivatedAllyIds,
+    ["p3", "p3", "p5"],
+    "Commander Swordmaster should still allow the other permanent Ally activation after an early duplicate",
+  );
 
   const swordmasterSpent = place(
     turnActions,

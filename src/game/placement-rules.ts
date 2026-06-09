@@ -70,7 +70,13 @@ export function defaultActivatedAllyId(player: Player, players: Player[]) {
 export function commanderCanActivateAlly(commander: Player, ally: Player) {
   if (commander.role !== "Commander") return commander.id === ally.id;
   if (ally.role !== "Ally" || ally.team !== commander.team) return false;
-  return commander.swordmasterBonus || !(commander.commanderActivatedAllyIds ?? []).includes(ally.id);
+  const activatedAllyIds = commander.commanderActivatedAllyIds ?? [];
+  const activationCount = activatedAllyIds.filter((allyId) => allyId === ally.id).length;
+  if (activationCount === 0) return true;
+  if (!commander.swordmasterBonus || commander.swordmasterAgentSpent || activationCount > 1) return false;
+  return !activatedAllyIds.some((allyId, _index, allIds) =>
+    allIds.filter((candidateId) => candidateId === allyId).length > 1
+  );
 }
 
 export function legalActivatedAlliesForCommander(commander: Player, players: Player[]) {

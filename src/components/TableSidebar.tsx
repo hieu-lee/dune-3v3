@@ -152,9 +152,13 @@ export function TableSidebar({ game, tableStateLockedByPending, onShieldWallChan
             tabIndex={0}
           >
             <span className="card-asset-preview">
-              <span className="card-art card-asset-image intrigue-deck-back-art" aria-hidden="true">
-                <span>Intrigue</span>
-              </span>
+              <img
+                className="card-art card-asset-image intrigue-deck-back-art"
+                src="/assets/dune-cards-hub/intrigue/intrigue-back-side.png"
+                alt=""
+                aria-hidden="true"
+                loading="lazy"
+              />
               <span className="card-resting-meta" aria-hidden="true">{game.intrigueDeck.length} deck</span>
               <span className="card-hold-details" aria-hidden="true">
                 <span className="card-detail-kicker">Face-down deck</span>

@@ -490,6 +490,7 @@ export function BoardPanel({
   onSelectSpace,
   onSelectSpySlot,
 }: BoardPanelProps) {
+  const [conflictFace, setConflictFace] = useState<"conflict" | "commanders">("conflict");
   const boardStageRef = useRef<HTMLDivElement | null>(null);
   const [stageMeasurements, setStageMeasurements] = useState<BoardStageMeasurements>(emptyBoardStageMeasurements);
   const conflictSlots = conflictDeploymentOrder(game.players);
@@ -559,6 +560,7 @@ export function BoardPanel({
         };
       };
       stage.querySelectorAll<HTMLElement>("[data-space-id]").forEach((element) => {
+        if (element.closest('[data-board-face-active="false"]')) return;
         const spaceId = element.dataset.spaceId;
         if (!spaceId) return;
         spaces[spaceId] = measureElement(element);
@@ -584,7 +586,7 @@ export function BoardPanel({
       resizeObserver?.disconnect();
       window.removeEventListener("resize", measure);
     };
-  }, []);
+  }, [conflictFace]);
 
   function renderSpyNetwork() {
     if (stageMeasurements.width <= 0 || stageMeasurements.height <= 0 || spySlotLayouts.length === 0) return null;
@@ -853,10 +855,11 @@ export function BoardPanel({
         data-region-id={region.id}
         aria-label={region.title}
       >
-        <header className="board-region-header" data-spy-blocker="">
-          <span>{region.subtitle}</span>
-          <strong>{region.title}</strong>
-        </header>
+        {variant !== "board" && (
+          <header className="board-region-header" data-spy-blocker="">
+            <strong>{region.title}</strong>
+          </header>
+        )}
         {influenceTrackFaction && renderInfluenceTrack(influenceTrackFaction)}
         <div className="board-region-spaces">
           {spaces.map(renderSpaceTile)}
@@ -880,51 +883,82 @@ export function BoardPanel({
 
           <div className="board-center-band">
             {renderRegion(boardRegions[2])}
-            <div className="board-conflict-field" aria-label="Conflict deployment area">
-              <div className="conflict-emblem">
-                <Swords size={28} />
-                <span>{game.conflict ? `Conflict ${game.conflict.level}` : "Conflict"}</span>
-                <strong>{game.conflict?.name ?? "No active conflict"}</strong>
-                <small>{game.phase === "combat" ? "Combat phase" : game.shieldWall ? "Shield Wall standing" : "Shield Wall down"}</small>
-              </div>
-              <span className="conflict-summary">
-                {conflictSummary}
-              </span>
-              <div className="conflict-slots" role="list">
-                {conflictSlots.map(({ player }) => {
-                  const units = conflictUnitCount(player);
-                  const activeCombatant = game.phase === "combat" && game.players[game.activeSeat]?.id === player.id;
-                  return (
-                    <article
-                      className={[
-                        "conflict-slot",
-                        units === 0 && player.conflict === 0 ? "is-empty" : "",
-                        player.deployedSandworms > 0 ? "has-worms" : "",
-                        activeCombatant ? "is-active" : "",
-                      ].filter(Boolean).join(" ")}
-                      data-testid={`conflict-slot-${player.id}`}
-                      data-player-id={player.id}
-                      key={player.id}
-                      role="listitem"
-                      style={{ "--player-color": player.color } as CSSProperties}
-                    >
-                      <span>{teams[player.team].name}</span>
-                      <strong>{player.leader}</strong>
-                      <div className="conflict-slot-stats">
-                        <span><Swords size={12} /> {player.conflict}</span>
-                        <span>{player.deployedTroops}T</span>
-                        <span>{player.deployedSandworms}W</span>
-                      </div>
-                    </article>
-                  );
-                })}
+            <div
+              className={`board-conflict-field ${conflictFace === "commanders" ? "is-commanders-face" : "is-conflict-face"}`}
+              aria-label={conflictFace === "commanders" ? "Commander board spaces" : "Conflict deployment area"}
+            >
+              <button
+                className="board-flip-button"
+                type="button"
+                aria-label={conflictFace === "commanders" ? "Show conflict deployment" : "Show commander boards"}
+                title={conflictFace === "commanders" ? "Show conflict deployment" : "Show commander boards"}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setConflictFace((current) => current === "conflict" ? "commanders" : "conflict");
+                }}
+              >
+                {conflictFace === "commanders" ? <Swords size={14} /> : <Users size={14} />}
+                <span>{conflictFace === "commanders" ? "Conflict" : "Commanders"}</span>
+              </button>
+              <div className="board-flip-scene" aria-live="polite">
+                <div className="board-flip-card">
+                  <div
+                    className="board-flip-face board-flip-face-front"
+                    data-board-face-active={conflictFace === "conflict"}
+                    aria-hidden={conflictFace !== "conflict"}
+                    inert={conflictFace !== "conflict"}
+                  >
+                    <div className="conflict-emblem">
+                      <Swords size={28} />
+                      <span>{game.conflict ? `Conflict ${game.conflict.level}` : "Conflict"}</span>
+                      <strong>{game.conflict?.name ?? "No active conflict"}</strong>
+                      <small>{game.phase === "combat" ? "Combat phase" : game.shieldWall ? "Shield Wall standing" : "Shield Wall down"}</small>
+                    </div>
+                    <span className="conflict-summary">
+                      {conflictSummary}
+                    </span>
+                    <div className="conflict-slots" role="list">
+                      {conflictSlots.map(({ player }) => {
+                        const units = conflictUnitCount(player);
+                        const activeCombatant = game.phase === "combat" && game.players[game.activeSeat]?.id === player.id;
+                        return (
+                          <article
+                            className={[
+                              "conflict-slot",
+                              units === 0 && player.conflict === 0 ? "is-empty" : "",
+                              player.deployedSandworms > 0 ? "has-worms" : "",
+                              activeCombatant ? "is-active" : "",
+                            ].filter(Boolean).join(" ")}
+                            data-testid={`conflict-slot-${player.id}`}
+                            data-player-id={player.id}
+                            key={player.id}
+                            role="listitem"
+                            style={{ "--player-color": player.color } as CSSProperties}
+                          >
+                            <span>{teams[player.team].name}</span>
+                            <strong>{player.leader}</strong>
+                            <div className="conflict-slot-stats">
+                              <span><Swords size={12} /> {player.conflict}</span>
+                              <span>{player.deployedTroops}T</span>
+                              <span>{player.deployedSandworms}W</span>
+                            </div>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div
+                    className="board-flip-face board-flip-face-back board-conflict-commanders"
+                    data-board-face-active={conflictFace === "commanders"}
+                    aria-hidden={conflictFace !== "commanders"}
+                    inert={conflictFace !== "commanders"}
+                  >
+                    {commanderRegions.map((region) => renderRegion(region, "commander"))}
+                  </div>
+                </div>
               </div>
             </div>
             {renderRegion(boardRegions[3])}
-          </div>
-
-          <div className="board-commander-dock">
-            {commanderRegions.map((region) => renderRegion(region, "commander"))}
           </div>
 
           {unplacedSpaces.length > 0 && (

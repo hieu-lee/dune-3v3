@@ -31,7 +31,7 @@ button {
   flex-direction: column;
   width: min(1840px, 100%);
   margin: 0 auto;
-  padding: 24px;
+  padding: 76px 24px 24px;
 }
 
 .command-bar {
@@ -773,8 +773,119 @@ h2 {
 
 .table-grid {
   display: grid;
-  grid-template-columns: 238px minmax(0, 1fr) 284px;
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
+}
+
+.table-drawer-controls {
+  position: fixed;
+  z-index: 95;
+  display: flex;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.table-drawer-controls-left {
+  top: 18px;
+  left: 24px;
+}
+
+.table-drawer-controls-right {
+  right: 18px;
+  bottom: 70px;
+}
+
+.table-drawer-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 42px;
+  border: 1px solid rgba(242, 184, 75, 0.3);
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, rgba(35, 28, 22, 0.94), rgba(19, 16, 14, 0.94)),
+    rgba(20, 18, 15, 0.9);
+  color: #fff3d8;
+  cursor: pointer;
+  font-size: 0.76rem;
+  font-weight: 950;
+  line-height: 1;
+  padding: 0 12px;
+  pointer-events: auto;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.32);
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.table-drawer-toggle:hover,
+.table-drawer-toggle:focus-visible,
+.table-drawer-toggle.is-active {
+  border-color: rgba(242, 184, 75, 0.58);
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.38);
+  transform: translateY(-1px);
+}
+
+.table-drawer-toggle:focus-visible {
+  outline: 2px solid rgba(242, 184, 75, 0.52);
+  outline-offset: 2px;
+}
+
+.table-drawer {
+  position: fixed;
+  top: 72px;
+  bottom: 18px;
+  z-index: 90;
+  width: min(380px, calc(100vw - 28px));
+  overflow-y: auto;
+  border: 1px solid rgba(255, 246, 230, 0.16);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(30, 24, 20, 0.96), rgba(16, 14, 12, 0.96)),
+    rgba(18, 15, 13, 0.96);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.44);
+  padding: 12px;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 220ms ease,
+    transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.table-drawer-left {
+  left: 16px;
+  transform: translateX(calc(-100% - 18px));
+}
+
+.table-drawer-right {
+  right: 16px;
+  bottom: 124px;
+  z-index: 91;
+  width: min(430px, calc(100vw - 28px));
+  transform: translateX(calc(100% + 18px));
+}
+
+.table-drawer.is-open {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
+}
+
+.table-drawer .team-column,
+.table-drawer .player-column {
+  grid-template-columns: 1fr;
+}
+
+.table-drawer-right .team-column,
+.table-drawer-right .player-column,
+.table-log-drawer .log-panel-drawer-content ol {
+  padding-bottom: 10px;
+}
+
+.table-log-drawer {
+  overflow: hidden;
 }
 
 .team-column,
@@ -861,6 +972,11 @@ h2 {
     radial-gradient(circle at 50% 58%, rgba(166, 226, 220, 0.22), transparent 40%),
     repeating-linear-gradient(135deg, rgba(166, 226, 220, 0.22) 0 2px, transparent 2px 12px),
     linear-gradient(160deg, rgba(36, 104, 96, 0.98), rgba(13, 19, 20, 0.98));
+}
+
+img.intrigue-deck-back-art {
+  background: #070604;
+  object-fit: cover;
 }
 
 .intrigue-discard-empty-art {
@@ -1405,7 +1521,32 @@ h2 {
 
 @media (max-width: 760px) {
   .app-shell {
-    padding: 14px;
+    padding: 70px 14px 14px;
+  }
+
+  .table-drawer-controls-left {
+    left: 14px;
+    top: 14px;
+  }
+
+  .table-drawer-controls-right {
+    bottom: max(62px, calc(54px + env(safe-area-inset-bottom)));
+    right: 14px;
+  }
+
+  .table-drawer {
+    top: 62px;
+    width: min(380px, calc(100vw - 20px));
+  }
+
+  .table-drawer-left {
+    left: 10px;
+  }
+
+  .table-drawer-right {
+    right: 10px;
+    bottom: max(116px, calc(108px + env(safe-area-inset-bottom)));
+    width: min(430px, calc(100vw - 20px));
   }
 
   h1 {

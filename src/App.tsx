@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, MonitorPlay, PlugZap } from "lucide-react";
+import { Link, MonitorPlay, PanelLeftOpen, PlugZap, ScrollText, Users } from "lucide-react";
 import { ActiveHandPanel } from "./components/ActiveHandPanel";
 import { BoardPanel, type BoardSpySlotChoices } from "./components/BoardPanel";
 import { CommandBar } from "./components/CommandBar";
@@ -103,6 +103,8 @@ export default function App() {
   const [selectedSpaceId, setSelectedSpaceId] = useState<string | null>(null);
   const [selectedSpyEntrySpaceId, setSelectedSpyEntrySpaceId] = useState<string | null>(null);
   const [selectedLeaderId, setSelectedLeaderId] = useState<string | null>(null);
+  const [tableInfoOpen, setTableInfoOpen] = useState(false);
+  const [rightDrawer, setRightDrawer] = useState<"leaders" | "log" | null>(null);
   const [commanderTargets, setCommanderTargets] = useState<Record<string, string>>({});
   const [changeAllegiancesSelections, setChangeAllegiancesSelections] = useState<Record<string, ChangeAllegiancesSelection>>({});
   const leaderOpenerRef = useRef<HTMLButtonElement | null>(null);
@@ -636,12 +638,6 @@ export default function App() {
       />
 
       <section className="table-grid">
-        <TableSidebar
-          game={game}
-          tableStateLockedByPending={tableStateLockedByPending}
-          onShieldWallChange={updateShieldWall}
-        />
-
         <BoardPanel
           game={game}
           legalSpaceIds={legalSpaces}
@@ -652,14 +648,85 @@ export default function App() {
           onSelectSpace={selectBoardSpace}
           onSelectSpySlot={selectBoardSpySlot}
         />
+      </section>
 
+      <div className="table-drawer-controls table-drawer-controls-left">
+        <button
+          className={`table-drawer-toggle ${tableInfoOpen ? "is-active" : ""}`}
+          type="button"
+          aria-controls="table-info-drawer"
+          aria-expanded={tableInfoOpen}
+          title={tableInfoOpen ? "Hide table column" : "Show table column"}
+          onClick={() => setTableInfoOpen((open) => !open)}
+        >
+          <PanelLeftOpen size={18} />
+          <span>Table</span>
+        </button>
+      </div>
+
+      <div className="table-drawer-controls table-drawer-controls-right">
+        <button
+          className={`table-drawer-toggle ${rightDrawer === "leaders" ? "is-active" : ""}`}
+          type="button"
+          aria-controls="leader-drawer"
+          aria-expanded={rightDrawer === "leaders"}
+          title={rightDrawer === "leaders" ? "Hide leaders" : "Show leaders"}
+          onClick={() => setRightDrawer((open) => open === "leaders" ? null : "leaders")}
+        >
+          <Users size={18} />
+          <span>Leaders</span>
+        </button>
+        <button
+          className={`table-drawer-toggle ${rightDrawer === "log" ? "is-active" : ""}`}
+          type="button"
+          aria-controls="table-log-drawer"
+          aria-expanded={rightDrawer === "log"}
+          title={rightDrawer === "log" ? "Hide table log" : "Show table log"}
+          onClick={() => setRightDrawer((open) => open === "log" ? null : "log")}
+        >
+          <ScrollText size={18} />
+          <span>Log</span>
+        </button>
+      </div>
+
+      <aside
+        id="table-info-drawer"
+        className={`table-drawer table-drawer-left ${tableInfoOpen ? "is-open" : ""}`}
+        aria-label="Current conflict and contracts"
+        aria-hidden={!tableInfoOpen}
+        inert={!tableInfoOpen}
+      >
+        <TableSidebar
+          game={game}
+          tableStateLockedByPending={tableStateLockedByPending}
+          onShieldWallChange={updateShieldWall}
+        />
+      </aside>
+
+      <aside
+        id="leader-drawer"
+        className={`table-drawer table-drawer-right ${rightDrawer === "leaders" ? "is-open" : ""}`}
+        aria-label="Leaders"
+        aria-hidden={rightDrawer !== "leaders"}
+        inert={rightDrawer !== "leaders"}
+      >
         <PlayerColumn
           game={game}
           tableStateLockedByPending={tableStateLockedByPending}
           onOpenLeaderReference={openLeaderReference}
           onMakerHooksChange={updateMakerHooks}
         />
-      </section>
+      </aside>
+
+      <aside
+        id="table-log-drawer"
+        className={`table-drawer table-drawer-right table-log-drawer ${rightDrawer === "log" ? "is-open" : ""}`}
+        aria-label="Table log"
+        aria-hidden={rightDrawer !== "log"}
+        inert={rightDrawer !== "log"}
+      >
+        <RecentLogPanel entries={game.log} variant="drawer" />
+      </aside>
 
       <LeaderReferenceModal player={selectedLeader} onClose={closeLeaderReference} />
 
@@ -730,8 +797,6 @@ export default function App() {
           playingPhase={playingPhase && !roomActionLocked}
           onBuyCard={buyCard}
         />
-
-        <RecentLogPanel entries={game.log} />
       </section>
 
       <PendingResolutionOverlay active={pendingOverlayActive} resetKey={pendingOverlayResetKey}>

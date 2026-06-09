@@ -64,6 +64,7 @@ try {
   page.on("pageerror", (error) => consoleErrors.push(error.message));
 
   await page.goto(url, { waitUntil: "networkidle" });
+  await page.getByRole("button", { name: "Local", exact: true }).click();
   await page.waitForFunction(() => Boolean(window.__DUNE_DEBUG__?.getGame && window.__DUNE_DEBUG__?.setGame));
   const fixture = await page.evaluate(() => {
     const debug = window.__DUNE_DEBUG__;

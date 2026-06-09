@@ -23,6 +23,7 @@ export function TableSidebar({ game, tableStateLockedByPending, onShieldWallChan
   const sandwormRewardLabel = sandwormRewardDoublers.map((player) => player.leader).join(", ");
   const shaddamCommander = game.players.find((player) => player.team === "shaddam" && player.role === "Commander");
   const currentConflictRewardRows = game.conflict ? conflictRewardRows(game.conflict) : [];
+  const intrigueDiscardTop = game.intrigueDiscard.at(-1);
 
   return (
     <aside className="team-column">
@@ -142,12 +143,58 @@ export function TableSidebar({ game, tableStateLockedByPending, onShieldWallChan
           <div>
             <span className="conflict-level">{game.intrigueDeck.length} cards queued</span>
             <h2>Intrigue Deck</h2>
-            <p>Board spaces draw physical Intrigue cards into the owning player's hand.</p>
           </div>
         </div>
-        <div className="team-metrics">
-          <span>{game.intrigueDeck.length} deck</span>
-          <span>{game.intrigueDiscard.length} discard</span>
+        <div className="intrigue-deck-preview" aria-label="Intrigue deck and discard">
+          <span
+            className="intrigue-deck-surface intrigue-deck-stack"
+            aria-label={`Face-down Intrigue deck, ${game.intrigueDeck.length} cards`}
+            tabIndex={0}
+          >
+            <span className="card-asset-preview">
+              <span className="card-art card-asset-image intrigue-deck-back-art" aria-hidden="true">
+                <span>Intrigue</span>
+              </span>
+              <span className="card-resting-meta" aria-hidden="true">{game.intrigueDeck.length} deck</span>
+              <span className="card-hold-details" aria-hidden="true">
+                <span className="card-detail-kicker">Face-down deck</span>
+                <strong>{game.intrigueDeck.length} Intrigue cards</strong>
+                <span className="card-detail-row">
+                  <b>Draw</b>
+                  <small>Board spaces draw Intrigue cards into the owning player's hand.</small>
+                </span>
+              </span>
+            </span>
+          </span>
+          <span
+            className="intrigue-deck-surface intrigue-discard-stack"
+            aria-label={intrigueDiscardTop ? `Intrigue discard, top card ${intrigueDiscardTop.name}` : "Intrigue discard, empty"}
+            tabIndex={0}
+          >
+            <span className="card-asset-preview">
+              {intrigueDiscardTop?.thumbnailPath || intrigueDiscardTop?.imagePath ? (
+                <img
+                  className="card-art card-asset-image"
+                  src={intrigueDiscardTop.thumbnailPath ?? intrigueDiscardTop.imagePath}
+                  alt=""
+                  loading="lazy"
+                />
+              ) : (
+                <span className="card-art card-asset-image intrigue-discard-empty-art" aria-hidden="true">
+                  <span>Discard</span>
+                </span>
+              )}
+              <span className="card-resting-meta" aria-hidden="true">{game.intrigueDiscard.length} discard</span>
+              <span className="card-hold-details" aria-hidden="true">
+                <span className="card-detail-kicker">Intrigue discard</span>
+                <strong>{intrigueDiscardTop?.name ?? "Empty discard"}</strong>
+                <span className="card-detail-row">
+                  <b>{intrigueDiscardTop ? "Effect" : "Status"}</b>
+                  <small>{intrigueDiscardTop?.summary ?? "Played and cycled Intrigue cards will appear here."}</small>
+                </span>
+              </span>
+            </span>
+          </span>
         </div>
       </article>
     </aside>

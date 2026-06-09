@@ -86,6 +86,11 @@
     opacity 0s linear;
 }
 
+.card-asset-preview .intrigue-deck-back-art,
+.card-asset-preview .intrigue-discard-empty-art {
+  display: grid;
+}
+
 .card-asset-missing {
   display: grid;
   min-height: 150px;
@@ -233,6 +238,9 @@
 .market-card:hover .card-asset-image,
 .market-card:focus-visible .card-asset-image,
 .card-asset-preview:hover .card-asset-image,
+.card-asset-preview:focus-visible .card-asset-image,
+.intrigue-deck-surface:hover .card-asset-image,
+.intrigue-deck-surface:focus-visible .card-asset-image,
 .throne-choice-card:focus-visible .card-asset-image,
 .acquire-card-choice-card:focus-visible .card-asset-image {
   filter: saturate(0.88) brightness(0.56);
@@ -247,6 +255,9 @@
 .market-card:hover .card-resting-meta,
 .market-card:focus-visible .card-resting-meta,
 .card-asset-preview:hover .card-resting-meta,
+.card-asset-preview:focus-visible .card-resting-meta,
+.intrigue-deck-surface:hover .card-resting-meta,
+.intrigue-deck-surface:focus-visible .card-resting-meta,
 .throne-choice-card:focus-visible .card-resting-meta,
 .acquire-card-choice-card:focus-visible .card-resting-meta {
   opacity: 0;
@@ -258,6 +269,9 @@
 .market-card:hover .card-hold-details,
 .market-card:focus-visible .card-hold-details,
 .card-asset-preview:hover .card-hold-details,
+.card-asset-preview:focus-visible .card-hold-details,
+.intrigue-deck-surface:hover .card-hold-details,
+.intrigue-deck-surface:focus-visible .card-hold-details,
 .throne-choice-card:focus-visible .card-hold-details,
 .acquire-card-choice-card:focus-visible .card-hold-details {
   opacity: 1;

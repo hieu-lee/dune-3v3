@@ -46,6 +46,7 @@
     "verify:contracts": "node scripts/verify-contracts.mjs",
     "verify:endgame": "node scripts/verify-endgame.mjs",
     "verify:influence": "node scripts/verify-influence.mjs",
+    "verify:intrigue-deck-panel": "node scripts/verify-intrigue-deck-panel.mjs",
     "verify:imperium-cards": "node scripts/verify-imperium-cards.mjs",
     "verify:intrigues": "node scripts/verify-intrigues.mjs",
     "verify:leaders": "node scripts/verify-leaders.mjs",

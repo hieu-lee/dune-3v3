@@ -920,6 +920,7 @@ try {
   const imperialPrivilegeDrawCard = testCard("imperial-privilege-draw", "city");
   const imperialPrivilegeOldIntrigue = testIntrigue("imperial-privilege-old");
   const imperialPrivilegeNewIntrigue = testIntrigue("imperial-privilege-new");
+  const imperialPrivilegeExistingDiscard = testIntrigue("imperial-privilege-existing-discard");
   const imperialPrivilege = place(
     turnActions,
     {
@@ -933,7 +934,7 @@ try {
       })),
       agentPlacementOwners: { "assembly-hall": "p2" },
       intrigueDeck: [imperialPrivilegeNewIntrigue],
-      intrigueDiscard: [],
+      intrigueDiscard: [imperialPrivilegeExistingDiscard],
       spaces: { "assembly-hall": "p2" },
     },
     landsraadCard,
@@ -995,8 +996,8 @@ try {
   );
   assert.deepEqual(
     imperialPrivilegeCycled.intrigueDiscard.map((card) => card.id),
-    [imperialPrivilegeOldIntrigue.id],
-    "Imperial Privilege should move the discarded Intrigue to the Intrigue discard pile",
+    [imperialPrivilegeExistingDiscard.id, imperialPrivilegeOldIntrigue.id],
+    "Imperial Privilege should append the discarded Intrigue to the top of the Intrigue discard pile",
   );
   const imperialPrivilegeRecalled = state.resolveBoardAgentRecallChoice(
     imperialPrivilegeCycled,

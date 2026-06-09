@@ -99,7 +99,7 @@ export function resolveTrashIntrigueForReward(
   const advancedState: GameState = {
     ...state,
     players: state.players.map((player) => player.id === owner.id ? ownerAfterTrash : player),
-    intrigueDiscard: pending.discard ? [trashedIntrigue, ...state.intrigueDiscard] : state.intrigueDiscard,
+    intrigueDiscard: pending.discard ? [...state.intrigueDiscard, trashedIntrigue] : state.intrigueDiscard,
     ...advancePendingAction(state),
     log: state.log,
   };

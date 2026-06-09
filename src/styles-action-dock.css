@@ -73,6 +73,103 @@
   background: rgba(29, 56, 54, 0.72);
 }
 
+.pending-resolution-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: clamp(12px, 2vw, 28px);
+  pointer-events: auto;
+}
+
+.pending-resolution-scrim {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at center, rgba(91, 192, 190, 0.1), transparent 38rem),
+    rgba(8, 7, 6, 0.46);
+  backdrop-filter: blur(2px);
+}
+
+.pending-resolution-shell {
+  position: relative;
+  z-index: 1;
+  width: min(1120px, 100%);
+  max-height: min(760px, calc(100vh - 28px));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 8px;
+  pointer-events: auto;
+}
+
+.pending-resolution-toolbar {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.pending-resolution-toggle,
+.pending-resolution-reveal {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid rgba(242, 184, 75, 0.42);
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, rgba(242, 184, 75, 0.18), rgba(242, 184, 75, 0.1)),
+    rgba(20, 18, 15, 0.9);
+  color: #fff0c7;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 950;
+  line-height: 1;
+  padding: 0 12px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+}
+
+.pending-resolution-toggle:hover,
+.pending-resolution-toggle:focus-visible,
+.pending-resolution-reveal:hover,
+.pending-resolution-reveal:focus-visible {
+  border-color: rgba(255, 231, 174, 0.72);
+  outline: 2px solid rgba(242, 184, 75, 0.28);
+  outline-offset: 2px;
+}
+
+.pending-resolution-body {
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid rgba(166, 226, 220, 0.22);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(29, 56, 54, 0.84), rgba(22, 18, 15, 0.94)),
+    rgba(20, 18, 15, 0.94);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.38);
+}
+
+.pending-resolution-body > .pending-panel,
+.pending-resolution-body > .room-pending-panel {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.pending-resolution-body > .pending-panel {
+  min-height: min(300px, calc(100vh - 120px));
+}
+
+.pending-resolution-reveal {
+  position: fixed;
+  right: max(14px, env(safe-area-inset-right));
+  bottom: max(14px, env(safe-area-inset-bottom));
+  z-index: 81;
+  pointer-events: auto;
+}
+
 .pending-panel:has(> .pending-controls.spy-grid) {
   grid-template-columns: minmax(170px, 0.24fr) minmax(0, 1fr);
 }

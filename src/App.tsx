@@ -8,6 +8,7 @@ import { IntrigueHandPanel } from "./components/IntrigueHandPanel";
 import { LeaderReferenceModal } from "./components/LeaderReferenceModal";
 import { MarketPanel } from "./components/MarketPanel";
 import { PendingActionPanel } from "./components/PendingActionPanel";
+import { PendingResolutionOverlay } from "./components/PendingResolutionOverlay";
 import { PlayerColumn } from "./components/PlayerColumn";
 import { RecentLogPanel } from "./components/RecentLogPanel";
 import { RoomPanel } from "./components/RoomPanel";
@@ -435,6 +436,12 @@ export default function App() {
   const plotIntrigueLocked = !playingPhase || pendingLocked;
   const debugCaptureAvailable = browserDebugEnabled && typeof window.__DUNE_DEBUG_CAPTURE__ === "function";
   const canResolveRoomPending = roomSession.inRoom && roomPendingActionCanResolve(game, roomSession.claimedPlayerId);
+  const showRoomWaitingPending = Boolean(roomSession.inRoom && pendingAction && !canResolveRoomPending);
+  const showResolvablePending = Boolean(pendingAction && (!roomSession.inRoom || canResolveRoomPending));
+  const pendingOverlayActive = showRoomWaitingPending || showResolvablePending;
+  const pendingOverlayResetKey = pendingAction
+    ? `${roomSession.inRoom ? "room" : "local"}:${canResolveRoomPending ? "resolve" : "wait"}:${JSON.stringify(pendingAction)}:${game.pendingQueue.length}`
+    : "none";
   const pendingActionHandlers = createPendingActionHandlers({
     commanderTargets: effectiveCommanderTargets,
     game,
@@ -572,13 +579,6 @@ export default function App() {
         player={roomSession.inRoom ? claimedPlayer : activePlayer}
         showHand={roomSession.inRoom}
       />
-      {roomSession.inRoom && !canResolveRoomPending && (
-        <RoomPendingPanel
-          claimedPlayerId={roomSession.claimedPlayerId}
-          game={game}
-          onChooseThroneRowCard={(cardId) => void roomSession.sendAction({ kind: "choose-throne-row-card", cardId })}
-        />
-      )}
 
       <CommandBar
         activePlayer={activePlayer}
@@ -639,15 +639,6 @@ export default function App() {
           />
         )}
 
-        {pendingAction && (!roomSession.inRoom || canResolveRoomPending) && (
-          <PendingActionPanel
-            game={game}
-            pendingAction={pendingAction}
-            viewerPlayerId={roomSession.inRoom ? roomSession.claimedPlayerId : undefined}
-            {...(roomSession.inRoom ? roomPendingActionHandlers : pendingActionHandlers)}
-          />
-        )}
-
         <ActiveHandPanel
           activeAllies={activeAllies}
           activePlayer={activePlayer}
@@ -693,6 +684,24 @@ export default function App() {
 
         <RecentLogPanel entries={game.log} />
       </section>
+
+      <PendingResolutionOverlay active={pendingOverlayActive} resetKey={pendingOverlayResetKey}>
+        {showRoomWaitingPending && (
+          <RoomPendingPanel
+            claimedPlayerId={roomSession.claimedPlayerId}
+            game={game}
+            onChooseThroneRowCard={(cardId) => void roomSession.sendAction({ kind: "choose-throne-row-card", cardId })}
+          />
+        )}
+        {showResolvablePending && pendingAction && (
+          <PendingActionPanel
+            game={game}
+            pendingAction={pendingAction}
+            viewerPlayerId={roomSession.inRoom ? roomSession.claimedPlayerId : undefined}
+            {...(roomSession.inRoom ? roomPendingActionHandlers : pendingActionHandlers)}
+          />
+        )}
+      </PendingResolutionOverlay>
     </main>
   );
 }

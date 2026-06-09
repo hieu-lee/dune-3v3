@@ -12,6 +12,15 @@
   }
 }
 @media (max-width: 1024px) {
+  .pending-resolution-overlay {
+    align-items: start;
+    padding: 10px;
+  }
+
+  .pending-resolution-shell {
+    max-height: calc(100vh - 20px);
+  }
+
   .pending-panel {
     align-items: stretch;
     grid-template-columns: 1fr;
@@ -44,6 +53,22 @@
   }
 }
 @media (max-width: 760px) {
+  .pending-resolution-overlay {
+    padding: 8px;
+  }
+
+  .pending-resolution-shell {
+    max-height: calc(100vh - 16px);
+    gap: 6px;
+  }
+
+  .pending-resolution-toggle,
+  .pending-resolution-reveal {
+    min-height: 34px;
+    font-size: 0.72rem;
+    padding: 0 10px;
+  }
+
   .pending-panel {
     align-items: stretch;
   }

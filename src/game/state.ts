@@ -4,6 +4,7 @@ export {
 } from "./agent-effects";
 
 export {
+  resolveAllianceOwnersForInfluenceChanges,
   resolveAllianceOwners,
   setAllianceOwner,
 } from "./alliance-rules";
@@ -212,6 +213,7 @@ export {
   adjustInfluence,
   markMuadDibUnpredictableFoeResolved,
   resolveMuadDibUnpredictableFoe,
+  resolveLeaderInfluenceThresholdRewardEffects,
   resolveLeaderInfluenceThresholdRewards,
   scoreGurneyAlwaysSmiling,
 } from "./leader-rewards";

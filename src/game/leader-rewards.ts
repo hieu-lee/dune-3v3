@@ -1,5 +1,7 @@
 import { resolveAllianceOwnersForInfluenceChanges } from "./alliance-rules";
 import { playerHasConflictUnits } from "./conflict-rules";
+import { factionLabels } from "./data";
+import { playerTroopSupply } from "./deck-utils";
 import { drawIntrigueCards } from "./intrigue-deck";
 import {
   gurneyHalleckLeaderName,
@@ -7,10 +9,20 @@ import {
   muadDibLeaderName,
   princessIrulanLeaderName,
 } from "./leader-constants";
+import {
+  queuePendingActions,
+} from "./pending-actions";
+import {
+  placeableSpySpaces,
+  recallableSpySupplySpaces,
+} from "./spy-choices";
 import { recordTurnSpiceGain } from "./turn-trackers";
-import type { FactionId, GameState, Player } from "./types";
+import type { FactionId, GameState, PendingAction, Player, ResourceId } from "./types";
 
 const influenceVictoryPointThreshold = 2;
+const standardTrackRewardThreshold = 4;
+const commanderTeamResourceThreshold = 1;
+const commanderTeamSecondResourceThreshold = 3;
 const gurneyAlwaysSmilingBaseThreshold = 6;
 const gurneyAlwaysSmilingSixPlayerThreshold = 10;
 const margotLoyaltyFaction: FactionId = "bene";
@@ -128,8 +140,241 @@ function reachesLadyMargotLoyalty(previous: Player, next: Player) {
   );
 }
 
-export function resolveLeaderInfluenceThresholdRewards(state: GameState, previousPlayers: Player[]): GameState {
-  const thresholdRewardState = previousPlayers.reduce((nextState, previous) => {
+function reachesInfluenceThreshold(previous: Player, next: Player, faction: FactionId, threshold: number) {
+  return previous.influence[faction] < threshold && next.influence[faction] >= threshold;
+}
+
+function addLogAfterCurrentAction(state: GameState, logEntry: string): GameState {
+  return {
+    ...state,
+    log: state.log.length > 0
+      ? [state.log[0], logEntry, ...state.log.slice(1)]
+      : [logEntry],
+  };
+}
+
+function drawIntrigueCardsAfterCurrentActionLog(
+  state: GameState,
+  ownerId: string,
+  count: number,
+  source: string,
+): GameState {
+  const previousLog = state.log;
+  const drawnState = drawIntrigueCards(state, ownerId, count, source);
+  const addedLogCount = drawnState.log.length - previousLog.length;
+  if (previousLog.length === 0 || addedLogCount <= 0) return drawnState;
+  return {
+    ...drawnState,
+    log: [
+      previousLog[0],
+      ...drawnState.log.slice(0, addedLogCount),
+      ...previousLog.slice(1),
+    ],
+  };
+}
+
+function gainPlayerResource(player: Player, resource: ResourceId, amount: number): Player {
+  return {
+    ...player,
+    resources: {
+      ...player.resources,
+      [resource]: player.resources[resource] + amount,
+    },
+  };
+}
+
+function resourceLabel(resource: ResourceId) {
+  return resource === "solari" ? "Solari" : resource;
+}
+
+function resolveGreatHousesInfluenceReward(state: GameState, owner: Player): GameState {
+  const recruitCount = Math.min(playerTroopSupply(owner), 2);
+  if (recruitCount <= 0) return state;
+  return addLogAfterCurrentAction({
+    ...state,
+    players: state.players.map((player) =>
+      player.id === owner.id ? { ...player, garrison: player.garrison + recruitCount } : player
+    ),
+  }, `${owner.leader} reaches 4 ${factionLabels.greatHouses} Influence and recruits ${recruitCount} troop${recruitCount === 1 ? "" : "s"}.`);
+}
+
+function resolveSpacingInfluenceReward(state: GameState, owner: Player): GameState {
+  return addLogAfterCurrentAction({
+    ...state,
+    players: state.players.map((player) =>
+      player.id === owner.id ? gainPlayerResource(player, "solari", 3) : player
+    ),
+  }, `${owner.leader} reaches 4 ${factionLabels.spacing} Influence and gains 3 Solari.`);
+}
+
+function resolveBeneInfluenceReward(state: GameState, owner: Player): GameState {
+  return drawIntrigueCardsAfterCurrentActionLog(
+    state,
+    owner.id,
+    1,
+    `4 ${factionLabels.bene} Influence`,
+  );
+}
+
+function fringeWorldsSpyPending(state: GameState, owner: Player): PendingAction | undefined {
+  const pending: PendingAction = {
+    kind: "spy",
+    ownerId: owner.id,
+    remaining: 1,
+    source: `4 ${factionLabels.fringeWorlds} Influence`,
+    recallForSupply: true,
+    mustPlaceSpy: true,
+  };
+  return placeableSpySpaces(state, pending).length > 0 ||
+    recallableSpySupplySpaces(state, pending).length > 0
+    ? pending
+    : undefined;
+}
+
+function resolveFringeWorldsInfluenceReward(state: GameState, owner: Player): GameState {
+  const spyPending = fringeWorldsSpyPending(state, owner);
+  if (!spyPending) {
+    return addLogAfterCurrentAction(
+      state,
+      `${owner.leader} reaches 4 ${factionLabels.fringeWorlds} Influence but has no legal spy placement.`,
+    );
+  }
+  return addLogAfterCurrentAction({
+    ...state,
+    ...queuePendingActions(state, [spyPending]),
+  }, `${owner.leader} reaches 4 ${factionLabels.fringeWorlds} Influence and must place 1 spy.`);
+}
+
+function resolveStandardTrackInfluenceReward(
+  state: GameState,
+  previous: Player,
+  current: Player,
+  faction: FactionId,
+): GameState {
+  if (!reachesInfluenceThreshold(previous, current, faction, standardTrackRewardThreshold)) return state;
+  switch (faction) {
+    case "greatHouses":
+      return resolveGreatHousesInfluenceReward(state, current);
+    case "spacing":
+      return resolveSpacingInfluenceReward(state, current);
+    case "bene":
+      return resolveBeneInfluenceReward(state, current);
+    case "fringeWorlds":
+      return resolveFringeWorldsInfluenceReward(state, current);
+    default:
+      return state;
+  }
+}
+
+function resolveStandardTrackInfluenceRewards(
+  state: GameState,
+  previousPlayers: Player[],
+  factions: FactionId[],
+): GameState {
+  return previousPlayers.reduce((nextState, previous) => {
+    const current = nextState.players.find((player) => player.id === previous.id);
+    if (!current) return nextState;
+    return factions.reduce(
+      (rewardState, faction) => resolveStandardTrackInfluenceReward(rewardState, previous, current, faction),
+      nextState,
+    );
+  }, state);
+}
+
+function resolveCommanderTeamResourceReward(
+  state: GameState,
+  commander: Player,
+  faction: FactionId,
+  threshold: number,
+  resource: ResourceId,
+): GameState {
+  const teamMemberIds = new Set(state.players
+    .filter((player) => player.team === commander.team)
+    .map((player) => player.id));
+  let rewardedState: GameState = {
+    ...state,
+    players: state.players.map((player) =>
+      teamMemberIds.has(player.id) ? gainPlayerResource(player, resource, 1) : player
+    ),
+  };
+  if (resource === "spice") {
+    for (const playerId of teamMemberIds) {
+      rewardedState = recordTurnSpiceGain(rewardedState, playerId, 1);
+    }
+  }
+  return addLogAfterCurrentAction(
+    rewardedState,
+    `${commander.leader} reaches ${threshold} ${factionLabels[faction]} Influence; each player on their team gains 1 ${resourceLabel(resource)}.`,
+  );
+}
+
+function resolveCommanderTeamSpyReward(
+  state: GameState,
+  commander: Player,
+  faction: FactionId,
+  threshold: number,
+): GameState {
+  return addLogAfterCurrentAction({
+    ...state,
+    players: state.players.map((player) =>
+      player.team === commander.team ? { ...player, spies: player.spies + 1 } : player
+    ),
+  }, `${commander.leader} reaches ${threshold} ${factionLabels[faction]} Influence; each player on their team gains 1 spy.`);
+}
+
+function resolveCommanderInfluenceRewards(state: GameState, previousPlayers: Player[]): GameState {
+  return previousPlayers.reduce((nextState, previous) => {
+    const current = nextState.players.find((player) => player.id === previous.id);
+    if (!current || current.role !== "Commander") return nextState;
+    if (current.team === "muaddib") {
+      let rewardState = nextState;
+      if (reachesInfluenceThreshold(previous, current, "fremen", commanderTeamResourceThreshold)) {
+        rewardState = resolveCommanderTeamResourceReward(
+          rewardState,
+          current,
+          "fremen",
+          commanderTeamResourceThreshold,
+          "spice",
+        );
+      }
+      if (reachesInfluenceThreshold(previous, current, "fremen", commanderTeamSecondResourceThreshold)) {
+        rewardState = resolveCommanderTeamResourceReward(
+          rewardState,
+          current,
+          "fremen",
+          commanderTeamSecondResourceThreshold,
+          "water",
+        );
+      }
+      return rewardState;
+    }
+    if (current.team === "shaddam") {
+      let rewardState = nextState;
+      if (reachesInfluenceThreshold(previous, current, "emperor", commanderTeamResourceThreshold)) {
+        rewardState = resolveCommanderTeamResourceReward(
+          rewardState,
+          current,
+          "emperor",
+          commanderTeamResourceThreshold,
+          "solari",
+        );
+      }
+      if (reachesInfluenceThreshold(previous, current, "emperor", commanderTeamSecondResourceThreshold)) {
+        rewardState = resolveCommanderTeamSpyReward(
+          rewardState,
+          current,
+          "emperor",
+          commanderTeamSecondResourceThreshold,
+        );
+      }
+      return rewardState;
+    }
+    return nextState;
+  }, state);
+}
+
+export function resolveLeaderSpecificInfluenceThresholdRewardEffects(state: GameState, previousPlayers: Player[]): GameState {
+  return previousPlayers.reduce((nextState, previous) => {
     const current = nextState.players.find((player) => player.id === previous.id);
     if (!current) return nextState;
     if (reachesPrincessIrulanBirthright(previous, current)) {
@@ -167,7 +412,43 @@ export function resolveLeaderInfluenceThresholdRewards(state: GameState, previou
     };
     return recordTurnSpiceGain(rewardedState, current.id, margotLoyaltySpice);
   }, state);
-  return resolveAllianceOwnersForInfluenceChanges(thresholdRewardState, previousPlayers);
+}
+
+export function resolveStandardAndCommanderInfluenceThresholdRewardEffects(
+  state: GameState,
+  previousPlayers: Player[],
+): GameState {
+  const standardRewardState = resolveStandardTrackInfluenceRewards(
+    state,
+    previousPlayers,
+    ["greatHouses", "spacing", "bene"],
+  );
+  const commanderRewardState = resolveCommanderInfluenceRewards(standardRewardState, previousPlayers);
+  return resolveStandardTrackInfluenceRewards(commanderRewardState, previousPlayers, ["fringeWorlds"]);
+}
+
+export function resolveLeaderInfluenceThresholdRewardEffects(state: GameState, previousPlayers: Player[]): GameState {
+  return resolveStandardAndCommanderInfluenceThresholdRewardEffects(
+    resolveLeaderSpecificInfluenceThresholdRewardEffects(state, previousPlayers),
+    previousPlayers,
+  );
+}
+
+export function resolveLeaderInfluenceThresholdRewards(state: GameState, previousPlayers: Player[]): GameState {
+  return resolveAllianceOwnersForInfluenceChanges(
+    resolveLeaderInfluenceThresholdRewardEffects(state, previousPlayers),
+    previousPlayers,
+  );
+}
+
+export function resolveStandardAndCommanderInfluenceThresholdRewards(
+  state: GameState,
+  previousPlayers: Player[],
+): GameState {
+  return resolveAllianceOwnersForInfluenceChanges(
+    resolveStandardAndCommanderInfluenceThresholdRewardEffects(state, previousPlayers),
+    previousPlayers,
+  );
 }
 
 export function adjustInfluenceAndResolveThresholdRewards(

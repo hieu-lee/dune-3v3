@@ -2,6 +2,9 @@ import {
   applyBoardEffect,
 } from "./agent-effects";
 import {
+  resolveLeaderInfluenceThresholdRewards,
+} from "./leader-rewards";
+import {
   boardSpaceRewardApplies,
 } from "./board-rules";
 import { resolveSecretsIntriguePressure } from "./board-location-rules";
@@ -17,6 +20,7 @@ import {
 } from "./leader-constants";
 import {
   advancePendingAction,
+  pendingActionsFor,
   prependPendingAction,
 } from "./pending-actions";
 import {
@@ -109,16 +113,51 @@ export function resolveRepeatBoardSpaceChoice(
   const { recruitedTroops, source: repeatedOwner } = applyBoardEffect(paidOwner, paidOwner, space);
   const players = state.players.map((player) => (player.id === owner.id ? repeatedOwner : player));
   const resourceLabel = resourceLabels[pending.resource];
-  const baseState = recordRepeatUse({
+  const advancedPending = advancePendingAction(state);
+  const repeatedState = resolveLeaderInfluenceThresholdRewards({
     ...state,
     players,
-    ...advancePendingAction(state),
+    ...advancedPending,
+    pendingAction: undefined,
+    pendingQueue: [],
     log: [`${owner.leader} spends ${pending.cost} ${resourceLabel} for ${pending.source} to repeat ${space.name}.`, ...state.log],
-  }, pending);
+  }, state.players);
+  const olderPendingActions = [
+    advancedPending.pendingAction,
+    ...advancedPending.pendingQueue,
+  ].filter((action): action is PendingAction => Boolean(action));
   const repeatedPending = pendingActionForSpace(space, repeatedOwner, repeatedOwner, players, 0, false, recruitedTroops);
   const repeatedTrashPending = pendingActionForBoardTrash(space, repeatedOwner);
+  const [firstOlderPending, ...remainingOlderPendingActions] = olderPendingActions;
+  const mergedRepeatAndOlderPending =
+    repeatedPending && firstOlderPending
+      ? pendingActionsFor(repeatedPending, firstOlderPending, repeatedOwner.spies)
+      : undefined;
+  const repeatedSpacePending =
+    repeatedPending?.kind === "spy" &&
+    firstOlderPending?.kind === "spy" &&
+    mergedRepeatAndOlderPending?.length === 1
+      ? mergedRepeatAndOlderPending[0]
+      : repeatedPending;
+  const queuedOlderPendingActions =
+    repeatedSpacePending !== repeatedPending
+      ? remainingOlderPendingActions
+      : olderPendingActions;
+  const pendingWithOlderActions = repeatedState.pendingAction
+    ? {
+        pendingAction: repeatedState.pendingAction,
+        pendingQueue: [...repeatedState.pendingQueue, ...queuedOlderPendingActions],
+      }
+    : {
+        pendingAction: queuedOlderPendingActions[0],
+        pendingQueue: [...repeatedState.pendingQueue, ...queuedOlderPendingActions.slice(1)],
+      };
+  const baseState = recordRepeatUse({
+    ...repeatedState,
+    ...pendingWithOlderActions,
+  }, pending);
   const withPending = prependPendingAction(
-    prependPendingAction(baseState, repeatedPending),
+    prependPendingAction(baseState, repeatedSpacePending),
     repeatedTrashPending,
   );
   const intrigueGain = boardSpaceRewardApplies(space, paidOwner) ? space.gain?.intrigue ?? 0 : 0;

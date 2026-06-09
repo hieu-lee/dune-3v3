@@ -461,6 +461,46 @@ export function verifyLeaderSpiesAndReverendRepeat({ cards, data, game, players,
     "trash-card",
     "The original Controversial Technology trash should remain queued",
   );
+  const repeatedControversialWithFringeReward = state.resolveRepeatBoardSpaceChoice(
+    {
+      ...oneTrashReverendRepeatGame,
+      intrigueDeck: [intrigueCard],
+      pendingAction: controversialRepeatPending,
+      pendingQueue: [originalControversialTrashPending],
+      players: oneTrashReverendRepeatGame.players.map((player) =>
+        player.id === ladyJessica.id
+          ? {
+              ...reverendRepeatOwner,
+              influence: { ...reverendRepeatOwner.influence, fringeWorlds: 3 },
+              playArea: [],
+              spies: 1,
+            }
+          : player
+      ),
+    },
+    controversialRepeatPending,
+    "repeat",
+  );
+  assert.equal(
+    repeatedControversialWithFringeReward.pendingAction?.kind,
+    "trash-card",
+    "Repeated Controversial Technology trash should remain first when the repeat reaches Fringe Worlds 4",
+  );
+  assert.equal(
+    repeatedControversialWithFringeReward.pendingQueue[0]?.kind,
+    "spy",
+    "Fringe Worlds 4 spy placement from a repeated space should queue before older pending actions",
+  );
+  assert.equal(
+    repeatedControversialWithFringeReward.pendingQueue[0]?.source,
+    "4 Fringe Worlds Influence",
+    "The queued spy should be the repeated-space Fringe Worlds threshold reward",
+  );
+  assert.equal(
+    repeatedControversialWithFringeReward.pendingQueue[1]?.kind,
+    "trash-card",
+    "Older queued actions should remain behind the repeated-space threshold reward",
+  );
   const repeatedControversialAfterOnlyTrash = state.trashPlayerCard(
     repeatedControversialWithOriginalTrash,
     repeatedControversialWithOriginalTrash.pendingAction,

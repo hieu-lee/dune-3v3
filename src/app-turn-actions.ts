@@ -41,6 +41,8 @@ import {
   recordTurnSpiceGainAndCompleteHarvestContracts,
   recordTurnSpiceGain,
   resolveSecretsIntriguePressure,
+  resolveAllianceOwnersForInfluenceChanges,
+  resolveLeaderInfluenceThresholdRewardEffects,
   resolveLeaderInfluenceThresholdRewards,
   resolveLocationControlIncome,
   resolveStabanSmuggleSpice,
@@ -451,6 +453,32 @@ export function placeAgentAction(
   effectedTarget = players.find((candidate) => candidate.id === effectedTarget.id) ?? effectedTarget;
   deploymentOwner = player.role === "Commander" ? effectedTarget : source;
   let postEffectState: GameState = { ...controlledPostEffectState, players, conflictDeploymentBlock };
+  const agentPlacementLog = player.role === "Commander"
+    ? `${player.leader} activates ${target.leader} at ${selectedSpace.name} with ${selectedCard.name}.`
+    : `${player.leader} sends an Agent to ${selectedSpace.name} with ${selectedCard.name}.`;
+  const preThresholdDeploymentOwner = deploymentOwner;
+  const preContractThresholdState = resolveLeaderInfluenceThresholdRewardEffects({
+    ...postEffectState,
+    pendingAction: undefined,
+    pendingQueue: [],
+    log: [],
+  }, placementState.players);
+  const preContractThresholdLogs = preContractThresholdState.log;
+  const preContractThresholdPendingActions = [
+    preContractThresholdState.pendingAction,
+    ...preContractThresholdState.pendingQueue,
+  ].filter((action): action is PendingAction => Boolean(action));
+  postEffectState = {
+    ...preContractThresholdState,
+    pendingAction: postEffectState.pendingAction,
+    pendingQueue: postEffectState.pendingQueue,
+    log: postEffectState.log,
+  };
+  players = postEffectState.players;
+  source = players.find((candidate) => candidate.id === source.id) ?? source;
+  effectedTarget = players.find((candidate) => candidate.id === effectedTarget.id) ?? effectedTarget;
+  deploymentOwner = player.role === "Commander" ? effectedTarget : source;
+  const thresholdRecruitedTroops = Math.max(0, deploymentOwner.garrison - preThresholdDeploymentOwner.garrison);
   const contractCompletion = completeChoamContractsForBoardSpace(postEffectState, source.id, selectedSpace.id);
   postEffectState = contractCompletion.state;
   players = postEffectState.players;
@@ -472,7 +500,10 @@ export function placeAgentAction(
   const totalRecalledAgents =
     (cardAgentEffect.recalledAgents ?? 0) + contractCompletion.recalledAgents + harvestCompletion.recalledAgents;
   const extraRecruitedTroops =
-    (cardAgentEffect.recruitedTroops ?? 0) + contractCompletion.recruitedTroops + harvestCompletion.recruitedTroops;
+    (cardAgentEffect.recruitedTroops ?? 0) +
+    thresholdRecruitedTroops +
+    contractCompletion.recruitedTroops +
+    harvestCompletion.recruitedTroops;
   const futureSourceIntrigues = futureSourceIntriguesBeforePendingChoice(
     postEffectState,
     selectedSpace,
@@ -553,6 +584,7 @@ export function placeAgentAction(
         ...remainingLeaderPlacementPendings,
         ...[boardTrashPending].filter((action): action is PendingAction => Boolean(action)),
         ...[spyVisitCardDrawPending].filter((action): action is PendingAction => Boolean(action)),
+        ...preContractThresholdPendingActions,
       ]
     : [
         ...boardChoicePendings,
@@ -561,6 +593,7 @@ export function placeAgentAction(
         ...remainingLeaderPlacementPendings,
         ...[boardTrashPending].filter((action): action is PendingAction => Boolean(action)),
         ...[spyVisitCardDrawPending].filter((action): action is PendingAction => Boolean(action)),
+        ...preContractThresholdPendingActions,
       ];
   if (sietchTabrPending) {
     const sietchAction = {
@@ -587,9 +620,6 @@ export function placeAgentAction(
     stateAfterTopDeckReservations,
     topDeckReservations.pendingActions,
   );
-  const agentPlacementLog = player.role === "Commander"
-    ? `${player.leader} activates ${target.leader} at ${selectedSpace.name} with ${selectedCard.name}.`
-    : `${player.leader} sends an Agent to ${selectedSpace.name} with ${selectedCard.name}.`;
   const nextState: GameState = {
     ...stateAfterTopDeckReservations,
     agentTurnComplete: true,
@@ -638,14 +668,14 @@ export function placeAgentAction(
       cardAgentEffect.log,
       spyEntry.log,
       agentPlacementLog,
+      ...preContractThresholdLogs,
       ...postEffectState.log,
     ].filter((entry): entry is string => Boolean(entry)),
   };
   const intrigueGain = boardSpaceIntrigueGainFor(selectedSpace, player);
-  const influenceThresholdState = resolveLeaderInfluenceThresholdRewards(nextState, placementState.players);
   const boardIntrigueState = intrigueGain > 0
-    ? drawIntrigueCards(influenceThresholdState, source.id, intrigueGain, selectedSpace.name)
-    : influenceThresholdState;
+    ? drawIntrigueCards(nextState, source.id, intrigueGain, selectedSpace.name)
+    : nextState;
   const cardSourceIntrigueState = cardAgentEffect.sourceIntriguesToDraw
     ? drawIntrigueCards(boardIntrigueState, source.id, cardAgentEffect.sourceIntriguesToDraw, selectedCard.name)
     : boardIntrigueState;
@@ -660,7 +690,8 @@ export function placeAgentAction(
   const makerTrackedState = selectedSpace.maker
     ? recordRoundMakerSpaceVisit(resolvedState, player.id)
     : resolvedState;
-  return completeChoamContractsForCurrentTurnHarvests(makerTrackedState, agentPlacementLog).state;
+  const allianceTrackedState = resolveAllianceOwnersForInfluenceChanges(makerTrackedState, placementState.players);
+  return completeChoamContractsForCurrentTurnHarvests(allianceTrackedState, agentPlacementLog).state;
 }
 
 type RevealTurnPlan = {

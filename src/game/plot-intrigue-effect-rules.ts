@@ -15,7 +15,9 @@ import { conflictProtectedByShieldWall } from "./critical-locations";
 import { conflictDeploymentBlockedFor } from "./conflict-rules";
 import { drawIntrigueCards } from "./intrigue-deck";
 import {
-  adjustInfluenceAndResolveThresholdRewards,
+  adjustInfluence,
+  resolveLeaderSpecificInfluenceThresholdRewardEffects,
+  resolveStandardAndCommanderInfluenceThresholdRewards,
 } from "./leader-rewards";
 import { acquirableCardsForPending, activatedAllyEffectOwner } from "./market-rules";
 import { pendingActionForSpyPlacements } from "./spy-effect-pending-rules";
@@ -274,12 +276,20 @@ function applyInfluenceAdjustments(
   activatedAllyId: string | undefined,
   adjustments: InfluenceAdjustmentEffect[],
 ) {
-  return adjustments.reduce((next, adjustment) => {
+  const thresholdPreviousPlayers = state.players;
+  const adjustedState = adjustments.reduce((next, adjustment) => {
     const ownerId = adjustment.selector === "activated-ally" ? activatedAllyId : sourceId;
-    return ownerId
-      ? adjustInfluenceAndResolveThresholdRewards(next, ownerId, adjustment.faction, adjustment.amount)
-      : next;
+    if (!ownerId) return next;
+    const previousPlayers = next.players;
+    const influenceState = {
+      ...next,
+      players: next.players.map((player) =>
+        player.id === ownerId ? adjustInfluence(player, adjustment.faction, adjustment.amount) : player
+      ),
+    };
+    return resolveLeaderSpecificInfluenceThresholdRewardEffects(influenceState, previousPlayers);
   }, state);
+  return resolveStandardAndCommanderInfluenceThresholdRewards(adjustedState, thresholdPreviousPlayers);
 }
 
 export function playTypedPlotIntrigue(

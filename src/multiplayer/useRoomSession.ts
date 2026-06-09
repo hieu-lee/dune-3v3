@@ -400,6 +400,29 @@ export function useRoomSession() {
     return true;
   }, [identity?.token, roomId]);
 
+  const startRoom = useCallback(async () => {
+    if (!roomId || !identity?.token) return false;
+    const mutationGeneration = startRoomMutation();
+    const mutationRoomId = roomId;
+    setError(null);
+    const response = await fetch(`/api/rooms/${roomId}/start`, {
+      method: "POST",
+      headers: { "x-room-token": identity.token },
+    });
+    const body = await response.json().catch(() => undefined) as { error?: string; snapshot?: RoomSnapshot } | undefined;
+    if (!mutationIsCurrent(mutationGeneration, mutationRoomId)) return false;
+    if (!response.ok) {
+      if (body?.snapshot) storeSnapshot(body.snapshot);
+      setStatus("error");
+      setError(body?.error ?? "Unable to start room");
+      return false;
+    }
+    if (body?.snapshot) storeSnapshot(body.snapshot);
+    setStatus("ready");
+    setError(null);
+    return true;
+  }, [identity?.token, roomId]);
+
   const sendAction = useCallback(async (action: RoomActionCommand) => {
     if (
       !roomId ||
@@ -463,7 +486,8 @@ export function useRoomSession() {
     roomId,
     sendAction,
     snapshot,
+    startRoom,
     status,
     syncMode,
-  }), [claimSeat, createRoom, error, fillAiOpponents, joinRoom, leaveRoom, releaseSeat, roomId, sendAction, snapshot, status, syncMode]);
+  }), [claimSeat, createRoom, error, fillAiOpponents, joinRoom, leaveRoom, releaseSeat, roomId, sendAction, snapshot, startRoom, status, syncMode]);
 }

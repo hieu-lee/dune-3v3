@@ -27,7 +27,11 @@ export function pendingActionForShaddamPersonalBoard(state: GameState): PendingA
   return { kind: "throne-row", ownerId: shaddam.id, source: shaddamPersonalBoardThroneSource };
 }
 
-export function initialGame(): GameState {
+type InitialGameOptions = {
+  includeSetupPending?: boolean;
+};
+
+export function initialGame({ includeSetupPending = true }: InitialGameOptions = {}): GameState {
   const market = shuffleCards(cloneCards(imperiumDeck));
   const [conflict, ...conflictDeck] = buildSixPlayerConflictDeck();
   if (!conflict) throw new Error("Missing Uprising conflict cards for six-player setup.");
@@ -89,7 +93,7 @@ export function initialGame(): GameState {
       `Only Allies draw Objectives; ${players[firstSeat].leader} has the First Player marker.`,
     ],
   };
-  const setupPending = pendingActionForShaddamPersonalBoard(game);
+  const setupPending = includeSetupPending ? pendingActionForShaddamPersonalBoard(game) : undefined;
   return setupPending
     ? {
         ...game,

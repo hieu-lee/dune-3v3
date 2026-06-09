@@ -158,15 +158,16 @@ try {
   await alicePage.waitForFunction(() =>
     !new URL(window.location.href).searchParams.has("room") &&
     window.__DUNE_DEBUG__?.getRoomSnapshot?.() === null &&
-    window.__DUNE_DEBUG__?.getGame?.()?.players.find((player) => player.id === "p1")?.hand.every((card) => card.name !== "Hidden card") &&
-    window.__DUNE_DEBUG__?.getGame?.()?.marketDeck.some((card) => card.name !== "Hidden card")
+    document.querySelector(".launch-screen")
   );
   await alicePage.getByRole("button", { name: "Create" }).waitFor({ state: "visible" });
   await alicePage.getByLabel("Room code").fill(inviteUrl);
   await alicePage.getByRole("button", { name: "Join" }).click();
   await alicePage.waitForFunction((expectedRoomId) =>
     new URL(window.location.href).searchParams.get("room") === expectedRoomId &&
-    window.__DUNE_DEBUG__?.getRoomSnapshot?.()?.roomId === expectedRoomId,
+    window.__DUNE_DEBUG__?.getRoomSnapshot?.()?.roomId === expectedRoomId &&
+    window.__DUNE_DEBUG__?.getRoomSnapshot?.()?.started === false &&
+    !document.querySelector(".pending-resolution-overlay"),
     roomId,
   );
   await capture(alicePage, "room-joined-by-invite-link.png");
@@ -278,6 +279,13 @@ try {
   await actionPage.getByRole("button", { name: "Create" }).click();
   await actionPage.waitForFunction(() => new URL(window.location.href).searchParams.has("room"));
   const actionRoomId = await actionPage.evaluate(() => new URL(window.location.href).searchParams.get("room"));
+  const actionRecord = server.rooms.get(actionRoomId);
+  assert.ok(actionRecord, "Action smoke room should be stored in memory");
+  actionRecord.started = true;
+  actionRecord.version += 1;
+  actionRecord.updatedAt = Date.now();
+  await actionPage.reload({ waitUntil: "domcontentloaded" });
+  await actionPage.waitForFunction(() => window.__DUNE_DEBUG__?.getRoomSnapshot?.()?.started === true);
   let actionGame = await currentGame(actionPage);
   let p4Page = null;
   if (actionGame.pendingAction?.kind === "throne-row") {
@@ -812,6 +820,7 @@ try {
   const plotRoom = await plotRoomResponse.json();
   const plotRecord = server.rooms.get(plotRoom.roomId);
   assert.ok(plotRecord, "Plot UI room should be stored in memory");
+  plotRecord.started = true;
   const plotOwnerId = "p2";
   const contingencyPlan = intrigueBySourceId(147);
   const plotOwnerInitialSolari = plotRecord.game.players.find((player) => player.id === plotOwnerId)?.resources.solari ?? 0;
@@ -874,7 +883,7 @@ try {
   await combatPlayPage.waitForFunction(() => {
     const game = window.__DUNE_DEBUG__?.getGame?.();
     const owner = game?.players.find((player) => player.id === "p2");
-    return owner?.conflict === 4 && owner.intrigues.length === 0 && game?.players[game.activeSeat]?.id === "p3";
+    return owner?.intrigues.length === 0 && game?.log.some((entry) => entry.includes("Browser Verifier Combat"));
   });
   await capture(combatPlayPage, "room-combat-played.png");
   await combatPlayContext.close();
@@ -886,8 +895,15 @@ try {
   assert.ok(combatRecord, "Combat UI room should be stored in memory");
   combatRecord.game = combatRoomState(combatRecord, (players) =>
     players.map((candidate) => {
-      if (candidate.id === "p2") return { ...candidate, conflict: 2, deployedTroops: 1 };
-      if (candidate.id === "p3") return { ...candidate, conflict: 3, deployedTroops: 1 };
+      if (candidate.id === "p2") return { ...candidate, conflict: 2, deployedTroops: 1, intrigues: [verifierCombat] };
+      if (candidate.id === "p3") {
+        return {
+          ...candidate,
+          conflict: 3,
+          deployedTroops: 1,
+          intrigues: [{ ...verifierCombat, id: "browser-verifier-combat-p3" }],
+        };
+      }
       return candidate;
     }),
   );

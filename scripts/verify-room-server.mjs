@@ -20,6 +20,7 @@ const {
   canPay,
   effectiveCost,
   iconCanReach,
+  pendingActionForShaddamPersonalBoard,
   spyObservationPostIdForSpace,
   spyPostCount,
   startCombatPhase,
@@ -197,9 +198,10 @@ async function assertAiFillOpponents() {
     for (let attempt = 0; attempt < 30; attempt += 1) {
       created = await aiJsonFetch("/api/rooms", { method: "POST" });
       assert.equal(created.response.status, 201, "AI fill test room creation should succeed");
-      if (created.body.game.pendingAction?.kind === "throne-row") break;
+      if (created.body.game.imperiumRow.some(canMoveCardToThroneRow)) break;
     }
-    assert.equal(created.body.game.pendingAction?.kind, "throne-row", "AI fill test should start with Shaddam setup pending");
+    assert.equal(created.body.started, false, "AI fill test room should not start immediately");
+    assert.equal(created.body.game.pendingAction, undefined, "AI fill test room should not queue setup before start");
     const roomId = created.body.roomId;
     const p1Claim = await aiJsonFetch(`/api/rooms/${roomId}/seats/p1/claim`, {
       method: "POST",
@@ -242,6 +244,17 @@ async function assertAiFillOpponents() {
         `${playerId} should remain a human seat`,
       );
     }
+    const started = await aiJsonFetch(`/api/rooms/${roomId}/start`, {
+      method: "POST",
+      headers: { "x-room-token": p1Claim.body.token },
+    });
+    assert.equal(started.response.status, 200, "AI fill room should start once all seats are claimed");
+    assert.equal(started.body.snapshot.started, true, "Started AI fill room should expose started state");
+    assert.equal(
+      started.body.snapshot.game.pendingAction?.kind,
+      "throne-row",
+      "Starting the AI fill room should queue Shaddam setup",
+    );
     assert.equal(
       JSON.stringify(fill.body.snapshot).includes(p1Claim.body.token),
       false,
@@ -332,6 +345,7 @@ async function assertAiRoundDiscussionUsesSeatSnapshots() {
       previousSummaries: {},
       lastDiscussedCompletedRound: 0,
     };
+    room.started = true;
     room.game = {
       ...room.game,
       phase: "playing",
@@ -459,6 +473,8 @@ function assertVisibleObjectives(snapshot, playerId) {
 }
 
 async function roomAction(roomId, token, baseVersion, action) {
+  const record = server.rooms.get(roomId);
+  if (record) record.started = true;
   return await jsonFetch(`/api/rooms/${roomId}/actions`, {
     method: "POST",
     headers: {
@@ -473,7 +489,24 @@ async function createRoomWithThronePending() {
   for (let attempt = 0; attempt < 20; attempt += 1) {
     const created = await jsonFetch("/api/rooms", { method: "POST" });
     assert.equal(created.response.status, 201, "Action test room creation should succeed");
-    if (created.body.game.pendingAction?.kind === "throne-row") return created.body;
+    const record = server.rooms.get(created.body.roomId);
+    assert.ok(record, "Action test room should be stored");
+    const setupPending = pendingActionForShaddamPersonalBoard(record.game);
+    if (!setupPending) continue;
+    record.started = true;
+    record.version += 1;
+    record.updatedAt = Date.now();
+    record.game = {
+      ...record.game,
+      pendingAction: setupPending,
+      log: [
+        "Resolve Shaddam's starting Throne Row choice from the Emperor personal board.",
+        ...record.game.log,
+      ],
+    };
+    const snapshot = await jsonFetch(`/api/rooms/${created.body.roomId}`);
+    assert.equal(snapshot.response.status, 200, "Action test room snapshot should reload after setup");
+    return snapshot.body;
   }
   assert.fail("Expected at least one created room to need Shaddam's setup Throne Row choice");
 }
@@ -569,6 +602,9 @@ try {
   assert.equal(created.response.status, 201, "Room creation should succeed");
   const roomId = created.body.roomId;
   assert.match(roomId, /^[A-F0-9]{8}$/, "Room id should be a short share code");
+  assert.equal(created.body.started, false, "Created rooms should wait for an explicit start");
+  assert.equal(created.body.game.pendingAction, undefined, "Created rooms should not queue setup pending actions before start");
+  assert.equal(created.body.game.pendingQueue.length, 0, "Created rooms should not queue setup choices before start");
   assert.equal(created.body.seats.length, 6, "Room snapshot should expose all six seats");
   assert.equal(created.body.viewerPlayerId, undefined, "Unclaimed room snapshot should not have a viewer seat");
   assertHiddenHand(created.body, "p1");
@@ -594,6 +630,24 @@ try {
   assertHiddenHand(p1Claim.body.snapshot, "p2");
   assertHiddenObjectives(p1Claim.body.snapshot, "p2");
   assertHiddenSharedDecks(p1Claim.body.snapshot);
+  assert.equal(p1Claim.body.snapshot.started, false, "Claiming a seat should not start the room");
+  assert.equal(p1Claim.body.snapshot.game.pendingAction, undefined, "Claiming a seat should not queue setup choices");
+  const actionBeforeStart = await jsonFetch(`/api/rooms/${roomId}/actions`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-room-token": p1Claim.body.token,
+    },
+    body: JSON.stringify({ baseVersion: p1Claim.body.snapshot.version, action: { kind: "end-agent" } }),
+  });
+  assert.equal(actionBeforeStart.response.status, 409, "Unstarted rooms should reject game actions");
+  assert.match(actionBeforeStart.body.error, /Start the room/, "Unstarted action rejection should explain the start requirement");
+  assert.equal(actionBeforeStart.body.snapshot.started, false, "Rejected unstarted action should return an unstarted snapshot");
+  const earlyStart = await jsonFetch(`/api/rooms/${roomId}/start`, {
+    method: "POST",
+    headers: { "x-room-token": p1Claim.body.token },
+  });
+  assert.equal(earlyStart.response.status, 409, "Room start should require every seat to be claimed");
   const rawStorageResponse = await fetch(`${baseUrl}/artifacts/qa/verify-room-server/rooms.json`);
   const rawStorageBody = await rawStorageResponse.text();
   assert.equal(rawStorageResponse.status, 404, "Room storage artifacts should not be web-accessible");

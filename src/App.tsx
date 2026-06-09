@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, MonitorPlay, PlugZap } from "lucide-react";
 import { ActiveHandPanel } from "./components/ActiveHandPanel";
 import { BoardPanel, type BoardSpySlotChoices } from "./components/BoardPanel";
 import { CommandBar } from "./components/CommandBar";
@@ -96,7 +97,8 @@ const browserDebugEnabled = Boolean(appEnv?.DEV || appEnv?.VITE_DUNE_DEBUG === "
 
 export default function App() {
   const roomSession = useRoomSession();
-  const [game, setGame] = useState<GameState>(() => initialGame());
+  const [game, setGame] = useState<GameState>(() => initialGame({ includeSetupPending: false }));
+  const [localStarted, setLocalStarted] = useState(false);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [selectedSpaceId, setSelectedSpaceId] = useState<string | null>(null);
   const [selectedSpyEntrySpaceId, setSelectedSpyEntrySpaceId] = useState<string | null>(null);
@@ -104,8 +106,18 @@ export default function App() {
   const [commanderTargets, setCommanderTargets] = useState<Record<string, string>>({});
   const [changeAllegiancesSelections, setChangeAllegiancesSelections] = useState<Record<string, ChangeAllegiancesSelection>>({});
   const leaderOpenerRef = useRef<HTMLButtonElement | null>(null);
+  const gameRef = useRef<GameState | null>(null);
   const localGameRef = useRef<GameState | null>(null);
+  const localStartedRef = useRef(false);
   const wasInRoomRef = useRef(false);
+
+  useEffect(() => {
+    gameRef.current = game;
+  }, [game]);
+
+  useEffect(() => {
+    localStartedRef.current = localStarted;
+  }, [localStarted]);
 
   useEffect(() => {
     if (!browserDebugEnabled) {
@@ -146,7 +158,8 @@ export default function App() {
     if (!roomSession.snapshot) {
       if (wasInRoomRef.current && !roomSession.inRoom) {
         wasInRoomRef.current = false;
-        setGame(localGameRef.current ?? initialGame());
+        setGame(localGameRef.current ?? initialGame({ includeSetupPending: false }));
+        setLocalStarted(Boolean(localGameRef.current));
         setSelectedCardId(null);
         setSelectedSpaceId(null);
         setSelectedSpyEntrySpaceId(null);
@@ -154,7 +167,7 @@ export default function App() {
       return;
     }
     if (!wasInRoomRef.current) {
-      localGameRef.current = game;
+      localGameRef.current = localStartedRef.current ? gameRef.current ?? game : null;
       wasInRoomRef.current = true;
     }
     setGame(roomSession.snapshot.game);
@@ -164,6 +177,7 @@ export default function App() {
   }, [roomSession.inRoom, roomSession.snapshot]);
 
   const activePlayer = game.players[game.activeSeat];
+  const roomStarted = !roomSession.inRoom || roomSession.snapshot?.started === true;
   const claimedPlayer = roomSession.claimedPlayerId
     ? game.players.find((player) => player.id === roomSession.claimedPlayerId)
     : undefined;
@@ -183,7 +197,7 @@ export default function App() {
   const selectedCard = activePlayer.hand.find((card) => card.id === selectedCardId) ?? null;
   const selectedSpace = boardSpaces.find((space) => space.id === selectedSpaceId) ?? null;
   const selectedLeader = game.players.find((player) => player.id === selectedLeaderId) ?? null;
-  const canControlActivePlayer = !roomSession.inRoom || roomSession.claimedPlayerId === activePlayer.id;
+  const canControlActivePlayer = !roomSession.inRoom || (roomStarted && roomSession.claimedPlayerId === activePlayer.id);
 
   function closeLeaderReference() {
     setSelectedLeaderId(null);
@@ -402,14 +416,22 @@ export default function App() {
     setGame((current) => finishEndgame(current));
   }
 
-  function resetGame() {
-    if (roomSession.inRoom) return;
+  function startLocalGame() {
     setGame(initialGame());
+    setLocalStarted(true);
     setSelectedCardId(null);
     setSelectedSpaceId(null);
     setSelectedLeaderId(null);
+    setSelectedSpyEntrySpaceId(null);
     setCommanderTargets({});
   }
+
+  function resetGame() {
+    if (roomSession.inRoom) return;
+    startLocalGame();
+  }
+
+  const showLaunchScreen = !roomSession.inRoom && !localStarted;
 
   const pendingAction = game.pendingAction;
   const tableStateLockedByPending = tableStateLockedByPendingActions(game) || roomSession.inRoom;
@@ -421,8 +443,16 @@ export default function App() {
     ? roomSession.snapshot?.endgameChoices.conditionalChoices ?? []
     : endgameConditionalIntrigueChoices(game);
   const playingPhase = game.phase === "playing";
-  const roomActionLocked = roomSession.inRoom && !canControlActivePlayer;
+  const roomActionLocked = roomSession.inRoom && (!roomStarted || !canControlActivePlayer);
   const pendingLocked = Boolean(game.pendingAction) || game.pendingQueue.length > 0 || roomActionLocked;
+  const handPendingStatusLabel =
+    game.pendingAction || game.pendingQueue.length > 0
+      ? "Resolve pending choice"
+      : roomSession.inRoom && !roomStarted
+        ? "Waiting for game start"
+        : roomActionLocked
+          ? "Waiting for active player"
+          : undefined;
   const placementDecisionActive = Boolean(
     selectedCard &&
       canControlActivePlayer &&
@@ -436,8 +466,14 @@ export default function App() {
   const plotIntrigueLocked = !playingPhase || pendingLocked;
   const debugCaptureAvailable = browserDebugEnabled && typeof window.__DUNE_DEBUG_CAPTURE__ === "function";
   const canResolveRoomPending = roomSession.inRoom && roomPendingActionCanResolve(game, roomSession.claimedPlayerId);
-  const showRoomWaitingPending = Boolean(roomSession.inRoom && pendingAction && !canResolveRoomPending);
-  const showResolvablePending = Boolean(pendingAction && (!roomSession.inRoom || canResolveRoomPending));
+  const showRoomWaitingPending = Boolean(
+    roomStarted &&
+      roomSession.inRoom &&
+      roomSession.claimedPlayerId &&
+      pendingAction &&
+      !canResolveRoomPending,
+  );
+  const showResolvablePending = Boolean(pendingAction && (!roomSession.inRoom || (roomStarted && canResolveRoomPending)));
   const pendingOverlayActive = showRoomWaitingPending || showResolvablePending;
   const pendingOverlayResetKey = pendingAction
     ? `${roomSession.inRoom ? "room" : "local"}:${canResolveRoomPending ? "resolve" : "wait"}:${JSON.stringify(pendingAction)}:${game.pendingQueue.length}`
@@ -557,6 +593,17 @@ export default function App() {
     setSelectedSpyEntrySpaceId(null);
   };
 
+  if (showLaunchScreen) {
+    return (
+      <LaunchScreen
+        loading={roomSession.status === "loading"}
+        onCreateRoom={roomSession.createRoom}
+        onJoinRoom={roomSession.joinRoom}
+        onStartLocal={startLocalGame}
+      />
+    );
+  }
+
   return (
     <main className="app-shell">
       <RoomPanel
@@ -572,6 +619,7 @@ export default function App() {
         onJoinRoom={roomSession.joinRoom}
         onLeaveRoom={roomSession.leaveRoom}
         onReleaseSeat={roomSession.releaseSeat}
+        onStartRoom={roomSession.startRoom}
       />
       <RoomPrivatePanel
         compactForPending={game.pendingAction?.kind === "team-resource-payment"}
@@ -648,6 +696,7 @@ export default function App() {
           phase={game.phase}
           pendingActionActive={Boolean(game.pendingAction)}
           pendingLocked={pendingLocked}
+          pendingStatusLabel={handPendingStatusLabel}
           playingPhase={playingPhase && !roomActionLocked}
           selectedCardId={selectedCardId}
           onEndAgentTurn={endAgentTurn}
@@ -702,6 +751,50 @@ export default function App() {
           />
         )}
       </PendingResolutionOverlay>
+    </main>
+  );
+}
+
+type LaunchScreenProps = {
+  loading: boolean;
+  onCreateRoom: () => void;
+  onJoinRoom: (roomId: string) => void;
+  onStartLocal: () => void;
+};
+
+function LaunchScreen({ loading, onCreateRoom, onJoinRoom, onStartLocal }: LaunchScreenProps) {
+  const [joinCode, setJoinCode] = useState("");
+
+  return (
+    <main className="launch-screen" aria-label="Dune Imperium Uprising">
+      <div className="launch-actions" aria-label="Game mode">
+        <button type="button" onClick={onStartLocal}>
+          <MonitorPlay size={18} />
+          Local
+        </button>
+        <button type="button" className="primary-action" disabled={loading} onClick={onCreateRoom}>
+          <PlugZap size={18} />
+          Create room
+        </button>
+        <form
+          className="launch-join"
+          onSubmit={(event) => {
+            event.preventDefault();
+            onJoinRoom(joinCode);
+          }}
+        >
+          <input
+            aria-label="Room code"
+            placeholder="Room code or link"
+            value={joinCode}
+            onChange={(event) => setJoinCode(event.currentTarget.value)}
+          />
+          <button type="submit">
+            <Link size={18} />
+            Join
+          </button>
+        </form>
+      </div>
     </main>
   );
 }

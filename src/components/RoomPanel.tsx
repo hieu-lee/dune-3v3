@@ -1,4 +1,4 @@
-import { Bot, Link, LogOut, PlugZap, UserCheck, UserMinus } from "lucide-react";
+import { Bot, Link, LogOut, Play, PlugZap, UserCheck, UserMinus } from "lucide-react";
 import { useState } from "react";
 import { teams } from "../game/data";
 import type { PublicRoomAiState, RoomSnapshot } from "../multiplayer/room-state";
@@ -16,6 +16,7 @@ type RoomPanelProps = {
   onJoinRoom: (roomId: string) => void;
   onLeaveRoom: () => void;
   onReleaseSeat: (playerId: string) => void;
+  onStartRoom: () => void;
 };
 
 export function RoomPanel({
@@ -31,12 +32,15 @@ export function RoomPanel({
   onJoinRoom,
   onLeaveRoom,
   onReleaseSeat,
+  onStartRoom,
 }: RoomPanelProps) {
   const [joinCode, setJoinCode] = useState("");
   const [playerName, setPlayerName] = useState("");
   const claimedSeat = snapshot?.seats.find((seat) => seat.playerId === claimedPlayerId);
   const teammateSeats = claimedSeat ? snapshot?.seats.filter((seat) => seat.team === claimedSeat.team) ?? [] : [];
   const opponentSeats = claimedSeat ? snapshot?.seats.filter((seat) => seat.team !== claimedSeat.team) ?? [] : [];
+  const allSeatsClaimed = Boolean(snapshot?.seats.every((seat) => seat.claimedBy));
+  const canStartRoom = Boolean(inRoom && snapshot && !snapshot.started && claimedSeat && allSeatsClaimed);
   const canFillAiOpponents = Boolean(
     inRoom &&
     snapshot &&
@@ -104,6 +108,18 @@ export function RoomPanel({
               >
                 <Bot size={16} />
                 AI opponents
+              </button>
+            )}
+            {snapshot && !snapshot.started && (
+              <button
+                type="button"
+                className="primary-action"
+                disabled={!canStartRoom}
+                title={canStartRoom ? "Start the game" : "Claim all six seats before starting"}
+                onClick={onStartRoom}
+              >
+                <Play size={16} />
+                Start game
               </button>
             )}
             <button type="button" onClick={onLeaveRoom}>

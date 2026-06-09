@@ -56,6 +56,7 @@ export type PublicRoomAiState = {
 export type RoomSnapshot = {
   roomId: string;
   version: number;
+  started: boolean;
   createdAt: number;
   updatedAt: number;
   endgameReady: Record<string, boolean | undefined>;
@@ -82,6 +83,7 @@ export type StoredRoomAiState = PublicRoomAiState & {
 export type StoredRoom = {
   id: string;
   version: number;
+  started: boolean;
   createdAt: number;
   updatedAt: number;
   game: GameState;
@@ -171,6 +173,11 @@ function endgameChoicesForViewer(game: GameState, viewerPlayerId?: string): Room
   };
 }
 
+function roomStartedForSnapshot(room: StoredRoom) {
+  if (room.started !== false) return true;
+  return Boolean(room.game.pendingAction || room.game.pendingQueue.length > 0 || room.game.phase !== "playing");
+}
+
 export function sanitizeGameForSeat(game: GameState, viewerPlayerId?: string): GameState {
   return {
     ...game,
@@ -190,6 +197,7 @@ export function roomSnapshotFor(room: StoredRoom, viewerToken?: string): RoomSna
   return {
     roomId: room.id,
     version: room.version,
+    started: roomStartedForSnapshot(room),
     createdAt: room.createdAt,
     updatedAt: room.updatedAt,
     endgameReady: { ...room.endgameReady },

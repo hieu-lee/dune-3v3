@@ -14,6 +14,7 @@ type ActiveHandPanelProps = {
   phase: GamePhase;
   pendingActionActive: boolean;
   pendingLocked: boolean;
+  pendingStatusLabel?: string;
   playingPhase: boolean;
   selectedCardId: string | null;
   onEndAgentTurn: () => void;
@@ -34,6 +35,7 @@ export function ActiveHandPanel({
   phase,
   pendingActionActive,
   pendingLocked,
+  pendingStatusLabel,
   playingPhase,
   selectedCardId,
   onEndAgentTurn,
@@ -59,8 +61,8 @@ export function ActiveHandPanel({
     : agentTurnComplete
       ? "Agent resolved"
       : "Agent turn";
-  const turnStageDetail = pendingActionActive || pendingLocked
-    ? "Resolve pending choice"
+  const turnStageDetail = pendingStatusLabel
+    ? pendingStatusLabel
     : activePlayer.revealed
       ? `${activePlayer.persuasion} persuasion`
       : agentTurnComplete

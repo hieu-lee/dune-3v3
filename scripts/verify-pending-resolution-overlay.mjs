@@ -47,6 +47,8 @@ try {
 
   await page.goto(url, { waitUntil: "networkidle" });
   await page.waitForFunction(() => Boolean(window.__DUNE_DEBUG__?.getGame && window.__DUNE_DEBUG__?.setGame));
+  await page.getByRole("button", { name: "Local" }).click();
+  await page.locator(".app-shell").waitFor({ state: "visible", timeout: 5000 });
 
   await setPendingDraw(page, { amount: 2, source: "Overlay verifier" });
   await page.locator(".pending-resolution-overlay").waitFor({ state: "visible", timeout: 5000 });

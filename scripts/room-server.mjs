@@ -122,6 +122,7 @@ function isPathInside(child, parent) {
 function disconnectLoadedSeats(room) {
   return {
     ...room,
+    started: room.started ?? true,
     endgameReady: room.endgameReady ?? {},
     seats: Object.fromEntries(
       Object.entries(room.seats ?? {}).map(([playerId, seat]) => [
@@ -365,9 +366,10 @@ export async function createRoomServer({
     const room = {
       id,
       version: 1,
+      started: false,
       createdAt: now,
       updatedAt: now,
-      game: initialGame(),
+      game: initialGame({ includeSetupPending: false }),
       endgameReady: {},
       seats: {},
     };
@@ -462,6 +464,32 @@ export async function createRoomServer({
     room.updatedAt = Date.now();
     await persistRooms();
     await broadcast(room);
+  }
+
+  function allSeatsClaimed(room) {
+    return room.game.players.every((player) => room.seats[player.id]);
+  }
+
+  function roomIsStarted(room) {
+    return room.started !== false ||
+      Boolean(room.game.pendingAction || room.game.pendingQueue?.length > 0 || room.game.phase !== "playing");
+  }
+
+  async function startRoom(room) {
+    if (room.started) return;
+    const { pendingActionForShaddamPersonalBoard } = await gameState();
+    const setupPending = pendingActionForShaddamPersonalBoard(room.game);
+    room.started = true;
+    if (setupPending && !room.game.pendingAction && room.game.pendingQueue.length === 0) {
+      room.game = {
+        ...room.game,
+        pendingAction: setupPending,
+        log: [
+          "Resolve Shaddam's starting Throne Row choice from the Emperor personal board.",
+          ...room.game.log,
+        ],
+      };
+    }
   }
 
   async function applyInternalRoomAction(room, actorId, action) {
@@ -560,6 +588,7 @@ export async function createRoomServer({
   }
 
   function aiActionIsPending(room, runtime) {
+    if (!roomIsStarted(room)) return false;
     const controlledIds = aiPlayerIds(room);
     if (controlledIds.size === 0) return false;
     return nextActionSeats(room, runtime).some((entry) => controlledIds.has(entry.player.id));
@@ -582,6 +611,7 @@ export async function createRoomServer({
     for (let attempt = 0; attempt < 6; attempt += 1) {
       const room = rooms.get(roomId);
       if (!room?.ai?.enabled || room.game.phase === "finished") return false;
+      if (!roomIsStarted(room)) return false;
       const baseVersion = room.version;
       const controlledIds = aiPlayerIds(room);
       const candidate = nextActionSeats(room, runtime).find((entry) => controlledIds.has(entry.player.id));
@@ -761,6 +791,24 @@ export async function createRoomServer({
       });
     }
 
+    const startMatch = url.pathname.match(/^\/api\/rooms\/([A-Z0-9]+)\/start$/);
+    if (request.method === "POST" && startMatch) {
+      const room = rooms.get(startMatch[1]);
+      if (!room) return sendError(response, 404, "Room not found");
+      const token = tokenFromRequest(request, url);
+      return await enqueueRoomWrite(room.id, async () => {
+        const claim = Object.values(room.seats).find((seat) => seat?.token === token);
+        if (!claim) return sendError(response, 401, "Claim a seat before starting the room");
+        if (!allSeatsClaimed(room)) return sendError(response, 409, "Claim all six seats before starting the room");
+        if (!room.started) {
+          await startRoom(room);
+          await persistAndBroadcastRoom(room);
+        }
+        scheduleAiRoom(room.id);
+        return sendJson(response, 200, { snapshot: await snapshotFor(room, token) });
+      });
+    }
+
     const releaseMatch = url.pathname.match(/^\/api\/rooms\/([A-Z0-9]+)\/seats\/([^/]+)\/release$/);
     if (request.method === "POST" && releaseMatch) {
       const room = rooms.get(releaseMatch[1]);
@@ -838,6 +886,12 @@ export async function createRoomServer({
       return await enqueueRoomWrite(room.id, async () => {
         const claim = Object.values(room.seats).find((seat) => seat?.token === token);
         if (!claim) return sendError(response, 401, "Claim a seat before taking room actions");
+        if (!roomIsStarted(room)) {
+          return sendJson(response, 409, {
+            error: "Start the room before taking game actions",
+            snapshot: await snapshotFor(room, token),
+          });
+        }
         if (body.baseVersion !== room.version) {
           return sendJson(response, 409, {
             error: "Room state changed; refresh and try again",

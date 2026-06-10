@@ -553,9 +553,8 @@ export function placeSpyForPending(
   pending: SpyPendingAction,
   spaceId: string,
 ): GameState {
-  return continueAfterResolvedConflictReward(
-    resolvePlaceSpyForPending(state, pending, spaceId, finishCombatIfNoActors),
-  );
+  const resolvedState = resolvePlaceSpyForPending(state, pending, spaceId, finishCombatIfNoActors);
+  return resolvedState === state ? state : continueAfterResolvedConflictReward(resolvedState);
 }
 
 export function resolveStabanUnseenNetworkChoice(

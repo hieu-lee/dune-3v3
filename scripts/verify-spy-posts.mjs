@@ -585,6 +585,8 @@ try {
     {
       ...legacyDuplicateSharedPosts,
       spyPosts: { [arrakeen.id]: feyd.id, [spiceRefinery.id]: feyd.id },
+      pendingAction: legacyDuplicateRecallPending,
+      pendingQueue: [],
     },
     legacyDuplicateRecallPending,
     arrakeen.id,
@@ -628,7 +630,7 @@ try {
   );
   const recalledTwoSpyLegacyPost = state.recallSpyForPending(
     normalizedActiveLegacyDuplicateRecallState,
-    legacyDuplicateTwoRecallPending,
+    normalizedActiveLegacyDuplicateRecallState.pendingAction,
     arrakeen.id,
   );
   assert.equal(
@@ -664,7 +666,7 @@ try {
   });
   const recalledOneOfTwoLegacyDuplicatePosts = state.recallSpyForPending(
     activeTwoPostLegacyDuplicateRecallState,
-    legacyDuplicateTwoRecallPending,
+    activeTwoPostLegacyDuplicateRecallState.pendingAction,
     arrakeen.id,
   );
   assert.equal(
@@ -1011,6 +1013,67 @@ try {
     state.iconCanReach({ icons: ["spy"] }, arrakeen, feyd, false, { [spiceRefinery.id]: feyd.id }, game.players, {}),
     true,
     "Legacy per-space spy keys should still observe the whole shared post",
+  );
+  const noActiveRecallPending = {
+    kind: "recall-spy",
+    ownerId: feyd.id,
+    combatRecipientId: feyd.id,
+    remaining: 1,
+    strength: 99,
+    source: "Forged inactive recall",
+    optional: false,
+  };
+  const noActiveRecallState = {
+    ...sharedArrakeenPostState,
+    pendingAction: undefined,
+    pendingQueue: [],
+  };
+  assert.equal(
+    state.recallSpyForPending(noActiveRecallState, noActiveRecallPending, arrakeen.id),
+    noActiveRecallState,
+    "Forged spy recall should not mutate state when it is not the active pending action",
+  );
+  const noActiveSupplyRecallPending = {
+    kind: "spy",
+    ownerId: feyd.id,
+    remaining: 1,
+    source: "Forged inactive supply recall",
+    recallForSupply: true,
+  };
+  const noActiveSupplyRecallState = {
+    ...sharedArrakeenPostState,
+    pendingAction: undefined,
+    pendingQueue: [],
+    players: sharedArrakeenPostState.players.map((player) =>
+      player.id === feyd.id ? { ...player, spies: 0 } : player
+    ),
+  };
+  assert.equal(
+    state.recallSpyForSupplyForPending(noActiveSupplyRecallState, noActiveSupplyRecallPending, arrakeen.id),
+    noActiveSupplyRecallState,
+    "Forged spy supply recall should not mutate state when it is not the active pending action",
+  );
+  const noActivePlacePending = {
+    kind: "spy",
+    ownerId: feyd.id,
+    remaining: 1,
+    source: "Forged inactive placement",
+  };
+  const noActivePlaceState = {
+    ...sharedArrakeenPostState,
+    conflict: undefined,
+    pendingAction: undefined,
+    pendingQueue: [],
+    players: sharedArrakeenPostState.players.map((player) => ({
+      ...player,
+      agentsReady: 0,
+      revealed: true,
+    })),
+  };
+  assert.equal(
+    state.placeSpyForPending(noActivePlaceState, noActivePlacePending, espionage.id),
+    noActivePlaceState,
+    "Forged spy placement should not advance or mutate state when it is not the active pending action",
   );
   assert.equal(
     spies.canPlaceSpyPost(sharedArrakeenPostState, spiceRefinery, shaddam),

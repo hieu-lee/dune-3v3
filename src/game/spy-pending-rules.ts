@@ -76,6 +76,7 @@ export function resolvePlaceSpyForPending(
   spaceId: string,
   finishPendingResolution: FinishPendingResolution,
 ): GameState {
+  if (state.pendingAction !== pending) return state;
   const owner = state.players.find((player) => player.id === pending.ownerId);
   const space = boardSpaces.find((candidate) => candidate.id === spaceId);
   if (
@@ -154,6 +155,7 @@ export function recallSpyForSupplyForPending(
   pending: SpyPendingAction,
   spaceId: string,
 ): GameState {
+  if (state.pendingAction !== pending) return state;
   if (!pending.recallForSupply) return state;
   const owner = state.players.find((player) => player.id === pending.ownerId);
   if (!owner || owner.spies > 0 || pending.remaining <= 0) return state;
@@ -269,6 +271,7 @@ export function recallSpyForPending(
   pending: RecallSpyPendingAction,
   spaceId: string,
 ): GameState {
+  if (state.pendingAction !== pending) return state;
   const owner = state.players.find((player) => player.id === pending.ownerId);
   if (!owner) return { ...state, ...advancePendingAction(state) };
   const space = boardSpaces.find((candidate) => candidate.id === spaceId);
@@ -337,6 +340,7 @@ export function recallSpyForPending(
 }
 
 export function skipRecallSpy(state: GameState, pending: RecallSpyPendingAction): GameState {
+  if (state.pendingAction !== pending) return state;
   if (!pending.optional) return state;
   const owner = state.players.find((player) => player.id === pending.ownerId);
   return normalizeSpyObservationPosts({

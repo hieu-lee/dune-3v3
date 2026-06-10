@@ -305,7 +305,7 @@ function actionEntry(id, label, playerId, action) {
 
 function actionWouldChangeState(room, playerId, action, runtime) {
   try {
-    runtime.actions.applyRoomAction(structuredClone(room.game), playerId, action);
+    runtime.actions.applyRoomAction(room.game, playerId, action);
     return true;
   } catch {
     return false;

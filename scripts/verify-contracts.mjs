@@ -145,42 +145,80 @@ try {
   const ally = game.players.find((player) => player.id === "p2");
   assert.ok(ally, "Initial game should include p2");
   const emptyPublicContracts = { ...game, contractOffer: [], contractDeck: [] };
+  const shaddamFallbackPending = {
+    kind: "contract",
+    ownerId: shaddam.id,
+    source: "Test Contract Space",
+    spaceId: "accept-contract",
+  };
+  const shaddamFallbackState = { ...emptyPublicContracts, pendingAction: shaddamFallbackPending };
   const blockedFallback = state.collectChoamContractFallback(
-    emptyPublicContracts,
-    { kind: "contract", ownerId: shaddam.id, source: "Test Contract Space", spaceId: "accept-contract" },
+    shaddamFallbackState,
+    shaddamFallbackPending,
   );
   assert.equal(
     blockedFallback,
-    emptyPublicContracts,
+    shaddamFallbackState,
     "Shaddam must take reserved contracts before the no-public-contract fallback can resolve",
   );
 
+  const allyFallbackPending = {
+    kind: "contract",
+    ownerId: ally.id,
+    source: "Test Contract Space",
+    spaceId: "accept-contract",
+  };
+  const allyFallbackState = { ...emptyPublicContracts, pendingAction: allyFallbackPending };
   const allyFallback = state.collectChoamContractFallback(
-    emptyPublicContracts,
-    { kind: "contract", ownerId: ally.id, source: "Test Contract Space", spaceId: "accept-contract" },
+    allyFallbackState,
+    allyFallbackPending,
   );
   assert.equal(
     allyFallback.players.find((player) => player.id === ally.id)?.resources.solari,
     ally.resources.solari + 2,
     "Players without reserved contracts can collect the no-public-contract fallback",
   );
+  const publicOnlyBlockedFallbackPending = {
+    kind: "contract",
+    ownerId: ally.id,
+    source: "Test Public Contract",
+    publicOnly: true,
+  };
+  const publicOnlyBlockedFallbackState = { ...emptyPublicContracts, pendingAction: publicOnlyBlockedFallbackPending };
   const publicOnlyBlockedFallback = state.collectChoamContractFallback(
-    emptyPublicContracts,
-    { kind: "contract", ownerId: ally.id, source: "Test Public Contract", publicOnly: true },
+    publicOnlyBlockedFallbackState,
+    publicOnlyBlockedFallbackPending,
   );
   assert.equal(
     publicOnlyBlockedFallback,
-    emptyPublicContracts,
+    publicOnlyBlockedFallbackState,
     "Public-only CHOAM contract choices should not fall back unless explicitly allowed",
   );
+  const publicOnlyAllowedFallbackPending = {
+    kind: "contract",
+    ownerId: shaddam.id,
+    source: "Reach Agreement",
+    publicOnly: true,
+    allowFallback: true,
+  };
+  const publicOnlyAllowedFallbackState = { ...emptyPublicContracts, pendingAction: publicOnlyAllowedFallbackPending };
   const publicOnlyAllowedFallback = state.collectChoamContractFallback(
-    emptyPublicContracts,
-    { kind: "contract", ownerId: shaddam.id, source: "Reach Agreement", publicOnly: true, allowFallback: true },
+    publicOnlyAllowedFallbackState,
+    publicOnlyAllowedFallbackPending,
   );
   assert.equal(
     publicOnlyAllowedFallback.players.find((player) => player.id === shaddam.id)?.resources.solari,
     shaddam.resources.solari + 2,
     "Public-only CHOAM contract choices with fallback should ignore reserved contracts when no public contracts remain",
+  );
+  const forgedFallback = state.collectChoamContractFallback(
+    emptyPublicContracts,
+    { kind: "contract", ownerId: ally.id, source: "Forged Contract", spaceId: "accept-contract" },
+  );
+  assert.equal(
+    forgedFallback,
+    emptyPublicContracts,
+    "Forged CHOAM contract fallbacks should not mutate state when there is no active contract pending action",
   );
 
   const publicOfferIds = game.contractOffer.map((contract) => contract.id);
@@ -197,11 +235,14 @@ try {
     "Mandatory CHOAM contract choices must not be skippable through finishPendingAction",
   );
 
-  const next = state.takeChoamContract(
-    game,
-    { kind: "contract", ownerId: shaddam.id, source: "Test Contract Space", spaceId: "accept-contract" },
-    sardaukar.id,
-  );
+  const reservedTakePending = {
+    kind: "contract",
+    ownerId: shaddam.id,
+    source: "Test Contract Space",
+    spaceId: "accept-contract",
+  };
+  const reservedTakeState = { ...game, pendingAction: reservedTakePending };
+  const next = state.takeChoamContract(reservedTakeState, reservedTakePending, sardaukar.id);
   const nextShaddam = next.players.find((player) => player.id === shaddam.id);
   assert.ok(nextShaddam, "Shaddam should remain in the game");
   assert.deepEqual(next.contractOffer.map((contract) => contract.id), publicOfferIds, "Reserved take should not refill public offers");
@@ -213,15 +254,33 @@ try {
   );
   assert.equal(nextShaddam.contracts.at(-1)?.card.name, "Sardaukar I");
   assert.equal(nextShaddam.contracts.at(-1)?.takenAtSpaceId, "accept-contract");
+  const publicOnlyReservedPending = {
+    kind: "contract",
+    ownerId: shaddam.id,
+    source: "Reach Agreement",
+    publicOnly: true,
+    allowFallback: true,
+  };
+  const publicOnlyReservedState = { ...game, pendingAction: publicOnlyReservedPending };
   const publicOnlyReservedBlocked = state.takeChoamContract(
-    game,
-    { kind: "contract", ownerId: shaddam.id, source: "Reach Agreement", publicOnly: true, allowFallback: true },
+    publicOnlyReservedState,
+    publicOnlyReservedPending,
     sardaukar.id,
   );
   assert.equal(
     publicOnlyReservedBlocked,
-    game,
+    publicOnlyReservedState,
     "Public-only CHOAM contract choices with fallback should still reject reserved contracts",
+  );
+  const forgedPublicTake = state.takeChoamContract(
+    game,
+    { kind: "contract", ownerId: ally.id, source: "Forged Contract", publicOnly: true },
+    game.contractOffer[0].id,
+  );
+  assert.equal(
+    forgedPublicTake,
+    game,
+    "Forged CHOAM contract takes should not mutate state when there is no active contract pending action",
   );
 
   const immediate = contractByName("Immediate");
@@ -1085,12 +1144,15 @@ try {
     "Research Station's board-space troops should remain deployable after the contract spy placement",
   );
 
-  const illegal = state.takeChoamContract(
-    game,
-    { kind: "contract", ownerId: ally.id, source: "Test Contract Space", spaceId: "accept-contract" },
-    sardaukar.id,
-  );
-  assert.equal(illegal, game, "Non-Shaddam players must not be able to take reserved Sardaukar contracts");
+  const illegalReservedPending = {
+    kind: "contract",
+    ownerId: ally.id,
+    source: "Test Contract Space",
+    spaceId: "accept-contract",
+  };
+  const illegalReservedState = { ...game, pendingAction: illegalReservedPending };
+  const illegal = state.takeChoamContract(illegalReservedState, illegalReservedPending, sardaukar.id);
+  assert.equal(illegal, illegalReservedState, "Non-Shaddam players must not be able to take reserved Sardaukar contracts");
 
   console.log("contract verification passed");
 } finally {

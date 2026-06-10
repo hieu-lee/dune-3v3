@@ -643,6 +643,7 @@ export function resolveTakeChoamContract(
   contractId: string,
   finishPendingResolution: FinishPendingResolution,
 ): GameState {
+  if (state.pendingAction !== pending) return state;
   const offerIndex = state.contractOffer.findIndex((contract) => contract.id === contractId);
   const contract = state.contractOffer[offerIndex];
   const owner = state.players.find((player) => player.id === pending.ownerId);
@@ -842,6 +843,7 @@ export function resolveChoamContractFallback(
   pending: ContractPendingAction,
   finishPendingResolution: FinishPendingResolution,
 ): GameState {
+  if (state.pendingAction !== pending) return state;
   if (pending.publicOnly && !pending.allowFallback) return state;
   if (state.contractOffer.length > 0) return state;
   const owner = state.players.find((player) => player.id === pending.ownerId);

@@ -236,9 +236,8 @@ function resolvePostDeployIntrigueDraw(state: GameState, draw: PostDeployIntrigu
 }
 
 export function takeChoamContract(state: GameState, pending: ContractPendingAction, contractId: string): GameState {
-  return continueAfterResolvedConflictReward(
-    resolveTakeChoamContract(state, pending, contractId, finishCombatIfNoActors),
-  );
+  const resolvedState = resolveTakeChoamContract(state, pending, contractId, finishCombatIfNoActors);
+  return resolvedState === state ? state : continueAfterResolvedConflictReward(resolvedState);
 }
 
 export function acquireCardForPending(
@@ -251,9 +250,8 @@ export function acquireCardForPending(
 }
 
 export function collectChoamContractFallback(state: GameState, pending: ContractPendingAction): GameState {
-  return continueAfterResolvedConflictReward(
-    resolveChoamContractFallback(state, pending, finishCombatIfNoActors),
-  );
+  const resolvedState = resolveChoamContractFallback(state, pending, finishCombatIfNoActors);
+  return resolvedState === state ? state : continueAfterResolvedConflictReward(resolvedState);
 }
 
 export function trashPlayerCard(

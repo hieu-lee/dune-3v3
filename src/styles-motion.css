@@ -445,7 +445,7 @@
 .spy-network-slot.is-legal:hover,
 .spy-network-slot.is-legal:focus-visible,
 .spy-network-slot.is-selected {
-  transform: translate(-50%, -50%) scale(1.06);
+  transform: scale(1.06);
 }
 
 .conflict-slot.has-worms,

@@ -103,7 +103,11 @@
   cursor: default;
   padding: 0;
   pointer-events: none;
-  transform: translate(-50%, -50%);
+  /* Center the marker on the slot point with margins (not transform) so the
+     ring stays aligned with the connector lines even if a transform reset or
+     reduced-motion rule clears the button transform. */
+  margin-left: calc(var(--spy-slot-size) / -2);
+  margin-top: calc(var(--spy-slot-size) / -2);
 }
 
 .spy-network-slot-ring {

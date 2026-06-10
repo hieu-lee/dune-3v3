@@ -110,6 +110,7 @@ const hiddenIntrigueArrayCache = new Map<string, IntrigueCard[]>();
 const hiddenContractArrayCache = new Map<string, ContractCard[]>();
 const hiddenConflictArrayCache = new Map<number, ConflictCard[]>();
 const hiddenObjectiveArrayCache = new Map<string, ObjectiveCard[]>();
+const hiddenObjectiveArrayBySource = new WeakMap<ObjectiveCard[], Map<string, ObjectiveCard[]>>();
 const hiddenCardIcons = Object.freeze([]) as unknown as Card["icons"];
 const hiddenConflictRewards = Object.freeze([]) as unknown as ConflictCard["rewards"];
 
@@ -197,12 +198,22 @@ function hiddenConflicts(count: number): ConflictCard[] {
 }
 
 function hiddenObjectives(playerId: string, objectives: ObjectiveCard[]): ObjectiveCard[] {
+  let arraysForSource = hiddenObjectiveArrayBySource.get(objectives);
+  if (!arraysForSource) {
+    arraysForSource = new Map();
+    hiddenObjectiveArrayBySource.set(objectives, arraysForSource);
+  }
+  const existingForSource = arraysForSource.get(playerId);
+  if (existingForSource) return existingForSource;
+
   const key = `${playerId}:${objectives.map((objective, index) =>
     `${index}:${objective.scored ? "scored" : "hidden"}:${objective.playerCount}`,
   ).join("|")}`;
-  return cachedHiddenArray(hiddenObjectiveArrayCache, key, () =>
+  const hidden = cachedHiddenArray(hiddenObjectiveArrayCache, key, () =>
     objectives.map((objective, index) => hiddenObjective(playerId, index, objective)),
   );
+  arraysForSource.set(playerId, hidden);
+  return hidden;
 }
 
 function sanitizePendingAction(action: PendingAction | undefined, viewerPlayerId?: string): PendingAction | undefined {

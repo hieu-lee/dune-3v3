@@ -290,6 +290,63 @@ async function assertAiFillOpponents() {
   }
 }
 
+async function assertStartedSeatsStayLocked() {
+  const startedRoom = await jsonFetch("/api/rooms", { method: "POST" });
+  assert.equal(startedRoom.response.status, 201, "Started seat-lock room creation should succeed");
+  const roomId = startedRoom.body.roomId;
+  const claims = new Map();
+  for (const playerId of ["p1", "p2", "p3", "p4", "p5", "p6"]) {
+    const claim = await jsonFetch(`/api/rooms/${roomId}/seats/${playerId}/claim`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: `Seat Lock ${playerId}` }),
+    });
+    assert.equal(claim.response.status, 200, `${playerId} should be claimable before the room starts`);
+    claims.set(playerId, claim.body);
+  }
+  const start = await jsonFetch(`/api/rooms/${roomId}/start`, {
+    method: "POST",
+    headers: { "x-room-token": claims.get("p1").token },
+  });
+  assert.equal(start.response.status, 200, "Fully claimed seat-lock room should start");
+  assert.equal(start.body.snapshot.started, true, "Seat-lock fixture should be started");
+
+  const roomRecord = server.rooms.get(roomId);
+  assert.ok(roomRecord, "Started seat-lock room should remain stored");
+  roomRecord.seats.p2.connected = false;
+  const noTokenReclaim = await jsonFetch(`/api/rooms/${roomId}/seats/p2/claim`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: "Started Seat Hijacker" }),
+  });
+  assert.equal(noTokenReclaim.response.status, 409, "Started disconnected seats should require the original reconnect token");
+  assert.notEqual(
+    noTokenReclaim.body?.snapshot?.viewerPlayerId,
+    "p2",
+    "Rejected started-seat reclaim should not expose the target player's private snapshot",
+  );
+
+  roomRecord.seats.p4 = undefined;
+  const noTokenEmptyStartedSeat = await jsonFetch(`/api/rooms/${roomId}/seats/p4/claim`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: "Started Empty Seat Hijacker" }),
+  });
+  assert.equal(noTokenEmptyStartedSeat.response.status, 409, "Started empty seats should not accept new claims");
+  assert.notEqual(
+    noTokenEmptyStartedSeat.body?.snapshot?.viewerPlayerId,
+    "p4",
+    "Rejected started empty-seat claim should not expose the target player's private snapshot",
+  );
+
+  const releaseStartedSeat = await jsonFetch(`/api/rooms/${roomId}/seats/p3/release`, {
+    method: "POST",
+    headers: { "x-room-token": claims.get("p3").token },
+  });
+  assert.equal(releaseStartedSeat.response.status, 409, "Started seats should not be releasable");
+  assert.equal(roomRecord.seats.p3?.token, claims.get("p3").token, "Rejected started-seat release should keep the seat locked");
+}
+
 async function assertAiRoundDiscussionUsesSeatSnapshots() {
   const storageFile = join(outDir, "ai-discussion-rooms.json");
   await rm(storageFile, { force: true });
@@ -511,6 +568,16 @@ async function createRoomWithThronePending() {
     assert.ok(record, "Action test room should be stored");
     const setupPending = pendingActionForShaddamPersonalBoard(record.game);
     if (!setupPending) continue;
+    const tokens = {};
+    for (const playerId of ["p1", "p2", "p3", "p4", "p5", "p6"]) {
+      const claim = await jsonFetch(`/api/rooms/${created.body.roomId}/seats/${playerId}/claim`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: playerId === "p4" ? "Shaddam" : `Action ${playerId}` }),
+      });
+      assert.equal(claim.response.status, 200, `${playerId} action-test seat should be claimable before setup starts`);
+      tokens[playerId] = claim.body.token;
+    }
     record.started = true;
     record.version += 1;
     record.updatedAt = Date.now();
@@ -524,7 +591,7 @@ async function createRoomWithThronePending() {
     };
     const snapshot = await jsonFetch(`/api/rooms/${created.body.roomId}`);
     assert.equal(snapshot.response.status, 200, "Action test room snapshot should reload after setup");
-    return snapshot.body;
+    return { snapshot: snapshot.body, tokens };
   }
   assert.fail("Expected at least one created room to need Shaddam's setup Throne Row choice");
 }
@@ -709,6 +776,7 @@ try {
     "/public/qa-room-server-public-storage.json",
   ]);
   await assertPollHeartbeatDisconnects();
+  await assertStartedSeatsStayLocked();
   await assertAiFillOpponents();
   await assertAiRoundDiscussionUsesSeatSnapshots();
 
@@ -919,6 +987,12 @@ try {
   const legacyGuildSpyTraitRoomId = legacyGuildSpyTraitRoom.body.roomId;
   const legacyGuildSpyTraitRecord = server.rooms.get(legacyGuildSpyTraitRoomId);
   assert.ok(legacyGuildSpyTraitRecord, "Legacy Guild Spy trait room should be stored in memory");
+  const legacyGuildSpyTraitSeedClaim = await jsonFetch(`/api/rooms/${legacyGuildSpyTraitRoomId}/seats/p2/claim`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: "Migrated Guild Spy Owner" }),
+  });
+  assert.equal(legacyGuildSpyTraitSeedClaim.response.status, 200, "Legacy Guild Spy owner should be claimable before restart");
   const legacyGuildSpyTraitVersion = legacyGuildSpyTraitRecord.version;
   const legacyGuildSpy = {
     ...dataCardBySourceId(imperiumDeck, 43, "Guild Spy"),
@@ -975,7 +1049,7 @@ try {
   const legacyGuildSpyTraitClaim = await jsonFetch(`/api/rooms/${legacyGuildSpyTraitRoomId}/seats/p2/claim`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ name: "Migrated Guild Spy Owner" }),
+    body: JSON.stringify({ name: "Migrated Guild Spy Owner", token: legacyGuildSpyTraitSeedClaim.body.token }),
   });
   assert.equal(legacyGuildSpyTraitClaim.response.status, 200, "Migrated Guild Spy owner should be claimable");
   const legacyGuildSpyTraitDiscard = await roomAction(
@@ -1005,6 +1079,12 @@ try {
   const staleRevealRecord = server.rooms.get(staleRevealRoomId);
   assert.ok(staleRevealRecord, "Stale reveal-adjust room should be stored in memory");
   const staleRevealOwnerId = "p2";
+  const staleRevealSeedClaim = await jsonFetch(`/api/rooms/${staleRevealRoomId}/seats/${staleRevealOwnerId}/claim`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: "Migrated Reveal Owner" }),
+  });
+  assert.equal(staleRevealSeedClaim.response.status, 200, "Stale reveal-adjust owner should be claimable before restart");
   const staleRevealOwnerBefore = player(staleRevealRoom.body, staleRevealOwnerId);
   const staleRevealVersion = staleRevealRecord.version;
   staleRevealRecord.game = {
@@ -1075,7 +1155,7 @@ try {
   const staleRevealOwnerClaim = await jsonFetch(`/api/rooms/${staleRevealRoomId}/seats/${staleRevealOwnerId}/claim`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ name: "Migrated Reveal Owner" }),
+    body: JSON.stringify({ name: "Migrated Reveal Owner", token: staleRevealSeedClaim.body.token }),
   });
   assert.equal(staleRevealOwnerClaim.response.status, 200, "Migrated stale reveal-adjust owner should be claimable");
   const migratedMakerChoice = await roomAction(
@@ -1384,6 +1464,12 @@ try {
   const activeLegacySpyRoomId = activeLegacySpyRoom.body.roomId;
   const activeLegacySpyRecord = server.rooms.get(activeLegacySpyRoomId);
   assert.ok(activeLegacySpyRecord, "Active legacy spy-recall room should be stored in memory");
+  const activeLegacySpySeedClaim = await jsonFetch(`/api/rooms/${activeLegacySpyRoomId}/seats/p2/claim`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: "Legacy Spy Owner" }),
+  });
+  assert.equal(activeLegacySpySeedClaim.response.status, 200, "Active legacy spy-recall owner should be claimable before restart");
   const activeLegacySpyVersion = activeLegacySpyRecord.version;
   activeLegacySpyRecord.game = {
     ...activeLegacySpyRecord.game,
@@ -1423,7 +1509,7 @@ try {
   const activeLegacySpyClaim = await jsonFetch(`/api/rooms/${activeLegacySpyRoomId}/seats/p2/claim`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ name: "Legacy Spy Owner" }),
+    body: JSON.stringify({ name: "Legacy Spy Owner", token: activeLegacySpySeedClaim.body.token }),
   });
   assert.equal(activeLegacySpyClaim.response.status, 200, "Active legacy spy-recall owner should be claimable");
   const resolvedActiveLegacySpyRecall = await roomAction(
@@ -1488,12 +1574,13 @@ try {
     "Recovered room action should advance turn state",
   );
 
-  let actionSnapshot = await createRoomWithThronePending();
+  const actionSetup = await createRoomWithThronePending();
+  let actionSnapshot = actionSetup.snapshot;
   const actionRoomId = actionSnapshot.roomId;
   const p4Claim = await jsonFetch(`/api/rooms/${actionRoomId}/seats/p4/claim`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ name: "Shaddam" }),
+    body: JSON.stringify({ name: "Shaddam", token: actionSetup.tokens.p4 }),
   });
   assert.equal(p4Claim.response.status, 200, "Pending owner should be able to claim Shaddam");
   actionSnapshot = p4Claim.body.snapshot;
@@ -1513,7 +1600,7 @@ try {
   const p1ActionClaim = await jsonFetch(`/api/rooms/${actionRoomId}/seats/p1/claim`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ name: "Not Shaddam" }),
+    body: JSON.stringify({ name: "Not Shaddam", token: actionSetup.tokens.p1 }),
   });
   assert.equal(p1ActionClaim.response.status, 200, "A second action-test seat should be claimable");
   const setupVersionAfterP1Claim = p1ActionClaim.body.snapshot.version;
@@ -1541,22 +1628,8 @@ try {
   const wrongReveal = await roomAction(actionRoomId, wrongTurnToken, actionSnapshot.version, { kind: "reveal-turn" });
   assert.equal(wrongReveal.response.status, 403, "Non-active seats should not perform active turn actions");
 
-  let activeToken =
-    activePlayerId === "p4"
-      ? p4Claim.body.token
-      : activePlayerId === "p1"
-        ? p1ActionClaim.body.token
-        : undefined;
-  if (!activeToken) {
-    const activeClaim = await jsonFetch(`/api/rooms/${actionRoomId}/seats/${activePlayerId}/claim`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: "Active Player" }),
-    });
-    assert.equal(activeClaim.response.status, 200, "Active player should be claimable for room actions");
-    activeToken = activeClaim.body.token;
-    actionSnapshot = activeClaim.body.snapshot;
-  }
+  const activeToken = actionSetup.tokens[activePlayerId];
+  assert.ok(activeToken, "Active player should have a pre-start reconnect token for room actions");
 
   const revealAction = await roomAction(actionRoomId, activeToken, actionSnapshot.version, { kind: "reveal-turn" });
   assert.equal(revealAction.response.status, 200, "Claimed active player should reveal through the room action endpoint");
@@ -2590,10 +2663,16 @@ try {
     body: JSON.stringify({ name: "Resource Trade Partner" }),
   });
   assert.equal(resourceTradePartnerClaim.response.status, 200, "Resource trade partner should be claimable");
+  const resourceTradeActorClaim = await jsonFetch(`/api/rooms/${resourceTradeRoom.body.roomId}/seats/${resourceTradeActor.id}/claim`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: "Resource Trade Actor" }),
+  });
+  assert.equal(resourceTradeActorClaim.response.status, 200, "Resource trade actor should be claimable");
   const forgedResourceSelection = await roomAction(
     resourceTradeRoom.body.roomId,
     resourceTradePartnerClaim.body.token,
-    resourceTradePartnerClaim.body.snapshot.version,
+    resourceTradeActorClaim.body.snapshot.version,
     {
       kind: "pending",
       command: { kind: "update-trade", resource: "water" },
@@ -2618,12 +2697,6 @@ try {
     forgedTradeClearVersion,
     "Rejected room trade clear should not advance the room version",
   );
-  const resourceTradeActorClaim = await jsonFetch(`/api/rooms/${resourceTradeRoom.body.roomId}/seats/${resourceTradeActor.id}/claim`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ name: "Resource Trade Actor" }),
-  });
-  assert.equal(resourceTradeActorClaim.response.status, 200, "Resource trade actor should be claimable");
   const noOpResourceSelection = await roomAction(
     resourceTradeRoom.body.roomId,
     resourceTradeActorClaim.body.token,

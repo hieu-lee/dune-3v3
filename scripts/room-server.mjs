@@ -497,6 +497,10 @@ export async function createRoomServer({
       Boolean(room.game.pendingAction || room.game.pendingQueue?.length > 0 || room.game.phase !== "playing");
   }
 
+  function roomSeatsAreLocked(room) {
+    return room.started !== false;
+  }
+
   async function startRoom(room) {
     if (room.started) return;
     const { pendingActionForShaddamPersonalBoard } = await gameState();
@@ -787,6 +791,15 @@ export async function createRoomServer({
       return await enqueueRoomWrite(room.id, async () => {
         const existing = room.seats[playerId];
         const existingTokenSeat = seatClaimForToken(room, previousToken);
+        if (roomSeatsAreLocked(room)) {
+          const tokenOwnsTargetSeat = Boolean(previousToken && (
+            existing?.token === previousToken ||
+            existingTokenSeat?.playerId === playerId
+          ));
+          if (!tokenOwnsTargetSeat) {
+            return sendError(response, 409, existing ? "Started seat requires its reconnect token" : "Started rooms do not allow new seat claims");
+          }
+        }
         if (existing && existing.token !== previousToken && existing.connected) {
           return sendError(response, 409, "Seat already claimed");
         }
@@ -840,6 +853,7 @@ export async function createRoomServer({
       return await enqueueRoomWrite(room.id, async () => {
         const existing = room.seats[playerId];
         if (!existing) return sendError(response, 409, "Seat is not claimed");
+        if (roomSeatsAreLocked(room)) return sendError(response, 409, "Started seats cannot be released");
         if (!token || existing.token !== token) {
           return sendError(response, 403, "Only the current seat token can release that seat");
         }

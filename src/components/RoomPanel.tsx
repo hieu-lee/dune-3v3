@@ -92,7 +92,7 @@ export function RoomPanel({
               value={playerName}
               onChange={(event) => setPlayerName(event.currentTarget.value)}
             />
-            {claimedPlayerId && (
+            {claimedPlayerId && !snapshot?.started && (
               <button type="button" onClick={() => onReleaseSeat(claimedPlayerId)}>
                 <UserMinus size={16} />
                 Release
@@ -145,9 +145,11 @@ export function RoomPanel({
           {snapshot.seats.map((seat) => {
             const claimed = Boolean(seat.claimedBy);
             const mine = seat.playerId === claimedPlayerId;
-            const canRecoverOffline = claimed && !seat.ai && !seat.connected && !claimedPlayerId;
-            const canSwitch = !claimed && Boolean(claimedPlayerId);
-            const unavailable = !mine && !canRecoverOffline && !canSwitch && claimed;
+            const seatsLocked = Boolean(snapshot.started);
+            const canRecoverOffline = !seatsLocked && claimed && !seat.ai && !seat.connected && !claimedPlayerId;
+            const canSwitch = !seatsLocked && !claimed && Boolean(claimedPlayerId);
+            const lockedOpenSeat = seatsLocked && !claimed;
+            const unavailable = lockedOpenSeat || (!mine && !canRecoverOffline && !canSwitch && claimed);
             const pendingName = playerName.trim();
             const canUpdateName = mine && pendingName && pendingName !== seat.claimedBy;
             const seatAction = mine
@@ -157,9 +159,13 @@ export function RoomPanel({
               : seat.claimedBy
                 ? seat.connected
                   ? seat.claimedBy
-                  : `${seat.claimedBy} offline - reclaim`
+                  : seatsLocked
+                    ? `${seat.claimedBy} offline`
+                    : `${seat.claimedBy} offline - reclaim`
                 : canSwitch
                   ? "Switch"
+                  : lockedOpenSeat
+                    ? "Locked"
                   : "Claim";
             return (
               <button

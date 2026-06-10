@@ -393,6 +393,75 @@
   color: #ffe1a8 !important;
 }
 
+.influence-track-rewards {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  align-items: end;
+  gap: 2px;
+}
+
+.influence-track-reward-slot {
+  display: flex;
+  align-items: end;
+  justify-content: center;
+  min-height: 16px;
+}
+
+.influence-track-reward {
+  --reward-color: #c8a766;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid color-mix(in srgb, var(--reward-color), transparent 42%);
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--reward-color), transparent 78%), rgba(8, 7, 6, 0.4)),
+    rgba(8, 7, 6, 0.4);
+  color: color-mix(in srgb, var(--reward-color), #fff6e6 55%);
+  font-size: 0.46rem;
+  font-weight: 950;
+  line-height: 1;
+  opacity: 0.55;
+  padding: 2px 4px;
+}
+
+.influence-track-reward.is-reached {
+  opacity: 1;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--reward-color), transparent 35%), 0 0 6px color-mix(in srgb, var(--reward-color), transparent 55%);
+}
+
+.influence-track-reward.is-team {
+  border-style: dashed;
+}
+
+.influence-track-reward b {
+  color: color-mix(in srgb, var(--reward-color), #fff6e6 72%);
+}
+
+.influence-track-reward.tone-solari {
+  --reward-color: #e7c14d;
+}
+
+.influence-track-reward.tone-spice {
+  --reward-color: #d98a3a;
+}
+
+.influence-track-reward.tone-water {
+  --reward-color: #4fb8e0;
+}
+
+.influence-track-reward.tone-troop {
+  --reward-color: #c8584a;
+}
+
+.influence-track-reward.tone-intrigue {
+  --reward-color: #9172dd;
+}
+
+.influence-track-reward.tone-spy {
+  --reward-color: #7fa6c8;
+}
+
 .influence-track-scale {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));

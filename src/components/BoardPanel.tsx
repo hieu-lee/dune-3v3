@@ -1,5 +1,16 @@
 import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { Crown, FileText, Sparkles, Swords, Users } from "lucide-react";
+import {
+  CircleDollarSign,
+  Crown,
+  Droplets,
+  Eye,
+  FileText,
+  ScrollText,
+  Sparkles,
+  Swords,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
 import { costLabel, factionShortLabels } from "../app-helpers";
 import { locationControlOwnerId } from "../game/critical-locations";
 import { boardSpaces, factionLabels as factionFullLabels, iconLabels, teams } from "../game/data";
@@ -66,6 +77,41 @@ const influenceTrackByRegionId: Partial<Record<string, FactionId>> = {
 };
 const influenceTrackSteps = [0, 1, 2, 3, 4] as const;
 
+type InfluenceTrackRewardTone = ResourceId | "troop" | "intrigue" | "spy";
+
+type InfluenceTrackReward = {
+  step: number;
+  amount: number;
+  Icon: LucideIcon;
+  tone: InfluenceTrackRewardTone;
+  label: string;
+  perTeammate?: boolean;
+};
+
+// Mirrors the threshold rewards resolved in src/game/leader-rewards.ts so the
+// board surfaces the same payouts the rules engine grants automatically.
+const influenceTrackRewards: Partial<Record<FactionId, InfluenceTrackReward[]>> = {
+  greatHouses: [{ step: 4, amount: 2, Icon: Swords, tone: "troop", label: "Recruit 2 troops" }],
+  spacing: [{ step: 4, amount: 3, Icon: CircleDollarSign, tone: "solari", label: "Gain 3 Solari" }],
+  bene: [{ step: 4, amount: 1, Icon: ScrollText, tone: "intrigue", label: "Draw 1 Intrigue" }],
+  fringeWorlds: [{ step: 4, amount: 1, Icon: Eye, tone: "spy", label: "Place 1 spy" }],
+  fremen: [
+    { step: 1, amount: 1, Icon: Sparkles, tone: "spice", label: "Each teammate gains 1 spice", perTeammate: true },
+    { step: 3, amount: 1, Icon: Droplets, tone: "water", label: "Each teammate gains 1 water", perTeammate: true },
+  ],
+  emperor: [
+    { step: 1, amount: 1, Icon: CircleDollarSign, tone: "solari", label: "Each teammate gains 1 Solari", perTeammate: true },
+    { step: 3, amount: 1, Icon: Eye, tone: "spy", label: "Each teammate gains 1 spy", perTeammate: true },
+  ],
+};
+
+// Commander tracks reward only the team's Commander reaching the threshold, so
+// their progress is read off that Commander's cube rather than any teammate.
+const commanderTrackTeamByFaction: Partial<Record<FactionId, TeamId>> = {
+  fremen: "muaddib",
+  emperor: "shaddam",
+};
+
 type SpaceMeasurement = {
   centerX: number;
   centerY: number;
@@ -86,7 +132,12 @@ type Point = {
 };
 
 const spySlotCollisionRadius = 18;
-const spySlotLineStopRadius = 15;
+// Stop just inside the rendered ring radius (--spy-slot-ring-size / 2 = 9px in
+// styles-board.css) so the connector tucks under the opaque ring with no
+// sub-pixel sliver between the line and the marker.
+const spySlotLineStopRadius = 7;
+// Minimum drawn length; shorter connectors collapse to a dot and are dropped.
+const spySlotMinSegmentLength = 2;
 const spySlotClampPadding = 30;
 const spySlotOutsideGap = 34;
 const spySlotOccupiedMargin = 36;
@@ -458,7 +509,8 @@ function edgePointToward(measurement: SpaceMeasurement, target: Point): Point {
   if (Math.abs(dx) < 0.001 && Math.abs(dy) < 0.001) {
     return { x: measurement.centerX, y: measurement.centerY };
   }
-  const padding = 5;
+  // Land exactly on the tile's edge so the connector visibly meets the space.
+  const padding = 0;
   const widthScale = dx === 0 ? Number.POSITIVE_INFINITY : (measurement.width / 2 + padding) / Math.abs(dx);
   const heightScale = dy === 0 ? Number.POSITIVE_INFINITY : (measurement.height / 2 + padding) / Math.abs(dy);
   const scale = Math.min(widthScale, heightScale);
@@ -515,10 +567,12 @@ export function BoardPanel({
         const singleton = measuredSpaces.length === 1;
         const postId = spyObservationPostIdForSpace(representativeSpaceId);
         const slotPoint = spySlotPointForPost(postId, representativeSpaceId, measuredSpaces, stageMeasurements);
-        const segments = measuredSpaces.map(({ measurement }) => ({
-          from: edgePointToward(measurement, slotPoint),
-          to: slotEdgePointToward(slotPoint, measurement),
-        }));
+        const segments = measuredSpaces
+          .map(({ measurement }) => ({
+            from: edgePointToward(measurement, slotPoint),
+            to: slotEdgePointToward(slotPoint, measurement),
+          }))
+          .filter(({ from, to }) => Math.hypot(to.x - from.x, to.y - from.y) >= spySlotMinSegmentLength);
         const ownerIds = spyObservationPostOwnerIds(game, representativeSpaceId);
         const owners = ownerIds
           .map((ownerId) => game.players.find((player) => player.id === ownerId))
@@ -801,6 +855,11 @@ export function BoardPanel({
         a.seat - b.seat
       );
     const fullLabel = factionFullLabels[faction];
+    const rewards = influenceTrackRewards[faction] ?? [];
+    const commanderTeam = commanderTrackTeamByFaction[faction];
+    const progressAmount = commanderTeam
+      ? game.players.find((player) => player.team === commanderTeam && player.role === "Commander")?.influence[faction] ?? 0
+      : entries.reduce((highest, entry) => Math.max(highest, entry.amount), 0);
 
     return (
       <div className="influence-track" data-faction-id={faction} data-spy-blocker="">
@@ -816,6 +875,30 @@ export function BoardPanel({
             ) : "Alliance open"}
           </small>
         </div>
+        {rewards.length > 0 && (
+          <div className="influence-track-rewards" role="list" aria-label={`${fullLabel} threshold rewards`}>
+            {influenceTrackSteps.map((step) => {
+              const reward = rewards.find((entry) => entry.step === step);
+              if (!reward) return <span key={step} className="influence-track-reward-slot" aria-hidden="true" />;
+              const reached = progressAmount >= reward.step;
+              const ariaLabel = `${reward.step}${reward.step === 4 ? "+" : ""} ${fullLabel} Influence: ${reward.label}${reached ? " (reached)" : ""}`;
+              return (
+                <span key={step} className="influence-track-reward-slot">
+                  <span
+                    className={`influence-track-reward tone-${reward.tone} ${reached ? "is-reached" : ""} ${reward.perTeammate ? "is-team" : ""}`}
+                    role="listitem"
+                    aria-label={ariaLabel}
+                    title={ariaLabel}
+                  >
+                    <reward.Icon size={9} aria-hidden="true" />
+                    <b>{reward.amount}</b>
+                    {reward.perTeammate && <Users size={8} aria-hidden="true" />}
+                  </span>
+                </span>
+              );
+            })}
+          </div>
+        )}
         <div className="influence-track-scale" aria-hidden="true">
           {influenceTrackSteps.map((step) => <span key={step}>{step === 4 ? "4+" : step}</span>)}
         </div>

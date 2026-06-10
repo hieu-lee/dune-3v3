@@ -1,0 +1,471 @@
+:root {
+  --motion-fast: 120ms;
+  --motion-medium: 180ms;
+  --motion-slow: 260ms;
+  --motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-spring: cubic-bezier(0.2, 0.72, 0.18, 1);
+}
+
+@keyframes surface-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes soft-scale-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes pulse-ready {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(242, 184, 75, 0.18);
+  }
+
+  50% {
+    box-shadow: 0 0 0 5px rgba(242, 184, 75, 0);
+  }
+}
+
+:where(
+  .round-panel,
+  .room-panel,
+  .room-private-panel,
+  .room-pending-panel,
+  .hand-panel,
+  .market-panel,
+  .log-panel,
+  .pending-panel,
+  .team-card,
+  .player-card,
+  .conflict-card,
+  .choam-card,
+  .intrigue-deck-card,
+  .board-panel
+) {
+  animation: surface-enter var(--motion-slow) var(--motion-ease) both;
+}
+
+:where(
+  .room-seat,
+  .room-ai-status,
+  .room-error,
+  .turn-action-summary,
+  .turn-status-chip,
+  .activation-strip button,
+  .private-zone-card,
+  .private-zone-empty,
+  .room-pending-status,
+  .endgame-score-card,
+  .endgame-choice-card,
+  .endgame-choice-empty,
+  .endgame-result-note,
+  .conflict-slot,
+  .influence-track,
+  .influence-track-marker,
+  .agent-marker,
+  .spy-marker,
+  .maker-marker,
+  .control-marker,
+  .space-rewards span,
+  .battle-icon-chip,
+  .conflict-rewards span,
+  .contract-offer,
+  .top-deck-selection-card,
+  .contract-choice-summary,
+  .contract-choice-section,
+  .contract-choice-empty,
+  .trash-choice-summary,
+  .trash-choice-section,
+  .discard-choice-summary,
+  .discard-choice-section,
+  .resource-split-participants,
+  .resource-split-option,
+  .resource-split-lane,
+  .support-target,
+  .military-choice-summary,
+  .military-choice-card,
+  .influence-choice-summary,
+  .influence-choice-card,
+  .split-choice-summary,
+  .split-choice-card,
+  .leader-choice-summary,
+  .leader-choice-card,
+  .paid-reward-choice-summary,
+  .paid-reward-choice-card,
+  .action-choice-summary,
+  .action-choice-card,
+  .throne-choice-summary,
+  .throne-choice-card,
+  .conflict-tie-summary,
+  .conflict-tie-card,
+  .spy-choice-summary,
+  .spy-choice-card
+) {
+  transition:
+    background-color var(--motion-medium) ease,
+    border-color var(--motion-medium) ease,
+    box-shadow var(--motion-medium) ease,
+    color var(--motion-fast) ease,
+    filter var(--motion-medium) ease,
+    opacity var(--motion-medium) ease,
+    transform var(--motion-medium) var(--motion-ease);
+}
+
+:where(
+  button,
+  input,
+  select,
+  summary,
+  .icon-button,
+  .room-inline-form button,
+  .room-inline-form input,
+  .launch-actions button,
+  .launch-join input,
+  .intrigue-card > button,
+  .intrigue-actions button,
+  .endgame-score-button,
+  .endgame-ready-button
+) {
+  transition:
+    background-color var(--motion-medium) ease,
+    border-color var(--motion-medium) ease,
+    box-shadow var(--motion-medium) ease,
+    color var(--motion-fast) ease,
+    filter var(--motion-medium) ease,
+    opacity var(--motion-medium) ease,
+    outline-color var(--motion-fast) ease,
+    transform var(--motion-medium) var(--motion-ease);
+}
+
+:where(
+  .launch-actions button,
+  .room-inline-form button,
+  .icon-button,
+  .turn-actions button,
+  .activation-strip button,
+  .pending-controls button,
+  .resource-picker button,
+  .intrigue-card > button,
+  .intrigue-actions button,
+  .endgame-score-button,
+  .endgame-ready-button
+):hover:not(:disabled),
+:where(
+  .launch-actions button,
+  .room-inline-form button,
+  .icon-button,
+  .turn-actions button,
+  .activation-strip button,
+  .pending-controls button,
+  .resource-picker button,
+  .intrigue-card > button,
+  .intrigue-actions button,
+  .endgame-score-button,
+  .endgame-ready-button
+):focus-visible {
+  transform: translateY(-1px);
+}
+
+:where(
+  .launch-actions button,
+  .room-inline-form button,
+  .icon-button,
+  .turn-actions button,
+  .activation-strip button,
+  .pending-controls button,
+  .resource-picker button,
+  .intrigue-card > button,
+  .intrigue-actions button,
+  .endgame-score-button,
+  .endgame-ready-button
+):active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+  transition-duration: var(--motion-fast);
+}
+
+:where(button, input, select):disabled {
+  transform: none;
+}
+
+:where(
+  .room-seat.open,
+  .room-seat.switchable,
+  .room-seat.recoverable,
+  .pending-panel .pending-controls button:not(:disabled),
+  .resource-picker button:not(:disabled),
+  .activation-strip button,
+  .private-zone-card,
+  .endgame-score-button:not(:disabled),
+  .endgame-ready-button:not(:disabled)
+) {
+  will-change: transform;
+}
+
+.room-seat.open:hover,
+.room-seat.open:focus-visible,
+.room-seat.switchable:hover,
+.room-seat.switchable:focus-visible,
+.room-seat.recoverable:hover,
+.room-seat.recoverable:focus-visible {
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
+  transform: translateY(-2px);
+}
+
+.room-seat.selected,
+.pending-controls button.selected,
+.pending-controls button[aria-pressed="true"],
+.resource-picker button.selected,
+.activation-strip button.selected,
+.endgame-score-card.leading,
+.conflict-slot.is-active {
+  transform: translateY(-1px);
+}
+
+.pending-resolution-overlay {
+  animation: surface-enter var(--motion-slow) var(--motion-ease) both;
+}
+
+.pending-resolution-scrim {
+  transition:
+    backdrop-filter var(--motion-slow) ease,
+    background var(--motion-slow) ease,
+    opacity var(--motion-slow) ease;
+}
+
+.pending-resolution-shell,
+.private-zone-card-modal,
+.leader-modal,
+.room-pending-summary,
+.hidden-active-hand-summary {
+  animation: soft-scale-enter var(--motion-slow) var(--motion-ease) both;
+}
+
+.pending-resolution-body,
+.pending-panel,
+.room-panel,
+.room-private-panel,
+.room-pending-panel,
+.hand-panel,
+.market-panel,
+.team-card,
+.player-card,
+.conflict-card,
+.choam-card,
+.intrigue-deck-card,
+.board-panel,
+.table-drawer,
+.log-panel,
+.room-private-zones,
+.private-zone-grid section,
+.private-zone-card-detail-copy {
+  transition:
+    background-color var(--motion-medium) ease,
+    border-color var(--motion-medium) ease,
+    box-shadow var(--motion-medium) ease,
+    opacity var(--motion-medium) ease,
+    transform var(--motion-medium) var(--motion-ease);
+}
+
+.table-drawer-toggle,
+.board-flip-button,
+.pending-resolution-toggle,
+.pending-resolution-reveal,
+.turn-actions button,
+.activation-strip button,
+.pending-controls button,
+.resource-picker button {
+  transition:
+    background-color var(--motion-medium) ease,
+    border-color var(--motion-medium) ease,
+    box-shadow var(--motion-medium) ease,
+    color var(--motion-fast) ease,
+    filter var(--motion-medium) ease,
+    opacity var(--motion-medium) ease,
+    outline-color var(--motion-fast) ease,
+    transform var(--motion-medium) var(--motion-ease);
+}
+
+.log-panel summary:hover,
+.log-panel summary:focus-visible,
+.room-private-zones summary:hover,
+.room-private-zones summary:focus-visible {
+  background: rgba(242, 184, 75, 0.08);
+}
+
+.log-panel li {
+  animation: soft-scale-enter var(--motion-medium) var(--motion-ease);
+  transition:
+    color var(--motion-fast) ease,
+    opacity var(--motion-medium) ease,
+    transform var(--motion-medium) var(--motion-ease);
+}
+
+.log-panel li:hover {
+  transform: translateX(2px);
+}
+
+.board-region::before,
+.space-tile::after,
+.space-art-frame,
+.space-footer,
+.space-detail,
+.hidden-card-back,
+.hidden-active-card-mini,
+.card-asset-preview,
+.card-resting-meta,
+.card-hold-details,
+.card-asset-missing,
+.intrigue-deck-back-art,
+.intrigue-discard-empty-art,
+.conflict-art,
+.card-art,
+.private-zone-card-art,
+.private-zone-card-art img,
+.top-deck-selection-card img,
+.pending-panel > .pending-controls > span:first-child {
+  transition:
+    background-color var(--motion-medium) ease,
+    border-color var(--motion-medium) ease,
+    box-shadow var(--motion-medium) ease,
+    color var(--motion-fast) ease,
+    filter var(--motion-medium) ease,
+    opacity var(--motion-medium) ease,
+    transform var(--motion-medium) var(--motion-ease);
+}
+
+.space-tile,
+.hand-card,
+.market-card,
+.intrigue-deck-surface,
+.private-zone-card {
+  transition:
+    background-color var(--motion-medium) ease,
+    border-color var(--motion-medium) ease,
+    box-shadow var(--motion-medium) ease,
+    color var(--motion-fast) ease,
+    filter var(--motion-medium) ease,
+    opacity var(--motion-medium) ease,
+    transform var(--motion-medium) var(--motion-spring);
+}
+
+.hand-card.selected,
+.turn-status-chip {
+  animation: pulse-ready 1200ms ease-in-out 1;
+}
+
+.space-tile:hover .space-art,
+.space-tile:focus-visible .space-art,
+.hand-card:not(.hidden-hand-card):hover .card-asset-image,
+.hand-card:not(.hidden-hand-card):focus-visible .card-asset-image,
+.market-card:hover .card-asset-image,
+.market-card:focus-visible .card-asset-image,
+.card-asset-preview:hover .card-asset-image,
+.card-asset-preview:focus-visible .card-asset-image,
+.intrigue-deck-surface:hover .card-asset-image,
+.intrigue-deck-surface:focus-visible .card-asset-image,
+.throne-choice-card:focus-visible .card-asset-image,
+.acquire-card-choice-card:focus-visible .card-asset-image {
+  transition:
+    filter var(--motion-medium) ease 500ms,
+    opacity var(--motion-medium) ease 500ms,
+    transform var(--motion-medium) var(--motion-ease) 500ms;
+}
+
+.space-tile:hover .space-hover-details,
+.space-tile:focus-visible .space-hover-details,
+.hand-card:not(.hidden-hand-card):hover .card-hold-details,
+.hand-card:not(.hidden-hand-card):focus-visible .card-hold-details,
+.market-card:hover .card-hold-details,
+.market-card:focus-visible .card-hold-details,
+.card-asset-preview:hover .card-hold-details,
+.card-asset-preview:focus-visible .card-hold-details,
+.intrigue-deck-surface:hover .card-hold-details,
+.intrigue-deck-surface:focus-visible .card-hold-details,
+.throne-choice-card:focus-visible .card-hold-details,
+.acquire-card-choice-card:focus-visible .card-hold-details {
+  transition:
+    opacity var(--motion-medium) ease 500ms,
+    transform var(--motion-medium) var(--motion-ease) 500ms,
+    visibility 0s linear 500ms;
+}
+
+.space-tile:hover .space-occupancy,
+.space-tile:focus-visible .space-occupancy,
+.hand-card:not(.hidden-hand-card):hover .card-resting-meta,
+.hand-card:not(.hidden-hand-card):focus-visible .card-resting-meta,
+.market-card:hover .card-resting-meta,
+.market-card:focus-visible .card-resting-meta,
+.card-asset-preview:hover .card-resting-meta,
+.card-asset-preview:focus-visible .card-resting-meta,
+.intrigue-deck-surface:hover .card-resting-meta,
+.intrigue-deck-surface:focus-visible .card-resting-meta,
+.throne-choice-card:focus-visible .card-resting-meta,
+.acquire-card-choice-card:focus-visible .card-resting-meta {
+  transition: opacity var(--motion-fast) ease 500ms;
+}
+
+.spy-network-lines line {
+  transition:
+    opacity var(--motion-medium) ease,
+    stroke var(--motion-medium) ease,
+    stroke-width var(--motion-medium) ease,
+    filter var(--motion-medium) ease;
+}
+
+.spy-network-slot {
+  transition: transform var(--motion-medium) var(--motion-ease);
+}
+
+.spy-network-slot-ring,
+.spy-network-slot-owners,
+.spy-network-slot-owner {
+  transition:
+    background-color var(--motion-medium) ease,
+    border-color var(--motion-medium) ease,
+    box-shadow var(--motion-medium) ease,
+    opacity var(--motion-medium) ease,
+    transform var(--motion-medium) var(--motion-ease);
+}
+
+.spy-network-slot.is-legal:hover,
+.spy-network-slot.is-legal:focus-visible,
+.spy-network-slot.is-selected {
+  transform: scale(1.06);
+}
+
+.conflict-slot.has-worms,
+.influence-track-marker.holds-alliance,
+.room-pending-status.ready {
+  animation: pulse-ready 1400ms ease-in-out 2;
+}
+
+.endgame-score-card.leading {
+  animation: pulse-ready 1400ms ease-in-out 2;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-delay: 0ms !important;
+    transition-duration: 1ms !important;
+  }
+}

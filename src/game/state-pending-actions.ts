@@ -134,6 +134,7 @@ export function finishPendingAction(state: GameState): GameState {
   if (state.pendingAction?.kind === "acquire-card" && state.pendingAction.optional !== true) return state;
   if (state.pendingAction?.kind === "contract" && state.pendingAction.optional !== true) return state;
   if (state.pendingAction?.kind === "discard-hand-card") return state;
+  if (state.pendingAction?.kind === "trash-card") return skipTrashCard(state, state.pendingAction);
   if (state.pendingAction?.kind === "draw-cards") return resolveDrawCardsForPending(state, state.pendingAction);
   const resolvedState = state.pendingAction?.kind === "deploy"
     ? resolvePostDeployIntrigueDraw(state, state.pendingAction.postDeployIntrigueDraw)

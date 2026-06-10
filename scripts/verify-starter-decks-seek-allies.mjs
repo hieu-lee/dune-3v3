@@ -79,6 +79,11 @@ function assertSeekAlliesPending({ card, game, label, source, state, target }) {
   const unresolvedGame = { ...pendingGame, pendingAction: pending, pendingQueue: [] };
   const skipped = state.skipTrashCard(unresolvedGame, pending);
   assert.deepEqual(skipped.pendingAction, pending, `${label} should not skip a resolvable mandatory trash`);
+  assert.equal(
+    state.finishPendingAction(unresolvedGame),
+    unresolvedGame,
+    `${label} should not clear a resolvable mandatory trash through the generic finish action`,
+  );
 
   const resolved = state.trashPlayerCard(unresolvedGame, pending, "playArea", card.id);
   assert.equal(

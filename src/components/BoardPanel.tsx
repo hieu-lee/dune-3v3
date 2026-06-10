@@ -132,9 +132,9 @@ type Point = {
 };
 
 const spySlotCollisionRadius = 18;
-// Matches the rendered ring radius (--spy-slot-size / 2 in styles-board.css) so a
-// connector line ends exactly on the ring's border rather than floating short of it.
-const spySlotLineStopRadius = 14;
+// Matches the rendered ring radius (--spy-slot-ring-size / 2 in styles-board.css)
+// so connectors stop on the visible marker, not on the larger button hit area.
+const spySlotLineStopRadius = 9;
 // Minimum drawn length; shorter connectors collapse to a dot and are dropped.
 const spySlotMinSegmentLength = 2;
 const spySlotClampPadding = 30;

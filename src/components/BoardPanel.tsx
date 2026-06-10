@@ -132,7 +132,11 @@ type Point = {
 };
 
 const spySlotCollisionRadius = 18;
-const spySlotLineStopRadius = 15;
+// Matches the rendered ring radius (--spy-slot-size / 2 in styles-board.css) so a
+// connector line ends exactly on the ring's border rather than floating short of it.
+const spySlotLineStopRadius = 14;
+// Minimum drawn length; shorter connectors collapse to a dot and are dropped.
+const spySlotMinSegmentLength = 2;
 const spySlotClampPadding = 30;
 const spySlotOutsideGap = 34;
 const spySlotOccupiedMargin = 36;
@@ -504,7 +508,8 @@ function edgePointToward(measurement: SpaceMeasurement, target: Point): Point {
   if (Math.abs(dx) < 0.001 && Math.abs(dy) < 0.001) {
     return { x: measurement.centerX, y: measurement.centerY };
   }
-  const padding = 5;
+  // Land exactly on the tile's edge so the connector visibly meets the space.
+  const padding = 0;
   const widthScale = dx === 0 ? Number.POSITIVE_INFINITY : (measurement.width / 2 + padding) / Math.abs(dx);
   const heightScale = dy === 0 ? Number.POSITIVE_INFINITY : (measurement.height / 2 + padding) / Math.abs(dy);
   const scale = Math.min(widthScale, heightScale);
@@ -561,10 +566,12 @@ export function BoardPanel({
         const singleton = measuredSpaces.length === 1;
         const postId = spyObservationPostIdForSpace(representativeSpaceId);
         const slotPoint = spySlotPointForPost(postId, representativeSpaceId, measuredSpaces, stageMeasurements);
-        const segments = measuredSpaces.map(({ measurement }) => ({
-          from: edgePointToward(measurement, slotPoint),
-          to: slotEdgePointToward(slotPoint, measurement),
-        }));
+        const segments = measuredSpaces
+          .map(({ measurement }) => ({
+            from: edgePointToward(measurement, slotPoint),
+            to: slotEdgePointToward(slotPoint, measurement),
+          }))
+          .filter(({ from, to }) => Math.hypot(to.x - from.x, to.y - from.y) >= spySlotMinSegmentLength);
         const ownerIds = spyObservationPostOwnerIds(game, representativeSpaceId);
         const owners = ownerIds
           .map((ownerId) => game.players.find((player) => player.id === ownerId))

@@ -76,6 +76,9 @@ import {
   advancePendingAction,
 } from "./pending-actions";
 import {
+  skipPendingActionChoice as resolveSkipPendingActionChoice,
+} from "./pending-action-choice-rules";
+import {
   boardAgentRecallSpaceIds,
 } from "./placement-rules";
 import {
@@ -135,6 +138,7 @@ export function finishPendingAction(state: GameState): GameState {
   if (state.pendingAction?.kind === "contract" && state.pendingAction.optional !== true) return state;
   if (state.pendingAction?.kind === "discard-hand-card") return state;
   if (state.pendingAction?.kind === "trash-card") return skipTrashCard(state, state.pendingAction);
+  if (state.pendingAction?.kind === "pending-action-choice") return skipPendingActionChoice(state, state.pendingAction);
   if (state.pendingAction?.kind === "draw-cards") return resolveDrawCardsForPending(state, state.pendingAction);
   const resolvedState = state.pendingAction?.kind === "deploy"
     ? resolvePostDeployIntrigueDraw(state, state.pendingAction.postDeployIntrigueDraw)
@@ -167,6 +171,7 @@ type LoseInfluenceForInfluencePendingAction = Extract<PendingAction, { kind: "lo
 type PayResourceForHighCouncilSeatPendingAction = Extract<PendingAction, { kind: "pay-resource-for-high-council-seat" }>;
 type BoardInfluenceChoicePendingAction = Extract<PendingAction, { kind: "board-influence-choice" }>;
 type OptionalSpacePaymentPendingAction = Extract<PendingAction, { kind: "optional-space-payment" }>;
+type PendingActionChoicePendingAction = Extract<PendingAction, { kind: "pending-action-choice" }>;
 type PostDeployIntrigueDrawPendingAction = DeployPendingAction | MakerChoicePendingAction | SietchTabrPendingAction;
 
 function matchingPostDeployIntrigueDraw(
@@ -380,6 +385,13 @@ export function skipTrashIntrigueForReward(
   pending: TrashIntrigueForRewardPendingAction,
 ): GameState {
   return continueAfterResolvedConflictReward(resolveSkipTrashIntrigueForReward(state, pending));
+}
+
+export function skipPendingActionChoice(
+  state: GameState,
+  pending: PendingActionChoicePendingAction,
+): GameState {
+  return continueAfterResolvedConflictReward(resolveSkipPendingActionChoice(state, pending));
 }
 
 export function boardAgentRecallSpacesForPending(

@@ -63,8 +63,14 @@ export function verifyLeaderIrulanSignetAndBirthright({ cards, game, players, sp
     [costOneImperiumCard.id],
     "Chronicler's Insight should acquire exactly cost-1 cards, not cost-0 cards",
   );
+  const unresolvedIrulanChoice = { ...irulanSignetState, pendingAction: irulanSignetPending, pendingQueue: [] };
+  assert.equal(
+    state.finishPendingAction(unresolvedIrulanChoice),
+    unresolvedIrulanChoice,
+    "Chronicler's Insight should not clear a mandatory pending-action choice through the generic finish action",
+  );
   const irulanAcquireChoice = state.resolvePendingActionChoice(
-    { ...irulanSignetState, pendingAction: irulanSignetPending, pendingQueue: [] },
+    unresolvedIrulanChoice,
     irulanSignetPending,
     "acquire",
   );

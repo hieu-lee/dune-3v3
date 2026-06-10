@@ -98,12 +98,14 @@ try {
   const deployFixture = fixture(state, data, (players) =>
     players.map((player) => (player.id === "p2" ? { ...player, garrison: 2 } : player)),
   );
-  const deployed = state.deployTroopToConflict(deployFixture, {
+  const deployPending = {
     kind: "deploy",
     ownerId: "p2",
     remaining: 2,
     source: "Verifier deployment",
-  });
+  };
+  const activeDeployFixture = { ...deployFixture, pendingAction: deployPending };
+  const deployed = state.deployTroopToConflict(activeDeployFixture, deployPending);
   const deployedPlayer = playerById(deployed, "p2");
   assert.equal(deployedPlayer.garrison, 1, "Deploying should spend one garrison troop");
   assert.equal(deployedPlayer.conflict, 2, "Deploying should add troop strength");
@@ -114,14 +116,31 @@ try {
     remaining: 1,
     source: "Verifier deployment",
   });
+  const forgedDeployFixture = {
+    ...deployFixture,
+    pendingAction: { kind: "throne-row", ownerId: "p4", source: "Verifier unrelated pending" },
+  };
+  const forgedDeploy = state.deployTroopToConflict(forgedDeployFixture, {
+    kind: "deploy",
+    ownerId: "p2",
+    remaining: 2,
+    source: "Forged deployment",
+  });
+  assert.equal(
+    forgedDeploy,
+    forgedDeployFixture,
+    "Forged deployment pending actions must not mutate state when deploy is not the active pending action",
+  );
 
   const reinforceFixture = fixture(state, data, (players) => players);
-  const reinforcedConflict = state.reinforceTroop(reinforceFixture, {
+  const reinforceConflictPending = {
     kind: "reinforce",
     team: "shaddam",
     remaining: 2,
     source: "Verifier support",
-  }, "p2", "conflict");
+  };
+  const reinforceConflictFixture = { ...reinforceFixture, pendingAction: reinforceConflictPending };
+  const reinforcedConflict = state.reinforceTroop(reinforceConflictFixture, reinforceConflictPending, "p2", "conflict");
   const reinforcedConflictPlayer = playerById(reinforcedConflict, "p2");
   assert.equal(reinforcedConflictPlayer.garrison, playerById(reinforceFixture, "p2").garrison);
   assert.equal(reinforcedConflictPlayer.conflict, 2);
@@ -133,12 +152,14 @@ try {
     source: "Verifier support",
   });
 
-  const reinforcedGarrison = state.reinforceTroop(reinforceFixture, {
+  const reinforceGarrisonPending = {
     kind: "reinforce",
     team: "shaddam",
     remaining: 1,
     source: "Verifier support",
-  }, "p2", "garrison");
+  };
+  const reinforceGarrisonFixture = { ...reinforceFixture, pendingAction: reinforceGarrisonPending };
+  const reinforcedGarrison = state.reinforceTroop(reinforceGarrisonFixture, reinforceGarrisonPending, "p2", "garrison");
   const reinforcedGarrisonPlayer = playerById(reinforcedGarrison, "p2");
   assert.equal(reinforcedGarrisonPlayer.garrison, playerById(reinforceFixture, "p2").garrison + 1);
   assert.equal(reinforcedGarrisonPlayer.conflict, 0);

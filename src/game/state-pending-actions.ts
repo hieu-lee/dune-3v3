@@ -791,6 +791,7 @@ export function resolveSietchTabrChoice(
 }
 
 export function deployTroopToConflict(state: GameState, pending: DeployPendingAction): GameState {
+  if (state.pendingAction !== pending) return state;
   const owner = state.players.find((player) => player.id === pending.ownerId);
   if (pending.conflictBlocked || conflictDeploymentBlockedForOwner(state, pending.ownerId)) {
     return { ...state, ...advancePendingAction(state) };
@@ -820,6 +821,7 @@ export function deployTroopToConflict(state: GameState, pending: DeployPendingAc
 }
 
 export function deployControlDefenseTroop(state: GameState, pending: ControlDefensePendingAction): GameState {
+  if (state.pendingAction !== pending) return state;
   const owner = state.players.find((player) => player.id === pending.ownerId);
   if (!owner || playerTroopSupply(owner) <= 0) return { ...state, ...advancePendingAction(state) };
 
@@ -843,6 +845,7 @@ export function deployControlDefenseTroop(state: GameState, pending: ControlDefe
 }
 
 export function skipControlDefenseTroop(state: GameState, pending: ControlDefensePendingAction): GameState {
+  if (state.pendingAction !== pending) return state;
   const owner = state.players.find((player) => player.id === pending.ownerId);
   return {
     ...state,
@@ -860,6 +863,7 @@ export function reinforceTroop(
   playerId: string,
   destination: "garrison" | "conflict",
 ): GameState {
+  if (state.pendingAction !== pending) return state;
   if (pending.remaining <= 0) return state;
   if (destination === "conflict" && pending.conflictBlocked) return state;
   const recipient = state.players.find((player) => player.id === playerId);

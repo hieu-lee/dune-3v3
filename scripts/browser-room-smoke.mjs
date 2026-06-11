@@ -264,12 +264,15 @@ try {
   );
   assert.equal(
     await bobRecoveryPage.getByTestId("room-seat-p2").isDisabled(),
-    false,
-    "Disconnected claimed seats should be recoverable from a browser without the old token",
+    true,
+    "Disconnected claimed seats should not be recoverable from a browser without the old token",
   );
-  await claimSeat(bobRecoveryPage, "p2", "Bob Reopened");
-  await waitForVisiblePrivateHand(bobRecoveryPage, "p2");
-  await capture(bobRecoveryPage, "room-bob-offline-reclaimed.png");
+  assert.doesNotMatch(
+    await bobRecoveryPage.getByTestId("room-seat-p2").innerText(),
+    /reclaim/i,
+    "Disconnected claimed seats should not be labeled as tokenless reclaimable",
+  );
+  await capture(bobRecoveryPage, "room-bob-offline-locked.png");
   await bobRecoveryContext.close();
 
   const actionContext = await browser.newContext({ viewport: { width: 1440, height: 1100 } });
@@ -281,16 +284,24 @@ try {
   const actionRoomId = await actionPage.evaluate(() => new URL(window.location.href).searchParams.get("room"));
   const actionRecord = server.rooms.get(actionRoomId);
   assert.ok(actionRecord, "Action smoke room should be stored in memory");
+  let actionGame = await currentGame(actionPage);
+  const activePlayerId = actionGame.players[actionGame.activeSeat].id;
+  await claimSeat(actionPage, "p4", "Shaddam");
+  let activePage = actionPage;
+  let activeContext = actionContext;
+  if (activePlayerId !== "p4") {
+    activeContext = await browser.newContext({ viewport: { width: 1440, height: 1100 } });
+    activePage = await activeContext.newPage();
+    observePage(activePage);
+    await activePage.goto(`${server.resolvedUrls.local[0]}?room=${actionRoomId}`, { waitUntil: "domcontentloaded" });
+    await claimSeat(activePage, activePlayerId, "Active");
+  }
   actionRecord.started = true;
   actionRecord.version += 1;
   actionRecord.updatedAt = Date.now();
   await actionPage.reload({ waitUntil: "domcontentloaded" });
   await actionPage.waitForFunction(() => window.__DUNE_DEBUG__?.getRoomSnapshot?.()?.started === true);
-  let actionGame = await currentGame(actionPage);
-  let p4Page = null;
   if (actionGame.pendingAction?.kind === "throne-row") {
-    await claimSeat(actionPage, "p4", "Shaddam");
-    p4Page = actionPage;
     const firstThroneCard = actionPage.locator(".pending-panel .throne-choice button").first();
     await firstThroneCard.waitFor({ state: "visible" });
     await firstThroneCard.click();
@@ -299,18 +310,9 @@ try {
   }
 
   actionGame = await currentGame(actionPage);
-  const activePlayerId = actionGame.players[actionGame.activeSeat].id;
-  let activePage = actionPage;
-  let activeContext = actionContext;
-  if (p4Page && activePlayerId !== "p4") {
-    activeContext = await browser.newContext({ viewport: { width: 1440, height: 1100 } });
-    activePage = await activeContext.newPage();
-    observePage(activePage);
-    await activePage.goto(`${server.resolvedUrls.local[0]}?room=${actionRoomId}`, { waitUntil: "domcontentloaded" });
-  }
-  if (!p4Page || activePlayerId !== "p4") {
-    await activePage.waitForFunction(() => document.querySelector(".room-seat"));
-    await claimSeat(activePage, activePlayerId, "Active");
+  if (activePage !== actionPage) {
+    await activePage.reload({ waitUntil: "domcontentloaded" });
+    await activePage.waitForFunction(() => window.__DUNE_DEBUG__?.getRoomSnapshot?.()?.started === true);
   }
   await activePage.getByTestId("reveal-turn").click();
   await activePage.waitForFunction(
@@ -820,8 +822,13 @@ try {
   const plotRoom = await plotRoomResponse.json();
   const plotRecord = server.rooms.get(plotRoom.roomId);
   assert.ok(plotRecord, "Plot UI room should be stored in memory");
-  plotRecord.started = true;
   const plotOwnerId = "p2";
+  const plotContext = await browser.newContext({ viewport: { width: 1440, height: 1100 } });
+  const plotPage = await plotContext.newPage();
+  observePage(plotPage);
+  await plotPage.goto(`${server.resolvedUrls.local[0]}?room=${plotRoom.roomId}`, { waitUntil: "domcontentloaded" });
+  await claimSeat(plotPage, plotOwnerId, "Plot");
+  plotRecord.started = true;
   const contingencyPlan = intrigueBySourceId(147);
   const plotOwnerInitialSolari = plotRecord.game.players.find((player) => player.id === plotOwnerId)?.resources.solari ?? 0;
   plotRecord.game = {
@@ -836,11 +843,8 @@ try {
         : { ...player, intrigues: [], hand: [], deck: [], discard: [] }
     ),
   };
-  const plotContext = await browser.newContext({ viewport: { width: 1440, height: 1100 } });
-  const plotPage = await plotContext.newPage();
-  observePage(plotPage);
-  await plotPage.goto(`${server.resolvedUrls.local[0]}?room=${plotRoom.roomId}`, { waitUntil: "domcontentloaded" });
-  await claimSeat(plotPage, plotOwnerId, "Plot");
+  await plotPage.reload({ waitUntil: "domcontentloaded" });
+  await waitForSelectedSeat(plotPage, plotOwnerId);
   await plotPage.locator(".intrigue-hand").getByRole("button", { name: "Gain 2 Solari", exact: true }).click();
   await plotPage.waitForFunction(
     ({ ownerId, expectedSolari }) => {

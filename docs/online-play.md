@@ -92,7 +92,7 @@ The important files are:
 - `online-tunnel-lobby-loaded.png` and `.state.json`: public lobby loaded through the tunnel before room creation.
 - `online-tunnel-alice-claimed.png` and `.state.json`: first public browser claimed seat.
 - `online-tunnel-bob-claimed.png` and `.state.json`: second public browser claimed seat and first browser observed the update through polling.
-- `online-tunnel-bob-reclaimed.png` and `.state.json`: fresh public browser reclaimed the second seat after polling stopped and the seat went offline.
+- `online-tunnel-bob-offline-locked.png` and `.state.json`: fresh public browser saw the disconnected second seat locked instead of tokenlessly reclaimable.
 - `online-tunnel-alice-reconnected.png` and `.state.json`: reconnect-token recovery over the public tunnel.
 - `console.json` and `request-failures.json`: raw browser diagnostics.
 

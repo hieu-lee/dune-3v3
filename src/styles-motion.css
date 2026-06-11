@@ -205,7 +205,6 @@
 :where(
   .room-seat.open,
   .room-seat.switchable,
-  .room-seat.recoverable,
   .pending-panel .pending-controls button:not(:disabled),
   .resource-picker button:not(:disabled),
   .activation-strip button,
@@ -219,9 +218,7 @@
 .room-seat.open:hover,
 .room-seat.open:focus-visible,
 .room-seat.switchable:hover,
-.room-seat.switchable:focus-visible,
-.room-seat.recoverable:hover,
-.room-seat.recoverable:focus-visible {
+.room-seat.switchable:focus-visible {
   box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
   transform: translateY(-2px);
 }

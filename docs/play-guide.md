@@ -89,7 +89,7 @@ If a player claims the wrong seat:
 If a player disconnects:
 
 - Refreshing the same browser should reclaim the seat using the locally stored reconnect token.
-- If the original browser is gone, a fresh browser can click the disconnected offline seat to recover it.
+- If the original browser is gone and the reconnect token is unavailable, the seat stays locked to protect that player's private hand. Release the seat before switching devices.
 
 ## Playing A Turn
 
@@ -190,8 +190,8 @@ Every browser run writes artifacts under `artifacts/qa/...`, including screensho
 - **`pnpm run play:online` cannot find `cloudflared`:** install `cloudflared`, then confirm `cloudflared --version` works in the same terminal.
 - **Players cannot open the host URL:** make sure they are using the host machine's reachable network address, not `127.0.0.1` from their own machine.
 - **A TryCloudflare room looks stale:** make sure the URL includes `sync=poll`, then refresh.
-- **A player sees only hidden cards:** they probably have not claimed a seat, lost their local token, or are viewing as an unclaimed spectator. Reclaim the seat or click the offline seat if it is disconnected.
+- **A player sees only hidden cards:** they probably have not claimed a seat, lost their local token, or are viewing as an unclaimed spectator. Reconnect from the browser with the stored token, or release the seat before switching devices.
 - **A button is disabled:** it is probably not that player's turn, a pending action belongs to someone else, or the move is illegal.
 - **A player chose the wrong seat:** use **Release** or click an unclaimed seat to switch.
-- **The room looks stale after reconnecting:** refresh the page. If the old browser was closed, wait for the seat to show offline, then reclaim it.
+- **The room looks stale after reconnecting:** refresh the page. If the old browser was closed and its stored token is unavailable, the seat cannot be reclaimed from a fresh browser.
 - **You want to discard a test room:** stop the server and remove the configured room storage file, or run with `--no-storage` next time.

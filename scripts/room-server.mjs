@@ -502,7 +502,7 @@ export async function createRoomServer({
   }
 
   function seatClaimRequiresReconnectToken(room, existing, existingTokenSeat) {
-    return room.started !== false || Boolean(roomIsStarted(room) && (existing || existingTokenSeat));
+    return Boolean(existing) || room.started !== false || Boolean(roomIsStarted(room) && existingTokenSeat);
   }
 
   async function startRoom(room) {
@@ -801,7 +801,7 @@ export async function createRoomServer({
             existingTokenSeat?.playerId === playerId
           ));
           if (!tokenOwnsTargetSeat) {
-            return sendError(response, 409, existing ? "Started seat requires its reconnect token" : "Started rooms do not allow new seat claims");
+            return sendError(response, 409, existing ? "Claimed seat requires its reconnect token" : "Started rooms do not allow new seat claims");
           }
         }
         if (existing && existing.token !== previousToken && existing.connected) {

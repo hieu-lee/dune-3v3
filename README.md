@@ -47,7 +47,7 @@ For step-by-step player instructions, see [docs/play-guide.md](docs/play-guide.m
 3. Each player opens the link, enters a player name, and claims one of the six seats.
 4. If someone picks the wrong seat, they can switch to an open seat or press **Release**.
 5. If someone closes or refreshes the browser, the local reconnect token should restore their seat.
-6. If a disconnected seat needs to be recovered from a new browser, click the offline seat to reclaim it.
+6. If someone needs to move browsers, release the seat first or reconnect from a browser that still has the stored token.
 7. Play from the table UI. Only the active player or pending-choice owner can make the current room action.
 
 Seat layout:

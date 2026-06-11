@@ -57,6 +57,7 @@ export type RoomSnapshot = {
   roomId: string;
   version: number;
   started: boolean;
+  seatsLocked: boolean;
   createdAt: number;
   updatedAt: number;
   endgameReady: Record<string, boolean | undefined>;
@@ -276,6 +277,7 @@ export function roomSnapshotFor(room: StoredRoom, viewerToken?: string): RoomSna
     roomId: room.id,
     version: room.version,
     started: roomStartedForSnapshot(room),
+    seatsLocked: room.started !== false,
     createdAt: room.createdAt,
     updatedAt: room.updatedAt,
     endgameReady: { ...room.endgameReady },

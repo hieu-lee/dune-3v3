@@ -206,12 +206,20 @@ try {
   observePage(bobRecoveryPage);
   await openPublicApp(bobRecoveryPage, inviteUrl);
   await bobRecoveryPage.waitForFunction(() => window.__DUNE_DEBUG__?.getRoomSyncMode?.() === "poll");
-  await claimSeat(bobRecoveryPage, "p2", "Bob Reopened");
-  await waitForVisiblePrivateHand(bobRecoveryPage, "p2");
-  await alicePage.waitForFunction(() =>
-    window.__DUNE_DEBUG__?.getRoomSnapshot?.()?.seats.find((seat) => seat.playerId === "p2")?.claimedBy === "Bob Reopened"
+  await bobRecoveryPage.waitForFunction(() =>
+    document.querySelector("[data-testid='room-seat-p2']")?.textContent?.includes("offline")
   );
-  await capture(bobRecoveryPage, "online-tunnel-bob-reclaimed.png");
+  assert.equal(
+    await bobRecoveryPage.getByTestId("room-seat-p2").isDisabled(),
+    true,
+    "Fresh public browsers should not reclaim disconnected seats without the old token",
+  );
+  assert.doesNotMatch(
+    await bobRecoveryPage.getByTestId("room-seat-p2").innerText(),
+    /reclaim/i,
+    "Disconnected claimed seats should not be labeled as tokenless reclaimable over the public tunnel",
+  );
+  await capture(bobRecoveryPage, "online-tunnel-bob-offline-locked.png");
   await stopRoomPolling(bobRecoveryPage);
   await bobRecoveryContext.close();
 

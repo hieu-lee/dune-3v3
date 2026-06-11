@@ -380,13 +380,8 @@ button {
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--seat-accent), transparent 58%);
 }
 
-.room-seat.switchable,
-.room-seat.recoverable {
+.room-seat.switchable {
   border-color: color-mix(in srgb, var(--seat-accent), transparent 58%);
-}
-
-.room-seat.recoverable {
-  background: rgba(91, 192, 190, 0.08);
 }
 
 .room-seat.ai {

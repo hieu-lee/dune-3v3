@@ -105,6 +105,7 @@ async function assertPollHeartbeatDisconnects() {
     });
     assert.equal(claim.response.status, 200, "Poll-mode seat claim should succeed");
     const token = claim.body.token;
+    assertVisibleHand(claim.body.snapshot, "p1");
     await sleep(70);
     const refreshed = await pollJson(`/api/rooms/${roomId}`, {
       headers: { "x-room-sync": "poll", "x-room-token": token },
@@ -150,13 +151,25 @@ async function assertPollHeartbeatDisconnects() {
       false,
       "Poll-mode seat should go offline after polling stops",
     );
-    const reclaimed = await pollJson(`/api/rooms/${roomId}/seats/p1/claim`, {
+    const tokenlessReclaim = await pollJson(`/api/rooms/${roomId}/seats/p1/claim`, {
       method: "POST",
       headers: { "content-type": "application/json", "x-room-sync": "poll" },
       body: JSON.stringify({ name: "Poll Reclaimer" }),
     });
-    assert.equal(reclaimed.response.status, 200, "Offline poll-mode seat should be reclaimable without the old token");
-    assert.notEqual(reclaimed.body.token, token, "Offline poll-mode reclaim should issue a new reconnect token");
+    assert.equal(
+      tokenlessReclaim.response.status,
+      409,
+      "Offline poll-mode seats with pre-dealt private state should require the old token",
+    );
+    assert.equal(tokenlessReclaim.body.token, undefined, "Rejected tokenless reclaim should not issue a new token");
+    assert.equal(tokenlessReclaim.body.snapshot, undefined, "Rejected tokenless reclaim should not reveal the seat hand");
+    const reclaimed = await pollJson(`/api/rooms/${roomId}/seats/p1/claim`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-room-sync": "poll" },
+      body: JSON.stringify({ name: "Poll Reconnector", token }),
+    });
+    assert.equal(reclaimed.response.status, 200, "Offline poll-mode seat should reconnect with the old token");
+    assert.equal(reclaimed.body.token, token, "Token reconnect should keep the original reconnect token");
   } finally {
     await pollServer.close();
   }
@@ -310,6 +323,7 @@ async function assertStartedSeatsStayLocked() {
   });
   assert.equal(start.response.status, 200, "Fully claimed seat-lock room should start");
   assert.equal(start.body.snapshot.started, true, "Seat-lock fixture should be started");
+  assert.equal(start.body.snapshot.seatsLocked, true, "Explicitly started rooms should report locked seats");
 
   const roomRecord = server.rooms.get(roomId);
   assert.ok(roomRecord, "Started seat-lock room should remain stored");
@@ -371,6 +385,7 @@ async function assertInferredStartedSeatsStayLocked() {
   const inferredSnapshot = await jsonFetch(`/api/rooms/${roomId}`);
   assert.equal(inferredSnapshot.response.status, 200, "Inferred-started room snapshot should load");
   assert.equal(inferredSnapshot.body.started, true, "Pending state should make the room appear started");
+  assert.equal(inferredSnapshot.body.seatsLocked, false, "Legacy inferred-started rooms should keep unclaimed seats claimable");
   const noTokenReclaim = await jsonFetch(`/api/rooms/${roomId}/seats/p1/claim`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -937,17 +952,17 @@ try {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ name: "Offline Friend Reopened" }),
   });
-  assert.equal(offlineReclaim.response.status, 200, "Disconnected claimed seats should be recoverable without the old token");
+  assert.equal(offlineReclaim.response.status, 409, "Disconnected claimed seats should require the old token");
+  assert.equal(offlineReclaim.body.token, undefined, "Rejected disconnected-seat takeover should not issue a fresh reconnect token");
   assert.notEqual(
-    offlineReclaim.body.token,
-    offlineOriginalClaim.body.token,
-    "Offline recovery without the original token should issue a fresh reconnect token",
+    offlineReclaim.body?.snapshot?.viewerPlayerId,
+    "p3",
+    "Rejected disconnected-seat takeover should not expose the reclaimed viewer seat",
   );
-  assert.equal(offlineReclaim.body.snapshot.viewerPlayerId, "p3", "Offline recovery should restore the reclaimed viewer seat");
   assert.equal(
-    offlineReclaim.body.snapshot.seats.find((seat) => seat.playerId === "p3")?.claimedBy,
-    "Offline Friend Reopened",
-    "Offline recovery should update the displayed claimant",
+    recoveryRoomRecord.seats.p3?.name,
+    "Offline Friend",
+    "Rejected disconnected-seat takeover should keep the original claimant",
   );
 
   const firstP1Stream = await openRoomEventStream(roomId, p1Claim.body.token);

@@ -145,11 +145,11 @@ export function RoomPanel({
           {snapshot.seats.map((seat) => {
             const claimed = Boolean(seat.claimedBy);
             const mine = seat.playerId === claimedPlayerId;
-            const seatsLocked = Boolean(snapshot.started);
-            const canRecoverOffline = !seatsLocked && claimed && !seat.ai && !seat.connected && !claimedPlayerId;
-            const canSwitch = !seatsLocked && !claimed && Boolean(claimedPlayerId);
+            const seatsLocked = Boolean(snapshot.seatsLocked);
+            const canSwitch = !snapshot.started && !claimed && Boolean(claimedPlayerId);
+            const canClaimOpenSeat = !claimed && !seatsLocked && !claimedPlayerId;
             const lockedOpenSeat = seatsLocked && !claimed;
-            const unavailable = lockedOpenSeat || (!mine && !canRecoverOffline && !canSwitch && claimed);
+            const unavailable = lockedOpenSeat || (!mine && !canSwitch && !canClaimOpenSeat);
             const pendingName = playerName.trim();
             const canUpdateName = mine && pendingName && pendingName !== seat.claimedBy;
             const seatAction = mine
@@ -159,13 +159,13 @@ export function RoomPanel({
               : seat.claimedBy
                 ? seat.connected
                   ? seat.claimedBy
-                  : seatsLocked
-                    ? `${seat.claimedBy} offline`
-                    : `${seat.claimedBy} offline - reclaim`
+                  : `${seat.claimedBy} offline`
                 : canSwitch
                   ? "Switch"
-                  : lockedOpenSeat
-                    ? "Locked"
+                : lockedOpenSeat
+                  ? "Locked"
+                  : claimedPlayerId
+                    ? "Unavailable"
                   : "Claim";
             return (
               <button
@@ -176,9 +176,8 @@ export function RoomPanel({
                   mine ? "selected" : "",
                   unavailable ? "claimed" : "",
                   canSwitch ? "switchable" : "",
-                  canRecoverOffline ? "recoverable" : "",
                   seat.ai ? "ai" : "",
-                  !claimed ? "open" : "",
+                  canClaimOpenSeat ? "open" : "",
                 ]
                   .filter(Boolean)
                   .join(" ")}

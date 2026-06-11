@@ -214,6 +214,7 @@ export function resolveStabanUnseenNetworkChoiceForPending(
   choice: "pay" | "skip",
   finishPendingResolution: FinishPendingResolution,
 ): GameState {
+  if (state.pendingAction !== pending) return state;
   const owner = state.players.find((player) => player.id === pending.ownerId);
   const space = boardSpaces.find((candidate) => candidate.id === pending.spaceId);
   if (!owner || !space || owner.leader !== stabanTuekLeaderName || owner.role !== "Ally") return state;

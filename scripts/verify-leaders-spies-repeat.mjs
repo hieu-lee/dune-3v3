@@ -110,6 +110,16 @@ export function verifyLeaderSpiesAndReverendRepeat({ cards, data, game, players,
   assert.equal(playerById(stabanLandsraadReward, staban.id).resources.spice, 0, "Unseen Network Landsraad reward should spend 1 spice");
   assert.equal(playerById(stabanLandsraadReward, staban.id).resources.solari, 5, "Unseen Network Landsraad reward should gain 3 Solari");
   assert.equal(stabanLandsraadReward.pendingAction, undefined, "Unseen Network should clear after resolving the Landsraad reward");
+  const staleStabanUnseenNetworkState = {
+    ...stabanLandsraadPlacement,
+    pendingAction: { kind: "draw-cards", ownerId: staban.id, source: "Live pending", amount: 1 },
+    pendingQueue: [],
+  };
+  assert.deepEqual(
+    state.resolveStabanUnseenNetworkChoice(staleStabanUnseenNetworkState, stabanLandsraadPlacement.pendingAction, "pay"),
+    staleStabanUnseenNetworkState,
+    "Unseen Network should reject stale pending actions",
+  );
   const stabanFactionPlacement = state.placeSpyForPending(
     {
       ...stabanSignetState,

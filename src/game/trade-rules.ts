@@ -145,6 +145,7 @@ export function updateTradeSelection(
   resource: TradeGoodId,
   partnerId?: string,
 ): GameState {
+  if (state.pendingAction !== pending) return state;
   if (!supportedTradeGoods.has(resource)) return state;
   const nextPartnerId = partnerId ?? pending.partnerId;
   const actor = state.players.find((player) => player.id === pending.actorId);
@@ -176,6 +177,7 @@ export function transferTradeGood(
   toId: string,
   intrigueId?: string,
 ): GameState {
+  if (state.pendingAction !== pending) return state;
   const from = state.players.find((player) => player.id === fromId);
   const to = state.players.find((player) => player.id === toId);
   if (!from || !to) return state;

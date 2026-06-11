@@ -53,6 +53,17 @@ try {
   assert.equal(opponentSelection, spiceTradeState, "Trade partner selection must stay within the actor's team");
   const unsupportedSelection = state.updateTradeSelection(spiceTradeState, pending, "melange");
   assert.equal(unsupportedSelection, spiceTradeState, "Trade goods outside the supported set must be ignored");
+  const staleSelectionState = {
+    ...spiceTradeState,
+    pendingAction: {
+      kind: "draw-cards",
+      ownerId: actor.id,
+      remaining: 1,
+      source: "Stale trade guard",
+    },
+  };
+  const staleSelection = state.updateTradeSelection(staleSelectionState, pending, "water");
+  assert.equal(staleSelection, staleSelectionState, "Stale trade selections must not replace the live pending action");
 
   const spiceActor = spiceTradeState.players.find((player) => player.id === actor.id);
   const spicePartner = spiceTradeState.players.find((player) => player.id === partner.id);
@@ -84,8 +95,11 @@ try {
   assert.equal(lockedPartner, spiceAfter, "Trade partner cannot change after goods have moved");
 
   const opponentPending = { ...pending, partnerId: "p3" };
-  const opponentAfter = state.transferTradeGood(spiceTradeState, opponentPending, actor.id, "p3");
-  assert.equal(opponentAfter, spiceTradeState, "Trade transfers must stay within one team");
+  const opponentTradeState = { ...spiceTradeState, pendingAction: opponentPending };
+  const opponentAfter = state.transferTradeGood(opponentTradeState, opponentPending, actor.id, "p3");
+  assert.equal(opponentAfter, opponentTradeState, "Trade transfers must stay within one team");
+  const staleTransfer = state.transferTradeGood(staleSelectionState, pending, actor.id, partner.id);
+  assert.equal(staleTransfer, staleSelectionState, "Stale trade transfers must not move resources or replace the live pending action");
 
   const [intrigue] = data.intrigueCards;
   assert.ok(intrigue, "Uprising Intrigue data should be available");

@@ -28,6 +28,18 @@ export async function runCombatIntriguesSmoke({
 
   await page.setViewportSize({ width: 390, height: 900 });
   await page.evaluate(() => window.scrollTo(0, 0));
+  const compactCombatChoiceHeights = await page.locator(".combat-panel .combat-target button").evaluateAll((buttons) =>
+    buttons.map((button) => ({
+      label: button.textContent?.trim() ?? "",
+      height: button.getBoundingClientRect().height,
+    })),
+  );
+  const undersizedCompactCombatChoices = compactCombatChoiceHeights.filter(({ height }) => height < 32);
+  assert.deepEqual(
+    undersizedCompactCombatChoices,
+    [],
+    "Mobile Combat Intrigue choice buttons should keep at least a 32px tap target",
+  );
   await screenshot(page, captures, "combat-intrigues-mobile.png");
 
   await page.setViewportSize({ width: 1440, height: 1100 });

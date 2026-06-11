@@ -83,26 +83,13 @@ export function createBrowserDebugPageTools({ artifactStem, consoleMessages, wri
 
   async function setDebugGameAndWait(page, game) {
     await setDebugGame(page, game);
+    const serializedGame = JSON.stringify(game);
     await page.waitForFunction(
-      ({ activeSeat, activePlayerId, firstHandCardId, pendingKind, throneRowIds }) => {
+      (expectedGame) => {
         const current = window.__DUNE_DEBUG__?.getGame();
-        const activePlayer = current?.players[current.activeSeat];
-        return Boolean(
-          current &&
-            current.activeSeat === activeSeat &&
-            activePlayer?.id === activePlayerId &&
-            activePlayer.hand[0]?.id === firstHandCardId &&
-            (current.pendingAction?.kind ?? null) === pendingKind &&
-            JSON.stringify(current.throneRow.map((card) => card.id)) === JSON.stringify(throneRowIds),
-        );
+        return Boolean(current && JSON.stringify(current) === expectedGame);
       },
-      {
-        activeSeat: game.activeSeat,
-        activePlayerId: game.players[game.activeSeat].id,
-        firstHandCardId: game.players[game.activeSeat].hand[0]?.id,
-        pendingKind: game.pendingAction?.kind ?? null,
-        throneRowIds: game.throneRow.map((card) => card.id),
-      },
+      serializedGame,
     );
   }
 

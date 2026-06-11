@@ -131,7 +131,7 @@ const browser = await chromium.launch({ headless: true });
 try {
   const page = await browser.newPage();
   const consoleMessages = [];
-  const { waitForCaptureReady } = createBrowserDebugPageTools({
+  const { setDebugGameAndWait, waitForCaptureReady } = createBrowserDebugPageTools({
     artifactStem: (name) => name,
     consoleMessages,
     writeArtifact: async () => "",
@@ -151,6 +151,34 @@ try {
         message.text.includes("broken readiness fixture")
     ),
     "Browser debug capture readiness should warn when an image has finished loading in a broken state",
+  );
+
+  const oldDebugGame = {
+    activeSeat: 0,
+    pendingAction: undefined,
+    throneRow: [{ id: "same-throne-card" }],
+    players: [{ id: "p1", hand: [{ id: "same-first-hand-card" }, { id: "old-second-hand-card" }] }],
+  };
+  const nextDebugGame = {
+    ...oldDebugGame,
+    players: [{ ...oldDebugGame.players[0], hand: [oldDebugGame.players[0].hand[0], { id: "new-second-hand-card" }] }],
+  };
+  await page.evaluate((game) => {
+    window.__debugGame = game;
+    window.__DUNE_DEBUG__ = {
+      getGame: () => window.__debugGame,
+      setGame: (nextGame) => {
+        window.setTimeout(() => {
+          window.__debugGame = nextGame;
+        }, 50);
+      },
+    };
+  }, oldDebugGame);
+  await setDebugGameAndWait(page, nextDebugGame);
+  assert.equal(
+    await page.evaluate(() => window.__debugGame.players[0].hand[1].id),
+    "new-second-hand-card",
+    "Browser debug setGame wait should wait for the requested game, not just matching shallow state markers",
   );
 } finally {
   await browser.close();

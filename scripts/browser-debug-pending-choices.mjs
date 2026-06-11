@@ -30,6 +30,7 @@ export async function runPendingChoicesSmoke({
 
   const recallBefore = await currentGame(page);
   const recallOwnerBefore = recallBefore.players.find((player) => player.id === "p2");
+  await hidePendingResolutionOverlay(page);
   const arrakeenRecallSlot = page.locator('.board-panel .spy-network-slot.is-legal[data-spy-space-id="arrakeen"]');
   assert.equal(await arrakeenRecallSlot.count(), 1, "Arrakeen board spy slot should be actionable for recall");
   await arrakeenRecallSlot.click();
@@ -65,6 +66,7 @@ export async function runPendingChoicesSmoke({
   await setDebugGameAndWait(page, pendingChoiceStates.placeSpy);
   const boardSpyBefore = await currentGame(page);
   const boardSpyOwnerBefore = boardSpyBefore.players.find((player) => player.id === "p2");
+  await hidePendingResolutionOverlay(page);
   const researchStationSpySlot = page.locator('.board-panel .spy-network-slot.is-legal[data-spy-space-id="research-station"]');
   assert.equal(await researchStationSpySlot.count(), 1, "Research Station / Spice Refinery board spy slot should be actionable");
   await researchStationSpySlot.click();
@@ -145,8 +147,36 @@ export async function runPendingChoicesSmoke({
   assert.equal(fixedOwnerAfter.influence.fremen, 1);
 }
 
+async function hidePendingResolutionOverlay(page) {
+  const hideButton = page.getByRole("button", { name: "Hide pending resolution" });
+  if (await hideButton.isVisible().catch(() => false)) {
+    await hideButton.click();
+  }
+  await page.locator(".pending-resolution-overlay").waitFor({ state: "hidden" });
+}
+
 async function assertSpyNetworkGeometry(page, label) {
-  const geometry = await page.locator(".board-panel .board-stage").evaluate((stage) => {
+  let geometry;
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    geometry = await spyNetworkGeometry(page);
+    if (geometry.overlaps.length === 0 && geometry.lineOverlaps.length === 0) break;
+    await page.waitForTimeout(50);
+  }
+
+  assert.deepEqual(
+    geometry.overlaps,
+    [],
+    `${label} spy circles should not overlap board location tiles`,
+  );
+  assert.deepEqual(
+    geometry.lineOverlaps,
+    [],
+    `${label} spy connection edges should not cross board location interiors`,
+  );
+}
+
+async function spyNetworkGeometry(page) {
+  return page.locator(".board-panel .board-stage").evaluate((stage) => {
     const stageRect = stage.getBoundingClientRect();
     const rectFor = (element) => {
       const rect = element.getBoundingClientRect();
@@ -221,17 +251,6 @@ async function assertSpyNetworkGeometry(page, label) {
 
     return { lineOverlaps, overlaps };
   });
-
-  assert.deepEqual(
-    geometry.overlaps,
-    [],
-    `${label} spy circles should not overlap board location tiles`,
-  );
-  assert.deepEqual(
-    geometry.lineOverlaps,
-    [],
-    `${label} spy connection edges should not cross board location interiors`,
-  );
 }
 
 async function createPendingChoiceStates(server, initialPlayableGame) {

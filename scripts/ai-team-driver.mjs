@@ -678,10 +678,50 @@ function pendingCommands(room, pending, runtime, coverage = {}) {
   return command ? [command] : [];
 }
 
-function plotCommandVariants(game, player, intrigue, commanderTargets) {
+const plotIntrigueSourceIds = {
+  sietchRitual: 127,
+  mercenaries: 128,
+  councilorsAmbition: 129,
+  strategicStockpiling: 130,
+  detonation: 131,
+  departForArrakis: 132,
+  cunning: 133,
+  opportunism: 134,
+  changeAllegiances: 135,
+  specialMission: 136,
+  unexpectedAllies: 137,
+  callToArms: 138,
+  buyAccess: 139,
+  imperiumPolitics: 140,
+  shaddamsFavor: 141,
+  intelligenceReport: 142,
+  manipulate: 143,
+  distraction: 144,
+  marketOpportunity: 145,
+  contingencyPlan: 147,
+  inspireAwe: 148,
+  leverage: 447,
+  backedByChoam: 448,
+};
+
+function influenceLossPairChoices(player) {
+  const factions = Object.keys(player.influence);
+  const pairs = [];
+  factions.forEach((first, firstIndex) => {
+    factions.slice(firstIndex).forEach((second) => {
+      const requiredFirst = first === second ? 2 : 1;
+      const requiredSecond = first === second ? 0 : 1;
+      if ((player.influence[first] ?? 0) >= requiredFirst && (player.influence[second] ?? 0) >= requiredSecond) {
+        pairs.push([first, second]);
+      }
+    });
+  });
+  return pairs;
+}
+
+function exhaustivePlotCommandVariants(game, player, intrigue) {
   const factions = Object.keys(player.influence);
   const variants = [
-    { kind: "score-battle-icon", intrigueId: intrigue.id },
     { kind: "contingency-plan", intrigueId: intrigue.id },
     { kind: "call-to-arms", intrigueId: intrigue.id },
     { kind: "intelligence-report", intrigueId: intrigue.id },
@@ -705,10 +745,18 @@ function plotCommandVariants(game, player, intrigue, commanderTargets) {
     }
     variants.push({ kind: "change-allegiances", intrigueId: intrigue.id, choice: { kind: "spend-spice", gainFaction: faction } });
     for (const loseFaction of factions) {
-      if (loseFaction === faction) continue;
       variants.push({ kind: "change-allegiances", intrigueId: intrigue.id, choice: { kind: "shift", loseFaction, gainFaction: faction } });
-      variants.push({ kind: "opportunism", intrigueId: intrigue.id, choice: { loseFaction, gainFaction: faction } });
+      for (const spiceGainFaction of factions) {
+        variants.push({
+          kind: "change-allegiances",
+          intrigueId: intrigue.id,
+          choice: { kind: "both", loseFaction, shiftGainFaction: faction, spiceGainFaction },
+        });
+      }
     }
+  }
+  for (const choice of influenceLossPairChoices(player)) {
+    variants.push({ kind: "opportunism", intrigueId: intrigue.id, choice });
   }
   for (const first of factions) {
     for (const second of factions) {
@@ -723,18 +771,169 @@ function plotCommandVariants(game, player, intrigue, commanderTargets) {
   for (const choice of ["shield-wall", "deploy"]) variants.push({ kind: "detonation", intrigueId: intrigue.id, choice });
   for (const removeShieldWall of [false, true]) variants.push({ kind: "unexpected-allies", intrigueId: intrigue.id, removeShieldWall });
 
-  return variants.map((command) => ({
+  return variants;
+}
+
+function selectedPlotCommandVariants(game, player, intrigue, commanderTargets, runtime) {
+  const factions = Object.keys(player.influence);
+  const variants = intrigue.battleIcon
+    ? [{ kind: "score-battle-icon", intrigueId: intrigue.id }]
+    : [];
+
+  switch (intrigue.sourceId) {
+    case plotIntrigueSourceIds.sietchRitual:
+      for (const faction of factions) {
+        for (const discardCard of player.hand) {
+          variants.push({ kind: "sietch-ritual", intrigueId: intrigue.id, discardCardId: discardCard.id, faction });
+        }
+      }
+      break;
+    case plotIntrigueSourceIds.mercenaries:
+      variants.push({ kind: "mercenaries", intrigueId: intrigue.id });
+      break;
+    case plotIntrigueSourceIds.councilorsAmbition:
+      variants.push({ kind: "councilors-ambition", intrigueId: intrigue.id });
+      break;
+    case plotIntrigueSourceIds.strategicStockpiling:
+      for (const choice of ["spice", "water", "both"]) {
+        variants.push({ kind: "strategic-stockpiling", intrigueId: intrigue.id, choice });
+      }
+      break;
+    case plotIntrigueSourceIds.detonation:
+      for (const choice of ["shield-wall", "deploy"]) variants.push({ kind: "detonation", intrigueId: intrigue.id, choice });
+      break;
+    case plotIntrigueSourceIds.departForArrakis:
+      for (const choice of ["draw", "spend-spice"]) variants.push({ kind: "depart-for-arrakis", intrigueId: intrigue.id, choice });
+      break;
+    case plotIntrigueSourceIds.cunning:
+      for (const choice of ["draw", "paid-trash"]) variants.push({ kind: "cunning", intrigueId: intrigue.id, choice });
+      break;
+    case plotIntrigueSourceIds.opportunism:
+      if (player.resources.solari >= 2) {
+        for (const choice of influenceLossPairChoices(player)) {
+          variants.push({ kind: "opportunism", intrigueId: intrigue.id, choice });
+        }
+      }
+      break;
+    case plotIntrigueSourceIds.changeAllegiances:
+      {
+        const influenceOwnerId = player.revealed ? player.revealActivatedAllyId : commanderTargets?.[player.id];
+        const gainChoices = runtime.state.changeAllegiancesGainChoices(player);
+        const lossChoices = runtime.state.changeAllegiancesLossChoices(game, player, influenceOwnerId);
+        const canSpendSpice = player.resources.spice >= 3;
+        for (const gainFaction of gainChoices) {
+          if (canSpendSpice) {
+            variants.push({ kind: "change-allegiances", intrigueId: intrigue.id, choice: { kind: "spend-spice", gainFaction } });
+          }
+          for (const loseFaction of lossChoices) {
+            variants.push({ kind: "change-allegiances", intrigueId: intrigue.id, choice: { kind: "shift", loseFaction, gainFaction } });
+            if (canSpendSpice) {
+              for (const spiceGainFaction of gainChoices) {
+                variants.push({
+                  kind: "change-allegiances",
+                  intrigueId: intrigue.id,
+                  choice: { kind: "both", loseFaction, shiftGainFaction: gainFaction, spiceGainFaction },
+                });
+              }
+            }
+          }
+        }
+        break;
+      }
+    case plotIntrigueSourceIds.specialMission:
+      variants.push({ kind: "special-mission", intrigueId: intrigue.id, choice: { kind: "place-spy" } });
+      for (const spaceId of Object.keys(game.spyPosts ?? {})) {
+        variants.push({ kind: "special-mission", intrigueId: intrigue.id, choice: { kind: "recall-spy", spaceId } });
+      }
+      break;
+    case plotIntrigueSourceIds.unexpectedAllies:
+      variants.push({ kind: "unexpected-allies", intrigueId: intrigue.id, removeShieldWall: true });
+      break;
+    case plotIntrigueSourceIds.callToArms:
+      variants.push({ kind: "call-to-arms", intrigueId: intrigue.id });
+      break;
+    case plotIntrigueSourceIds.buyAccess:
+      for (const first of factions) {
+        for (const second of factions) {
+          if (first === second) continue;
+          variants.push({ kind: "buy-access", intrigueId: intrigue.id, choice: [first, second] });
+        }
+      }
+      break;
+    case plotIntrigueSourceIds.imperiumPolitics:
+      for (const faction of factions) variants.push({ kind: "imperium-politics", intrigueId: intrigue.id, faction });
+      break;
+    case plotIntrigueSourceIds.shaddamsFavor:
+      variants.push({ kind: "shaddams-favor", intrigueId: intrigue.id });
+      break;
+    case plotIntrigueSourceIds.intelligenceReport:
+      variants.push({ kind: "intelligence-report", intrigueId: intrigue.id });
+      break;
+    case plotIntrigueSourceIds.manipulate:
+      for (const card of game.imperiumRow) variants.push({ kind: "manipulate", intrigueId: intrigue.id, cardId: card.id });
+      break;
+    case plotIntrigueSourceIds.distraction:
+      variants.push({ kind: "distraction", intrigueId: intrigue.id });
+      break;
+    case plotIntrigueSourceIds.marketOpportunity:
+      for (const choice of ["spice-to-solari", "solari-to-spice"]) {
+        variants.push({ kind: "market-opportunity", intrigueId: intrigue.id, choice });
+      }
+      break;
+    case plotIntrigueSourceIds.contingencyPlan:
+      variants.push({ kind: "contingency-plan", intrigueId: intrigue.id });
+      break;
+    case plotIntrigueSourceIds.inspireAwe:
+      variants.push({ kind: "inspire-awe", intrigueId: intrigue.id });
+      break;
+    case plotIntrigueSourceIds.leverage:
+      variants.push({ kind: "leverage", intrigueId: intrigue.id });
+      break;
+    case plotIntrigueSourceIds.backedByChoam:
+      for (const faction of factions) variants.push({ kind: "backed-by-choam", intrigueId: intrigue.id, faction });
+      break;
+    default:
+      variants.push(...exhaustivePlotCommandVariants(game, player, intrigue));
+      break;
+  }
+
+  return variants;
+}
+
+function plotCommandVariants(game, player, intrigue, commanderTargets, runtime) {
+  return selectedPlotCommandVariants(game, player, intrigue, commanderTargets, runtime).map((command) => ({
     kind: "plot-intrigue",
     command,
     ...(commanderTargets ? { commanderTargets } : {}),
   }));
 }
 
-function addPlotIntrigueActions(legalActions, room, player, runtime) {
+function generatedPlotCommandIsKnownLegal(intrigue, player, commanderTargets, command) {
+  return (
+    (intrigue.sourceId === plotIntrigueSourceIds.opportunism && command.kind === "opportunism") ||
+    (
+      intrigue.sourceId === plotIntrigueSourceIds.changeAllegiances &&
+      command.kind === "change-allegiances" &&
+      (player.role !== "Commander" || Boolean(commanderTargets?.[player.id]))
+    )
+  );
+}
+
+function addPlotIntrigueActions(legalActions, room, player, runtime, coverage = {}) {
   const targetVariants = commanderTargetVariants(player, room.game.players);
   for (const intrigue of player.intrigues) {
     for (const target of targetVariants) {
-      for (const action of plotCommandVariants(room.game, player, intrigue, target.value)) {
+      for (const action of plotCommandVariants(room.game, player, intrigue, target.value, runtime)) {
+        coverage.plotCommandVariants = (coverage.plotCommandVariants ?? 0) + 1;
+        if (generatedPlotCommandIsKnownLegal(intrigue, player, target.value, action.command)) {
+          legalActions.push(actionEntry(
+            `plot:${intrigue.id}:${action.command.kind}:${JSON.stringify(action.command)}:${target.value?.[player.id] ?? "self"}`,
+            `Play Plot Intrigue ${intrigue.name} as ${action.command.kind}${target.label}`,
+            player.id,
+            action,
+          ));
+          continue;
+        }
         addIfLegal(
           legalActions,
           room,
@@ -847,7 +1046,7 @@ export function legalActionsForSeat(room, playerId, runtime, coverage = {}) {
     }
 
     if (!player.revealed) {
-      addPlotIntrigueActions(legalActions, room, player, runtime);
+      addPlotIntrigueActions(legalActions, room, player, runtime, coverage);
       for (const target of targetVariants) {
         legalActions.push(actionEntry(
           `reveal:${target.value?.[player.id] ?? "self"}`,
@@ -869,7 +1068,7 @@ export function legalActionsForSeat(room, playerId, runtime, coverage = {}) {
         ));
       }
     }
-    addPlotIntrigueActions(legalActions, room, player, runtime);
+    addPlotIntrigueActions(legalActions, room, player, runtime, coverage);
     legalActions.push(actionEntry("end-reveal", "End Reveal turn", playerId, { kind: "end-reveal" }));
     return legalActions;
   }

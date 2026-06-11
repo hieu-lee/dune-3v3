@@ -137,7 +137,8 @@ function assertNoMutation(label, room, playerId, runtime) {
 }
 
 function measure(label, room, playerId, runtime) {
-  const actionCount = legalActionsForSeat(room, playerId, runtime).length;
+  const coverage = {};
+  const actionCount = legalActionsForSeat(room, playerId, runtime, coverage).length;
   assertNoMutation(label, room, playerId, runtime);
   for (let index = 0; index < warmupIterations; index += 1) {
     legalActionsForSeat(room, playerId, runtime);
@@ -157,6 +158,7 @@ function measure(label, room, playerId, runtime) {
     label,
     playerId,
     actionCount,
+    plotCommandVariants: coverage.plotCommandVariants ?? 0,
     iterations,
     medianMs: Number(medianMs.toFixed(3)),
     enumerationsPerSecond: Number((iterations / (medianMs / 1000)).toFixed(1)),

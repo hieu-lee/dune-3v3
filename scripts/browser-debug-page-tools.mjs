@@ -110,6 +110,10 @@ export function createBrowserDebugPageTools({ artifactStem, consoleMessages, wri
     await page.setViewportSize({ width, height });
     await page.goto(url, { waitUntil: "networkidle" });
     await page.waitForFunction(() => Boolean(window.__DUNE_DEBUG__));
+    const localButton = page.getByRole("button", { name: "Local", exact: true });
+    if (await localButton.isVisible().catch(() => false)) {
+      await localButton.click();
+    }
     await page.locator(".app-shell").waitFor({ state: "visible" });
   }
 

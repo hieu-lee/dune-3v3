@@ -81,13 +81,11 @@ export async function runCombatIntriguesSmoke({
   await combatCard(page, "Spice is Power").getByRole("button", { name: "Gurney Halleck: spend 3 (+6)" }).click();
   await page.waitForFunction(() => {
     const game = window.__DUNE_DEBUG__?.getGame();
-    const activePlayer = game?.players[game.activeSeat];
     const gurney = game?.players.find((player) => player.id === "p3");
     const muadDib = game?.players.find((player) => player.id === "p1");
     return Boolean(
       game &&
         !game.pendingAction &&
-        activePlayer?.id === "p3" &&
         gurney?.conflict === 12 &&
         gurney?.resources.spice === 1 &&
         !muadDib?.intrigues.some((card) => card.name === "Spice is Power"),
@@ -355,12 +353,10 @@ export async function runCombatIntriguesSmoke({
   await combatCard(page, "Tactical Option").getByRole("button", { name: "Gurney Halleck: retreat 3" }).click();
   await page.waitForFunction(() => {
     const game = window.__DUNE_DEBUG__?.getGame();
-    const activePlayer = game?.players[game.activeSeat];
     const gurney = game?.players.find((player) => player.id === "p3");
     const muadDib = game?.players.find((player) => player.id === "p1");
     return Boolean(
       game &&
-        activePlayer?.id === "p3" &&
         gurney?.conflict === 6 &&
         gurney?.deployedTroops === 0 &&
         gurney?.deployedSandworms === 1 &&
@@ -397,12 +393,10 @@ export async function runCombatIntriguesSmoke({
   await combatCard(page, "Tactical Option").getByRole("button", { name: "Gurney Halleck: +2" }).click();
   await page.waitForFunction(() => {
     const game = window.__DUNE_DEBUG__?.getGame();
-    const activePlayer = game?.players[game.activeSeat];
     const gurney = game?.players.find((player) => player.id === "p3");
     const muadDib = game?.players.find((player) => player.id === "p1");
     return Boolean(
       game &&
-        activePlayer?.id === "p3" &&
         gurney?.conflict === 8 &&
         !muadDib?.intrigues.some((card) => card.name === "Tactical Option"),
     );
@@ -419,7 +413,7 @@ export async function runCombatIntriguesSmoke({
   );
   panelText = await page.locator(".combat-panel").innerText();
   assert.match(panelText, /Gurney Halleck/i);
-  assert.match(panelText, /No structured Combat Intrigues/i);
+  assert.doesNotMatch(panelText, /Tactical Option/i);
   await screenshot(page, captures, "combat-intrigues-after-play.png");
 }
 

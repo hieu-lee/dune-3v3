@@ -10,10 +10,19 @@ export function createBrowserDebugPageTools({ artifactStem, consoleMessages, wri
         image.loading = "eager";
       });
 
+      const imageDescription = (image) =>
+        [image.alt, image.currentSrc || image.src].filter(Boolean).join(" - ") || "(unnamed image)";
+
       const pendingSources = () =>
         Array.from(document.images)
           .filter((image) => !image.complete)
-          .map((image) => image.currentSrc || image.src || image.alt || "(unnamed image)")
+          .map(imageDescription)
+          .slice(0, 12);
+
+      const brokenSources = () =>
+        Array.from(document.images)
+          .filter((image) => (image.currentSrc || image.src) && image.complete && image.naturalWidth === 0)
+          .map(imageDescription)
           .slice(0, 12);
 
       const ready = Promise.all([
@@ -28,10 +37,14 @@ export function createBrowserDebugPageTools({ artifactStem, consoleMessages, wri
           }),
         ),
         Promise.all(images.map((image) => image.decode?.().catch(() => undefined))),
-      ]).then(() => ({ timedOut: false, pendingImages: [] }));
+      ]).then(() => ({ timedOut: false, pendingImages: [], brokenImages: brokenSources() }));
 
       const timeout = new Promise((resolve) => {
-        window.setTimeout(() => resolve({ timedOut: true, pendingImages: pendingSources() }), timeoutMs);
+        window.setTimeout(() => resolve({
+          timedOut: true,
+          pendingImages: pendingSources(),
+          brokenImages: brokenSources(),
+        }), timeoutMs);
       });
 
       return Promise.race([ready, timeout]);
@@ -40,6 +53,12 @@ export function createBrowserDebugPageTools({ artifactStem, consoleMessages, wri
       consoleMessages.push({
         type: "warning",
         text: `Capture readiness timed out with pending images: ${readiness.pendingImages.join(", ") || "none"}`,
+      });
+    }
+    if (readiness.brokenImages?.length > 0) {
+      consoleMessages.push({
+        type: "warning",
+        text: `Capture readiness found broken images: ${readiness.brokenImages.join(", ")}`,
       });
     }
     await page.waitForTimeout(50);

@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { chromium } from "playwright";
 import { generatedArtifactNames, isGeneratedArtifactName, scenarioNames, scenarios } from "./browser-debug-artifacts.mjs";
+import { createBrowserDebugPageTools } from "./browser-debug-page-tools.mjs";
 
 function readProjectFile(path) {
   return readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
@@ -124,5 +126,34 @@ for (const needle of [
   assertMentions(app, needle, "src/App.tsx");
 }
 assertMentions(commandBar, 'data-testid="debug-capture"', "src/components/CommandBar.tsx");
+
+const browser = await chromium.launch({ headless: true });
+try {
+  const page = await browser.newPage();
+  const consoleMessages = [];
+  const { waitForCaptureReady } = createBrowserDebugPageTools({
+    artifactStem: (name) => name,
+    consoleMessages,
+    writeArtifact: async () => "",
+    writeJson: async () => "",
+  });
+  await page.setContent(`
+    <html>
+      <body>
+        <img alt="broken readiness fixture" src="data:image/png;base64,not-a-real-png">
+      </body>
+    </html>
+  `);
+  await waitForCaptureReady(page);
+  assert.ok(
+    consoleMessages.some((message) =>
+      message.type === "warning" &&
+        message.text.includes("broken readiness fixture")
+    ),
+    "Browser debug capture readiness should warn when an image has finished loading in a broken state",
+  );
+} finally {
+  await browser.close();
+}
 
 console.log("browser debug pipeline verification passed");

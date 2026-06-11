@@ -498,7 +498,11 @@ export async function createRoomServer({
   }
 
   function roomSeatsAreLocked(room) {
-    return room.started !== false;
+    return roomIsStarted(room);
+  }
+
+  function seatClaimRequiresReconnectToken(room, existing, existingTokenSeat) {
+    return room.started !== false || Boolean(roomIsStarted(room) && (existing || existingTokenSeat));
   }
 
   async function startRoom(room) {
@@ -791,7 +795,7 @@ export async function createRoomServer({
       return await enqueueRoomWrite(room.id, async () => {
         const existing = room.seats[playerId];
         const existingTokenSeat = seatClaimForToken(room, previousToken);
-        if (roomSeatsAreLocked(room)) {
+        if (seatClaimRequiresReconnectToken(room, existing, existingTokenSeat)) {
           const tokenOwnsTargetSeat = Boolean(previousToken && (
             existing?.token === previousToken ||
             existingTokenSeat?.playerId === playerId

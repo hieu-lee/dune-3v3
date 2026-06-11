@@ -347,6 +347,68 @@ async function assertStartedSeatsStayLocked() {
   assert.equal(roomRecord.seats.p3?.token, claims.get("p3").token, "Rejected started-seat release should keep the seat locked");
 }
 
+async function assertInferredStartedSeatsStayLocked() {
+  const created = await jsonFetch("/api/rooms", { method: "POST" });
+  assert.equal(created.response.status, 201, "Inferred-started lock room creation should succeed");
+  const roomId = created.body.roomId;
+  const claim = await jsonFetch(`/api/rooms/${roomId}/seats/p1/claim`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: "Inferred Started Owner" }),
+  });
+  assert.equal(claim.response.status, 200, "Inferred-started lock seat should be claimable before pending state");
+
+  const roomRecord = server.rooms.get(roomId);
+  assert.ok(roomRecord, "Inferred-started lock room should remain stored");
+  roomRecord.started = false;
+  roomRecord.game = {
+    ...roomRecord.game,
+    pendingAction: { kind: "deploy", ownerId: "p1", remaining: 1, source: "Inferred started verifier" },
+    pendingQueue: [],
+  };
+  roomRecord.seats.p1.connected = false;
+
+  const inferredSnapshot = await jsonFetch(`/api/rooms/${roomId}`);
+  assert.equal(inferredSnapshot.response.status, 200, "Inferred-started room snapshot should load");
+  assert.equal(inferredSnapshot.body.started, true, "Pending state should make the room appear started");
+  const noTokenReclaim = await jsonFetch(`/api/rooms/${roomId}/seats/p1/claim`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: "Inferred Started Hijacker" }),
+  });
+  assert.equal(noTokenReclaim.response.status, 409, "Inferred-started disconnected seats should require the original reconnect token");
+  assert.notEqual(noTokenReclaim.body?.token, claim.body.token, "Rejected inferred-started reclaim should not issue a new token");
+  assert.notEqual(
+    noTokenReclaim.body?.snapshot?.viewerPlayerId,
+    "p1",
+    "Rejected inferred-started reclaim should not expose the target player's private snapshot",
+  );
+
+  const releaseInferredStartedSeat = await jsonFetch(`/api/rooms/${roomId}/seats/p1/release`, {
+    method: "POST",
+    headers: { "x-room-token": claim.body.token },
+  });
+  assert.equal(releaseInferredStartedSeat.response.status, 409, "Inferred-started seats should not be releasable");
+  assert.equal(roomRecord.seats.p1?.token, claim.body.token, "Rejected inferred-started release should keep the seat locked");
+
+  const tokenSwitch = await jsonFetch(`/api/rooms/${roomId}/seats/p2/claim`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: "Inferred Started Switch", token: claim.body.token }),
+  });
+  assert.equal(tokenSwitch.response.status, 409, "Inferred-started rooms should not allow reconnect tokens to switch seats");
+  assert.equal(roomRecord.seats.p1?.token, claim.body.token, "Rejected inferred-started seat switch should keep the original seat claimed");
+  assert.equal(roomRecord.seats.p2, undefined, "Rejected inferred-started seat switch should not claim the target seat");
+
+  const unclaimedSeat = await jsonFetch(`/api/rooms/${roomId}/seats/p2/claim`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: "Inferred Started Joiner" }),
+  });
+  assert.equal(unclaimedSeat.response.status, 200, "Unclaimed inferred-started legacy seats should remain claimable");
+  assert.notEqual(unclaimedSeat.body.token, claim.body.token, "Unclaimed inferred-started seat should receive its own token");
+}
+
 async function assertAiRoundDiscussionUsesSeatSnapshots() {
   const storageFile = join(outDir, "ai-discussion-rooms.json");
   await rm(storageFile, { force: true });
@@ -777,6 +839,7 @@ try {
   ]);
   await assertPollHeartbeatDisconnects();
   await assertStartedSeatsStayLocked();
+  await assertInferredStartedSeatsStayLocked();
   await assertAiFillOpponents();
   await assertAiRoundDiscussionUsesSeatSnapshots();
 

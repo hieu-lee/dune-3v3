@@ -557,6 +557,18 @@ function player(snapshot, playerId) {
   return found;
 }
 
+function pendingActionKey(pendingAction) {
+  if (!pendingAction) return undefined;
+  return [
+    pendingAction.kind,
+    pendingAction.ownerId ?? "",
+    pendingAction.actorId ?? "",
+    pendingAction.partnerId ?? "",
+    pendingAction.team ?? "",
+    pendingAction.source ?? "",
+  ].join(":");
+}
+
 function assertHiddenHand(snapshot, playerId) {
   const owner = player(snapshot, playerId);
   assert.ok(owner.hand.length > 0, `${playerId} should preserve hidden hand count`);
@@ -2685,6 +2697,212 @@ try {
     JSON.stringify(legacyContractObserverSnapshot.body).includes(reservedContract.name),
     false,
     "Legacy reserved CHOAM contract identity should be hidden from other players after restart migration",
+  );
+
+  const retryRoom = await jsonFetch("/api/rooms", { method: "POST" });
+  assert.equal(retryRoom.response.status, 201, "Duplicate pending-action room creation should succeed");
+  const retryRoomRecord = server.rooms.get(retryRoom.body.roomId);
+  assert.ok(retryRoomRecord, "Duplicate pending-action room should be stored in memory");
+  const retryOwnerId = "p2";
+  retryRoomRecord.version += 1;
+  retryRoomRecord.game = {
+    ...retryRoomRecord.game,
+    phase: "playing",
+    pendingAction: { kind: "draw-cards", ownerId: retryOwnerId, amount: 1, source: "Verifier Retry Draw" },
+    pendingQueue: [],
+    players: retryRoomRecord.game.players.map((candidate) =>
+      candidate.id === retryOwnerId
+        ? { ...candidate, hand: [], deck: [{ id: "retry-draw-card", name: "Retry Draw Card", icons: [], persuasion: 0, swords: 0, play: "", reveal: "" }] }
+        : candidate,
+    ),
+  };
+  const retryOwnerClaim = await jsonFetch(`/api/rooms/${retryRoom.body.roomId}/seats/${retryOwnerId}/claim`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: "Retry Owner" }),
+  });
+  assert.equal(retryOwnerClaim.response.status, 200, "Duplicate pending-action owner should be claimable");
+  const retryBaseVersion = retryOwnerClaim.body.snapshot.version;
+  const retryClearCommand = {
+    kind: "clear-pending-action",
+    pendingKey: pendingActionKey(retryOwnerClaim.body.snapshot.game.pendingAction),
+  };
+  const firstRetryClear = await roomAction(
+    retryRoom.body.roomId,
+    retryOwnerClaim.body.token,
+    retryBaseVersion,
+    { kind: "pending", command: retryClearCommand },
+  );
+  assert.equal(firstRetryClear.response.status, 200, "First pending-action retry fixture clear should succeed");
+  assert.ok(
+    player(firstRetryClear.body.snapshot, retryOwnerId).hand.some((card) => card.id === "retry-draw-card"),
+    "First pending-action retry fixture clear should resolve the draw",
+  );
+  const duplicateRetryClear = await roomAction(
+    retryRoom.body.roomId,
+    retryOwnerClaim.body.token,
+    retryBaseVersion,
+    { kind: "pending", command: retryClearCommand },
+  );
+  assert.equal(duplicateRetryClear.response.status, 200, "Duplicate retried pending action should not surface as a room error");
+  assert.equal(
+    duplicateRetryClear.body.snapshot.game.pendingAction,
+    undefined,
+    "Duplicate retried pending action should return the already-cleared snapshot",
+  );
+  const staleCurrentPendingRoom = await jsonFetch("/api/rooms", { method: "POST" });
+  assert.equal(staleCurrentPendingRoom.response.status, 201, "Stale current pending-action room creation should succeed");
+  const staleCurrentPendingRecord = server.rooms.get(staleCurrentPendingRoom.body.roomId);
+  assert.ok(staleCurrentPendingRecord, "Stale current pending-action room should be stored in memory");
+  staleCurrentPendingRecord.version += 1;
+  staleCurrentPendingRecord.game = {
+    ...staleCurrentPendingRecord.game,
+    phase: "playing",
+    pendingAction: { kind: "draw-cards", ownerId: retryOwnerId, amount: 1, source: "Verifier Stale Current Draw" },
+    pendingQueue: [],
+    players: staleCurrentPendingRecord.game.players.map((candidate) =>
+      candidate.id === retryOwnerId
+        ? { ...candidate, hand: [], deck: [{ id: "stale-current-draw-card", name: "Stale Current Draw Card", icons: [], persuasion: 0, swords: 0, play: "", reveal: "" }] }
+        : candidate,
+    ),
+  };
+  const staleCurrentOwnerClaim = await jsonFetch(`/api/rooms/${staleCurrentPendingRoom.body.roomId}/seats/${retryOwnerId}/claim`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: "Stale Current Owner" }),
+  });
+  assert.equal(staleCurrentOwnerClaim.response.status, 200, "Stale current pending-action owner should be claimable");
+  const staleCurrentBaseVersion = staleCurrentOwnerClaim.body.snapshot.version;
+  staleCurrentPendingRecord.version += 1;
+  const staleCurrentClear = await roomAction(
+    staleCurrentPendingRoom.body.roomId,
+    staleCurrentOwnerClaim.body.token,
+    staleCurrentBaseVersion,
+    {
+      kind: "pending",
+      command: {
+        kind: "clear-pending-action",
+        pendingKey: pendingActionKey(staleCurrentOwnerClaim.body.snapshot.game.pendingAction),
+      },
+    },
+  );
+  assert.equal(
+    staleCurrentClear.response.status,
+    409,
+    "Stale clear for a still-current pending action should keep the room-state-changed guard",
+  );
+  assert.equal(
+    server.rooms.get(staleCurrentPendingRoom.body.roomId).game.pendingAction?.kind,
+    "draw-cards",
+    "Rejected stale clear for a still-current pending action should not silently drop the pending action",
+  );
+  const staleDeployRoom = await jsonFetch("/api/rooms", { method: "POST" });
+  assert.equal(staleDeployRoom.response.status, 201, "Stale deploy pending-action room creation should succeed");
+  const staleDeployRecord = server.rooms.get(staleDeployRoom.body.roomId);
+  assert.ok(staleDeployRecord, "Stale deploy pending-action room should be stored in memory");
+  staleDeployRecord.version += 1;
+  staleDeployRecord.game = {
+    ...staleDeployRecord.game,
+    phase: "combat",
+    pendingAction: { kind: "deploy", ownerId: retryOwnerId, remaining: 2, source: "Verifier Stale Deploy" },
+    pendingQueue: [],
+    players: staleDeployRecord.game.players.map((candidate) =>
+      candidate.id === retryOwnerId
+        ? { ...candidate, garrison: Math.max(candidate.garrison, 2), conflict: 0, deployedTroops: 0 }
+        : candidate,
+    ),
+  };
+  const staleDeployOwnerClaim = await jsonFetch(`/api/rooms/${staleDeployRoom.body.roomId}/seats/${retryOwnerId}/claim`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: "Stale Deploy Owner" }),
+  });
+  assert.equal(staleDeployOwnerClaim.response.status, 200, "Stale deploy pending-action owner should be claimable");
+  const staleDeployBaseVersion = staleDeployOwnerClaim.body.snapshot.version;
+  const staleDeployClearCommand = {
+    kind: "clear-pending-action",
+    pendingKey: pendingActionKey(staleDeployOwnerClaim.body.snapshot.game.pendingAction),
+  };
+  const partialDeploy = await roomAction(
+    staleDeployRoom.body.roomId,
+    staleDeployOwnerClaim.body.token,
+    staleDeployBaseVersion,
+    { kind: "pending", command: { kind: "deploy-one" } },
+  );
+  assert.equal(partialDeploy.response.status, 200, "Partial deploy should mutate the current pending action");
+  assert.equal(partialDeploy.body.snapshot.game.pendingAction?.remaining, 1, "Partial deploy should leave the deploy pending action current");
+  const staleDeployClear = await roomAction(
+    staleDeployRoom.body.roomId,
+    staleDeployOwnerClaim.body.token,
+    staleDeployBaseVersion,
+    { kind: "pending", command: staleDeployClearCommand },
+  );
+  assert.equal(
+    staleDeployClear.response.status,
+    409,
+    "Stale clear for a mutated but still-current deploy pending action should keep the room-state-changed guard",
+  );
+  assert.equal(
+    server.rooms.get(staleDeployRoom.body.roomId).game.pendingAction?.remaining,
+    1,
+    "Rejected stale clear for a mutated deploy pending action should not silently drop the pending action",
+  );
+  const queuedRetryRoom = await jsonFetch("/api/rooms", { method: "POST" });
+  assert.equal(queuedRetryRoom.response.status, 201, "Queued duplicate pending-action room creation should succeed");
+  const queuedRetryRoomRecord = server.rooms.get(queuedRetryRoom.body.roomId);
+  assert.ok(queuedRetryRoomRecord, "Queued duplicate pending-action room should be stored in memory");
+  queuedRetryRoomRecord.version += 1;
+  queuedRetryRoomRecord.game = {
+    ...queuedRetryRoomRecord.game,
+    phase: "playing",
+    pendingAction: { kind: "draw-cards", ownerId: retryOwnerId, amount: 1, source: "Verifier Queued Retry Draw" },
+    pendingQueue: [{
+      kind: "discard-card-for-draw",
+      ownerId: retryOwnerId,
+      source: "Verifier Queued Retry Discard",
+      drawCards: 1,
+      optional: true,
+    }],
+    players: queuedRetryRoomRecord.game.players.map((candidate) =>
+      candidate.id === retryOwnerId
+        ? { ...candidate, hand: [], deck: [{ id: "queued-retry-draw-card", name: "Queued Retry Draw Card", icons: [], persuasion: 0, swords: 0, play: "", reveal: "" }] }
+        : candidate,
+    ),
+  };
+  const queuedRetryOwnerClaim = await jsonFetch(`/api/rooms/${queuedRetryRoom.body.roomId}/seats/${retryOwnerId}/claim`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: "Queued Retry Owner" }),
+  });
+  assert.equal(queuedRetryOwnerClaim.response.status, 200, "Queued duplicate pending-action owner should be claimable");
+  const queuedRetryBaseVersion = queuedRetryOwnerClaim.body.snapshot.version;
+  const queuedRetryClearCommand = {
+    kind: "clear-pending-action",
+    pendingKey: pendingActionKey(queuedRetryOwnerClaim.body.snapshot.game.pendingAction),
+  };
+  const firstQueuedRetryClear = await roomAction(
+    queuedRetryRoom.body.roomId,
+    queuedRetryOwnerClaim.body.token,
+    queuedRetryBaseVersion,
+    { kind: "pending", command: queuedRetryClearCommand },
+  );
+  assert.equal(firstQueuedRetryClear.response.status, 200, "First queued pending-action retry fixture clear should succeed");
+  assert.equal(
+    firstQueuedRetryClear.body.snapshot.game.pendingAction?.kind,
+    "discard-card-for-draw",
+    "First queued pending-action retry fixture clear should advance the next pending action",
+  );
+  const duplicateQueuedRetryClear = await roomAction(
+    queuedRetryRoom.body.roomId,
+    queuedRetryOwnerClaim.body.token,
+    queuedRetryBaseVersion,
+    { kind: "pending", command: queuedRetryClearCommand },
+  );
+  assert.equal(duplicateQueuedRetryClear.response.status, 200, "Duplicate queued retried pending action should not surface as a room error");
+  assert.equal(
+    duplicateQueuedRetryClear.body.snapshot.game.pendingAction?.kind,
+    "discard-card-for-draw",
+    "Duplicate queued retried pending action should return the already-advanced pending snapshot",
   );
 
   const tradeRoom = await jsonFetch("/api/rooms", { method: "POST" });

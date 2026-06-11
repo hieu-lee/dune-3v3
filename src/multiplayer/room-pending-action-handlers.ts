@@ -1,10 +1,30 @@
 import type { PendingActionPanelProps } from "../components/PendingActionPanel.types";
+import type { PendingAction } from "../game/types";
 import type { RoomActionCommand, RoomPendingActionCommand } from "./room-actions";
 
 type RoomSendAction = (action: RoomActionCommand) => void | Promise<boolean>;
 type PendingHandlers = Omit<PendingActionPanelProps, "game" | "pendingAction">;
 
-export function createRoomPendingActionHandlers(sendAction: RoomSendAction): PendingHandlers {
+function pendingActionKey(pendingAction?: PendingAction) {
+  if (!pendingAction) return undefined;
+  const action = pendingAction as PendingAction & {
+    ownerId?: string;
+    source?: string;
+    actorId?: string;
+    partnerId?: string;
+    team?: string;
+  };
+  return [
+    action.kind,
+    action.ownerId ?? "",
+    action.actorId ?? "",
+    action.partnerId ?? "",
+    action.team ?? "",
+    action.source ?? "",
+  ].join(":");
+}
+
+export function createRoomPendingActionHandlers(sendAction: RoomSendAction, pendingAction?: PendingAction): PendingHandlers {
   const pending = (command: RoomPendingActionCommand) => {
     void sendAction({ kind: "pending", command });
   };
@@ -49,7 +69,7 @@ export function createRoomPendingActionHandlers(sendAction: RoomSendAction): Pen
     chooseTopDeckSelection: (choice) => pending({ kind: "choose-top-deck-selection", choice }),
     chooseTrashIntrigueForReward: (intrigueId) => pending({ kind: "choose-trash-intrigue-for-reward", intrigueId }),
     chooseTrashSourceForTrade: (partnerId) => pending({ kind: "choose-trash-source-for-trade", partnerId }),
-    clearPendingAction: () => pending({ kind: "clear-pending-action" }),
+    clearPendingAction: () => pending({ kind: "clear-pending-action", pendingKey: pendingActionKey(pendingAction) }),
     collectContractFallback: () => pending({ kind: "collect-contract-fallback" }),
     deployControlDefense: () => pending({ kind: "deploy-control-defense" }),
     deployOne: () => pending({ kind: "deploy-one" }),

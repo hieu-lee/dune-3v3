@@ -46,6 +46,27 @@ function sendNoContent(response) {
   response.end();
 }
 
+function pendingActionKey(pendingAction) {
+  if (!pendingAction) return undefined;
+  return [
+    pendingAction.kind,
+    pendingAction.ownerId ?? "",
+    pendingAction.actorId ?? "",
+    pendingAction.partnerId ?? "",
+    pendingAction.team ?? "",
+    pendingAction.source ?? "",
+  ].join(":");
+}
+
+function actionLooksLikeResolvedPendingRetry(action, currentPendingAction) {
+  return (
+    action?.kind === "pending" &&
+    action.command?.kind === "clear-pending-action" &&
+    action.command.pendingKey &&
+    action.command.pendingKey !== pendingActionKey(currentPendingAction)
+  );
+}
+
 function requestError(status, message) {
   const error = new Error(message);
   error.status = status;
@@ -978,6 +999,9 @@ export async function createRoomServer({
           });
         }
         if (body.baseVersion !== room.version) {
+          if (actionLooksLikeResolvedPendingRetry(body.action, room.game.pendingAction)) {
+            return sendJson(response, 200, { snapshot: await snapshotFor(room, token) });
+          }
           return sendJson(response, 409, {
             error: "Room state changed; refresh and try again",
             snapshot: await snapshotFor(room, token),

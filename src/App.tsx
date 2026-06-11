@@ -487,7 +487,7 @@ export default function App() {
     game,
     setGame,
   });
-  const roomPendingActionHandlers = createRoomPendingActionHandlers(roomSession.sendAction);
+  const roomPendingActionHandlers = createRoomPendingActionHandlers(roomSession.sendAction, pendingAction);
   const boardSpySlotChoices = useMemo<BoardSpySlotChoices | undefined>(() => {
     const pending = game.pendingAction;
     if (!pending && placementDecisionActive && spyEntrySpaceIds.length > 0) {

@@ -84,7 +84,7 @@ export type RoomPendingActionCommand =
   | { kind: "choose-top-deck-selection"; choice: TopDeckSelectionChoice }
   | { kind: "choose-trash-intrigue-for-reward"; intrigueId: string }
   | { kind: "choose-trash-source-for-trade"; partnerId: string }
-  | { kind: "clear-pending-action" }
+  | { kind: "clear-pending-action"; pendingKey?: string }
   | { kind: "collect-contract-fallback" }
   | { kind: "deploy-control-defense" }
   | { kind: "deploy-one" }

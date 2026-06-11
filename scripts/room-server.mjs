@@ -219,6 +219,47 @@ function migrateCardTraits(room, { normalizeGameCardTraits }) {
   };
 }
 
+function migrateReservedContractPrivacy(room, { reservedContracts }) {
+  const reservedIds = new Set(reservedContracts.map((contract) => contract.id));
+  const reservedNames = reservedContracts.map((contract) => contract.name);
+  let changed = false;
+  const players = room.game.players.map((player) => {
+    let playerChanged = false;
+    const contracts = player.contracts.map((contract) => {
+      if (contract.reserved || !reservedIds.has(contract.card?.id)) return contract;
+      changed = true;
+      playerChanged = true;
+      return { ...contract, reserved: true };
+    });
+    return playerChanged ? { ...player, contracts } : player;
+  });
+  const log = Array.isArray(room.game.log)
+    ? room.game.log.map((line) => {
+        const redacted = reservedNames.reduce(
+          (current, name) =>
+            current.replace(
+              `takes the reserved ${name} CHOAM contract`,
+              "takes a reserved CHOAM contract",
+            ),
+          line,
+        );
+        if (redacted !== line) changed = true;
+        return redacted;
+      })
+    : room.game.log;
+  if (!changed) return room;
+  return {
+    ...room,
+    version: room.version + 1,
+    updatedAt: migrationTimestamp(),
+    game: {
+      ...room.game,
+      players,
+      log,
+    },
+  };
+}
+
 function validStoredRoom(candidate) {
   return (
     candidate &&
@@ -292,10 +333,14 @@ export async function createRoomServer({
       normalizeGameCardTraits,
       scoreGurneyAlwaysSmiling,
     } = await gameState();
+    const { shaddamReservedContracts } = await vite.ssrLoadModule("/src/game/data.ts");
     return migrateObsoleteRevealAdjust(
-      migrateCardTraits(
-        migrateSpyObservationPosts(room, { normalizeSpyObservationPosts }),
-        { normalizeGameCardTraits },
+      migrateReservedContractPrivacy(
+        migrateCardTraits(
+          migrateSpyObservationPosts(room, { normalizeSpyObservationPosts }),
+          { normalizeGameCardTraits },
+        ),
+        { reservedContracts: shaddamReservedContracts },
       ),
       { advancePendingAction, scoreGurneyAlwaysSmiling },
     );

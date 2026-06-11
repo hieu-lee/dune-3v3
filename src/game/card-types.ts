@@ -126,6 +126,7 @@ export type BoardSpace = {
 export type PlayerContract = {
   card: ContractCard;
   completed: boolean;
+  reserved?: boolean;
   takenRound: number;
   takenAtSpaceId?: string;
 };

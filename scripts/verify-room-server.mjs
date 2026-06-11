@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, rm } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { createMockAiClient } from "./ai-team-driver.mjs";
 import { createRoomServer } from "./room-server.mjs";
@@ -2597,6 +2597,12 @@ try {
     body: JSON.stringify({ name: "Contract Owner" }),
   });
   assert.equal(contractOwnerClaim.response.status, 200, "Contract pending owner should be claimable");
+  const contractObserverClaim = await jsonFetch(`/api/rooms/${contractRoom.body.roomId}/seats/p1/claim`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: "Contract Observer" }),
+  });
+  assert.equal(contractObserverClaim.response.status, 200, "Contract observer should be claimable");
   contractRoomRecord.version += 1;
   contractRoomRecord.game = {
     ...contractRoomRecord.game,
@@ -2620,6 +2626,65 @@ try {
     server.rooms.get(contractRoom.body.roomId).version,
     invalidContractSelectionVersion,
     "Rejected room contract selection should not advance the room version",
+  );
+  const reservedContractOwner = contractRoomRecord.game.players.find((candidate) => candidate.id === fallbackContractOwnerId);
+  assert.ok(reservedContractOwner, "Contract owner should exist for reserved contract privacy verification");
+  const reservedContract = reservedContractOwner?.reservedContracts[0];
+  assert.ok(reservedContract, "Contract owner should have a reserved CHOAM contract for privacy verification");
+  contractRoomRecord.version += 1;
+  contractRoomRecord.game = {
+    ...contractRoomRecord.game,
+    contractOffer: [],
+    pendingAction: { kind: "contract", ownerId: fallbackContractOwnerId, source: "Verifier Reserved Contract" },
+    pendingQueue: [],
+  };
+  const reservedContractSelection = await roomAction(
+    contractRoom.body.roomId,
+    contractOwnerClaim.body.token,
+    contractRoomRecord.version,
+    {
+      kind: "pending",
+      command: { kind: "take-contract", contractId: reservedContract.id },
+    },
+  );
+  assert.equal(reservedContractSelection.response.status, 200, "Room reserved contract selection should succeed");
+  const contractObserverSnapshot = await jsonFetch(`/api/rooms/${contractRoom.body.roomId}`, {
+    headers: { "x-room-token": contractObserverClaim.body.token },
+  });
+  assert.equal(contractObserverSnapshot.response.status, 200, "Contract observer snapshot should load");
+  assert.equal(
+    JSON.stringify(contractObserverSnapshot.body).includes(reservedContract.name),
+    false,
+    "Reserved CHOAM contract identity should stay hidden from other players after selection",
+  );
+  const legacyReservedContractRoom = structuredClone(server.rooms.get(contractRoom.body.roomId));
+  assert.ok(legacyReservedContractRoom, "Reserved contract room should be available for legacy migration verification");
+  legacyReservedContractRoom.game.players = legacyReservedContractRoom.game.players.map((candidate) =>
+    candidate.id === fallbackContractOwnerId
+      ? {
+          ...candidate,
+          contracts: candidate.contracts.map((contract) => {
+            if (contract.card.id !== reservedContract.id) return contract;
+            const { reserved: _reserved, ...legacyContract } = contract;
+            return legacyContract;
+          }),
+        }
+      : candidate,
+  );
+  legacyReservedContractRoom.game.log = [
+    `${reservedContractOwner.leader} takes the reserved ${reservedContract.name} CHOAM contract from Verifier Reserved Contract.`,
+    ...legacyReservedContractRoom.game.log,
+  ];
+  await writeFile(storageFile, `${JSON.stringify({ rooms: [legacyReservedContractRoom] })}\n`, "utf8");
+  await restartServer();
+  const legacyContractObserverSnapshot = await jsonFetch(`/api/rooms/${contractRoom.body.roomId}`, {
+    headers: { "x-room-token": contractObserverClaim.body.token },
+  });
+  assert.equal(legacyContractObserverSnapshot.response.status, 200, "Legacy contract observer snapshot should load after restart");
+  assert.equal(
+    JSON.stringify(legacyContractObserverSnapshot.body).includes(reservedContract.name),
+    false,
+    "Legacy reserved CHOAM contract identity should be hidden from other players after restart migration",
   );
 
   const tradeRoom = await jsonFetch("/api/rooms", { method: "POST" });

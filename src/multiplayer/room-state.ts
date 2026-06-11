@@ -226,6 +226,14 @@ function sanitizePendingAction(action: PendingAction | undefined, viewerPlayerId
   return action;
 }
 
+function sanitizePlayerContracts(player: Player) {
+  return player.contracts.map((contract, index) =>
+    contract.reserved && !contract.completed
+      ? { ...contract, card: hiddenContract(index, `${player.id}-taken-reserved`) }
+      : contract,
+  );
+}
+
 function sanitizePlayer(player: Player, viewerPlayerId?: string): Player {
   if (player.id === viewerPlayerId) {
     return {
@@ -240,6 +248,7 @@ function sanitizePlayer(player: Player, viewerPlayerId?: string): Player {
     manipulatedCards: hiddenCards(`${player.id}-manipulated`, player.manipulatedCards.length),
     intrigues: hiddenIntrigues(player.id, player.intrigues.length),
     objectives: hiddenObjectives(player.id, player.objectives),
+    contracts: sanitizePlayerContracts(player),
     reservedContracts: hiddenContracts(`${player.id}-reserved`, player.reservedContracts.length),
   };
 }

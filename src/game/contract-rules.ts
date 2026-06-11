@@ -664,6 +664,7 @@ export function resolveTakeChoamContract(
               {
                 card: reservedContract,
                 completed: false,
+                reserved: true,
                 takenRound: state.round,
                 takenAtSpaceId: pending.spaceId,
               },
@@ -671,7 +672,7 @@ export function resolveTakeChoamContract(
           }
         : player,
     );
-    const actionLog = `${owner.leader} takes the reserved ${reservedContract.name} CHOAM contract from ${pending.source}.`;
+    const actionLog = `${owner.leader} takes a reserved CHOAM contract from ${pending.source}.`;
     const takenState = skipUnavailablePublicContractPendings({
       ...state,
       players,

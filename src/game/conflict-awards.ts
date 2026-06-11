@@ -597,6 +597,7 @@ export function payConflictVpConversion(
   state: GameState,
   pending: ConflictVpConversionPendingAction,
 ): GameState {
+  if (state.pendingAction !== pending) return state;
   const owner = state.players.find((player) => player.id === pending.ownerId);
   if (!owner || pending.cost.kind !== "resource" || !canPayConflictVpConversion(state, pending)) return state;
 
@@ -631,6 +632,7 @@ export function recallSpyForConflictVpConversion(
   pending: ConflictVpConversionPendingAction,
   spaceId: string,
 ): GameState {
+  if (state.pendingAction !== pending) return state;
   const owner = state.players.find((player) => player.id === pending.ownerId);
   if (!owner || pending.cost.kind !== "recall-spies") return state;
   const space = boardSpaces.find((candidate) => candidate.id === spaceId);
@@ -708,6 +710,7 @@ export function skipConflictVpConversion(
   state: GameState,
   pending: ConflictVpConversionPendingAction,
 ): GameState {
+  if (state.pendingAction !== pending) return state;
   if (pending.cost.kind === "recall-spies" && pending.cost.recalled > 0) return state;
   const owner = state.players.find((player) => player.id === pending.ownerId);
   return normalizeSpyObservationPosts({

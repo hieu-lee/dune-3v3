@@ -772,6 +772,7 @@ try {
     ),
     spyPosts: { [arrakeen.id]: feyd.id, [spiceRefinery.id]: feyd.id, carthag: feyd.id },
     sharedSpyPosts: {},
+    pendingAction: conflictConversionPending,
     pendingQueue: [],
   });
   assert.equal(
@@ -789,19 +790,22 @@ try {
     conflictConversionPending,
     arrakeen.id,
   );
-  assert.equal(conflictRecalledSharedPost.pendingAction.cost.recalled, 1);
+  assert.equal(
+    conflictRecalledSharedPost.pendingAction,
+    undefined,
+    "Recalling the normalized duplicate shared post should complete the two-spy conflict VP conversion",
+  );
   assert.equal(
     playerById(conflictRecalledSharedPost, feyd.id).spies,
     2,
-    "First conflict VP recall should keep the normalized duplicate refund and return the recalled shared post",
+    "Completed conflict VP recall should return both stored spies from the normalized duplicate post",
   );
-  const conflictRecalledSeparatePost = state.recallSpyForConflictVpConversion(
-    conflictRecalledSharedPost,
-    conflictRecalledSharedPost.pendingAction,
-    "carthag",
+  assert.equal(playerById(conflictRecalledSharedPost, feyd.id).vp, 1);
+  assert.equal(
+    conflictRecalledSharedPost.spyPosts.carthag,
+    feyd.id,
+    "Completed conflict VP recall should preserve the unselected separate spy post",
   );
-  assert.equal(playerById(conflictRecalledSeparatePost, feyd.id).spies, 3);
-  assert.equal(playerById(conflictRecalledSeparatePost, feyd.id).vp, 1);
 
   const activeLegacyDuplicateConflictState = {
     ...game,

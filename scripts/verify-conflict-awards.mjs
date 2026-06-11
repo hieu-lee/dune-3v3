@@ -711,6 +711,22 @@ try {
   );
   assert.equal(playerById(spiceRefineryPaid, "p2").vp, 2, "Battle For Spice Refinery conversion should spend Solari for 1 VP");
   assert.equal(playerById(spiceRefineryPaid, "p2").resources.solari, 0);
+  const liveDrawPending = { kind: "draw-cards", ownerId: "p2", source: "Live pending", amount: 1 };
+  const staleConversionPaymentState = {
+    ...spiceRefineryPending,
+    pendingAction: liveDrawPending,
+    pendingQueue: [],
+  };
+  assert.deepEqual(
+    state.payConflictVpConversion(staleConversionPaymentState, spiceRefineryPending.pendingAction),
+    staleConversionPaymentState,
+    "Conflict VP conversion payment should reject stale pending actions",
+  );
+  assert.deepEqual(
+    state.skipConflictVpConversion(staleConversionPaymentState, spiceRefineryPending.pendingAction),
+    staleConversionPaymentState,
+    "Conflict VP conversion skip should reject stale pending actions",
+  );
 
   const conversionBeforeDefense = {
     ...fixture(state, data, (players) =>
@@ -749,6 +765,16 @@ try {
   assert.equal(arrakeenPending.locationControl.arrakeen, "p2");
   assert.equal(playerById(arrakeenPending, "p2").vp, 1, "Battle For Arrakeen should award its printed first-place VP");
   assert.deepEqual(arrakeenPending.pendingAction?.cost, { kind: "recall-spies", count: 2, recalled: 0 });
+  const staleConversionRecallState = {
+    ...arrakeenPending,
+    pendingAction: liveDrawPending,
+    pendingQueue: [],
+  };
+  assert.deepEqual(
+    state.recallSpyForConflictVpConversion(staleConversionRecallState, arrakeenPending.pendingAction, "arrakeen"),
+    staleConversionRecallState,
+    "Conflict VP conversion spy recall should reject stale pending actions",
+  );
   const arrakeenRecalledOnce = state.startNextRound(
     state.recallSpyForConflictVpConversion(arrakeenPending, arrakeenPending.pendingAction, "arrakeen"),
   );

@@ -354,7 +354,7 @@ export async function createRoomServer({
       savedAt: Date.now(),
       rooms: [...rooms.values()],
     };
-    await writeFile(tempFile, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+    await writeFile(tempFile, `${JSON.stringify(payload)}\n`, "utf8");
     await rename(tempFile, resolvedStorageFile);
   }
 

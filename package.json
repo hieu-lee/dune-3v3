@@ -13,6 +13,7 @@
     "verify": "node scripts/verify-all.mjs",
     "verify:all": "node scripts/verify-all.mjs",
     "benchmark:ai-legal-actions": "node --expose-gc scripts/benchmark-ai-legal-actions.mjs",
+    "benchmark:room-persistence": "node --expose-gc scripts/benchmark-room-persistence-serialization.mjs",
     "benchmark:room-snapshot": "node --expose-gc scripts/benchmark-room-snapshot-sanitization.mjs",
     "verify:ai-team": "node scripts/verify-ai-team.mjs",
     "verify:ai-legal-actions": "node scripts/verify-ai-legal-actions.mjs",

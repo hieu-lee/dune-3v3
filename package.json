@@ -55,6 +55,7 @@
     "verify:leaders": "node scripts/verify-leaders.mjs",
     "verify:local-action-idempotency": "node scripts/verify-local-action-idempotency.mjs",
     "verify:maker-spice": "node scripts/verify-maker-spice.mjs",
+    "verify:modal-layering": "node scripts/verify-modal-layering.mjs",
     "verify:objectives": "node scripts/verify-objectives.mjs",
     "verify:pending-resolution-overlay": "node scripts/verify-pending-resolution-overlay.mjs",
     "verify:player-setup": "node scripts/verify-player-setup.mjs",

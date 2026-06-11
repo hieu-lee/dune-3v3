@@ -1467,7 +1467,7 @@ img.intrigue-deck-back-art {
 
 .modal-backdrop {
   position: fixed;
-  z-index: 70;
+  z-index: 130;
   inset: 0;
   display: grid;
   align-items: center;

@@ -207,6 +207,145 @@ try {
     "Revealed Commander AI legal actions",
   );
 
+  const standardPlaceGame = withActivePlayer(initialGame({ includeSetupPending: false }), "p2", () => ({
+    agentsReady: 1,
+    revealed: false,
+    resources: { spice: 8, solari: 8, water: 8 },
+    hand: data.imperiumDeck.slice(0, 5).map((card, index) => ({ ...card, id: `place-hand-${index}` })),
+    intrigues: [],
+  }));
+  const standardPlaceRoom = makeRoom(standardPlaceGame);
+  const standardPlaceActions = legalActionsForSeat(standardPlaceRoom, "p2", runtime);
+  assert.ok(
+    standardPlaceActions.some((entry) => entry.action?.kind === "place-agent"),
+    "AI legal actions should include generated place-agent actions",
+  );
+  assertAllActionsApply(
+    standardPlaceRoom,
+    "p2",
+    runtime,
+    standardPlaceActions,
+    "AI generated place-agent actions",
+  );
+
+  const commanderPlaceGame = withActivePlayer(initialGame({ includeSetupPending: false }), "p1", () => ({
+    agentsReady: 1,
+    revealed: false,
+    resources: { spice: 8, solari: 8, water: 8 },
+    hand: data.imperiumDeck.slice(0, 5).map((card, index) => ({ ...card, id: `commander-place-hand-${index}` })),
+    intrigues: [],
+  }));
+  const commanderPlaceRoom = makeRoom(commanderPlaceGame);
+  const commanderPlaceActions = legalActionsForSeat(commanderPlaceRoom, "p1", runtime);
+  assert.ok(
+    commanderPlaceActions.some((entry) => entry.action?.kind === "place-agent" && entry.action.commanderTargets),
+    "Commander AI legal actions should include targeted place-agent actions",
+  );
+  assertAllActionsApply(
+    commanderPlaceRoom,
+    "p1",
+    runtime,
+    commanderPlaceActions,
+    "AI generated Commander place-agent actions",
+  );
+
+  const calculusOfPower = cardNamed(data.imperiumDeck, "Calculus of Power");
+  const occupiedSpyEntryGame = withActivePlayer(initialGame({ includeSetupPending: false }), "p2", () => ({
+    agentsReady: 1,
+    revealed: false,
+    resources: { spice: 8, solari: 8, water: 8 },
+    hand: [{ ...calculusOfPower, id: "occupied-spy-entry-calculus" }],
+    intrigues: [],
+  }));
+  const occupiedSpyEntryRoom = makeRoom({
+    ...occupiedSpyEntryGame,
+    spaces: { arrakeen: "p3" },
+    spyPosts: { arrakeen: "p2" },
+  });
+  const occupiedSpyEntryActions = legalActionsForSeat(occupiedSpyEntryRoom, "p2", runtime);
+  assert.ok(
+    occupiedSpyEntryActions.some((entry) =>
+      entry.action?.kind === "place-agent" &&
+      entry.action.spaceId === "arrakeen" &&
+      entry.action.spyEntrySpaceId === "arrakeen"
+    ),
+    "AI legal actions should include occupied-space spy-entry place-agent actions",
+  );
+  assertAllActionsApply(
+    occupiedSpyEntryRoom,
+    "p2",
+    runtime,
+    occupiedSpyEntryActions,
+    "AI generated occupied-space spy-entry actions",
+  );
+
+  const commanderAllyIds = initialGame({ includeSetupPending: false }).players
+    .filter((player) => player.team === "muaddib" && player.role === "Ally")
+    .map((player) => player.id);
+  const exhaustedCommanderPlaceGame = withActivePlayer(initialGame({ includeSetupPending: false }), "p1", () => ({
+    agentsReady: 1,
+    revealed: false,
+    resources: { spice: 8, solari: 8, water: 8 },
+    hand: data.imperiumDeck.slice(0, 5).map((card, index) => ({ ...card, id: `exhausted-commander-hand-${index}` })),
+    intrigues: [],
+    commanderActivatedAllyIds: commanderAllyIds,
+    swordmasterBonus: false,
+    swordmasterAgentSpent: false,
+  }));
+  const exhaustedCommanderPlaceRoom = makeRoom(exhaustedCommanderPlaceGame);
+  const exhaustedCommanderPlaceActions = legalActionsForSeat(exhaustedCommanderPlaceRoom, "p1", runtime);
+  assert.equal(
+    exhaustedCommanderPlaceActions.some((entry) => entry.action?.kind === "place-agent"),
+    false,
+    "Exhausted Commander AI legal actions should not include untargeted place-agent actions",
+  );
+  assertAllActionsApply(
+    exhaustedCommanderPlaceRoom,
+    "p1",
+    runtime,
+    exhaustedCommanderPlaceActions,
+    "Exhausted Commander AI legal actions with a ready agent",
+  );
+
+  const swordmasterAllyId = commanderAllyIds[0];
+  const swordmasterCommanderPlaceGame = withActivePlayer(initialGame({ includeSetupPending: false }), "p1", () => ({
+    agentsReady: 1,
+    revealed: false,
+    resources: { spice: 8, solari: 8, water: 8 },
+    hand: data.imperiumDeck.slice(0, 5).map((card, index) => ({ ...card, id: `swordmaster-commander-hand-${index}` })),
+    intrigues: [],
+    commanderActivatedAllyIds: [swordmasterAllyId],
+    swordmasterBonus: true,
+    swordmasterAgentSpent: false,
+  }));
+  const swordmasterCommanderPlaceRoom = makeRoom(swordmasterCommanderPlaceGame);
+  const swordmasterCommanderPlaceActions = legalActionsForSeat(swordmasterCommanderPlaceRoom, "p1", runtime);
+  assert.ok(
+    swordmasterCommanderPlaceActions.some((entry) =>
+      entry.action?.kind === "place-agent" &&
+      entry.action.commanderTargets?.p1 === swordmasterAllyId
+    ),
+    "Swordmaster Commander AI legal actions should include a legal second Ally activation",
+  );
+  assertAllActionsApply(
+    swordmasterCommanderPlaceRoom,
+    "p1",
+    runtime,
+    swordmasterCommanderPlaceActions,
+    "Swordmaster Commander AI generated place-agent actions",
+  );
+
+  const queuedWithoutActivePendingRoom = makeRoom({
+    ...standardPlaceGame,
+    pendingAction: undefined,
+    pendingQueue: [{ kind: "draw-cards", ownerId: "p2", source: "Queued verifier pending", amount: 1 }],
+  });
+  assert.deepEqual(
+    legalActionsForSeat(queuedWithoutActivePendingRoom, "p2", runtime),
+    [],
+    "AI legal actions should wait when a queued pending action remains without an active pending action",
+  );
+
   console.log("AI legal action verification passed");
 } finally {
   await vite.close();

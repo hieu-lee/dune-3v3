@@ -159,6 +159,7 @@ function measure(label, room, playerId, runtime) {
     playerId,
     actionCount,
     plotCommandVariants: coverage.plotCommandVariants ?? 0,
+    trustedPlaceAgentActions: coverage.trustedPlaceAgentActions ?? 0,
     iterations,
     medianMs: Number(medianMs.toFixed(3)),
     enumerationsPerSecond: Number((iterations / (medianMs / 1000)).toFixed(1)),

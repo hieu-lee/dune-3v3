@@ -317,7 +317,7 @@ function addIfLegal(entries, room, playerId, id, label, action, runtime) {
   entries.push(actionEntry(id, label, playerId, action));
 }
 
-function commanderTargetVariants(player, players) {
+function commanderTargetVariants(player, players, { includeUntargetedFallback = true } = {}) {
   if (player.role !== "Commander") return [{ label: "", value: undefined }];
   const activatedAllyIds = player.commanderActivatedAllyIds ?? [];
   const hasDuplicateActivation = activatedAllyIds.some((allyId, _index, allIds) =>
@@ -336,7 +336,7 @@ function commanderTargetVariants(player, players) {
       )
     )
   );
-  if (allies.length === 0) return [{ label: "", value: undefined }];
+  if (allies.length === 0) return includeUntargetedFallback ? [{ label: "", value: undefined }] : [];
   return allies.map((ally) => ({
     label: ` for ${ally.leader}`,
     value: { [player.id]: ally.id },
@@ -1004,6 +1004,7 @@ export function legalActionsForSeat(room, playerId, runtime, coverage = {}) {
     }
     return legalActions;
   }
+  if (game.pendingQueue.length > 0) return [];
 
   if (game.phase === "playing") {
     if (game.players[game.activeSeat]?.id !== playerId) return [];
@@ -1013,6 +1014,7 @@ export function legalActionsForSeat(room, playerId, runtime, coverage = {}) {
     }
 
     const targetVariants = commanderTargetVariants(player, game.players);
+    const placeAgentTargetVariants = commanderTargetVariants(player, game.players, { includeUntargetedFallback: false });
     if (!player.revealed && player.agentsReady > 0) {
       for (const card of player.hand) {
         for (const space of runtime.data.boardSpaces) {
@@ -1022,14 +1024,13 @@ export function legalActionsForSeat(room, playerId, runtime, coverage = {}) {
           const spyEntrySpaceIds = game.spaces[space.id]
             ? runtime.state.spyEntrySpaceIdsForOccupiedSpace(game, space.id, player.id)
             : [undefined];
-          for (const target of targetVariants) {
+          for (const target of placeAgentTargetVariants) {
             for (const spyEntrySpaceId of spyEntrySpaceIds) {
-              addIfLegal(
-                legalActions,
-                room,
-                playerId,
+              coverage.trustedPlaceAgentActions = (coverage.trustedPlaceAgentActions ?? 0) + 1;
+              legalActions.push(actionEntry(
                 `place:${card.id}:${space.id}:${target.value?.[player.id] ?? "self"}:${spyEntrySpaceId ?? "open"}`,
                 `Place ${card.name} at ${space.name}${target.label}`,
+                playerId,
                 {
                   kind: "place-agent",
                   cardId: card.id,
@@ -1037,8 +1038,7 @@ export function legalActionsForSeat(room, playerId, runtime, coverage = {}) {
                   ...(spyEntrySpaceId ? { spyEntrySpaceId } : {}),
                   ...(target.value ? { commanderTargets: target.value } : {}),
                 },
-                runtime,
-              );
+              ));
             }
           }
         }

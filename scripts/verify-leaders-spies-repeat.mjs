@@ -398,6 +398,16 @@ export function verifyLeaderSpiesAndReverendRepeat({ cards, data, game, players,
   );
   assert.equal(repeatedSecrets.turnReverendMotherJessicaRepeats[ladyJessica.id], true, "Reverend Mother use should be marked for the turn");
   assert.equal(repeatedSecrets.pendingAction, undefined, "Reverend Mother without deferred space effects should advance pending actions");
+  const staleReverendRepeatState = {
+    ...reverendSecretsGame,
+    pendingAction: { kind: "draw-cards", ownerId: ladyJessica.id, source: "Live pending", amount: 1 },
+    pendingQueue: [],
+  };
+  assert.deepEqual(
+    state.resolveRepeatBoardSpaceChoice(staleReverendRepeatState, reverendRepeatPending, "repeat"),
+    staleReverendRepeatState,
+    "Reverend Mother repeat should reject stale pending actions",
+  );
   const duplicateRepeatState = { ...repeatedSecrets, pendingAction: reverendRepeatPending, pendingQueue: [] };
   assert.equal(
     state.resolveRepeatBoardSpaceChoice(duplicateRepeatState, reverendRepeatPending, "repeat"),

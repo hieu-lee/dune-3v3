@@ -87,6 +87,7 @@ export function resolveRepeatBoardSpaceChoice(
   pending: RepeatBoardSpacePendingAction,
   choice: RepeatBoardSpaceChoice,
 ): GameState {
+  if (state.pendingAction !== pending) return state;
   const owner = state.players.find((player) => player.id === pending.ownerId);
   const space = boardSpaces.find((candidate) => candidate.id === pending.spaceId);
   if (!owner || !space) return state;

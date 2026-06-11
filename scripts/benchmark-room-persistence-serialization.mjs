@@ -104,6 +104,48 @@ function measure(label, payload, serialize) {
   };
 }
 
+function measureCachedChangedRoom(payload) {
+  const roomIds = payload.rooms.map((room) => room.id);
+  const roomsById = new Map(payload.rooms.map((room) => [room.id, room]));
+  const serializedRooms = new Map(payload.rooms.map((room) => [room.id, JSON.stringify(room)]));
+  function serializeChangedRoom(iteration) {
+    const roomId = roomIds[iteration % roomIds.length];
+    const room = roomsById.get(roomId);
+    serializedRooms.set(roomId, JSON.stringify({
+      ...room,
+      updatedAt: room.updatedAt + iteration + 1,
+    }));
+    const serializedRoomList = roomIds.map((id) => {
+      let serializedRoom = serializedRooms.get(id);
+      if (!serializedRoom) {
+        serializedRoom = JSON.stringify(roomsById.get(id));
+        serializedRooms.set(id, serializedRoom);
+      }
+      return serializedRoom;
+    });
+    return `{"schemaVersion":${payload.schemaVersion},"savedAt":${payload.savedAt + iteration},"rooms":[${serializedRoomList.join(",")}]}\n`;
+  }
+  for (let index = 0; index < warmupIterations; index += 1) serializeChangedRoom(index);
+  globalThis.gc?.();
+  const samples = [];
+  let bytes = 0;
+  for (let sample = 0; sample < sampleCount; sample += 1) {
+    const startedAt = performance.now();
+    for (let index = 0; index < iterations; index += 1) {
+      bytes = Buffer.byteLength(serializeChangedRoom(sample * iterations + index), "utf8");
+    }
+    const durationMs = performance.now() - startedAt;
+    samples.push(durationMs / iterations);
+  }
+  samples.sort((left, right) => left - right);
+  const medianMsPerSave = samples[Math.floor(samples.length / 2)];
+  return {
+    label: "cached-compact-json",
+    medianMsPerSave: Number(medianMsPerSave.toFixed(3)),
+    bytes,
+  };
+}
+
 const vite = await createViteServer({ appType: "spa", logLevel: "silent", server: { middlewareMode: true } });
 try {
   const { initialGame } = await vite.ssrLoadModule("/src/game/state.ts");
@@ -114,11 +156,14 @@ try {
     const payload = payloadFor(game, roomCount);
     const pretty = measure("pretty-json", payload, (value) => `${JSON.stringify(value, null, 2)}\n`);
     const compact = measure("compact-json", payload, (value) => `${JSON.stringify(value)}\n`);
+    const cachedCompact = measureCachedChangedRoom(payload);
     return {
       roomCount,
       pretty,
       compact,
+      cachedCompact,
       speedup: Number((pretty.medianMsPerSave / compact.medianMsPerSave).toFixed(2)),
+      cachedSpeedup: Number((compact.medianMsPerSave / cachedCompact.medianMsPerSave).toFixed(2)),
       byteReduction: Number((1 - compact.bytes / pretty.bytes).toFixed(3)),
     };
   });

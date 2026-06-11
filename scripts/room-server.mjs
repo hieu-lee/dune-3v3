@@ -368,6 +368,9 @@ export async function createRoomServer({
   }
 
   const rooms = await loadStoredRooms(resolvedStorageFile, migrateLoadedRoom);
+  const serializedRooms = new Map([...rooms].map(([roomId, room]) => [roomId, JSON.stringify(room)]));
+  let serializedRoomListDirty = true;
+  let serializedRoomList = [];
   const streams = new Map();
   const pollDisconnectTimers = new Map();
   const roomWriteChains = new Map();
@@ -415,17 +418,32 @@ export async function createRoomServer({
     if (!resolvedStorageFile) return;
     const tempFile = `${resolvedStorageFile}.${process.pid}.${saveSerial += 1}.tmp`;
     await mkdir(dirname(resolvedStorageFile), { recursive: true });
-    const payload = {
-      schemaVersion: 1,
-      savedAt: Date.now(),
-      rooms: [...rooms.values()],
-    };
-    await writeFile(tempFile, `${JSON.stringify(payload)}\n`, "utf8");
+    if (serializedRoomListDirty) {
+      serializedRoomList = [...rooms.keys()].map((roomId) => {
+        let serializedRoom = serializedRooms.get(roomId);
+        if (!serializedRoom) {
+          const room = rooms.get(roomId);
+          serializedRoom = JSON.stringify(room);
+          serializedRooms.set(roomId, serializedRoom);
+        }
+        return serializedRoom;
+      });
+      serializedRoomListDirty = false;
+    }
+    const payload = `{"schemaVersion":1,"savedAt":${Date.now()},"rooms":[${serializedRoomList.join(",")}]}\n`;
+    await writeFile(tempFile, payload, "utf8");
     await rename(tempFile, resolvedStorageFile);
   }
 
-  function persistRooms() {
+  function persistRooms(changedRoom) {
     if (!resolvedStorageFile) return Promise.resolve();
+    if (changedRoom) {
+      serializedRooms.set(changedRoom.id, JSON.stringify(changedRoom));
+      serializedRoomListDirty = true;
+    } else {
+      for (const [roomId, room] of rooms) serializedRooms.set(roomId, JSON.stringify(room));
+      serializedRoomListDirty = true;
+    }
     saveChain = saveChain.then(writeRoomsToDisk, writeRoomsToDisk);
     return saveChain;
   }
@@ -462,7 +480,7 @@ export async function createRoomServer({
       seats: {},
     };
     rooms.set(id, room);
-    await persistRooms();
+    await persistRooms(room);
     return room;
   }
 
@@ -515,7 +533,7 @@ export async function createRoomServer({
       claim.connected = false;
       room.version += 1;
       room.updatedAt = Date.now();
-      await persistRooms();
+      await persistRooms(room);
       await broadcast(room);
     }).catch((error) => {
       console.error(`failed to persist disconnected room ${room.id}:`, error);
@@ -550,7 +568,7 @@ export async function createRoomServer({
   async function persistAndBroadcastRoom(room) {
     room.version += 1;
     room.updatedAt = Date.now();
-    await persistRooms();
+    await persistRooms(room);
     await broadcast(room);
   }
 
@@ -838,7 +856,7 @@ export async function createRoomServer({
           latestClaim.connected = true;
           room.version += 1;
           room.updatedAt = Date.now();
-          await persistRooms();
+          await persistRooms(room);
           await broadcast(room);
         });
       }
@@ -1044,7 +1062,7 @@ export async function createRoomServer({
           latestClaim.connected = true;
           room.version += 1;
           room.updatedAt = Date.now();
-          await persistRooms();
+          await persistRooms(room);
           await broadcast(room);
         });
       }

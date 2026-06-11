@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { isDeepStrictEqual } from "node:util";
 
 import { withActivePlayer } from "./verify-imperium-cards-fixtures.mjs";
 import { playerById } from "./verify-starter-decks-fixtures.mjs";
@@ -124,6 +125,24 @@ export function verifyImperiumCardRevealTroopEffects({
   assert.equal(playerById(chaniRetreated, p2.id).garrison, 2, "Chani should return retreated troops to garrison");
   assert.equal(playerById(chaniRetreated, p2.id).conflict, 4, "Chani should replace the troops' strength with four Reveal strength");
   assert.equal(chaniRetreated.pendingAction, undefined, "Chani retreat should clear its pending action");
+  const staleRevealTroopFailures = [];
+  const staleChaniRetreatState = {
+    ...chaniRetreatRevealed,
+    pendingAction: { kind: "draw-cards", ownerId: p2.id, source: "Live pending", amount: 1 },
+    pendingQueue: [],
+  };
+  if (!isDeepStrictEqual(
+    state.resolveRetreatTroopsForStrength(staleChaniRetreatState, chaniRetreatRevealed.pendingAction),
+    staleChaniRetreatState,
+  )) {
+    staleRevealTroopFailures.push("retreat-troops-for-strength resolve");
+  }
+  if (!isDeepStrictEqual(
+    state.skipRetreatTroopsForStrength(staleChaniRetreatState, chaniRetreatRevealed.pendingAction),
+    staleChaniRetreatState,
+  )) {
+    staleRevealTroopFailures.push("retreat-troops-for-strength skip");
+  }
 
   const leadershipChaniFixture = withActivePlayer(game, p2.id, () => ({
     agentsReady: 0,
@@ -220,9 +239,10 @@ export function verifyImperiumCardRevealTroopEffects({
   assert.equal(playerById(syntheticRetreated, p2.id).deployedTroops, 1, "Synthetic retreat should remove the requested troop count");
   assert.equal(playerById(syntheticRetreated, p2.id).garrison, 1, "Synthetic retreat should return exactly one troop to garrison");
   assert.equal(playerById(syntheticRetreated, p2.id).conflict, 6, "Synthetic retreat should subtract troop strength and add printed strength");
+  const nonOptionalRetreatPending = { ...syntheticRetreatState.pendingAction, optional: false };
   const nonOptionalSkip = state.skipRetreatTroopsForStrength(
-    { ...syntheticRetreatState, pendingAction: { ...syntheticRetreatState.pendingAction, optional: false } },
-    { ...syntheticRetreatState.pendingAction, optional: false },
+    { ...syntheticRetreatState, pendingAction: nonOptionalRetreatPending },
+    nonOptionalRetreatPending,
   );
   assert.equal(
     nonOptionalSkip.pendingAction?.kind,
@@ -323,9 +343,10 @@ export function verifyImperiumCardRevealTroopEffects({
   const unswervingSkipped = state.skipDeployOrRetreatTroopsChoice(unswervingDeployRevealed, unswervingDeployPending);
   assert.equal(unswervingSkipped.pendingAction, undefined, "Unswerving deploy-or-retreat should be optional");
   assert.equal(playerById(unswervingSkipped, p2.id).garrison, 1, "Skipping Unswerving should keep the recruited troop in garrison");
+  const unswervingMandatoryPending = { ...unswervingDeployPending, optional: false };
   const unswervingMandatorySkip = state.skipDeployOrRetreatTroopsChoice(
-    { ...unswervingDeployRevealed, pendingAction: { ...unswervingDeployPending, optional: false } },
-    { ...unswervingDeployPending, optional: false },
+    { ...unswervingDeployRevealed, pendingAction: unswervingMandatoryPending },
+    unswervingMandatoryPending,
   );
   assert.equal(
     unswervingMandatorySkip.pendingAction?.kind,
@@ -342,6 +363,28 @@ export function verifyImperiumCardRevealTroopEffects({
   assert.equal(playerById(unswervingDeployed, p2.id).conflict, 2, "Unswerving deploy should add troop strength");
   assert.equal(unswervingDeployed.turnUnitDeployments[p2.id], 1, "Unswerving deploy should count as a turn deployment");
   assert.equal(unswervingDeployed.pendingAction, undefined, "Unswerving deploy should clear its pending action");
+  const staleUnswervingDeployState = {
+    ...unswervingDeployRevealed,
+    pendingAction: { kind: "draw-cards", ownerId: p2.id, source: "Live pending", amount: 1 },
+    pendingQueue: [],
+  };
+  if (!isDeepStrictEqual(
+    state.resolveDeployOrRetreatTroopsChoice(staleUnswervingDeployState, unswervingDeployPending, "deploy"),
+    staleUnswervingDeployState,
+  )) {
+    staleRevealTroopFailures.push("deploy-or-retreat-troops resolve");
+  }
+  if (!isDeepStrictEqual(
+    state.skipDeployOrRetreatTroopsChoice(staleUnswervingDeployState, unswervingDeployPending),
+    staleUnswervingDeployState,
+  )) {
+    staleRevealTroopFailures.push("deploy-or-retreat-troops skip");
+  }
+  assert.deepEqual(
+    staleRevealTroopFailures,
+    [],
+    "Reveal troop pending resolvers should reject stale pending actions",
+  );
 
   const unswervingRetreatFixture = withActivePlayer(game, p2.id, () => ({
     agentsReady: 0,

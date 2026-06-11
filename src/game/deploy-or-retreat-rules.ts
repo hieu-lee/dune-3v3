@@ -46,6 +46,7 @@ export function resolveDeployOrRetreatTroopsChoice(
   pending: DeployOrRetreatTroopsPendingAction,
   choice: DeployOrRetreatTroopsChoice,
 ): GameState {
+  if (state.pendingAction !== pending) return state;
   const owner = state.players.find((player) => player.id === pending.ownerId);
   const recipient = state.players.find((player) => player.id === pending.recipientId);
   if (!owner || !recipient || pending.troopCount <= 0) return state;
@@ -98,6 +99,7 @@ export function skipDeployOrRetreatTroopsChoice(
   state: GameState,
   pending: DeployOrRetreatTroopsPendingAction,
 ): GameState {
+  if (state.pendingAction !== pending) return state;
   if (!pending.optional) return state;
   const owner = state.players.find((player) => player.id === pending.ownerId);
   return {

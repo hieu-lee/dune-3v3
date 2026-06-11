@@ -23,6 +23,7 @@ export function resolveRetreatTroopsForStrength(
   state: GameState,
   pending: RetreatTroopsForStrengthPendingAction,
 ): GameState {
+  if (state.pendingAction !== pending) return state;
   const owner = state.players.find((player) => player.id === pending.ownerId);
   const recipient = state.players.find((player) => player.id === pending.combatRecipientId);
   if (!owner || !recipient || !canResolveRetreatTroopsForStrength(state, pending)) return state;
@@ -59,6 +60,7 @@ export function skipRetreatTroopsForStrength(
   state: GameState,
   pending: RetreatTroopsForStrengthPendingAction,
 ): GameState {
+  if (state.pendingAction !== pending) return state;
   if (!pending.optional) return state;
   const owner = state.players.find((player) => player.id === pending.ownerId);
   return {

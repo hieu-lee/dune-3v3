@@ -396,6 +396,8 @@ export function moveImperiumCardToThroneRow(
   pending: ThroneRowPendingAction,
   cardId: string,
 ): GameState {
+  if (state.pendingAction !== pending) return state;
+
   const owner = state.players.find((player) => player.id === pending.ownerId);
   if (!owner || owner.team !== "shaddam" || owner.role !== "Commander") return state;
 

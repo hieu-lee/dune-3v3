@@ -81,6 +81,10 @@ try {
     { kind: "throne-row", ownerId: shaddam.id, source: "Imperial Tent" },
     "Imperial Tent should queue a Throne Row choice when an eligible row card exists",
   );
+  const imperialTentPendingFixture = {
+    ...imperialTentFixture,
+    pendingAction: pending,
+  };
   assert.equal(
     state.pendingActionForCard(imperialTent, { ...muadDib, playArea: [imperialTent] }, fixture),
     undefined,
@@ -114,7 +118,7 @@ try {
     "A generic Throne Row move spec should not queue an unresolvable Shaddam Ally pending action",
   );
 
-  const moved = state.moveImperiumCardToThroneRow(fixture, pending, eligible.id);
+  const moved = state.moveImperiumCardToThroneRow(imperialTentPendingFixture, pending, eligible.id);
   assert.deepEqual(moved.throneRow.map((card) => card.id), [eligible.id]);
   assert.equal(moved.imperiumRow.length, 5, "Moving to the Throne Row should immediately refill the Imperium Row");
   assert.equal(moved.imperiumRow.some((card) => card.id === eligible.id), false);
@@ -122,20 +126,33 @@ try {
   assert.equal(moved.marketDeck.length, fixture.marketDeck.length - 1);
   assert.equal(moved.pendingAction, undefined, "Choosing a Throne Row card should advance the pending action");
   assert.match(moved.log[0], /moves .* to the Throne Row/);
+  const staleThroneRowState = {
+    ...fixture,
+    pendingAction: { kind: "draw-cards", ownerId: shaddam.id, source: "Live pending", amount: 1 },
+    pendingQueue: [],
+  };
+  assert.deepEqual(
+    state.moveImperiumCardToThroneRow(staleThroneRowState, pending, eligible.id),
+    staleThroneRowState,
+    "Throne Row resolution should reject stale pending actions",
+  );
 
   const setupPending = state.pendingActionForShaddamPersonalBoard(fixture);
-  const setupMoved = state.moveImperiumCardToThroneRow(fixture, setupPending, eligible.id);
+  const setupPendingFixture = { ...fixture, pendingAction: setupPending };
+  const setupMoved = state.moveImperiumCardToThroneRow(setupPendingFixture, setupPending, eligible.id);
   assert.deepEqual(setupMoved.throneRow.map((card) => card.id), [eligible.id]);
   assert.match(setupMoved.log[0], /Emperor personal board/);
 
   assert.equal(
-    state.moveImperiumCardToThroneRow(fixture, pending, fremen.id),
-    fixture,
+    state.moveImperiumCardToThroneRow(imperialTentPendingFixture, pending, fremen.id),
+    imperialTentPendingFixture,
     "Fremen cards cannot be moved to the Throne Row",
   );
+  const nonShaddamPending = { ...pending, ownerId: muadDib.id };
+  const nonShaddamPendingFixture = { ...fixture, pendingAction: nonShaddamPending };
   assert.equal(
-    state.moveImperiumCardToThroneRow(fixture, { ...pending, ownerId: muadDib.id }, eligible.id),
-    fixture,
+    state.moveImperiumCardToThroneRow(nonShaddamPendingFixture, nonShaddamPending, eligible.id),
+    nonShaddamPendingFixture,
     "Only Shaddam can move cards to the Throne Row",
   );
 

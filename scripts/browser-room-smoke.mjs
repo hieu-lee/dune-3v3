@@ -338,6 +338,11 @@ try {
   const pendingRoomRecord = server.rooms.get(pendingRoom.roomId);
   assert.ok(pendingRoomRecord, "Pending UI room should be stored in memory");
   const pendingOwnerId = "p2";
+  const pendingObserverContext = await browser.newContext({ viewport: { width: 1440, height: 1100 } });
+  const pendingObserverPage = await pendingObserverContext.newPage();
+  observePage(pendingObserverPage);
+  await pendingObserverPage.goto(`${server.resolvedUrls.local[0]}?room=${pendingRoom.roomId}`, { waitUntil: "domcontentloaded" });
+  await claimSeat(pendingObserverPage, "p1", "Pending Observer");
   const pendingOwnerInitialSpice = pendingRoomRecord.game.players.find((player) => player.id === pendingOwnerId)?.resources.spice ?? 0;
   pendingRoomRecord.game = {
     ...pendingRoomRecord.game,
@@ -353,6 +358,19 @@ try {
     },
     pendingQueue: [],
   };
+  await pendingObserverPage.reload({ waitUntil: "domcontentloaded" });
+  await pendingObserverPage.waitForFunction(() => window.__DUNE_DEBUG__?.getRoomSnapshot?.()?.started === true);
+  assert.equal(
+    await pendingObserverPage.getByTestId("room-seat-p2").isDisabled(),
+    true,
+    "Claimed viewers should not be offered token-switch claims for open inferred-started seats",
+  );
+  assert.match(
+    await pendingObserverPage.getByTestId("room-seat-p2").innerText(),
+    /Unavailable/i,
+    "Open inferred-started seats should be unavailable to already claimed viewers",
+  );
+  await capture(pendingObserverPage, "room-inferred-started-open-seat-unavailable.png");
   const pendingContext = await browser.newContext({ viewport: { width: 1440, height: 1100 } });
   const pendingPage = await pendingContext.newPage();
   observePage(pendingPage);
@@ -369,6 +387,7 @@ try {
   );
   await capture(pendingPage, "room-pending-maker-resolved.png");
   await pendingContext.close();
+  await pendingObserverContext.close();
 
   const splitMakerRoomResponse = await fetch(`${server.resolvedUrls.local[0]}api/rooms`, { method: "POST" });
   assert.equal(splitMakerRoomResponse.status, 201, "Split Maker UI room should be created");

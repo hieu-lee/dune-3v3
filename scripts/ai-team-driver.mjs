@@ -312,11 +312,6 @@ function actionWouldChangeState(room, playerId, action, runtime) {
   }
 }
 
-function addIfLegal(entries, room, playerId, id, label, action, runtime) {
-  if (!actionWouldChangeState(room, playerId, action, runtime)) return;
-  entries.push(actionEntry(id, label, playerId, action));
-}
-
 function commanderTargetVariants(player, players, { includeUntargetedFallback = true } = {}) {
   if (player.role !== "Commander") return [{ label: "", value: undefined }];
   const activatedAllyIds = player.commanderActivatedAllyIds ?? [];
@@ -934,15 +929,13 @@ function addPlotIntrigueActions(legalActions, room, player, runtime, coverage = 
           ));
           continue;
         }
-        addIfLegal(
-          legalActions,
-          room,
-          player.id,
+        if (!actionWouldChangeState(room, player.id, action, runtime)) continue;
+        legalActions.push(actionEntry(
           `plot:${intrigue.id}:${action.command.kind}:${JSON.stringify(action.command)}:${target.value?.[player.id] ?? "self"}`,
           `Play Plot Intrigue ${intrigue.name} as ${action.command.kind}${target.label}`,
+          player.id,
           action,
-          runtime,
-        );
+        ));
       }
     }
   }
@@ -968,15 +961,13 @@ function addCombatIntrigueActions(legalActions, room, player, runtime) {
           ...(player.role === "Commander" ? { targetId } : {}),
           ...(combatChoice ? { combatChoice } : {}),
         };
-        addIfLegal(
-          legalActions,
-          room,
-          player.id,
+        if (!actionWouldChangeState(room, player.id, action, runtime)) continue;
+        legalActions.push(actionEntry(
           `combat:${intrigue.id}:${targetId}:${JSON.stringify(combatChoice ?? "auto")}`,
           `Play Combat Intrigue ${intrigue.name}${combatChoice ? ` (${JSON.stringify(combatChoice)})` : ""}`,
+          player.id,
           action,
-          runtime,
-        );
+        ));
       }
     }
   }
@@ -993,14 +984,14 @@ export function legalActionsForSeat(room, playerId, runtime, coverage = {}) {
     for (const command of pendingCommands(room, game.pendingAction, runtime, coverage)) {
       const ownerId = pendingOwnerId(room, game.pendingAction, command);
       if (ownerId !== playerId) continue;
-      addIfLegal(legalActions,
-        room,
-        playerId,
+      const action = { kind: "pending", command };
+      if (!actionWouldChangeState(room, playerId, action, runtime)) continue;
+      legalActions.push(actionEntry(
         `pending:${game.pendingAction.kind}:${JSON.stringify(command)}`,
         `Resolve pending ${game.pendingAction.kind} with ${command.kind}`,
-        { kind: "pending", command },
-        runtime,
-      );
+        playerId,
+        action,
+      ));
     }
     return legalActions;
   }

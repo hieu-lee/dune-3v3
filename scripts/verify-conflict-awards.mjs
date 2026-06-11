@@ -915,6 +915,16 @@ try {
     rank: 1,
     source: "Skirmish (Desert Mouse)",
   });
+  const staleConflictTieState = {
+    ...sameTeamPending,
+    pendingAction: { kind: "draw-cards", ownerId: "p2", source: "Live pending", amount: 1 },
+    pendingQueue: [],
+  };
+  assert.deepEqual(
+    state.resolveConflictTie(staleConflictTieState, sameTeamPending.pendingAction, "p2"),
+    staleConflictTieState,
+    "Conflict tie resolution should reject stale pending actions",
+  );
   const conceded = state.startNextRound(state.resolveConflictTie(sameTeamPending, sameTeamPending.pendingAction, "p2"));
   assert.equal(playerById(conceded, "p2").wonConflicts.length, 1, "Chosen Ally should take the tied Conflict");
   assert.equal(playerById(conceded, "p6").wonConflicts.length, 0);

@@ -775,6 +775,7 @@ export function resolveConflictTie(
   pending: ConflictTiePendingAction,
   winnerId?: string,
 ): GameState {
+  if (state.pendingAction !== pending) return state;
   if (!state.conflict) return state;
 
   const contenders = state.players.filter(

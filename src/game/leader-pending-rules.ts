@@ -85,6 +85,7 @@ export function resolveLeaderTransitionChoice(
   pending: LeaderTransitionPendingAction,
   choice: LeaderTransitionChoice,
 ): GameState {
+  if (state.pendingAction !== pending) return state;
   const owner = state.players.find((player) => player.id === pending.ownerId);
   const counterAmount = owner ? leaderCounterAmount(owner, pending.counter) : 0;
   if (

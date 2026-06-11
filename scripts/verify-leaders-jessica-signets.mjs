@@ -306,6 +306,16 @@ export function verifyLeaderJessicaSignets({ appTurnActions, cards, data, game, 
     [leadTheWayDraw.id, leadTheWayDiscardDraw.id],
     "Other Memories should draw one deck card per returned memory",
   );
+  const staleOtherMemoriesState = {
+    ...jessicaOtherMemoriesGame,
+    pendingAction: { kind: "draw-cards", ownerId: ladyJessica.id, source: "Live pending", amount: 1 },
+    pendingQueue: [],
+  };
+  assert.deepEqual(
+    state.resolveLeaderTransitionChoice(staleOtherMemoriesState, jessicaOtherMemoriesPending, "transition"),
+    staleOtherMemoriesState,
+    "Other Memories should reject stale pending actions",
+  );
   const skippedOtherMemories = state.resolveLeaderTransitionChoice(
     jessicaOtherMemoriesGame,
     jessicaOtherMemoriesPending,

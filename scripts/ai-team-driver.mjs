@@ -21,7 +21,8 @@ export async function createAiRuntime(server) {
   const actions = await server.ssrLoadModule("/src/multiplayer/room-actions.ts");
   const influenceChoices = await server.ssrLoadModule("/src/game/influence-choices.ts");
   const cardTraits = await server.ssrLoadModule("/src/game/card-traits.ts");
-  return { server, state, data, actions, influenceChoices, cardTraits };
+  const cardIdentifiers = await server.ssrLoadModule("/src/game/card-identifiers.ts");
+  return { server, state, data, actions, influenceChoices, cardTraits, cardIdentifiers };
 }
 
 export function createOpenAiResponseClient({
@@ -941,12 +942,30 @@ function addPlotIntrigueActions(legalActions, room, player, runtime, coverage = 
   }
 }
 
-function combatChoiceVariants(target) {
-  const choices = [undefined, "spend-spice", "add-strength"];
-  for (let count = 1; count <= Math.min(target?.deployedTroops ?? 0, 4); count += 1) {
-    choices.push({ kind: "retreat-troops", count });
+function combatChoiceVariantsForIntrigue(intrigue, target, runtime) {
+  const cardIdentifiers = runtime.cardIdentifiers;
+  const deployedTroops = target?.deployedTroops ?? 0;
+  if (cardIdentifiers.isTacticalOptionIntrigue(intrigue)) {
+    const choices = ["add-strength"];
+    for (let count = 1; count <= deployedTroops; count += 1) {
+      choices.push({ kind: "retreat-troops", count });
+    }
+    return choices;
   }
-  return choices;
+  if (cardIdentifiers.isSpiceIsPowerIntrigue(intrigue)) {
+    const choices = [];
+    if ((target?.resources?.spice ?? 0) >= 3) choices.push("spend-spice");
+    if (deployedTroops >= 3) choices.push({ kind: "retreat-troops", count: 3 });
+    return choices;
+  }
+  if (cardIdentifiers.isGoToGroundIntrigue(intrigue) || cardIdentifiers.isReachAgreementIntrigue(intrigue)) {
+    const choices = [];
+    for (let count = 1; count <= Math.min(2, deployedTroops); count += 1) {
+      choices.push({ kind: "retreat-troops", count });
+    }
+    return choices;
+  }
+  return [undefined];
 }
 
 function addCombatIntrigueActions(legalActions, room, player, runtime) {
@@ -954,7 +973,7 @@ function addCombatIntrigueActions(legalActions, room, player, runtime) {
   for (const intrigue of player.intrigues) {
     for (const targetId of targets) {
       const target = room.game.players.find((candidate) => candidate.id === targetId);
-      for (const combatChoice of combatChoiceVariants(target)) {
+      for (const combatChoice of combatChoiceVariantsForIntrigue(intrigue, target, runtime)) {
         const action = {
           kind: "play-combat-intrigue",
           intrigueId: intrigue.id,

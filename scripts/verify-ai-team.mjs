@@ -65,6 +65,12 @@ function cardByTrait(cards, trait) {
   return { ...card, id: `ai-test-${trait.toLowerCase().replace(/[^a-z0-9]+/g, "-")}` };
 }
 
+function intrigueBySourceId(data, sourceId, id) {
+  const card = data.intrigueCards.find((candidate) => candidate.sourceId === sourceId);
+  assert.ok(card, `Expected Intrigue source ${sourceId}`);
+  return { ...card, id };
+}
+
 async function verifyToolCallRetryPath() {
   const legalActions = [
     { id: "legal-a", label: "Legal A", playerId: "p1", action: { kind: "end-reveal" } },
@@ -334,6 +340,82 @@ try {
     "AI snapshot should expose all real Influence tracks with game-state keys",
   );
   assertNoForeignHands(p1AiSnapshot, room.game);
+
+  const aiCombatRoom = {
+    ...room,
+    game: {
+      ...withActivePlayer(room.game, "p2", () => ({
+        agentsReady: 0,
+        revealed: true,
+        conflict: 4,
+        deployedTroops: 3,
+        resources: { spice: 3, solari: 0, water: 0 },
+        intrigues: [
+          intrigueBySourceId(runtime.data, 147, "ai-contingency-plan"),
+          intrigueBySourceId(runtime.data, 151, "ai-devour"),
+          intrigueBySourceId(runtime.data, 152, "ai-impress"),
+          intrigueBySourceId(runtime.data, 146, "ai-go-to-ground"),
+          intrigueBySourceId(runtime.data, 150, "ai-spice-is-power"),
+          intrigueBySourceId(runtime.data, 155, "ai-tactical-option"),
+          intrigueBySourceId(runtime.data, 449, "ai-reach-agreement"),
+        ],
+      })),
+      phase: "combat",
+    },
+  };
+  const aiCombatActionIds = legalActionsForSeat(aiCombatRoom, "p2", runtime)
+    .filter((entry) => entry.id.startsWith("combat:"))
+    .map((entry) => entry.id)
+    .sort();
+  assert.deepEqual(
+    aiCombatActionIds.filter((id) => id.startsWith("combat:ai-contingency-plan:")),
+    ["combat:ai-contingency-plan:p2:\"auto\""],
+    "AI legal actions should not offer irrelevant manual choices for automatic Combat Intrigues",
+  );
+  assert.deepEqual(
+    aiCombatActionIds.filter((id) => id.startsWith("combat:ai-devour:")),
+    ["combat:ai-devour:p2:\"auto\""],
+    "AI legal actions should not duplicate Devour with ignored manual choices",
+  );
+  assert.deepEqual(
+    aiCombatActionIds.filter((id) => id.startsWith("combat:ai-impress:")),
+    ["combat:ai-impress:p2:\"auto\""],
+    "AI legal actions should keep Impress as the single acquire-card combat play",
+  );
+  assert.deepEqual(
+    aiCombatActionIds.filter((id) => id.startsWith("combat:ai-go-to-ground:")),
+    [
+      "combat:ai-go-to-ground:p2:{\"kind\":\"retreat-troops\",\"count\":1}",
+      "combat:ai-go-to-ground:p2:{\"kind\":\"retreat-troops\",\"count\":2}",
+    ],
+    "AI legal actions should keep Go to Ground troop-count choices",
+  );
+  assert.deepEqual(
+    aiCombatActionIds.filter((id) => id.startsWith("combat:ai-spice-is-power:")),
+    [
+      "combat:ai-spice-is-power:p2:\"spend-spice\"",
+      "combat:ai-spice-is-power:p2:{\"kind\":\"retreat-troops\",\"count\":3}",
+    ],
+    "AI legal actions should keep both real Spice Is Power branches when available",
+  );
+  assert.deepEqual(
+    aiCombatActionIds.filter((id) => id.startsWith("combat:ai-tactical-option:")),
+    [
+      "combat:ai-tactical-option:p2:\"add-strength\"",
+      "combat:ai-tactical-option:p2:{\"kind\":\"retreat-troops\",\"count\":1}",
+      "combat:ai-tactical-option:p2:{\"kind\":\"retreat-troops\",\"count\":2}",
+      "combat:ai-tactical-option:p2:{\"kind\":\"retreat-troops\",\"count\":3}",
+    ],
+    "AI legal actions should keep all Tactical Option choices for deployed troop counts",
+  );
+  assert.deepEqual(
+    aiCombatActionIds.filter((id) => id.startsWith("combat:ai-reach-agreement:")),
+    [
+      "combat:ai-reach-agreement:p2:{\"kind\":\"retreat-troops\",\"count\":1}",
+      "combat:ai-reach-agreement:p2:{\"kind\":\"retreat-troops\",\"count\":2}",
+    ],
+    "AI legal actions should keep Reach Agreement troop-count choices",
+  );
 
   room.game = {
     ...room.game,

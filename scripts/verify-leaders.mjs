@@ -1022,6 +1022,16 @@ try {
   assert.equal(playerById(amberDesertScoutsResolved, ladyAmber.id).conflict, 4, "Desert Scouts should remove the retreated troop strength");
   assert.equal(amberDesertScoutsResolved.pendingAction, undefined, "Desert Scouts should advance the pending action");
   assert.match(amberDesertScoutsResolved.log[0], /retreats 1 troop/, "Desert Scouts should log the retreat");
+  const staleAmberDesertScoutsState = {
+    ...amberRevealBase,
+    pendingAction: { kind: "draw-cards", ownerId: ladyAmber.id, source: "Live pending", amount: 1 },
+    pendingQueue: [],
+  };
+  assert.deepEqual(
+    state.resolveLadyAmberDesertScoutsChoice(staleAmberDesertScoutsState, amberDesertScoutsPending[0], "retreat"),
+    staleAmberDesertScoutsState,
+    "Desert Scouts should reject stale pending actions",
+  );
   const amberDesertScoutsSkipped = state.resolveLadyAmberDesertScoutsChoice(
     { ...amberRevealBase, pendingAction: amberDesertScoutsPending[0], pendingQueue: [] },
     amberDesertScoutsPending[0],

@@ -35,6 +35,7 @@ export function resolveLadyAmberDesertScoutsChoice(
   pending: LadyAmberDesertScoutsPendingAction,
   choice: LadyAmberDesertScoutsChoice,
 ): GameState {
+  if (state.pendingAction !== pending) return state;
   const owner = state.players.find((player) => player.id === pending.ownerId);
   if (!owner || owner.leader !== ladyAmberMetulliLeaderName || owner.role !== "Ally") return state;
 

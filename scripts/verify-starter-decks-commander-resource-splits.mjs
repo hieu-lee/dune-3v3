@@ -70,6 +70,17 @@ export function verifyStarterDeckCommanderResourceSplits({ data, game, players, 
   assert.equal(playerById(spiceSplit, muadDib.id).resources.water, 0, "Usul spice choice does not give Commander water");
   assert.equal(playerById(spiceSplit, muadDibAllyA.id).resources.water, 1, "Usul spice choice gives Ally water");
   assert.equal(state.hasGainedSpiceThisTurn(spiceSplit, muadDib.id), true, "Usul should track Commander spice gains");
+  const liveDrawPending = { kind: "draw-cards", ownerId: muadDib.id, source: "Live pending", amount: 1 };
+  const staleUsulResolution = {
+    ...baseUsulResolution,
+    pendingAction: liveDrawPending,
+    pendingQueue: [],
+  };
+  assert.deepEqual(
+    state.resolveCommanderResourceSplitChoice(staleUsulResolution, usulPending, 0),
+    staleUsulResolution,
+    "Commander resource split should reject stale pending actions",
+  );
 
   const arrakeen = data.boardSpaces.find((space) => space.id === "arrakeen");
   assert.ok(arrakeen, "Arrakeen should exist for Usul queue regression");
@@ -99,12 +110,13 @@ export function verifyStarterDeckCommanderResourceSplits({ data, game, players, 
   assert.equal(playerById(queuedWaterSplit, muadDibAllyA.id).resources.spice, 1, "Queued Usul gives Ally spice");
   assert.equal(queuedWaterSplit.pendingAction, undefined, "Queued Usul resolution clears the pending queue");
 
+  const wrongTeamUsulPending = { ...usulPending, team: "shaddam" };
   const wrongTeamUsulState = state.resolveCommanderResourceSplitChoice(
     {
       ...baseUsulResolution,
-      pendingAction: { ...usulPending, team: "shaddam" },
+      pendingAction: wrongTeamUsulPending,
     },
-    { ...usulPending, team: "shaddam" },
+    wrongTeamUsulPending,
     0,
   );
   assert.equal(playerById(wrongTeamUsulState, muadDib.id).resources.water, 0, "Wrong-team Usul should not pay Muad'Dib");
@@ -274,12 +286,13 @@ export function verifyStarterDeckCommanderResourceSplits({ data, game, players, 
     undefined,
     "Queued Critical Shipments resolution clears the pending queue",
   );
+  const wrongTeamCriticalShipmentsPending = { ...criticalShipmentsPending, team: "muaddib" };
   const wrongTeamCriticalShipmentsState = state.resolveCommanderResourceSplitChoice(
     {
       ...baseCriticalShipmentsResolution,
-      pendingAction: { ...criticalShipmentsPending, team: "muaddib" },
+      pendingAction: wrongTeamCriticalShipmentsPending,
     },
-    { ...criticalShipmentsPending, team: "muaddib" },
+    wrongTeamCriticalShipmentsPending,
     1,
   );
   assert.equal(

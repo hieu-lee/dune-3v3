@@ -621,6 +621,7 @@ export function resolveCommanderResourceSplitChoice(
   pending: CommanderResourceSplitPendingAction,
   optionIndex: number,
 ): GameState {
+  if (state.pendingAction !== pending) return state;
   const option = pending.options[optionIndex];
   if (!option) return state;
   const commander = state.players.find((player) => player.id === pending.commanderId);

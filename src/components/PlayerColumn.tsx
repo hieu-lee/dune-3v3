@@ -10,6 +10,7 @@ import { feydRauthaLeaderName } from "../game/leader-constants";
 import { battleIconLabels, factionIds, factionLabels, teams } from "../game/data";
 import { canHaveMakerHooks, playerDoublesConflictRewards } from "../game/state";
 import type { GameState } from "../game/types";
+import { PlayerVault } from "./PlayerVault";
 
 type PlayerColumnProps = {
   game: GameState;
@@ -186,6 +187,7 @@ export function PlayerColumn({
                 ))}
               </div>
             )}
+            <PlayerVault player={player} />
           </article>
         );
       })}

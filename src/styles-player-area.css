@@ -1,0 +1,155 @@
+/* Per-player card vault: deck stacks + graveyard/trash holes. */
+
+.player-vault {
+  --vault-accent: var(--player, rgba(242, 184, 75, 0.85));
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: linear-gradient(155deg, rgba(28, 22, 17, 0.85), rgba(16, 13, 11, 0.92));
+  border: 1px solid rgba(246, 239, 225, 0.08);
+}
+
+.vault-deck,
+.vault-hole {
+  --slot-w: 46px;
+  --slot-h: 64px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: rgba(246, 239, 225, 0.78);
+  font: inherit;
+}
+
+button.vault-hole {
+  cursor: pointer;
+}
+
+.vault-deck-stack,
+.vault-hole-well {
+  position: relative;
+  width: var(--slot-w);
+  height: var(--slot-h);
+  border-radius: 7px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Deck = face-down stack with a layered-edge illusion. */
+.vault-deck-stack {
+  box-shadow:
+    2px 2px 0 -1px rgba(246, 239, 225, 0.18),
+    4px 4px 0 -2px rgba(246, 239, 225, 0.1),
+    0 6px 12px rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(0, 0, 0, 0.55);
+}
+
+.vault-deck-art {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.vault-deck.is-empty .vault-deck-stack {
+  box-shadow: none;
+}
+
+.vault-deck-empty {
+  width: 100%;
+  height: 100%;
+  border: 1px dashed rgba(246, 239, 225, 0.22);
+  border-radius: 7px;
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(246, 239, 225, 0.04),
+    rgba(246, 239, 225, 0.04) 4px,
+    transparent 4px,
+    transparent 8px
+  );
+}
+
+/* Hole = recessed well for graveyard / trash. */
+.vault-hole-well {
+  background: radial-gradient(circle at 50% 38%, rgba(0, 0, 0, 0.92), rgba(0, 0, 0, 0.6) 62%, rgba(34, 26, 20, 0.9) 100%);
+  border: 1px solid rgba(0, 0, 0, 0.7);
+  box-shadow:
+    inset 0 4px 10px rgba(0, 0, 0, 0.85),
+    inset 0 -1px 0 rgba(246, 239, 225, 0.06);
+  color: rgba(246, 239, 225, 0.5);
+}
+
+.vault-hole--graveyard .vault-hole-well {
+  box-shadow:
+    inset 0 4px 10px rgba(0, 0, 0, 0.85),
+    inset 0 0 0 2px rgba(91, 192, 190, 0.28);
+}
+
+.vault-hole--trash .vault-hole-well {
+  box-shadow:
+    inset 0 4px 10px rgba(0, 0, 0, 0.85),
+    inset 0 0 0 2px rgba(220, 96, 78, 0.32);
+}
+
+button.vault-hole:hover .vault-hole-well,
+button.vault-hole:focus-visible .vault-hole-well {
+  outline: 2px solid var(--vault-accent);
+  outline-offset: 1px;
+}
+
+.vault-hole.is-empty .vault-hole-icon {
+  opacity: 0.4;
+}
+
+.vault-slot-label {
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(246, 239, 225, 0.55);
+  white-space: nowrap;
+}
+
+/* Count badge: subtle by default, brightens on hover/focus. */
+.vault-slot-count {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #15110f;
+  background: var(--vault-accent);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  opacity: 0.55;
+  transform: scale(0.92);
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.vault-deck:hover .vault-slot-count,
+.vault-hole:hover .vault-slot-count,
+.vault-hole:focus-visible .vault-slot-count {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.vault-deck.is-empty .vault-slot-count,
+.vault-hole.is-empty .vault-slot-count {
+  background: rgba(246, 239, 225, 0.22);
+  color: rgba(246, 239, 225, 0.7);
+}

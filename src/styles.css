@@ -42,8 +42,12 @@ button {
   order: 2;
 }
 
-.table-grid {
+.player-table-strip {
   order: 3;
+}
+
+.table-grid {
+  order: 4;
 }
 
 .command-bar,

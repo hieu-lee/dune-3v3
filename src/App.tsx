@@ -12,6 +12,7 @@ import { PendingActionPanel } from "./components/PendingActionPanel";
 import { PendingResolutionOverlay } from "./components/PendingResolutionOverlay";
 import { PileInspector, type OpenPile } from "./components/PileInspector";
 import { PlayerColumn } from "./components/PlayerColumn";
+import { PlayerTableStrip } from "./components/PlayerTableStrip";
 import type { VaultPileId } from "./components/PlayerVault";
 import { RecentLogPanel } from "./components/RecentLogPanel";
 import { RoomPanel } from "./components/RoomPanel";
@@ -654,6 +655,8 @@ export default function App() {
         onCaptureDebug={debugCaptureAvailable ? () => void window.__DUNE_DEBUG__?.capture("button") : undefined}
         onResetGame={resetGame}
       />
+
+      <PlayerTableStrip game={game} />
 
       <section className="table-grid">
         <BoardPanel

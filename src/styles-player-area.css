@@ -394,3 +394,158 @@ button.vault-hole:focus-visible .vault-hole-well {
     animation: none;
   }
 }
+
+/* Persistent compact scoreboard of all players around the table. */
+.player-table-strip {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.player-strip-tile {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 246, 230, 0.13);
+  border-top: 3px solid var(--player);
+  border-radius: 8px;
+  background: rgba(30, 24, 20, 0.8);
+}
+
+.player-strip-tile.active {
+  border-color: var(--player);
+  box-shadow:
+    0 0 0 1px var(--player),
+    0 0 16px -4px var(--player);
+}
+
+.player-strip-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.player-strip-swatch {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: var(--player);
+}
+
+.player-strip-names {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.15;
+}
+
+.player-strip-names strong {
+  font-size: 0.82rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.player-strip-names small {
+  font-size: 0.62rem;
+  color: rgba(246, 239, 225, 0.55);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.player-strip-tag {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 2px 5px;
+  border-radius: 999px;
+  background: rgba(255, 246, 230, 0.1);
+  color: rgba(246, 239, 225, 0.7);
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.player-strip-tag.is-turn {
+  background: var(--player);
+  color: #10100f;
+}
+
+.player-strip-resources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: rgba(246, 239, 225, 0.92);
+}
+
+.player-strip-resources span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.player-strip-resources .vp-resource {
+  color: #f7d790;
+}
+
+.player-strip-influence {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.player-strip-faction {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 246, 230, 0.08);
+  background: rgba(0, 0, 0, 0.3);
+  font-size: 0.62rem;
+  font-weight: 700;
+}
+
+.player-strip-faction b {
+  font-size: 0.55rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: rgba(242, 184, 75, 0.82);
+}
+
+.player-strip-faction.holds-alliance {
+  border-color: var(--player);
+  color: #fff;
+}
+
+@media (max-width: 1180px) {
+  .player-table-strip {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .player-table-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}

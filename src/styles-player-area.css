@@ -495,21 +495,40 @@ button.vault-hole:focus-visible .vault-hole-well {
   color: #f7d790;
 }
 
+.player-strip-piles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: rgba(246, 239, 225, 0.86);
+}
+
+.player-strip-piles .player-strip-pile {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.player-strip-piles .player-strip-pile.is-zero {
+  color: rgba(246, 239, 225, 0.4);
+}
+
 .player-strip-influence {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 3px;
 }
 
 .player-strip-faction {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  padding: 1px 5px;
+  gap: 2px;
+  padding: 1px 4px;
   border-radius: 999px;
   border: 1px solid rgba(255, 246, 230, 0.08);
   background: rgba(0, 0, 0, 0.3);
-  font-size: 0.62rem;
+  font-size: 0.6rem;
   font-weight: 700;
 }
 

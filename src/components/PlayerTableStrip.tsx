@@ -1,8 +1,9 @@
 import type { CSSProperties } from "react";
-import { Trophy } from "lucide-react";
+import { Archive, Hand, Layers, Trash2, Trophy } from "lucide-react";
 import { factionShortLabels, resources } from "../app-helpers";
 import { factionIds, factionLabels, teams } from "../game/data";
 import type { GameState } from "../game/types";
+import { graveyardCards, trashCards } from "./PlayerVault";
 
 type PlayerTableStripProps = {
   game: GameState;
@@ -16,6 +17,12 @@ export function PlayerTableStrip({ game }: PlayerTableStripProps) {
       {game.players.map((player, index) => {
         const activeTurn = turnActive && index === game.activeSeat;
         const heldAlliances = factionIds.filter((faction) => game.alliances[faction] === player.id);
+        const piles = [
+          { id: "deck", label: "Deck", Icon: Layers, count: player.deck.length },
+          { id: "hand", label: "Hand", Icon: Hand, count: player.hand.length },
+          { id: "graveyard", label: "Graveyard", Icon: Archive, count: graveyardCards(player).length },
+          { id: "trash", label: "Trash", Icon: Trash2, count: trashCards(player).length },
+        ] as const;
         return (
           <article
             className={[
@@ -56,6 +63,20 @@ export function PlayerTableStrip({ game }: PlayerTableStripProps) {
                 {player.agentsReady}/{player.agentsTotal}
                 <span className="sr-only"> {player.role === "Commander" ? "activations" : "agents"} ready</span>
               </span>
+            </div>
+            <div className="player-strip-piles" role="list" aria-label={`${player.leader} card piles`}>
+              {piles.map(({ id, label, Icon, count }) => (
+                <span
+                  className={["player-strip-pile", count === 0 ? "is-zero" : ""].filter(Boolean).join(" ")}
+                  key={id}
+                  role="listitem"
+                  title={`${label}: ${count} ${count === 1 ? "card" : "cards"}`}
+                >
+                  <Icon size={12} aria-hidden="true" />
+                  {count}
+                  <span className="sr-only"> {label}</span>
+                </span>
+              ))}
             </div>
             <div className="player-strip-influence" role="list" aria-label={`${player.leader} faction influence`}>
               {factionIds.map((faction) => {

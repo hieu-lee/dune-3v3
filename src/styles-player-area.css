@@ -362,3 +362,35 @@ button.vault-hole:focus-visible .vault-hole-well {
   text-transform: uppercase;
   color: rgba(242, 184, 75, 0.85);
 }
+
+/* Current-turn aura around the active hand, colored per character. */
+.active-hand-panel.turn-aura-active {
+  border-color: var(--turn-aura, rgba(255, 246, 230, 0.13));
+  box-shadow:
+    0 18px 50px rgba(0, 0, 0, 0.22),
+    0 0 0 1px var(--turn-aura, transparent),
+    0 0 24px -3px var(--turn-aura, transparent);
+  animation: turn-aura-pulse 2.6s ease-in-out infinite;
+}
+
+@keyframes turn-aura-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 18px 50px rgba(0, 0, 0, 0.22),
+      0 0 0 1px var(--turn-aura, transparent),
+      0 0 16px -6px var(--turn-aura, transparent);
+  }
+  50% {
+    box-shadow:
+      0 18px 50px rgba(0, 0, 0, 0.22),
+      0 0 0 1px var(--turn-aura, transparent),
+      0 0 30px -2px var(--turn-aura, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .active-hand-panel.turn-aura-active {
+    animation: none;
+  }
+}

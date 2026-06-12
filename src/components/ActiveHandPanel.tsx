@@ -1,5 +1,5 @@
 import { BookOpen, EyeOff, HandCoins, SkipForward } from "lucide-react";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { commanderCanActivateAlly } from "../game/state";
 import type { GamePhase, Player } from "../game/types";
 import { CardAssetPreview, cardAccessibleSummary } from "./CardAssetPreview";
@@ -75,15 +75,20 @@ export function ActiveHandPanel({
   const revealPrimary = !placeAgentPrimary && !endAgentPrimary && !activePlayer.revealed && activePlayer.agentsReady === 0 && !pendingActionActive;
   const endRevealPrimary = activePlayer.revealed && !pendingActionActive;
   const compactForActionContext = pendingActionActive || phase === "combat";
+  const turnAuraActive = phase === "playing" || phase === "combat";
 
   return (
-    <div className={[
-      "hand-panel",
-      "active-hand-panel",
-      emptyPanel ? "empty-hand-panel" : "",
-      compactForActionContext ? "active-hand-compact" : "",
-      phase === "combat" ? "active-hand-combat" : "",
-    ].filter(Boolean).join(" ")}>
+    <div
+      className={[
+        "hand-panel",
+        "active-hand-panel",
+        emptyPanel ? "empty-hand-panel" : "",
+        compactForActionContext ? "active-hand-compact" : "",
+        phase === "combat" ? "active-hand-combat" : "",
+        turnAuraActive ? "turn-aura-active" : "",
+      ].filter(Boolean).join(" ")}
+      style={turnAuraActive ? ({ "--turn-aura": activePlayer.color } as CSSProperties) : undefined}
+    >
       <div className="panel-heading">
         <div>
           <p className="eyebrow">Active hand</p>

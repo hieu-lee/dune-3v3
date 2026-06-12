@@ -10,13 +10,14 @@ import { feydRauthaLeaderName } from "../game/leader-constants";
 import { battleIconLabels, factionIds, factionLabels, teams } from "../game/data";
 import { canHaveMakerHooks, playerDoublesConflictRewards } from "../game/state";
 import type { GameState } from "../game/types";
-import { PlayerVault } from "./PlayerVault";
+import { PlayerVault, type VaultPileId } from "./PlayerVault";
 
 type PlayerColumnProps = {
   game: GameState;
   tableStateLockedByPending: boolean;
   onOpenLeaderReference: (playerId: string, opener: HTMLButtonElement) => void;
   onMakerHooksChange: (playerId: string, hasHooks: boolean) => void;
+  onOpenPile?: (playerId: string, pile: VaultPileId) => void;
 };
 
 export function PlayerColumn({
@@ -24,6 +25,7 @@ export function PlayerColumn({
   tableStateLockedByPending,
   onOpenLeaderReference,
   onMakerHooksChange,
+  onOpenPile,
 }: PlayerColumnProps) {
   return (
     <aside className="player-column">
@@ -187,7 +189,7 @@ export function PlayerColumn({
                 ))}
               </div>
             )}
-            <PlayerVault player={player} />
+            <PlayerVault player={player} onOpenPile={onOpenPile} />
           </article>
         );
       })}

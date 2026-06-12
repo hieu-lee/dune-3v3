@@ -153,3 +153,212 @@ button.vault-hole:focus-visible .vault-hole-well {
   background: rgba(246, 239, 225, 0.22);
   color: rgba(246, 239, 225, 0.7);
 }
+
+/* ----- Pile inspector: right list drawer + left card detail ----- */
+
+.pile-inspector-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  border: none;
+  margin: 0;
+  padding: 0;
+  background: rgba(8, 6, 5, 0.55);
+  opacity: 0;
+  pointer-events: none;
+  cursor: default;
+  transition: opacity 200ms ease;
+}
+
+.pile-inspector-backdrop.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.pile-list-drawer,
+.pile-detail-panel {
+  position: fixed;
+  top: 72px;
+  bottom: 18px;
+  z-index: 101;
+  border: 1px solid rgba(255, 246, 230, 0.16);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(30, 24, 20, 0.97), rgba(16, 14, 12, 0.97)),
+    rgba(18, 15, 13, 0.97);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  padding: 14px;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 220ms ease,
+    transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.pile-list-drawer {
+  right: 16px;
+  width: min(360px, calc(100vw - 28px));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: hidden;
+  transform: translateX(calc(100% + 24px));
+}
+
+.pile-detail-panel {
+  left: 16px;
+  width: min(330px, calc(100vw - 28px));
+  overflow-y: auto;
+  transform: translateX(calc(-100% - 24px));
+}
+
+.pile-list-drawer.is-open,
+.pile-detail-panel.is-open {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
+}
+
+.pile-list-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pile-list-header .eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.pile-list-header h2 {
+  margin: 2px 0 0;
+  font-size: 18px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pile-list-count {
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #15110f;
+  background: rgba(242, 184, 75, 0.9);
+  border-radius: 9px;
+  padding: 1px 8px;
+}
+
+.pile-list-empty {
+  color: rgba(246, 239, 225, 0.55);
+  font-size: 13px;
+}
+
+.pile-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 2px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+
+.pile-list-card {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px;
+  border-radius: 8px;
+  border: 1px solid rgba(246, 239, 225, 0.1);
+  background: rgba(246, 239, 225, 0.04);
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+
+.pile-list-card:hover {
+  border-color: rgba(246, 239, 225, 0.28);
+  background: rgba(246, 239, 225, 0.08);
+}
+
+.pile-list-card.selected {
+  border-color: rgba(242, 184, 75, 0.9);
+  background: rgba(242, 184, 75, 0.12);
+}
+
+.pile-list-card-art {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 60px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pile-list-card-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pile-list-card-missing {
+  font-size: 8px;
+  text-align: center;
+  color: rgba(246, 239, 225, 0.6);
+  padding: 2px;
+}
+
+.pile-list-card-name {
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.pile-detail-body .eyebrow {
+  margin: 0;
+}
+
+.pile-detail-body h2 {
+  margin: 2px 0 10px;
+  font-size: 19px;
+}
+
+.pile-detail-art {
+  width: 100%;
+  border-radius: 10px;
+  display: block;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+}
+
+.pile-detail-art-missing {
+  aspect-ratio: 5 / 7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+  color: rgba(246, 239, 225, 0.5);
+  font-size: 13px;
+}
+
+.pile-detail-line {
+  display: grid;
+  gap: 2px;
+  margin: 10px 0 0;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.pile-detail-line b {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(242, 184, 75, 0.85);
+}

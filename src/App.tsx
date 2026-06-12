@@ -10,7 +10,9 @@ import { LeaderReferenceModal } from "./components/LeaderReferenceModal";
 import { MarketPanel } from "./components/MarketPanel";
 import { PendingActionPanel } from "./components/PendingActionPanel";
 import { PendingResolutionOverlay } from "./components/PendingResolutionOverlay";
+import { PileInspector, type OpenPile } from "./components/PileInspector";
 import { PlayerColumn } from "./components/PlayerColumn";
+import type { VaultPileId } from "./components/PlayerVault";
 import { RecentLogPanel } from "./components/RecentLogPanel";
 import { RoomPanel } from "./components/RoomPanel";
 import { RoomPendingPanel } from "./components/RoomPendingPanel";
@@ -105,6 +107,8 @@ export default function App() {
   const [selectedLeaderId, setSelectedLeaderId] = useState<string | null>(null);
   const [tableInfoOpen, setTableInfoOpen] = useState(false);
   const [rightDrawer, setRightDrawer] = useState<"leaders" | "log" | null>(null);
+  const [inspectedPile, setInspectedPile] = useState<OpenPile | null>(null);
+  const [inspectedPileCardIndex, setInspectedPileCardIndex] = useState<number | null>(null);
   const [commanderTargets, setCommanderTargets] = useState<Record<string, string>>({});
   const [changeAllegiancesSelections, setChangeAllegiancesSelections] = useState<Record<string, ChangeAllegiancesSelection>>({});
   const leaderOpenerRef = useRef<HTMLButtonElement | null>(null);
@@ -209,6 +213,18 @@ export default function App() {
   function openLeaderReference(playerId: string, opener: HTMLButtonElement) {
     leaderOpenerRef.current = opener;
     setSelectedLeaderId(playerId);
+  }
+
+  function openPile(playerId: string, pile: VaultPileId) {
+    setInspectedPile((current) =>
+      current && current.playerId === playerId && current.pile === pile ? null : { playerId, pile },
+    );
+    setInspectedPileCardIndex(null);
+  }
+
+  function closePile() {
+    setInspectedPile(null);
+    setInspectedPileCardIndex(null);
   }
 
   const legalSpaces = useMemo(() => {
@@ -717,6 +733,7 @@ export default function App() {
           tableStateLockedByPending={tableStateLockedByPending}
           onOpenLeaderReference={openLeaderReference}
           onMakerHooksChange={updateMakerHooks}
+          onOpenPile={openPile}
         />
       </aside>
 
@@ -731,6 +748,14 @@ export default function App() {
       </aside>
 
       <LeaderReferenceModal player={selectedLeader} onClose={closeLeaderReference} />
+
+      <PileInspector
+        game={game}
+        open={inspectedPile}
+        selectedIndex={inspectedPileCardIndex}
+        onSelectIndex={setInspectedPileCardIndex}
+        onClose={closePile}
+      />
 
       <section className="action-dock">
         {game.phase === "combat" && combatActor && !pendingAction && (!roomSession.inRoom || canControlActivePlayer) && (

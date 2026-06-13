@@ -634,22 +634,22 @@ button.vault-hole:focus-visible .vault-hole-well {
 @keyframes card-play-reveal-pop {
   0% {
     opacity: 0;
-    transform: perspective(900px) rotateY(82deg) scale(0.72);
+    transform: perspective(900px) translate(0, 0) scale(0.72) rotateY(82deg);
   }
-  16% {
+  14% {
     opacity: 1;
-    transform: perspective(900px) rotateY(0deg) scale(1.05);
+    transform: perspective(900px) translate(0, 0) scale(1.05) rotateY(0deg);
   }
-  28% {
-    transform: perspective(900px) rotateY(0deg) scale(1);
+  26% {
+    transform: perspective(900px) translate(0, 0) scale(1) rotateY(0deg);
   }
-  76% {
+  58% {
     opacity: 1;
-    transform: perspective(900px) rotateY(0deg) scale(1);
+    transform: perspective(900px) translate(0, 0) scale(1) rotateY(0deg);
   }
   100% {
     opacity: 0;
-    transform: perspective(900px) rotateY(0deg) scale(0.97) translateY(-14px);
+    transform: perspective(900px) translate(var(--fly-x, 0px), var(--fly-y, 0px)) scale(0.34) rotateY(0deg);
   }
 }
 

@@ -30,6 +30,7 @@ export function PlayerTableStrip({ game }: PlayerTableStripProps) {
               activeTurn ? "active" : "",
             ].filter(Boolean).join(" ")}
             key={player.id}
+            data-player-id={player.id}
             style={{ "--player": player.color } as CSSProperties}
             aria-current={activeTurn ? "true" : undefined}
           >

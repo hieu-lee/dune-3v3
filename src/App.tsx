@@ -155,6 +155,7 @@ export default function App() {
             announcements.push({
               id: ++playAnnouncementSeqRef.current,
               card,
+              playerId: player.id,
               playerName: player.leader,
               playerColor: player.color,
               action: player.revealed ? "revealed" : "played",

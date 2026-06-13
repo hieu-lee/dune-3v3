@@ -125,13 +125,15 @@ export function useRoomSession() {
   }
 
   const acceptSnapshot = useCallback((snapshotRoomId: string, token: string | undefined, nextSnapshot: RoomSnapshot) => {
-    const tokenClearsCurrentIdentity = Boolean(token && token === identityRef.current?.token && !nextSnapshot.viewerPlayerId);
-    if (tokenClearsCurrentIdentity) {
-      removeStoredIdentity(snapshotRoomId);
-      storeIdentity(undefined);
-    }
     setSnapshot((currentSnapshot) => {
       const currentIdentity = identityRef.current;
+      const tokenClearsCurrentIdentity = Boolean(token && token === currentIdentity?.token && !nextSnapshot.viewerPlayerId);
+      const tokenRepairsCurrentIdentity = Boolean(
+        token &&
+          token === currentIdentity?.token &&
+          nextSnapshot.viewerPlayerId &&
+          nextSnapshot.viewerPlayerId !== currentIdentity.playerId
+      );
       if (
         currentSnapshot &&
         currentSnapshot.roomId === nextSnapshot.roomId &&
@@ -140,11 +142,20 @@ export function useRoomSession() {
         snapshotRef.current = currentSnapshot;
         return currentSnapshot;
       }
+      if (tokenClearsCurrentIdentity) {
+        removeStoredIdentity(snapshotRoomId);
+        storeIdentity(undefined);
+      } else if (tokenRepairsCurrentIdentity && token && nextSnapshot.viewerPlayerId) {
+        const repairedIdentity = { playerId: nextSnapshot.viewerPlayerId, token };
+        writeStoredIdentity(snapshotRoomId, repairedIdentity);
+        storeIdentity(repairedIdentity);
+      }
       if (
         currentSnapshot &&
         currentSnapshot.roomId === nextSnapshot.roomId &&
         currentSnapshot.viewerPlayerId !== nextSnapshot.viewerPlayerId &&
         !tokenClearsCurrentIdentity &&
+        !tokenRepairsCurrentIdentity &&
         (
           currentSnapshot.version >= nextSnapshot.version ||
           currentSnapshot.viewerPlayerId === currentIdentity?.playerId ||

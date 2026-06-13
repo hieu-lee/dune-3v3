@@ -275,6 +275,46 @@ try {
   await capture(bobRecoveryPage, "room-bob-offline-locked.png");
   await bobRecoveryContext.close();
 
+  const identityRepairContext = await browser.newContext({ viewport: { width: 1440, height: 1100 } });
+  const identityRepairPage = await identityRepairContext.newPage();
+  observePage(identityRepairPage);
+  await identityRepairPage.goto(server.resolvedUrls.local[0], { waitUntil: "domcontentloaded" });
+  await identityRepairPage.getByRole("button", { name: "Create" }).click();
+  await identityRepairPage.waitForFunction(() => new URL(window.location.href).searchParams.has("room"));
+  const identityRepairRoomId = await identityRepairPage.evaluate(() => new URL(window.location.href).searchParams.get("room"));
+  assert.match(identityRepairRoomId, /^[A-F0-9]{8}$/);
+  await claimSeat(identityRepairPage, "p1", "Identity Repair");
+  const staleIdentity = await identityRepairPage.evaluate((id) =>
+    JSON.parse(window.localStorage.getItem(`dune-3v3-room-${id}`) ?? "null"),
+    identityRepairRoomId,
+  );
+  assert.equal(staleIdentity?.playerId, "p1", "Identity repair fixture should start with a p1 identity");
+  assert.ok(staleIdentity?.token, "Identity repair fixture should store a reconnect token");
+  const switchedIdentityResponse = await fetch(
+    `${server.resolvedUrls.local[0]}api/rooms/${identityRepairRoomId}/seats/p3/claim`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "Identity Repair", token: staleIdentity.token }),
+    },
+  );
+  assert.equal(switchedIdentityResponse.status, 200, "Server-side token seat switch should succeed");
+  await identityRepairPage.reload({ waitUntil: "domcontentloaded" });
+  await identityRepairPage.waitForFunction(() =>
+    window.__DUNE_DEBUG__?.getRoomSnapshot?.()?.viewerPlayerId === "p3"
+  );
+  const repairedIdentity = await identityRepairPage.evaluate((id) =>
+    JSON.parse(window.localStorage.getItem(`dune-3v3-room-${id}`) ?? "null"),
+    identityRepairRoomId,
+  );
+  assert.equal(
+    repairedIdentity?.playerId,
+    "p3",
+    "Stored reconnect identity should track the seat currently owned by the token",
+  );
+  await capture(identityRepairPage, "room-reconnect-identity-repaired.png");
+  await identityRepairContext.close();
+
   const actionContext = await browser.newContext({ viewport: { width: 1440, height: 1100 } });
   const actionPage = await actionContext.newPage();
   observePage(actionPage);

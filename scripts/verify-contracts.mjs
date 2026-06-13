@@ -531,6 +531,63 @@ try {
   });
   assertCompleted(cumulativeHarvestCompleted, ally.id, "Harvest 3+");
 
+  const deliveryAgreement = imperiumCardByName("Delivery Agreement");
+  const pendingChoiceHarvestBase = state.recordTurnSpiceGain(
+    state.recordTurnMakerSpaceVisit(
+      withHeldContracts(
+        updatePlayer(
+          {
+            ...game,
+            activeSeat: harvestActiveSeat,
+            pendingAction: undefined,
+            pendingQueue: [],
+            spaces: {},
+          },
+          ally.id,
+          (player) => ({
+            ...player,
+            hand: [],
+            playArea: [deliveryAgreement],
+            resources: { ...player.resources, spice: 2 },
+          }),
+        ),
+        ally.id,
+        ["Harvest 3+"],
+      ),
+      ally.id,
+    ),
+    ally.id,
+    2,
+  );
+  const pendingChoiceHarvestAction = {
+    kind: "pending-action-choice",
+    ownerId: ally.id,
+    source: "Delivery Agreement",
+    cardId: deliveryAgreement.id,
+    options: [{
+      id: "spice",
+      label: "Gain 1 spice",
+      pending: {
+        kind: "gain-resource",
+        ownerId: ally.id,
+        resource: "spice",
+        amount: 1,
+        source: "Delivery Agreement",
+      },
+    }],
+  };
+  const pendingChoiceHarvestCompleted = state.resolvePendingActionChoice(
+    { ...pendingChoiceHarvestBase, pendingAction: pendingChoiceHarvestAction },
+    pendingChoiceHarvestAction,
+    "spice",
+  );
+  assert.equal(
+    pendingChoiceHarvestCompleted.turnSpiceGains[ally.id],
+    3,
+    "Pending choice spice should count toward same-turn Harvest totals",
+  );
+  assertCompleted(pendingChoiceHarvestCompleted, ally.id, "Harvest 3+");
+
 	  const priorityContracts = imperiumCardByName("Priority Contracts");
 	  const desertPower = imperiumCardByName("Desert Power");
 	  const cardSpiceHarvestHeld = withHeldContracts(

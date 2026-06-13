@@ -18,7 +18,7 @@ import {
   placeableSpySpaces,
   recallableSpySupplySpaces,
 } from "./spy-choices";
-import { recordTurnSpiceGain } from "./turn-trackers";
+import { recordTurnSpiceGainAndCompleteHarvestContracts } from "./contract-rules";
 import type {
   GameState,
   PendingAction,
@@ -93,6 +93,7 @@ export function resolvePendingActionChoice(
     };
   }
   if (nestedPending.kind === "gain-resource") {
+    const actionLog = `${owner.leader} chooses ${option.label} for ${pending.source}: gains ${nestedPending.amount} ${nestedPending.resource}.`;
     const resourceGainedState = {
       ...state,
       players: state.players.map((player) =>
@@ -107,13 +108,15 @@ export function resolvePendingActionChoice(
           : player
       ),
       ...advancePendingAction(state),
-      log: [
-        `${owner.leader} chooses ${option.label} for ${pending.source}: gains ${nestedPending.amount} ${nestedPending.resource}.`,
-        ...state.log,
-      ],
+      log: [actionLog, ...state.log],
     };
     return nestedPending.resource === "spice"
-      ? recordTurnSpiceGain(resourceGainedState, nestedPending.ownerId, nestedPending.amount)
+      ? recordTurnSpiceGainAndCompleteHarvestContracts(
+        resourceGainedState,
+        nestedPending.ownerId,
+        nestedPending.amount,
+        actionLog,
+      ).state
       : resourceGainedState;
   }
   if (nestedPending.kind === "gain-strength") {

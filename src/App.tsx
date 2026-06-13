@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, MonitorPlay, PanelLeftOpen, PlugZap, ScrollText, Users } from "lucide-react";
 import { ActiveHandPanel } from "./components/ActiveHandPanel";
 import { BoardPanel, type BoardSpySlotChoices } from "./components/BoardPanel";
+import { CardPlayReveal, type CardPlayAnnouncement } from "./components/CardPlayReveal";
 import { CommandBar } from "./components/CommandBar";
 import { CombatIntriguePanel } from "./components/CombatIntriguePanel";
 import { EndgamePanel } from "./components/EndgamePanel";
@@ -98,6 +99,8 @@ declare global {
 const appEnv = (import.meta as ImportMeta & { env?: { DEV?: boolean; VITE_DUNE_DEBUG?: string } }).env;
 const browserDebugEnabled = Boolean(appEnv?.DEV || appEnv?.VITE_DUNE_DEBUG === "1");
 
+const MAX_REVEAL_QUEUE = 8;
+
 export default function App() {
   const roomSession = useRoomSession();
   const [game, setGame] = useState<GameState>(() => initialGame({ includeSetupPending: false }));
@@ -110,6 +113,10 @@ export default function App() {
   const [rightDrawer, setRightDrawer] = useState<"leaders" | "log" | null>(null);
   const [inspectedPile, setInspectedPile] = useState<OpenPile | null>(null);
   const [inspectedPileCardIndex, setInspectedPileCardIndex] = useState<number | null>(null);
+  const [playQueue, setPlayQueue] = useState<CardPlayAnnouncement[]>([]);
+  const playAreaSizesRef = useRef<Map<string, number>>(new Map());
+  const playAreaContextRef = useRef<string | null>(null);
+  const playAnnouncementSeqRef = useRef(0);
   const [commanderTargets, setCommanderTargets] = useState<Record<string, string>>({});
   const [changeAllegiancesSelections, setChangeAllegiancesSelections] = useState<Record<string, ChangeAllegiancesSelection>>({});
   const leaderOpenerRef = useRef<HTMLButtonElement | null>(null);
@@ -121,6 +128,53 @@ export default function App() {
   useEffect(() => {
     gameRef.current = game;
   }, [game]);
+
+  useEffect(() => {
+    const contextKey = roomSession.inRoom ? `room:${roomSession.roomId}` : "local";
+    const sizes = playAreaSizesRef.current;
+    // On the first run or whenever the whole game is swapped (room enter/leave),
+    // re-baseline play-area sizes without announcing pre-existing plays.
+    const contextChanged = playAreaContextRef.current !== contextKey;
+    if (contextChanged) {
+      sizes.clear();
+      playAreaContextRef.current = contextKey;
+    }
+    const announcements: CardPlayAnnouncement[] = [];
+    for (const player of game.players) {
+      // Only announce for players already baselined; a player id first seen
+      // mid-context (e.g. joining a room) is baselined silently, not announced.
+      const known = sizes.has(player.id);
+      const previousSize = sizes.get(player.id) ?? 0;
+      const currentSize = player.playArea.length;
+      if (!contextChanged && known && currentSize > previousSize) {
+        // Announce every newly added card in order so a full Reveal (whole hand
+        // appended at once) shows each card, not just the last one.
+        for (let index = previousSize; index < currentSize; index += 1) {
+          const card = player.playArea[index];
+          if (card) {
+            announcements.push({
+              id: ++playAnnouncementSeqRef.current,
+              card,
+              playerName: player.leader,
+              playerColor: player.color,
+              action: player.revealed ? "revealed" : "played",
+            });
+          }
+        }
+      }
+      sizes.set(player.id, currentSize);
+    }
+    if (announcements.length > 0) {
+      // Bound the queue so a bulk reveal/reshuffle can't back the overlay up
+      // indefinitely. Keep the currently-displayed head, then the most recent
+      // items, so trimming never evicts the card that is mid-animation.
+      setPlayQueue((queue) => {
+        const next = [...queue, ...announcements];
+        if (next.length <= MAX_REVEAL_QUEUE) return next;
+        return [next[0], ...next.slice(-(MAX_REVEAL_QUEUE - 1))];
+      });
+    }
+  }, [game, roomSession.inRoom, roomSession.roomId]);
 
   useEffect(() => {
     localStartedRef.current = localStarted;
@@ -751,6 +805,11 @@ export default function App() {
       </aside>
 
       <LeaderReferenceModal player={selectedLeader} onClose={closeLeaderReference} />
+
+      <CardPlayReveal
+        announcement={playQueue[0] ?? null}
+        onDone={() => setPlayQueue((queue) => queue.slice(1))}
+      />
 
       <PileInspector
         game={game}

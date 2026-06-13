@@ -568,3 +568,99 @@ button.vault-hole:focus-visible .vault-hole-well {
   white-space: nowrap;
   border: 0;
 }
+
+/* Card-play reveal flourish, visible to all players. */
+.card-play-reveal {
+  position: fixed;
+  inset: 0;
+  z-index: 88;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.card-play-reveal-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  transform-origin: center;
+  animation: card-play-reveal-pop var(--reveal-duration, 1500ms) ease forwards;
+}
+
+.card-play-reveal-art,
+.card-play-reveal-fallback {
+  width: min(240px, 42vw);
+  aspect-ratio: 5 / 7;
+  border-radius: 12px;
+  border: 2px solid var(--player, rgba(255, 246, 230, 0.4));
+  box-shadow:
+    0 24px 70px rgba(0, 0, 0, 0.55),
+    0 0 0 1px var(--player, transparent),
+    0 0 36px -6px var(--player, transparent);
+  object-fit: cover;
+  background: rgba(20, 16, 13, 0.92);
+}
+
+.card-play-reveal-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px;
+  text-align: center;
+  color: rgba(246, 239, 225, 0.92);
+  font-weight: 800;
+}
+
+.card-play-reveal-caption {
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(12, 10, 8, 0.85);
+  border: 1px solid var(--player, rgba(255, 246, 230, 0.3));
+  color: rgba(246, 239, 225, 0.92);
+  font-size: 0.82rem;
+}
+
+.card-play-reveal-caption b {
+  color: var(--player, #f7d790);
+}
+
+.card-play-reveal-caption em {
+  font-style: normal;
+  font-weight: 700;
+}
+
+@keyframes card-play-reveal-pop {
+  0% {
+    opacity: 0;
+    transform: perspective(900px) rotateY(82deg) scale(0.72);
+  }
+  16% {
+    opacity: 1;
+    transform: perspective(900px) rotateY(0deg) scale(1.05);
+  }
+  28% {
+    transform: perspective(900px) rotateY(0deg) scale(1);
+  }
+  76% {
+    opacity: 1;
+    transform: perspective(900px) rotateY(0deg) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: perspective(900px) rotateY(0deg) scale(0.97) translateY(-14px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-play-reveal-card {
+    animation: card-play-reveal-fade var(--reveal-duration, 1500ms) ease forwards;
+  }
+  @keyframes card-play-reveal-fade {
+    0% { opacity: 0; }
+    12% { opacity: 1; }
+    80% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+}

@@ -992,6 +992,20 @@ function addCombatIntrigueActions(legalActions, room, player, runtime) {
   }
 }
 
+function placeableSpaceCandidates(game, player, runtime) {
+  return runtime.data.boardSpaces
+    .filter((space) =>
+      runtime.state.agentSpaceAvailable(game, space, player) &&
+      runtime.state.canPay(player, runtime.state.effectiveCost(space, game.players))
+    )
+    .map((space) => ({
+      space,
+      spyEntrySpaceIds: game.spaces[space.id]
+        ? runtime.state.spyEntrySpaceIdsForOccupiedSpace(game, space.id, player.id)
+        : [undefined],
+    }));
+}
+
 export function legalActionsForSeat(room, playerId, runtime, coverage = {}) {
   const game = room.game;
   const player = game.players.find((candidate) => candidate.id === playerId);
@@ -1026,14 +1040,10 @@ export function legalActionsForSeat(room, playerId, runtime, coverage = {}) {
     const targetVariants = commanderTargetVariants(player, game.players);
     const placeAgentTargetVariants = commanderTargetVariants(player, game.players, { includeUntargetedFallback: false });
     if (!player.revealed && player.agentsReady > 0) {
+      const placeableSpaces = placeableSpaceCandidates(game, player, runtime);
       for (const card of player.hand) {
-        for (const space of runtime.data.boardSpaces) {
-          if (!runtime.state.agentSpaceAvailable(game, space, player)) continue;
-          if (!runtime.state.canPay(player, runtime.state.effectiveCost(space, game.players))) continue;
+        for (const { space, spyEntrySpaceIds } of placeableSpaces) {
           if (!runtime.state.iconCanReach(card, space, player, game.swordmasterClaimed, game.spyPosts, game.players, game.sharedSpyPosts)) continue;
-          const spyEntrySpaceIds = game.spaces[space.id]
-            ? runtime.state.spyEntrySpaceIdsForOccupiedSpace(game, space.id, player.id)
-            : [undefined];
           for (const target of placeAgentTargetVariants) {
             for (const spyEntrySpaceId of spyEntrySpaceIds) {
               coverage.trustedPlaceAgentActions = (coverage.trustedPlaceAgentActions ?? 0) + 1;

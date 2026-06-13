@@ -1,9 +1,6 @@
 .board-panel {
   align-self: start;
   min-height: 690px;
-  /* Cap the board to roughly one viewport and let it scroll internally, so the
-     player strip and command bar stay reachable without a long page scroll. */
-  max-height: calc(100vh - 40px);
   border: 1px solid rgba(255, 246, 230, 0.13);
   border-radius: 8px;
   background:
@@ -11,7 +8,7 @@
     repeating-linear-gradient(30deg, rgba(211, 166, 87, 0.08) 0 2px, transparent 2px 18px);
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.22);
   backdrop-filter: blur(16px);
-  overflow: auto;
+  overflow-x: auto;
   padding: 14px;
 }
 

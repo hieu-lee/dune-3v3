@@ -1,10 +1,20 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Archive, Trash2, X } from "lucide-react";
-import type { Card, GameState } from "../game/types";
+import { Archive, Eye, FileText, Trash2, X } from "lucide-react";
+import type { GameState } from "../game/types";
 import { graveyardCards, trashCards, type VaultPileId } from "./PlayerVault";
 
 export type OpenPile = { playerId: string; pile: VaultPileId };
+
+type InspectCard = {
+  id: string;
+  name: string;
+  imagePath?: string;
+  thumbnailPath?: string;
+  play?: string;
+  reveal?: string;
+  summary?: string;
+};
 
 type PileInspectorProps = {
   game: GameState;
@@ -17,19 +27,45 @@ type PileInspectorProps = {
 const PILE_META: Record<VaultPileId, { label: string; Icon: typeof Archive }> = {
   graveyard: { label: "Graveyard", Icon: Archive },
   trash: { label: "Trash", Icon: Trash2 },
+  contract: { label: "Contracts", Icon: FileText },
+  intrigue: { label: "Intrigues", Icon: Eye },
 };
 
-function pileCards(game: GameState, open: OpenPile | null): Card[] {
+function pileCards(game: GameState, open: OpenPile | null): InspectCard[] {
   if (!open) return [];
   const player = game.players.find((candidate) => candidate.id === open.playerId);
   if (!player) return [];
-  return open.pile === "graveyard" ? graveyardCards(player) : trashCards(player);
+  switch (open.pile) {
+    case "graveyard":
+      return graveyardCards(player);
+    case "trash":
+      return trashCards(player);
+    case "contract":
+      return player.contracts.map((contract) => ({
+        id: contract.card.id,
+        name: contract.card.name,
+        imagePath: contract.card.imagePath,
+        thumbnailPath: contract.card.thumbnailPath,
+        summary: contract.completed ? "Completed" : "Pending",
+      }));
+    case "intrigue":
+      return player.intrigues.map((intrigue) => ({
+        id: intrigue.id,
+        name: intrigue.name,
+        imagePath: intrigue.imagePath,
+        thumbnailPath: intrigue.thumbnailPath,
+        summary: intrigue.summary,
+      }));
+    default:
+      return [];
+  }
 }
 
-function cardEffectLines(card: Card): { label: string; text: string }[] {
+function cardEffectLines(card: InspectCard): { label: string; text: string }[] {
   return [
     card.play ? { label: "Agent", text: card.play } : null,
     card.reveal ? { label: "Reveal", text: card.reveal } : null,
+    card.summary ? { label: "Details", text: card.summary } : null,
   ].filter((line): line is { label: string; text: string } => Boolean(line));
 }
 

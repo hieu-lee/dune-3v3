@@ -8,7 +8,7 @@ export const VAULT_DECK_BACKS = {
   contract: "/assets/dune-cards-hub/contract/choam-contract-backside.png",
 } as const;
 
-export type VaultPileId = "graveyard" | "trash";
+export type VaultPileId = "graveyard" | "trash" | "contract" | "intrigue";
 
 export function graveyardCards(player: Player) {
   return [...player.discard, ...player.playArea];
@@ -25,19 +25,16 @@ type VaultDeckProps = {
   label: string;
   count: number;
   noun: string;
+  pile?: VaultPileId;
+  onOpen?: (pile: VaultPileId) => void;
 };
 
-function VaultDeck({ deck, label, count, noun }: VaultDeckProps) {
+function VaultDeck({ deck, label, count, noun, pile, onOpen }: VaultDeckProps) {
   const empty = count === 0;
   const hoverLabel = `${count} ${count === 1 ? noun : `${noun}s`} remaining`;
-  return (
-    <div
-      className={`vault-deck vault-deck--${deck} ${empty ? "is-empty" : ""}`}
-      data-deck={deck}
-      role="img"
-      aria-label={`${label}: ${hoverLabel}`}
-      title={`${label}: ${hoverLabel}`}
-    >
+  const className = `vault-deck vault-deck--${deck} ${empty ? "is-empty" : ""}`;
+  const inner = (
+    <>
       <span className="vault-deck-stack" aria-hidden="true">
         {empty ? (
           <span className="vault-deck-empty" />
@@ -47,6 +44,33 @@ function VaultDeck({ deck, label, count, noun }: VaultDeckProps) {
       </span>
       <span className="vault-slot-label" aria-hidden="true">{label}</span>
       <span className="vault-slot-count" aria-hidden="true">{count}</span>
+    </>
+  );
+
+  if (pile && onOpen) {
+    return (
+      <button
+        type="button"
+        className={className}
+        data-deck={deck}
+        title={`${label}: ${hoverLabel}`}
+        aria-label={`${label}: ${hoverLabel}. Open pile`}
+        onClick={() => onOpen(pile)}
+      >
+        {inner}
+      </button>
+    );
+  }
+
+  return (
+    <div
+      className={className}
+      data-deck={deck}
+      role="img"
+      aria-label={`${label}: ${hoverLabel}`}
+      title={`${label}: ${hoverLabel}`}
+    >
+      {inner}
     </div>
   );
 }
@@ -97,10 +121,11 @@ function VaultHole({ pile, label, count, Icon, onOpen }: VaultHoleProps) {
 
 type PlayerVaultProps = {
   player: Player;
+  intriguesInspectable?: boolean;
   onOpenPile?: (playerId: string, pile: VaultPileId) => void;
 };
 
-export function PlayerVault({ player, onOpenPile }: PlayerVaultProps) {
+export function PlayerVault({ player, intriguesInspectable = false, onOpenPile }: PlayerVaultProps) {
   const graveyard = graveyardCards(player);
   const trash = trashCards(player);
   const openPile = onOpenPile ? (pile: VaultPileId) => onOpenPile(player.id, pile) : undefined;
@@ -108,8 +133,22 @@ export function PlayerVault({ player, onOpenPile }: PlayerVaultProps) {
   return (
     <div className="player-vault" style={{ "--player": player.color } as CSSProperties} role="group" aria-label={`${player.leader} card piles`}>
       <VaultDeck deck="playing" label="Deck" count={player.deck.length} noun="card" />
-      <VaultDeck deck="intrigue" label="Intrigue" count={player.intrigues.length} noun="intrigue" />
-      <VaultDeck deck="contract" label="Contracts" count={player.contracts.length} noun="contract" />
+      <VaultDeck
+        deck="intrigue"
+        label="Intrigue"
+        count={player.intrigues.length}
+        noun="intrigue"
+        pile={intriguesInspectable ? "intrigue" : undefined}
+        onOpen={intriguesInspectable ? openPile : undefined}
+      />
+      <VaultDeck
+        deck="contract"
+        label="Contracts"
+        count={player.contracts.length}
+        noun="contract"
+        pile="contract"
+        onOpen={openPile}
+      />
       <VaultHole pile="graveyard" label="Graveyard" count={graveyard.length} Icon={Archive} onOpen={openPile} />
       <VaultHole pile="trash" label="Trash" count={trash.length} Icon={Trash2} onOpen={openPile} />
     </div>

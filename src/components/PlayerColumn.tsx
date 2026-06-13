@@ -15,6 +15,7 @@ import { PlayerVault, type VaultPileId } from "./PlayerVault";
 type PlayerColumnProps = {
   game: GameState;
   tableStateLockedByPending: boolean;
+  viewerPlayerId?: string | null;
   onOpenLeaderReference: (playerId: string, opener: HTMLButtonElement) => void;
   onMakerHooksChange: (playerId: string, hasHooks: boolean) => void;
   onOpenPile?: (playerId: string, pile: VaultPileId) => void;
@@ -23,6 +24,7 @@ type PlayerColumnProps = {
 export function PlayerColumn({
   game,
   tableStateLockedByPending,
+  viewerPlayerId,
   onOpenLeaderReference,
   onMakerHooksChange,
   onOpenPile,
@@ -189,7 +191,11 @@ export function PlayerColumn({
                 ))}
               </div>
             )}
-            <PlayerVault player={player} onOpenPile={onOpenPile} />
+            <PlayerVault
+              player={player}
+              intriguesInspectable={viewerPlayerId != null && player.id === viewerPlayerId}
+              onOpenPile={onOpenPile}
+            />
           </article>
         );
       })}

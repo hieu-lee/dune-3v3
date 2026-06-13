@@ -13,7 +13,6 @@ import { PendingActionPanel } from "./components/PendingActionPanel";
 import { PendingResolutionOverlay } from "./components/PendingResolutionOverlay";
 import { PileInspector, type OpenPile } from "./components/PileInspector";
 import { PlayerColumn } from "./components/PlayerColumn";
-import { PlayerTableStrip } from "./components/PlayerTableStrip";
 import type { VaultPileId } from "./components/PlayerVault";
 import { RecentLogPanel } from "./components/RecentLogPanel";
 import { RoomPanel } from "./components/RoomPanel";
@@ -155,7 +154,6 @@ export default function App() {
             announcements.push({
               id: ++playAnnouncementSeqRef.current,
               card,
-              playerId: player.id,
               playerName: player.leader,
               playerColor: player.color,
               action: player.revealed ? "revealed" : "played",
@@ -697,12 +695,14 @@ export default function App() {
         onReleaseSeat={roomSession.releaseSeat}
         onStartRoom={roomSession.startRoom}
       />
-      <RoomPrivatePanel
-        compactForPending={game.pendingAction?.kind === "team-resource-payment"}
-        phase={game.phase}
-        player={roomSession.inRoom ? claimedPlayer : activePlayer}
-        showHand={roomSession.inRoom}
-      />
+      {roomSession.inRoom && (
+        <RoomPrivatePanel
+          compactForPending={game.pendingAction?.kind === "team-resource-payment"}
+          phase={game.phase}
+          player={claimedPlayer}
+          showHand
+        />
+      )}
 
       <CommandBar
         activePlayer={activePlayer}
@@ -710,8 +710,6 @@ export default function App() {
         onCaptureDebug={debugCaptureAvailable ? () => void window.__DUNE_DEBUG__?.capture("button") : undefined}
         onResetGame={resetGame}
       />
-
-      <PlayerTableStrip game={game} />
 
       <section className="table-grid">
         <BoardPanel
@@ -789,6 +787,7 @@ export default function App() {
         <PlayerColumn
           game={game}
           tableStateLockedByPending={tableStateLockedByPending}
+          viewerPlayerId={roomSession.inRoom ? roomSession.claimedPlayerId : activePlayer.id}
           onOpenLeaderReference={openLeaderReference}
           onMakerHooksChange={updateMakerHooks}
           onOpenPile={openPile}

@@ -1985,6 +1985,54 @@ try {
     "Rejected forged reinforce should not move the target Ally into the conflict",
   );
 
+  const commanderSplitAuthRoom = await jsonFetch("/api/rooms", { method: "POST" });
+  assert.equal(commanderSplitAuthRoom.response.status, 201, "Commander split authorization room creation should succeed");
+  const commanderSplitAuthRecord = server.rooms.get(commanderSplitAuthRoom.body.roomId);
+  assert.ok(commanderSplitAuthRecord, "Commander split authorization room should be stored in memory");
+  const commanderSplitCommanderClaim = await jsonFetch(`/api/rooms/${commanderSplitAuthRoom.body.roomId}/seats/p1/claim`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: "Split Commander" }),
+  });
+  assert.equal(commanderSplitCommanderClaim.response.status, 200, "Commander split owner should be claimable");
+  const commanderSplitAllyClaim = await jsonFetch(`/api/rooms/${commanderSplitAuthRoom.body.roomId}/seats/p3/claim`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: "Split Ally" }),
+  });
+  assert.equal(commanderSplitAllyClaim.response.status, 200, "Commander split Ally should be claimable");
+  const commanderSplitCommanderBefore = commanderSplitAuthRecord.game.players.find((candidate) => candidate.id === "p1");
+  assert.ok(commanderSplitCommanderBefore, "Commander split Commander should exist");
+  commanderSplitAuthRecord.started = true;
+  commanderSplitAuthRecord.game = {
+    ...commanderSplitAuthRecord.game,
+    phase: "playing",
+    pendingAction: {
+      kind: "commander-resource-split",
+      commanderId: "p1",
+      allyId: "p3",
+      team: "muaddib",
+      source: "Verifier Usul",
+      options: [
+        { commanderResource: "water", commanderAmount: 1, allyResource: "spice", allyAmount: 1 },
+        { commanderResource: "spice", commanderAmount: 1, allyResource: "water", allyAmount: 1 },
+      ],
+    },
+    pendingQueue: [],
+  };
+  const forgedCommanderSplit = await roomAction(
+    commanderSplitAuthRoom.body.roomId,
+    commanderSplitAllyClaim.body.token,
+    commanderSplitAllyClaim.body.snapshot.version,
+    { kind: "pending", command: { kind: "choose-commander-resource-split", optionIndex: 1 } },
+  );
+  assert.equal(forgedCommanderSplit.response.status, 403, "Room Commander resource splits should require the Commander token");
+  assert.equal(
+    server.rooms.get(commanderSplitAuthRoom.body.roomId).game.players.find((candidate) => candidate.id === "p1")?.resources.spice,
+    commanderSplitCommanderBefore.resources.spice,
+    "Rejected forged Commander resource split should not grant Commander resources",
+  );
+
   const splitMakerRoom = await jsonFetch("/api/rooms", { method: "POST" });
   assert.equal(splitMakerRoom.response.status, 201, "Split Maker room creation should succeed");
   const splitMakerRecord = server.rooms.get(splitMakerRoom.body.roomId);

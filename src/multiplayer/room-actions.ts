@@ -628,7 +628,7 @@ function pendingActionPlayerIds(state: GameState, pending: PendingAction): strin
         .filter((player) => player.team === pending.team && (pending.kind !== "reinforce" || player.role === "Ally"))
         .map((player) => player.id);
     case "commander-resource-split":
-      return unique([pending.commanderId, pending.allyId]);
+      return unique([pending.commanderId]);
     case "board-influence-choice":
       return boardInfluenceChoiceResolverIds(pending);
     case "team-resource-payment":

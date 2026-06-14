@@ -775,6 +775,11 @@ function selectedPlotCommandVariants(game, player, intrigue, commanderTargets, r
   const variants = intrigue.battleIcon
     ? [{ kind: "score-battle-icon", intrigueId: intrigue.id }]
     : [];
+  const personalFaction = player.role === "Commander"
+    ? player.team === "muaddib" ? "fremen" : "emperor"
+    : undefined;
+  const commanderCanRouteInfluence = (faction) =>
+    player.role !== "Commander" || faction === personalFaction || Boolean(commanderTargets?.[player.id]);
 
   switch (intrigue.sourceId) {
     case plotIntrigueSourceIds.sietchRitual:
@@ -791,10 +796,19 @@ function selectedPlotCommandVariants(game, player, intrigue, commanderTargets, r
       variants.push({ kind: "councilors-ambition", intrigueId: intrigue.id });
       break;
     case plotIntrigueSourceIds.strategicStockpiling:
-      for (const choice of ["spice", "water", "both"]) {
-        variants.push({ kind: "strategic-stockpiling", intrigueId: intrigue.id, choice });
+      {
+        const hasGuildInfluence = runtime.state.effectiveRequirementInfluence(player, "spacing", game.players) >= 3;
+        if (player.resources.spice >= 5) {
+          variants.push({ kind: "strategic-stockpiling", intrigueId: intrigue.id, choice: "spice" });
+        }
+        if (hasGuildInfluence && player.resources.water >= 3) {
+          variants.push({ kind: "strategic-stockpiling", intrigueId: intrigue.id, choice: "water" });
+        }
+        if (hasGuildInfluence && player.resources.spice >= 5 && player.resources.water >= 3) {
+          variants.push({ kind: "strategic-stockpiling", intrigueId: intrigue.id, choice: "both" });
+        }
+        break;
       }
-      break;
     case plotIntrigueSourceIds.detonation:
       for (const choice of ["shield-wall", "deploy"]) variants.push({ kind: "detonation", intrigueId: intrigue.id, choice });
       break;
@@ -849,15 +863,26 @@ function selectedPlotCommandVariants(game, player, intrigue, commanderTargets, r
       variants.push({ kind: "call-to-arms", intrigueId: intrigue.id });
       break;
     case plotIntrigueSourceIds.buyAccess:
-      for (const first of factions) {
-        for (const second of factions) {
-          if (first === second) continue;
-          variants.push({ kind: "buy-access", intrigueId: intrigue.id, choice: [first, second] });
+      if (player.resources.solari >= 5) {
+        for (const first of factions) {
+          for (const second of factions) {
+            if (first === second) continue;
+            const choice = [first, second];
+            if (runtime.influenceChoices.validBuyAccessChoice(player, choice) && choice.every(commanderCanRouteInfluence)) {
+              variants.push({ kind: "buy-access", intrigueId: intrigue.id, choice });
+            }
+          }
         }
       }
       break;
     case plotIntrigueSourceIds.imperiumPolitics:
-      for (const faction of factions) variants.push({ kind: "imperium-politics", intrigueId: intrigue.id, faction });
+      if (player.resources.solari >= 1) {
+        for (const faction of runtime.influenceChoices.imperiumPoliticsFactionChoices(player)) {
+          if (commanderCanRouteInfluence(faction)) {
+            variants.push({ kind: "imperium-politics", intrigueId: intrigue.id, faction });
+          }
+        }
+      }
       break;
     case plotIntrigueSourceIds.shaddamsFavor:
       variants.push({ kind: "shaddams-favor", intrigueId: intrigue.id });
@@ -872,9 +897,8 @@ function selectedPlotCommandVariants(game, player, intrigue, commanderTargets, r
       variants.push({ kind: "distraction", intrigueId: intrigue.id });
       break;
     case plotIntrigueSourceIds.marketOpportunity:
-      for (const choice of ["spice-to-solari", "solari-to-spice"]) {
-        variants.push({ kind: "market-opportunity", intrigueId: intrigue.id, choice });
-      }
+      if (player.resources.spice >= 2) variants.push({ kind: "market-opportunity", intrigueId: intrigue.id, choice: "spice-to-solari" });
+      if (player.resources.solari >= 5) variants.push({ kind: "market-opportunity", intrigueId: intrigue.id, choice: "solari-to-spice" });
       break;
     case plotIntrigueSourceIds.contingencyPlan:
       variants.push({ kind: "contingency-plan", intrigueId: intrigue.id });
@@ -886,7 +910,11 @@ function selectedPlotCommandVariants(game, player, intrigue, commanderTargets, r
       variants.push({ kind: "leverage", intrigueId: intrigue.id });
       break;
     case plotIntrigueSourceIds.backedByChoam:
-      for (const faction of factions) variants.push({ kind: "backed-by-choam", intrigueId: intrigue.id, faction });
+      for (const faction of factions) {
+        if ((player.influence[faction] ?? 0) > 0) {
+          variants.push({ kind: "backed-by-choam", intrigueId: intrigue.id, faction });
+        }
+      }
       break;
     default:
       variants.push(...exhaustivePlotCommandVariants(game, player, intrigue));
@@ -905,12 +933,20 @@ function plotCommandVariants(game, player, intrigue, commanderTargets, runtime) 
 }
 
 function generatedPlotCommandIsKnownLegal(intrigue, player, commanderTargets, command) {
+  const routedCommanderTarget = player.role !== "Commander" || Boolean(commanderTargets?.[player.id]);
   return (
+    (intrigue.sourceId === plotIntrigueSourceIds.callToArms && command.kind === "call-to-arms") ||
+    (intrigue.sourceId === plotIntrigueSourceIds.manipulate && command.kind === "manipulate") ||
+    (intrigue.sourceId === plotIntrigueSourceIds.marketOpportunity && command.kind === "market-opportunity") ||
+    (intrigue.sourceId === plotIntrigueSourceIds.strategicStockpiling && command.kind === "strategic-stockpiling") ||
+    (intrigue.sourceId === plotIntrigueSourceIds.imperiumPolitics && command.kind === "imperium-politics") ||
+    (intrigue.sourceId === plotIntrigueSourceIds.buyAccess && command.kind === "buy-access") ||
+    (intrigue.sourceId === plotIntrigueSourceIds.backedByChoam && command.kind === "backed-by-choam") ||
     (intrigue.sourceId === plotIntrigueSourceIds.opportunism && command.kind === "opportunism") ||
     (
       intrigue.sourceId === plotIntrigueSourceIds.changeAllegiances &&
       command.kind === "change-allegiances" &&
-      (player.role !== "Commander" || Boolean(commanderTargets?.[player.id]))
+      routedCommanderTarget
     )
   );
 }

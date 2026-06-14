@@ -1944,6 +1944,47 @@ try {
   );
   assert.equal(makerPendingAction.body.snapshot.game.pendingAction, undefined, "Room pending maker choice should advance pending action");
 
+  const reinforceAuthRoom = await jsonFetch("/api/rooms", { method: "POST" });
+  assert.equal(reinforceAuthRoom.response.status, 201, "Reinforce authorization room creation should succeed");
+  const reinforceAuthRecord = server.rooms.get(reinforceAuthRoom.body.roomId);
+  assert.ok(reinforceAuthRecord, "Reinforce authorization room should be stored in memory");
+  const reinforceP1Claim = await jsonFetch(`/api/rooms/${reinforceAuthRoom.body.roomId}/seats/p1/claim`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: "Wrong Reinforce Owner" }),
+  });
+  assert.equal(reinforceP1Claim.response.status, 200, "Wrong reinforce owner should be claimable");
+  const reinforceP3Claim = await jsonFetch(`/api/rooms/${reinforceAuthRoom.body.roomId}/seats/p3/claim`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name: "Reinforce Owner" }),
+  });
+  assert.equal(reinforceP3Claim.response.status, 200, "Reinforce owner should be claimable");
+  reinforceAuthRecord.started = true;
+  reinforceAuthRecord.game = {
+    ...reinforceAuthRecord.game,
+    phase: "playing",
+    pendingAction: { kind: "reinforce", team: "muaddib", remaining: 1, source: "Verifier Reinforce" },
+    pendingQueue: [],
+    players: reinforceAuthRecord.game.players.map((candidate) =>
+      candidate.id === "p3"
+        ? { ...candidate, garrison: 0, conflict: 0, deployedTroops: 0 }
+        : candidate
+    ),
+  };
+  const forgedReinforce = await roomAction(
+    reinforceAuthRoom.body.roomId,
+    reinforceP1Claim.body.token,
+    reinforceP3Claim.body.snapshot.version,
+    { kind: "pending", command: { kind: "reinforce-one", playerId: "p3", destination: "conflict" } },
+  );
+  assert.equal(forgedReinforce.response.status, 403, "Room reinforce choices should not move another Ally's troop");
+  assert.equal(
+    server.rooms.get(reinforceAuthRoom.body.roomId).game.players.find((candidate) => candidate.id === "p3")?.conflict,
+    0,
+    "Rejected forged reinforce should not move the target Ally into the conflict",
+  );
+
   const splitMakerRoom = await jsonFetch("/api/rooms", { method: "POST" });
   assert.equal(splitMakerRoom.response.status, 201, "Split Maker room creation should succeed");
   const splitMakerRecord = server.rooms.get(splitMakerRoom.body.roomId);

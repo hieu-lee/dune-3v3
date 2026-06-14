@@ -625,7 +625,7 @@ function pendingActionPlayerIds(state: GameState, pending: PendingAction): strin
     case "reinforce":
     case "conflict-tie":
       return state.players
-        .filter((player) => player.team === pending.team)
+        .filter((player) => player.team === pending.team && (pending.kind !== "reinforce" || player.role === "Ally"))
         .map((player) => player.id);
     case "commander-resource-split":
       return unique([pending.commanderId, pending.allyId]);
@@ -864,6 +864,9 @@ function applyRoomPendingAction(state: GameState, playerId: string, command: Roo
       return maybeStartCombatPhase(gameRules.skipTeamResourcePayment(state, pending));
     }
     case "reinforce-one":
+      if (command.playerId !== playerId) {
+        throw new RoomActionError(403, "You can only reinforce your own seat");
+      }
       return maybeStartCombatPhase(gameRules.reinforceTroop(state, pendingOf(state, "reinforce"), command.playerId, command.destination));
     case "update-trade": {
       const pending = pendingOf(state, "trade");
